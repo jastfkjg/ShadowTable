@@ -1,0 +1,283 @@
+<view class="page">
+  <view class="brand">
+    <text class="brand-mark">影中执刃</text>
+    <view class="brand-actions">
+      <button wx:if="{{room}}" class="switch-table" bindtap="returnHome" disabled="{{busy}}" aria-label="切换牌桌，保留当前座位">切换牌桌</button>
+      <button class="connection-button" bindtap="connectionInfo" aria-label="{{!network || needsLogin ? '连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '连接正常' : '连接未确认'}}">
+        <view class="connection-dot {{!network || needsLogin ? 'offline' : loading || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
+      </button>
+    </view>
+  </view>
+  <view wx:if="{{loading}}" class="status" role="status">正在连接牌桌…</view>
+  <view wx:if="{{error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+    <view class="error-dialog" role="dialog" aria-modal="true" aria-label="操作提示">
+      <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>
+      <view class="dialog-message">{{error}}</view>
+      <view class="dialog-actions">
+        <button wx:if="{{recoverableError && !hasPendingRequest}}" class="secondary" bindtap="returnHome" disabled="{{busy}}">返回入口</button>
+        <button wx:if="{{recoverableError}}" class="primary" bindtap="retry" loading="{{busy}}" disabled="{{busy}}">{{needsLogin?'重新登录':'重试'}}</button>
+        <button wx:else class="primary" bindtap="dismissError">知道了</button>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+  <block wx:if="{{!room}}">
+    <form class="panel entry-panel" bindsubmit="submitEntry">
+      <label class="label" for="nickname">桌上昵称</label>
+      <input class="input" id="nickname" name="nickname" type="nickname" maxlength="16"
+        value="{{name}}" bindinput="inputName" bindblur="inputName"
+        placeholder="点此使用微信昵称或输入" disabled="{{busy}}" />
+      <view class="entry-tabs">
+        <button class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}">创建房间</button>
+        <button class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}">加入房间</button>
+      </view>
+      <block wx:if="{{entryMode!=='join'}}">
+        <view class="field-title">人数</view>
+        <view class="capacity-grid">
+          <button wx:for="{{capacities}}" wx:key="*this" class="capacity-option {{capacity===item?'active':''}}"
+            data-capacity="{{item}}" bindtap="pickCapacity" disabled="{{busy || loading}}"
+            aria-label="{{item+'人'+(capacity===item?'，已选':'')}}">{{item}}人</button>
+        </view>
+        <view class="field-title">板子 <text class="small muted">{{availableBoards.length===1?'已自动选择':'选择一种玩法'}}</text></view>
+        <view wx:if="{{availableBoards.length===1}}" class="single-board">{{boardName}}</view>
+        <view wx:else class="board-options">
+          <button wx:for="{{availableBoards}}" wx:key="id" class="board-option {{boardId===item.id?'active':''}}"
+            data-index="{{index}}" bindtap="pickBoard" disabled="{{busy || loading}}">
+            <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
+          </button>
+        </view>
+        <text wx:if="{{boardAssisted}}" class="small muted assisted-hint">互认、起刀与最终胜负在线下完成</text>
+        <button class="text-button rules-toggle" bindtap="toggleRules">{{showRules?'收起说明':'玩法说明'}}</button>
+        <view wx:if="{{showRules}}" class="rules-detail">
+          <text class="small muted">{{boardDescription}}</text>
+          <block wx:for="{{boards}}" wx:key="id">
+            <view wx:if="{{!item.available && capacity===12}}" class="board-row">
+              <text class="small">{{item.name}} · 待开放</text>
+            </view>
+          </block>
+        </view>
+        <button class="primary" form-type="submit" data-action="create" loading="{{busy}}" disabled="{{loading || busy}}">创建 {{capacity}} 人房间</button>
+      </block>
+      <block wx:else>
+        <label class="field-title" for="room-code">房间码</label>
+        <input class="input room-input" id="room-code" name="code" type="number" maxlength="6"
+          value="{{code}}" bindinput="inputCode" placeholder="输入6位房间码" disabled="{{busy}}" />
+        <button class="primary" form-type="submit" data-action="join" loading="{{busy}}" disabled="{{loading || busy}}">加入房间</button>
+      </block>
+    </form>
+    <block wx:if="{{memberRooms.length}}">
+      <view class="section-title">我的牌桌</view>
+      <view wx:for="{{memberRooms}}" wx:key="code" class="member-room">
+        <button class="secondary room-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading}}">
+          {{item.code}} · {{item.seat}}号 · {{item.phaseName}}
+        </button>
+        <button wx:if="{{item.isHost}}" class="room-delete" data-code="{{item.code}}" bindtap="deleteRoom" disabled="{{busy || loading}}" aria-label="{{'删除牌桌'+item.code}}">删除</button>
+      </view>
+
+    </block>
+  </block>
+  <block wx:else>
+    <view class="room-header"
+      ><view
+        ><text class="kicker">房间码</text
+        ><view class="room-code">{{room.code}}</view></view
+      ><view class="my-seat"
+        ><text class="small muted">我的座位</text
+        ><view>{{room.me.seat}}<text class="small"> 号</text></view></view
+      ></view
+    >
+    <view class="row subline"
+      ><text>{{room.boardName}} · {{room.capacity}}人</text
+      ><text>{{room.me.isHost?'房主 · 参与游戏':'玩家'}}</text></view
+    >
+    <view wx:if="{{room.assisted}}" class="notice">线下辅助 · 互认、起刀与胜负在线下完成</view>
+    <view class="phase-strip"
+      ><view class="kicker"
+        >{{room.game?'第 '+room.game+' 局':'准备开局'}} {{room.round?' / 任务 '+room.round:''}}</view
+      ><view class="phase-title">{{room.phaseName}}</view
+      ><text wx:if="{{room.leader}}" class="muted"
+        >队长 {{room.leader}} 号 · 连续否决 {{room.rejects}} / 5</text
+      ></view
+    >
+      <view wx:if="{{room.phase!=='lobby'}}" class="identity {{revealed?'open':''}}"
+        ><text class="kicker">仅供本人查看</text
+        ><view class="identity-title"
+          >{{revealed?secret.role:'身份已遮盖'}}</view
+        ><text class="muted"
+          >{{revealed?secret.faction:'请避免让身边的人看到屏幕'}}</text
+        ><view wx:if="{{revealed}}" class="private-info"
+          >{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view
+        ><button
+          class="secondary"
+          bindtap="reveal"
+          disabled="{{busy || !network}}"
+        >
+          {{revealed?'立即遮盖':'查看身份 / 操作'}}
+        </button>
+        <view wx:if="{{room.needsSubmission}}" class="submission"
+          >{{room.me.submitted?'已提交':'请完成本轮操作'}}</view
+        >
+        <view
+          wx:if="{{revealed && secret.action && !room.me.submitted}}"
+          class="private-actions"
+          ><text class="label">{{secret.action.label}}</text
+          ><text class="small muted">提交后不可更改</text
+          ><button
+            wx:for="{{choiceButtons}}"
+            wx:key="value"
+            class="primary"
+            data-value="{{item.value}}"
+            bindtap="submitChoice"
+            disabled="{{busy}}"
+          >
+            {{item.label}}</button
+          ><button
+            wx:for="{{targetButtons}}"
+            wx:key="seat"
+            class="secondary"
+            data-seat="{{item.seat}}"
+            bindtap="submitTarget"
+            disabled="{{busy}}"
+          >
+            {{item.seat}} 号 · {{item.name}}
+          </button></view
+        >
+      </view>
+    <block wx:if="{{room.phase==='lobby'}}">
+      <view class="panel"
+        >
+        <button wx:if="{{room.me.isHost}}" class="text-button" bindtap="toggleRoomSettings">{{showRoomSettings?'收起设置':'人数与板子设置'}}</button>
+        <view wx:if="{{room.me.isHost && showRoomSettings}}">
+          <picker range="{{roomCapacities}}" value="{{roomCapacityIndex}}" bindchange="configureCapacity" disabled="{{busy}}">
+            <view class="picker setting-row"><text>人数</text><text>{{room.capacity}}人 · 更改</text></view>
+          </picker>
+          <picker wx:if="{{roomBoards.length>1}}" range="{{roomBoards}}" range-key="name" value="{{roomBoardIndex}}" bindchange="configureBoard" disabled="{{busy}}">
+            <view class="picker setting-row"><text>板子</text><text>{{room.boardName}} · 更改</text></view>
+          </picker>
+          <view wx:else class="picker">{{room.boardName}}</view>
+          <text class="small muted">修改后需全员重新准备</text>
+        </view>
+        <text class="muted small">全员准备后开局</text>
+        <button class="primary" bindtap="ready" disabled="{{busy}}">
+          {{room.me.ready?'取消准备':'我准备好了'}}</button
+        ><button
+          wx:if="{{room.me.isHost}}"
+          class="secondary"
+          bindtap="start"
+          disabled="{{busy}}"
+        >
+          开始游戏
+        </button></view
+      >
+    </block>
+    <view class="section-title"
+      >座位
+      <text class="small muted"
+        >{{room.phase==='lobby'?'点空位换座':'金色标记为任务队员'}}</text
+      ></view
+    >
+    <view class="seats"
+      ><button
+        wx:for="{{seats}}"
+        wx:key="seat"
+        class="seat {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
+        data-seat="{{item.seat}}"
+        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')}}"
+        bindtap="seat"
+        disabled="{{busy || (room.phase==='lobby'?item.occupied:!(room.phase==='proposal' && room.leader===room.me.seat))}}"
+      >
+        <view class="seat-number"
+          >{{item.seat}}<text class="seat-flag"
+            >{{item.mine?'你':item.host?'房主':''}}</text
+          ></view
+        ><view class="seat-name">{{item.name}}</view
+        ><view class="seat-meta"
+          >{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.inTeam?'任务队员':'已入座')}}</view
+        >
+      </button></view
+    >
+    <block wx:if="{{room.phase==='lobby'}}">
+      <button wx:if="{{room.me.isHost && room.players.length>1}}" class="text-button" bindtap="toggleTransfer">{{showTransfer?'收起转交':'转交房主'}}</button>
+      <view wx:if="{{room.me.isHost && room.players.length>1 && showTransfer}}" class="panel"
+        ><text class="label">需要离开？先转交房主</text
+        ><block wx:for="{{room.players}}" wx:key="seat"
+          ><button
+            wx:if="{{item.seat!==room.me.seat}}"
+            class="compact secondary"
+            data-seat="{{item.seat}}"
+            bindtap="transfer"
+            disabled="{{busy}}"
+          >
+            交给 {{item.seat}} 号 · {{item.name}}
+          </button></block
+        ></view
+      >
+      <button class="leave-button" bindtap="leave" disabled="{{busy}}">
+        离开房间
+      </button>
+    </block>
+    <block wx:else>
+      <view wx:if="{{room.phase==='proposal'}}" class="panel"
+        ><view class="label">本轮需要 {{room.teamSize}} 人</view
+        ><text class="muted"
+          >{{room.leader===room.me.seat?'点座位选人，再提交队伍':'等待队长选人'}}</text
+        ><view class="team-line">当前队伍：{{teamText}}</view
+        ><button
+          wx:if="{{room.leader===room.me.seat}}"
+          class="primary"
+          bindtap="propose"
+          disabled="{{busy || selected.length!==room.teamSize}}"
+        >
+          提交队伍（已选 {{selected.length}} / {{room.teamSize}}）
+        </button></view
+      >
+      <view
+        wx:if="{{room.phase==='teamVote' || room.phase==='quest' || room.phase==='teamResult'}}"
+        class="panel"
+        ><text class="label">任务队伍 {{teamText}} 号</text
+        ><text class="muted"
+          >{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text
+        ></view
+      >
+      <view wx:if="{{room.result}}" class="result"
+        ><text class="kicker">{{room.result.winner?'最终结果':room.assisted && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text
+        ><view class="phase-title"
+          >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.assisted && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
+        ><text>{{room.result.reason}}</text
+        ><button
+          wx:if="{{room.me.isHost}}"
+          class="primary"
+          bindtap="rematch"
+          disabled="{{busy}}"
+        >
+          同房再开一局</button
+        ><text wx:else class="muted">等待房主开启下一局</text></view
+      >
+      <view wx:if="{{room.phase==='offlineFinal'}}" class="panel">
+        <text class="label">请线下完成特殊结算</text><text class="muted">任务记录已保留。起刀、内奸及最终胜负在线下完成，小程序不自动判定。</text>
+        <button wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{busy}}">线下已结算，结束本局</button>
+      </view>
+      <view wx:if="{{room.canAdvance}}" class="panel host-panel"
+        ><text class="label">推进对局</text
+        ><text class="muted"
+          >确认大家已操作后推进</text
+        ><button
+          class="primary"
+          bindtap="advance"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+        >
+          {{room.phase==='proposal'?'开启组队表决':room.phase==='teamResult'?'继续下一阶段':room.phase==='questResult'?'继续下一阶段':'结算并推进'}}</button
+        ><button wx:if="{{room.assisted}}" class="secondary" bindtap="offline" disabled="{{busy}}">转入线下起刀 / 特殊结算</button><button class="text-button" bindtap="terminate" disabled="{{busy}}">
+          终止本局
+        </button></view
+      >
+      <view wx:if="{{history.length}}" class="section-title">公开记录</view
+      ><view wx:for="{{history}}" wx:key="key" class="history-row"
+        ><view>{{item.text}}</view
+        ><text class="muted small">{{item.detail}}</text></view
+      >
+    </block>
+
+  </block>
+</view>

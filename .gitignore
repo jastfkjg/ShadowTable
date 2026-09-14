@@ -1,0 +1,9 @@
+node_modules/
+data/
+.env
+*.sqlite*
+project.private.config.json
+miniprogram/config.local.js
+
+output/
+.playwright-cli/

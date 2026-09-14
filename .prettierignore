@@ -1,0 +1,4 @@
+# HTML formatter may insert line breaks into WXML expression string literals.
+*.wxml
+output/
+docs/sources/

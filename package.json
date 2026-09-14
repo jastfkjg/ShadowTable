@@ -1,0 +1,19 @@
+{
+  "name": "shadowtable",
+  "version": "0.1.0",
+  "private": true,
+  "description": "线下桌游微信小程序，服务端权威裁决",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "DEV_AUTH=1 node server/index.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check server/engine.js && node --check server/app.js && node --check miniprogram/pages/table/table.js"
+  },
+  "devDependencies": {
+    "miniprogram-compiler": "0.2.3",
+    "prettier": "3.6.2"
+  }
+}

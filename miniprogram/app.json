@@ -1,0 +1,11 @@
+{
+  "pages": ["pages/table/table"],
+  "window": {
+    "navigationBarTitleText": "影中执刃 · ShadowTable",
+    "navigationBarBackgroundColor": "#101c24",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#101c24"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
