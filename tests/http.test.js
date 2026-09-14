@@ -127,7 +127,7 @@ test("重试创建只生成同一个房间，请求编号不可用于不同载�
       (
         await a.req("/api/rooms", t, {
           name: "甲",
-          board: "knights",
+          board: "shadow-blade",
           capacity: 12,
         })
       ).status,

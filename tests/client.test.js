@@ -407,7 +407,7 @@ test("先选人数：自动匹配可用板子，切板不改变人数", async ()
     p.pickCapacity({ currentTarget: { dataset: { capacity: 12 } } });
     assert.deepEqual(
       Array.from(p.data.availableBoards, (b) => b.id),
-      ["classic-court", "shadow-assist"],
+      ["classic-court", "shadow-assist", "chaos", "knights"],
     );
     p.pickBoard({ currentTarget: { dataset: { index: 1 } } });
     assert.equal(p.data.capacity, 12);
@@ -825,4 +825,124 @@ test("操作请求晚于切后台或阶段切换返回时，不弹出旧操作",
   resolve({ stage: "old", action: { label: "任务", choices: ["fail"] } });
   await second;
   assert.equal(p.data.actionDialog, false);
+});
+
+test("发身份弹窗点击才显示身份视角，遮盖及重开不泄露到页面身份卡", async () => {
+  const secret = {
+    stage: "i1",
+    role: "梅林",
+    faction: "好人阵营",
+    information: "坏人2号",
+    action: { label: "确认身份", choices: ["confirm"] },
+  };
+  const p = page({ request: async () => secret });
+  p.roomCode = "123456";
+  p.setData({
+    room: {
+      stage: "i1",
+      phase: "identity",
+      needsSubmission: true,
+      me: { submitted: false },
+    },
+  });
+  await p.openAction();
+  assert.equal(p.data.actionSecret, null);
+  await p.revealActionIdentity();
+  assert.equal(p.data.actionSecret.role, "梅林");
+  assert.equal(p.data.actionSecret.information, "坏人2号");
+  assert.equal(p.data.secret, null);
+  assert.equal(p.data.revealed, false);
+  assert.equal(p.data.actionDialog, true);
+  await p.revealActionIdentity();
+  assert.equal(p.data.actionSecret, null);
+  await p.revealActionIdentity();
+  p.closeAction();
+  assert.equal(p.data.actionSecret, null);
+  await p.openAction();
+  assert.equal(p.data.actionSecret, null);
+  await p.revealActionIdentity();
+  p.onHide();
+  assert.equal(p.data.actionSecret, null);
+});
+
+for (const cancel of ["close", "background", "stage", "submitted"]) {
+  test(`弹窗身份延迟响应在${cancel}后不能显示`, async () => {
+    let resolve;
+    const p = page({
+      request: () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    });
+    p.roomCode = "123456";
+    p.setData({
+      actionDialog: true,
+      room: { stage: "i1", phase: "identity", me: { submitted: false } },
+    });
+    const pending = p.revealActionIdentity();
+    if (cancel === "close") p.closeAction();
+    if (cancel === "background") p.onHide();
+    if (cancel === "stage") p.data.room.stage = "i2";
+    if (cancel === "submitted") p.data.room.me.submitted = true;
+    resolve({ stage: "i1", role: "梅林", information: "坏人2号" });
+    await pending;
+    assert.equal(p.data.actionSecret, null);
+    assert.equal(p.data.busy, false);
+  });
+}
+
+test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下一轮", async () => {
+  const a = await server();
+  try {
+    const ps = [];
+    for (let i = 0; i < 12; i++) ps.push(await a.actor());
+    const host = ps[0];
+    host.setData({
+      name: "房主",
+      loading: false,
+      boardId: "knights",
+      capacity: 12,
+    });
+    host.create();
+    await settle(host);
+    for (let i = 1; i < 12; i++) {
+      ps[i].setData({ name: "玩家" + i, code: host.roomCode, loading: false });
+      ps[i].join();
+      await settle(ps[i]);
+    }
+    const refresh = () => Promise.all(ps.map((p) => p.refresh()));
+    await refresh();
+    for (const p of ps) await cmd(p, "ready", { ready: true });
+    await host.start();
+    await settle(host);
+    await refresh();
+    assert.ok(host.data.room.knights);
+    host.openTool({ currentTarget: { dataset: { kind: "skills" } } });
+    assert.equal(host.data.toolTitle, "使用技能");
+    await host.launchTool();
+    await settle(host);
+    await refresh();
+    for (const p of ps) {
+      await p.openAction();
+      assert.equal(p.data.actionChoices[0].label, "不使用技能 / 确认");
+      assert.ok(
+        p.data.actionChoices.every(
+          (c) => c.label && !c.label.startsWith("target:"),
+        ),
+      );
+      await cmd(p, "submit", { value: "pass" });
+    }
+    host.settleTool();
+    await settle(host);
+    await refresh();
+    assert.equal(host.data.room.phase, "tools");
+    assert.ok(host.data.history.at(-1).text.includes("技能与复活"));
+    host.openTool({ currentTarget: { dataset: { kind: "nextRound" } } });
+    await host.launchTool();
+    await settle(host);
+    await refresh();
+    assert.equal(host.data.room.knights.round, 2);
+  } finally {
+    await a.close();
+  }
 });

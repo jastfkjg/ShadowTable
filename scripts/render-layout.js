@@ -9,6 +9,7 @@ const {
   enter,
   command,
   publicView,
+  privateView,
 } = require("../server/engine");
 const root = path.resolve(__dirname, "../miniprogram");
 const ctx = { window: {}, global: {}, console };
@@ -35,6 +36,8 @@ function html(n) {
       "wx-input": "input",
       "wx-label": "label",
     }[n.tag] || "div";
+  if (n.tag === "wx-scroll-view")
+    n.attr = { ...n.attr, style: (n.attr?.style || "") + ";overflow-y:auto" };
   const attrs = Object.entries(n.attr || {})
     .filter(([k]) =>
       ["class", "disabled", "placeholder", "value", "role", "style"].includes(
@@ -42,7 +45,11 @@ function html(n) {
       ),
     )
     .map(([k, v]) =>
-      k === "disabled" ? (v ? "disabled" : "") : `${k}="${escape(v)}"`,
+      k === "disabled"
+        ? v
+          ? "disabled"
+          : ""
+        : `${k}="${escape(k === "style" ? String(v).replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)") : v)}"`,
     )
     .join(" ");
   return `<${tag} ${attrs}>${(n.children || []).map(html).join("")}${tag === "input" ? "" : `</${tag}>`}`;
@@ -212,6 +219,34 @@ scenes.actionDialog = {
     { value: "success", label: "任务成功" },
     { value: "fail", label: "任务失败" },
   ],
+  actionTargets: [],
+};
+const knightRoom = newRoom("628419", "p1", "林间", "knights", 12);
+for (let i = 2; i <= 12; i++) enter(knightRoom, "p" + i, "玩家" + i);
+for (const p of knightRoom.players)
+  command(knightRoom, p.uid, {
+    type: "ready",
+    ready: true,
+    stage: knightRoom.stage,
+  });
+command(knightRoom, "p1", {
+  type: "start",
+  flexible: true,
+  stage: knightRoom.stage,
+});
+scenes.knightTools = roomData(knightRoom);
+knightRoom.roles.p1 = "magician";
+command(knightRoom, "p1", {
+  type: "beginActivity",
+  kind: "skills",
+  stage: knightRoom.stage,
+});
+const skillAction = privateView(knightRoom, "p1").action;
+scenes.knightSkills = {
+  ...roomData(knightRoom),
+  actionDialog: true,
+  actionLabel: skillAction.label,
+  actionChoices: skillAction.options,
   actionTargets: [],
 };
 const css = fs

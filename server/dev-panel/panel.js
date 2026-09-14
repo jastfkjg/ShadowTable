@@ -119,6 +119,41 @@ class Companion {
       if (!room) throw new Error("未能确认入座，请刷新后继续");
     }
   }
+  async clearPlayers() {
+    if (this.actors.some((a) => a.pending))
+      throw new Error("请先重试未确认的操作，再清空陪测玩家");
+    await this.refresh();
+    const joined = this.actors.filter((a) => a.joined);
+    if (joined.some((a) => !a.room))
+      throw new Error("未能确认玩家状态，请刷新后再清空");
+    const room = joined[0]?.room;
+    const host = joined.find((a) => a.room.me.isHost);
+    const seats = new Set(joined.map((a) => a.room.me.seat));
+    const successor = room?.players.find((p) => !seats.has(p.seat));
+    // Never discard the only credentials able to manage a retained table.
+    if (host && !successor)
+      throw new Error("请先让真人玩家入座接任房主，再清空陪测玩家");
+    if (room && room.phase !== "lobby") {
+      if (!host)
+        throw new Error(
+          "请先由房主在小程序结束本局并点击同房重开，回到准备阶段后再清空",
+        );
+      if (!["ended", "terminated"].includes(room.phase)) {
+        await this.command(host, "terminate");
+        await this.refresh();
+      }
+      await this.command(host, "rematch");
+      await this.refresh();
+    }
+    if (host) await this.command(host, "transfer", { seat: successor.seat });
+    for (const actor of [...this.actors]) {
+      if (actor.joined) await this.command(actor, "leave");
+      else {
+        this.actors = this.actors.filter((a) => a !== actor);
+        this.save();
+      }
+    }
+  }
   async batch(value) {
     let count = 0;
     // Frozen stage per actor: never turn a bulk action into a later phase's action.
@@ -232,7 +267,21 @@ if (typeof document !== "undefined") {
         else if (r?.me.submitted)
           actions = '<span class="submitted">已提交</span>';
         else if (spec?.choices)
-          actions = spec.choices.map((v) => button(v, names[v] || v)).join("");
+          actions = spec.choices
+            .map((v) =>
+              button(
+                v,
+                spec.options?.find((o) => o.value === v)?.label ||
+                  {
+                    magic: "魔法",
+                    thiefFail: "盗贼失败",
+                    pass: "不使用技能 / 确认",
+                  }[v] ||
+                  names[v] ||
+                  v,
+              ),
+            )
+            .join("");
         else if (spec?.targets) {
           actions =
             `<label>最终目标<select data-target><option value="">选择座位</option>${spec.targets.map((t) => `<option value="${t.seat}" ${String(targets[actor.id]) === String(t.seat) ? "selected" : ""}>${t.seat}号 · ${escape(t.name)}</option>`).join("")}</select></label>` +
@@ -272,9 +321,7 @@ if (typeof document !== "undefined") {
       $("join").disabled =
         !!room &&
         (room.phase !== "lobby" || room.players.length >= room.capacity);
-      $("leave").disabled = companion.actors.some(
-        (a) => a.pending || (a.joined && a.room?.phase !== "lobby"),
-      );
+      $("leave").disabled = companion.actors.some((a) => a.pending);
       $("fill").disabled =
         !room ||
         room.phase !== "lobby" ||
@@ -391,7 +438,7 @@ if (typeof document !== "undefined") {
         return companion.command(actor, "submit", {
           value: Number(targets[actor.id]),
         });
-      if (["confirm", "approve", "reject", "success", "fail"].includes(action))
+      if (actor.secret?.action?.choices?.includes(action))
         return companion.command(actor, "submit", { value: action });
       return companion.command(actor, action);
     });
@@ -399,18 +446,11 @@ if (typeof document !== "undefined") {
   $("leave").onclick = () => {
     if (
       !confirm(
-        "让本面板的测试玩家离席？真实玩家和牌桌不会被删除。仅准备阶段可执行。",
+        "清空本面板的陪测玩家？若陪测玩家是房主，将先结束本局、回到准备阶段并转交房主给真人玩家。保留真人玩家和牌桌，可重新添加陪测玩家。",
       )
     )
       return;
-    run(async () => {
-      for (const actor of [...companion.actors]) {
-        if (!actor.joined && !actor.pending) {
-          companion.actors = companion.actors.filter((a) => a !== actor);
-          companion.save();
-        } else await companion.command(actor, "leave");
-      }
-    }, "测试玩家已离席");
+    run(() => companion.clearPlayers(), "陪测玩家已清空，可重新添加测试玩家");
   };
   render();
   if (companion.actors.length)

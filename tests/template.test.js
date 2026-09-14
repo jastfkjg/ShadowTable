@@ -308,3 +308,37 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   });
   assert.ok(!JSON.stringify(guest).includes("当前操作进度"));
 });
+
+test("发身份弹窗默认隐藏，展开后在确认按钮前展示身份和视角", () => {
+  const data = {
+    ...base,
+    room: {
+      phase: "identity",
+      needsSubmission: true,
+      me: { submitted: false },
+    },
+    actionDialog: true,
+    actionChoices: [{ value: "confirm", label: "确认" }],
+  };
+  const hidden = render(data);
+  assert.ok(byHandler(hidden, "revealActionIdentity"));
+  const shown = render({
+    ...data,
+    actionSecret: { role: "梅林", faction: "好人阵营", information: "坏人2号" },
+  });
+  const text = JSON.stringify(shown);
+  assert.ok(text.includes("梅林"));
+  assert.ok(text.includes("好人阵营"));
+  assert.ok(text.includes("坏人2号"));
+  assert.ok(text.includes("立即遮盖"));
+  assert.ok(text.indexOf("坏人2号") < text.indexOf("submitChoice"));
+  assert.ok(!JSON.stringify(hidden).includes("坏人2号"));
+  const closed = render({
+    ...data,
+    actionDialog: false,
+    actionSecret: { role: "梅林" },
+  });
+  assert.ok(!JSON.stringify(closed).includes("梅林"));
+  const vote = render({ ...data, room: { ...data.room, phase: "teamVote" } });
+  assert.equal(byHandler(vote, "revealActionIdentity"), undefined);
+});

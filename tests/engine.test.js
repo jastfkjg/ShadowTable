@@ -72,7 +72,7 @@ test("6–9人配置和视野按角色隔离，随机首队长有效", () => {
   }
 });
 test("未确认板子及基础配置不支持的人数拒绝启用", () => {
-  for (const id of ["shadow-blade", "chaos", "knights"])
+  for (const id of ["shadow-blade"])
     assert.throws(() => newRoom("123456", "p", "a", id, 12), /尚未确认/);
   assert.throws(() => newRoom("123456", "p", "a", "classic", 11), /人数/);
 });

@@ -804,6 +804,22 @@ button.finish-game-button {
   margin: 0;
   flex-shrink: 0;
 }
-.action-hint { margin: 16rpx 0 24rpx; }
+.action-choice-list { margin-top: 24rpx; }
+.action-choice-list button { margin: 0 0 16rpx; }
+.action-choice-list button:last-child { margin-bottom: 0; }
 .action-target-scroll { height: 440rpx; overflow-y: auto; }
 .action-dialog .text-button { margin-bottom: 0; }
+
+.action-identity {
+  margin: 24rpx 0;
+  overflow-wrap: break-word;
+}
+.action-identity-details {
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid var(--border);
+  border-radius: 20rpx;
+}
+.action-identity .identity-title { margin-top: 0; }
+.action-identity .private-info { white-space: pre-wrap; }
+.action-identity button { margin: 0; }

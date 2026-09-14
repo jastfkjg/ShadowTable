@@ -5,9 +5,13 @@ const CHOICES = {
   reject: "反对",
   success: "任务成功",
   fail: "任务失败",
+  magic: "魔法（反转结果）",
+  thiefFail: "盗贼失败",
+  pass: "不使用技能 / 确认",
 };
 function toolHistory(h, key) {
   const text = h.number ? `第${h.number}次操作 · ` : "";
+  if (h.kind === "variant") return { key, text: h.text, detail: "" };
   if (h.kind === "toolVote")
     return {
       key,
@@ -22,13 +26,15 @@ function toolHistory(h, key) {
     return {
       key,
       text: text + (h.success ? "任务成功" : "任务失败"),
-      detail: `${h.team.join("、")}号 · ${h.fails}张失败票（需${h.threshold}张才失败）`,
+      detail: h.counts
+        ? `${h.team.join("、")}号 · 成功${h.counts.success} / 失败${h.counts.fail} / 盗贼失败${h.counts.thiefFail} / 魔法${h.counts.magic}（失败门槛${h.threshold}）`
+        : `${h.team.join("、")}号 · ${h.fails}张失败票（需${h.threshold}张才失败）`,
     };
   if (h.kind === "toolKnife")
     return {
       key,
       text: text + "刀梅林",
-      detail: `${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
+      detail: `${h.target === 0 ? "空刀" : h.target + "号"} · ${h.hit ? (h.target === 0 ? "空刀命中" : "命中梅林") : h.target === 0 ? "空刀未命中" : "未命中梅林"}`,
     };
   if (h.kind === "toolReverse")
     return {
@@ -57,6 +63,7 @@ Page({
     showRules: false,
     showRoomRules: false,
     actionDialog: false,
+    actionSecret: null,
     actionLoading: false,
     actionLabel: "",
     actionChoices: [],
@@ -135,6 +142,7 @@ Page({
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
       actionDialog: false,
+      actionSecret: null,
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
@@ -260,6 +268,7 @@ Page({
           targetButtons: [],
           selected,
           actionDialog: false,
+          actionSecret: null,
           actionLoading: false,
           actionLabel: "",
           actionChoices: [],
@@ -278,6 +287,7 @@ Page({
         seat,
         name: p ? p.name : "空位",
         occupied: !!p,
+        alive: p?.alive !== false,
         ready: !!p?.ready,
         mine: seat === room.me.seat,
         host: !!p?.isHost,
@@ -693,12 +703,31 @@ Page({
     this.toolStage = room.stage;
     this.setData({
       toolType,
+      toolTitle:
+        {
+          skills: "使用技能",
+          conversion: "身份转换",
+          fairy: "仙女查验",
+          night: "夜晚",
+          nextRound: "进入下一轮",
+        }[toolType] || "",
+      toolDescription:
+        {
+          skills:
+            "所有玩家同时秘密提交技能。收齐后按车长顺序结算，猎人开枪会单独提示；技能结束按出局顺序抽B牌。",
+          conversion: "抽取本轮转换牌，兰斯洛特只交换阵营。",
+          fairy: "仙女持有者私密查验并传递，其他玩家确认。",
+          night: "更新月下先知的私密视野。",
+          nextRound: "完成本轮技能后进入下一轮，新B牌技能生效。",
+        }[toolType] || "",
       toolSeats,
       toolThreshold: 1,
-      toolPlayers: room.players.map((p) => ({
-        ...p,
-        selected: toolSeats.includes(p.seat),
-      })),
+      toolPlayers: room.players
+        .filter((p) => toolType === "assassination" || p.alive !== false)
+        .map((p) => ({
+          ...p,
+          selected: toolSeats.includes(p.seat),
+        })),
     });
   },
   closeTool() {
@@ -707,9 +736,12 @@ Page({
   toggleToolSeat(e) {
     if (this.data.busy) return;
     const seat = Number(e.currentTarget.dataset.seat);
-    const toolSeats = this.data.toolSeats.includes(seat)
-      ? this.data.toolSeats.filter((s) => s !== seat)
-      : [...this.data.toolSeats, seat];
+    const toolSeats =
+      this.data.room.knights && this.data.toolType === "assassination"
+        ? [seat]
+        : this.data.toolSeats.includes(seat)
+          ? this.data.toolSeats.filter((s) => s !== seat)
+          : [...this.data.toolSeats, seat];
     this.setData({
       toolSeats,
       toolPlayers: this.data.toolPlayers.map((p) => ({
@@ -734,6 +766,7 @@ Page({
       kind,
       team: [...this.data.toolSeats],
       threshold: this.data.toolThreshold,
+      actor: this.data.toolSeats[0],
       replace: room.hasActiveOperation,
     };
     if (
@@ -859,6 +892,7 @@ Page({
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
       actionDialog: false,
+      actionSecret: null,
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
@@ -893,13 +927,16 @@ Page({
         return;
       if (!response.action) return;
       this.promptedActionStage = room.stage;
-      // Store only the action in this dialog; role and initial vision stay out of it.
+      // Identity is fetched separately only after an explicit reveal tap.
       this.setData({
         actionDialog: true,
         actionLabel: response.action.label,
         actionChoices: (response.action.choices || []).map((value) => ({
           value,
-          label: CHOICES[value],
+          label:
+            response.action.options?.find((o) => o.value === value)?.label ||
+            CHOICES[value] ||
+            value,
         })),
         actionTargets: response.action.targets || [],
       });
@@ -909,6 +946,51 @@ Page({
     } finally {
       if (generation === this.actionGeneration)
         this.setData({ actionLoading: false });
+    }
+  },
+  async revealActionIdentity() {
+    if (this.data.actionSecret) {
+      this.setData({ actionSecret: null });
+      return;
+    }
+    const room = this.data.room;
+    if (
+      !this.data.actionDialog ||
+      room?.phase !== "identity" ||
+      room.me.submitted ||
+      !this.foreground ||
+      this.data.busy ||
+      !this.data.network
+    )
+      return;
+    const generation = this.actionGeneration;
+    this.setData({ busy: true });
+    try {
+      const secret = await api.request(
+        "/api/rooms/" + this.roomCode + "/private",
+      );
+      if (
+        this.alive &&
+        this.foreground &&
+        this.data.actionDialog &&
+        generation === this.actionGeneration &&
+        this.data.room?.stage === room.stage &&
+        secret.stage === room.stage &&
+        !this.data.room.me.submitted
+      ) {
+        this.setData({
+          actionSecret: {
+            role: secret.role,
+            faction: secret.faction,
+            information: secret.information,
+          },
+        });
+      }
+    } catch (e) {
+      if (generation === this.actionGeneration && this.foreground)
+        this.handleError(e);
+    } finally {
+      this.setData({ busy: false });
     }
   },
   async reveal() {
@@ -936,7 +1018,10 @@ Page({
           secret,
           choiceButtons: (secret.action?.choices || []).map((value) => ({
             value,
-            label: CHOICES[value],
+            label:
+              secret.action.options?.find((o) => o.value === value)?.label ||
+              CHOICES[value] ||
+              value,
           })),
           targetButtons: secret.action?.targets || [],
         });

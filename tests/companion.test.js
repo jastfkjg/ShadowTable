@@ -236,3 +236,121 @@ test("陪测未确认请求在刷新后沿用原编号重试", async () => {
     await a.close();
   }
 });
+
+test("清空陪测：终止和进行中均可重置，转交真人房主并重新补位", async () => {
+  const a = await launch();
+  try {
+    for (const terminated of [true, false]) {
+      const human = (await a.request("/api/dev-login", null, {})).token;
+      const { code } = await a.request("/api/rooms", human, {
+        name: "真人",
+        capacity: 6,
+      });
+      let saved;
+      const panel = new Companion({
+        request: a.request,
+        save: (s) => (saved = structuredClone(s)),
+      });
+      const bot = await panel.add(code);
+      await panel.fill();
+      const view = () => a.request("/api/rooms/" + code, human);
+      const command = async (type, extra = {}) =>
+        a.request("/api/rooms/" + code + "/commands", human, {
+          type,
+          stage: (await view()).stage,
+          ...extra,
+        });
+      await command("ready", { ready: true });
+      await panel.batch("ready");
+      await command("transfer", { seat: bot.room.me.seat });
+      await panel.refresh();
+      await panel.command(bot, "start");
+      await panel.refresh();
+      if (terminated) {
+        await panel.command(bot, "terminate");
+        await panel.refresh();
+      }
+      await panel.clearPlayers();
+      const room = await view();
+      assert.equal(room.phase, "lobby");
+      assert.equal(room.me.isHost, true);
+      assert.equal(room.me.ready, false);
+      assert.equal(room.players.length, 1);
+      assert.equal(panel.actors.length, 0);
+      assert.deepEqual(saved.actors, []);
+      await panel.add(code);
+      await panel.fill();
+      assert.equal(panel.actors.length, 5);
+    }
+  } finally {
+    await a.close();
+  }
+});
+
+test("清空陪测不能代替真人结束对局，也不能遗失唯一房主", async () => {
+  const a = await launch();
+  try {
+    const human = (await a.request("/api/dev-login", null, {})).token;
+    const { code } = await a.request("/api/rooms", human, {
+      name: "真人",
+      capacity: 6,
+    });
+    const panel = new Companion({ request: a.request });
+    const bot = await panel.add(code);
+    await panel.fill();
+    const view = () => a.request("/api/rooms/" + code, human);
+    const command = async (type, extra = {}) =>
+      a.request("/api/rooms/" + code + "/commands", human, {
+        type,
+        stage: (await view()).stage,
+        ...extra,
+      });
+    await command("ready", { ready: true });
+    await panel.batch("ready");
+    await command("start");
+    await assert.rejects(panel.clearPlayers(), /请先由房主/);
+    assert.equal((await view()).phase, "identity");
+    assert.equal(panel.actors.length, 5);
+    await command("terminate");
+    await command("rematch");
+    await command("transfer", { seat: bot.room.me.seat });
+    await command("leave");
+    await assert.rejects(panel.clearPlayers(), /真人玩家入座/);
+    assert.equal(panel.actors.length, 5);
+    assert.equal(bot.room.me.isHost, true);
+  } finally {
+    await a.close();
+  }
+});
+
+test("清空回执丢失保留凭据和幂等编号，确认后才移除", async () => {
+  const a = await launch();
+  try {
+    const human = (await a.request("/api/dev-login", null, {})).token;
+    const { code } = await a.request("/api/rooms", human, { name: "真人" });
+    const panel = new Companion({ request: a.request });
+    const bot = await panel.add(code);
+    let lostId;
+    panel.request = async (...args) => {
+      const result = await a.request(...args);
+      if (args[2]?.type === "leave") {
+        lostId = args[3];
+        throw new Error("回执丢失");
+      }
+      return result;
+    };
+    await assert.rejects(panel.clearPlayers(), /回执丢失/);
+    assert.equal(panel.actors.length, 1);
+    assert.equal(bot.pending.id, lostId);
+    await assert.rejects(panel.clearPlayers(), /未确认/);
+    panel.request = a.request;
+    await panel.retry(bot);
+    assert.equal(panel.actors.length, 0);
+    assert.equal(
+      (await a.request("/api/rooms/" + code, human)).players.length,
+      1,
+    );
+  } finally {
+    await a.close();
+  }
+});

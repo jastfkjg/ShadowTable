@@ -53,6 +53,7 @@
           ><button data-batch="reject">全部反对</button
           ><button data-batch="success">任务全成功</button
           ><button data-batch="fail">合法失败牌</button>
+          <button id="leave" class="danger">清空陪测玩家</button>
         </div>
         <div class="options">
           <label><input id="reveal" type="checkbox" />显示测试玩家身份</label
@@ -63,9 +64,8 @@
         </p>
         <div id="players" class="players"></div>
         <footer>
-          <button id="leave" class="danger">测试玩家全部离席</button>
           <p>
-            仅准备阶段可离席。关闭网页只暂停控制，账号和座位保留；同一标签页刷新可恢复。
+            清空后可重新添加陪测玩家，真人和牌桌保留。真人担任房主时，需先在小程序回到准备阶段。关闭网页仅暂停控制，刷新可恢复。
           </p>
         </footer>
       </section>
