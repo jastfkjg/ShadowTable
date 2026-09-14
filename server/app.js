@@ -51,10 +51,17 @@ function createApp({
   function limit(key, max) {
     const now = clock(),
       old = limits.get(key);
-    if (!old || now - old.at > 60000) limits.set(key, { at: now, n: 1 });
+    if (!old || now - old.at >= 60000) limits.set(key, { at: now, n: 1 });
     else {
       old.n++;
-      check(old.n <= max, "请求过于频繁，请稍后重试", 429);
+      if (old.n > max) {
+        const error = new RuleError("请求过于频繁，请稍后重试", 429);
+        error.retryAfter = Math.max(
+          1,
+          Math.ceil((60000 - (now - old.at)) / 1000),
+        );
+        throw error;
+      }
     }
     if (limits.size > 10000)
       for (const [k, v] of limits) if (now - v.at > 60000) limits.delete(k);
@@ -99,7 +106,9 @@ function createApp({
           return send(404, { error: "接口不存在" });
         return;
       }
-      limit(`ip:${req.socket.remoteAddress}`, 600);
+      // Shared Wi-Fi and local companion players must fit under the IP ceiling.
+      // Per-account and login/create limits below remain unchanged.
+      limit(`ip:${req.socket.remoteAddress}`, 6000);
       if (req.method === "GET" && path === "/health")
         return send(200, { ok: true });
       if (req.method === "GET" && path === "/api/boards")
@@ -203,6 +212,8 @@ function createApp({
       // Receipts store no role, action, or old view. Client fetches a fresh scoped view.
       send(200, result);
     } catch (e) {
+      if (e.status === 429)
+        res.setHeader("Retry-After", String(e.retryAfter || 60));
       send(e instanceof RuleError ? e.status : 500, {
         error:
           e instanceof RuleError ? e.message : "服务器处理失败，请稍后重试",

@@ -1,5 +1,8 @@
 {
-  "pages": ["pages/table/table"],
+  "pages": [
+    "pages/table/table",
+    "pages/settings/settings"
+  ],
   "window": {
     "navigationBarTitleText": "影中执刃 · ShadowTable",
     "navigationBarBackgroundColor": "#101c24",

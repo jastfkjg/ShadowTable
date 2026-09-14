@@ -936,7 +936,7 @@ test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下�
     await settle(host);
     await refresh();
     assert.equal(host.data.room.phase, "tools");
-    assert.ok(host.data.history.at(-1).text.includes("技能与复活"));
+    assert.ok(host.data.history.at(-1).text.includes("技能最终结果"));
     host.openTool({ currentTarget: { dataset: { kind: "quest" } } });
     host.toggleToolSeat({ currentTarget: { dataset: { seat: 1 } } });
     await host.launchTool();

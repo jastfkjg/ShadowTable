@@ -1,5 +1,13 @@
 const config = require("./config");
+let retryAt = 0;
 function request(path, method = "GET", data, requestId) {
+  if (Date.now() < retryAt)
+    return Promise.reject(
+      Object.assign(new Error("请求冷却中，请稍后重试"), {
+        status: 429,
+        retryAfterMs: retryAt - Date.now(),
+      }),
+    );
   return new Promise((resolve, reject) =>
     wx.request({
       url: config.baseUrl + path,
@@ -16,6 +24,17 @@ function request(path, method = "GET", data, requestId) {
         else {
           const e = new Error(res.data.error || "请求失败");
           e.status = res.statusCode;
+          if (e.status === 429) {
+            const headers = res.header || {};
+            const key = Object.keys(headers).find(
+              (k) => k.toLowerCase() === "retry-after",
+            );
+            e.retryAfterMs = Math.min(
+              60000,
+              Math.max(1000, (Number(headers[key]) || 60) * 1000),
+            );
+            retryAt = Date.now() + e.retryAfterMs;
+          }
           if (e.status === 401) wx.removeStorageSync("session");
           reject(e);
         }
@@ -27,7 +46,11 @@ function request(path, method = "GET", data, requestId) {
           message = "服务地址未通过微信域名校验，请联系房主检查服务配置";
         else if (/timeout|超时/i.test(detail))
           message = "请求超时，结果尚未确认，请重试原请求";
-        else if (/connection[ _]refused|connection[ _]reset|name[ _]not[ _]resolved/i.test(detail))
+        else if (
+          /connection[ _]refused|connection[ _]reset|name[ _]not[ _]resolved/i.test(
+            detail,
+          )
+        )
           message = "暂时无法连接游戏服务，请检查网络或稍后重试原请求";
         reject(new Error(message));
       },

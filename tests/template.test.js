@@ -149,7 +149,7 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
   });
   assert.ok(byHandler(host, "toggleRoomSettings"));
   assert.ok(
-    nodes(host).some((n) => n.attr?.bindchange === "configureCapacity"),
+    !nodes(host).some((n) => n.attr?.bindchange === "configureCapacity"),
   );
 });
 
@@ -370,4 +370,60 @@ test("十二骑士去除刀梅林和夜晚入口，新身份提醒显示新牌",
   });
   assert.ok(JSON.stringify(popup).includes("红守卫"));
   assert.ok(byHandler(popup, "acknowledgeIdentity"));
+});
+
+test("技能过程开关仅房主可见，默认不可见", () => {
+  const room = {
+    phase: "tools",
+    board: "knights",
+    canUseTools: true,
+    knights: { round: 1 },
+    showSkillDetails: false,
+    team: [],
+    me: { isHost: true },
+  };
+  assert.equal(
+    byHandler(render({ ...base, room }), "toggleSkillVisibility"),
+    undefined,
+  );
+  const tree = render({ ...base, room, showRoomSettings: true });
+  assert.equal(byHandler(tree, "toggleSkillVisibility"), undefined);
+  assert.ok(byHandler(tree, "toggleRoomSettings"));
+  const guest = render({
+    ...base,
+    room: { ...room, canUseTools: false, me: { isHost: false } },
+  });
+  assert.equal(byHandler(guest, "toggleSkillVisibility"), undefined);
+});
+
+test("独立设置页使用原生开关和统一保存，非管理员不显示设置", () => {
+  const settingsRender = factory("pages/settings/settings.wxml");
+  const data = {
+    loading: false,
+    authorized: true,
+    busy: false,
+    room: {
+      code: "123456",
+      boardName: "十二骑士",
+      capacity: 12,
+      phase: "tools",
+    },
+    boardId: "knights",
+    visible: false,
+    dirty: false,
+  };
+  const tree = settingsRender(data);
+  assert.ok(
+    nodes(tree).some(
+      (n) => n.tag === "wx-switch" && n.attr.bindchange === "toggleVisibility",
+    ),
+  );
+  assert.equal(byHandler(tree, "save").attr.disabled, true);
+  const dirty = settingsRender({ ...data, dirty: true });
+  assert.equal(byHandler(dirty, "save").attr.disabled, false);
+  assert.equal(
+    byHandler(settingsRender({ ...data, authorized: false }), "save"),
+    undefined,
+  );
+  assert.ok(!nodes(tree).some((n) => n.attr?.bindchange === "pickCapacity"));
 });

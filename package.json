@@ -10,7 +10,7 @@
     "start": "node server/index.js",
     "dev": "DEV_AUTH=1 DEV_PANEL=1 node server/index.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check server/engine.js && node --check server/knights.js && node --check server/variants.js && node --check server/app.js && node --check miniprogram/pages/table/table.js && node --check server/dev-panel/panel.js && node --check server/dev-panel/index.js"
+    "check": "node --check server/engine.js && node --check server/knights.js && node --check server/variants.js && node --check server/app.js && node --check miniprogram/pages/table/table.js && node --check miniprogram/pages/settings/settings.js && node --check server/dev-panel/panel.js && node --check server/dev-panel/index.js"
   },
   "devDependencies": {
     "miniprogram-compiler": "0.2.3",

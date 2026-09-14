@@ -559,7 +559,6 @@ function canUseTools(room) {
   return !!room.roles && !["lobby", "ended", "terminated"].includes(room.phase);
 }
 function advanceKnightRound(room) {
-  requireRule(room.knights.round < 5, "已完成第五轮，不能再开启新一轮");
   room.knights.round++;
   room.round = room.knights.round;
   room.leader = (room.leader % room.capacity) + 1;
@@ -567,6 +566,7 @@ function advanceKnightRound(room) {
 }
 function convertKnights(room) {
   const k = room.knights;
+  requireRule(k.conversions.length > 0, "转换牌已用完");
   const change = k.conversions.shift();
   if (change)
     for (const p of room.players) {
@@ -613,23 +613,14 @@ function beginActivity(room, input) {
     if (["skills", "fairy"].includes(kind)) {
       if (kind === "skills") {
         if (k.skillRound === k.round) advanceKnightRound(room);
-        if (k.round >= 2 && k.convertedRound < k.round) convertKnights(room);
       }
       knights.begin(room, kind, requireRule);
       room.toolSequence++;
       room.activity = { kind, number: room.toolSequence, threshold: null };
     } else {
       if (kind === "conversion") {
-        requireRule(
-          k.round >= 2 && k.convertedRound < k.round,
-          "第2–5轮可转换且每轮一次",
-        );
         convertKnights(room);
       } else if (kind === "night") {
-        requireRule(
-          k.round >= 2 && k.nightRound < k.round && k.skillRound === k.round,
-          "第2–5轮技能后可进入夜晚且每轮一次",
-        );
         for (const p of knights.living(room))
           if (room.roles[p.uid] === "prophet" && knights.eligible(room, p.uid))
             k.players[p.uid].nightInfo = `第${k.round}轮夜晚B牌坏人：${
@@ -751,13 +742,20 @@ function settleActivity(room) {
     knights.updateNight(room, ROLES);
     if (room.activity.kind === "skills")
       for (const text of room.knights.events || [])
-        room.history.push({ kind: "variant", number, text });
-    room.history.push({
-      kind: "variant",
-      text:
-        room.activity.kind === "fairy" ? "仙女查验已完成" : "技能与复活已完成",
-      number,
-    });
+        room.history.push({ kind: "skillDetail", number, text });
+    if (room.activity.kind === "skills") {
+      const result = room.knights.summary;
+      const list = (seats) => (seats.length ? seats.join("、") + "号" : "无");
+      room.history.push({
+        kind: "skillResult",
+        number,
+        ...result,
+        text: "技能最终结果",
+        detail: `本轮出局：${list(result.eliminated)}；抽牌复活：${list(result.redrawn)}；原牌复活：${list(result.restored)}；最终仍出局：${list(result.out)}`,
+      });
+    }
+    if (room.activity.kind === "fairy")
+      room.history.push({ kind: "variant", text: "仙女查验已完成", number });
     room.activity = null;
     room.team = [];
     stage(room, "tools");
@@ -912,6 +910,7 @@ function publicView(room, uid) {
           : Object.values(room.roles)
         : roleDeck(room.board, room.capacity),
     ),
+    showSkillDetails: room.showSkillDetails === true,
     operationProgress: operationProgress(room, uid),
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
@@ -955,7 +954,10 @@ function publicView(room, uid) {
       name: p.name,
       ready: p.ready,
       isHost: p.uid === room.host,
-      alive: room.knights ? room.knights.players[p.uid].alive : true,
+      alive: room.knights
+        ? (room.knights.snapshot?.players[p.uid] || room.knights.players[p.uid])
+            .alive
+        : true,
     })),
     leader: room.leader || null,
     round: room.round || null,
@@ -967,7 +969,16 @@ function publicView(room, uid) {
         : null,
     rejects: room.rejects || 0,
     quests: room.quests || [],
-    history: room.history,
+    history: room.history.filter(
+      (h) =>
+        room.showSkillDetails === true ||
+        !(
+          h.kind === "skillDetail" ||
+          (room.board === "knights" &&
+            h.kind === "variant" &&
+            /^\d+号(?:使用技能|开枪|使用复活)/.test(h.text || ""))
+        ),
+    ),
     result: room.result || null,
     proposalSubmitted: !!room.proposalSubmitted,
     needsSubmission: room.flexible
@@ -1010,6 +1021,29 @@ function command(room, uid, input) {
     ].includes(type)
   )
     requireRule(uid === room.host, "只有房主可以管理流程", 403);
+  if (type === "updateSettings") {
+    requireRule(uid === room.host, "只有房主可以管理流程", 403);
+    requireRule(typeof input.visible === "boolean", "显示设置无效");
+    const next = structuredClone(room);
+    if (input.board !== room.board || input.capacity !== room.capacity)
+      command(next, uid, {
+        type: "configure",
+        stage: next.stage,
+        board: input.board,
+        capacity: input.capacity,
+      });
+    if (next.board === "knights") next.showSkillDetails = input.visible;
+    else requireRule(input.visible === false, "当前板子没有技能过程设置");
+    Object.assign(room, next);
+    return;
+  }
+  if (type === "setSkillVisibility") {
+    requireRule(uid === room.host, "只有房主可以管理流程", 403);
+    requireRule(room.board === "knights", "当前板子没有技能过程设置");
+    requireRule(typeof input.visible === "boolean", "显示设置无效");
+    room.showSkillDetails = input.visible;
+    return;
+  }
   if (type === "ackIdentity") {
     const state = room.knights?.players[uid];
     requireRule(

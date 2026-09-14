@@ -297,3 +297,28 @@ test("空牌桌跨重启保留归属，离席房主可管理但无私密视图",
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("同IP十二人正常轮询不互相限流，单账号仍限流并返回冷却时间", async () => {
+  let now = 0;
+  const a = await launch({ clock: () => now });
+  try {
+    const tokens = await users(a, 12);
+    for (let n = 0; n < 60; n++)
+      for (const t of tokens)
+        assert.equal((await a.req("/api/me/rooms", t)).status, 200);
+    for (let n = 0; n < 120; n++)
+      assert.equal((await a.req("/api/me/rooms", tokens[0])).status, 200);
+    const url = "http://127.0.0.1:" + a.server.address().port + "/api/me/rooms";
+    const r = await fetch(url, {
+      headers: { Authorization: "Bearer " + tokens[0] },
+    });
+    assert.equal(r.status, 429);
+    assert.equal(r.headers.get("Retry-After"), "60");
+    await r.json();
+    assert.equal((await a.req("/api/me/rooms", tokens[1])).status, 200);
+    now = 60000;
+    assert.equal((await a.req("/api/me/rooms", tokens[0])).status, 200);
+  } finally {
+    await a.close();
+  }
+});

@@ -72,6 +72,7 @@ class Companion {
   }
   async refresh() {
     for (const actor of this.actors) {
+      const previousSecret = actor.secret;
       actor.secret = null;
       if (actor.pending) continue;
       if (!actor.joined) continue;
@@ -80,10 +81,13 @@ class Companion {
         const secret =
           room.phase === "lobby"
             ? null
-            : await this.request(
-                "/api/rooms/" + this.code + "/private",
-                actor.token,
-              );
+            : previousSecret?.stage === room.stage &&
+                previousSecret?.game === room.game
+              ? previousSecret
+              : await this.request(
+                  "/api/rooms/" + this.code + "/private",
+                  actor.token,
+                );
         if (secret && secret.stage !== room.stage) {
           actor.room = null;
           continue;
@@ -185,10 +189,15 @@ if (typeof document !== "undefined") {
   } catch {
     state = null;
   }
+  let retryAt = 0;
   const companion = new Companion({
     state: state || undefined,
     save: (value) => sessionStorage.setItem(key, JSON.stringify(value)),
     request: async (path, token, data, id) => {
+      if (Date.now() < retryAt)
+        throw Object.assign(new Error("请求冷却中，请稍后重试"), {
+          status: 429,
+        });
       const response = await fetch(path, {
         method: data ? "POST" : "GET",
         signal: AbortSignal.timeout(10000),
@@ -204,6 +213,16 @@ if (typeof document !== "undefined") {
         body: data ? JSON.stringify(data) : undefined,
       });
       const result = await response.json();
+      if (response.status === 429)
+        retryAt =
+          Date.now() +
+          Math.min(
+            60000,
+            Math.max(
+              1000,
+              (Number(response.headers.get("Retry-After")) || 60) * 1000,
+            ),
+          );
       if (!response.ok)
         throw Object.assign(new Error(result.error || "请求失败"), {
           status: response.status,
@@ -513,6 +532,7 @@ if (typeof document !== "undefined") {
   setInterval(async () => {
     if (
       busy ||
+      Date.now() < retryAt ||
       document.hidden ||
       !companion.actors.length ||
       document.activeElement?.matches("input,select")

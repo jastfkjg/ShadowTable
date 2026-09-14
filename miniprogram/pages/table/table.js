@@ -11,6 +11,8 @@ const CHOICES = {
 };
 function toolHistory(h, key) {
   const text = h.number ? `第${h.number}次操作 · ` : "";
+  if (["skillDetail", "skillResult"].includes(h.kind))
+    return { key, text: h.text, detail: h.detail || "" };
   if (h.kind === "variant") return { key, text: h.text, detail: "" };
   if (h.kind === "toolVote")
     return {
@@ -115,7 +117,10 @@ Page({
   },
   onShow() {
     this.foreground = true;
-    if (this.alive) this.schedule();
+    if (this.alive) {
+      if (this.roomCode) this.refresh().catch((e) => this.handleError(e));
+      this.schedule();
+    }
   },
   onHide() {
     this.foreground = false;
@@ -194,6 +199,18 @@ Page({
   },
   handleError(e) {
     this.mask();
+    if (e.status === 429) {
+      this.rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
+      if (!this.pending && this.roomCode) {
+        this.setData({
+          error: "",
+          notice: "请求较多，冷却后会自动刷新",
+          serverConnected: true,
+        });
+        this.schedule();
+        return;
+      }
+    }
     this.setData({
       error: e.message,
       serverConnected: !!e.status && e.status < 500 && e.status !== 401,
@@ -214,20 +231,23 @@ Page({
   schedule() {
     clearTimeout(this.timer);
     if (this.foreground && this.alive && this.roomCode)
-      this.timer = setTimeout(async () => {
-        if (
-          this.roomCode &&
-          !this.data.busy &&
-          !this.pending &&
-          !this.data.error
-        )
-          try {
-            await this.refresh();
-          } catch (e) {
-            this.handleError(e);
-          }
-        this.schedule();
-      }, 2500);
+      this.timer = setTimeout(
+        async () => {
+          if (
+            this.roomCode &&
+            !this.data.busy &&
+            !this.pending &&
+            !this.data.error
+          )
+            try {
+              await this.refresh();
+            } catch (e) {
+              this.handleError(e);
+            }
+          this.schedule();
+        },
+        Math.max(2500, (this.rateLimitUntil || 0) - Date.now()),
+      );
   },
   async refresh() {
     if (!this.roomCode) return;
@@ -319,6 +339,10 @@ Page({
     );
     this.updateChangedData({
       ...privacyUpdate,
+      notice:
+        this.data.notice === "请求较多，冷却后会自动刷新"
+          ? ""
+          : this.data.notice,
       room,
       seats,
       history,
@@ -348,7 +372,12 @@ Page({
       (this.data.actionDialog || this.data.actionLoading)
     )
       this.closeAction();
-    if (room.me.identityChanged && this.foreground && !this.data.identityChange)
+    if (
+      room.me.identityChanged &&
+      !this.data.showRoomSettings &&
+      this.foreground &&
+      !this.data.identityChange
+    )
       await this.showIdentityChange();
     if (
       !room.me.identityChanged &&
@@ -358,7 +387,8 @@ Page({
       this.promptedActionStage !== room.stage &&
       !this.data.actionLoading &&
       !this.data.toolType &&
-      !this.data.showRoomRules
+      !this.data.showRoomRules &&
+      !this.data.showRoomSettings
     )
       await this.openAction();
   },
@@ -483,7 +513,11 @@ Page({
     this.setData({ showRoomRules: false });
   },
   toggleRoomSettings() {
-    this.setData({ showRoomSettings: !this.data.showRoomSettings });
+    if (!this.data.room?.me.isHost || this.data.busy) return;
+    this.mask();
+    wx.navigateTo({
+      url: "/pages/settings/settings?code=" + this.data.room.code,
+    });
   },
   toggleTransfer() {
     this.setData({ showTransfer: !this.data.showTransfer });
@@ -698,6 +732,17 @@ Page({
     }
     this.cmd(type, extra);
   },
+  async toggleSkillVisibility() {
+    const visible = !this.data.room.showSkillDetails;
+    if (visible)
+      return this.confirmCommand(
+        "公开技能过程？",
+        "所有玩家将看到已结算技能的出手人、目标及过程；新身份牌面不公开。",
+        "setSkillVisibility",
+        { visible },
+      );
+    this.cmd("setSkillVisibility", { visible });
+  },
   openTool(e) {
     const room = this.data.room;
     if (!room?.canUseTools || this.data.busy) return;
@@ -718,9 +763,9 @@ Page({
       toolDescription:
         {
           skills:
-            "全员同时提交，按车长顺序结算。再次发起会进入下一轮，并自动补做该轮身份转换。",
-          conversion: "抽取本轮转换牌，兰斯洛特只交换阵营。",
-          fairy: "仙女持有者私密查验并传递，其他玩家确认。",
+            "全员同时提交，按车长顺序结算。再次发起会进入下一轮，新身份技能随之生效。",
+          conversion: "抽取一张转换牌，按牌面决定兰斯洛特是否交换阵营。",
+          fairy: "仅仙女持有者选择目标，私密查验并传递仙女。",
           night: "更新月下先知的私密视野。",
         }[toolType] || "",
       toolSeats,

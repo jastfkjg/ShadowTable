@@ -367,16 +367,15 @@ test("任务自动推进轮次：非法请求不推进，投票不推进，取�
   assert.equal(r.knights.round, 2);
   assert.equal(r.history.filter((h) => h.text === "进入第2轮").length, 1);
 });
-test("第五轮技能后不能自动进入第六轮，失败请求不改变对局", () => {
+test("第五轮之后仍可发起任务", () => {
   const r = setup();
   r.round = r.knights.round = 5;
   r.knights.skillRound = 5;
-  const before = structuredClone(r);
-  assert.throws(() => begin(r, "quest", { team: [1], threshold: 1 }), /第五轮/);
-  assert.deepEqual(r, before);
+  begin(r, "quest", { team: [1], threshold: 1 });
+  assert.equal(r.knights.round, 6);
 });
 
-test("连续发起技能自动换轮、转换并启用新B身份，取消重试不重复转换", () => {
+test("连续技能启用新B身份，但不自动抽取转换牌", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "servant" });
   r.knights.deck = ["redGuard"];
@@ -385,14 +384,14 @@ test("连续发起技能自动换轮、转换并启用新B身份，取消重试�
   assert.equal(r.knights.players.p2.availableRound, 2);
   begin(r, "skills");
   assert.equal(r.knights.round, 2);
-  assert.equal(r.knights.convertedRound, 2);
+  assert.equal(r.knights.convertedRound, 0);
   assert.ok(privateView(r, "p2").action.choices.includes("target:1"));
-  assert.equal(r.knights.conversions.length, 2);
+  assert.equal(r.knights.conversions.length, 3);
   const old = r.stage;
   run(r, "p1", "cancelActivity");
   begin(r, "skills");
   assert.equal(r.knights.round, 2);
-  assert.equal(r.knights.conversions.length, 2);
+  assert.equal(r.knights.conversions.length, 3);
   assert.throws(
     () =>
       command(r, "p1", { type: "beginActivity", kind: "skills", stage: old }),
@@ -410,10 +409,181 @@ test("任务已换轮或手动转换后发起技能不重复推进或抽转换�
   assert.equal(r.knights.round, 2);
   assert.equal(r.knights.conversions.length, count);
 });
-test("第五轮技能完成后再次发起技能不修改状态", () => {
+test("第五轮之后仍可发起技能", () => {
   const r = setup();
   r.round = r.knights.round = r.knights.skillRound = 5;
+  begin(r, "skills");
+  assert.equal(r.knights.round, 6);
+});
+
+test("技能过程默认服务端隐藏，最终出局复活始终公示，房主可切换", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "servant" });
+  r.knights.deck = ["redGuard"];
+  skills(r, { p1: "target:2" });
+  for (const uid of ["p1", "p3"]) {
+    const v = publicView(r, uid);
+    assert.equal(v.showSkillDetails, false);
+    assert.ok(!v.history.some((h) => h.kind === "skillDetail"));
+    assert.ok(!JSON.stringify(v.history).includes("目标2号"));
+    const result = v.history.find((h) => h.kind === "skillResult");
+    assert.deepEqual(result.eliminated, [2]);
+    assert.deepEqual(result.redrawn, [2]);
+    assert.deepEqual(result.out, []);
+    assert.ok(!JSON.stringify(result).includes("红守卫"));
+  }
+  assert.throws(
+    () => run(r, "p3", "setSkillVisibility", { visible: true }),
+    /只有房主/,
+  );
+  run(r, "p1", "setSkillVisibility", { visible: true });
+  assert.ok(
+    publicView(r, "p3").history.some(
+      (h) => h.kind === "skillDetail" && h.text.includes("目标2号"),
+    ),
+  );
+  run(r, "p1", "setSkillVisibility", { visible: false });
+  assert.ok(!publicView(r, "p1").history.some((h) => h.kind === "skillDetail"));
+});
+test("守护、替死、换号与B牌耗尽合并后的结果不暴露秘密过程", () => {
+  const r = setup();
+  configure(r, {
+    p1: "blueAwakened",
+    p2: "blueGuard",
+    p3: "redAwakened",
+    p4: "servant",
+    p5: "magician",
+  });
+  r.knights.deck = [];
+  skills(r, { p1: "target:4", p2: "target:4", p3: "target:6", p5: "swap:6:7" });
+  const result = publicView(r, "p2").history.find(
+    (h) => h.kind === "skillResult",
+  );
+  assert.deepEqual(result.out, [5, 7]);
+  assert.deepEqual(result.eliminated, [5, 7]);
+  assert.deepEqual(result.redrawn, []);
+  assert.ok(!JSON.stringify(publicView(r, "p2").history).includes("设置守护"));
+  run(r, "p1", "setSkillVisibility", { visible: true });
+  assert.ok(
+    publicView(r, "p2").history.some((h) => h.text?.includes("设置守护")),
+  );
+});
+test("旧过程记录默认隐藏，技能链未结束时不公示中途存活变化", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "redHunter" });
+  r.knights.deck = [];
+  r.history.push({ kind: "variant", text: "1号使用技能，目标2号：2号出局" });
+  assert.ok(
+    !publicView(r, "p3").history.some((h) => h.text?.includes("目标2号")),
+  );
+  skills(r, { p1: "target:2" });
+  assert.equal(r.phase, "hunterTurn");
+  assert.equal(
+    publicView(r, "p3").players.find((p) => p.seat === 2).alive,
+    true,
+  );
+  submitAll(r);
+  run(r, "p1", "settleTool");
+  assert.equal(
+    publicView(r, "p3").players.find((p) => p.seat === 2).alive,
+    false,
+  );
+  assert.deepEqual(
+    publicView(r, "p3").history.find((h) => h.kind === "skillResult").out,
+    [2],
+  );
+});
+
+test("设置页保存校验管理员与配置阶段，非法组合不会部分更新", () => {
+  const r = setup();
   const before = structuredClone(r);
-  assert.throws(() => begin(r, "skills"), /第五轮/);
+  assert.throws(
+    () =>
+      run(r, "p2", "updateSettings", {
+        board: "knights",
+        capacity: 12,
+        visible: true,
+      }),
+    /只有房主/,
+  );
+  assert.throws(
+    () =>
+      run(r, "p1", "updateSettings", {
+        board: "classic",
+        capacity: 6,
+        visible: true,
+      }),
+    /准备阶段/,
+  );
   assert.deepEqual(r, before);
+  run(r, "p1", "updateSettings", {
+    board: "knights",
+    capacity: 12,
+    visible: true,
+  });
+  assert.equal(r.showSkillDetails, true);
+});
+
+test("仙女可在首轮技能前连续查验，只由当前持有者提交", () => {
+  const r = setup();
+  r.knights.fairy = 1;
+  for (const [holder, target] of [
+    [1, 2],
+    [2, 3],
+  ]) {
+    begin(r, "fairy");
+    const before = structuredClone(r);
+    assert.throws(() => begin(r, "conversion"), /进行中/);
+    assert.deepEqual(r, before);
+    assert.equal(publicView(r, "p1").operationProgress.total, 1);
+    for (const p of r.players) {
+      assert.equal(!!privateView(r, p.uid).action, p.seat === holder);
+    }
+    assert.throws(
+      () => run(r, "p12", "submit", { value: "pass" }),
+      /没有秘密操作/,
+    );
+    assert.throws(
+      () => run(r, `p${holder}`, "submit", { value: `target:${holder}` }),
+      /不合法/,
+    );
+    run(r, `p${holder}`, "submit", { value: `target:${target}` });
+    run(r, "p1", "settleTool");
+    assert.equal(r.knights.fairy, target);
+  }
+  assert.equal(r.knights.round, 1);
+  assert.equal(r.knights.skillRound, 0);
+});
+
+test("转换可在首轮连续独立发起，牌堆耗尽时不修改状态", () => {
+  const r = setup();
+  configure(r, { p1: "blueLancelot", p2: "redLancelot" });
+  r.knights.conversions = [true, false, true];
+  begin(r, "conversion");
+  assert.equal(r.knights.players.p1.faction, "evil");
+  begin(r, "conversion");
+  assert.equal(r.knights.players.p1.faction, "evil");
+  begin(r, "conversion");
+  assert.equal(r.knights.players.p1.faction, "good");
+  const before = structuredClone(r);
+  assert.throws(() => begin(r, "conversion"), /转换牌已用完/);
+  assert.deepEqual(r, before);
+  begin(r, "skills");
+  assert.equal(r.phase, "skillPrepare");
+});
+
+test("各辅助板子任务只等待队员，非队员无法提交", () => {
+  for (const board of ["knights", "chaos", "shadow-assist"]) {
+    const r = setup(board);
+    begin(r, "quest", { team: [2, 3], threshold: 1 });
+    assert.equal(publicView(r, "p1").operationProgress.total, 2);
+    assert.equal(privateView(r, "p1").action, null);
+    assert.throws(
+      () => run(r, "p1", "submit", { value: "confirm" }),
+      /没有秘密操作/,
+    );
+    submitAll(r);
+    run(r, "p1", "settleTool");
+    assert.equal(r.phase, "tools");
+  }
 });

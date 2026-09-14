@@ -156,20 +156,16 @@ function action(room, uid) {
     };
   }
   if (room.phase === "fairy") {
-    options =
-      uid === room.players.find((p) => p.seat === k.fairy)?.uid
-        ? targets
-            .filter(
-              (t) => t.seat !== k.fairy && !k.fairyVisited.includes(t.seat),
-            )
-            .map((t) => ({
-              value: `target:${t.seat}`,
-              label: `查验 ${t.seat}号并传递仙女`,
-            }))
-        : [pass];
+    if (uid !== room.players.find((p) => p.seat === k.fairy)?.uid) return null;
+    options = targets
+      .filter((t) => t.seat !== k.fairy && !k.fairyVisited.includes(t.seat))
+      .map((t) => ({
+        value: `target:${t.seat}`,
+        label: `查验 ${t.seat}号并传递仙女`,
+      }));
     return {
       kind: "choice",
-      label: "仙女私密查验；其他玩家确认",
+      label: "选择查验目标并传递仙女",
       choices: options.map((o) => o.value),
       options,
     };
@@ -180,10 +176,6 @@ function begin(room, kind, check) {
   const k = room.knights;
   if (kind === "skills") {
     check(k.skillRound < k.round, "本轮技能已经执行");
-    check(
-      k.round === 1 || k.convertedRound === k.round,
-      "请先执行本轮身份转换",
-    );
     k.snapshot = {
       players: structuredClone(k.players),
       roles: { ...room.roles },
@@ -191,6 +183,8 @@ function begin(room, kind, check) {
       deck: [...k.deck],
     };
     k.events = [];
+    k.cycleEliminated = [];
+    k.cycleRestored = [];
     k.guards = {};
     k.witches = {};
     k.swap = null;
@@ -206,10 +200,6 @@ function begin(room, kind, check) {
     k.cursor = 0;
     resetStage(room, "skillPrepare");
   } else if (kind === "fairy") {
-    check(
-      k.round >= 2 && k.fairyRound < k.round && k.skillRound === k.round,
-      "仙女需在第2–5轮技能后执行且每轮一次",
-    );
     check(
       living(room).some(
         (p) => p.seat !== k.fairy && !k.fairyVisited.includes(p.seat),
@@ -232,6 +222,11 @@ function cancel(room) {
 }
 function settle(room, check, allRoles) {
   const k = room.knights;
+  // Continue rooms whose skill cycle began before this version.
+  k.cycleEliminated ||= room.players
+    .filter((p) => k.snapshot?.players[p.uid].alive && !k.players[p.uid].alive)
+    .map((p) => p.uid);
+  k.cycleRestored ||= [];
   const val = (uid) => room.submissions[uid];
   const seatUid = (n) => room.players.find((p) => p.seat === n)?.uid;
   const targetUid = (value) => {
@@ -267,6 +262,7 @@ function settle(room, check, allRoles) {
       substitute = true;
     }
     k.players[uid].alive = false;
+    if (!k.cycleEliminated.includes(uid)) k.cycleEliminated.push(uid);
     k.deaths = k.deaths.filter((d) => d.uid !== uid);
     k.deaths.push({ uid, substitute, round: k.round });
     if (
@@ -311,6 +307,21 @@ function settle(room, check, allRoles) {
         if (guards.includes(room.roles[p.uid])) k.guards[p.uid] = target;
         if (room.roles[p.uid] === "witch") k.witches[p.uid] = target;
       }
+    for (const p of room.players) {
+      const value = val(p.uid),
+        role = room.roles[p.uid];
+      if (value.startsWith("swap:"))
+        k.events.push(
+          `${p.seat}号换号：${value.split(":").slice(1).join("、")}号`,
+        );
+      else if (
+        value.startsWith("target:") &&
+        [...guards, "witch"].includes(role)
+      )
+        k.events.push(
+          `${p.seat}号${role === "witch" ? "指定替死" : "设置守护"}，目标${value.split(":")[1]}号`,
+        );
+    }
     k.planned = { ...room.submissions };
     room.phase = "skillTurn";
     room.submissions = k.planned;
@@ -333,6 +344,7 @@ function settle(room, check, allRoles) {
     ) {
       k.players[actor].used = true;
       k.players[last.uid].alive = true;
+      k.cycleRestored.push(last.uid);
       k.events.push(
         `${room.players.find((p) => p.uid === actor).seat}号使用复活，${room.players.find((p) => p.uid === last.uid).seat}号恢复原身份（不公开角色）`,
       );
@@ -386,11 +398,13 @@ function settle(room, check, allRoles) {
     room.submissions = k.planned;
     return settle(room, check, allRoles);
   }
+  const drawn = [];
   // Draw once, in death order, only for players who remain dead.
   for (const death of k.deaths) {
     const p = k.players[death.uid];
     if (p.alive || !k.deck.length) continue;
     const card = k.deck.shift();
+    drawn.push(death.uid);
     if (p.armor) {
       p.armor = false;
       p.used = true;
@@ -406,6 +420,22 @@ function settle(room, check, allRoles) {
     p.availableRound = k.round + 1;
   }
   k.deaths = k.deaths.filter((d) => !k.players[d.uid].alive);
+  const seats = (ids) =>
+    [...new Set(ids)]
+      .map((uid) => room.players.find((p) => p.uid === uid).seat)
+      .sort((a, b) => a - b);
+  k.summary = {
+    eliminated: seats(k.cycleEliminated),
+    redrawn: seats(drawn),
+    restored: seats(
+      k.cycleRestored.filter(
+        (uid) => k.players[uid].alive && !drawn.includes(uid),
+      ),
+    ),
+    out: seats(
+      room.players.filter((p) => !k.players[p.uid].alive).map((p) => p.uid),
+    ),
+  };
   k.skillRound = k.round;
   delete k.snapshot;
   delete k.planned;
@@ -413,7 +443,7 @@ function settle(room, check, allRoles) {
 }
 function updateNight(room, allRoles) {
   const k = room.knights;
-  if (k.round < 2 || k.skillRound !== k.round) return;
+  if (k.skillRound !== k.round) return;
   for (const p of living(room)) {
     if (room.roles[p.uid] === "prophet" && eligible(room, p.uid)) {
       const seats = living(room)

@@ -354,3 +354,26 @@ test("清空回执丢失保留凭据和幂等编号，确认后才移除", async
     await a.close();
   }
 });
+
+test("陪测轮询复用同阶段私密视图，阶段变化后重新获取", async () => {
+  let stage = "s1",
+    privateReads = 0;
+  const c = new Companion({
+    state: { code: "123456", actors: [{ id: "a", token: "t", joined: true }] },
+    request: async (path) => {
+      if (path.endsWith("/private")) {
+        privateReads++;
+        return { stage, game: 1, role: "测试角色" };
+      }
+      return { stage, game: 1, phase: "tools", me: {} };
+    },
+  });
+  await c.refresh();
+  await c.refresh();
+  await c.refresh();
+  assert.equal(privateReads, 1);
+  stage = "s2";
+  await c.refresh();
+  assert.equal(privateReads, 2);
+  assert.equal(c.actors[0].secret.stage, "s2");
+});

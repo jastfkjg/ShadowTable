@@ -1,0 +1,41 @@
+<view class="page settings-page">
+  <view wx:if="{{loading}}" class="muted">正在加载房间设置…</view>
+  <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
+  <block wx:if="{{!loading && authorized}}">
+    <view class="settings-header">
+      <view class="settings-eyebrow">房间 {{room.code}} · 管理员</view>
+      <view class="settings-title">{{room.boardName}}</view>
+      <view class="muted">{{room.capacity}}人 · {{room.phase==='lobby'?'准备中':'已发牌'}}</view>
+    </view>
+    <view class="settings-section-title">房间配置</view>
+    <view class="settings-section">
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || pendingSave}}">
+        <view class="settings-row"><text>人数</text><text class="settings-value">{{capacity}} 人 ›</text></view>
+      </picker>
+      <view wx:else class="settings-row"><text>人数</text><text class="muted">{{room.capacity}} 人</text></view>
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{choices}}" range-key="name" value="{{boardIndex}}" bindchange="pickBoard" disabled="{{busy || pendingSave}}">
+        <view class="settings-row"><text>板子</text><text class="settings-value">{{choices[boardIndex].name}} ›</text></view>
+      </picker>
+      <view wx:else class="settings-row"><text>板子</text><text class="muted settings-value">{{room.boardName}}</text></view>
+    </view>
+    <view class="settings-help">{{room.phase==='lobby'?'保存人数或板子变更后，全员需要重新准备。':'对局中不能修改人数和板子。'}}</view>
+    <block wx:if="{{boardId==='knights'}}">
+      <view class="settings-section-title">信息公开</view>
+      <view class="settings-section">
+        <view class="settings-row">
+          <view><view>公开技能过程</view><view class="settings-caption">{{visible?'保存后所有玩家可见':'仅公示最终结果'}}</view></view>
+          <switch checked="{{visible}}" bindchange="toggleVisibility" color="#c3a361" disabled="{{busy || pendingSave}}" aria-label="公开技能过程"/>
+        </view>
+      </view>
+      <view class="settings-help">开启后公开出手人、目标等过程。最终出局和复活结果始终公示，新身份仅本人可见。</view>
+    </block>
+    <view class="settings-footer">
+      <button class="primary" bindtap="save" disabled="{{busy || (!dirty && !pendingSave)}}" loading="{{busy}}">{{busy?'正在保存…':pendingSave?'重试保存':dirty?'保存设置':'设置已保存'}}</button>
+      <button class="text-button" bindtap="back" disabled="{{busy}}">返回牌桌</button>
+    </view>
+  </block>
+  <block wx:if="{{!loading && !authorized}}">
+    <button class="secondary" bindtap="load">重新加载</button>
+    <button class="text-button" bindtap="back">返回牌桌</button>
+  </block>
+</view>

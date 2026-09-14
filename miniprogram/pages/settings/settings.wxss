@@ -1,0 +1,69 @@
+.settings-page {
+  padding-top: 48rpx;
+}
+.settings-header {
+  margin-bottom: 56rpx;
+}
+.settings-eyebrow {
+  color: var(--accent);
+  font-size: 26rpx;
+  margin-bottom: 12rpx;
+}
+.settings-title {
+  font-size: 42rpx;
+  font-weight: 650;
+  margin-bottom: 8rpx;
+}
+.settings-section-title {
+  color: var(--muted);
+  font-size: 28rpx;
+  margin: 40rpx 0 16rpx;
+}
+.settings-section {
+  background: var(--surface);
+  border: 1rpx solid var(--border);
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+.settings-row {
+  min-height: 112rpx;
+  padding: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  box-sizing: border-box;
+}
+.settings-row + .settings-row,
+.settings-section picker + picker {
+  border-top: 1rpx solid var(--border);
+}
+.settings-value {
+  text-align: right;
+  max-width: 70%;
+  overflow-wrap: break-word;
+}
+.settings-caption {
+  color: var(--muted);
+  font-size: 26rpx;
+  margin-top: 4rpx;
+}
+.settings-help {
+  color: var(--muted);
+  font-size: 26rpx;
+  margin: 16rpx 8rpx 0;
+  line-height: 1.7;
+}
+.settings-footer {
+  margin-top: 64rpx;
+}
+.settings-error {
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid #d89c92;
+  border-radius: 16rpx;
+  color: #f2b6ae;
+}
+switch {
+  flex-shrink: 0;
+}

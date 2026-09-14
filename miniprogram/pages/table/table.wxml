@@ -135,7 +135,8 @@
         <text class="room-board-name">{{room.boardName}} · {{room.capacity}}人</text>
         <button class="room-rules-button" bindtap="openRoomRules" aria-label="查看当前板子的角色配置">配置说明</button>
       </view>
-      <text class="room-host-label">{{room.me.isHost?'房主':'玩家'}}</text>
+      <button wx:if="{{room.me.isHost}}" class="room-rules-button" bindtap="toggleRoomSettings">房间设置</button>
+      <text wx:else class="room-host-label">玩家</text>
     </view>
     <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
       <view class="error-dialog" role="dialog" aria-modal="true" aria-label="角色配置">
@@ -176,17 +177,6 @@
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
         >
-        <button wx:if="{{room.me.isHost}}" class="text-button" bindtap="toggleRoomSettings">{{showRoomSettings?'收起设置':'人数与板子设置'}}</button>
-        <view wx:if="{{room.me.isHost && showRoomSettings}}">
-          <picker range="{{roomCapacities}}" value="{{roomCapacityIndex}}" bindchange="configureCapacity" disabled="{{busy}}">
-            <view class="picker setting-row"><text>人数</text><text>{{room.capacity}}人 · 更改</text></view>
-          </picker>
-          <picker wx:if="{{roomBoards.length>1}}" range="{{roomBoards}}" range-key="name" value="{{roomBoardIndex}}" bindchange="configureBoard" disabled="{{busy}}">
-            <view class="picker setting-row"><text>板子</text><text>{{room.boardName}} · 更改</text></view>
-          </picker>
-          <view wx:else class="picker">{{room.boardName}}</view>
-          <text class="small muted">修改后需全员重新准备</text>
-        </view>
         <text class="muted small">全员准备后开局</text>
         <button class="primary" bindtap="ready" disabled="{{busy}}">
           {{room.me.ready?'取消准备':'我准备好了'}}</button

@@ -29,6 +29,9 @@ const escape = (s) =>
   );
 function html(n) {
   if (typeof n === "string" || typeof n === "number") return escape(n);
+  // Approximate the native switch only in this layout projection.
+  if (n.tag === "wx-switch")
+    return `<span role="switch" aria-checked="${!!n.attr?.checked}" style="display:inline-block;flex-shrink:0;width:50px;height:30px;border-radius:20px;background:${n.attr?.checked ? "#c3a361" : "#536570"};padding:3px;box-sizing:border-box"><span style="display:block;width:24px;height:24px;border-radius:50%;background:#f2eee5;margin-left:${n.attr?.checked ? 20 : 0}px"></span></span>`;
   const tag =
     {
       "wx-text": "span",
@@ -249,6 +252,24 @@ scenes.knightSkills = {
   actionChoices: skillAction.options,
   actionTargets: [],
 };
+const settingsRender = factory("pages/settings/settings.wxml");
+scenes.roomSettings = {
+  loading: false,
+  authorized: true,
+  busy: false,
+  room: {
+    code: "600435",
+    boardName: "阿瓦隆 · 十二骑士",
+    capacity: 12,
+    phase: "tools",
+  },
+  boardId: "knights",
+  visible: false,
+  dirty: false,
+};
+const settingsCss = fs
+  .readFileSync(path.join(root, "pages/settings/settings.wxss"), "utf8")
+  .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace(/^page\s*\{/m, "body {")
@@ -257,7 +278,7 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>影中执刃 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}</style>${html(render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>影中执刃 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}</style>${html(name === "roomSettings" ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");
