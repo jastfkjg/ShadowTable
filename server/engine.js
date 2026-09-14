@@ -152,6 +152,12 @@ function enter(room, uid, name) {
   if (room.players.some((p) => p.uid === uid)) return;
   requireRule(room.phase === "lobby", "游戏已开始，无法加入");
   requireRule(room.players.length < room.capacity, "房间已满");
+  requireRule(
+    uid === room.host ||
+      room.players.some((p) => p.uid === room.host) ||
+      room.players.length < room.capacity - 1,
+    "请为未入座的房主保留一个座位",
+  );
   const seat = Array.from({ length: room.capacity }, (_, i) => i + 1).find(
     (s) => !room.players.some((p) => p.seat === s),
   );
@@ -328,6 +334,18 @@ function privateView(room, uid) {
     action: actionSpec(room, uid),
   };
 }
+function roomSummary(room, uid) {
+  const p = room.players.find((p) => p.uid === uid);
+  requireRule(p || room.host === uid, "你不在该房间", 403);
+  return {
+    code: room.code,
+    boardName: BOARDS.find((b) => b.id === room.board).name,
+    phaseName: PHASES[room.phase],
+    game: room.game,
+    seat: p?.seat ?? null,
+    isHost: room.host === uid,
+  };
+}
 function publicView(room, uid) {
   const p = member(room, uid);
   // Explicit allowlist only: never spread the authoritative room into a response.
@@ -398,10 +416,6 @@ function command(room, uid, input) {
     requireRule(uid === room.host, "只有房主可以管理流程", 403);
   if (type === "leave") {
     requireRule(room.phase === "lobby", "对局中不可离开座位，请联系房主终止");
-    requireRule(
-      uid !== room.host || room.players.length === 1,
-      "请先转交房主再离开",
-    );
     room.players = room.players.filter((p) => p.uid !== uid);
     return;
   }
@@ -676,6 +690,7 @@ module.exports = {
   enter,
   command,
   publicView,
+  roomSummary,
   privateView,
   actionSpec,
 };

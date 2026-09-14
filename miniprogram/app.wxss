@@ -626,3 +626,33 @@ button.connection-button {
 .connection-dot.offline {
   background: #ed9d94;
 }
+
+.room-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin: 12rpx 0 8rpx;
+}
+button.copy-room {
+  width: auto;
+  min-width: 0;
+  min-height: 88rpx;
+  margin: 0;
+  padding: 12rpx 0;
+  display: flex;
+  gap: 16rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  background: transparent;
+  color: var(--muted);
+}
+.copy-label {
+  color: var(--accent);
+  font-size: 24rpx;
+}
+.summary-seat {
+  font-size: 26rpx;
+  color: var(--muted);
+  flex-shrink: 0;
+}

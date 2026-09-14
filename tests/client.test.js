@@ -452,7 +452,7 @@ test("微信昵称以表单最终值建房并记住，清空后不复用旧昵�
   }
 });
 
-test("离开后刷新列表，失效房间只请求一次且清除恢复入口", async () => {
+test("离开后刷新列表，空桌保留并可重新入座", async () => {
   const a = await server();
   try {
     const storage = new Map();
@@ -469,13 +469,13 @@ test("离开后刷新列表，失效房间只请求一次且清除恢复入口",
     await settle(p);
     assert.equal(p.roomCode, null);
     assert.equal(storage.has("roomCode"), false);
-    assert.equal(p.data.memberRooms.length, 0);
+    assert.equal(p.data.memberRooms.length, 1);
+    assert.equal(p.data.memberRooms[0].seat, null);
     await p.openRoom({ currentTarget: { dataset: { code } } });
-    assert.equal(p.roomCode, null);
-    assert.equal(p.data.error, "");
-    assert.equal(storage.has("roomCode"), false);
-    await p.refresh();
-    assert.equal(p.data.room, null);
+    await settle(p);
+    assert.equal(p.roomCode, code);
+    assert.equal(p.data.room.me.isHost, true);
+    assert.equal(p.data.room.me.ready, false);
   } finally {
     await a.close();
   }

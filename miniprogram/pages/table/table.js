@@ -274,8 +274,8 @@ Page({
     const code = e.currentTarget.dataset.code;
     this.setData({ busy: true, error: "" });
     try {
-      const room = await api.request("/api/rooms/" + code);
-      if (!room.me.isHost) throw new Error("只有当前房主可以删除牌桌");
+      const room = await api.request("/api/rooms/" + code + "/management");
+      if (!room.isHost) throw new Error("只有当前房主可以删除牌桌");
       if (
         !(await this.confirm(
           "删除牌桌 " + code + "？",
@@ -314,6 +314,24 @@ Page({
   },
   async openRoom(e) {
     if (this.data.busy || this.pending) return;
+    const target = this.data.memberRooms.find(
+      (r) => r.code === e.currentTarget.dataset.code,
+    );
+    if (target?.isHost && target.seat === null) {
+      if (!this.data.name.trim()) {
+        this.setData({
+          code: target.code,
+          entryMode: "join",
+          error: "请填写昵称后重新入座",
+        });
+        return;
+      }
+      return this.mutate(
+        "/api/rooms/" + target.code + "/join",
+        { name: this.data.name },
+        "enter",
+      );
+    }
     this.mask();
     this.roomCode = e.currentTarget.dataset.code;
     this.setData({ loading: true, error: "" });
@@ -600,17 +618,12 @@ Page({
   async leave() {
     if (this.data.busy || this.pending || !this.data.room) return;
     const room = this.data.room;
-    if (room.me.isHost && room.players.length > 1) {
-      this.setData({ showTransfer: true });
-      this.handleError({ message: "请先转交房主，再离开房间", status: 400 });
-      return;
-    }
     if (
       !(await this.confirm(
         "离开房间？",
-        room.players.length === 1
-          ? "离开后，这张空牌桌将自动关闭。"
-          : "离开后将释放你的座位，重新加入需要输入房间码。",
+        room.me.isHost
+          ? "离开仅释放座位，牌桌与房主身份保留，可从我的牌桌重新入座。"
+          : "离开后将释放你的座位，牌桌保留。重新加入需要输入房间码。",
       ))
     )
       return;
@@ -621,6 +634,15 @@ Page({
     )
       return;
     this.cmd("leave", {}, "leave");
+  },
+  copyRoomCode() {
+    const code = this.data.room?.code;
+    if (!code) return;
+    wx.setClipboardData({
+      data: code,
+      fail: () =>
+        this.handleError({ message: "复制失败，请再试一次", status: 400 }),
+    });
   },
   connectionInfo() {
     const content =

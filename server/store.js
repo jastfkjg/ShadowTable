@@ -34,11 +34,11 @@ class Store {
     return this.db
       .prepare(
         `SELECT state FROM rooms
-      WHERE EXISTS (SELECT 1 FROM json_each(rooms.state, '$.players')
+      WHERE json_extract(state, '$.host') = ? OR EXISTS (SELECT 1 FROM json_each(rooms.state, '$.players')
         WHERE json_extract(value, '$.uid') = ?)
       ORDER BY code`,
       )
-      .all(uid)
+      .all(uid, uid)
       .map((row) => JSON.parse(row.state));
   }
   save(room) {

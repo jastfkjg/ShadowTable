@@ -69,7 +69,7 @@
       <view class="section-title">我的牌桌</view>
       <view wx:for="{{memberRooms}}" wx:key="code" class="member-room">
         <button class="secondary room-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading}}">
-          {{item.code}} · {{item.seat}}号 · {{item.phaseName}}
+          {{item.code}} · {{item.seat===null?'重新入座':item.seat+'号'}} · {{item.phaseName}}
         </button>
         <button wx:if="{{item.isHost}}" class="room-delete" data-code="{{item.code}}" bindtap="deleteRoom" disabled="{{busy || loading}}" aria-label="{{'删除牌桌'+item.code}}">删除</button>
       </view>
@@ -77,15 +77,12 @@
     </block>
   </block>
   <block wx:else>
-    <view class="room-header"
-      ><view
-        ><text class="kicker">房间码</text
-        ><view class="room-code">{{room.code}}</view></view
-      ><view class="my-seat"
-        ><text class="small muted">我的座位</text
-        ><view>{{room.me.seat}}<text class="small"> 号</text></view></view
-      ></view
-    >
+    <view class="room-summary">
+      <button class="copy-room" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}">
+        <text>房间 {{room.code}}</text><text class="copy-label">复制</text>
+      </button>
+      <text class="summary-seat">你在 {{room.me.seat}} 号</text>
+    </view>
     <view class="row subline"
       ><text>{{room.boardName}} · {{room.capacity}}人</text
       ><text>{{room.me.isHost?'房主 · 参与游戏':'玩家'}}</text></view
@@ -199,7 +196,7 @@
     <block wx:if="{{room.phase==='lobby'}}">
       <button wx:if="{{room.me.isHost && room.players.length>1}}" class="text-button" bindtap="toggleTransfer">{{showTransfer?'收起转交':'转交房主'}}</button>
       <view wx:if="{{room.me.isHost && room.players.length>1 && showTransfer}}" class="panel"
-        ><text class="label">需要离开？先转交房主</text
+        ><text class="label">选择新房主</text
         ><block wx:for="{{room.players}}" wx:key="seat"
           ><button
             wx:if="{{item.seat!==room.me.seat}}"

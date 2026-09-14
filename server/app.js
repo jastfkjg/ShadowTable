@@ -9,6 +9,7 @@ const {
   enter,
   command,
   publicView,
+  roomSummary,
   privateView,
 } = require("./engine");
 const hash = (s) => createHash("sha256").update(s).digest("hex");
@@ -116,25 +117,19 @@ function createApp({
       const uid = session.uid;
       limit(`uid:${uid}`, 180);
       if (req.method === "GET" && path === "/api/me/rooms") {
-        const rooms = store.roomsFor(uid).map((room) => {
-          const view = publicView(room, uid);
-          return {
-            code: view.code,
-            boardName: view.boardName,
-            phaseName: view.phaseName,
-            game: view.game,
-            seat: view.me.seat,
-            isHost: view.me.isHost,
-          };
-        });
+        const rooms = store.roomsFor(uid).map((room) => roomSummary(room, uid));
         return send(200, { rooms });
       }
       const match = path.match(
-        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete))?$/,
+        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management))?$/,
       );
       if (req.method === "GET" && match) {
         const room = store.get(match[1]);
         check(room, "房间不存在", 404);
+        if (match[2] === "management") {
+          check(room.host === uid, "只有房主可以管理牌桌", 403);
+          return send(200, { ...roomSummary(room, uid), stage: room.stage });
+        }
         check(!match[2] || match[2] === "private", "接口不存在", 404);
         return send(
           200,
@@ -191,8 +186,8 @@ function createApp({
           else command(room, uid, b);
           response = { code: room.code, accepted: true };
         }
-        if (room.players.length) store.save(room);
-        else store.remove(room.code);
+        if (match?.[2] === "delete") store.remove(room.code);
+        else store.save(room);
         store.addReceipt(uid, id, fingerprint, response);
         return response;
       });

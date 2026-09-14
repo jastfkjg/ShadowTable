@@ -233,3 +233,61 @@ test("删除牌桌仅当前房主可执行，检查阶段且重试幂等", async
     await a.close();
   }
 });
+
+test("空牌桌跨重启保留归属，离席房主可管理但无私密视图", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "shadowtable-empty-"));
+  const database = join(dir, "test.sqlite");
+  let a = await launch({ database });
+  try {
+    const [host, guest] = await users(a, 2);
+    const code = (await a.req("/api/rooms", host, { name: "房主" })).data.code;
+    const path = "/api/rooms/" + code;
+    const room = (await a.req(path, host)).data;
+    await a.req(path + "/commands", host, { type: "leave", stage: room.stage });
+    await a.close();
+    a = await launch({ database });
+    const list = (await a.req("/api/me/rooms", host)).data.rooms;
+    assert.equal(list[0].code, code);
+    assert.equal(list[0].seat, null);
+    assert.equal(list[0].isHost, true);
+    assert.equal((await a.req(path + "/private", host)).status, 403);
+    assert.equal((await a.req(path + "/management", guest)).status, 403);
+    assert.equal(
+      (await a.req(path + "/join", guest, { name: "成员" })).status,
+      200,
+    );
+    const g = (await a.req(path, guest)).data;
+    assert.equal(g.me.isHost, false);
+    assert.equal(
+      (
+        await a.req(path + "/commands", guest, {
+          type: "configure",
+          stage: g.stage,
+          board: "classic",
+          capacity: 6,
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await a.req(path + "/join", host, { name: "房主" })).status,
+      200,
+    );
+    const h = (await a.req(path, host)).data;
+    assert.equal(h.me.isHost, true);
+    assert.equal(
+      (await a.req(path + "/commands", host, { type: "leave", stage: h.stage }))
+        .status,
+      200,
+    );
+    const management = (await a.req(path + "/management", host)).data;
+    assert.equal(
+      (await a.req(path + "/delete", host, { stage: management.stage })).status,
+      200,
+    );
+    assert.equal((await a.req(path, guest)).status, 404);
+  } finally {
+    await a.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

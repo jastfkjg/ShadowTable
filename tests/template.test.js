@@ -125,3 +125,30 @@ test("业务错误居中弹窗只提供关闭，连接错误才提供重试", ()
   assert.ok(byHandler(recovery, "retry"));
   assert.equal(byHandler(recovery, "returnHome"), undefined);
 });
+
+test("房间设置仅房主可见，普通玩家仍可准备和复制房间号", () => {
+  const room = {
+    code: "123456",
+    phase: "lobby",
+    players: [],
+    me: { isHost: false, seat: 2 },
+  };
+  const guest = render({ ...base, room, showRoomSettings: true });
+  assert.equal(byHandler(guest, "toggleRoomSettings"), undefined);
+  assert.equal(
+    nodes(guest).some((n) => n.attr?.bindchange === "configureCapacity"),
+    false,
+  );
+  assert.equal(byHandler(guest, "start"), undefined);
+  assert.ok(byHandler(guest, "ready"));
+  assert.ok(byHandler(guest, "copyRoomCode"));
+  const host = render({
+    ...base,
+    room: { ...room, me: { isHost: true, seat: 1 } },
+    showRoomSettings: true,
+  });
+  assert.ok(byHandler(host, "toggleRoomSettings"));
+  assert.ok(
+    nodes(host).some((n) => n.attr?.bindchange === "configureCapacity"),
+  );
+});
