@@ -37,11 +37,15 @@ async function body(req) {
 function createApp({
   database = "data/shadowtable.sqlite",
   devAuth = false,
+  devPanel = false,
   appId = "",
   appSecret = "",
   exchangeCode,
   clock = () => Date.now(),
 } = {}) {
+  // Defense in depth: callers cannot enable development features in production.
+  devAuth = devAuth && process.env.NODE_ENV !== "production";
+  const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
   const store = new Store(database),
     limits = new Map();
   function limit(key, max) {
@@ -90,6 +94,11 @@ function createApp({
     };
     try {
       const path = new URL(req.url, "http://localhost").pathname;
+      if (path === "/dev" || path.startsWith("/dev/")) {
+        if (!panel || !panel(req, res, path))
+          return send(404, { error: "接口不存在" });
+        return;
+      }
       limit(`ip:${req.socket.remoteAddress}`, 600);
       if (req.method === "GET" && path === "/health")
         return send(200, { ok: true });

@@ -152,3 +152,30 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
     nodes(host).some((n) => n.attr?.bindchange === "configureCapacity"),
   );
 });
+
+test("说明仅列阵营角色，房间内玩家可打开当前配置弹窗", () => {
+  const { BOARDS } = require("../server/engine");
+  const roles = BOARDS[0].roleConfigurations[6];
+  const home = render({
+    ...base,
+    entryMode: "create",
+    showRules: true,
+    boardRoleConfiguration: roles,
+    boardDescription: "不应显示的玩法描述",
+  });
+  assert.ok(JSON.stringify(home).includes("梅林，派西维尔，忠臣×2"));
+  assert.ok(!JSON.stringify(home).includes("不应显示的玩法描述"));
+  const room = {
+    phase: "lobby",
+    me: { isHost: false },
+    roleConfiguration: roles,
+  };
+  assert.ok(byHandler(render({ ...base, room }), "openRoomRules"));
+  assert.equal(
+    byHandler(render({ ...base, room }), "closeRoomRules"),
+    undefined,
+  );
+  const open = render({ ...base, room, showRoomRules: true });
+  assert.ok(byHandler(open, "closeRoomRules"));
+  assert.ok(JSON.stringify(open).includes("莫甘娜，刺客"));
+});

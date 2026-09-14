@@ -1,0 +1,258 @@
+:root {
+  color-scheme: dark;
+  --bg: #101c24;
+  --surface: #1b2b35;
+  --text: #f2eee5;
+  --muted: #b1bfc6;
+  --accent: #e5c68b;
+  --border: #536570;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    sans-serif;
+}
+main {
+  max-width: 1140px;
+  margin: auto;
+  padding: 36px 24px 64px;
+}
+header,
+.room-heading,
+.join-row,
+.options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+}
+h1 {
+  font-size: 30px;
+  margin: 4px 0;
+}
+h1 span {
+  font-weight: 400;
+  color: var(--muted);
+}
+h2 {
+  margin: 0;
+  font-size: 24px;
+}
+h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+.badge {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 30px;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 13px;
+}
+.entry {
+  max-width: 600px;
+  margin: 28px 0;
+}
+label {
+  display: block;
+}
+input,
+button,
+select {
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+input:not([type="checkbox"]),
+select {
+  min-height: 46px;
+  padding: 8px 12px;
+  max-width: 100%;
+}
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+button {
+  min-height: 44px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.primary {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+.danger {
+  color: #f2b6ae;
+}
+.join-row {
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+.join-row input {
+  width: 210px;
+  letter-spacing: 3px;
+}
+p,
+.hint {
+  color: var(--muted);
+  font-size: 14px;
+}
+.toolbar,
+.actions,
+.team {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar {
+  margin: 20px 0;
+}
+.options {
+  justify-content: flex-start;
+  color: var(--muted);
+  font-size: 14px;
+}
+.players {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.player {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+.player h3 {
+  color: var(--accent);
+}
+.player p {
+  overflow-wrap: anywhere;
+}
+.player .role {
+  color: var(--accent);
+}
+.actions {
+  margin-top: 16px;
+}
+.team {
+  margin: 12px 0;
+}
+.team label {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 56px;
+}
+.player select {
+  width: 100%;
+}
+.error {
+  color: #ffc8c0;
+  background: #432d31;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.success {
+  color: #9ed7b2;
+  padding: 12px 0;
+}
+#feedback:empty {
+  display: none;
+}
+.submitted {
+  color: #9ed7b2;
+}
+footer {
+  margin: 28px 0;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+details {
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  color: var(--muted);
+}
+summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+#connection {
+  font-size: 12px;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 850px) {
+  .players {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
+  main {
+    padding: 24px 16px;
+  }
+  .players {
+    grid-template-columns: 1fr;
+  }
+  header {
+    align-items: flex-start;
+  }
+  h1 {
+    font-size: 24px;
+  }
+  .join-row {
+    flex-wrap: wrap;
+  }
+  .room-heading {
+    align-items: flex-start;
+  }
+  .toolbar button {
+    flex: 1;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+}

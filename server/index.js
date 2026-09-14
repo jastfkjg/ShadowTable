@@ -6,6 +6,7 @@ if (process.env.NODE_ENV === "production" && devAuth)
 const { server, store } = createApp({
   database: process.env.DB_PATH || "data/shadowtable.sqlite",
   devAuth,
+  devPanel: process.env.DEV_PANEL === "1",
   appId: process.env.WECHAT_APP_ID,
   appSecret: process.env.WECHAT_APP_SECRET,
 });

@@ -592,3 +592,33 @@ test("业务拒绝仍表示连接正常，网络失败不能显示绿色确认",
   p.handleError(new Error("网络失败"));
   assert.equal(p.data.serverConnected, false);
 });
+
+test("玩法说明随人数和板子更新，房间配置弹窗可关闭且退出时重置", () => {
+  const { BOARDS } = require("../server/engine");
+  const p = page({});
+  p.setData({ boards: BOARDS });
+  p.selectCapacity(6);
+  assert.equal(
+    p.data.boardRoleConfiguration[0].roles,
+    "梅林，派西维尔，忠臣×2",
+  );
+  p.toggleRules();
+  p.selectCapacity(12);
+  assert.equal(p.data.showRules, false);
+  assert.equal(
+    p.data.boardRoleConfiguration[1].roles.includes("奥伯伦×2"),
+    true,
+  );
+  const index = p.data.availableBoards.findIndex(
+    (b) => b.id === "shadow-assist",
+  );
+  p.pickBoard({ detail: { value: index } });
+  assert.equal(p.data.boardRoleConfiguration[0].roles.includes("蓝内奸"), true);
+  p.openRoomRules();
+  assert.equal(p.data.showRoomRules, true);
+  p.closeRoomRules();
+  assert.equal(p.data.showRoomRules, false);
+  p.openRoomRules();
+  p.clearRoom();
+  assert.equal(p.data.showRoomRules, false);
+});

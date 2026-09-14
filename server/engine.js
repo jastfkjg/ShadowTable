@@ -24,7 +24,8 @@ const BOARDS = [
     name: "阿瓦隆 · 经典基础",
     available: true,
     counts: [6, 7, 8, 9],
-    description: "梅林、刺客与普通阵营角色；原版基础规则",
+    namesByCapacity: { 9: "阿瓦隆 · 9人逆仆" },
+    description: "按人数配置梅林、派西维尔及坏人角色；9人含逆仆",
   },
   {
     id: "classic-court",
@@ -172,14 +173,26 @@ function end(room, winner, reason) {
   room.result = { winner, reason };
   stage(room, "ended");
 }
-function start(room) {
-  requireRule(
-    room.players.length === room.capacity && room.players.every((p) => p.ready),
-    "需要所有座位入座且全员准备",
-  );
-  board(room.board, room.capacity);
-  room.players.sort((a, b) => a.seat - b.seat);
-  const [good, evil] = COUNTS[room.capacity];
+function roleDeck(boardId, capacity) {
+  if (boardId === "classic" && capacity <= 9) {
+    const goodRoles = [
+      "merlin",
+      "percival",
+      ...Array(capacity <= 7 ? 2 : 3).fill("servant"),
+    ];
+    const evilRoles = {
+      6: ["morgana", "assassin"],
+      7: ["morgana", "assassin", "oberon"],
+      8: ["mordred", "morgana", "oberon"],
+      9: ["mordred", "morgana", "assassin"],
+    };
+    return [
+      ...goodRoles,
+      ...(capacity === 9 ? ["reverse"] : []),
+      ...evilRoles[capacity],
+    ];
+  }
+  const [good, evil] = COUNTS[capacity];
   const courtRoles = [
     "merlin",
     "percival",
@@ -189,38 +202,83 @@ function start(room) {
     "mordred",
     "oberon",
   ];
-  const roles = shuffle(
-    room.board === "classic-11"
-      ? [...courtRoles, "reverse"]
-      : room.board === "shadow-assist"
+  return boardId === "classic-11"
+    ? [...courtRoles, "reverse"]
+    : boardId === "shadow-assist"
+      ? [
+          "merlin",
+          "percival",
+          ...Array(4).fill("servant"),
+          "blueTraitor",
+          "mordred",
+          "morgana",
+          "assassin",
+          "oberon",
+          "redTraitor",
+        ]
+      : boardId === "classic-court"
         ? [
             "merlin",
             "percival",
-            ...Array(4).fill("servant"),
-            "blueTraitor",
-            "mordred",
-            "morgana",
+            ...Array(good - 2).fill("servant"),
             "assassin",
-            "oberon",
-            "redTraitor",
+            "morgana",
+            "mordred",
+            ...Array(evil - 3).fill("oberon"),
           ]
-        : room.board === "classic-court"
-          ? [
-              "merlin",
-              "percival",
-              ...Array(good - 2).fill("servant"),
-              "assassin",
-              "morgana",
-              "mordred",
-              ...Array(evil - 3).fill("oberon"),
-            ]
-          : [
-              "merlin",
-              ...Array(good - 1).fill("servant"),
-              "assassin",
-              ...Array(evil - 1).fill("minion"),
-            ],
+        : [
+            "merlin",
+            ...Array(good - 1).fill("servant"),
+            "assassin",
+            ...Array(evil - 1).fill("minion"),
+          ];
+}
+function roleConfiguration(roles) {
+  return ["good", "evil"].map((faction) => {
+    const ids = [
+      "merlin",
+      "percival",
+      "servant",
+      "reverse",
+      "blueTraitor",
+      "mordred",
+      "morgana",
+      "assassin",
+      "oberon",
+      "minion",
+      "redTraitor",
+    ].filter((id) => roles.includes(id) && ROLES[id][1] === faction);
+    return {
+      faction,
+      label: faction === "good" ? "好人阵营" : "坏人阵营",
+      roles: ids
+        .map((id) => {
+          const count = roles.filter((role) => role === id).length;
+          const name = id === "servant" ? "忠臣" : ROLES[id][0];
+          return name + (count > 1 ? `×${count}` : "");
+        })
+        .join("，"),
+    };
+  });
+}
+// Public composition only; never include player identities or seat assignments.
+for (const b of BOARDS) {
+  if (b.available)
+    b.roleConfigurations = Object.fromEntries(
+      b.counts.map((capacity) => [
+        capacity,
+        roleConfiguration(roleDeck(b.id, capacity)),
+      ]),
+    );
+}
+function start(room) {
+  requireRule(
+    room.players.length === room.capacity && room.players.every((p) => p.ready),
+    "需要所有座位入座且全员准备",
   );
+  board(room.board, room.capacity);
+  room.players.sort((a, b) => a.seat - b.seat);
+  const roles = shuffle(roleDeck(room.board, room.capacity));
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
@@ -318,8 +376,17 @@ function privateView(room, uid) {
     information = `梅林与莫甘娜位于：${seats((r) => ["merlin", "morgana"].includes(r))}号。你无法区分谁是梅林。`;
   else if (role === "oberon")
     information = "你不知道其他坏人是谁，其他坏人也看不见你。";
-  else if (side === "evil")
-    information = `你的坏人同伴座位：${seats((r) => ROLES[r][1] === "evil" && r !== "oberon")}（不知道具体身份${room.board === "classic-court" ? "；不包含奥伯伦" : ""}）`;
+  else if (side === "evil") {
+    const allies = room.players
+      .filter(
+        (p) =>
+          p.uid !== uid &&
+          ROLES[room.roles[p.uid]][1] === "evil" &&
+          room.roles[p.uid] !== "oberon",
+      )
+      .map((p) => `${p.seat}号（${ROLES[room.roles[p.uid]][0]}）`);
+    information = `你的坏人同伴：${allies.join("、") || "无可见同伴"}`;
+  }
   return {
     game: room.game,
     stage: room.stage,
@@ -334,13 +401,29 @@ function privateView(room, uid) {
     action: actionSpec(room, uid),
   };
 }
+function offlineAssassination(room) {
+  return (
+    room.board === "classic" &&
+    room.capacity === 8 &&
+    (room.phase === "lobby" ||
+      !room.roles ||
+      !Object.values(room.roles).includes("assassin"))
+  );
+}
+function boardName(room) {
+  const b = BOARDS.find((b) => b.id === room.board);
+  return b.namesByCapacity?.[room.capacity] || b.name;
+}
 function roomSummary(room, uid) {
   const p = room.players.find((p) => p.uid === uid);
   requireRule(p || room.host === uid, "你不在该房间", 403);
   return {
     code: room.code,
-    boardName: BOARDS.find((b) => b.id === room.board).name,
-    phaseName: PHASES[room.phase],
+    boardName: boardName(room),
+    phaseName:
+      room.phase === "offlineFinal" && offlineAssassination(room)
+        ? "线下刺梅林"
+        : PHASES[room.phase],
     game: room.game,
     seat: p?.seat ?? null,
     isHost: room.host === uid,
@@ -355,11 +438,20 @@ function publicView(room, uid) {
     boardName:
       room.board === "classic" && room.capacity === 10
         ? "旧版10人配置（请更换板子）"
-        : BOARDS.find((b) => b.id === room.board).name,
+        : boardName(room),
+    roleConfiguration: roleConfiguration(
+      room.phase !== "lobby" && room.roles
+        ? Object.values(room.roles)
+        : roleDeck(room.board, room.capacity),
+    ),
     assisted: room.board === "shadow-assist",
+    offlineAssassination: offlineAssassination(room),
     capacity: room.capacity,
     phase: room.phase,
-    phaseName: PHASES[room.phase],
+    phaseName:
+      room.phase === "offlineFinal" && offlineAssassination(room)
+        ? "线下刺梅林"
+        : PHASES[room.phase],
     stage: room.stage,
     game: room.game,
     me: {
@@ -513,10 +605,17 @@ function command(room, uid, input) {
   }
   if (type === "closeOffline") {
     requireRule(
-      room.board === "shadow-assist" && room.phase === "offlineFinal",
+      (room.board === "shadow-assist" || offlineAssassination(room)) &&
+        room.phase === "offlineFinal",
       "当前不是线下结算阶段",
     );
-    end(room, null, "线下特殊结算已完成。小程序未判定最终胜方。");
+    end(
+      room,
+      null,
+      offlineAssassination(room)
+        ? "莫德雷德线下刺梅林已结算，以线下胜负为准。"
+        : "线下特殊结算已完成。小程序未判定最终胜方。",
+    );
     return;
   }
   if (type === "propose") {
@@ -634,9 +733,9 @@ function command(room, uid, input) {
       if (room.quests.filter((q) => q.success).length === 3)
         stage(
           room,
-          room.board === "classic-11"
+          Object.values(room.roles).includes("reverse")
             ? "reverseStrike"
-            : room.board === "shadow-assist"
+            : room.board === "shadow-assist" || offlineAssassination(room)
               ? "offlineFinal"
               : "assassination",
         );

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>影中执刃 · 本地陪测</title>
+    <link rel="icon" href="/dev/icon.svg" />
+    <link rel="stylesheet" href="/dev/panel.css" />
+    <script src="/dev/panel.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <span class="eyebrow">LOCAL PLAYTEST</span>
+          <h1>影中执刃 <span>陪测台</span></h1>
+        </div>
+        <span class="badge">仅本机开发</span>
+      </header>
+      <section class="entry">
+        <form id="connect">
+          <label for="code">小程序房间号</label>
+          <div class="join-row">
+            <input
+              id="code"
+              name="code"
+              inputmode="numeric"
+              pattern="[0-9]{6}"
+              maxlength="6"
+              required
+              placeholder="输入6位房间号"
+            /><button class="primary" id="join">添加测试玩家</button>
+          </div>
+        </form>
+        <p>
+          先在小程序创建房间。这里仅操作本面板创建的测试账号，你的玩家仍由小程序控制。
+        </p>
+      </section>
+      <div id="feedback" role="status" aria-live="polite"></div>
+      <section id="workspace" hidden>
+        <div class="room-heading">
+          <div>
+            <h2 id="phase">等待连接</h2>
+            <p id="summary"></p>
+          </div>
+          <button id="refresh">刷新状态</button>
+        </div>
+        <div class="toolbar">
+          <button id="fill" class="primary">补齐空位</button
+          ><button data-batch="ready">全部准备</button
+          ><button data-batch="confirm">全部确认</button
+          ><button data-batch="approve">全部赞成</button
+          ><button data-batch="reject">全部反对</button
+          ><button data-batch="success">任务全成功</button
+          ><button data-batch="fail">合法失败牌</button>
+        </div>
+        <div class="options">
+          <label><input id="reveal" type="checkbox" />显示测试玩家身份</label
+          ><span id="connection">每4秒更新</span>
+        </div>
+        <p class="hint">
+          批量操作只作用于本面板玩家，且跳过已提交或不合法的操作。故意不点某个玩家，即可测试等待场景。
+        </p>
+        <div id="players" class="players"></div>
+        <footer>
+          <button id="leave" class="danger">测试玩家全部离席</button>
+          <p>
+            仅准备阶段可离席。关闭网页只暂停控制，账号和座位保留；同一标签页刷新可恢复。
+          </p>
+        </footer>
+      </section>
+      <details>
+        <summary>怎么测试刀人、任务失败和守护？</summary>
+        <p>
+          逐人选择投票、任务牌，刺客进入指认／刺杀阶段后可选目标。测试队长可勾选队员提交队伍；房主仍在小程序里推进。
+        </p>
+        <p>
+          守护、十二骑士等尚未实现的技能不提供模拟按钮。影中执刃辅助版的特殊结算仍在线下完成。
+        </p>
+        <p>
+          这里可查看测试账号的身份，适合验证功能，不用于真实对局。刷新保留本标签页的测试会话和未确认请求，重试始终使用原请求编号。
+        </p>
+      </details>
+    </main>
+  </body>
+</html>

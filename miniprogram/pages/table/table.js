@@ -19,6 +19,7 @@ Page({
     availableBoards: [],
     entryMode: "join",
     showRules: false,
+    showRoomRules: false,
     showRoomSettings: false,
     showTransfer: false,
     boardIndex: 0,
@@ -26,7 +27,7 @@ Page({
     memberRooms: [],
     boardId: "classic",
     boardName: "阿瓦隆 · 经典基础",
-    boardDescription: "梅林、刺客与普通阵营角色；原版基础规则",
+    boardRoleConfiguration: [],
     name: "",
     code: "",
     capacity: 6,
@@ -265,6 +266,7 @@ Page({
       code: "",
       error: "",
       entryMode: "join",
+      showRoomRules: false,
       showRoomSettings: false,
       showTransfer: false,
     });
@@ -362,6 +364,12 @@ Page({
   toggleRules() {
     this.setData({ showRules: !this.data.showRules });
   },
+  openRoomRules() {
+    this.setData({ showRoomRules: true });
+  },
+  closeRoomRules() {
+    this.setData({ showRoomRules: false });
+  },
   toggleRoomSettings() {
     this.setData({ showRoomSettings: !this.data.showRoomSettings });
   },
@@ -381,8 +389,8 @@ Page({
       capacityIndex: this.data.capacities.indexOf(capacity),
       availableBoards,
       boardId: b.id,
-      boardName: b.name,
-      boardDescription: b.description,
+      boardName: b.namesByCapacity?.[capacity] || b.name,
+      boardRoleConfiguration: b.roleConfigurations?.[capacity] || [],
       boardIndex: availableBoards.indexOf(b),
       boardAssisted: b.mode === "assisted",
       showRules: false,
@@ -395,8 +403,8 @@ Page({
     if (!b) return;
     this.setData({
       boardId: b.id,
-      boardName: b.name,
-      boardDescription: b.description,
+      boardName: b.namesByCapacity?.[this.data.capacity] || b.name,
+      boardRoleConfiguration: b.roleConfigurations?.[this.data.capacity] || [],
       boardIndex: index,
       boardAssisted: b.mode === "assisted",
       showRules: false,

@@ -53,7 +53,9 @@ test("6–9人配置和视野按角色隔离，随机首队长有效", () => {
     const r = setup(n),
       roles = Object.values(r.roles);
     assert.equal(
-      roles.filter((x) => ["merlin", "servant"].includes(x)).length,
+      roles.filter((x) =>
+        ["merlin", "percival", "servant", "reverse"].includes(x),
+      ).length,
       COUNTS[n][0],
     );
     assert.equal(roles.filter((x) => x === "merlin").length, 1);
@@ -226,7 +228,7 @@ test("3次失败胜利及7人第4任务双失败阈值", () => {
     all(g);
     advance(g);
     const evils = g.players.filter((p) =>
-      ["assassin", "minion"].includes(g.roles[p.uid]),
+      ["assassin", "morgana", "oberon"].includes(g.roles[p.uid]),
     );
     for (let q = 0; q < 4; q++) {
       const team = [
@@ -280,9 +282,8 @@ test("用户确认10/12人完整角色配置：梅林不见大莫、派西不区
     );
     const allies = privateView(r, find("assassin")[0].uid)
       .information.split("：")[1]
-      .split("（")[0]
       .split("、")
-      .map(Number);
+      .map((entry) => Number(entry.split("号")[0]));
     assert.ok(find("oberon").every((p) => !allies.includes(p.seat)));
     if (n === 12) assert.deepEqual(TEAMS[n], [3, 4, 5, 6, 6]);
     all(r);
@@ -336,9 +337,8 @@ test("11人逆仆只见刺客、对梅林举手、其他坏人看不见，只能
   assert.ok(seen.includes(reverse.seat));
   const allies = privateView(r, assassin.uid)
     .information.split("：")[1]
-    .split("（")[0]
     .split("、")
-    .map(Number);
+    .map((entry) => Number(entry.split("号")[0]));
   assert.ok(!allies.includes(reverse.seat));
   all(r);
   advance(r);
@@ -456,4 +456,172 @@ test("10人仅保留用户确认的经典基础角色板", () => {
   assert.throws(() => newRoom("123456", "p1", "甲", "classic", 10), /人数/);
   const r = newRoom("123456", "p1", "甲", "classic-court", 10);
   assert.equal(publicView(r, "p1").boardName, "阿瓦隆 · 经典基础");
+});
+
+test("所有可用板子的角色说明与实际发牌一致，六人使用派西莫甘娜配置", () => {
+  const { BOARDS } = require("../server/engine");
+  assert.deepEqual(BOARDS[0].roleConfigurations[6], [
+    { faction: "good", label: "好人阵营", roles: "梅林，派西维尔，忠臣×2" },
+    { faction: "evil", label: "坏人阵营", roles: "莫甘娜，刺客" },
+  ]);
+  for (const b of BOARDS.filter((b) => b.available)) {
+    for (const n of b.counts) {
+      const r = newRoom("123456", "p1", "玩家1", b.id, n);
+      const expected = b.roleConfigurations[n];
+      assert.deepEqual(publicView(r, "p1").roleConfiguration, expected);
+      for (let i = 2; i <= n; i++) enter(r, "p" + i, "玩家" + i);
+      r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
+      run(r, "p1", "start");
+      assert.equal(Object.values(r.roles).length, n);
+      for (const p of r.players) {
+        const view = publicView(r, p.uid);
+        assert.deepEqual(view.roleConfiguration, expected);
+        assert.equal(view.roles, undefined);
+      }
+    }
+  }
+});
+
+test("旧房间进行中按实际角色汇总说明，不修改身份", () => {
+  const r = setup();
+  r.roles = {
+    p1: "merlin",
+    p2: "servant",
+    p3: "servant",
+    p4: "servant",
+    p5: "assassin",
+    p6: "minion",
+  };
+  assert.equal(publicView(r, "p1").roleConfiguration[0].roles, "梅林，忠臣×3");
+  assert.equal(
+    publicView(r, "p1").roleConfiguration[1].roles,
+    "刺客，莫德雷德的爪牙",
+  );
+});
+
+test("6至9人角色逐项匹配用户配置，说明和发牌一致", () => {
+  const expected = {
+    6: ["merlin", "percival", "servant", "servant", "morgana", "assassin"],
+    7: [
+      "merlin",
+      "percival",
+      "servant",
+      "servant",
+      "morgana",
+      "assassin",
+      "oberon",
+    ],
+    8: [
+      "merlin",
+      "percival",
+      "servant",
+      "servant",
+      "servant",
+      "mordred",
+      "morgana",
+      "oberon",
+    ],
+    9: [
+      "merlin",
+      "percival",
+      "servant",
+      "servant",
+      "servant",
+      "reverse",
+      "mordred",
+      "morgana",
+      "assassin",
+    ],
+  };
+  for (const n of [6, 7, 8, 9]) {
+    const r = setup(n);
+    assert.deepEqual(Object.values(r.roles).sort(), expected[n].sort());
+  }
+  assert.equal(publicView(setup(9), "p1").boardName, "阿瓦隆 · 9人逆仆");
+});
+
+test("9人逆仆局三次成功进入逆仆刀，再刺梅林完成结算", () => {
+  const r = setup(9);
+  all(r);
+  advance(r);
+  for (let q = 0; q < 3; q++) {
+    completeQuest(
+      r,
+      r.players.slice(0, TEAMS[9][q]).map((p) => p.seat),
+    );
+    advance(r);
+  }
+  assert.equal(r.phase, "reverseStrike");
+  const reverse = r.players.find((p) => r.roles[p.uid] === "reverse");
+  all(r, (p) => (r.roles[p.uid] === "assassin" ? reverse.seat : "confirm"));
+  advance(r);
+  assert.equal(r.convertedReverse, reverse.uid);
+  assert.equal(r.phase, "assassination");
+  const merlin = r.players.find((p) => r.roles[p.uid] === "merlin");
+  all(r, (p) => (r.roles[p.uid] === "assassin" ? merlin.seat : "confirm"));
+  advance(r);
+  assert.equal(r.result.winner, "evil");
+});
+
+test("8人无刺客配置三次成功后由莫德雷德线下刺梅林，可结束并重开", () => {
+  const r = setup(8);
+  all(r);
+  advance(r);
+  for (let q = 0; q < 3; q++) {
+    completeQuest(
+      r,
+      r.players.slice(0, TEAMS[8][q]).map((p) => p.seat),
+    );
+    advance(r);
+  }
+  assert.equal(r.phase, "offlineFinal");
+  assert.equal(publicView(r, "p1").phaseName, "线下刺梅林");
+  assert.equal(publicView(r, "p1").canAdvance, false);
+  assert.throws(() => run(r, "p2", "closeOffline"), /只有房主/);
+  run(r, "p1", "closeOffline");
+  assert.equal(r.phase, "ended");
+  assert.equal(r.result.winner, null);
+  run(r, "p1", "rematch");
+  assert.equal(r.phase, "lobby");
+});
+
+test("睁眼坏人可见同伴座位和具体身份，奥伯伦及好人身份不泄露", () => {
+  const names = {
+    assassin: "刺客",
+    morgana: "莫甘娜",
+    mordred: "莫德雷德",
+    minion: "莫德雷德的爪牙",
+  };
+  for (const [board, count] of [
+    ["classic", 6],
+    ["classic", 7],
+    ["classic", 8],
+    ["classic", 9],
+    ["classic-court", 10],
+    ["classic-11", 11],
+    ["classic-court", 12],
+  ]) {
+    const r = setupBoard(board, count);
+    for (const p of r.players) {
+      const info = privateView(r, p.uid).information;
+      if (names[r.roles[p.uid]]) {
+        const allies = r.players.filter(
+          (other) => other.uid !== p.uid && names[r.roles[other.uid]],
+        );
+        assert.equal(
+          info,
+          "你的坏人同伴：" +
+            (allies
+              .map((other) => `${other.seat}号（${names[r.roles[other.uid]]}）`)
+              .join("、") || "无可见同伴"),
+        );
+      } else {
+        assert.ok(!info.includes("你的坏人同伴："));
+      }
+      const pub = publicView(r, p.uid);
+      assert.equal(pub.information, undefined);
+      assert.equal(pub.roles, undefined);
+      assert.ok(pub.players.every((player) => player.role === undefined));
+    }
+  }
 });

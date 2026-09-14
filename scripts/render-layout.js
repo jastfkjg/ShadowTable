@@ -75,6 +75,7 @@ const base = {
   boardId: "classic",
   boardName: "阿瓦隆 · 经典基础",
   capacity: 6,
+  boardRoleConfiguration: BOARDS[0].roleConfigurations[6],
   name: "",
   code: "",
   boards: BOARDS,
@@ -104,6 +105,8 @@ function roomData() {
 }
 const scenes = {
   home: base,
+  homeRules: { ...base, showRules: true },
+  roomRules: { ...roomData(), showRoomRules: true },
   home12: {
     ...base,
     capacity: 12,
@@ -118,6 +121,19 @@ r.players.forEach((p) =>
 );
 command(r, "p1", { type: "start", stage: r.stage });
 scenes.identity = roomData();
+const taskSeats = roomData();
+scenes.taskSeats = {
+  ...taskSeats,
+  room: { ...taskSeats.room, phase: "proposal", phaseName: "队长组队", needsSubmission: false, capacity: 6, teamSize: 2, leader: 3, team: [2, 4] },
+  teamText: "2、4",
+  seats: taskSeats.seats.slice(0, 6).map((seat) => ({ ...seat, inTeam: [2, 4].includes(seat.seat) })),
+};
+scenes.selfInTeam = {
+  ...scenes.taskSeats,
+  room: { ...scenes.taskSeats.room, team: [1, 4] },
+  teamText: "1、4",
+  seats: scenes.taskSeats.seats.map((seat) => ({ ...seat, inTeam: [1, 4].includes(seat.seat) })),
+};
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace(/^page\s*\{/m, "body {")
