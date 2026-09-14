@@ -125,3 +125,44 @@ test("保存时阶段已变化会刷新设置，不重复提交旧阶段", async
   assert.equal(p.pending, null);
   assert.ok(p.data.error.includes("重新修改"));
 });
+
+test("设置保存401后重新登录并沿用原请求编号与内容恢复", async () => {
+  let authenticated = true,
+    expired = false,
+    logins = 0;
+  const writes = [];
+  const p = page({
+    login: async () => {
+      logins++;
+      authenticated = true;
+    },
+    requestId: () => "original-save",
+    request: async (path, method, data, id) => {
+      if (method === "POST") {
+        writes.push({ id, data: JSON.stringify(data), authenticated });
+        if (!expired) {
+          expired = true;
+          authenticated = false;
+          throw Object.assign(new Error("登录已过期"), { status: 401 });
+        }
+        if (!authenticated)
+          throw Object.assign(new Error("登录已过期"), { status: 401 });
+        return { ok: true };
+      }
+      return path === "/api/boards" ? { boards: BOARDS } : room();
+    },
+  });
+  await p.load();
+  p.toggleVisibility({ detail: { value: true } });
+  await p.save();
+  assert.equal(p.data.pendingSave, true);
+  const beforeRetry = logins;
+  await p.save();
+  assert.ok(logins > beforeRetry);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[1].authenticated, true);
+  assert.equal(writes[1].id, writes[0].id);
+  assert.equal(writes[1].data, writes[0].data);
+  assert.equal(p.pending, null);
+  assert.equal(p.data.pendingSave, false);
+});

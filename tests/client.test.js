@@ -695,8 +695,16 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     await host.launchTool();
     await settle(host);
     await refresh();
-    for (const p of ps.slice(0, 2))
-      await cmd(p, "submit", { value: "success" });
+    for (const p of ps.slice(0, 2)) {
+      await p.openAction();
+      await p.submitChoice({ currentTarget: { dataset: { value: "success" } } });
+      assert.equal(p.data.room.me.submitted, false);
+      p.confirmChoice();
+      await settle(p);
+      assert.equal(p.data.room.me.submitted, true);
+      assert.equal(p.data.actionDialog, false);
+      assert.equal(p.data.draftChoice, "");
+    }
     assert.equal(ps[2].data.room.needsSubmission, false);
     host.settleTool();
     await settle(host);
@@ -1039,4 +1047,91 @@ test("仙女结果返回前切后台不显示，返回后默认遮盖，确认�
   assert.equal(sent[0][1].revision, 2);
   assert.equal(p.data.fairyResult, null);
   assert.equal(p.data.fairyResultRevealed, false);
+});
+
+test("投票与任务先选择再提交，草稿可修改且关闭或切后台清除", async () => {
+  for (const phase of ["teamVote", "quest"]) {
+    const choices = phase === "quest" ? ["success", "fail", "magic", "thiefFail"] : ["approve", "reject"];
+    const p = page({ request: async () => ({ stage: "s1", action: { choices } }) });
+    p.data.room = { stage: "s1", phase, needsSubmission: true, me: { submitted: false } };
+    p.roomCode = "123456";
+    const writes = [];
+    p.cmd = (...args) => writes.push(args);
+    await p.openAction();
+    p.confirmChoice();
+    assert.equal(writes.length, 0);
+    for (const value of choices) await p.submitChoice({ currentTarget: { dataset: { value } } });
+    assert.equal(writes.length, 0);
+    assert.equal(p.data.draftChoice, choices.at(-1));
+    p.confirmChoice();
+    assert.equal(writes[0][1].value, choices.at(-1));
+    p.closeAction();
+    assert.equal(p.data.draftChoice, "");
+    await p.openAction();
+    await p.submitChoice({ currentTarget: { dataset: { value: choices[0] } } });
+    p.data.room.stage = "s2";
+    p.confirmChoice();
+    assert.equal(writes.length, 1);
+    p.onHide();
+    assert.equal(p.data.draftChoice, "");
+    assert.equal(p.data.actionDialog, false);
+  }
+});
+
+test("换号以座位选择，合法组合才提交，取消确认或过期不会提交", async () => {
+  const players = Array.from({ length: 12 }, (_, i) => ({ seat: i + 1, name: `玩家${i + 1}` }));
+  const choices = ["pass"];
+  for (let a = 1; a <= 12; a++) for (let b = a + 1; b <= 12; b++) choices.push(`swap:${a}:${b}`);
+  const p = page({ request: async () => ({ stage: "s1", action: { choices } }) });
+  p.data.room = { stage: "s1", phase: "skillPrepare", players, needsSubmission: true, me: { submitted: false } };
+  const writes = [];
+  p.cmd = (...args) => writes.push(args);
+  await p.openAction();
+  assert.equal(p.data.actionChoices.length, 1);
+  assert.equal(p.data.swapPlayers.length, 12);
+  const tap = (seat) => p.toggleSwapSeat({ currentTarget: { dataset: { seat } } });
+  tap(12);
+  await p.confirmSwap();
+  assert.equal(writes.length, 0);
+  tap(1); tap(2);
+  assert.equal(p.data.swapSeats.length, 2);
+  p.confirm = async () => false;
+  await p.confirmSwap();
+  assert.equal(writes.length, 0);
+  tap(1); tap(2);
+  p.confirm = async () => true;
+  await p.confirmSwap();
+  assert.equal(writes[0][1].value, "swap:2:12");
+  p.confirm = async () => { p.data.room.stage = "s2"; return true; };
+  await p.confirmSwap();
+  assert.equal(writes.length, 1);
+  p.mask();
+  assert.equal(p.data.swapOptions.length, 0);
+  assert.equal(p.data.swapSeats.length, 0);
+});
+
+test("房主提示随入座准备与提交进度刷新，非房主不推算秘密进度", async () => {
+  let room = { stage: "s1", phase: "lobby", capacity: 6, players: [{ seat: 1, ready: true }], me: { seat: 1 }, history: [], team: [] };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = "123456";
+  await p.refresh();
+  assert.equal(p.data.canStart, false);
+  assert.ok(p.data.startHint.includes("还差 5 人入座"));
+  room.players = Array.from({ length: 6 }, (_, i) => ({ seat: i + 1, ready: i !== 5 }));
+  await p.refresh();
+  assert.equal(p.data.startHint, "还差 1 人准备");
+  room.players[5].ready = true;
+  await p.refresh();
+  assert.equal(p.data.canStart, true);
+  room.phase = "quest";
+  room.operationProgress = { total: 2, completed: 1 };
+  await p.refresh();
+  assert.equal(p.data.canSettle, false);
+  assert.equal(p.data.settleHint, "还差 1 人提交");
+  room.operationProgress.completed = 2;
+  await p.refresh();
+  assert.equal(p.data.canSettle, true);
+  room.operationProgress = null;
+  await p.refresh();
+  assert.equal(p.data.canSettle, false);
 });

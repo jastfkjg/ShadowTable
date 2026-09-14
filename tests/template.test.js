@@ -467,3 +467,25 @@ test("拓展板子不显示线下辅助提示，身份确认使用线上视野�
   assert.ok(!text.includes("互认、起刀与最终胜负在线下完成"));
   assert.ok(!text.includes("已完成互认，确认"));
 });
+
+test("换号显示12个座位而非66个组合，投票需要单独确认", () => {
+  const room = { phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, team: [] };
+  const swapPlayers = Array.from({ length: 12 }, (_, i) => ({ seat: i + 1, name: "玩家", selected: i < 2 }));
+  const tree = render({ ...base, room, actionDialog: true, swapOptions: ["swap:1:2"], swapPlayers, swapSeats: [1, 2], actionChoices: [{ value: "pass", label: "不使用技能" }] });
+  assert.equal(nodes(tree).filter((n) => n.attr?.bindtap === "toggleSwapSeat").length, 12);
+  assert.equal(byHandler(tree, "confirmSwap").attr.disabled, false);
+  const vote = { ...base, room: { ...room, phase: "teamVote" }, actionDialog: true, stagedChoice: true, actionChoices: [{ value: "approve", label: "赞成" }] };
+  assert.equal(byHandler(render(vote), "confirmChoice").attr.disabled, true);
+  assert.equal(byHandler(render({ ...vote, draftChoice: "approve", draftLabel: "赞成" }), "confirmChoice").attr.disabled, false);
+});
+
+test("房主开局与结算按钮未满足条件时禁用并展示等待人数", () => {
+  const room = { phase: "lobby", me: { isHost: true }, team: [] };
+  assert.equal(byHandler(render({ ...base, room, canStart: false, startHint: "还差 2 人准备" }), "start").attr.disabled, true);
+  assert.equal(byHandler(render({ ...base, room, canStart: true }), "start").attr.disabled, false);
+  const playing = { ...room, phase: "quest", canUseTools: true, hasActiveOperation: true };
+  const waiting = render({ ...base, room: playing, canSettle: false, settleHint: "还差 2 人提交" });
+  assert.equal(byHandler(waiting, "settleTool").attr.disabled, true);
+  assert.ok(JSON.stringify(waiting).includes("还差 2 人提交"));
+  assert.equal(byHandler(render({ ...base, room: playing, canSettle: true }), "settleTool").attr.disabled, false);
+});

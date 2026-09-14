@@ -62,8 +62,19 @@
         <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && !actionSecret}}" disabled="{{busy || !network}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
       <view class="action-choice-list">
-        <button wx:for="{{actionChoices}}" wx:key="value" class="primary" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
+        <button wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>
+      <block wx:if="{{swapOptions.length}}">
+        <view class="small muted">选择两个座位 · 已选 {{swapSeats.length}} / 2；再次点击可取消</view>
+        <view class="tool-seat-grid swap-seat-grid">
+          <button wx:for="{{swapPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}"><view>{{item.selected?'✓ ':''}}{{item.seat}}号</view><view class="swap-seat-name">{{item.name}}</view></button>
+        </view>
+        <button class="primary" bindtap="confirmSwap" disabled="{{busy || !network || swapSeats.length!==2}}">确认换号</button>
+      </block>
+      <block wx:if="{{stagedChoice}}">
+        <view class="small muted">{{draftChoice?'已选：'+draftLabel+'，确认提交后不可更改':'请先选择，再确认提交'}}</view>
+        <button class="primary" bindtap="confirmChoice" disabled="{{busy || !network || !draftChoice}}" loading="{{busy}}">确认提交</button>
+      </block>
       <scroll-view wx:if="{{actionTargets.length}}" scroll-y class="action-target-scroll">
         <button wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
       </scroll-view>
@@ -203,14 +214,14 @@
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
         >
-        <text class="muted small">全员准备后开局</text>
+        <text class="muted small">{{startHint}}</text>
         <button class="primary" bindtap="ready" disabled="{{busy}}">
           {{room.me.ready?'取消准备':'我准备好了'}}</button
         ><button
           wx:if="{{room.me.isHost}}"
           class="secondary"
           bindtap="start"
-          disabled="{{busy}}"
+          disabled="{{busy || !network || !canStart}}"
         >
           发放身份
         </button></view
@@ -324,16 +335,21 @@
             <text class="progress-state {{item.completed?'completed':'pending'}}">{{item.completed?'已完成':'未完成'}}</text>
           </view>
         </view>
-        <button wx:if="{{room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="primary" bindtap="settleTool" disabled="{{busy}}" loading="{{busy}}">结算当前操作</button>
+        <button wx:if="{{room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="primary" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
         <button wx:if="{{room.hasActiveOperation}}" class="text-button" bindtap="cancelTool" disabled="{{busy}}">作废当前操作</button>
       </view>
       <view wx:elif="{{room.flexible && room.phase==='tools'}}" class="panel">
         <view class="label">等待房主发起操作</view>
       </view>
+      <view wx:if="{{questSummary.total}}" class="quest-summary" aria-label="{{'已结算任务：成功'+questSummary.success+'次，失败'+questSummary.failure+'次'}}">
+        <text class="small muted">任务结果</text>
+        <view class="quest-summary-item"><text class="quest-result-icon success" aria-hidden="true">✓</text><text>成功 {{questSummary.success}}</text></view>
+        <view class="quest-summary-item"><text class="quest-result-icon failure" aria-hidden="true">×</text><text>失败 {{questSummary.failure}}</text></view>
+      </view>
       <view wx:if="{{history.length}}" class="section-title">公开记录</view
       ><view wx:for="{{history}}" wx:key="key" class="history-row"
-        ><view>{{item.text}}</view
-        ><text class="muted small">{{item.detail}}</text></view
+        ><view class="history-title"><text wx:if="{{item.questResult}}" class="quest-result-icon {{item.questResult}}" aria-hidden="true">{{item.questResult==='success'?'✓':'×'}}</text><text>{{item.text}}</text></view
+        ><view class="muted small history-detail">{{item.detail}}</view></view
       >
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">

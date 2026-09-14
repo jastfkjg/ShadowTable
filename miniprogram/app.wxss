@@ -882,3 +882,55 @@ button.finish-game-button {
   color: var(--accent);
   margin-top: 8rpx;
 }
+
+/* Compact two-seat selection for the magician's private action. */
+.swap-seat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.swap-seat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 24rpx;
+}
+
+.history-detail {
+  white-space: pre-line;
+  line-height: 1.7;
+}
+.history-title,
+.quest-summary,
+.quest-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.history-title {
+  margin-bottom: 8rpx;
+}
+.quest-summary {
+  flex-wrap: wrap;
+  gap: 24rpx;
+  margin: 24rpx 0;
+  font-size: 28rpx;
+}
+.quest-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+.quest-result-icon.success {
+  color: #a3dfbe;
+  background: #253e35;
+}
+.quest-result-icon.failure {
+  color: #f2b6ae;
+  background: #493033;
+}

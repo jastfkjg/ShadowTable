@@ -141,6 +141,7 @@ Page({
     const pending = this.pending;
     this.setData({ busy: true, error: "", pendingSave: true });
     try {
+      await api.login();
       await api.request(
         "/api/rooms/" + this.code + "/commands",
         "POST",

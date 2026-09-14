@@ -9,6 +9,17 @@ const CHOICES = {
   thiefFail: "盗贼失败",
   pass: "不使用技能 / 确认",
 };
+function voteSummary(votes) {
+  return [true, false]
+    .map((approve) => {
+      const seats = votes
+        .filter((v) => v.approve === approve)
+        .map((v) => v.seat)
+        .sort((a, b) => a - b);
+      return `${seats.length}票${approve ? "赞成" : "反对"}：${seats.length ? seats.join("，") : "无"}`;
+    })
+    .join("\n");
+}
 function toolHistory(h, key) {
   const text = h.number ? `第${h.number}次操作 · ` : "";
   if (["skillDetail", "skillResult"].includes(h.kind))
@@ -19,18 +30,17 @@ function toolHistory(h, key) {
       key,
       text: text + "投票" + (h.approved ? "通过" : "未通过"),
       detail:
-        (h.team.length ? `队伍 ${h.team.join("、")}号 · ` : "") +
-        h.votes
-          .map((v) => `${v.seat}号${v.approve ? "赞成" : "反对"}`)
-          .join(" / "),
+        (h.team.length ? `队伍 ${h.team.join("、")}号\n` : "") +
+        voteSummary(h.votes),
     };
   if (h.kind === "toolQuest")
     return {
       key,
       text: text + (h.success ? "任务成功" : "任务失败"),
+      questResult: h.success ? "success" : "failure",
       detail: h.counts
-        ? `${h.team.join("、")}号 · 成功${h.counts.success} / 失败${h.counts.fail} / 盗贼失败${h.counts.thiefFail} / 魔法${h.counts.magic}（失败门槛${h.threshold}）`
-        : `${h.team.join("、")}号 · ${h.fails}张失败票（需${h.threshold}张才失败）`,
+        ? `${h.team.join("、")}号 · 成功${h.counts.success} / 失败${h.counts.fail} / 盗贼失败${h.counts.thiefFail} / 魔法${h.counts.magic}`
+        : `${h.team.join("、")}号 · ${h.fails}张失败票`,
     };
   if (h.kind === "toolKnife")
     return {
@@ -70,6 +80,12 @@ Page({
     actionLabel: "",
     actionChoices: [],
     actionTargets: [],
+    draftChoice: "",
+    draftLabel: "",
+    stagedChoice: false,
+    swapOptions: [],
+    swapSeats: [],
+    swapPlayers: [],
     toolType: "",
     toolSeats: [],
     toolThreshold: 1,
@@ -155,6 +171,12 @@ Page({
       actionLabel: "",
       actionChoices: [],
       actionTargets: [],
+      draftChoice: "",
+      draftLabel: "",
+      stagedChoice: false,
+      swapOptions: [],
+      swapSeats: [],
+      swapPlayers: [],
       revealed: false,
       secret: null,
       choiceButtons: [],
@@ -300,6 +322,12 @@ Page({
           actionLabel: "",
           actionChoices: [],
           actionTargets: [],
+          draftChoice: "",
+          draftLabel: "",
+          stagedChoice: false,
+          swapOptions: [],
+          swapSeats: [],
+          swapPlayers: [],
         }
       : {};
     // Invalidate pending identity reads before committing the new stage in one update.
@@ -326,6 +354,8 @@ Page({
       (h, i) =>
         toolHistory(h, i) || {
           key: i,
+          questResult:
+            h.kind === "quest" ? (h.success ? "success" : "failure") : "",
           text:
             h.kind === "team"
               ? `第${h.round}轮 · ${h.leader}号组队 ${h.team.join("、")}：${h.approved ? "通过" : "否决"}`
@@ -334,11 +364,9 @@ Page({
                 : "最终行动",
           detail:
             h.kind === "team"
-              ? h.votes
-                  .map((v) => `${v.seat}号${v.approve ? "赞成" : "反对"}`)
-                  .join(" / ")
+              ? voteSummary(h.votes)
               : h.kind === "quest"
-                ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败（需${h.threshold}张才失败）`
+                ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败`
                 : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
         },
     );
@@ -349,8 +377,31 @@ Page({
           ? ""
           : this.data.notice,
       room,
+      canStart:
+        room.players.length === room.capacity &&
+        room.players.every((p) => p.ready),
+      startHint:
+        room.players.length < room.capacity
+          ? `还差 ${room.capacity - room.players.length} 人入座 · ${room.players.filter((p) => !p.ready).length} 人未准备`
+          : room.players.some((p) => !p.ready)
+            ? `还差 ${room.players.filter((p) => !p.ready).length} 人准备`
+            : "全员已准备，可以发放身份",
+      canSettle:
+        !!room.operationProgress &&
+        room.operationProgress.total > 0 &&
+        room.operationProgress.completed === room.operationProgress.total,
+      settleHint: room.operationProgress
+        ? room.operationProgress.completed < room.operationProgress.total
+          ? `还差 ${room.operationProgress.total - room.operationProgress.completed} 人提交`
+          : "参与者已全部提交，可以结算"
+        : "正在确认操作进度",
       seats,
       history,
+      questSummary: {
+        total: history.filter((h) => h.questResult).length,
+        success: history.filter((h) => h.questResult === "success").length,
+        failure: history.filter((h) => h.questResult === "failure").length,
+      },
       roomBoards: this.data.boards.filter(
         (b) => b.available && b.counts.includes(room.capacity),
       ),
@@ -958,6 +1009,12 @@ Page({
       actionLabel: "",
       actionChoices: [],
       actionTargets: [],
+      draftChoice: "",
+      draftLabel: "",
+      stagedChoice: false,
+      swapOptions: [],
+      swapSeats: [],
+      swapPlayers: [],
     });
   },
   async openAction() {
@@ -988,17 +1045,34 @@ Page({
         return;
       if (!response.action) return;
       this.promptedActionStage = room.stage;
+      this.actionDraftStage = room.stage;
+      const swapOptions = (response.action.choices || []).filter((v) =>
+        /^swap:\d+:\d+$/.test(v),
+      );
+      const swapSeats = new Set(
+        swapOptions.flatMap((v) => v.split(":").slice(1).map(Number)),
+      );
       // Identity is fetched separately only after an explicit reveal tap.
       this.setData({
         actionDialog: true,
         actionLabel: response.action.label,
-        actionChoices: (response.action.choices || []).map((value) => ({
-          value,
-          label:
-            response.action.options?.find((o) => o.value === value)?.label ||
-            CHOICES[value] ||
+        stagedChoice: ["teamVote", "quest"].includes(room.phase),
+        draftChoice: "",
+        draftLabel: "",
+        swapOptions,
+        swapSeats: [],
+        swapPlayers: (room.players || [])
+          .filter((p) => swapSeats.has(p.seat))
+          .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
+        actionChoices: (response.action.choices || [])
+          .filter((v) => !swapOptions.includes(v))
+          .map((value) => ({
             value,
-        })),
+            label:
+              response.action.options?.find((o) => o.value === value)?.label ||
+              CHOICES[value] ||
+              value,
+          })),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {
@@ -1179,8 +1253,88 @@ Page({
     this.setData({ identityChange: null, identityChangeRevealed: false });
     this.cmd("ackIdentity", { revision });
   },
+  toggleSwapSeat(e) {
+    if (
+      this.data.busy ||
+      !this.data.network ||
+      !this.foreground ||
+      !this.data.actionDialog ||
+      this.data.room?.stage !== this.actionDraftStage
+    )
+      return;
+    const seat = Number(e.currentTarget.dataset.seat);
+    if (!this.data.swapPlayers.some((p) => p.seat === seat)) return;
+    const selected = this.data.swapSeats.includes(seat)
+      ? this.data.swapSeats.filter((s) => s !== seat)
+      : this.data.swapSeats.length < 2
+        ? [...this.data.swapSeats, seat]
+        : this.data.swapSeats;
+    this.setData({
+      swapSeats: selected,
+      swapPlayers: this.data.swapPlayers.map((p) => ({
+        ...p,
+        selected: selected.includes(p.seat),
+      })),
+    });
+  },
+  async confirmSwap() {
+    if (
+      this.data.busy ||
+      !this.data.network ||
+      !this.foreground ||
+      !this.data.actionDialog ||
+      this.data.room?.stage !== this.actionDraftStage ||
+      this.data.swapSeats.length !== 2
+    )
+      return;
+    const seats = [...this.data.swapSeats].sort((a, b) => a - b);
+    const value = this.data.swapOptions.find(
+      (v) =>
+        v
+          .split(":")
+          .slice(1)
+          .map(Number)
+          .sort((a, b) => a - b)
+          .join(":") === seats.join(":"),
+    );
+    if (!value) return;
+    return this.confirmCommand(
+      "确认秘密换号？",
+      `交换 ${seats[0]} 号与 ${seats[1]} 号。提交后不可更改。`,
+      "submit",
+      { value },
+    );
+  },
+  confirmChoice() {
+    if (
+      this.data.busy ||
+      !this.foreground ||
+      !this.data.actionDialog ||
+      !this.data.stagedChoice ||
+      this.data.room?.stage !== this.actionDraftStage ||
+      this.data.room.me.submitted ||
+      !this.data.network
+    )
+      return;
+    const value = this.data.draftChoice;
+    if (!this.data.actionChoices.some((c) => c.value === value)) return;
+    this.cmd("submit", { value });
+  },
   async submitChoice(e) {
     const value = e.currentTarget.dataset.value;
+    if (["teamVote", "quest"].includes(this.data.room?.phase)) {
+      if (
+        this.data.busy ||
+        !this.foreground ||
+        !this.data.actionDialog ||
+        this.data.room.stage !== this.actionDraftStage
+      )
+        return;
+      const choice = this.data.actionChoices.find((c) => c.value === value);
+      if (choice)
+        this.setData({ draftChoice: value, draftLabel: choice.label });
+      return;
+    }
     if (
       ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].includes(
         this.data.room?.phase,
