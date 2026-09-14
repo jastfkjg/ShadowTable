@@ -135,8 +135,8 @@ test("换号影响刀的目标，魔术师连带出局，按出局顺序复活�
   assert.equal(r.roles.p3, "servant");
   assert.equal(r.knights.players.p4.availableRound, 2);
   assert.equal(r.knights.deck.length, 0);
-  assert.throws(() => begin(r, "skills"), /已经执行/);
-  begin(r, "nextRound");
+  begin(r, "quest", { team: [1], threshold: 1 });
+  run(r, "p1", "cancelActivity");
   begin(r, "conversion");
   begin(r, "skills");
   assert.ok(privateView(r, "p4").action.choices.includes("target:3"));
@@ -236,7 +236,8 @@ test("转换只改阵营，当前红兰斯强制失败；仙女先知视野仅�
   });
   r.knights.fairy = 1;
   skills(r);
-  begin(r, "nextRound");
+  begin(r, "quest", { team: [1], threshold: 1 });
+  run(r, "p1", "cancelActivity");
   r.knights.conversions = [true];
   begin(r, "conversion");
   assert.equal(r.roles.p1, "blueLancelot");
@@ -251,7 +252,7 @@ test("转换只改阵营，当前红兰斯强制失败；仙女先知视野仅�
   run(r, "p1", "settleTool");
   assert.ok(privateView(r, "p1").information.includes("4号查验结果：坏人"));
   assert.ok(!privateView(r, "p2").information.includes("查验结果"));
-  begin(r, "night");
+  assert.equal(r.knights.nightRound, 2);
   assert.ok(privateView(r, "p3").information.includes("4号"));
   assert.ok(!JSON.stringify(publicView(r, "p1")).includes("nightInfo"));
 });
@@ -298,4 +299,121 @@ test("换号未产生技能效果不消耗魔术师；A刀刀错仍消耗刀", (
   assert.equal(r.knights.players.p1.used, true);
   assert.equal(r.knights.players.p2.used, false);
   assert.equal(r.knights.players.p3.used, false);
+});
+
+test("复活新牌只向本人发未确认提醒，确认不影响他人且拒绝过期版本", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "servant" });
+  r.knights.deck = ["redGuard"];
+  skills(r, { p1: "target:2" });
+  assert.equal(privateView(r, "p2").role, "红守卫");
+  assert.equal(publicView(r, "p2").me.identityChanged, true);
+  assert.equal(publicView(r, "p1").me.identityChanged, false);
+  const rev = privateView(r, "p2").identityRevision;
+  assert.equal(publicView(structuredClone(r), "p2").me.identityChanged, true);
+  assert.throws(
+    () => run(r, "p2", "ackIdentity", { revision: rev - 1 }),
+    /身份已变化/,
+  );
+  run(r, "p2", "ackIdentity", { revision: rev });
+  assert.equal(publicView(r, "p2").me.identityChanged, false);
+  assert.equal(privateView(r, "p2").role, "红守卫");
+  assert.ok(!privateView(r, "p2").information.includes("存活"));
+  assert.ok(!privateView(r, "p2").information.includes("技能可用"));
+});
+
+test("旧房间已抽取B牌但没有提醒版本时也能查看并确认", () => {
+  const r = setup();
+  r.roles.p2 = "blueGuard";
+  Object.assign(r.knights.players.p2, { b: true, availableRound: 2 });
+  assert.equal(publicView(r, "p2").me.identityChanged, true);
+  assert.equal(privateView(r, "p2").identityRevision, 1);
+  run(r, "p2", "ackIdentity", { revision: 1 });
+  assert.equal(publicView(r, "p2").me.identityChanged, false);
+});
+
+test("任务自动推进轮次：非法请求不推进，投票不推进，取消重开不重复推进", () => {
+  const r = setup();
+  skills(r);
+  const before = structuredClone(r);
+  assert.throws(
+    () => begin(r, "quest", { team: [], threshold: 1 }),
+    /至少选择/,
+  );
+  assert.deepEqual(r, before);
+  assert.throws(() => begin(r, "nextRound"), /操作类型无效/);
+  assert.deepEqual(r, before);
+  begin(r, "vote");
+  run(r, "p1", "cancelActivity");
+  assert.equal(r.knights.round, 1);
+  const leader = r.leader;
+  begin(r, "quest", { team: [1], threshold: 1 });
+  assert.equal(r.knights.round, 2);
+  assert.equal(r.leader, (leader % 12) + 1);
+  const currentStage = r.stage;
+  run(r, "p1", "cancelActivity");
+  assert.throws(
+    () =>
+      command(r, "p1", {
+        type: "beginActivity",
+        kind: "quest",
+        team: [1],
+        threshold: 1,
+        stage: currentStage,
+      }),
+    /阶段已变化/,
+  );
+  begin(r, "quest", { team: [1], threshold: 1 });
+  assert.equal(r.knights.round, 2);
+  assert.equal(r.history.filter((h) => h.text === "进入第2轮").length, 1);
+});
+test("第五轮技能后不能自动进入第六轮，失败请求不改变对局", () => {
+  const r = setup();
+  r.round = r.knights.round = 5;
+  r.knights.skillRound = 5;
+  const before = structuredClone(r);
+  assert.throws(() => begin(r, "quest", { team: [1], threshold: 1 }), /第五轮/);
+  assert.deepEqual(r, before);
+});
+
+test("连续发起技能自动换轮、转换并启用新B身份，取消重试不重复转换", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "servant" });
+  r.knights.deck = ["redGuard"];
+  r.knights.conversions = [true, false, false];
+  skills(r, { p1: "target:2" });
+  assert.equal(r.knights.players.p2.availableRound, 2);
+  begin(r, "skills");
+  assert.equal(r.knights.round, 2);
+  assert.equal(r.knights.convertedRound, 2);
+  assert.ok(privateView(r, "p2").action.choices.includes("target:1"));
+  assert.equal(r.knights.conversions.length, 2);
+  const old = r.stage;
+  run(r, "p1", "cancelActivity");
+  begin(r, "skills");
+  assert.equal(r.knights.round, 2);
+  assert.equal(r.knights.conversions.length, 2);
+  assert.throws(
+    () =>
+      command(r, "p1", { type: "beginActivity", kind: "skills", stage: old }),
+    /阶段已变化/,
+  );
+});
+test("任务已换轮或手动转换后发起技能不重复推进或抽转换牌", () => {
+  const r = setup();
+  skills(r);
+  begin(r, "quest", { team: [1], threshold: 1 });
+  run(r, "p1", "cancelActivity");
+  begin(r, "conversion");
+  const count = r.knights.conversions.length;
+  begin(r, "skills");
+  assert.equal(r.knights.round, 2);
+  assert.equal(r.knights.conversions.length, count);
+});
+test("第五轮技能完成后再次发起技能不修改状态", () => {
+  const r = setup();
+  r.round = r.knights.round = r.knights.skillRound = 5;
+  const before = structuredClone(r);
+  assert.throws(() => begin(r, "skills"), /第五轮/);
+  assert.deepEqual(r, before);
 });

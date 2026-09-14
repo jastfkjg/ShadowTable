@@ -256,3 +256,17 @@ summary {
     padding: 5px 8px;
   }
 }
+
+#identity-change {
+  max-width: min(90vw, 480px);
+  max-height: 85vh;
+  overflow: auto;
+  color: #e8eef1;
+  background: #192d37;
+  border: 1px solid #657a84;
+  border-radius: 16px;
+  padding: 24px;
+}
+#identity-change::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}

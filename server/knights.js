@@ -400,6 +400,8 @@ function settle(room, check, allRoles) {
       p.faction = null;
       p.b = true;
     }
+    p.identityRevision =
+      (p.identityRevision ?? (p.availableRound > 1 ? 1 : 0)) + 1;
     p.alive = true;
     p.availableRound = k.round + 1;
   }
@@ -409,7 +411,24 @@ function settle(room, check, allRoles) {
   delete k.planned;
   return true;
 }
+function updateNight(room, allRoles) {
+  const k = room.knights;
+  if (k.round < 2 || k.skillRound !== k.round) return;
+  for (const p of living(room)) {
+    if (room.roles[p.uid] === "prophet" && eligible(room, p.uid)) {
+      const seats = living(room)
+        .filter(
+          (t) => k.players[t.uid].b && side(room, t.uid, allRoles) === "evil",
+        )
+        .map((t) => t.seat);
+      k.players[p.uid].nightInfo =
+        `第${k.round}轮B牌坏人：${seats.length ? seats.join("、") + "号" : "无"}`;
+    }
+  }
+  k.nightRound = k.round;
+}
 module.exports = {
+  updateNight,
   init,
   side,
   living,

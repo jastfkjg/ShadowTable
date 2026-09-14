@@ -1,3 +1,13 @@
+<view wx:if="{{identityChange && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog" role="dialog" aria-modal="true" aria-label="你的新身份">
+    <view class="dialog-title">你已获得新身份</view>
+    <view class="small muted">仅供本人查看 · 新技能下一轮可用</view>
+    <view class="identity-title">{{identityChange.role}}</view>
+    <view class="muted">{{identityChange.faction}}</view>
+    <view class="private-info">{{identityChange.information}}</view>
+    <button class="primary" bindtap="acknowledgeIdentity" disabled="{{busy}}">记住了，遮盖身份</button>
+  </view>
+</view>
 <view class="page">
   <view class="brand">
     <text class="brand-mark">影中执刃</text>
@@ -280,16 +290,14 @@
       <view wx:if="{{room.canUseTools}}" class="panel host-panel">
         <view class="label">房主操作</view>
         <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · 仙女{{room.knights.fairy}}号 · B牌剩余{{room.knights.remainingCards}}张</view>
+        <view wx:if="{{room.knights}}" class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</view>
         <view class="tool-actions">
           <button class="secondary" bindtap="openTool" data-kind="vote" disabled="{{busy}}">投票</button>
           <button class="secondary" bindtap="openTool" data-kind="quest" disabled="{{busy}}">做任务</button>
-          <button class="secondary" bindtap="openTool" data-kind="{{room.knifeOffline?'offline':'assassination'}}" disabled="{{busy}}">{{room.knifeOffline?'线下刀人':'刀梅林'}}</button>
           <block wx:if="{{room.knights}}">
             <button class="secondary" bindtap="openTool" data-kind="skills" disabled="{{busy}}">使用技能</button>
             <button class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{busy}}">身份转换</button>
             <button class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{busy}}">仙女查验</button>
-            <button class="secondary" bindtap="openTool" data-kind="night" disabled="{{busy}}">夜晚</button>
-            <button class="secondary" bindtap="openTool" data-kind="nextRound" disabled="{{busy}}">进入下一轮</button>
           </block>
           <button wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{busy}}">刀逆仆</button>
         </view>

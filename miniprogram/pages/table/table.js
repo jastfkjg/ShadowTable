@@ -141,6 +141,7 @@ Page({
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
+      identityChange: null,
       actionDialog: false,
       actionSecret: null,
       actionLoading: false,
@@ -262,6 +263,7 @@ Page({
     const selected = stageChanged ? [] : this.data.selected;
     const privacyUpdate = stageChanged
       ? {
+          identityChange: null,
           revealed: false,
           secret: null,
           choiceButtons: [],
@@ -346,7 +348,10 @@ Page({
       (this.data.actionDialog || this.data.actionLoading)
     )
       this.closeAction();
+    if (room.me.identityChanged && this.foreground && !this.data.identityChange)
+      await this.showIdentityChange();
     if (
+      !room.me.identityChanged &&
       room.needsSubmission &&
       !room.me.submitted &&
       this.foreground &&
@@ -709,16 +714,14 @@ Page({
           conversion: "身份转换",
           fairy: "仙女查验",
           night: "夜晚",
-          nextRound: "进入下一轮",
         }[toolType] || "",
       toolDescription:
         {
           skills:
-            "所有玩家同时秘密提交技能。收齐后按车长顺序结算，猎人开枪会单独提示；技能结束按出局顺序抽B牌。",
+            "全员同时提交，按车长顺序结算。再次发起会进入下一轮，并自动补做该轮身份转换。",
           conversion: "抽取本轮转换牌，兰斯洛特只交换阵营。",
           fairy: "仙女持有者私密查验并传递，其他玩家确认。",
           night: "更新月下先知的私密视野。",
-          nextRound: "完成本轮技能后进入下一轮，新B牌技能生效。",
         }[toolType] || "",
       toolSeats,
       toolThreshold: 1,
@@ -1032,8 +1035,53 @@ Page({
       this.setData({ busy: false });
     }
   },
-  submitChoice(e) {
-    this.cmd("submit", { value: e.currentTarget.dataset.value });
+  async showIdentityChange() {
+    const room = this.data.room;
+    if (!room || this.identityChangeLoading) return;
+    this.identityChangeLoading = true;
+    const generation = this.generation;
+    try {
+      const secret = await api.request("/api/rooms/" + room.code + "/private");
+      if (
+        this.foreground &&
+        this.alive &&
+        this.generation === generation &&
+        this.data.room?.code === room.code &&
+        this.data.room?.stage === secret.stage &&
+        this.data.room.me.identityChanged
+      ) {
+        this.closeAction();
+        this.setData({ identityChange: secret, revealed: false, secret: null });
+      }
+    } catch (e) {
+      this.handleError(e);
+    } finally {
+      this.identityChangeLoading = false;
+    }
+  },
+  acknowledgeIdentity() {
+    const revision = this.data.identityChange?.identityRevision;
+    if (revision === undefined) return;
+    this.setData({ identityChange: null });
+    this.cmd("ackIdentity", { revision });
+  },
+  async submitChoice(e) {
+    const value = e.currentTarget.dataset.value;
+    if (
+      ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].includes(
+        this.data.room?.phase,
+      )
+    ) {
+      const label =
+        this.data.actionChoices.find((c) => c.value === value)?.label || value;
+      return this.confirmCommand(
+        "确认使用技能？",
+        label + "。提交后不可更改。",
+        "submit",
+        { value },
+      );
+    }
+    this.cmd("submit", { value });
   },
   async submitTarget(e) {
     const seat = Number(e.currentTarget.dataset.seat);

@@ -233,7 +233,7 @@ test("房主工具入口覆盖任意发牌后阶段，普通玩家不能看见�
     const host = render({ ...base, room });
     assert.equal(
       nodes(host).filter((n) => n.attr?.bindtap === "openTool").length,
-      4,
+      3,
     );
     assert.equal(byHandler(host, "advance"), undefined);
     assert.ok(byHandler(host, "finishTools"));
@@ -341,4 +341,33 @@ test("发身份弹窗默认隐藏，展开后在确认按钮前展示身份和�
   assert.ok(!JSON.stringify(closed).includes("梅林"));
   const vote = render({ ...data, room: { ...data.room, phase: "teamVote" } });
   assert.equal(byHandler(vote, "revealActionIdentity"), undefined);
+});
+
+test("十二骑士去除刀梅林和夜晚入口，新身份提醒显示新牌", () => {
+  const room = {
+    phase: "tools",
+    canUseTools: true,
+    knights: { round: 2 },
+    team: [],
+    me: { isHost: true },
+  };
+  const tree = render({ ...base, room });
+  const kinds = nodes(tree)
+    .filter((n) => n.attr?.bindtap === "openTool")
+    .map((n) => n.attr["data-kind"]);
+  assert.ok(!kinds.includes("assassination"));
+  assert.ok(!kinds.includes("offline"));
+  assert.ok(!kinds.includes("night"));
+  assert.ok(!kinds.includes("nextRound"));
+  const popup = render({
+    ...base,
+    room,
+    identityChange: {
+      role: "红守卫",
+      faction: "坏人阵营",
+      information: "没有视野。",
+    },
+  });
+  assert.ok(JSON.stringify(popup).includes("红守卫"));
+  assert.ok(byHandler(popup, "acknowledgeIdentity"));
 });

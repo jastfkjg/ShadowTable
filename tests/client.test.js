@@ -937,7 +937,8 @@ test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下�
     await refresh();
     assert.equal(host.data.room.phase, "tools");
     assert.ok(host.data.history.at(-1).text.includes("技能与复活"));
-    host.openTool({ currentTarget: { dataset: { kind: "nextRound" } } });
+    host.openTool({ currentTarget: { dataset: { kind: "quest" } } });
+    host.toggleToolSeat({ currentTarget: { dataset: { seat: 1 } } });
     await host.launchTool();
     await settle(host);
     await refresh();
@@ -945,4 +946,45 @@ test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下�
   } finally {
     await a.close();
   }
+});
+
+test("技能二次确认：取消和过期不提交，确认才提交", async () => {
+  const p = page({});
+  p.data.room = { stage: "s1", phase: "skillPrepare" };
+  p.data.actionChoices = [{ value: "target:2", label: "对2号开刀" }];
+  const calls = [];
+  p.cmd = (...v) => calls.push(v);
+  p.confirm = async () => false;
+  await p.submitChoice({ currentTarget: { dataset: { value: "target:2" } } });
+  assert.equal(calls.length, 0);
+  p.confirm = async () => {
+    p.data.room.stage = "s2";
+    return true;
+  };
+  await p.submitChoice({ currentTarget: { dataset: { value: "target:2" } } });
+  assert.equal(calls.length, 0);
+  p.confirm = async () => true;
+  await p.submitChoice({ currentTarget: { dataset: { value: "target:2" } } });
+  assert.equal(calls[0][0], "submit");
+  assert.equal(calls[0][1].value, "target:2");
+});
+test("新身份弹窗使用当前私密牌，后台不显示，确认使用看到的版本", async () => {
+  const secret = {
+    stage: "s1",
+    role: "红守卫",
+    identityRevision: 2,
+    information: "没有视野。",
+  };
+  const p = page({ request: async () => secret });
+  p.data.room = { code: "123456", stage: "s1", me: { identityChanged: true } };
+  await p.showIdentityChange();
+  assert.equal(p.data.identityChange.role, "红守卫");
+  const sent = [];
+  p.cmd = (...v) => sent.push(v);
+  p.acknowledgeIdentity();
+  assert.equal(sent[0][1].revision, 2);
+  assert.equal(p.data.identityChange, null);
+  p.foreground = false;
+  await p.showIdentityChange();
+  assert.equal(p.data.identityChange, null);
 });

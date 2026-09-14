@@ -67,7 +67,7 @@ test("6–9人配置和视野按角色隔离，随机首队长有效", () => {
       const card = privateView(r, p.uid);
       assert.equal(card.role === "梅林", r.roles[p.uid] === "merlin");
       if (r.roles[p.uid] === "servant")
-        assert.equal(card.information, "你没有额外的初始视野");
+        assert.equal(card.information, "没有视野。");
     }
   }
 });

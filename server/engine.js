@@ -54,7 +54,7 @@ const BOARDS = [
   },
   {
     id: "shadow-assist",
-    name: "影中执刃 · 线下结算辅助",
+    name: "阿瓦隆 · 影中执刃",
     available: true,
     mode: "assisted",
     counts: [12],
@@ -64,7 +64,7 @@ const BOARDS = [
   {
     id: "chaos",
     mode: "assisted",
-    name: "混沌契约 · 线下结算辅助",
+    name: "阿瓦隆 · 混沌契约",
     available: true,
     counts: [12],
     description: "发牌与魔法任务线上；初始互认、绑定、盘刀与排名在线下",
@@ -347,6 +347,10 @@ function questChoices(room, uid) {
     return ["fail"];
   return faction(room, uid) === "good" ? ["success"] : ["success", "fail"];
 }
+function identityRevision(room, uid) {
+  const state = room.knights?.players[uid];
+  return state?.identityRevision ?? (state?.availableRound > 1 ? 1 : 0);
+}
 function knightKnifeAllowed(room, uid) {
   const threeSuccesses =
     room.history.filter((h) => h.kind === "toolQuest" && h.success).length >= 3;
@@ -433,7 +437,7 @@ function privateView(room, uid) {
   const role = room.roles[uid],
     name = ROLES[role][0],
     side = faction(room, uid);
-  let information = "你没有额外的初始视野";
+  let information = "没有视野。";
   const seats = (predicate) =>
     room.players
       .filter(
@@ -476,11 +480,11 @@ function privateView(room, uid) {
         "gaheris",
       ].includes(role)
     )
-      information = "没有额外的初始同伴视野。";
-    else if (state.b) information = "新B身份不新增初始互认信息。";
+      information = "没有视野。";
+    else if (state.b) information = "没有视野。";
     else if (["assassin", "mordred", "morgana"].includes(role))
       information = `初始见面匪：${seats((r) => ["assassin", "mordred", "morgana"].includes(r))}号（不区分角色）`;
-    information += ` ${state.alive ? "存活" : "已出局，不能投票和上车"}；${state.used ? "技能已消耗" : state.availableRound > room.knights.round ? "新技能下一轮生效" : "技能可用（如身份有技能）"}。`;
+
     const skillDescription = {
       blueGuard: "秘密守护一人，免疫一次出局才消耗。",
       redGuard: "秘密守护一人，免疫一次出局才消耗。",
@@ -515,6 +519,7 @@ function privateView(room, uid) {
   return {
     game: room.game,
     stage: room.stage,
+    identityRevision: identityRevision(room, uid),
     role: name,
     faction:
       side === "good" ? "好人阵营" : side === "third" ? "盗贼阵营" : "坏人阵营",
@@ -553,6 +558,28 @@ function hasActiveOperation(room) {
 function canUseTools(room) {
   return !!room.roles && !["lobby", "ended", "terminated"].includes(room.phase);
 }
+function advanceKnightRound(room) {
+  requireRule(room.knights.round < 5, "已完成第五轮，不能再开启新一轮");
+  room.knights.round++;
+  room.round = room.knights.round;
+  room.leader = (room.leader % room.capacity) + 1;
+  room.history.push({ kind: "variant", text: `进入第${room.round}轮` });
+}
+function convertKnights(room) {
+  const k = room.knights;
+  const change = k.conversions.shift();
+  if (change)
+    for (const p of room.players) {
+      if (["blueLancelot", "redLancelot"].includes(room.roles[p.uid]))
+        k.players[p.uid].faction =
+          faction(room, p.uid) === "good" ? "evil" : "good";
+    }
+  k.convertedRound = k.round;
+  room.history.push({
+    kind: "variant",
+    text: change ? "本轮阵营转换" : "本轮不转换",
+  });
+}
 function beginActivity(room, input) {
   requireRule(canUseTools(room), "请先发放身份，结束后需重新开局");
   const kind = input.kind;
@@ -571,7 +598,6 @@ function beginActivity(room, input) {
       "conversion",
       "fairy",
       "night",
-      "nextRound",
     ].includes(kind),
     "操作类型无效",
   );
@@ -580,11 +606,15 @@ function beginActivity(room, input) {
     "当前操作尚未结算，请先结算或确认作废",
     409,
   );
-  if (["skills", "conversion", "fairy", "night", "nextRound"].includes(kind)) {
+  if (["skills", "conversion", "fairy", "night"].includes(kind)) {
     requireRule(room.board === "knights", "当前板子不支持此操作");
     requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
     const k = room.knights;
     if (["skills", "fairy"].includes(kind)) {
+      if (kind === "skills") {
+        if (k.skillRound === k.round) advanceKnightRound(room);
+        if (k.round >= 2 && k.convertedRound < k.round) convertKnights(room);
+      }
       knights.begin(room, kind, requireRule);
       room.toolSequence++;
       room.activity = { kind, number: room.toolSequence, threshold: null };
@@ -594,17 +624,7 @@ function beginActivity(room, input) {
           k.round >= 2 && k.convertedRound < k.round,
           "第2–5轮可转换且每轮一次",
         );
-        const change = k.conversions.shift();
-        if (change)
-          for (const p of room.players)
-            if (["blueLancelot", "redLancelot"].includes(room.roles[p.uid]))
-              k.players[p.uid].faction =
-                faction(room, p.uid) === "good" ? "evil" : "good";
-        k.convertedRound = k.round;
-        room.history.push({
-          kind: "variant",
-          text: change ? "本轮阵营转换" : "本轮不转换",
-        });
+        convertKnights(room);
       } else if (kind === "night") {
         requireRule(
           k.round >= 2 && k.nightRound < k.round && k.skillRound === k.round,
@@ -626,15 +646,6 @@ function beginActivity(room, input) {
           kind: "variant",
           text: "夜晚已完成，先知请查看私密身份",
         });
-      } else {
-        requireRule(
-          k.round < 5 && k.skillRound === k.round,
-          "请先完成技能，最多五轮",
-        );
-        k.round++;
-        room.round = k.round;
-        room.leader = (room.leader % room.capacity) + 1;
-        room.history.push({ kind: "variant", text: `进入第${k.round}轮` });
       }
       stage(room, "tools");
     }
@@ -686,6 +697,15 @@ function beginActivity(room, input) {
       assisted(room) || !!room.knights || offlineAssassination(room),
       "当前配置支持线上刀人",
     );
+  // A new task opens the next round only after the previous skill cycle ended.
+  // Validate before mutating so malformed or stale requests cannot advance time.
+  if (
+    kind === "quest" &&
+    room.knights &&
+    room.knights.skillRound === room.knights.round
+  ) {
+    advanceKnightRound(room);
+  }
   if (hasActiveOperation(room)) {
     knights.cancel(room);
     room.history.push({ kind: "toolCanceled" });
@@ -728,6 +748,7 @@ function settleActivity(room) {
   const number = room.activity.number;
   if (KNIGHT_PHASES.includes(room.phase)) {
     if (!knights.settle(room, requireRule, ROLES)) return;
+    knights.updateNight(room, ROLES);
     if (room.activity.kind === "skills")
       for (const text of room.knights.events || [])
         room.history.push({ kind: "variant", number, text });
@@ -924,6 +945,10 @@ function publicView(room, uid) {
       isHost: room.host === uid,
       ready: p.ready,
       submitted: Object.hasOwn(room.submissions || {}, uid),
+      identityRevision: identityRevision(room, uid),
+      identityChanged:
+        identityRevision(room, uid) >
+        (room.knights?.players[uid].identityAcknowledged || 0),
     },
     players: room.players.map((p) => ({
       seat: p.seat,
@@ -985,6 +1010,17 @@ function command(room, uid, input) {
     ].includes(type)
   )
     requireRule(uid === room.host, "只有房主可以管理流程", 403);
+  if (type === "ackIdentity") {
+    const state = room.knights?.players[uid];
+    requireRule(
+      state && input.revision === identityRevision(room, uid),
+      "身份已变化，请重新查看",
+      409,
+    );
+    state.identityRevision = input.revision;
+    state.identityAcknowledged = input.revision;
+    return;
+  }
   if (type === "settleTool") {
     requireRule(
       canUseTools(room) &&

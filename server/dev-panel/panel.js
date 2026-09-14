@@ -241,7 +241,46 @@ if (typeof document !== "undefined") {
     );
   const button = (action, label, disabled = false) =>
     `<button data-action="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
+  let changedActor = null;
+  function showChangedIdentity() {
+    const dialog = $("identity-change");
+    if (busy || document.hidden || dialog.open) return;
+    const actor = companion.actors.find(
+      (a) => a.room?.me.identityChanged && a.secret && !a.pending,
+    );
+    if (!actor) return;
+    changedActor = { actor, revision: actor.secret.identityRevision };
+    $("identity-change-title").textContent =
+      `${actor.room.me.seat}号获得新身份`;
+    $("identity-change-role").textContent =
+      actor.secret.role + " · " + actor.secret.faction;
+    $("identity-change-info").textContent = actor.secret.information;
+    dialog.showModal();
+  }
+  $("identity-change-confirm").onclick = () => {
+    const change = changedActor;
+    const actor = change?.actor;
+    $("identity-change").close();
+    if (actor)
+      run(
+        () =>
+          companion.command(actor, "ackIdentity", {
+            revision: change.revision,
+          }),
+        "新身份已确认",
+      );
+  };
+  $("identity-change").addEventListener("cancel", (e) => e.preventDefault());
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      $("identity-change").close();
+      $("identity-change-role").textContent = "";
+      $("identity-change-info").textContent = "";
+    } else showChangedIdentity();
+  });
   function render() {
+    showChangedIdentity();
+    $("identity-change-confirm").disabled = busy;
     $("workspace").hidden = !companion.actors.length;
     const room = companion.actors.find((a) => a.room)?.room;
     $("phase").textContent = room ? room.phaseName : "等待玩家入座";
@@ -401,6 +440,22 @@ if (typeof document !== "undefined") {
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
     if (!action || !actor || busy) return;
+    if (
+      ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].includes(
+        actor.room?.phase,
+      ) &&
+      actor.secret?.action?.choices?.includes(action)
+    ) {
+      const label =
+        actor.secret.action.options?.find((o) => o.value === action)?.label ||
+        action;
+      if (
+        !confirm(
+          `${actor.room.me.seat}号：${label}。确认提交？提交后不可更改。`,
+        )
+      )
+        return;
+    }
     if (
       action === "target" &&
       (!targets[actor.id] ||
