@@ -86,6 +86,7 @@ const ROLES = {
   redTraitor: ["红内奸", "evil"],
 };
 const PHASES = {
+  tools: "等待房主发起操作",
   lobby: "入座与准备",
   identity: "私密身份确认",
   proposal: "队长组队",
@@ -271,7 +272,7 @@ for (const b of BOARDS) {
       ]),
     );
 }
-function start(room) {
+function start(room, flexible = false) {
   requireRule(
     room.players.length === room.capacity && room.players.every((p) => p.ready),
     "需要所有座位入座且全员准备",
@@ -292,7 +293,10 @@ function start(room) {
   room.result = null;
   room.proposalSubmitted = false;
   room.convertedReverse = null;
-  stage(room, "identity");
+  room.flexible = flexible;
+  room.activity = null;
+  room.toolSequence = 0;
+  stage(room, flexible ? "tools" : "identity");
 }
 function faction(room, uid) {
   if (uid === room.convertedReverse) return "evil";
@@ -332,11 +336,13 @@ function actionSpec(room, uid) {
             label: "选择本轮任务牌",
             choices: questChoices(room, uid),
           }
-        : {
-            kind: "confirm",
-            label: "本轮未上车，确认等待结算",
-            choices: ["confirm"],
-          };
+        : room.flexible
+          ? null
+          : {
+              kind: "confirm",
+              label: "本轮未上车，确认等待结算",
+              choices: ["confirm"],
+            };
     case "reverseStrike":
     case "assassination":
       return room.roles[uid] === "assassin"
@@ -348,7 +354,7 @@ function actionSpec(room, uid) {
                 : "填入匪队线下决定的梅林目标",
             targets: targets.filter((t) => t.seat !== p.seat),
           }
-        : { kind: "confirm", label: "确认进入最终结算", choices: ["confirm"] };
+        : { kind: "confirm", label: "确认本次刀人操作", choices: ["confirm"] };
     default:
       return null;
   }
@@ -414,19 +420,198 @@ function boardName(room) {
   const b = BOARDS.find((b) => b.id === room.board);
   return b.namesByCapacity?.[room.capacity] || b.name;
 }
+function hasActiveOperation(room) {
+  return [
+    "teamVote",
+    "quest",
+    "assassination",
+    "reverseStrike",
+    "offlineFinal",
+  ].includes(room.phase);
+}
+function canUseTools(room) {
+  return !!room.roles && !["lobby", "ended", "terminated"].includes(room.phase);
+}
+function beginActivity(room, input) {
+  requireRule(canUseTools(room), "请先发放身份，结束后需重新开局");
+  const kind = input.kind;
+  requireRule(
+    ["vote", "quest", "assassination", "reverseStrike", "offline"].includes(
+      kind,
+    ),
+    "操作类型无效",
+  );
+  requireRule(
+    !hasActiveOperation(room) || input.replace === true,
+    "当前操作尚未结算，请先结算或确认作废",
+    409,
+  );
+  const team = input.team || [];
+  if (["vote", "quest"].includes(kind)) {
+    requireRule(
+      Array.isArray(team) &&
+        new Set(team).size === team.length &&
+        team.every((seat) => room.players.some((p) => p.seat === seat)),
+      "队伍座位不合法",
+    );
+    if (kind === "quest") {
+      requireRule(team.length > 0, "请至少选择一位任务队员");
+      requireRule(
+        [1, 2].includes(input.threshold) && input.threshold <= team.length,
+        "失败票门槛无效",
+      );
+    }
+  }
+  if (["assassination", "reverseStrike"].includes(kind)) {
+    requireRule(room.board !== "shadow-assist", "本板子请在线下完成刀人");
+    requireRule(
+      Object.values(room.roles).includes("assassin"),
+      "本配置请在线下刺梅林",
+    );
+    if (kind === "reverseStrike")
+      requireRule(
+        Object.values(room.roles).includes("reverse"),
+        "当前配置没有逆仆",
+      );
+  }
+  if (kind === "offline")
+    requireRule(
+      room.board === "shadow-assist" || offlineAssassination(room),
+      "当前配置支持线上刀人",
+    );
+  if (hasActiveOperation(room)) room.history.push({ kind: "toolCanceled" });
+  room.flexible = true;
+  room.toolSequence = (room.toolSequence || 0) + 1;
+  room.activity = {
+    kind,
+    number: room.toolSequence,
+    threshold: kind === "quest" ? input.threshold : null,
+  };
+  room.team = ["vote", "quest"].includes(kind)
+    ? [...team].sort((a, b) => a - b)
+    : [];
+  room.result = null;
+  stage(
+    room,
+    {
+      vote: "teamVote",
+      quest: "quest",
+      assassination: "assassination",
+      reverseStrike: "reverseStrike",
+      offline: "offlineFinal",
+    }[kind],
+  );
+}
+function settleActivity(room) {
+  requireRule(
+    hasActiveOperation(room) && room.phase !== "offlineFinal",
+    "当前没有可结算的线上操作",
+  );
+  const participants = room.players.filter((p) => actionSpec(room, p.uid));
+  requireRule(
+    participants.length > 0 &&
+      participants.every((p) => Object.hasOwn(room.submissions, p.uid)),
+    "操作尚未完成，请等待参与者提交",
+    409,
+  );
+  const number = room.activity.number;
+  if (room.phase === "teamVote") {
+    const votes = room.players.map((p) => ({
+      seat: p.seat,
+      approve: room.submissions[p.uid] === "approve",
+    }));
+    room.history.push({
+      kind: "toolVote",
+      number,
+      team: [...room.team],
+      votes,
+      approved: votes.filter((v) => v.approve).length > votes.length / 2,
+    });
+  } else if (room.phase === "quest") {
+    const fails = participants.filter(
+      (p) => room.submissions[p.uid] === "fail",
+    ).length;
+    room.history.push({
+      kind: "toolQuest",
+      number,
+      team: [...room.team],
+      fails,
+      threshold: room.activity.threshold,
+      success: fails < room.activity.threshold,
+    });
+  } else {
+    const assassin = room.players.find((p) => room.roles[p.uid] === "assassin");
+    const target = room.players.find(
+      (p) => p.seat === room.submissions[assassin.uid],
+    );
+    if (room.phase === "reverseStrike") {
+      if (room.roles[target.uid] === "reverse")
+        room.convertedReverse = target.uid;
+      room.history.push({ kind: "toolReverse", number });
+    } else
+      room.history.push({
+        kind: "toolKnife",
+        number,
+        target: target.seat,
+        hit: room.roles[target.uid] === "merlin",
+      });
+  }
+  room.activity = null;
+  room.team = [];
+  stage(room, "tools");
+}
+function phaseName(room) {
+  if (room.flexible)
+    return (
+      {
+        teamVote: "全员投票",
+        quest: "任务出牌",
+        assassination: "刀梅林",
+        reverseStrike: "刀逆仆",
+        offlineFinal: "线下刀人",
+      }[room.phase] || PHASES[room.phase]
+    );
+  return room.phase === "offlineFinal" && offlineAssassination(room)
+    ? "线下刺梅林"
+    : PHASES[room.phase];
+}
 function roomSummary(room, uid) {
   const p = room.players.find((p) => p.uid === uid);
   requireRule(p || room.host === uid, "你不在该房间", 403);
   return {
     code: room.code,
     boardName: boardName(room),
-    phaseName:
-      room.phase === "offlineFinal" && offlineAssassination(room)
-        ? "线下刺梅林"
-        : PHASES[room.phase],
+    phaseName: phaseName(room),
     game: room.game,
     seat: p?.seat ?? null,
     isHost: room.host === uid,
+  };
+}
+function operationProgress(room, uid) {
+  if (
+    uid !== room.host ||
+    ![
+      "identity",
+      "teamVote",
+      "quest",
+      "assassination",
+      "reverseStrike",
+    ].includes(room.phase)
+  )
+    return null;
+  const players = room.players.map((p) => {
+    const required = !!actionSpec(room, p.uid);
+    return {
+      seat: p.seat,
+      name: p.name,
+      required,
+      completed: required && Object.hasOwn(room.submissions || {}, p.uid),
+    };
+  });
+  return {
+    players,
+    total: players.filter((p) => p.required).length,
+    completed: players.filter((p) => p.completed).length,
   };
 }
 function publicView(room, uid) {
@@ -444,14 +629,24 @@ function publicView(room, uid) {
         ? Object.values(room.roles)
         : roleDeck(room.board, room.capacity),
     ),
+    operationProgress: operationProgress(room, uid),
+    flexible: !!room.flexible,
+    canUseTools: room.host === uid && canUseTools(room),
+    hasActiveOperation: hasActiveOperation(room),
+    activity: room.activity
+      ? {
+          kind: room.activity.kind,
+          number: room.activity.number,
+          threshold: room.activity.threshold,
+        }
+      : null,
+    knifeOffline: room.board === "shadow-assist" || offlineAssassination(room),
+    hasReverse: !!room.roles && Object.values(room.roles).includes("reverse"),
     assisted: room.board === "shadow-assist",
     offlineAssassination: offlineAssassination(room),
     capacity: room.capacity,
     phase: room.phase,
-    phaseName:
-      room.phase === "offlineFinal" && offlineAssassination(room)
-        ? "线下刺梅林"
-        : PHASES[room.phase],
+    phaseName: phaseName(room),
     stage: room.stage,
     game: room.game,
     me: {
@@ -470,22 +665,32 @@ function publicView(room, uid) {
     leader: room.leader || null,
     round: room.round || null,
     team: room.team || [],
-    teamSize: room.round ? TEAMS[room.capacity][room.round - 1] : null,
+    teamSize: room.flexible
+      ? (room.team || []).length
+      : room.round
+        ? TEAMS[room.capacity][room.round - 1]
+        : null,
     rejects: room.rejects || 0,
     quests: room.quests || [],
     history: room.history,
     result: room.result || null,
     proposalSubmitted: !!room.proposalSubmitted,
-    needsSubmission: [
-      "identity",
-      "teamVote",
-      "quest",
-      "assassination",
-      "reverseStrike",
-    ].includes(room.phase),
+    needsSubmission: room.flexible
+      ? !!actionSpec(room, uid)
+      : [
+          "identity",
+          "teamVote",
+          "quest",
+          "assassination",
+          "reverseStrike",
+        ].includes(room.phase),
     canAdvance:
       room.host === uid &&
-      !["lobby", "ended", "terminated", "offlineFinal"].includes(room.phase),
+      (room.flexible
+        ? hasActiveOperation(room) && room.phase !== "offlineFinal"
+        : !["lobby", "ended", "terminated", "offlineFinal"].includes(
+            room.phase,
+          )),
   };
 }
 function command(room, uid, input) {
@@ -503,9 +708,64 @@ function command(room, uid, input) {
       "transfer",
       "offline",
       "closeOffline",
+      "beginActivity",
+      "settleTool",
+      "cancelActivity",
+      "finishTools",
     ].includes(type)
   )
     requireRule(uid === room.host, "只有房主可以管理流程", 403);
+  if (type === "settleTool") {
+    requireRule(
+      canUseTools(room) &&
+        hasActiveOperation(room) &&
+        room.phase !== "offlineFinal",
+      "当前没有可结算的线上操作",
+    );
+    // Validate settlement on a copy so a failed attempt leaves the original stage intact.
+    const next = structuredClone(room);
+    next.flexible = true;
+    if (!next.activity) {
+      next.toolSequence = (next.toolSequence || 0) + 1;
+      next.activity = {
+        kind: next.phase,
+        number: next.toolSequence,
+        threshold: next.capacity >= 7 && next.round === 4 ? 2 : 1,
+      };
+    }
+    settleActivity(next);
+    Object.assign(room, next);
+    return;
+  }
+  if (type === "beginActivity") {
+    beginActivity(room, input);
+    return;
+  }
+  if (type === "cancelActivity") {
+    requireRule(
+      canUseTools(room) && hasActiveOperation(room),
+      "当前没有进行中的操作",
+    );
+    room.history.push({ kind: "toolCanceled" });
+    room.flexible = true;
+    room.activity = null;
+    room.team = [];
+    stage(room, "tools");
+    return;
+  }
+  if (type === "finishTools") {
+    requireRule(canUseTools(room), "当前没有已发牌的对局");
+    requireRule(
+      !hasActiveOperation(room) || input.replace === true,
+      "请先结算或确认作废当前操作",
+      409,
+    );
+    if (hasActiveOperation(room)) room.history.push({ kind: "toolCanceled" });
+    room.flexible = true;
+    room.activity = null;
+    end(room, null, "房主已结束本局，以线下确认的胜负为准。");
+    return;
+  }
   if (type === "leave") {
     requireRule(room.phase === "lobby", "对局中不可离开座位，请联系房主终止");
     room.players = room.players.filter((p) => p.uid !== uid);
@@ -558,7 +818,11 @@ function command(room, uid, input) {
   }
   if (type === "start") {
     requireRule(room.phase === "lobby", "对局已经开始");
-    start(room);
+    requireRule(
+      input.flexible === undefined || typeof input.flexible === "boolean",
+      "流程设置无效",
+    );
+    start(room, input.flexible === true);
     return;
   }
   if (type === "rematch") {
@@ -578,6 +842,9 @@ function command(room, uid, input) {
       "rejects",
       "teamApproved",
       "convertedReverse",
+      "flexible",
+      "activity",
+      "toolSequence",
     ])
       delete room[key];
     room.history = [];
@@ -609,6 +876,13 @@ function command(room, uid, input) {
         room.phase === "offlineFinal",
       "当前不是线下结算阶段",
     );
+    if (room.flexible || input.keepPlaying === true) {
+      room.flexible = true;
+      room.history.push({ kind: "toolOffline", number: room.activity?.number });
+      room.activity = null;
+      stage(room, "tools");
+      return;
+    }
     end(
       room,
       null,
@@ -653,6 +927,10 @@ function command(room, uid, input) {
     return;
   }
   requireRule(type === "advance", "未知操作");
+  if (room.flexible) {
+    settleActivity(room);
+    return;
+  }
   if (
     [
       "identity",

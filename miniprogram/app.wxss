@@ -689,3 +689,121 @@ button.room-rules-button {
   white-space: nowrap;
   margin-left: auto;
 }
+
+.tool-actions,
+.tool-seat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+.tool-actions button {
+  margin: 0;
+}
+button.tool-seat-option {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  min-height: 88rpx;
+  padding: 12rpx;
+  background: var(--bg);
+  color: var(--text);
+  border: 1rpx solid var(--border);
+  font-size: 26rpx;
+}
+button.tool-seat-option.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #354039;
+}
+
+.tool-seat-scroll {
+  margin: 24rpx 0;
+  overflow-y: auto;
+}
+.tool-seat-scroll .tool-seat-grid {
+  margin: 0;
+}
+
+button.identity-compact {
+  width: 100%;
+  min-height: 96rpx;
+  margin: 24rpx 0;
+  padding: 20rpx 24rpx;
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  background: var(--surface);
+  color: var(--text);
+  border: 1rpx solid var(--border);
+  font-size: 28rpx;
+}
+.identity-compact-action {
+  color: var(--accent);
+}
+.operation-progress {
+  margin: 28rpx 0;
+  border-top: 1rpx solid var(--border);
+  padding-top: 24rpx;
+}
+.progress-heading,
+.progress-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16rpx;
+}
+.progress-heading {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+.progress-player {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid var(--border);
+  font-size: 28rpx;
+}
+.progress-player-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-state {
+  flex-shrink: 0;
+  font-size: 26rpx;
+}
+.progress-state.completed { color: var(--accent); }
+.progress-state.not-required { color: var(--muted); }
+.finish-game-footer {
+  margin-top: 48rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx solid var(--border);
+}
+button.finish-game-button {
+  width: 100%;
+  margin: 0;
+  background: #35272b;
+  color: #f2b6ae;
+  border: 1rpx solid #ab7774;
+  font-weight: 600;
+}
+
+.action-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: 16rpx 0 24rpx;
+  font-size: 28rpx;
+  color: var(--accent);
+}
+.action-entry button {
+  width: auto;
+  min-height: 88rpx;
+  margin: 0;
+  flex-shrink: 0;
+}
+.action-hint { margin: 16rpx 0 24rpx; }
+.action-target-scroll { height: 440rpx; overflow-y: auto; }
+.action-dialog .text-button { margin-bottom: 0; }

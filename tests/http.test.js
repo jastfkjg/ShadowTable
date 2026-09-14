@@ -82,13 +82,19 @@ test("HTTP完整创建/加入/并发准备/开始/确认/终止/同房再开，�
       ).status,
       403,
     );
-    const before = JSON.stringify(view);
+    const before = JSON.stringify({ ...view, operationProgress: null });
     await a.req(path + "/commands", tokens[1], {
       type: "submit",
       stage: view.stage,
       value: "confirm",
     });
-    assert.equal(JSON.stringify((await a.req(path, tokens[0])).data), before);
+    assert.equal(
+      JSON.stringify({
+        ...(await a.req(path, tokens[0])).data,
+        operationProgress: null,
+      }),
+      before,
+    );
     await a.req(path + "/commands", tokens[0], {
       type: "terminate",
       stage: view.stage,

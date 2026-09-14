@@ -37,7 +37,9 @@ function html(n) {
     }[n.tag] || "div";
   const attrs = Object.entries(n.attr || {})
     .filter(([k]) =>
-      ["class", "disabled", "placeholder", "value", "role"].includes(k),
+      ["class", "disabled", "placeholder", "value", "role", "style"].includes(
+        k,
+      ),
     )
     .map(([k, v]) =>
       k === "disabled" ? (v ? "disabled" : "") : `${k}="${escape(v)}"`,
@@ -88,8 +90,8 @@ const base = {
   selected: [],
   history: [],
 };
-function roomData() {
-  const room = publicView(r, "p1");
+function roomData(source = r) {
+  const room = publicView(source, "p1");
   return {
     ...base,
     room,
@@ -99,7 +101,7 @@ function roomData() {
       occupied: true,
       mine: p.seat === 1,
       host: p.isHost,
-      inTeam: false,
+      inTeam: room.team.includes(p.seat),
     })),
   };
 }
@@ -124,15 +126,93 @@ scenes.identity = roomData();
 const taskSeats = roomData();
 scenes.taskSeats = {
   ...taskSeats,
-  room: { ...taskSeats.room, phase: "proposal", phaseName: "队长组队", needsSubmission: false, capacity: 6, teamSize: 2, leader: 3, team: [2, 4] },
+  room: {
+    ...taskSeats.room,
+    phase: "proposal",
+    phaseName: "队长组队",
+    needsSubmission: false,
+    capacity: 6,
+    teamSize: 2,
+    leader: 3,
+    team: [2, 4],
+  },
   teamText: "2、4",
-  seats: taskSeats.seats.slice(0, 6).map((seat) => ({ ...seat, inTeam: [2, 4].includes(seat.seat) })),
+  seats: taskSeats.seats
+    .slice(0, 6)
+    .map((seat) => ({ ...seat, inTeam: [2, 4].includes(seat.seat) })),
 };
 scenes.selfInTeam = {
   ...scenes.taskSeats,
   room: { ...scenes.taskSeats.room, team: [1, 4] },
   teamText: "1、4",
-  seats: scenes.taskSeats.seats.map((seat) => ({ ...seat, inTeam: [1, 4].includes(seat.seat) })),
+  seats: scenes.taskSeats.seats.map((seat) => ({
+    ...seat,
+    inTeam: [1, 4].includes(seat.seat),
+  })),
+};
+const toolRoom = newRoom("628419", "p1", "林间", "classic", 6);
+for (let i = 2; i <= 6; i++)
+  enter(toolRoom, "p" + i, ["", "", "阿木", "小橙", "晚风", "Kiki", "七月"][i]);
+toolRoom.players.forEach((p) =>
+  command(toolRoom, p.uid, {
+    type: "ready",
+    ready: true,
+    stage: toolRoom.stage,
+  }),
+);
+command(toolRoom, "p1", {
+  type: "start",
+  flexible: true,
+  stage: toolRoom.stage,
+});
+scenes.tools = roomData(toolRoom);
+scenes.toolDialog = {
+  ...scenes.tools,
+  toolType: "quest",
+  toolSeats: [2, 4],
+  toolThreshold: 1,
+  toolThresholds: ["1 张失败票", "2 张失败票"],
+  toolPlayers: toolRoom.players.map((p) => ({
+    ...p,
+    selected: [2, 4].includes(p.seat),
+  })),
+};
+command(toolRoom, "p1", {
+  type: "beginActivity",
+  kind: "vote",
+  team: [2, 4],
+  stage: toolRoom.stage,
+});
+command(toolRoom, "p2", {
+  type: "submit",
+  value: "approve",
+  stage: toolRoom.stage,
+});
+command(toolRoom, "p4", {
+  type: "submit",
+  value: "reject",
+  stage: toolRoom.stage,
+});
+scenes.operationProgress = {
+  ...roomData(toolRoom),
+  teamText: "2、4",
+  history: [{ key: 0, text: "上次投票已结算", detail: "公开记录保留" }],
+};
+scenes.actionDialog = {
+  ...scenes.operationProgress,
+  room: {
+    ...scenes.operationProgress.room,
+    phase: "quest",
+    phaseName: "任务出牌",
+    needsSubmission: true,
+  },
+  actionDialog: true,
+  actionLabel: "选择本轮任务牌",
+  actionChoices: [
+    { value: "success", label: "任务成功" },
+    { value: "fail", label: "任务失败" },
+  ],
+  actionTargets: [],
 };
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")

@@ -80,7 +80,7 @@ test("WXML私密卡被遮盖时不把角色和行动渲染到树，非房主无�
     choiceButtons: [{ value: "success", label: "任务成功" }],
   });
   assert.ok(JSON.stringify(shown).includes("梅林"));
-  assert.ok(byHandler(shown, "submitChoice"));
+  assert.equal(byHandler(shown, "submitChoice"), undefined);
   const submitted = render({
     ...base,
     room: { ...room, me: { ...room.me, submitted: true } },
@@ -178,4 +178,133 @@ test("说明仅列阵营角色，房间内玩家可打开当前配置弹窗", ()
   const open = render({ ...base, room, showRoomRules: true });
   assert.ok(byHandler(open, "closeRoomRules"));
   assert.ok(JSON.stringify(open).includes("莫甘娜，刺客"));
+});
+
+test("投票和私密操作只在弹窗显示，已提交后弹窗消失且入口显示完成", () => {
+  const room = {
+    code: "123456",
+    phase: "teamVote",
+    team: [],
+    me: { submitted: false },
+    needsSubmission: true,
+  };
+  const data = {
+    ...base,
+    room,
+    actionDialog: true,
+    actionLabel: "是否同意",
+    actionChoices: [
+      { value: "approve", label: "赞成" },
+      { value: "reject", label: "反对" },
+    ],
+    secret: { role: "测试私密身份", information: "不可见" },
+  };
+  const open = render(data);
+  assert.ok(byHandler(open, "submitChoice"));
+  assert.ok(byHandler(open, "closeAction"));
+  assert.ok(!JSON.stringify(open).includes("测试私密身份"));
+  const closed = render({ ...data, actionDialog: false });
+  assert.equal(byHandler(closed, "submitChoice"), undefined);
+  assert.ok(byHandler(closed, "openAction"));
+  const done = render({ ...data, room: { ...room, me: { submitted: true } } });
+  assert.equal(byHandler(done, "submitChoice"), undefined);
+  assert.equal(byHandler(done, "openAction"), undefined);
+  assert.ok(JSON.stringify(done).includes("本轮操作已提交"));
+});
+
+test("房主工具入口覆盖任意发牌后阶段，普通玩家不能看见管理入口", () => {
+  for (const phase of [
+    "tools",
+    "identity",
+    "teamVote",
+    "quest",
+    "assassination",
+  ]) {
+    const room = {
+      phase,
+      flexible: true,
+      canUseTools: true,
+      hasActiveOperation: phase !== "tools",
+      knifeOffline: false,
+      hasReverse: true,
+      team: [],
+      me: { isHost: true },
+    };
+    const host = render({ ...base, room });
+    assert.equal(
+      nodes(host).filter((n) => n.attr?.bindtap === "openTool").length,
+      4,
+    );
+    assert.equal(byHandler(host, "advance"), undefined);
+    assert.ok(byHandler(host, "finishTools"));
+    const guest = render({
+      ...base,
+      room: { ...room, canUseTools: false, me: { isHost: false } },
+    });
+    assert.equal(byHandler(guest, "openTool"), undefined);
+    assert.equal(byHandler(guest, "finishTools"), undefined);
+  }
+  const room = {
+    phase: "tools",
+    flexible: true,
+    canUseTools: true,
+    team: [],
+    me: { isHost: true },
+  };
+  const dialog = render({
+    ...base,
+    room,
+    toolType: "quest",
+    toolSeats: [],
+    toolThreshold: 1,
+    toolPlayers: [{ seat: 1, name: "甲" }],
+  });
+  assert.ok(byHandler(dialog, "toggleToolSeat"));
+  assert.equal(byHandler(dialog, "launchTool").attr.disabled, true);
+});
+
+test("身份默认只显示一行入口，进度仅房主可见，结束按钮位于记录之后", () => {
+  const room = {
+    phase: "teamVote",
+    canUseTools: true,
+    hasActiveOperation: true,
+    team: [1],
+    me: { isHost: true },
+    operationProgress: {
+      total: 2,
+      completed: 1,
+      players: [
+        { seat: 1, name: "甲", required: true, completed: true },
+        { seat: 2, name: "乙", required: true, completed: false },
+        { seat: 3, name: "丙", required: false, completed: false },
+      ],
+    },
+  };
+  const tree = render({
+    ...base,
+    room,
+    history: [{ key: 0, text: "已有记录", detail: "已结算" }],
+    secret: { role: "测试私密角色", information: "隐私" },
+  });
+  const serialized = JSON.stringify(tree);
+  assert.ok(!serialized.includes("身份已遮盖"));
+  assert.ok(!serialized.includes("测试私密角色"));
+  assert.ok(byHandler(tree, "reveal"));
+  assert.ok(serialized.includes("未完成"));
+  assert.ok(serialized.includes("无需操作"));
+  const all = nodes(tree);
+  const footerIndex = all.findIndex((n) => n.attr?.bindtap === "finishTools");
+  assert.ok(
+    footerIndex > all.findIndex((n) => n.attr?.class === "history-row"),
+  );
+  const guest = render({
+    ...base,
+    room: {
+      ...room,
+      canUseTools: false,
+      operationProgress: null,
+      me: { isHost: false },
+    },
+  });
+  assert.ok(!JSON.stringify(guest).includes("当前操作进度"));
 });

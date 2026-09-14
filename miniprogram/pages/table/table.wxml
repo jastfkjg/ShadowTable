@@ -20,6 +20,41 @@
       </view>
     </view>
   </view>
+  <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+    <view class="error-dialog action-dialog" role="dialog" aria-modal="true" aria-label="当前操作">
+      <view class="dialog-title">{{actionLabel}}</view>
+      <view class="small muted action-hint">仅供本人操作 · 提交后不可更改</view>
+      <view class="action-choice-list">
+        <button wx:for="{{actionChoices}}" wx:key="value" class="primary" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{item.label}}</button>
+      </view>
+      <scroll-view wx:if="{{actionTargets.length}}" scroll-y class="action-target-scroll">
+        <button wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
+      </scroll-view>
+      <button class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后操作</button>
+    </view>
+  </view>
+  <view wx:if="{{toolType && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+    <view class="error-dialog" role="dialog" aria-modal="true" aria-label="发起操作">
+      <view class="dialog-title">{{toolType==='vote'?'发起投票':toolType==='quest'?'发起任务':toolType==='reverseStrike'?'刀逆仆':toolType==='offline'?'线下刀人':'刀梅林'}}</view>
+      <block wx:if="{{toolType==='vote' || toolType==='quest'}}">
+        <view class="small muted">{{toolType==='vote'?'全员赞成／反对投票；可选本次讨论的队伍，也可不选人直接投票。':'选择本次任务队员，由队员秘密出牌。'}}</view>
+        <scroll-view scroll-y class="tool-seat-scroll" style="height: {{toolPlayers.length>6?400:296}}rpx;">
+        <view class="tool-seat-grid">
+          <button wx:for="{{toolPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleToolSeat" data-seat="{{item.seat}}" disabled="{{busy}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">{{item.seat}}号 · {{item.name}}</button>
+        </view>
+        </scroll-view>
+        <view class="small muted">已选 {{toolSeats.length}} 人</view>
+        <picker wx:if="{{toolType==='quest'}}" range="{{toolThresholds}}" value="{{toolThreshold-1}}" bindchange="pickToolThreshold" disabled="{{busy}}">
+          <view class="picker setting-row"><text>判失败需要</text><text>{{toolThreshold}} 张失败票 · 更改</text></view>
+        </picker>
+      </block>
+      <view wx:else class="dialog-message">{{toolType==='offline'?'由对应角色在线下完成刀人，房主记录完成。':toolType==='reverseStrike'?'刺客在自己的手机上选择逆仆目标，结果保持私密。':'刺客在自己的手机上选择梅林目标。结算后记录命中结果，可继续其他操作。'}}</view>
+      <view class="dialog-actions">
+        <button class="secondary" bindtap="closeTool" disabled="{{busy}}">取消</button>
+        <button class="primary" bindtap="launchTool" disabled="{{busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">发起</button>
+      </view>
+    </view>
+  </view>
   <view wx:if="{{notice}}" class="notice">{{notice}}</view>
   <block wx:if="{{!room}}">
     <form class="panel entry-panel" bindsubmit="submitEntry">
@@ -100,56 +135,28 @@
     <view wx:if="{{room.assisted}}" class="notice">线下辅助 · 互认、起刀与胜负在线下完成</view>
     <view class="phase-strip"
       ><view class="kicker"
-        >{{room.game?'第 '+room.game+' 局':'准备开局'}} {{room.round?' / 任务 '+room.round:''}}</view
+        >{{room.game?'第 '+room.game+' 局':'准备开局'}} {{room.flexible?' · 按需操作':room.round?' / 任务 '+room.round:''}}</view
       ><view class="phase-title">{{room.phaseName}}</view
-      ><text wx:if="{{room.leader}}" class="muted"
+      ><text wx:if="{{room.leader && !room.flexible}}" class="muted"
         >队长 {{room.leader}} 号 · 连续否决 {{room.rejects}} / 5</text
       ></view
     >
-      <view wx:if="{{room.phase!=='lobby'}}" class="identity {{revealed?'open':''}}"
-        ><text class="kicker">仅供本人查看</text
-        ><view class="identity-title"
-          >{{revealed?secret.role:'身份已遮盖'}}</view
-        ><text class="muted"
-          >{{revealed?secret.faction:'请避免让身边的人看到屏幕'}}</text
-        ><view wx:if="{{revealed}}" class="private-info"
-          >{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view
-        ><button
-          class="secondary"
-          bindtap="reveal"
-          disabled="{{busy || !network}}"
-        >
-          {{revealed?'立即遮盖':'查看身份 / 操作'}}
-        </button>
-        <view wx:if="{{room.needsSubmission}}" class="submission"
-          >{{room.me.submitted?'已提交':'请完成本轮操作'}}</view
-        >
-        <view
-          wx:if="{{revealed && secret.action && !room.me.submitted}}"
-          class="private-actions"
-          ><text class="label">{{secret.action.label}}</text
-          ><text class="small muted">提交后不可更改</text
-          ><button
-            wx:for="{{choiceButtons}}"
-            wx:key="value"
-            class="primary"
-            data-value="{{item.value}}"
-            bindtap="submitChoice"
-            disabled="{{busy}}"
-          >
-            {{item.label}}</button
-          ><button
-            wx:for="{{targetButtons}}"
-            wx:key="seat"
-            class="secondary"
-            data-seat="{{item.seat}}"
-            bindtap="submitTarget"
-            disabled="{{busy}}"
-          >
-            {{item.seat}} 号 · {{item.name}}
-          </button></view
-        >
+    <block wx:if="{{room.phase!=='lobby'}}">
+      <button wx:if="{{!revealed}}" class="identity-compact" bindtap="reveal" disabled="{{busy || !network}}" aria-label="查看我的身份">
+        <text>我的身份</text><text class="identity-compact-action">查看身份 ›</text>
+      </button>
+      <view wx:else class="identity open">
+        <text class="kicker">仅供本人查看</text>
+        <view class="identity-title">{{secret.role}}</view>
+        <text class="muted">{{secret.faction}}</text>
+        <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
+        <button class="secondary" bindtap="reveal" disabled="{{busy || !network}}">立即遮盖</button>
       </view>
+    </block>
+    <view wx:if="{{room.needsSubmission}}" class="action-entry">
+      <text>{{room.me.submitted?'本轮操作已提交':'待完成操作'}}</text>
+      <button wx:if="{{!room.me.submitted}}" class="secondary" bindtap="openAction" disabled="{{busy || actionLoading || !network}}" loading="{{actionLoading}}">立即操作</button>
+    </view>
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
         >
@@ -173,7 +180,7 @@
           bindtap="start"
           disabled="{{busy}}"
         >
-          开始游戏
+          发放身份
         </button></view
       >
     </block>
@@ -191,7 +198,7 @@
         data-seat="{{item.seat}}"
         aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')}}"
         bindtap="seat"
-        disabled="{{busy || (room.phase==='lobby'?item.occupied:!(room.phase==='proposal' && room.leader===room.me.seat))}}"
+        disabled="{{busy || (room.phase==='lobby'?item.occupied:!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
       >
         <view class="seat-number"
           >{{item.seat}}<text class="seat-flag"
@@ -224,7 +231,7 @@
       </button>
     </block>
     <block wx:else>
-      <view wx:if="{{room.phase==='proposal'}}" class="panel"
+      <view wx:if="{{room.phase==='proposal' && !room.canUseTools && !room.flexible}}" class="panel"
         ><view class="label">本轮需要 {{room.teamSize}} 人</view
         ><text class="muted"
           >{{room.leader===room.me.seat?'点座位选人，再提交队伍':'等待队长选人'}}</text
@@ -241,15 +248,15 @@
       <view
         wx:if="{{room.phase==='teamVote' || room.phase==='quest' || room.phase==='teamResult'}}"
         class="panel"
-        ><text class="label">任务队伍 {{teamText}} 号</text
+        ><text class="label">{{room.team.length?'任务队伍 '+teamText+' 号':'全员投票'}}</text
         ><text class="muted"
-          >{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text
-        ></view
+          >{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text>
+        </view
       >
       <view wx:if="{{room.result}}" class="result"
-        ><text class="kicker">{{room.result.winner?'最终结果':(room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text
+        ><text class="kicker">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text
         ><view class="phase-title"
-          >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':(room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
+          >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
         ><text>{{room.result.reason}}</text
         ><button
           wx:if="{{room.me.isHost}}"
@@ -262,29 +269,40 @@
       >
       <view wx:if="{{room.phase==='offlineFinal'}}" class="panel">
         <text class="label">{{room.offlineAssassination?'请莫德雷德线下刺梅林':'请线下完成特殊结算'}}</text><text class="muted">{{room.offlineAssassination?'三次任务已成功，请在线下完成刺梅林并确认胜负。':'任务记录已保留。起刀、内奸及最终胜负在线下完成，小程序不自动判定。'}}</text>
-        <button wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{busy}}">线下已结算，结束本局</button>
+        <button wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{busy}}">线下已完成，记录结果</button>
       </view>
-      <view wx:if="{{room.canAdvance}}" class="panel host-panel"
-        ><text class="label">推进对局</text
-        ><text class="muted"
-          >确认大家已操作后推进</text
-        ><button
-          class="primary"
-          bindtap="advance"
-          disabled="{{busy}}"
-          loading="{{busy}}"
-        >
-          {{room.phase==='proposal'?'开启组队表决':room.phase==='teamResult'?'继续下一阶段':room.phase==='questResult'?'继续下一阶段':'结算并推进'}}</button
-        ><button wx:if="{{room.assisted}}" class="secondary" bindtap="offline" disabled="{{busy}}">转入线下起刀 / 特殊结算</button><button class="text-button" bindtap="terminate" disabled="{{busy}}">
-          终止本局
-        </button></view
-      >
+      <view wx:if="{{room.canUseTools}}" class="panel host-panel">
+        <view class="label">房主操作</view>
+        <view class="small muted">按线下进度发起操作，每次独立结算。</view>
+        <view class="tool-actions">
+          <button class="secondary" bindtap="openTool" data-kind="vote" disabled="{{busy}}">投票</button>
+          <button class="secondary" bindtap="openTool" data-kind="quest" disabled="{{busy}}">做任务</button>
+          <button class="secondary" bindtap="openTool" data-kind="{{room.knifeOffline?'offline':'assassination'}}" disabled="{{busy}}">{{room.knifeOffline?'线下刀人':'刀梅林'}}</button>
+          <button wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{busy}}">刀逆仆</button>
+        </view>
+        <view wx:if="{{room.operationProgress}}" class="operation-progress">
+          <view class="progress-heading"><text>当前操作进度</text><text>{{room.operationProgress.completed}} / {{room.operationProgress.total}} 已完成</text></view>
+          <view class="small muted">仅显示完成状态</view>
+          <view wx:for="{{room.operationProgress.players}}" wx:key="seat" class="progress-player">
+            <text class="progress-player-name">{{item.seat}}号 · {{item.name}}</text>
+            <text class="progress-state {{!item.required?'not-required':item.completed?'completed':'pending'}}">{{!item.required?'无需操作':item.completed?'已完成':'未完成'}}</text>
+          </view>
+        </view>
+        <button wx:if="{{room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="primary" bindtap="settleTool" disabled="{{busy}}" loading="{{busy}}">结算当前操作</button>
+        <button wx:if="{{room.hasActiveOperation}}" class="text-button" bindtap="cancelTool" disabled="{{busy}}">作废当前操作</button>
+      </view>
+      <view wx:elif="{{room.flexible && room.phase==='tools'}}" class="panel">
+        <view class="label">等待房主发起操作</view>
+        <view class="muted">可在线下继续讨论，身份与已结算记录保留。</view>
+      </view>
       <view wx:if="{{history.length}}" class="section-title">公开记录</view
       ><view wx:for="{{history}}" wx:key="key" class="history-row"
         ><view>{{item.text}}</view
         ><text class="muted small">{{item.detail}}</text></view
       >
     </block>
-
+    <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
+      <button class="finish-game-button" bindtap="finishTools" disabled="{{busy}}">结束本局</button>
+    </view>
   </block>
 </view>

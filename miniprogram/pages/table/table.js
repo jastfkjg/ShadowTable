@@ -6,6 +6,42 @@ const CHOICES = {
   success: "任务成功",
   fail: "任务失败",
 };
+function toolHistory(h, key) {
+  const text = h.number ? `第${h.number}次操作 · ` : "";
+  if (h.kind === "toolVote")
+    return {
+      key,
+      text: text + "投票" + (h.approved ? "通过" : "未通过"),
+      detail:
+        (h.team.length ? `队伍 ${h.team.join("、")}号 · ` : "") +
+        h.votes
+          .map((v) => `${v.seat}号${v.approve ? "赞成" : "反对"}`)
+          .join(" / "),
+    };
+  if (h.kind === "toolQuest")
+    return {
+      key,
+      text: text + (h.success ? "任务成功" : "任务失败"),
+      detail: `${h.team.join("、")}号 · ${h.fails}张失败票（需${h.threshold}张才失败）`,
+    };
+  if (h.kind === "toolKnife")
+    return {
+      key,
+      text: text + "刀梅林",
+      detail: `${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
+    };
+  if (h.kind === "toolReverse")
+    return {
+      key,
+      text: text + "刀逆仆已结算",
+      detail: "结果仅向相关玩家展示，可继续发起其他操作",
+    };
+  if (h.kind === "toolOffline")
+    return { key, text: text + "线下刀人已完成", detail: "以线下结算为准" };
+  if (h.kind === "toolCanceled")
+    return { key, text: "未结算的操作已作废", detail: "未公开或计入本次提交" };
+  return null;
+}
 Page({
   data: {
     loading: true,
@@ -20,6 +56,15 @@ Page({
     entryMode: "join",
     showRules: false,
     showRoomRules: false,
+    actionDialog: false,
+    actionLoading: false,
+    actionLabel: "",
+    actionChoices: [],
+    actionTargets: [],
+    toolType: "",
+    toolSeats: [],
+    toolThreshold: 1,
+    toolThresholds: ["1 张失败票", "2 张失败票"],
     showRoomSettings: false,
     showTransfer: false,
     boardIndex: 0,
@@ -77,9 +122,23 @@ Page({
     wx.offNetworkStatusChange(this.networkListener);
     this.mask();
   },
+  updateChangedData(values) {
+    const changed = {};
+    for (const key of Object.keys(values)) {
+      if (JSON.stringify(this.data[key]) !== JSON.stringify(values[key]))
+        changed[key] = values[key];
+    }
+    if (Object.keys(changed).length) this.setData(changed);
+  },
   mask() {
     this.generation = (this.generation || 0) + 1;
-    this.setData({
+    this.actionGeneration = (this.actionGeneration || 0) + 1;
+    this.updateChangedData({
+      actionDialog: false,
+      actionLoading: false,
+      actionLabel: "",
+      actionChoices: [],
+      actionTargets: [],
       revealed: false,
       secret: null,
       choiceButtons: [],
@@ -191,9 +250,26 @@ Page({
       sequence !== this.refreshSequence
     )
       return;
-    if (this.data.room?.stage !== room.stage) {
-      this.mask();
-      this.setData({ selected: [] });
+    const stageChanged = this.data.room?.stage !== room.stage;
+    const selected = stageChanged ? [] : this.data.selected;
+    const privacyUpdate = stageChanged
+      ? {
+          revealed: false,
+          secret: null,
+          choiceButtons: [],
+          targetButtons: [],
+          selected,
+          actionDialog: false,
+          actionLoading: false,
+          actionLabel: "",
+          actionChoices: [],
+          actionTargets: [],
+        }
+      : {};
+    // Invalidate pending identity reads before committing the new stage in one update.
+    if (stageChanged) {
+      this.generation = (this.generation || 0) + 1;
+      this.actionGeneration = (this.actionGeneration || 0) + 1;
     }
     const seats = Array.from({ length: room.capacity }, (_, i) => {
       const seat = i + 1,
@@ -206,27 +282,31 @@ Page({
         mine: seat === room.me.seat,
         host: !!p?.isHost,
         inTeam: room.team.includes(seat),
-        selected: this.data.selected.includes(seat),
+        selected: selected.includes(seat),
       };
     });
-    const history = room.history.map((h, i) => ({
-      key: i,
-      text:
-        h.kind === "team"
-          ? `第${h.round}轮 · ${h.leader}号组队 ${h.team.join("、")}：${h.approved ? "通过" : "否决"}`
-          : h.kind === "quest"
-            ? "任务结算"
-            : "最终行动",
-      detail:
-        h.kind === "team"
-          ? h.votes
-              .map((v) => `${v.seat}号${v.approve ? "赞成" : "反对"}`)
-              .join(" / ")
-          : h.kind === "quest"
-            ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败（需${h.threshold}张才失败）`
-            : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
-    }));
-    this.setData({
+    const history = room.history.map(
+      (h, i) =>
+        toolHistory(h, i) || {
+          key: i,
+          text:
+            h.kind === "team"
+              ? `第${h.round}轮 · ${h.leader}号组队 ${h.team.join("、")}：${h.approved ? "通过" : "否决"}`
+              : h.kind === "quest"
+                ? "任务结算"
+                : "最终行动",
+          detail:
+            h.kind === "team"
+              ? h.votes
+                  .map((v) => `${v.seat}号${v.approve ? "赞成" : "反对"}`)
+                  .join(" / ")
+              : h.kind === "quest"
+                ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败（需${h.threshold}张才失败）`
+                : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
+        },
+    );
+    this.updateChangedData({
+      ...privacyUpdate,
       room,
       seats,
       history,
@@ -251,6 +331,21 @@ Page({
       serverConnected: true,
       needsLogin: false,
     });
+    if (
+      (!room.needsSubmission || room.me.submitted) &&
+      (this.data.actionDialog || this.data.actionLoading)
+    )
+      this.closeAction();
+    if (
+      room.needsSubmission &&
+      !room.me.submitted &&
+      this.foreground &&
+      this.promptedActionStage !== room.stage &&
+      !this.data.actionLoading &&
+      !this.data.toolType &&
+      !this.data.showRoomRules
+    )
+      await this.openAction();
   },
   clearRoom() {
     clearTimeout(this.timer);
@@ -260,6 +355,8 @@ Page({
     wx.removeStorageSync("roomCode");
     this.setData({
       room: null,
+      toolType: "",
+      toolSeats: [],
       seats: [],
       history: [],
       selected: [],
@@ -586,11 +683,104 @@ Page({
     }
     this.cmd(type, extra);
   },
+  openTool(e) {
+    const room = this.data.room;
+    if (!room?.canUseTools || this.data.busy) return;
+    const toolType = e.currentTarget.dataset.kind;
+    const toolSeats = ["vote", "quest"].includes(toolType)
+      ? [...room.team]
+      : [];
+    this.toolStage = room.stage;
+    this.setData({
+      toolType,
+      toolSeats,
+      toolThreshold: 1,
+      toolPlayers: room.players.map((p) => ({
+        ...p,
+        selected: toolSeats.includes(p.seat),
+      })),
+    });
+  },
+  closeTool() {
+    this.setData({ toolType: "" });
+  },
+  toggleToolSeat(e) {
+    if (this.data.busy) return;
+    const seat = Number(e.currentTarget.dataset.seat);
+    const toolSeats = this.data.toolSeats.includes(seat)
+      ? this.data.toolSeats.filter((s) => s !== seat)
+      : [...this.data.toolSeats, seat];
+    this.setData({
+      toolSeats,
+      toolPlayers: this.data.toolPlayers.map((p) => ({
+        ...p,
+        selected: toolSeats.includes(p.seat),
+      })),
+    });
+  },
+  pickToolThreshold(e) {
+    this.setData({ toolThreshold: Number(e.detail.value) + 1 });
+  },
+  async launchTool() {
+    if (this.data.busy || this.pending) return;
+    const room = this.data.room;
+    if (!room || room.stage !== this.toolStage) {
+      this.closeTool();
+      this.setData({ error: "阶段已变化，请重新选择操作" });
+      return;
+    }
+    const kind = this.data.toolType;
+    const extra = {
+      kind,
+      team: [...this.data.toolSeats],
+      threshold: this.data.toolThreshold,
+      replace: room.hasActiveOperation,
+    };
+    if (
+      kind === "quest" &&
+      (!extra.team.length || extra.threshold > extra.team.length)
+    ) {
+      this.setData({ error: "请选择任务队员，失败票门槛不能超过队员人数" });
+      return;
+    }
+    if (
+      room.hasActiveOperation &&
+      !(await this.confirm(
+        "作废当前操作并切换？",
+        "当前尚未结算的提交将作废，已结算记录和玩家身份保留。",
+      ))
+    )
+      return;
+    if (!this.foreground || this.data.room?.stage !== room.stage) return;
+    this.closeTool();
+    this.cmd("beginActivity", extra);
+  },
+  settleTool() {
+    this.cmd("settleTool");
+  },
+  async cancelTool() {
+    return this.confirmCommand(
+      "作废当前操作？",
+      "本次未结算的提交将作废，玩家身份和已结算记录保留。",
+      "cancelActivity",
+    );
+  },
+  async finishTools() {
+    return this.confirmCommand(
+      "结束本局？",
+      this.data.room.hasActiveOperation
+        ? "当前未结算的操作将作废。保留已结算记录，以线下胜负为准。"
+        : "保留已结算记录，以线下胜负为准。结束后可以同房重新发牌。",
+      "finishTools",
+      { replace: true },
+    );
+  },
   async start() {
     return this.confirmCommand(
       "开始这一局？",
-      "按当前人数随机分配身份，所有人须已准备。",
+      "按当前人数随机分配身份，之后由房主按需发起投票、任务或刀人。",
       "start",
+      { flexible: true },
     );
   },
   propose() {
@@ -616,8 +806,9 @@ Page({
   async closeOffline() {
     return this.confirmCommand(
       "线下已结算完毕？",
-      "仅结束本局，不向服务器录入或推断胜方。",
+      "记录线下操作完成，随后可继续发起其他操作。",
       "closeOffline",
+      { keepPlaying: true },
     );
   },
   rematch() {
@@ -663,6 +854,62 @@ Page({
   },
   transfer(e) {
     this.cmd("transfer", { seat: Number(e.currentTarget.dataset.seat) });
+  },
+  closeAction() {
+    this.actionGeneration = (this.actionGeneration || 0) + 1;
+    this.updateChangedData({
+      actionDialog: false,
+      actionLoading: false,
+      actionLabel: "",
+      actionChoices: [],
+      actionTargets: [],
+    });
+  },
+  async openAction() {
+    const room = this.data.room;
+    if (
+      !room?.needsSubmission ||
+      room.me.submitted ||
+      !this.foreground ||
+      !this.data.network ||
+      this.data.actionLoading
+    )
+      return;
+    this.mask();
+    const generation = this.actionGeneration;
+    this.setData({ actionLoading: true });
+    try {
+      const response = await api.request(
+        "/api/rooms/" + this.roomCode + "/private",
+      );
+      if (
+        !this.alive ||
+        !this.foreground ||
+        generation !== this.actionGeneration ||
+        this.data.room?.stage !== room.stage ||
+        response.stage !== room.stage ||
+        this.data.room.me.submitted
+      )
+        return;
+      if (!response.action) return;
+      this.promptedActionStage = room.stage;
+      // Store only the action in this dialog; role and initial vision stay out of it.
+      this.setData({
+        actionDialog: true,
+        actionLabel: response.action.label,
+        actionChoices: (response.action.choices || []).map((value) => ({
+          value,
+          label: CHOICES[value],
+        })),
+        actionTargets: response.action.targets || [],
+      });
+    } catch (e) {
+      if (generation === this.actionGeneration && this.foreground)
+        this.handleError(e);
+    } finally {
+      if (generation === this.actionGeneration)
+        this.setData({ actionLoading: false });
+    }
   },
   async reveal() {
     if (this.data.revealed) {

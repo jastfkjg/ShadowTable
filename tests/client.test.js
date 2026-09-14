@@ -622,3 +622,207 @@ test("玩法说明随人数和板子更新，房间配置弹窗可关闭且退�
   p.clearRoom();
   assert.equal(p.data.showRoomRules, false);
 });
+
+test("无变化轮询不重复渲染，进入表决一次更新阶段且清除旧身份", async () => {
+  let room = {
+    code: "123456",
+    phase: "proposal",
+    stage: "proposal-stage",
+    capacity: 6,
+    players: [{ seat: 1, name: "甲" }],
+    me: { seat: 1 },
+    team: [1, 2],
+    history: [],
+  };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  p.setData({ loading: false });
+  await p.refresh();
+  const patches = [];
+  const originalSetData = p.setData;
+  p.setData = (patch) => {
+    patches.push(patch);
+    originalSetData.call(p, patch);
+  };
+  await p.refresh();
+  assert.equal(patches.length, 0);
+  p.setData({
+    revealed: true,
+    secret: { role: "刺客" },
+    selected: [1, 2],
+    choiceButtons: [{ value: "confirm" }],
+  });
+  patches.length = 0;
+  room = { ...room, stage: "vote-stage", phase: "teamVote" };
+  await p.refresh();
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].room.phase, "teamVote");
+  assert.equal(patches[0].revealed, false);
+  assert.equal(patches[0].secret, null);
+  assert.equal(p.data.selected.length, 0);
+  assert.equal(p.data.room.code, "123456");
+  assert.equal(p.data.loading, false);
+  assert.equal(patches[0].history, undefined);
+  patches.length = 0;
+  await p.refresh();
+  assert.equal(patches.length, 0);
+});
+
+test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并由房主结束", async () => {
+  const a = await server();
+  try {
+    const ps = [];
+    for (let i = 0; i < 6; i++) ps.push(await a.actor());
+    const host = ps[0];
+    host.setData({ name: "房主", loading: false });
+    host.create();
+    await settle(host);
+    for (let i = 1; i < 6; i++) {
+      ps[i].setData({ name: "玩家" + i, code: host.roomCode, loading: false });
+      ps[i].join();
+      await settle(ps[i]);
+    }
+    const refresh = () => Promise.all(ps.map((p) => p.refresh()));
+    await refresh();
+    for (const p of ps) await cmd(p, "ready", { ready: true });
+    await host.start();
+    await settle(host);
+    await refresh();
+    assert.ok(ps.every((p) => p.data.room.phase === "tools"));
+    host.openTool({ currentTarget: { dataset: { kind: "quest" } } });
+    for (const seat of [1, 2])
+      host.toggleToolSeat({ currentTarget: { dataset: { seat } } });
+    await host.launchTool();
+    await settle(host);
+    await refresh();
+    for (const p of ps.slice(0, 2))
+      await cmd(p, "submit", { value: "success" });
+    assert.equal(ps[2].data.room.needsSubmission, false);
+    host.settleTool();
+    await settle(host);
+    assert.equal(host.data.room.phase, "tools");
+    assert.ok(host.data.history.at(-1).text.includes("任务成功"));
+    host.openTool({ currentTarget: { dataset: { kind: "vote" } } });
+    await host.launchTool();
+    await settle(host);
+    await refresh();
+    for (const p of ps) await cmd(p, "submit", { value: "approve" });
+    host.settleTool();
+    await settle(host);
+    assert.ok(host.data.history.at(-1).text.includes("投票通过"));
+    host.openTool({ currentTarget: { dataset: { kind: "assassination" } } });
+    await host.launchTool();
+    await settle(host);
+    await refresh();
+    for (const p of ps) await p.reveal();
+    const assassin = ps.find((p) => p.data.secret.role === "刺客");
+    const merlin = ps.find((p) => p.data.secret.role === "梅林");
+    await cmd(assassin, "submit", { value: merlin.data.room.me.seat });
+    for (const p of ps.filter((p) => p !== assassin))
+      await cmd(p, "submit", { value: "confirm" });
+    host.settleTool();
+    await settle(host);
+    assert.equal(host.data.room.result, null);
+    assert.ok(host.data.history.at(-1).detail.includes("命中梅林"));
+    await host.finishTools();
+    await settle(host);
+    assert.equal(host.data.room.phase, "ended");
+  } finally {
+    await a.close();
+  }
+});
+
+test("操作配置过期不发起请求，替换当前操作取消确认时保留提交", async () => {
+  const p = page({});
+  p.setData({
+    room: {
+      stage: "a",
+      canUseTools: true,
+      hasActiveOperation: true,
+      team: [],
+      players: [],
+    },
+    busy: false,
+  });
+  p.openTool({ currentTarget: { dataset: { kind: "vote" } } });
+  let called = false;
+  p.cmd = () => {
+    called = true;
+  };
+  p.confirm = async () => false;
+  await p.launchTool();
+  assert.equal(called, false);
+  assert.equal(p.data.toolType, "vote");
+  p.data.room.stage = "b";
+  await p.launchTool();
+  assert.equal(called, false);
+  assert.ok(p.data.error.includes("阶段已变化"));
+});
+
+test("新操作自动弹窗但不展示身份，同阶段关闭后不反复弹出，可手动重开", async () => {
+  let room = {
+    code: "123456",
+    phase: "quest",
+    stage: "q1",
+    capacity: 6,
+    players: [],
+    team: [1],
+    history: [],
+    me: { seat: 1, submitted: false },
+    needsSubmission: true,
+  };
+  let privateReads = 0;
+  const p = page({
+    request: async (path) => {
+      if (path.endsWith("/private")) {
+        privateReads++;
+        return {
+          stage: room.stage,
+          role: "莫甘娜",
+          information: "同伴5号",
+          action: { label: "选择任务牌", choices: ["success", "fail"] },
+        };
+      }
+      return structuredClone(room);
+    },
+  });
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.actionDialog, true);
+  assert.equal(p.data.revealed, false);
+  assert.equal(p.data.secret, null);
+  assert.equal(p.data.actionChoices.length, 2);
+  p.closeAction();
+  await p.refresh();
+  assert.equal(privateReads, 1);
+  assert.equal(p.data.actionDialog, false);
+  await p.openAction();
+  assert.equal(p.data.actionDialog, true);
+  assert.equal(privateReads, 2);
+  room = { ...room, me: { ...room.me, submitted: true } };
+  await p.refresh();
+  assert.equal(p.data.actionDialog, false);
+  assert.equal(privateReads, 2);
+});
+
+test("操作请求晚于切后台或阶段切换返回时，不弹出旧操作", async () => {
+  let resolve;
+  const p = page({ request: () => new Promise((r) => (resolve = r)) });
+  p.roomCode = "123456";
+  p.setData({
+    room: { stage: "old", needsSubmission: true, me: { submitted: false } },
+    network: true,
+  });
+  const pending = p.openAction();
+  p.onHide();
+  resolve({ stage: "old", action: { label: "任务", choices: ["fail"] } });
+  await pending;
+  assert.equal(p.data.actionDialog, false);
+  assert.equal(p.data.actionChoices.length, 0);
+  p.foreground = true;
+  const second = p.openAction();
+  p.data.room.stage = "new";
+  resolve({ stage: "old", action: { label: "任务", choices: ["fail"] } });
+  await second;
+  assert.equal(p.data.actionDialog, false);
+});
