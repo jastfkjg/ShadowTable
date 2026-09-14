@@ -979,6 +979,18 @@ test("新身份弹窗使用当前私密牌，后台不显示，确认使用看�
   p.data.room = { code: "123456", stage: "s1", me: { identityChanged: true } };
   await p.showIdentityChange();
   assert.equal(p.data.identityChange.role, "红守卫");
+  assert.equal(p.data.identityChangeRevealed, false);
+  p.acknowledgeIdentity();
+  assert.ok(p.data.identityChange);
+  p.revealChangedIdentity();
+  assert.equal(p.data.identityChangeRevealed, true);
+  p.onHide();
+  assert.equal(p.data.identityChange, null);
+  assert.equal(p.data.identityChangeRevealed, false);
+  p.foreground = true;
+  await p.showIdentityChange();
+  assert.equal(p.data.identityChangeRevealed, false);
+  p.revealChangedIdentity();
   const sent = [];
   p.cmd = (...v) => sent.push(v);
   p.acknowledgeIdentity();
@@ -987,4 +999,44 @@ test("新身份弹窗使用当前私密牌，后台不显示，确认使用看�
   p.foreground = false;
   await p.showIdentityChange();
   assert.equal(p.data.identityChange, null);
+});
+
+test("仙女结果返回前切后台不显示，返回后默认遮盖，确认对应结果版本", async () => {
+  let resolve;
+  const secret = {
+    stage: "s1",
+    fairyResult: { revision: 2, information: "4号查验结果：坏人" },
+  };
+  const p = page({
+    request: () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  });
+  p.data.room = {
+    code: "123456",
+    stage: "s1",
+    me: { fairyResultPending: true },
+  };
+  const pending = p.showFairyResult();
+  p.onHide();
+  resolve(secret);
+  await pending;
+  assert.equal(p.data.fairyResult, null);
+  p.foreground = true;
+  const retry = p.showFairyResult();
+  resolve(secret);
+  await retry;
+  assert.equal(p.data.fairyResultRevealed, false);
+  const sent = [];
+  p.cmd = (...args) => sent.push(args);
+  p.acknowledgeFairyResult();
+  assert.equal(sent.length, 0);
+  p.revealFairyResult();
+  assert.equal(p.data.fairyResultRevealed, true);
+  p.acknowledgeFairyResult();
+  assert.equal(sent[0][0], "ackFairyResult");
+  assert.equal(sent[0][1].revision, 2);
+  assert.equal(p.data.fairyResult, null);
+  assert.equal(p.data.fairyResultRevealed, false);
 });

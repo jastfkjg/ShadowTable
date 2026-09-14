@@ -411,7 +411,9 @@ test("影中执刃辅助模式真实任务限制、阶段结算与线下结束�
   const role = (p) => r.roles[p.uid];
   assert.equal(Object.values(r.roles).filter((x) => x === "servant").length, 4);
   for (const p of r.players)
-    assert.ok(privateView(r, p.uid).information.includes("不提供额外初始视野"));
+    assert.ok(
+      !privateView(r, p.uid).information.includes("不提供额外初始视野"),
+    );
   all(r);
   advance(r);
   const good = r.players.filter((p) =>

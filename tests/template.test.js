@@ -291,7 +291,8 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   assert.ok(!serialized.includes("测试私密角色"));
   assert.ok(byHandler(tree, "reveal"));
   assert.ok(serialized.includes("未完成"));
-  assert.ok(serialized.includes("无需操作"));
+  assert.ok(!serialized.includes("无需操作"));
+  assert.ok(!serialized.includes("丙"));
   const all = nodes(tree);
   const footerIndex = all.findIndex((n) => n.attr?.bindtap === "finishTools");
   assert.ok(
@@ -343,7 +344,7 @@ test("发身份弹窗默认隐藏，展开后在确认按钮前展示身份和�
   assert.equal(byHandler(vote, "revealActionIdentity"), undefined);
 });
 
-test("十二骑士去除刀梅林和夜晚入口，新身份提醒显示新牌", () => {
+test("十二骑士不提供主动先知查验和刀梅林入口，新身份提醒默认遮盖，主动查看才显示新牌", () => {
   const room = {
     phase: "tools",
     canUseTools: true,
@@ -359,7 +360,7 @@ test("十二骑士去除刀梅林和夜晚入口，新身份提醒显示新牌",
   assert.ok(!kinds.includes("offline"));
   assert.ok(!kinds.includes("night"));
   assert.ok(!kinds.includes("nextRound"));
-  const popup = render({
+  const popupData = {
     ...base,
     room,
     identityChange: {
@@ -367,7 +368,13 @@ test("十二骑士去除刀梅林和夜晚入口，新身份提醒显示新牌",
       faction: "坏人阵营",
       information: "没有视野。",
     },
-  });
+  };
+  const hidden = render(popupData);
+  for (const value of ["红守卫", "坏人阵营", "没有视野。"])
+    assert.ok(!JSON.stringify(hidden).includes(value));
+  assert.ok(byHandler(hidden, "revealChangedIdentity"));
+  assert.ok(!byHandler(hidden, "acknowledgeIdentity"));
+  const popup = render({ ...popupData, identityChangeRevealed: true });
   assert.ok(JSON.stringify(popup).includes("红守卫"));
   assert.ok(byHandler(popup, "acknowledgeIdentity"));
 });
@@ -426,4 +433,37 @@ test("独立设置页使用原生开关和统一保存，非管理员不显示�
     undefined,
   );
   assert.ok(!nodes(tree).some((n) => n.attr?.bindchange === "pickCapacity"));
+});
+
+test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显示", () => {
+  const data = {
+    ...base,
+    fairyResult: { revision: 1, information: "4号查验结果：坏人" },
+  };
+  const hidden = render(data);
+  assert.ok(!JSON.stringify(hidden).includes("4号查验结果：坏人"));
+  assert.ok(byHandler(hidden, "revealFairyResult"));
+  assert.ok(!byHandler(hidden, "acknowledgeFairyResult"));
+  const shown = render({ ...data, fairyResultRevealed: true });
+  assert.ok(JSON.stringify(shown).includes("4号查验结果：坏人"));
+  assert.ok(byHandler(shown, "acknowledgeFairyResult"));
+});
+
+test("拓展板子不显示线下辅助提示，身份确认使用线上视野文案", () => {
+  const tree = render({
+    ...base,
+    boardAssisted: true,
+    room: {
+      assisted: true,
+      phase: "identity",
+      me: { isHost: false },
+      players: [],
+    },
+    actionDialog: true,
+    actionChoices: [{ value: "confirm", label: "确认" }],
+  });
+  const text = JSON.stringify(tree);
+  assert.ok(!text.includes("线下辅助"));
+  assert.ok(!text.includes("互认、起刀与最终胜负在线下完成"));
+  assert.ok(!text.includes("已完成互认，确认"));
 });

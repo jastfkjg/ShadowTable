@@ -197,10 +197,34 @@ button:not([disabled]):active {
   flex-wrap: wrap;
 }
 .phase-strip {
-  border-left: 5rpx solid var(--accent);
-  padding: 12rpx 24rpx;
-  margin: 36rpx 0;
+  border-left: 4rpx solid var(--accent);
+  padding: 16rpx 20rpx;
+  margin: 24rpx 0;
   background: var(--surface);
+}
+.phase-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 20rpx;
+}
+.phase-label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 24rpx;
+}
+.phase-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.phase-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+  margin-top: 8rpx;
+  color: var(--muted);
+  font-size: 24rpx;
 }
 .phase-title {
   font-size: 44rpx;
@@ -773,8 +797,12 @@ button.identity-compact {
   flex-shrink: 0;
   font-size: 26rpx;
 }
-.progress-state.completed { color: var(--accent); }
-.progress-state.not-required { color: var(--muted); }
+.progress-state.completed {
+  color: var(--accent);
+}
+.progress-state.not-required {
+  color: var(--muted);
+}
 .finish-game-footer {
   margin-top: 48rpx;
   padding-top: 28rpx;
@@ -804,11 +832,22 @@ button.finish-game-button {
   margin: 0;
   flex-shrink: 0;
 }
-.action-choice-list { margin-top: 24rpx; }
-.action-choice-list button { margin: 0 0 16rpx; }
-.action-choice-list button:last-child { margin-bottom: 0; }
-.action-target-scroll { height: 440rpx; overflow-y: auto; }
-.action-dialog .text-button { margin-bottom: 0; }
+.action-choice-list {
+  margin-top: 24rpx;
+}
+.action-choice-list button {
+  margin: 0 0 16rpx;
+}
+.action-choice-list button:last-child {
+  margin-bottom: 0;
+}
+.action-target-scroll {
+  height: 440rpx;
+  overflow-y: auto;
+}
+.action-dialog .text-button {
+  margin-bottom: 0;
+}
 
 .action-identity {
   margin: 24rpx 0;
@@ -820,6 +859,26 @@ button.finish-game-button {
   border: 1rpx solid var(--border);
   border-radius: 20rpx;
 }
-.action-identity .identity-title { margin-top: 0; }
-.action-identity .private-info { white-space: pre-wrap; }
-.action-identity button { margin: 0; }
+.action-identity .identity-title {
+  margin-top: 0;
+}
+.action-identity .private-info {
+  white-space: pre-wrap;
+}
+.action-identity button {
+  margin: 0;
+}
+
+.quest-threshold {
+  margin-top: 24rpx;
+}
+.threshold-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin: 12rpx 0;
+}
+.threshold-hint {
+  color: var(--accent);
+  margin-top: 8rpx;
+}

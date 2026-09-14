@@ -58,8 +58,7 @@ const BOARDS = [
     available: true,
     mode: "assisted",
     counts: [12],
-    description:
-      "身份与组队/任务线上；初始互认、起刀及内奸胜负在线下，不自动判最终胜方",
+    description: "初始身份视野、组队与任务；含红蓝内奸",
   },
   {
     id: "chaos",
@@ -67,7 +66,7 @@ const BOARDS = [
     name: "阿瓦隆 · 混沌契约",
     available: true,
     counts: [12],
-    description: "发牌与魔法任务线上；初始互认、绑定、盘刀与排名在线下",
+    description: "初始身份视野、组队与魔法任务；含术士、高文与盗贼",
   },
   {
     id: "knights",
@@ -376,10 +375,7 @@ function actionSpec(room, uid) {
     case "identity":
       return {
         kind: "confirm",
-        label:
-          room.board === "shadow-assist"
-            ? "我已记住身份并在线下完成初始互认"
-            : "我已查看并记住身份",
+        label: "我已查看并记住身份与视野",
         choices: ["confirm"],
       };
     case "teamVote":
@@ -447,10 +443,27 @@ function privateView(room, uid) {
       )
       .map((p) => p.seat)
       .join("、");
-  if (assisted(room))
-    information =
-      "本模式不提供额外初始视野。请线下按你们的规则完成互认、起刀与内奸胜负；手机只负责身份、组队与任务；混沌契约首夜绑定和排名也在线下完成。";
-  else if (role === "reverse")
+  if (assisted(room)) {
+    const visible = (allowed) => seats((r) => allowed.includes(r));
+    if (role === "merlin")
+      information = `你看见的坏人座位：${visible(room.board === "chaos" ? ["morgana", "redWarlock", "oberon", "redThief"] : ["morgana", "assassin", "oberon", "redTraitor"]) || "无"}号（不区分身份）。`;
+    else if (role === "percival")
+      information = `梅林与莫甘娜位于：${visible(["merlin", "morgana"])}号。你无法区分谁是梅林。`;
+    else if (room.board === "shadow-assist" && role === "redTraitor")
+      information = `你看见的坏人座位：${visible(["morgana", "assassin", "oberon"])}号（不区分身份）。`;
+    else if (
+      (room.board === "shadow-assist"
+        ? ["mordred", "morgana", "assassin"]
+        : ["mordred", "morgana", "redWarlock"]
+      ).includes(role)
+    )
+      information = `你的坏人同伴：${visible(room.board === "shadow-assist" ? ["mordred", "morgana", "assassin"] : ["mordred", "morgana", "redWarlock"])}号（不区分身份）。`;
+    else if (room.board === "chaos" && role === "gawain")
+      information = `蓝术士与红术士位于：${visible(["blueWarlock", "redWarlock"])}号（不区分身份）。`;
+    else if (room.board === "chaos" && ["blueThief", "redThief"].includes(role))
+      information = `你的盗贼同伴：${visible(["blueThief", "redThief"])}号。`;
+    else if (role === "oberon") information = "没有视野。你与其他坏人不互认。";
+  } else if (role === "reverse")
     information = `刺客位于：${seats((r) => r === "assassin")}号。${room.convertedReverse === uid ? "你已被命中，现随坏人阵营结算。" : "你只能投任务成功；被逆仆刀命中后转入坏人阵营。"}`;
   else if (role === "merlin")
     information = `你看见的举手座位：${seats((r) => (ROLES[r][1] === "evil" && r !== "mordred") || r === "reverse")}${room.board !== "classic" ? "（莫德雷德不在视野中）" : ""}`;
@@ -499,7 +512,8 @@ function privateView(room, uid) {
       redAwakened: "可击杀任意一人一次。",
       blueHunter: "出局后可开枪带走一人；女巫替死不能开枪。",
       redHunter: "出局后可开枪带走一人；女巫替死不能开枪。",
-      prophet: "夜晚查看在场B牌坏人座位。",
+      prophet:
+        "被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。",
     }[role];
     if (skillDescription) information += " " + skillDescription;
     else if (
@@ -513,13 +527,24 @@ function privateView(room, uid) {
       ].includes(role)
     )
       information += " 可刀刀客或B角色一次；刀错不出局，仍消耗技能。";
+    if (role === "prophet") {
+      information = skillDescription;
+      if (state.nightInfo) information += ` ${state.nightInfo}`;
+      else information += " 等待技能结算后自动更新。";
+    }
     if (state.fairyInfo) information += ` ${state.fairyInfo}`;
-    if (state.nightInfo) information += ` ${state.nightInfo}`;
   }
   return {
     game: room.game,
     stage: room.stage,
     identityRevision: identityRevision(room, uid),
+    passiveVision: !!room.knights && role === "prophet",
+    fairyResult: room.knights?.players[uid].fairyInfo
+      ? {
+          revision: room.knights.players[uid].fairyRevision || 1,
+          information: room.knights.players[uid].fairyInfo,
+        }
+      : null,
     role: name,
     faction:
       side === "good" ? "好人阵营" : side === "third" ? "盗贼阵营" : "坏人阵营",
@@ -597,7 +622,6 @@ function beginActivity(room, input) {
       "skills",
       "conversion",
       "fairy",
-      "night",
     ].includes(kind),
     "操作类型无效",
   );
@@ -606,7 +630,7 @@ function beginActivity(room, input) {
     "当前操作尚未结算，请先结算或确认作废",
     409,
   );
-  if (["skills", "conversion", "fairy", "night"].includes(kind)) {
+  if (["skills", "conversion", "fairy"].includes(kind)) {
     requireRule(room.board === "knights", "当前板子不支持此操作");
     requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
     const k = room.knights;
@@ -618,26 +642,7 @@ function beginActivity(room, input) {
       room.toolSequence++;
       room.activity = { kind, number: room.toolSequence, threshold: null };
     } else {
-      if (kind === "conversion") {
-        convertKnights(room);
-      } else if (kind === "night") {
-        for (const p of knights.living(room))
-          if (room.roles[p.uid] === "prophet" && knights.eligible(room, p.uid))
-            k.players[p.uid].nightInfo = `第${k.round}轮夜晚B牌坏人：${
-              knights
-                .living(room)
-                .filter(
-                  (t) => k.players[t.uid].b && faction(room, t.uid) === "evil",
-                )
-                .map((t) => t.seat)
-                .join("、") || "无"
-            }号`;
-        k.nightRound = k.round;
-        room.history.push({
-          kind: "variant",
-          text: "夜晚已完成，先知请查看私密身份",
-        });
-      }
+      convertKnights(room);
       stage(room, "tools");
     }
     return;
@@ -739,7 +744,7 @@ function settleActivity(room) {
   const number = room.activity.number;
   if (KNIGHT_PHASES.includes(room.phase)) {
     if (!knights.settle(room, requireRule, ROLES)) return;
-    knights.updateNight(room, ROLES);
+    if (room.activity.kind === "skills") knights.updateNight(room, ROLES);
     if (room.activity.kind === "skills")
       for (const text of room.knights.events || [])
         room.history.push({ kind: "skillDetail", number, text });
@@ -945,6 +950,10 @@ function publicView(room, uid) {
       ready: p.ready,
       submitted: Object.hasOwn(room.submissions || {}, uid),
       identityRevision: identityRevision(room, uid),
+      fairyResultPending:
+        !!room.knights?.players[uid].fairyInfo &&
+        (room.knights.players[uid].fairyRevision || 1) >
+          (room.knights.players[uid].fairyAcknowledged || 0),
       identityChanged:
         identityRevision(room, uid) >
         (room.knights?.players[uid].identityAcknowledged || 0),
@@ -1042,6 +1051,16 @@ function command(room, uid, input) {
     requireRule(room.board === "knights", "当前板子没有技能过程设置");
     requireRule(typeof input.visible === "boolean", "显示设置无效");
     room.showSkillDetails = input.visible;
+    return;
+  }
+  if (type === "ackFairyResult") {
+    const state = room.knights?.players[uid];
+    requireRule(
+      state?.fairyInfo && input.revision === (state.fairyRevision || 1),
+      "查验结果已变化，请重新查看",
+      409,
+    );
+    state.fairyAcknowledged = input.revision;
     return;
   }
   if (type === "ackIdentity") {

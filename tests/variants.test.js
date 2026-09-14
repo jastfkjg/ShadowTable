@@ -587,3 +587,144 @@ test("各辅助板子任务只等待队员，非队员无法提交", () => {
     assert.equal(r.phase, "tools");
   }
 });
+
+test("先知被动视野仅在技能结束后更新，可随时私密查看", () => {
+  const r = setup();
+  configure(r, {
+    p2: "prophet",
+    p3: "redGuard",
+    p4: "redLancelot",
+    p5: "redKnight",
+  });
+  r.knights.deck = [];
+  r.knights.players.p5.alive = false;
+  skills(r);
+  assert.match(privateView(r, "p2").information, /B牌坏人：3号/);
+  assert.ok(!privateView(r, "p1").information.includes("B牌坏人："));
+  assert.ok(!JSON.stringify(publicView(r, "p1")).includes("B牌坏人："));
+  const before = structuredClone(r);
+  assert.throws(() => begin(r, "night"), /操作类型无效/);
+  assert.deepEqual(r, before);
+  begin(r, "skills");
+  r.knights.players.p3.alive = false;
+  assert.match(privateView(r, "p2").information, /B牌坏人：3号/);
+  submitAll(r);
+  run(r, "p1", "settleTool");
+  assert.match(privateView(r, "p2").information, /B牌坏人：无/);
+  assert.equal(r.knights.players.p2.used, false);
+});
+
+test("新抽先知在本次技能结束即获得被动视野，不等待下一轮", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "servant", p3: "redGuard" });
+  r.knights.deck = ["prophet"];
+  skills(r, { p1: "target:2" });
+  const view = privateView(r, "p2");
+  assert.equal(view.passiveVision, true);
+  assert.match(view.information, /B牌坏人：3号/);
+  assert.ok(!view.information.includes("下一轮生效"));
+  assert.equal(r.knights.players.p2.availableRound, 2);
+});
+
+test("仙女结果只发给查验者，确认后重连不再提醒且不能确认他人结果", () => {
+  const r = setup();
+  r.knights.fairy = 1;
+  begin(r, "fairy");
+  run(r, "p1", "submit", { value: "target:2" });
+  run(r, "p1", "settleTool");
+  assert.equal(publicView(r, "p1").me.fairyResultPending, true);
+  assert.equal(publicView(r, "p2").me.fairyResultPending, false);
+  assert.equal(privateView(r, "p2").fairyResult, null);
+  assert.ok(!JSON.stringify(publicView(r, "p1")).includes("号查验结果"));
+  const result = privateView(r, "p1").fairyResult;
+  assert.match(result.information, /2号查验结果/);
+  assert.throws(
+    () => run(r, "p2", "ackFairyResult", { revision: result.revision }),
+    /结果已变化/,
+  );
+  assert.throws(
+    () => run(r, "p1", "ackFairyResult", { revision: 0 }),
+    /结果已变化/,
+  );
+  run(r, "p1", "ackFairyResult", { revision: result.revision });
+  assert.equal(
+    publicView(structuredClone(r), "p1").me.fairyResultPending,
+    false,
+  );
+  assert.equal(
+    privateView(r, "p1").fairyResult.information,
+    result.information,
+  );
+});
+
+test("两个拓展板子的初始视野逐角色校验，隐藏身份与不可见座位", () => {
+  const expectedByBoard = {
+    "shadow-assist": {
+      merlin: ["morgana", "assassin", "oberon", "redTraitor"],
+      percival: ["merlin", "morgana"],
+      mordred: ["morgana", "assassin"],
+      morgana: ["mordred", "assassin"],
+      assassin: ["mordred", "morgana"],
+      redTraitor: ["morgana", "assassin", "oberon"],
+    },
+    chaos: {
+      merlin: ["morgana", "redWarlock", "oberon", "redThief"],
+      percival: ["merlin", "morgana"],
+      mordred: ["morgana", "redWarlock"],
+      morgana: ["mordred", "redWarlock"],
+      redWarlock: ["mordred", "morgana"],
+      gawain: ["blueWarlock", "redWarlock"],
+      blueThief: ["redThief"],
+      redThief: ["blueThief"],
+    },
+  };
+  for (const [board, expected] of Object.entries(expectedByBoard)) {
+    const r = setup(board);
+    for (const p of r.players) {
+      const view = privateView(r, p.uid);
+      const visibleSeats = (view.information.match(/\d+/g) || [])
+        .map(Number)
+        .sort((a, b) => a - b);
+      const targetSeats = r.players
+        .filter((t) =>
+          (expected[r.roles[p.uid]] || []).includes(r.roles[t.uid]),
+        )
+        .map((t) => t.seat)
+        .sort((a, b) => a - b);
+      assert.deepEqual(
+        visibleSeats,
+        targetSeats,
+        `${board}: ${r.roles[p.uid]}`,
+      );
+      assert.ok(!view.information.includes("线下"));
+      assert.ok(!view.information.includes("不提供"));
+      assert.ok(
+        !JSON.stringify(publicView(r, p.uid)).includes(view.information),
+      );
+      if (
+        [
+          "mordred",
+          "morgana",
+          "assassin",
+          "redWarlock",
+          "redTraitor",
+          "merlin",
+        ].includes(r.roles[p.uid])
+      ) {
+        for (const name of [
+          "刺客",
+          "莫德雷德",
+          "莫甘娜",
+          "红术士",
+          "红内奸",
+          "奥伯伦",
+          "红盗贼",
+        ])
+          assert.ok(
+            !view.information.includes(name),
+            `${r.roles[p.uid]}不应获知具体身份`,
+          );
+      }
+    }
+  }
+});

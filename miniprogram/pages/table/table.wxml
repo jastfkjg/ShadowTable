@@ -1,16 +1,36 @@
+<view wx:if="{{fairyResult && !identityChange && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog" role="dialog" aria-modal="true" aria-label="仙女查验结果">
+    <view class="dialog-title">仙女查验结果</view>
+    <view class="small muted">仅供本人查看</view>
+    <block wx:if="{{fairyResultRevealed}}">
+      <view class="private-info">{{fairyResult.information}}</view>
+      <button class="primary" bindtap="acknowledgeFairyResult" disabled="{{busy}}">记住了，遮盖结果</button>
+    </block>
+    <block wx:else>
+      <view class="private-info muted">结果已遮盖，请确认周围无人查看。</view>
+      <button class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button>
+    </block>
+  </view>
+</view>
 <view wx:if="{{identityChange && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
   <view class="error-dialog" role="dialog" aria-modal="true" aria-label="你的新身份">
     <view class="dialog-title">你已获得新身份</view>
-    <view class="small muted">仅供本人查看 · 新技能下一轮可用</view>
-    <view class="identity-title">{{identityChange.role}}</view>
-    <view class="muted">{{identityChange.faction}}</view>
-    <view class="private-info">{{identityChange.information}}</view>
-    <button class="primary" bindtap="acknowledgeIdentity" disabled="{{busy}}">记住了，遮盖身份</button>
+    <view class="small muted">仅供本人查看 · {{identityChange.passiveVision?'视野随技能结算自动更新':'新技能下一轮可用'}}</view>
+    <block wx:if="{{identityChangeRevealed}}">
+      <view class="identity-title">{{identityChange.role}}</view>
+      <view class="muted">{{identityChange.faction}}</view>
+      <view class="private-info">{{identityChange.information}}</view>
+      <button class="primary" bindtap="acknowledgeIdentity" disabled="{{busy}}">记住了，遮盖身份</button>
+    </block>
+    <block wx:else>
+      <view class="private-info muted">身份已遮盖，请确认周围无人查看。</view>
+      <button class="primary" bindtap="revealChangedIdentity" disabled="{{busy}}">查看新身份</button>
+    </block>
   </view>
 </view>
 <view class="page">
   <view class="brand">
-    <text class="brand-mark">影中执刃</text>
+    <text class="brand-mark">桌边助手</text>
     <view class="brand-actions">
       <button wx:if="{{room}}" class="switch-table" bindtap="returnHome" disabled="{{busy}}" aria-label="切换牌桌，保留当前座位">切换牌桌</button>
       <button class="connection-button" bindtap="connectionInfo" aria-label="{{!network || needsLogin ? '连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '连接正常' : '连接未确认'}}">
@@ -42,7 +62,7 @@
         <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && !actionSecret}}" disabled="{{busy || !network}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
       <view class="action-choice-list">
-        <button wx:for="{{actionChoices}}" wx:key="value" class="primary" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{room.phase==='identity'?(room.assisted?'已完成互认，确认':'已记住身份'):item.label}}</button>
+        <button wx:for="{{actionChoices}}" wx:key="value" class="primary" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>
       <scroll-view wx:if="{{actionTargets.length}}" scroll-y class="action-target-scroll">
         <button wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
@@ -61,9 +81,15 @@
         </view>
         </scroll-view>
         <view class="small muted">已选 {{toolSeats.length}} 人</view>
-        <picker wx:if="{{toolType==='quest'}}" range="{{toolThresholds}}" value="{{toolThreshold-1}}" bindchange="pickToolThreshold" disabled="{{busy}}">
-          <view class="picker setting-row"><text>判失败需要</text><text>{{toolThreshold}} 张失败票 · 更改</text></view>
-        </picker>
+        <view wx:if="{{toolType==='quest'}}" class="quest-threshold">
+          <view class="label">失败票门槛</view>
+          <view class="threshold-options">
+            <button class="tool-seat-option {{toolThreshold===1?'active':''}}" bindtap="pickToolThreshold" data-value="1" disabled="{{busy}}" aria-label="{{'1 张失败票'+(toolThreshold===1?'，已选':'')}}">{{toolThreshold===1?'✓ ':''}}1 张</button>
+            <button class="tool-seat-option {{toolThreshold===2?'active':''}}" bindtap="pickToolThreshold" data-value="2" disabled="{{busy}}" aria-label="{{'2 张失败票'+(toolThreshold===2?'，已选':'')}}">{{toolThreshold===2?'✓ ':''}}2 张</button>
+          </view>
+          <view class="small muted">至少 {{toolThreshold}} 张失败票，任务才失败</view>
+          <view wx:if="{{toolSeats.length>0 && toolSeats.length<toolThreshold}}" class="small threshold-hint">请至少选择 {{toolThreshold}} 名任务队员</view>
+        </view>
       </block>
       <view wx:else class="dialog-message">{{toolDescription?toolDescription:toolType==='offline'?'线下刀人后，由房主记录完成。':toolType==='reverseStrike'?'刺客选择逆仆，结果私密。':'刺客选择梅林，结算后公开是否命中。'}}</view>
       <view class="dialog-actions">
@@ -98,7 +124,6 @@
             <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
           </button>
         </view>
-        <text wx:if="{{boardAssisted}}" class="small muted assisted-hint">互认、起刀与最终胜负在线下完成</text>
         <button class="text-button rules-toggle" bindtap="toggleRules">{{showRules?'收起配置':'角色配置'}}</button>
         <view wx:if="{{showRules}}" class="rules-detail">
           <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
@@ -150,15 +175,16 @@
         </view>
       </view>
     </view>
-    <view wx:if="{{room.assisted}}" class="notice">线下辅助 · 互认、起刀与胜负在线下完成</view>
-    <view class="phase-strip"
-      ><view class="kicker"
-        >{{room.game?'第 '+room.game+' 局':'准备开局'}} {{!room.flexible && room.round?' / 任务 '+room.round:''}}</view
-      ><view class="phase-title">{{room.phaseName}}</view
-      ><text wx:if="{{room.leader && !room.flexible}}" class="muted"
-        >队长 {{room.leader}} 号 · 连续否决 {{room.rejects}} / 5</text
-      ></view
-    >
+    <view class="phase-strip">
+      <view class="phase-heading">
+        <text class="phase-label">当前阶段</text>
+        <text class="phase-name">{{room.phaseName}}</text>
+      </view>
+      <view wx:if="{{!room.flexible && (room.round || room.leader)}}" class="phase-detail">
+        <text wx:if="{{room.round}}">任务 {{room.round}}</text>
+        <text wx:if="{{room.leader}}">队长 {{room.leader}} 号 · 连续否决 {{room.rejects}} / 5</text>
+      </view>
+    </view>
     <block wx:if="{{room.phase!=='lobby'}}">
       <button wx:if="{{!revealed}}" class="identity-compact" bindtap="reveal" disabled="{{busy || !network}}" aria-label="查看我的身份">
         <text>我的身份</text><text class="identity-compact-action">查看 ›</text>
@@ -293,9 +319,9 @@
         </view>
         <view wx:if="{{room.operationProgress}}" class="operation-progress">
           <view class="progress-heading"><text>当前操作进度</text><text>{{room.operationProgress.completed}} / {{room.operationProgress.total}} 已完成</text></view>
-          <view wx:for="{{room.operationProgress.players}}" wx:key="seat" class="progress-player">
+          <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{item.required}}" class="progress-player">
             <text class="progress-player-name">{{item.seat}}号 · {{item.name}}</text>
-            <text class="progress-state {{!item.required?'not-required':item.completed?'completed':'pending'}}">{{!item.required?'无需操作':item.completed?'已完成':'未完成'}}</text>
+            <text class="progress-state {{item.completed?'completed':'pending'}}">{{item.completed?'已完成':'未完成'}}</text>
           </view>
         </view>
         <button wx:if="{{room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="primary" bindtap="settleTool" disabled="{{busy}}" loading="{{busy}}">结算当前操作</button>

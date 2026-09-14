@@ -284,6 +284,9 @@ function settle(room, check, allRoles) {
   if (room.phase === "fairy") {
     const holder = seatUid(k.fairy),
       target = seatUid(Number(val(holder).split(":")[1]));
+    k.players[holder].fairyRevision =
+      (k.players[holder].fairyRevision ||
+        (k.players[holder].fairyInfo ? 1 : 0)) + 1;
     k.players[holder].fairyInfo =
       `${room.players.find((p) => p.uid === target).seat}号查验结果：${side(room, target, allRoles) === "good" ? "好人" : "坏人"}（第${k.round}轮）`;
     k.fairyVisited.push(k.fairy);
@@ -413,6 +416,7 @@ function settle(room, check, allRoles) {
       p.used = false;
       p.faction = null;
       p.b = true;
+      delete p.nightInfo;
     }
     p.identityRevision =
       (p.identityRevision ?? (p.availableRound > 1 ? 1 : 0)) + 1;
@@ -445,7 +449,7 @@ function updateNight(room, allRoles) {
   const k = room.knights;
   if (k.skillRound !== k.round) return;
   for (const p of living(room)) {
-    if (room.roles[p.uid] === "prophet" && eligible(room, p.uid)) {
+    if (room.roles[p.uid] === "prophet") {
       const seats = living(room)
         .filter(
           (t) => k.players[t.uid].b && side(room, t.uid, allRoles) === "evil",

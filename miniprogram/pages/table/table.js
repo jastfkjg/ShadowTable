@@ -73,7 +73,6 @@ Page({
     toolType: "",
     toolSeats: [],
     toolThreshold: 1,
-    toolThresholds: ["1 张失败票", "2 张失败票"],
     showRoomSettings: false,
     showTransfer: false,
     boardIndex: 0,
@@ -146,7 +145,10 @@ Page({
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
+      fairyResult: null,
+      fairyResultRevealed: false,
       identityChange: null,
+      identityChangeRevealed: false,
       actionDialog: false,
       actionSecret: null,
       actionLoading: false,
@@ -283,7 +285,10 @@ Page({
     const selected = stageChanged ? [] : this.data.selected;
     const privacyUpdate = stageChanged
       ? {
+          fairyResult: null,
+          fairyResultRevealed: false,
           identityChange: null,
+          identityChangeRevealed: false,
           revealed: false,
           secret: null,
           choiceButtons: [],
@@ -380,7 +385,15 @@ Page({
     )
       await this.showIdentityChange();
     if (
+      room.me.fairyResultPending &&
       !room.me.identityChanged &&
+      this.foreground &&
+      !this.data.fairyResult
+    )
+      await this.showFairyResult();
+    if (
+      !room.me.identityChanged &&
+      !room.me.fairyResultPending &&
       room.needsSubmission &&
       !room.me.submitted &&
       this.foreground &&
@@ -758,7 +771,6 @@ Page({
           skills: "使用技能",
           conversion: "身份转换",
           fairy: "仙女查验",
-          night: "夜晚",
         }[toolType] || "",
       toolDescription:
         {
@@ -766,7 +778,6 @@ Page({
             "全员同时提交，按车长顺序结算。再次发起会进入下一轮，新身份技能随之生效。",
           conversion: "抽取一张转换牌，按牌面决定兰斯洛特是否交换阵营。",
           fairy: "仅仙女持有者选择目标，私密查验并传递仙女。",
-          night: "更新月下先知的私密视野。",
         }[toolType] || "",
       toolSeats,
       toolThreshold: 1,
@@ -799,7 +810,9 @@ Page({
     });
   },
   pickToolThreshold(e) {
-    this.setData({ toolThreshold: Number(e.detail.value) + 1 });
+    if (this.data.busy) return;
+    const value = Number(e.currentTarget.dataset.value);
+    if ([1, 2].includes(value)) this.setData({ toolThreshold: value });
   },
   async launchTool() {
     if (this.data.busy || this.pending) return;
@@ -1080,6 +1093,52 @@ Page({
       this.setData({ busy: false });
     }
   },
+  async showFairyResult() {
+    const room = this.data.room;
+    if (!room || this.fairyResultLoading) return;
+    this.fairyResultLoading = true;
+    const generation = this.generation;
+    try {
+      const secret = await api.request("/api/rooms/" + room.code + "/private");
+      if (
+        this.alive &&
+        this.foreground &&
+        this.generation === generation &&
+        this.data.room?.code === room.code &&
+        this.data.room?.stage === secret.stage &&
+        this.data.room.me.fairyResultPending &&
+        !this.data.identityChange &&
+        secret.fairyResult
+      ) {
+        this.closeAction();
+        this.setData({
+          fairyResult: secret.fairyResult,
+          fairyResultRevealed: false,
+          revealed: false,
+          secret: null,
+        });
+      }
+    } catch (e) {
+      this.handleError(e);
+    } finally {
+      this.fairyResultLoading = false;
+    }
+  },
+  revealFairyResult() {
+    if (this.data.busy || !this.foreground || !this.data.fairyResult) return;
+    this.setData({ fairyResultRevealed: true });
+  },
+  acknowledgeFairyResult() {
+    if (
+      this.data.busy ||
+      !this.data.fairyResultRevealed ||
+      !this.data.fairyResult
+    )
+      return;
+    const revision = this.data.fairyResult.revision;
+    this.setData({ fairyResult: null, fairyResultRevealed: false });
+    this.cmd("ackFairyResult", { revision });
+  },
   async showIdentityChange() {
     const room = this.data.room;
     if (!room || this.identityChangeLoading) return;
@@ -1096,7 +1155,12 @@ Page({
         this.data.room.me.identityChanged
       ) {
         this.closeAction();
-        this.setData({ identityChange: secret, revealed: false, secret: null });
+        this.setData({
+          identityChange: secret,
+          identityChangeRevealed: false,
+          revealed: false,
+          secret: null,
+        });
       }
     } catch (e) {
       this.handleError(e);
@@ -1104,10 +1168,15 @@ Page({
       this.identityChangeLoading = false;
     }
   },
+  revealChangedIdentity() {
+    if (this.data.busy || !this.foreground || !this.data.identityChange) return;
+    this.setData({ identityChangeRevealed: true });
+  },
   acknowledgeIdentity() {
+    if (this.data.busy || !this.data.identityChangeRevealed) return;
     const revision = this.data.identityChange?.identityRevision;
     if (revision === undefined) return;
-    this.setData({ identityChange: null });
+    this.setData({ identityChange: null, identityChangeRevealed: false });
     this.cmd("ackIdentity", { revision });
   },
   async submitChoice(e) {
@@ -1139,7 +1208,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "影中执刃 · 一起入座",
+      title: "桌边助手 · 一起入座",
       path: "/pages/table/table?code=" + (this.roomCode || ""),
     };
   },
