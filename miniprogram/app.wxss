@@ -934,3 +934,73 @@ button.finish-game-button {
   color: #f2b6ae;
   background: #493033;
 }
+
+button.room-open {
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 20rpx 24rpx;
+  line-height: 1.5;
+}
+.member-room-code {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.member-room-board {
+  color: var(--muted);
+  font-size: 26rpx;
+  font-weight: 400;
+  white-space: normal;
+}
+.history-row {
+  padding: 24rpx 0;
+}
+.history-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+.history-vote-line {
+  display: flex;
+  align-items: baseline;
+  gap: 20rpx;
+  margin: 10rpx 0;
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+.history-vote-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  flex: 0 0 140rpx;
+}
+.history-count {
+  font-weight: 600;
+  font-size: 30rpx;
+  color: var(--text);
+}
+.history-vote-seats {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.history-team {
+  color: var(--muted);
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+.history-cards {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 28rpx;
+  row-gap: 8rpx;
+  margin-top: 10rpx;
+}
+.history-card-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+}

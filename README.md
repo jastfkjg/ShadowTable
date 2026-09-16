@@ -55,6 +55,8 @@ npm run dev
 
 ## 微信真机与部署
 
+已提供 [GitHub Actions 自动部署说明](docs/deployment.md)：推送 main 后先测试，再通过 SSH 部署，健康检查失败自动回退代码。首次使用需初始化服务器并配置部署 Secrets。
+
 本仓库未包含用户的小程序 AppID、AppSecret、已备案域名或微信发布授权；未冒充已发布或已通过真机验收。
 
 - 将真实 AppID 写入 `project.config.json`；将微信配置只注入服务端 `WECHAT_APP_ID` / `WECHAT_APP_SECRET`。客户端 `devAuth:false`。

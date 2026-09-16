@@ -21,14 +21,26 @@ function voteSummary(votes) {
     .join("\n");
 }
 function toolHistory(h, key) {
-  const text = h.number ? `第${h.number}次操作 · ` : "";
   if (["skillDetail", "skillResult"].includes(h.kind))
     return { key, text: h.text, detail: h.detail || "" };
   if (h.kind === "variant") return { key, text: h.text, detail: "" };
   if (h.kind === "toolVote")
     return {
       key,
-      text: text + "投票" + (h.approved ? "通过" : "未通过"),
+      text: "投票" + (h.approved ? "通过" : "未通过"),
+      voteGroups: [true, false].map((approve) => {
+        const seats = h.votes
+          .filter((v) => v.approve === approve)
+          .map((v) => v.seat)
+          .sort((a, b) => a - b);
+        return {
+          label: approve ? "赞成" : "反对",
+          count: seats.length,
+          seats: seats.length ? seats.join("、") + " 号" : "无",
+          tone: approve ? "approve" : "reject",
+        };
+      }),
+      teamLabel: h.team.length ? h.team.join("、") + " 号" : "",
       detail:
         (h.team.length ? `队伍 ${h.team.join("、")}号\n` : "") +
         voteSummary(h.votes),
@@ -36,8 +48,23 @@ function toolHistory(h, key) {
   if (h.kind === "toolQuest")
     return {
       key,
-      text: text + (h.success ? "任务成功" : "任务失败"),
+      text: (h.success ? "任务成功" : "任务失败"),
       questResult: h.success ? "success" : "failure",
+      teamLabel: h.team.join("、") + " 号",
+      cards: Object.entries(
+        h.counts || { success: h.team.length - h.fails, fail: h.fails },
+      )
+        .filter(([, count]) => count > 0)
+        .map(([kind, count]) => ({
+          label:
+            {
+              success: "成功",
+              fail: "失败",
+              thiefFail: "盗贼失败",
+              magic: "魔法",
+            }[kind] || kind,
+          count,
+        })),
       detail: h.counts
         ? `${h.team.join("、")}号 · 成功${h.counts.success} / 失败${h.counts.fail} / 盗贼失败${h.counts.thiefFail} / 魔法${h.counts.magic}`
         : `${h.team.join("、")}号 · ${h.fails}张失败票`,
@@ -45,17 +72,17 @@ function toolHistory(h, key) {
   if (h.kind === "toolKnife")
     return {
       key,
-      text: text + "刀梅林",
+      text: "刀梅林",
       detail: `${h.target === 0 ? "空刀" : h.target + "号"} · ${h.hit ? (h.target === 0 ? "空刀命中" : "命中梅林") : h.target === 0 ? "空刀未命中" : "未命中梅林"}`,
     };
   if (h.kind === "toolReverse")
     return {
       key,
-      text: text + "刀逆仆已结算",
+      text: "刀逆仆已结算",
       detail: "结果仅向相关玩家展示，可继续发起其他操作",
     };
   if (h.kind === "toolOffline")
-    return { key, text: text + "线下刀人已完成", detail: "以线下结算为准" };
+    return { key, text: "线下刀人已完成", detail: "以线下结算为准" };
   if (h.kind === "toolCanceled")
     return { key, text: "未结算的操作已作废", detail: "未公开或计入本次提交" };
   return null;

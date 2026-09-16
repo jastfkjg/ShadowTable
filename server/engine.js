@@ -864,6 +864,7 @@ function roomSummary(room, uid) {
   return {
     code: room.code,
     boardName: boardName(room),
+    capacity: room.capacity,
     phaseName: phaseName(room),
     game: room.game,
     seat: p?.seat ?? null,
