@@ -8,6 +8,7 @@ if (!!process.env.ADMIN_ORIGIN !== !!process.env.ADMIN_KEY)
 const { server, store } = createApp({
   adminOrigin: process.env.ADMIN_ORIGIN,
   adminKey: process.env.ADMIN_KEY,
+  webOrigin: process.env.WEB_ORIGIN,
   database: process.env.DB_PATH || "data/shadowtable.sqlite",
   devAuth,
   devPanel: process.env.DEV_PANEL === "1",

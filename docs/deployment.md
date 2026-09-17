@@ -32,6 +32,8 @@ DEV_AUTH=0
 DEV_PANEL=0
 WECHAT_APP_ID=真实AppID
 WECHAT_APP_SECRET=真实AppSecret
+# 网页版玩家入口（可选）：完整 HTTPS 源、不带末尾斜线或路径；配好后浏览器可直接访问
+WEB_ORIGIN=https://api.example.com
 ```
 
 Node 不自动读取 `.env`；systemd 负责加载此文件。密钥只保存在服务器。
@@ -92,7 +94,13 @@ server {
     location = /health {
         proxy_pass http://127.0.0.1:8787;
     }
-    location / { return 404; }
+    # 网页版玩家入口：与 API 同域托管，/ 落到服务端返回前端；/api/ 等更精确 location 优先匹配
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -162,3 +170,20 @@ location /admin/ {
 陪测玩家凭据绑定当前管理员会话和指定房间，不能单独使用、跨房间或创建新房。退出/重启后旧凭据不可用。陪测台只查看和操作它创建的账号；管理概览不暴露真人身份、OpenID 或秘密行动。陪测房间不会自动恢复为正式房间，需清理后明确关闭。
 
 数据仍使用现有 SQLite，启动会自动新增审计表，无需手动建表。部署不会自动修改 Nginx 或环境文件；这些配置只需管理员初始化一次。管理写操作结果不确定时，先刷新房间列表和审计记录确认，不要连续提交删除或终止。
+
+## 网页版玩家入口
+
+为应对小程序备案未通过的情况，提供与 API 同域托管的移动端网页版（`https://<域名>/`），登录方式为匿名访客，功能与小程序对等。备案通过后小程序仍是主入口；网页版不改变任何小程序代码。
+
+在 `/etc/shadowtable.env` 配置 `WEB_ORIGIN`（上文已加入示例）为完整 HTTPS 源、不带末尾斜线或路径，例如 `https://api.example.com`。留空时网页版整体关闭，根路径仍返回 401，行为与之前一致。本地开发用 `npm run dev` 已自动设置 `WEB_ORIGIN=http://127.0.0.1:8787`，一条命令即可在浏览器打开 `http://127.0.0.1:8787/` 联调。
+
+Nginx 的 `location / { return 404; }` 需改为 `proxy_pass`（上文 HTTPS 配置示例已改），并保留浏览器 Host（`proxy_set_header Host $http_host;`）与 Origin/`Sec-Fetch-Site` 请求头——访客登录据此校验同源，缺失会导致 403。`/api/`、`/health`、`/admin` 等更精确的 location 优先匹配，小程序的域名与请求路径完全不受影响。
+
+部署新代码、更新环境文件后，执行 `sudo nginx -t`、`sudo systemctl reload nginx` 和 `sudo systemctl restart shadowtable`（网页前端随 `server/web/` 一起部署，无需额外构建）。验证：
+
+```bash
+curl -i https://api.example.com/                    # 返回 HTML，含 Content-Security-Policy
+curl -i -X POST https://api.example.com/api/guest-login -H 'Origin: https://api.example.com'  # 返回 {"token":...}
+```
+
+玩家用浏览器打开根地址即进入，建房/加入流程与小程序一致；通过复制房间的“邀请链接”（`https://<域名>/?code=XXXXXX`）可直接直达加入页。数据存在同一 SQLite，小程序与网页玩家可混用同一房间。访客登录沿用登录限流与来源校验；访客只是换个登录通道，不会获得任何特权。

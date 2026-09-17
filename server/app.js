@@ -42,12 +42,34 @@ function createApp({
   appSecret = "",
   adminOrigin = "",
   adminKey = "",
+  webOrigin = "",
   exchangeCode,
   clock = () => Date.now(),
 } = {}) {
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
   const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
+  const web = webOrigin ? require("./web").serve : null;
+  let webHost = "";
+  if (webOrigin) {
+    let url;
+    try {
+      url = new URL(webOrigin);
+    } catch {
+      throw new Error("WEB_ORIGIN 必须是完整的源地址");
+    }
+    if (url.origin !== webOrigin)
+      throw new Error("WEB_ORIGIN 必须是完整的源地址，不含路径");
+    if (
+      url.protocol !== "https:" &&
+      !(
+        process.env.NODE_ENV !== "production" &&
+        ["localhost", "127.0.0.1"].includes(url.hostname)
+      )
+    )
+      throw new Error("网页版必须使用 HTTPS");
+    webHost = url.host;
+  }
   const store = new Store(database),
     limits = new Map();
   function limit(key, max) {
@@ -125,6 +147,7 @@ function createApp({
           return send(404, { error: "接口不存在" });
         return;
       }
+      if (web && web(req, res, path)) return;
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account and login/create limits below remain unchanged.
       limit(`ip:${req.socket.remoteAddress}`, 6000);
@@ -134,7 +157,7 @@ function createApp({
         return send(200, { boards: BOARDS });
       if (
         req.method === "POST" &&
-        ["/api/login", "/api/dev-login"].includes(path)
+        ["/api/login", "/api/dev-login", "/api/guest-login"].includes(path)
       ) {
         limit(`login:${req.socket.remoteAddress}`, 30);
         const b = await body(req);
@@ -142,6 +165,16 @@ function createApp({
         if (path === "/api/dev-login") {
           check(devAuth, "开发登录未开启", 404);
           uid = `dev:${randomBytes(24).toString("hex")}`;
+        } else if (path === "/api/guest-login") {
+          check(web, "网页登录未开启", 404);
+          check(
+            req.headers.host === webHost &&
+              req.headers.origin === webOrigin &&
+              req.headers["sec-fetch-site"] !== "cross-site",
+            "请求来源不匹配",
+            403,
+          );
+          uid = `guest:${randomBytes(24).toString("hex")}`;
         } else uid = `wx:${hash(await wechatLogin(b.code))}`;
         const token = randomBytes(32).toString("hex");
         store.addSession(hash(token), uid);
