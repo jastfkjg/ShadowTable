@@ -1214,3 +1214,8 @@ button.transfer-button {
 @media (max-width: 480px) {
   .option-dialog { margin: auto auto max(16px, env(safe-area-inset-bottom)); padding: 18px; }
 }
+
+.transfer-entry { margin-top: 24px; }
+.option-dialog[open] { display: flex; flex-direction: column; }
+.option-dialog .option-header { flex-shrink: 0; }
+.option-dialog .option-list { overflow-y: auto; min-height: 0; padding: 4px; }

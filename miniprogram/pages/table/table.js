@@ -124,7 +124,6 @@ Page({
     toolSeats: [],
     toolThreshold: 1,
     showRoomSettings: false,
-    showTransfer: false,
     boardIndex: 0,
     capacityIndex: 0,
     memberRooms: [],
@@ -516,7 +515,6 @@ Page({
       entryMode: "join",
       showRoomRules: false,
       showRoomSettings: false,
-      showTransfer: false,
     });
   },
   async deleteRoom(e) {
@@ -624,9 +622,6 @@ Page({
     wx.navigateTo({
       url: "/pages/settings/settings?code=" + this.data.room.code,
     });
-  },
-  toggleTransfer() {
-    this.setData({ showTransfer: !this.data.showTransfer });
   },
   selectCapacity(capacity) {
     const availableBoards = this.data.boards.filter(
@@ -1039,9 +1034,6 @@ Page({
           ? "正在确认操作，请稍候。"
           : "最近一次服务器请求成功。";
     wx.showModal({ title: "连接状态", content, showCancel: false });
-  },
-  transfer(e) {
-    this.cmd("transfer", { seat: Number(e.currentTarget.dataset.seat) });
   },
   closeAction() {
     this.actionGeneration = (this.actionGeneration || 0) + 1;

@@ -255,21 +255,6 @@
       </button></view
     >
     <block wx:if="{{room.phase==='lobby'}}">
-      <button wx:if="{{room.me.isHost && room.players.length>1}}" class="text-button" bindtap="toggleTransfer">{{showTransfer?'收起转交':'转交房主'}}</button>
-      <view wx:if="{{room.me.isHost && room.players.length>1 && showTransfer}}" class="panel"
-        ><text class="label">选择新房主</text
-        ><block wx:for="{{room.players}}" wx:key="seat"
-          ><button
-            wx:if="{{item.seat!==room.me.seat}}"
-            class="compact secondary"
-            data-seat="{{item.seat}}"
-            bindtap="transfer"
-            disabled="{{busy}}"
-          >
-            交给 {{item.seat}} 号 · {{item.name}}
-          </button></block
-        ></view
-      >
       <button class="leave-button" bindtap="leave" disabled="{{busy}}">
         离开房间
       </button>

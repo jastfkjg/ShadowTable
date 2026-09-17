@@ -9,11 +9,11 @@
     </view>
     <view class="settings-section-title">房间配置</view>
     <view class="settings-section">
-      <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || pendingSave}}">
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || pendingSave || pendingTransfer}}">
         <view class="settings-row"><text>人数</text><text class="settings-value">{{capacity}} 人 ›</text></view>
       </picker>
       <view wx:else class="settings-row"><text>人数</text><text class="muted">{{room.capacity}} 人</text></view>
-      <picker wx:if="{{room.phase==='lobby'}}" range="{{choices}}" range-key="name" value="{{boardIndex}}" bindchange="pickBoard" disabled="{{busy || pendingSave}}">
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{choices}}" range-key="name" value="{{boardIndex}}" bindchange="pickBoard" disabled="{{busy || pendingSave || pendingTransfer}}">
         <view class="settings-row"><text>板子</text><text class="settings-value">{{choices[boardIndex].name}} ›</text></view>
       </picker>
       <view wx:else class="settings-row"><text>板子</text><text class="muted settings-value">{{room.boardName}}</text></view>
@@ -24,13 +24,18 @@
       <view class="settings-section">
         <view class="settings-row">
           <view><view>公开技能过程</view><view class="settings-caption">{{visible?'保存后所有玩家可见':'仅公示最终结果'}}</view></view>
-          <switch checked="{{visible}}" bindchange="toggleVisibility" color="#c3a361" disabled="{{busy || pendingSave}}" aria-label="公开技能过程"/>
+          <switch checked="{{visible}}" bindchange="toggleVisibility" color="#c3a361" disabled="{{busy || pendingSave || pendingTransfer}}" aria-label="公开技能过程"/>
         </view>
       </view>
       <view class="settings-help">开启后公开出手人、目标等过程。最终出局和复活结果始终公示，新身份仅本人可见。</view>
     </block>
+    <view class="transfer-entry">
+      <button class="secondary" bindtap="openTransfer" disabled="{{busy || pendingSave || pendingTransfer || !transferPlayers.length}}">移交房主</button>
+      <view class="settings-help">{{transferPlayers.length?'任意阶段均可移交，新房主立即接管流程。':'其他玩家入座后可移交房主。'}}</view>
+    </view>
+    <button wx:if="{{pendingTransfer}}" class="secondary" bindtap="sendTransfer" disabled="{{busy}}">重试确认移交结果</button>
     <view class="settings-footer">
-      <button class="primary" bindtap="save" disabled="{{busy || (!dirty && !pendingSave)}}" loading="{{busy}}">{{busy?'正在保存…':pendingSave?'重试保存':dirty?'保存设置':'设置已保存'}}</button>
+      <button class="primary" bindtap="save" disabled="{{busy || pendingTransfer || (!dirty && !pendingSave)}}" loading="{{busy}}">{{busy?'正在保存…':pendingSave?'重试保存':dirty?'保存设置':'设置已保存'}}</button>
       <button class="text-button" bindtap="back" disabled="{{busy}}">返回牌桌</button>
     </view>
   </block>
@@ -38,4 +43,19 @@
     <button class="secondary" bindtap="load">重新加载</button>
     <button class="text-button" bindtap="back">返回牌桌</button>
   </block>
+</view>
+
+<view wx:if="{{showTransferPicker && authorized}}" class="dialog-backdrop" catchtap="closeTransfer" catchtouchmove="stopPropagation">
+  <view class="transfer-dialog" catchtap="stopPropagation" role="dialog" aria-modal="true" aria-label="选择新房主">
+    <view class="transfer-header">
+      <view class="transfer-heading"><view class="dialog-title">选择新房主</view><text class="transfer-count">{{transferPlayers.length}} 位玩家</text></view>
+      <view class="transfer-description">选择一位玩家接管房间，下一步确认移交。</view>
+    </view>
+    <scroll-view class="transfer-list" style="height: {{transferPlayers.length * 104}}rpx" scroll-y enhanced show-scrollbar="{{true}}" catchtouchmove="stopPropagation">
+      <button wx:for="{{transferPlayers}}" wx:key="seat" class="transfer-option" hover-class="transfer-option-hover" bindtap="transfer" data-seat="{{item.seat}}" disabled="{{busy}}">
+        <text class="transfer-seat">{{item.seat}}</text><text class="transfer-name">{{item.name}}</text><text class="transfer-chevron" aria-hidden="true">›</text>
+      </button>
+    </scroll-view>
+    <view class="transfer-footer"><button class="transfer-cancel" bindtap="closeTransfer" disabled="{{busy}}">取消</button></view>
+  </view>
 </view>

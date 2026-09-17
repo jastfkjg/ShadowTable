@@ -2495,24 +2495,13 @@
       var transfers = room.players.filter(function (p) {
         return p.seat !== room.me.seat;
       });
-      html +=
-        '<div class="settings-section-title">移交房主</div><div class="settings-section">';
-      if (!transfers.length)
-        html +=
-          '<div class="settings-row"><span class="muted">暂时没有其他在座玩家。</span></div>';
-      for (var m = 0; m < transfers.length; m++) {
-        var tp = transfers[m];
-        html +=
-          '<div class="settings-row"><span>' +
-          tp.seat +
-          "号 · " +
-          esc(tp.name) +
-          "</span>" +
-          btn("transfer-button", "transferFromSettings", "移交", { seat: tp.seat }, s.busy) +
-          "</div>";
-      }
-      html +=
-        '</div><div class="settings-help">把房主移交给在座玩家；对局中也可移交，新房主立即接管流程。</div>';
+      html += '<div class="transfer-entry"><select class="secondary" data-change="settingsTransfer"' +
+        (s.busy || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移交房主</option>';
+      transfers.forEach(function (player) {
+        html += '<option value="' + player.seat + '">' + player.seat + '号 · ' + esc(player.name) + '</option>';
+      });
+      html += '</select><div class="settings-help">' +
+        (transfers.length ? "任意阶段均可移交，新房主立即接管流程。" : "其他玩家入座后可移交房主。") + '</div></div>';
       html +=
         '<div class="settings-footer">' +
         btn(
@@ -2538,14 +2527,14 @@
   function enhanceSelects() {
     app.querySelectorAll("select[data-change]").forEach(function (select) {
       var key = select.dataset.change;
-      var label = /Capacity$/.test(key) ? "人数" : "板子";
+      var label = key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子";
       var trigger = document.createElement("button");
       trigger.type = "button";
       trigger.className = select.className + " option-trigger";
       trigger.dataset.optionTrigger = key;
       trigger.disabled = select.disabled || state.busy;
       trigger.setAttribute("aria-haspopup", "dialog");
-      trigger.setAttribute("aria-label", label + "：" + (select.selectedOptions[0] || {}).textContent);
+      trigger.setAttribute("aria-label", key === "settingsTransfer" ? "移交房主" : label + "：" + (select.selectedOptions[0] || {}).textContent);
       trigger.textContent = (select.selectedOptions[0] || {}).textContent || "请选择";
       select.hidden = true;
       select.after(trigger);
@@ -2570,6 +2559,7 @@
       '</h2></div><button type="button" class="option-close" aria-label="关闭选项">×</button></div><div class="option-list"></div>';
     var list = dialog.querySelector(".option-list");
     Array.from(select.options).forEach(function (option) {
+      if (option.disabled) return;
       var button = document.createElement("button");
       button.type = "button";
       button.className = "option-item";
@@ -2582,8 +2572,10 @@
         if (!current || current.disabled || state.busy) return;
         current.value = option.value;
         CHANGES[key](current);
+        if (key === "settingsTransfer") current.value = "";
         var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
-        if (trigger) trigger.focus();
+        if (!modal.hidden) modalCancel.focus();
+        else if (trigger) trigger.focus();
       });
       list.appendChild(button);
     });
@@ -2605,7 +2597,8 @@
       optionDialog = null;
       dialog.remove();
       var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
-      if (trigger) trigger.focus();
+      if (!modal.hidden) modalCancel.focus();
+      else if (trigger) trigger.focus();
     });
     document.body.appendChild(dialog);
     dialog.showModal();
@@ -2768,6 +2761,7 @@
     },
   };
   var CHANGES = {
+    settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },
     entryCapacity: function (el) {
       if (state.busy) return;
       selectCapacity(Number(el.value));

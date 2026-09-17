@@ -489,3 +489,21 @@ test("房主开局与结算按钮未满足条件时禁用并展示等待人数",
   assert.ok(JSON.stringify(waiting).includes("还差 2 人提交"));
   assert.equal(byHandler(render({ ...base, room: playing, canSettle: true }), "settleTool").attr.disabled, false);
 });
+
+test("移交入口仅在管理员设置页显示，玩家列表按需弹出", () => {
+  const renderSettings = factory("pages/settings/settings.wxml");
+  for (const phase of ["lobby", "tools", "ended"]) {
+    const data = { loading: false, authorized: true, busy: false, pendingSave: false, pendingTransfer: false, room: { phase }, transferPlayers: [{ seat: 2, name: "乙" }] };
+    const closed = renderSettings(data);
+    const button = byHandler(closed, "openTransfer");
+    assert.ok(button);
+    assert.equal(button.attr.disabled, false);
+    assert.equal(byHandler(closed, "transfer"), undefined);
+    const opened = renderSettings({ ...data, showTransferPicker: true });
+    assert.ok(byHandler(opened, "transfer"));
+    assert.ok(byHandler(opened, "closeTransfer"));
+    assert.equal(byHandler(renderSettings({ ...data, authorized: false }), "openTransfer"), undefined);
+    assert.equal(byHandler(renderSettings({ ...data, pendingTransfer: true }), "openTransfer").attr.disabled, true);
+    assert.equal(byHandler(renderSettings({ ...data, transferPlayers: [] }), "openTransfer").attr.disabled, true);
+  }
+});

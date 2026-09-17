@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const fs = require("node:fs");
 const { BOARDS } = require("../server/engine");
-function page(api) {
+function page(api, wxOverrides = {}) {
   let definition;
   vm.runInNewContext(
     fs.readFileSync(
@@ -15,7 +15,10 @@ function page(api) {
       Page: (p) => (definition = p),
       wx: {
         showToast: () => {},
+        navigateBack: () => {},
+        redirectTo: () => {},
         showModal: (o) => o.success({ confirm: true }),
+        ...wxOverrides,
       },
     },
   );
@@ -165,4 +168,119 @@ test("设置保存401后重新登录并沿用原请求编号与内容恢复", as
   assert.equal(writes[1].data, writes[0].data);
   assert.equal(p.pending, null);
   assert.equal(p.data.pendingSave, false);
+});
+
+const transferRoom = () => ({
+  ...room(),
+  players: [
+    { seat: 1, name: "甲" },
+    { seat: 2, name: "乙" },
+  ],
+  me: { isHost: true, seat: 1 },
+});
+test("设置页在各阶段可移交，成功后退出管理页面", async () => {
+  for (const phase of ["lobby", "tools", "ended", "terminated"]) {
+    const writes = [];
+    let returned = false;
+    const p = page(
+      {
+        login: async () => {},
+        requestId: () => "transfer-id",
+        request: async (path, method, data) => {
+          if (method === "POST") {
+            writes.push(data);
+            return { ok: true };
+          }
+          return path === "/api/boards"
+            ? { boards: BOARDS }
+            : { ...transferRoom(), phase };
+        },
+      },
+      {
+        navigateBack: () => {
+          returned = true;
+        },
+      },
+    );
+    await p.load();
+    assert.equal(p.data.transferPlayers.length, 1);
+    await p.transfer({ currentTarget: { dataset: { seat: 1 } } });
+    assert.equal(writes.length, 0);
+    await p.transfer({ currentTarget: { dataset: { seat: 2 } } });
+    assert.equal(writes[0].type, "transfer");
+    assert.equal(writes[0].seat, 2);
+    assert.equal(p.data.authorized, false);
+    assert.equal(returned, true);
+  }
+});
+test("移交取消不提交，网络未确认时沿用原请求重试", async () => {
+  const writes = [];
+  let confirmed = false;
+  const p = page(
+    {
+      login: async () => {},
+      requestId: () => "transfer-id",
+      request: async (path, method, data, id) => {
+        if (method === "POST") {
+          writes.push({ id, data: JSON.stringify(data) });
+          if (writes.length === 1) throw new Error("网络未确认");
+          return { ok: true };
+        }
+        return path === "/api/boards" ? { boards: BOARDS } : transferRoom();
+      },
+    },
+    { showModal: (o) => o.success({ confirm: confirmed }) },
+  );
+  await p.load();
+  const event = { currentTarget: { dataset: { seat: 2 } } };
+  await p.transfer(event);
+  assert.equal(writes.length, 0);
+  confirmed = true;
+  await p.transfer(event);
+  assert.equal(p.data.pendingTransfer, true);
+  await p.save();
+  assert.equal(writes.length, 1);
+  await p.sendTransfer();
+  assert.deepEqual(writes[1], writes[0]);
+  assert.equal(p.data.pendingTransfer, false);
+});
+test("移交阶段冲突刷新，权限撤销后禁止继续移交", async () => {
+  for (const status of [409, 403]) {
+    let changed = false;
+    const p = page({
+      login: async () => {},
+      requestId: () => "transfer-id",
+      request: async (path, method) => {
+        if (method === "POST") {
+          changed = true;
+          throw Object.assign(new Error("请求失效"), { status });
+        }
+        return path === "/api/boards"
+          ? { boards: BOARDS }
+          : { ...transferRoom(), stage: changed ? "s2" : "s1" };
+      },
+    });
+    await p.load();
+    await p.transfer({ currentTarget: { dataset: { seat: 2 } } });
+    assert.equal(p.transferPending, null);
+    assert.equal(p.data.busy, false);
+    if (status === 409) assert.equal(p.original.stage, "s2");
+    else assert.equal(p.data.authorized, false);
+  }
+});
+
+test("移交选择弹窗按需打开，取消不提交，空房或保存中不可打开", () => {
+  const p = page({});
+  p.data.authorized = true;
+  p.openTransfer();
+  assert.equal(p.data.showTransferPicker, false);
+  p.data.transferPlayers = [{ seat: 2, name: "乙" }];
+  p.openTransfer();
+  assert.equal(p.data.showTransferPicker, true);
+  p.closeTransfer();
+  assert.equal(p.data.showTransferPicker, false);
+  assert.equal(p.transferPending, undefined);
+  p.pending = { id: "saving" };
+  p.openTransfer();
+  assert.equal(p.data.showTransferPicker, false);
 });
