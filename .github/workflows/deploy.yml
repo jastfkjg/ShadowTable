@@ -1,67 +1,116 @@
-name: Backend CI and deploy
-
+name: Container CI and deploy
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: backend-${{ github.ref }}
+  group: shadowtable-production
   cancel-in-progress: false
-
 jobs:
-  verify:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - run: bash -n deploy/release.sh
-
+      - run: python3 -m unittest discover -s tests -p 'test_deploy.py'
+      - run: for script in deploy/cloud/*.sh; do bash -n "$script"; done
+      - run: bash deploy/cloud/smoke-test.sh
   deploy:
-    needs: verify
+    needs: test
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
     environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-      - name: Upload and activate release
-        shell: bash
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate registry configuration
+        id: image
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ vars.ACR_NAMESPACE }}
+          ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
         run: |
           set -euo pipefail
-          : "${DEPLOY_HOST:?Missing DEPLOY_HOST}"
-          : "${DEPLOY_USER:?Missing DEPLOY_USER}"
-          : "${DEPLOY_SSH_KEY:?Missing DEPLOY_SSH_KEY}"
-          : "${DEPLOY_KNOWN_HOSTS:?Missing DEPLOY_KNOWN_HOSTS}"
-          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          port="${DEPLOY_PORT:-22}"
-          [[ "$port" =~ ^[0-9]+$ ]]
-          release="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          ssh_dir="$(mktemp -d)"
-          trap 'rm -rf "$ssh_dir"' EXIT
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/key"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
-          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
-          ssh_args=(-i "$ssh_dir/key" -p "$port" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts")
-          target="${DEPLOY_USER}@${DEPLOY_HOST}"
-          tar -czf "$ssh_dir/backend.tgz" server package.json package-lock.json deploy/release.sh
-          ssh "${ssh_args[@]}" "$target" "mkdir -p /opt/shadowtable/releases/$release"
-          ssh "${ssh_args[@]}" "$target" "tar -xzf - -C /opt/shadowtable/releases/$release" < "$ssh_dir/backend.tgz"
-          ssh "${ssh_args[@]}" "$target" "bash /opt/shadowtable/releases/$release/deploy/release.sh $release"
+          [[ "$ACR_REGISTRY" =~ ^[a-z0-9][a-z0-9.-]*\.aliyuncs\.com$ ]] || { echo 'Set ACR_REGISTRY to the public ACR hostname, without https:// or a path.' >&2; exit 1; }
+          [[ "$ACR_NAMESPACE" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set ACR_NAMESPACE.' >&2; exit 1; }
+          [[ "$ACR_REPOSITORY" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set ACR_REPOSITORY.' >&2; exit 1; }
+          echo "name=$ACR_REGISTRY/$ACR_NAMESPACE/$ACR_REPOSITORY" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Check server prerequisites before building
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          SSH_PORT=${SSH_PORT:-22}
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < deploy/cloud/preflight.sh
+      - name: Build and publish
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          # ACR Personal Edition rejects OCI attestation artifact manifests.
+          provenance: false
+          sbom: false
+          outputs: type=image,push=true,oci-mediatypes=false
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Deploy over SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          SSH_PORT=${SSH_PORT:-22}
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          SSH=(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          target="$SSH_USER@$SSH_HOST"
+          release="/opt/shadowtable/releases/${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          "${SSH[@]}" "$target" "umask 077; mkdir -p '$release'"
+          tar -C deploy/cloud -czf - . | "${SSH[@]}" "$target" "tar -xzf - -C '$release'"
+          "${SSH[@]}" "$target" "bash '$release/deploy.sh' '$IMAGE'"
+      - name: Remove SSH key
+        if: always()
+        run: rm -f "$HOME/.ssh/deploy_key"

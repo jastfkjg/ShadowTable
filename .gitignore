@@ -7,3 +7,6 @@ miniprogram/config.local.js
 
 output/
 .playwright-cli/
+
+# Python deployment tests
+__pycache__/

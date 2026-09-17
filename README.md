@@ -59,7 +59,7 @@ npm run dev
 
 ## 微信真机与部署
 
-已提供 [GitHub Actions 自动部署说明](docs/deployment.md)：推送 main 后先测试，再通过 SSH 部署，健康检查失败自动回退代码。首次使用需初始化服务器并配置部署 Secrets。
+已提供 [GitHub Actions 自动部署说明](docs/deployment.md)：推送 main 后先测试并构建镜像，再通过 SSH 更新独立 Compose；健康检查失败回退应用镜像。公网入口由 jastcraft-infra 独立 Caddy 网关管理。首次使用需初始化服务器并配置部署 Secrets。
 
 本仓库未包含用户的小程序 AppID、AppSecret、已备案域名或微信发布授权；未冒充已发布或已通过真机验收。
 
@@ -127,4 +127,4 @@ NODE_ENV=production DEV_AUTH=0 PORT=8787 npm start
 
 ## 正式测试与管理平台
 
-新增 `/admin` 管理入口：配置 `ADMIN_ORIGIN` / `ADMIN_KEY` 后启用独立管理员登录，支持房间概览、为现有准备阶段房间开启陪测、清理测试座位、终止/删除房间及操作审计。原本地 `/dev` 陪测保留。生产环境不需要开启开发登录，具体配置与 Nginx 转发见 [部署文档](docs/deployment.md#正式测试与管理平台)。小程序新增陪测房间标记，需要同步发布客户端改动。
+新增 `/admin` 管理入口：配置 `ADMIN_ORIGIN` / `ADMIN_KEY` 后启用独立管理员登录，支持房间概览、为现有准备阶段房间开启陪测、清理测试座位、终止/删除房间及操作审计。原本地 `/dev` 陪测保留。生产环境不需要开启开发登录，具体环境配置与网关部署见 [部署文档](docs/deployment.md)。小程序新增陪测房间标记，需要同步发布客户端改动。

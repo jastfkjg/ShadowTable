@@ -1,0 +1,40 @@
+name: shadowtable
+services:
+  app:
+    image: ${SHADOWTABLE_IMAGE:?Deploy an immutable image first}
+    restart: unless-stopped
+    init: true
+    env_file: /opt/shadowtable/app.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      DB_PATH: /data/shadowtable.sqlite
+      DEV_AUTH: '0'
+      DEV_PANEL: '0'
+    volumes:
+      - /opt/shadowtable/data:/data
+    networks:
+      proxy:
+        aliases: [shadowtable-upstream]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8787/health').then(async r=>{if(!r.ok || !(await r.json()).ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+networks:
+  proxy:
+    external: true
+    name: shadowtable_proxy

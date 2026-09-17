@@ -1,189 +1,91 @@
-# GitHub Actions 自动部署
+# EC2 容器部署
 
-工作流 `.github/workflows/deploy.yml` 在 PR 中运行检查与测试；推送到 main 后，测试通过才部署。也可在 Actions 手动运行 main。部署目标是 Linux + systemd + Node.js 24 + Nginx 的单台服务器，不包含小程序上传发布。
+ShadowTable 使用单个 Node 24 容器提供网页和 API，SQLite 持久化到 `/opt/shadowtable/data`。独立 Caddy 网关由相邻 `jastcraft-infra` 仓库管理；本项目不安装 Nginx，也不部署 Caddy。首次网关切换必须先遵循该仓库 README。
 
-每次仅上传 server、package 文件和部署脚本；数据库、微信密钥和本地开发数据不会上传。版本放在 `/opt/shadowtable/releases/`，`current` 软链接指向正在使用的版本。部署会短暂重启单进程，健康检查失败会回退代码；数据库不回滚，未来涉及不兼容数据库迁移时必须另行设计迁移与恢复流程。
+## 1. 初始化服务器
 
-## 一次性初始化服务器
-
-以下以 Ubuntu/Debian 为例，由管理员执行。先安装 Node.js 24（确保 `/usr/bin/node` 可执行）、Nginx、curl、tar、util-linux、sudo、OpenSSH server。Node.js 的安装方式可按服务器现有管理方式选择；若路径不同，同时修改 service 与 release.sh 中的路径。
+需要 Linux、Docker Engine、Compose >=2.24、Python3、curl、tar、flock 和 SSH。以下 `deploy` 替换为实际部署账号。账号需具备 Docker 权限（等同宿主机高权限）。
 
 ```bash
-sudo adduser --disabled-password --gecos '' deploy
-sudo useradd --system --user-group --home-dir /nonexistent --shell /usr/sbin/nologin shadowtable
-sudo install -d -o deploy -g deploy -m 755 /opt/shadowtable /opt/shadowtable/releases
-sudo install -d -o shadowtable -g shadowtable -m 700 /var/lib/shadowtable
-sudo install -d -o deploy -g deploy -m 700 /home/deploy/.ssh
-sudo touch /home/deploy/.ssh/authorized_keys
-sudo chown deploy:deploy /home/deploy/.ssh/authorized_keys
-sudo chmod 600 /home/deploy/.ssh/authorized_keys
+sudo install -d -o deploy -g deploy -m 700 /opt/shadowtable /opt/shadowtable/releases /opt/shadowtable/backups
+sudo install -d -o 1000 -g 1000 -m 700 /opt/shadowtable/data
 ```
 
-使用专用于部署的 SSH 密钥，把公钥加入 `/home/deploy/.ssh/authorized_keys`；私钥保存到 GitHub Secret。运行服务的 shadowtable 账号与上传代码的 deploy 账号分开。
+容器以 Node 镜像的 node 用户 UID/GID 1000 运行。数据目录必须可写；如果使用 user namespace remap/rootless Docker，需按该运行环境调整宿主 UID 映射。
 
-创建 `/etc/shadowtable.env`，root 所有、权限 600，填写：
+将 `deploy/cloud/app.env.example` 上传为 `/opt/shadowtable/app.env`，权限 600、部署用户所有，设置：
 
 ```dotenv
-NODE_ENV=production
-HOST=127.0.0.1
-PORT=8787
-DB_PATH=/var/lib/shadowtable/shadowtable.sqlite
-DEV_AUTH=0
-DEV_PANEL=0
-WECHAT_APP_ID=真实AppID
-WECHAT_APP_SECRET=真实AppSecret
-# 网页版玩家入口（可选）：完整 HTTPS 源、不带末尾斜线或路径；配好后浏览器可直接访问
-WEB_ORIGIN=https://api.example.com
+WEB_ORIGIN=https://table.example.com
+ADMIN_ORIGIN=
+ADMIN_KEY=
+WECHAT_APP_ID=
+WECHAT_APP_SECRET=
 ```
 
-Node 不自动读取 `.env`；systemd 负责加载此文件。密钥只保存在服务器。
+`WEB_ORIGIN` 与网关 SHADOWTABLE_DOMAIN 一致，HTTPS、不含末尾斜线。管理员入口需要两项同时设置：`ADMIN_ORIGIN` 等于 WEB_ORIGIN，`ADMIN_KEY` 用 `openssl rand -hex 32` 生成。网页版访客不需要微信凭据；小程序登录才需要。含 `$` 的值在 env 文件用单引号包围，避免 Compose 插值。环境由 Compose 注入，Node 不自动加载 .env。
 
-从仓库复制服务配置，并启用开机启动（首次部署前没有 current，暂不启动）：
+生产模式、监听地址、SQLite 路径及关闭开发入口由 Compose 固定。只运行一个 app，禁止 scale/PM2 cluster。不映射 8787 到宿主机，流量经 shadowtable_proxy 网络进入。
 
-```bash
-sudo install -m 644 deploy/shadowtable.service /etc/systemd/system/shadowtable.service
-sudo systemctl daemon-reload
-sudo systemctl enable shadowtable
-```
+## 2. 镜像和 GitHub Actions
 
-通过 `sudo visudo -f /etc/sudoers.d/shadowtable-deploy` 写入以下精确授权。先确认 `command -v systemctl` 是 `/usr/bin/systemctl`：
+沿用 echooo 的 ACR 方式，为 ShadowTable 建立独立镜像仓库。服务器部署用户 `docker login <ACR_REGISTRY>`，账号需有拉取权限。
 
-```sudoers
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart shadowtable, /usr/bin/systemctl stop shadowtable
-```
-
-通过 `sudo visudo -c` 验证。不要授权 deploy 任意 sudo 命令。后续修改 service 文件需要管理员手动安装；工作流只更新应用代码。
-
-## GitHub 配置
-
-仓库 Settings → Environments 新建 `production`，将允许部署的分支限制为 main。若套餐不支持 Environment secrets，可使用仓库 Actions secrets；工作流仍引用 production 环境。需要完全自动部署时，不设置人工审批规则。
-
-在 production 的 secrets（或仓库 Actions secrets）设置：
+在 GitHub 仓库配置 Variables：
 
 | 名称 | 内容 |
 | --- | --- |
-| DEPLOY_HOST | 服务器 IPv4 或 SSH 域名，不带协议 |
-| DEPLOY_USER | `deploy` |
-| DEPLOY_PORT | SSH 端口，可省略，默认 22 |
-| DEPLOY_SSH_KEY | 部署专用 SSH 私钥全文，使用无交互口令的专用密钥 |
-| DEPLOY_KNOWN_HOSTS | 经核验的服务器 SSH 主机公钥 known_hosts 行 |
+| ACR_REGISTRY | 控制台给出的公网 aliyuncs.com registry，不带协议 |
+| ACR_NAMESPACE | 命名空间 |
+| ACR_REPOSITORY | ShadowTable 独立仓库名称 |
 
-known_hosts 应从可信管理连接核对服务器主机公钥指纹后生成，不要在工作流里临时 ssh-keyscan 并直接信任。非 22 端口对应的条目格式是 `[域名或IP]:端口 key-type public-key`，主机名应与 DEPLOY_HOST 一致。
+新建 `production` Environment，将部署分支限制为 main，配置 Secrets（也可使用仓库 Secrets）：
 
-GitHub 托管 runner 必须能通过 SSH 到达服务器；若防火墙严格限制固定来源，需配置合适的 runner/网络入口。服务器需要能通过 HTTPS 请求 `api.weixin.qq.com`。不要公开 8787。
+| 名称 | 内容 |
+| --- | --- |
+| ACR_USERNAME / ACR_PASSWORD | ACR 推送凭据 |
+| SSH_HOST / SSH_PORT / SSH_USER | EC2 SSH 地址、端口（默认22）、部署用户 |
+| SSH_KEY | 专用 SSH 私钥 |
+| SSH_KNOWN_HOSTS | 已经可信渠道核验的服务器 host key |
 
-提交并推送工作流到 main 后，在 Actions → Backend CI and deploy 查看运行。PR 只测试，不读取部署密钥。生产部署串行执行，正在执行的部署不会被新推送取消；并发待执行任务可能被较新的任务取代。
+旧流程的 `DEPLOY_*` Secrets 不再使用。GitHub runner 必须能访问 SSH 和镜像仓库。首次服务器尚未初始化时先禁用 Actions，准备就绪后再启用并手动运行 main。
 
-## HTTPS 与小程序
+PR 只验证；push main 和手动 main 发布先运行语法、单元测试、部署故障测试和容器冒烟测试，再构建 amd64/arm64 镜像。发布到独立 ACR 仓库并锁定 digest，通过 SSH 上传部署脚本到新 release。工作流不上传本地数据库、私钥、环境文件或小程序。
 
-Actions 不负责 DNS、证书签发或 Nginx 初始化。先配置 API 域名和有效证书，再将以下配置中的域名、证书路径替换成实际值：
+服务器发布流程：检查配置及数据权限 → 拉镜像 → 停止写入 → 备份整个数据目录（含 WAL）→ 启动单实例并等待健康 → 检查公网 `/health` JSON → 更新 current/previous。
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name api.example.com;
-    ssl_certificate /etc/nginx/certs/fullchain.pem;
-    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+失败后恢复上一容器版本；首次部署失败则停服。自动回退只回退应用，不恢复数据库：因此此通道只允许向后兼容的数据库变更。不兼容迁移必须单独安排维护及恢复方案。备份失败会中止发布并尝试恢复旧应用。
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    location = /health {
-        proxy_pass http://127.0.0.1:8787;
-    }
-    # 网页版玩家入口：与 API 同域托管，/ 落到服务端返回前端；/api/ 等更精确 location 优先匹配
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+## 3. 从旧 systemd 方案迁移（仅已部署过的服务器需要）
 
-执行 `sudo nginx -t` 后重新加载 Nginx，并安排证书自动续期。小程序 `miniprogram/config.js` 设置正式 HTTPS baseUrl 和 `devAuth: false`，在微信后台配置 request 合法域名。小程序发布独立操作。
+旧 `deploy/release.sh` 和 service 文件已从仓库移除，不能再用旧流水线部署。
 
-## 验收与运维
+1. 停止并禁用 `shadowtable.service`，确认没有其他进程写 SQLite。
+2. 备份 `/var/lib/shadowtable` 整个目录及 `/etc/shadowtable.env`。
+3. 将数据库目录内容（包含 WAL/SHM，如存在）复制到 `/opt/shadowtable/data`，设所有者 1000:1000、目录权限700；不要复制开发机数据。
+4. 将旧环境中的适用项安全迁到 app.env；Compose 固定的 HOST/PORT/DB_PATH 不必复制。
+5. 记录旧 current 指向，将旧 `/opt/shadowtable/current` 软链接移到 `legacy-current`，不要删除旧 releases。新容器脚本拒绝把 systemd release 当作回退版本。
+6. 网关与代理网络就绪后首次发布容器，验证数据后完成迁移。
+
+首次容器发布失败时不会自动恢复 systemd。如需回退，先停容器，再按数据兼容性恢复原数据备份、旧 current 和服务。严禁同时运行旧服务与新容器。
+
+## 4. 验收及运维
 
 ```bash
-sudo systemctl status shadowtable
-sudo journalctl -u shadowtable -n 100 --no-pager
-curl --fail https://api.example.com/health
+bash /opt/shadowtable/current/compose.sh ps
+bash /opt/shadowtable/current/compose.sh logs --tail 100 app
+curl --fail https://table.example.com/health
+curl --fail https://table.example.com/
 ```
 
-工作流只验证服务器内部 `/health`，不验证公网 HTTPS、证书或微信登录；首次上线必须用真机验证登录、建房、加入、秘密操作以及重启后恢复房间。
+用浏览器测试访客登录、建房、另一台设备加入、秘密操作和重启恢复；启用后台时测试 `/admin`。网页与 API 同域，由网关整站代理，保留 Host/Origin/Sec-Fetch-Site；不需要配置 CORS 或前端构建。
 
-- SQLite 开启 WAL：使用 SQLite 在线备份或停服备份整个数据目录，不能运行中只复制主文件。上线前配置定时异机备份。
-- 只运行单个 Node 实例。不要启用 PM2 cluster 或多服务器共享 SQLite。
-- 当前限流按连接 IP 计算，Nginx 后所有玩家共享登录 30 次/分钟、总请求 6000 次/分钟的 IP 额度。设置代理请求头不会自动修复；扩大规模前需修改后端的可信代理处理。
-- 健康检查失败时自动回退上一版本代码；首次部署失败则停服。回退失败需要管理员检查日志。
-- 历史版本暂不自动删除；定期清理不用的版本，至少保留当前版本和上一个可用版本。数据目录不会随版本清理。
-- 手动回退最简单的方式是 revert main 上的问题提交并推送，让工作流重新部署。
-- 若服务器已按旧说明把代码直接放在 `/opt/shadowtable`，先备份数据库，再迁移到本说明的 current/releases 布局并更新服务配置。
+发布脚本中的公网检查不替代业务验收。网关异常时会导致发布失败并回退应用；本项目不会修改或重启网关。
 
-参考：[GitHub 部署控制](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments)、[Nginx proxy_pass](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)。
+每次发布有停写备份，但不代替定时备份。安排 SQLite 在线备份或维护窗口内停服备份，并复制到异机/对象存储，设置保留周期及恢复演练。不要运行中只复制 sqlite 主文件，不要把备份放到公开静态目录。日志已限制大小和数量；定期清理历史 release、镜像和备份，至少保留当前及上一版本。
 
-## 正式测试与管理平台
+需要手工应用回退时，在 `/opt/shadowtable/deploy.lock` 锁下停止当前 app，用 previous 的 compose.sh 启动并健康检查，再更新 current。不得在旧版本不兼容当前 schema 时这样操作；数据库恢复需停写并明确数据损失范围。
 
-新增 `/admin`，与仅本机使用的 `/dev` 分开。无需开启 `DEV_AUTH` 或 `DEV_PANEL`；生产环境继续保持两者为 0。
+当前后端以连接 IP 限流，代理后玩家共享代理 IP 额度（登录30次/分钟，总请求6000次/分钟）；设置转发头不会自动改变这一行为。扩大规模前需实现可信代理 IP 处理。
 
-在服务器 `/etc/shadowtable.env` 添加：
-
-```dotenv
-ADMIN_ORIGIN=https://api.example.com
-ADMIN_KEY=至少32字符的随机管理密钥
-```
-
-使用 `openssl rand -hex 32` 生成密钥，将它安全保存到环境文件及管理员密码管理器中，不放入小程序、仓库或 URL。`ADMIN_ORIGIN` 必须与浏览器地址的源完全一致，不带末尾斜线或路径。正式环境只允许 HTTPS。两项留空时管理平台关闭。
-
-在同一个 Nginx HTTPS server 中增加：
-
-```nginx
-location = /admin {
-    proxy_pass http://127.0.0.1:8787;
-    proxy_set_header Host $http_host;
-}
-location /admin/ {
-    proxy_pass http://127.0.0.1:8787;
-    proxy_set_header Host $http_host;
-}
-```
-
-`/api/admin/` 由原有 `/api/` location 转发。确保该 location 也保留浏览器 Host（建议 `proxy_set_header Host $http_host;`，非标准 HTTPS 端口必须保留端口号），并且不要移除 Origin/Cookie 请求头，也不要对管理页面或 API 配置代理缓存。
-
-部署新代码、更新环境文件后，执行 `sudo nginx -t`、`sudo systemctl reload nginx` 和 `sudo systemctl restart shadowtable`。浏览器打开 `https://api.example.com/admin`，输入管理密钥即可登录。服务重启、密钥轮换或退出登录后，管理员会话失效，需要重新登录。
-
-### 使用流程
-
-1. 正式玩家先在小程序创建房间。平台显示房间号、板子、人数和阶段，分页每页 50 条。
-2. 在准备阶段选择“开启陪测”，输入房间号和操作原因。直接使用原房间和原玩家，无需重新建房。
-3. 小程序显示“测试房间 · 陪测已开启”（需要发布本次小程序改动）；打开“陪测台”，输入原房间号，添加或补齐测试玩家，继续使用原有准备、投票、任务和技能测试功能。
-4. 已发牌的房间不能新加玩家。要测试已有对局，先由房主结束并同房重开，再开启陪测。
-5. 完成后回到准备阶段清空陪测玩家，再关闭陪测。管理员会话过期后可重新登录，用“清理陪测座位”清除旧账号并保留真人；如果房主是陪测账号，会转交给在座真人。
-6. “终止对局”“同房重开”和“删除房间”均需输入房间号及原因。终止不判胜负；删除不可在平台恢复。最近 100 条审计记录可在页面查看，完整记录存 SQLite `admin_audit`，包括陪测操作类型，不记录秘密票型/目标。
-
-当前为单管理员共享密钥模式，审计记录统一标记管理操作，不能区分多个使用者；尚未实现多管理员角色、找回密码或 MFA。管理员会话保存在内存中，有效期 8 小时；浏览器使用 HttpOnly、Secure、SameSite=Strict Cookie。管理密钥不存入浏览器存储。登录全局限制每分钟10次。
-
-陪测玩家凭据绑定当前管理员会话和指定房间，不能单独使用、跨房间或创建新房。退出/重启后旧凭据不可用。陪测台只查看和操作它创建的账号；管理概览不暴露真人身份、OpenID 或秘密行动。陪测房间不会自动恢复为正式房间，需清理后明确关闭。
-
-数据仍使用现有 SQLite，启动会自动新增审计表，无需手动建表。部署不会自动修改 Nginx 或环境文件；这些配置只需管理员初始化一次。管理写操作结果不确定时，先刷新房间列表和审计记录确认，不要连续提交删除或终止。
-
-## 网页版玩家入口
-
-为应对小程序备案未通过的情况，提供与 API 同域托管的移动端网页版（`https://<域名>/`），登录方式为匿名访客，功能与小程序对等。备案通过后小程序仍是主入口；网页版不改变任何小程序代码。
-
-在 `/etc/shadowtable.env` 配置 `WEB_ORIGIN`（上文已加入示例）为完整 HTTPS 源、不带末尾斜线或路径，例如 `https://api.example.com`。留空时网页版整体关闭，根路径仍返回 401，行为与之前一致。本地开发用 `npm run dev` 已自动设置 `WEB_ORIGIN=http://127.0.0.1:8787`，一条命令即可在浏览器打开 `http://127.0.0.1:8787/` 联调。
-
-Nginx 的 `location / { return 404; }` 需改为 `proxy_pass`（上文 HTTPS 配置示例已改），并保留浏览器 Host（`proxy_set_header Host $http_host;`）与 Origin/`Sec-Fetch-Site` 请求头——访客登录据此校验同源，缺失会导致 403。`/api/`、`/health`、`/admin` 等更精确的 location 优先匹配，小程序的域名与请求路径完全不受影响。
-
-部署新代码、更新环境文件后，执行 `sudo nginx -t`、`sudo systemctl reload nginx` 和 `sudo systemctl restart shadowtable`（网页前端随 `server/web/` 一起部署，无需额外构建）。验证：
-
-```bash
-curl -i https://api.example.com/                    # 返回 HTML，含 Content-Security-Policy
-curl -i -X POST https://api.example.com/api/guest-login -H 'Origin: https://api.example.com'  # 返回 {"token":...}
-```
-
-玩家用浏览器打开根地址即进入，建房/加入流程与小程序一致；通过复制房间的“邀请链接”（`https://<域名>/?code=XXXXXX`）可直接直达加入页。数据存在同一 SQLite，小程序与网页玩家可混用同一房间。访客登录沿用登录限流与来源校验；访客只是换个登录通道，不会获得任何特权。
+小程序发布独立进行：配置真实 AppID/AppSecret、HTTPS baseUrl 和 request 合法域名，关闭 devAuth，再单独上传发布。
