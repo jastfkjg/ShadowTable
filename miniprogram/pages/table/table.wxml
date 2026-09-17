@@ -17,7 +17,7 @@
     <view class="dialog-title">你已获得新身份</view>
     <view class="small muted">仅供本人查看 · {{identityChange.passiveVision?'视野随技能结算自动更新':'新技能下一轮可用'}}</view>
     <block wx:if="{{identityChangeRevealed}}">
-      <view class="identity-title">{{identityChange.role}}</view>
+      <view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view>
       <view class="muted">{{identityChange.faction}}</view>
       <view class="private-info">{{identityChange.information}}</view>
       <button class="primary" bindtap="acknowledgeIdentity" disabled="{{busy}}">记住了，遮盖身份</button>
@@ -28,11 +28,11 @@
     </block>
   </view>
 </view>
-<view class="page">
+<view class="page {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view class="brand">
     <text class="brand-mark">桌边助手</text>
     <view class="brand-actions">
-      <button wx:if="{{room}}" class="switch-table" bindtap="returnHome" disabled="{{busy}}" aria-label="切换牌桌，保留当前座位">切换牌桌</button>
+      <button wx:if="{{room}}" class="switch-table" bindtap="returnHome" disabled="{{busy}}" aria-label="返回首页，保留当前座位">回首页</button>
       <button class="connection-button" bindtap="connectionInfo" aria-label="{{!network || needsLogin ? '连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '连接正常' : '连接未确认'}}">
         <view class="connection-dot {{!network || needsLogin ? 'offline' : loading || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
       </button>
@@ -44,7 +44,7 @@
       <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>
       <view class="dialog-message">{{error}}</view>
       <view class="dialog-actions">
-        <button wx:if="{{recoverableError && !hasPendingRequest}}" class="secondary" bindtap="returnHome" disabled="{{busy}}">返回入口</button>
+        <button wx:if="{{recoverableError && !hasPendingRequest}}" class="secondary" bindtap="returnHome" disabled="{{busy}}">回首页</button>
         <button wx:if="{{recoverableError}}" class="primary" bindtap="retry" loading="{{busy}}" disabled="{{busy}}">{{needsLogin?'重新登录':'重试'}}</button>
         <button wx:else class="primary" bindtap="dismissError">知道了</button>
       </view>
@@ -55,7 +55,7 @@
       <view class="dialog-title">{{room.phase==='identity'?'查看身份':actionLabel}}</view>
       <view wx:if="{{room.phase==='identity'}}" class="action-identity">
         <view wx:if="{{actionSecret}}" class="action-identity-details">
-          <view class="identity-title">{{actionSecret.role}}</view>
+          <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
           <view class="muted">{{actionSecret.faction}}</view>
           <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
         </view>
@@ -202,7 +202,7 @@
         <text>我的身份</text><text class="identity-compact-action">查看 ›</text>
       </button>
       <view wx:else class="identity open">
-        <view class="identity-title">{{secret.role}}</view>
+        <view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view>
         <text class="muted">{{secret.faction}}</text>
         <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
         <button class="secondary" bindtap="reveal" disabled="{{busy || !network}}">立即遮盖</button>
@@ -297,7 +297,7 @@
           >{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text>
         </view
       >
-      <view wx:if="{{room.result}}" class="result"
+      <view wx:if="{{room.result}}" class="result {{room.result.winner==='good'?'result-good':(room.result.winner==='evil'?'result-evil':'result-neutral')}}"
         ><text class="kicker">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text
         ><view class="phase-title"
           >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
@@ -336,8 +336,6 @@
             <text class="progress-state {{item.completed?'completed':'pending'}}">{{item.completed?'已完成':'未完成'}}</text>
           </view>
         </view>
-        <button wx:if="{{room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="primary" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
-        <button wx:if="{{room.hasActiveOperation}}" class="text-button" bindtap="cancelTool" disabled="{{busy}}">作废当前操作</button>
       </view>
       <view wx:elif="{{room.flexible && room.phase==='tools'}}" class="panel">
         <view class="label">等待房主发起操作</view>
@@ -367,6 +365,12 @@
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
       <button class="finish-game-button" bindtap="finishTools" disabled="{{busy}}">结束本局</button>
+    </view>
+    <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
+      <view class="host-action-bar-inner">
+        <button class="primary bar-settle" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
+        <button class="secondary bar-cancel" bindtap="cancelTool" disabled="{{busy}}">作废</button>
+      </view>
     </view>
   </block>
 </view>

@@ -9,6 +9,13 @@ const CHOICES = {
   thiefFail: "盗贼失败",
   pass: "不使用技能 / 确认",
 };
+function factionTone(faction) {
+  if (!faction) return "";
+  if (faction.includes("好人")) return "good";
+  if (faction.includes("坏人")) return "evil";
+  if (faction.includes("盗贼")) return "third";
+  return "";
+}
 function voteSummary(votes) {
   return [true, false]
     .map((approve) => {
@@ -210,6 +217,11 @@ Page({
       targetButtons: [],
     });
   },
+  buzz(type = "light") {
+    try {
+      if (wx.vibrateShort) wx.vibrateShort({ type });
+    } catch (e) {}
+  },
   async bootstrap() {
     this.setData({ loading: true, error: "" });
     try {
@@ -331,6 +343,9 @@ Page({
     )
       return;
     const stageChanged = this.data.room?.stage !== room.stage;
+    // Haptic nudge on game-stage transitions; stronger when it is now our turn.
+    if (stageChanged && this.data.room)
+      this.buzz(room.needsSubmission && !room.me.submitted ? "medium" : "light");
     const selected = stageChanged ? [] : this.data.selected;
     const privacyUpdate = stageChanged
       ? {
@@ -1011,6 +1026,7 @@ Page({
     if (!code) return;
     wx.setClipboardData({
       data: code,
+      success: () => wx.showToast({ title: "房间号已复制", icon: "success" }),
       fail: () =>
         this.handleError({ message: "复制失败，请再试一次", status: 400 }),
     });
@@ -1144,6 +1160,7 @@ Page({
           actionSecret: {
             role: secret.role,
             faction: secret.faction,
+            factionTone: factionTone(secret.faction),
             information: secret.information,
           },
         });
@@ -1175,6 +1192,7 @@ Page({
         secret.stage === stage &&
         this.data.room.stage === stage
       ) {
+        secret.factionTone = factionTone(secret.faction);
         this.setData({
           revealed: true,
           secret,
@@ -1256,6 +1274,7 @@ Page({
         this.data.room.me.identityChanged
       ) {
         this.closeAction();
+        secret.factionTone = factionTone(secret.faction);
         this.setData({
           identityChange: secret,
           identityChangeRevealed: false,

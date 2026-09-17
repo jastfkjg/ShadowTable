@@ -5,6 +5,9 @@ page {
   --muted: #b1bfc6;
   --accent: #e5c68b;
   --border: #536570;
+  --good: #a3dfbe;
+  --evil: #f2b6ae;
+  --third: #8ab8d9;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
@@ -1003,4 +1006,66 @@ button.room-open {
   gap: 8rpx;
   font-size: 26rpx;
   color: var(--muted);
+}
+
+/* Faction color system: color the role name only — good green, evil red, third blue. */
+.faction-good {
+  color: var(--good);
+}
+.faction-evil {
+  color: var(--evil);
+}
+.faction-third {
+  color: var(--third);
+}
+.result-good {
+  background: #263c38;
+}
+.result-evil {
+  background: #3a2a2c;
+}
+.result-neutral {
+  background: var(--surface);
+}
+.history-vote-count.approve,
+.history-vote-count.approve .history-count {
+  color: var(--good);
+}
+.history-vote-count.reject,
+.history-vote-count.reject .history-count {
+  color: var(--evil);
+}
+
+/* Sticky host action bar: settle / cancel stay reachable during an operation. */
+.page.has-host-bar {
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+}
+.host-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  background: var(--bg);
+  border-top: 1rpx solid var(--border);
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.host-action-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  max-width: 900rpx;
+  margin: 0 auto;
+}
+.host-action-bar-inner button {
+  margin: 0;
+  min-height: 88rpx;
+}
+.host-action-bar-inner .bar-settle {
+  flex: 2;
+}
+.host-action-bar-inner .bar-cancel {
+  flex: 0 0 152rpx;
+  font-size: 26rpx;
 }
