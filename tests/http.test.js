@@ -196,7 +196,16 @@ test("我的房间列表只返回本人成员关系，无他人房间、身份�
     assert.deepEqual(list.map((r) => r.code).sort(), [owned, shared].sort());
     assert.deepEqual(
       Object.keys(list[0]).sort(),
-      ["code", "boardName", "capacity", "phaseName", "game", "seat", "isHost"].sort(),
+      [
+        "code",
+        "boardName",
+        "capacity",
+        "phaseName",
+        "game",
+        "seat",
+        "testRoom",
+        "isHost",
+      ].sort(),
     );
     assert.deepEqual((await a.req("/api/me/rooms", outsider)).data.rooms, []);
     assert.equal((await a.req("/api/me/rooms", second)).data.rooms.length, 1);

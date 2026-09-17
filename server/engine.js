@@ -863,6 +863,7 @@ function roomSummary(room, uid) {
   requireRule(p || room.host === uid, "你不在该房间", 403);
   return {
     code: room.code,
+    testRoom: room.testRoom === true,
     boardName: boardName(room),
     capacity: room.capacity,
     phaseName: phaseName(room),
@@ -904,6 +905,7 @@ function publicView(room, uid) {
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
     code: room.code,
+    testRoom: room.testRoom === true,
     board: room.board,
     boardName:
       room.board === "classic" && room.capacity === 10

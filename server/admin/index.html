@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="/admin/icon.svg" />
+    <title>桌边助手 · 管理平台</title>
+    <link rel="stylesheet" href="/admin/style.css" />
+    <script src="/admin/app.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">SHADOWTABLE / OPERATIONS</p>
+          <h1>桌边助手管理平台</h1>
+          <p>管理牌桌，连接陪测，追踪操作记录。</p>
+        </div>
+        <button id="logout" hidden>退出登录</button>
+      </header>
+      <p id="feedback" role="status" aria-live="polite"></p>
+      <section id="login">
+        <h2>管理员登录</h2>
+        <p>使用服务器配置的管理密钥。会话有效期为 8 小时。</p>
+        <form id="login-form">
+          <input
+            type="hidden"
+            name="username"
+            autocomplete="username"
+            value="admin"
+          />
+          <label for="key">管理密钥</label
+          ><input
+            id="key"
+            type="password"
+            autocomplete="current-password"
+            required
+            minlength="32"
+          /><button class="primary">登录平台</button>
+        </form>
+      </section>
+      <div id="dashboard" hidden>
+        <nav>
+          <button id="refresh">刷新列表</button
+          ><a href="/admin/companion">打开陪测台 →</a>
+        </nav>
+        <section>
+          <div class="section-heading">
+            <h2>房间概览</h2>
+            <span id="count"></span>
+          </div>
+          <p>
+            现有正式房间可在准备阶段开启陪测。开启后小程序会显示测试标记，原玩家和房间号保留。
+          </p>
+          <div id="rooms"></div>
+          <div class="pager">
+            <button id="prev">上一页</button><span id="page"></span
+            ><button id="next">下一页</button>
+          </div>
+        </section>
+        <section>
+          <div class="section-heading">
+            <h2>操作记录</h2>
+            <span>最近 100 条</span>
+          </div>
+          <p>
+            记录管理员登录、陪测账号创建和房间管理操作。玩家身份与秘密行动不在此展示。
+          </p>
+          <ol id="audit"></ol>
+        </section>
+      </div>
+      <dialog id="confirm-dialog">
+        <form id="action-form">
+          <h2 id="action-title"></h2>
+          <p id="action-description"></p>
+          <label for="confirm-code">输入房间号确认</label
+          ><input
+            id="confirm-code"
+            inputmode="numeric"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            required
+          /><label for="reason">操作原因</label
+          ><textarea
+            id="reason"
+            minlength="2"
+            maxlength="200"
+            required
+          ></textarea>
+          <p id="action-error" role="alert"></p>
+          <div class="dialog-actions">
+            <button id="cancel" type="button">取消</button
+            ><button class="danger" id="submit-action">确认操作</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+  </body>
+</html>

@@ -168,6 +168,7 @@
     </view>
     <view class="row subline room-subline">
       <view class="room-board-info">
+        <text wx:if="{{room.testRoom}}" class="small">测试房间 · 陪测已开启</text>
         <text class="room-board-name">{{room.boardName}} · {{room.capacity}}人</text>
         <button class="room-rules-button" bindtap="openRoomRules" aria-label="查看当前板子的角色配置">配置说明</button>
       </view>

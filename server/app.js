@@ -40,6 +40,8 @@ function createApp({
   devPanel = false,
   appId = "",
   appSecret = "",
+  adminOrigin = "",
+  adminKey = "",
   exchangeCode,
   clock = () => Date.now(),
 } = {}) {
@@ -91,16 +93,33 @@ function createApp({
     check(data.openid && !data.errcode, "微信登录凭证已失效，请重新登录", 401);
     return data.openid;
   }
+  const admin =
+    adminOrigin && adminKey
+      ? require("./admin").createAdmin({
+          store,
+          origin: adminOrigin,
+          key: adminKey,
+          body,
+          limit,
+        })
+      : null;
   const server = http.createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    const send = (status, data) => {
+    const send = (status, data, raw = false) => {
       res.writeHead(status);
-      res.end(JSON.stringify(data));
+      res.end(raw ? data : JSON.stringify(data));
     };
     try {
       const path = new URL(req.url, "http://localhost").pathname;
+      if (admin && (await admin.handle(req, res, path, send))) return;
+      if (
+        path === "/admin" ||
+        path.startsWith("/admin/") ||
+        path.startsWith("/api/admin/")
+      )
+        return send(404, { error: "管理平台未启用" });
       if (path === "/dev" || path.startsWith("/dev/")) {
         if (!panel || !panel(req, res, path))
           return send(404, { error: "接口不存在" });
@@ -133,6 +152,19 @@ function createApp({
       const session = store.session(hash(token));
       check(session, "登录已过期，请重新登录", 401);
       const uid = session.uid;
+      if (uid.startsWith("test:")) {
+        check(admin, "陪测平台未启用", 403);
+        const adminSession = admin.authenticate(req);
+        const [, code, owner] = uid.split(":");
+        check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
+        check(
+          path.startsWith(`/api/rooms/${code}/`) ||
+            path === `/api/rooms/${code}`,
+          "陪测账号只能访问绑定房间",
+          403,
+        );
+        check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
+      }
       limit(`uid:${uid}`, 180);
       if (req.method === "GET" && path === "/api/me/rooms") {
         const rooms = store.roomsFor(uid).map((room) => roomSummary(room, uid));
@@ -207,6 +239,17 @@ function createApp({
         if (match?.[2] === "delete") store.remove(room.code);
         else store.save(room);
         store.addReceipt(uid, id, fingerprint, response);
+        if (uid.startsWith("test:"))
+          store.db
+            .prepare(
+              "INSERT INTO admin_audit(action,code,reason,created) VALUES(?,?,?,?)",
+            )
+            .run(
+              "companion",
+              room.code,
+              match[2] === "commands" ? b.type : match[2],
+              Date.now(),
+            );
         return response;
       });
       // Receipts store no role, action, or old view. Client fetches a fresh scoped view.

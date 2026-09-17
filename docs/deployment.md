@@ -117,3 +117,48 @@ curl --fail https://api.example.com/health
 - 若服务器已按旧说明把代码直接放在 `/opt/shadowtable`，先备份数据库，再迁移到本说明的 current/releases 布局并更新服务配置。
 
 参考：[GitHub 部署控制](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments)、[Nginx proxy_pass](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)。
+
+## 正式测试与管理平台
+
+新增 `/admin`，与仅本机使用的 `/dev` 分开。无需开启 `DEV_AUTH` 或 `DEV_PANEL`；生产环境继续保持两者为 0。
+
+在服务器 `/etc/shadowtable.env` 添加：
+
+```dotenv
+ADMIN_ORIGIN=https://api.example.com
+ADMIN_KEY=至少32字符的随机管理密钥
+```
+
+使用 `openssl rand -hex 32` 生成密钥，将它安全保存到环境文件及管理员密码管理器中，不放入小程序、仓库或 URL。`ADMIN_ORIGIN` 必须与浏览器地址的源完全一致，不带末尾斜线或路径。正式环境只允许 HTTPS。两项留空时管理平台关闭。
+
+在同一个 Nginx HTTPS server 中增加：
+
+```nginx
+location = /admin {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $http_host;
+}
+location /admin/ {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $http_host;
+}
+```
+
+`/api/admin/` 由原有 `/api/` location 转发。确保该 location 也保留浏览器 Host（建议 `proxy_set_header Host $http_host;`，非标准 HTTPS 端口必须保留端口号），并且不要移除 Origin/Cookie 请求头，也不要对管理页面或 API 配置代理缓存。
+
+部署新代码、更新环境文件后，执行 `sudo nginx -t`、`sudo systemctl reload nginx` 和 `sudo systemctl restart shadowtable`。浏览器打开 `https://api.example.com/admin`，输入管理密钥即可登录。服务重启、密钥轮换或退出登录后，管理员会话失效，需要重新登录。
+
+### 使用流程
+
+1. 正式玩家先在小程序创建房间。平台显示房间号、板子、人数和阶段，分页每页 50 条。
+2. 在准备阶段选择“开启陪测”，输入房间号和操作原因。直接使用原房间和原玩家，无需重新建房。
+3. 小程序显示“测试房间 · 陪测已开启”（需要发布本次小程序改动）；打开“陪测台”，输入原房间号，添加或补齐测试玩家，继续使用原有准备、投票、任务和技能测试功能。
+4. 已发牌的房间不能新加玩家。要测试已有对局，先由房主结束并同房重开，再开启陪测。
+5. 完成后回到准备阶段清空陪测玩家，再关闭陪测。管理员会话过期后可重新登录，用“清理陪测座位”清除旧账号并保留真人；如果房主是陪测账号，会转交给在座真人。
+6. “终止对局”“同房重开”和“删除房间”均需输入房间号及原因。终止不判胜负；删除不可在平台恢复。最近 100 条审计记录可在页面查看，完整记录存 SQLite `admin_audit`，包括陪测操作类型，不记录秘密票型/目标。
+
+当前为单管理员共享密钥模式，审计记录统一标记管理操作，不能区分多个使用者；尚未实现多管理员角色、找回密码或 MFA。管理员会话保存在内存中，有效期 8 小时；浏览器使用 HttpOnly、Secure、SameSite=Strict Cookie。管理密钥不存入浏览器存储。登录全局限制每分钟10次。
+
+陪测玩家凭据绑定当前管理员会话和指定房间，不能单独使用、跨房间或创建新房。退出/重启后旧凭据不可用。陪测台只查看和操作它创建的账号；管理概览不暴露真人身份、OpenID 或秘密行动。陪测房间不会自动恢复为正式房间，需清理后明确关闭。
+
+数据仍使用现有 SQLite，启动会自动新增审计表，无需手动建表。部署不会自动修改 Nginx 或环境文件；这些配置只需管理员初始化一次。管理写操作结果不确定时，先刷新房间列表和审计记录确认，不要连续提交删除或终止。

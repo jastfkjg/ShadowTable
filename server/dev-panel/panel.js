@@ -26,7 +26,7 @@ class Companion {
     if (this.actors.some((a) => a.pending))
       throw new Error("请先重试未确认的操作");
     this.code = code;
-    const { token } = await this.request("/api/dev-login", null, {});
+    const { token } = await this.request("/api/dev-login", null, { code });
     const id = crypto.randomUUID();
     const actor = {
       id,
@@ -182,7 +182,10 @@ class Companion {
 if (typeof module !== "undefined") module.exports = { Companion };
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
-  const key = "shadowtable-local-companion-v1";
+  const managed = location.pathname.startsWith("/admin/");
+  const key = managed
+    ? "shadowtable-admin-companion-v1"
+    : "shadowtable-local-companion-v1";
   let state;
   try {
     state = JSON.parse(sessionStorage.getItem(key) || "null");
@@ -198,6 +201,7 @@ if (typeof document !== "undefined") {
         throw Object.assign(new Error("请求冷却中，请稍后重试"), {
           status: 429,
         });
+      if (managed && path === "/api/dev-login") path = "/api/admin/actors";
       const response = await fetch(path, {
         method: data ? "POST" : "GET",
         signal: AbortSignal.timeout(10000),

@@ -3,7 +3,11 @@ const { createApp } = require("./app");
 const devAuth = process.env.DEV_AUTH === "1";
 if (process.env.NODE_ENV === "production" && devAuth)
   throw new Error("生产环境禁止开发登录");
+if (!!process.env.ADMIN_ORIGIN !== !!process.env.ADMIN_KEY)
+  throw new Error("ADMIN_ORIGIN 和 ADMIN_KEY 必须同时配置");
 const { server, store } = createApp({
+  adminOrigin: process.env.ADMIN_ORIGIN,
+  adminKey: process.env.ADMIN_KEY,
   database: process.env.DB_PATH || "data/shadowtable.sqlite",
   devAuth,
   devPanel: process.env.DEV_PANEL === "1",
