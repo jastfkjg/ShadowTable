@@ -351,13 +351,28 @@
     }, 1600);
   }
   function confirm(title, content, showCancel) {
+    if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
+      var opener = document.activeElement;
       modalTitle.textContent = title;
       modalMessage.textContent = content;
       modalCancel.hidden = showCancel === false;
       modal.hidden = false;
+      (showCancel === false ? modalOk : modalCancel).focus();
+      function onKey(event) {
+        if (event.key === "Escape" && showCancel !== false) {
+          event.preventDefault();
+          done(false);
+        } else if (event.key === "Tab") {
+          event.preventDefault();
+          (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus();
+        }
+      }
+      modal.addEventListener("keydown", onKey);
       function done(val) {
         modal.hidden = true;
+        modal.removeEventListener("keydown", onKey);
+        if (opener && opener.isConnected) opener.focus();
         modalOk.onclick = null;
         modalCancel.onclick = null;
         resolve(val);
@@ -427,10 +442,14 @@
   function schedule() {
     clearTimeout(timer);
     if (foreground && alive && roomCode)
-      timer = setTimeout(function () {
-        if (roomCode && !state.busy && !pending && !state.error)
-          refresh().catch(handleError);
-        schedule();
+      timer = setTimeout(async function () {
+        try {
+          if (roomCode && !state.busy && !pending && !state.error) await refresh();
+        } catch (e) {
+          handleError(e);
+        } finally {
+          schedule();
+        }
       }, Math.max(2500, (rateLimitUntil || 0) - Date.now()));
   }
   function clearRoom() {
@@ -706,6 +725,11 @@
       }).length,
     };
     patch.teamText = room.team.join("、") || "尚未选择";
+    if (!room.me.isHost || stageChanged) patch.toolType = "";
+    if (state.settings && !room.me.isHost) {
+      state.settings.authorized = false;
+      state.settings.error = "房主已变更，你不再拥有管理权限。";
+    }
     setState(patch);
     if (
       (!room.needsSubmission || room.me.submitted) &&
@@ -1496,7 +1520,7 @@
       var room = await request("/api/rooms/" + roomCode);
       if (!room.me.isHost) throw new Error("仅房主管理员可访问房间设置");
       var boards = (await request("/api/boards")).boards;
-      if (!alive) return;
+      if (!alive || state.settings !== s) return;
       settingsOriginal = room;
       var capacities = [
         ...new Set(
@@ -1529,9 +1553,9 @@
       });
       updateSettingsChoices(room.capacity, room.board);
     } catch (e) {
-      if (alive) setSettings({ error: e.message });
+      if (alive && state.settings === s) setSettings({ error: e.message });
     } finally {
-      if (alive) setSettings({ loading: false });
+      if (alive && state.settings === s) setSettings({ loading: false });
     }
   }
   function updateSettingsChoices(capacity, boardId) {
@@ -2524,8 +2548,8 @@
   }
   // Keep option selection in a themed, keyboard-accessible modal above settings.
   var optionDialog = null;
-  function enhanceSelects() {
-    app.querySelectorAll("select[data-change]").forEach(function (select) {
+  function enhanceSelects(root) {
+    root.querySelectorAll("select[data-change]").forEach(function (select) {
       var key = select.dataset.change;
       var label = key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子";
       var trigger = document.createElement("button");
@@ -2538,8 +2562,9 @@
       trigger.textContent = (select.selectedOptions[0] || {}).textContent || "请选择";
       select.hidden = true;
       select.after(trigger);
-      trigger.addEventListener("click", function () { openOptions(select, label); });
     });
+  }
+  function validateOptionDialog() {
     if (optionDialog) {
       var current = app.querySelector('select[data-change="' + optionDialog.dataset.key + '"]');
       if (!current || current.disabled || state.busy || current.innerHTML !== optionDialog.optionSnapshot)
@@ -2567,15 +2592,17 @@
       button.setAttribute("aria-pressed", String(option.selected));
       button.innerHTML = '<span>' + esc(option.textContent) + '</span><span class="option-check" aria-hidden="true">' + (option.selected ? "✓" : "") + '</span>';
       button.addEventListener("click", function () {
-        var current = app.querySelector('select[data-change="' + key + '"]');
+        // Finish native dialog focus restoration before opening confirmation.
+        dialog.addEventListener("close", function () {
+          var current = app.querySelector('select[data-change="' + key + '"]');
+          if (!current || current.disabled || state.busy) return;
+          current.value = option.value;
+          CHANGES[key](current);
+          if (key === "settingsTransfer") current.value = "";
+          var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
+          if (modal.hidden && trigger) trigger.focus();
+        }, { once: true });
         dialog.close();
-        if (!current || current.disabled || state.busy) return;
-        current.value = option.value;
-        CHANGES[key](current);
-        if (key === "settingsTransfer") current.value = "";
-        var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
-        if (!modal.hidden) modalCancel.focus();
-        else if (trigger) trigger.focus();
       });
       list.appendChild(button);
     });
@@ -2605,13 +2632,62 @@
     var selected = list.querySelector('[aria-pressed="true"]') || list.querySelector("button");
     if (selected) selected.focus();
   }
+  // Reconcile matching nodes in place: polling and selection must not restart
+  // animations, detach focused controls, or reset scroll containers.
+  function nodeKey(node) {
+    if (node.nodeType !== 1) return "";
+    if (node.id) return node.tagName + "#" + node.id;
+    var identity = ["data-action", "data-change", "data-input", "data-option-trigger"]
+      .map(function (attr) { return node.getAttribute(attr) || ""; }).join("|");
+    var detail = ["data-seat", "data-value", "data-code", "data-kind", "data-mode"]
+      .map(function (attr) { return node.getAttribute(attr) || ""; }).join("|");
+    return node.tagName + ":" + identity + ":" + detail + ":" + (node.classList[0] || "");
+  }
+  function patchDOM(parent, source) {
+    var cursor = parent.firstChild;
+    Array.from(source.childNodes).forEach(function (next) {
+      var match = cursor;
+      while (match && (match.nodeType !== next.nodeType || nodeKey(match) !== nodeKey(next)))
+        match = match.nextSibling;
+      if (!match) {
+        parent.insertBefore(next, cursor);
+        return;
+      }
+      if (match !== cursor) parent.insertBefore(match, cursor);
+      if (match.nodeType === 3) {
+        if (match.nodeValue !== next.nodeValue) match.nodeValue = next.nodeValue;
+      } else if (match.nodeType === 1) {
+        var nextValue = next.value;
+        var nextChecked = next.checked;
+        Array.from(match.attributes).forEach(function (attr) {
+          if (!next.hasAttribute(attr.name)) match.removeAttribute(attr.name);
+        });
+        Array.from(next.attributes).forEach(function (attr) {
+          if (match.getAttribute(attr.name) !== attr.value) match.setAttribute(attr.name, attr.value);
+        });
+        patchDOM(match, next);
+        if (match.tagName === "INPUT") {
+          if (match.value !== nextValue) match.value = nextValue;
+          if (match.checked !== nextChecked) match.checked = nextChecked;
+        }
+        if (match.tagName === "SELECT" && match.value !== nextValue) match.value = nextValue;
+      }
+      cursor = match.nextSibling;
+    });
+    while (cursor) {
+      var removed = cursor;
+      cursor = cursor.nextSibling;
+      parent.removeChild(removed);
+    }
+  }
   function render() {
     var hasHostBar =
       state.room &&
       state.room.canUseTools &&
       state.room.hasActiveOperation &&
       state.room.phase !== "offlineFinal";
-    app.innerHTML =
+    var next = document.createElement("div");
+    next.innerHTML =
       viewFairyResult() +
       viewIdentityChange() +
       '<div class="page' +
@@ -2626,7 +2702,9 @@
       (state.room ? viewRoom() : viewEntry()) +
       "</div>" +
       viewSettingsDialog();
-    enhanceSelects();
+    enhanceSelects(next);
+    patchDOM(app, next);
+    validateOptionDialog();
   }
 
   // ===== event delegation =====
@@ -2800,6 +2878,13 @@
   };
 
   app.addEventListener("click", function (e) {
+    var picker = e.target.closest("[data-option-trigger]");
+    if (picker && !picker.disabled) {
+      var key = picker.dataset.optionTrigger;
+      var select = app.querySelector('select[data-change="' + key + '"]');
+      if (select) openOptions(select, key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子");
+      return;
+    }
     var t = e.target.closest("[data-action]");
     if (!t) return;
     var fn = ACTIONS[t.dataset.action];
