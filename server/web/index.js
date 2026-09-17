@@ -16,6 +16,7 @@ function serve(req, res, path) {
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
   res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Cache-Control", "no-store");
   res.writeHead(200);
   res.end(readFileSync(join(__dirname, asset[0])));
   return true;

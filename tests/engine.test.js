@@ -89,6 +89,28 @@ test("座位冲突、未准备、跨房间、非房主推进、过期阶段均�
     /阶段已变化/,
   );
 });
+test("转交房主可在任意阶段进行，新房主接管流程且不能转给自己", () => {
+  const r = setup();
+  assert.notEqual(r.phase, "lobby");
+  run(r, "p1", "transfer", { seat: 2 });
+  assert.equal(r.host, "p2");
+  assert.throws(() => run(r, "p1", "transfer", { seat: 3 }), /房主/);
+  assert.throws(() => run(r, "p2", "transfer", { seat: 2 }), /不能转交给自己/);
+  assert.throws(() => run(r, "p2", "transfer", { seat: 99 }), /目标座位无人/);
+  run(r, "p2", "transfer", { seat: 3 });
+  assert.equal(r.host, "p3");
+});
+test("准备、结算和终止阶段移交不会改变对局数据", () => {
+  for (const phase of ["lobby", "teamVote", "quest", "offlineFinal", "ended", "terminated"]) {
+    const r = setup();
+    r.phase = phase;
+    const before = structuredClone(r);
+    run(r, "p1", "transfer", { seat: 2 });
+    assert.deepEqual(r, { ...before, host: "p2" });
+    assert.equal(publicView(r, "p2").me.isHost, true);
+    assert.equal(publicView(r, "p1").me.isHost, false);
+  }
+});
 test("秘密提交不改变其他普通玩家视图，房主仅额外获得进度", () => {
   const r = setup();
   const before = JSON.stringify(publicView(r, "p3"));

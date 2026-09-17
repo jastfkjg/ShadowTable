@@ -925,10 +925,25 @@ button.leave-button {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .action-choice-list button {
   margin: 0;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 12px 16px;
+  min-height: 52px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
+}
+.action-choice-list button.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 700;
 }
 .action-target-scroll {
   max-height: 240px;
@@ -941,6 +956,14 @@ button.leave-button {
 }
 .action-target-scroll button {
   margin: 0;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 10px 14px;
+  min-height: 48px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 .swap-seat-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1113,6 +1136,18 @@ button.leave-button {
   border-radius: 6px;
   padding: 0 8px;
 }
+button.transfer-button {
+  width: auto;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  margin: 0;
+}
 
 /* Toast */
 #toast {
@@ -1133,4 +1168,49 @@ button.leave-button {
 }
 #toast.show {
   opacity: 1;
+}
+/* Themed option picker, shared by entry and room settings. */
+.option-trigger {
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  gap: 16px;
+  min-height: 48px;
+  height: auto;
+}
+.option-trigger::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  margin-right: 4px;
+}
+.option-trigger.settings-select { width: auto; }
+.option-dialog {
+  color-scheme: dark;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 80px #0008;
+  overflow: auto;
+}
+.option-dialog::backdrop { background: #071018b8; }
+.option-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.option-header h2 { margin: 2px 0 0; font-size: 22px; }
+.option-close { width: 44px; min-height: 44px; flex-shrink: 0; font-size: 26px; color: var(--muted); }
+.option-list { display: grid; gap: 8px; }
+.option-item { justify-content: space-between; text-align: left; padding: 12px 16px; border: 1px solid transparent; background: var(--bg); }
+.option-item[aria-pressed="true"] { border-color: var(--accent); background: #e5c68b14; color: var(--accent); }
+.option-check { flex-shrink: 0; width: 20px; }
+.option-trigger:focus-visible, .option-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (hover: hover) { .option-item:hover, .option-close:hover { background: #e5c68b20; } }
+@media (max-width: 480px) {
+  .option-dialog { margin: auto auto max(16px, env(safe-area-inset-bottom)); padding: 18px; }
 }

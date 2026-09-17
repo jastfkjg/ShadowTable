@@ -1135,9 +1135,9 @@ function command(room, uid, input) {
     return;
   }
   if (type === "transfer") {
-    requireRule(room.phase === "lobby", "仅准备阶段可以转交房主");
     const target = room.players.find((p) => p.seat === input.seat);
     requireRule(target, "目标座位无人");
+    requireRule(target.uid !== uid, "不能转交给自己");
     room.host = target.uid;
     return;
   }

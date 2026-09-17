@@ -946,9 +946,6 @@
   function propose() {
     cmd("propose", { team: state.selected });
   }
-  function transfer(seatNum) {
-    cmd("transfer", { seat: seatNum });
-  }
   async function leave() {
     if (state.busy || pending || !state.room) return;
     var room = state.room;
@@ -1617,6 +1614,55 @@
     }
     closeSettings();
   }
+  async function transferFromSettings(seat) {
+    var s = state.settings;
+    if (!s || s.busy || !s.authorized || !s.room || state.busy || pending)
+      return;
+    var target = s.room.players.filter(function (p) {
+      return p.seat === seat && p.seat !== s.room.me.seat;
+    })[0];
+    if (!target) return;
+    if (
+      !(await confirm(
+        "移交房主？",
+        "房主身份将移交给 " +
+          seat +
+          "号 · " +
+          target.name +
+          "，你不再拥有管理权限。对局中也可移交，新房主立即接管流程。" +
+          (s.dirty ? "未保存的房间设置将放弃。" : ""),
+      ))
+    )
+      return;
+    if (!alive || !foreground || !state.room) return;
+    var id = requestId();
+    var data = { type: "transfer", stage: state.room.stage, seat: seat };
+    setSettings({ busy: true, error: "" });
+    try {
+      await login();
+      await request("/api/rooms/" + roomCode + "/commands", "POST", data, id);
+      if (!alive) return;
+      toast("房主已移交");
+      closeSettings();
+      await refresh();
+    } catch (e) {
+      if (!alive) return;
+      setSettings({
+        error: e.message,
+        authorized:
+          e.status === 403
+            ? false
+            : !!(state.settings && state.settings.authorized),
+      });
+      if (e.status === 409) {
+        setSettings({ busy: false });
+        await loadSettings();
+        setSettings({ error: "房间状态已变化，请重试。" });
+      }
+    } finally {
+      if (alive) setSettings({ busy: false });
+    }
+  }
 
   // ===== render =====
   function btn(cls, action, label, opts, disabled) {
@@ -1796,9 +1842,7 @@
           ? state.draftChoice === c.value
             ? "primary"
             : "secondary"
-          : state.swapOptions.length
-            ? "secondary"
-            : "primary";
+          : "secondary";
       var label =
         (state.stagedChoice && state.draftChoice === c.value ? "✓ " : "") +
         (r.phase === "identity" ? "已记住身份与视野" : c.label);
@@ -2149,27 +2193,6 @@
     }
     html += "</div>";
     if (r.phase === "lobby") {
-      if (r.me.isHost && r.players.length > 1)
-        html +=
-          btn("text-button", "toggleTransfer", state.showTransfer ? "收起转交" : "转交房主") +
-          (state.showTransfer
-            ? '<div class="panel"><span class="label">选择新房主</span>' +
-              r.players
-                .filter(function (p) {
-                  return p.seat !== r.me.seat;
-                })
-                .map(function (p) {
-                  return btn(
-                    "compact secondary",
-                    "transfer",
-                    "交给 " + p.seat + " 号 · " + p.name,
-                    { seat: p.seat },
-                    state.busy,
-                  );
-                })
-                .join("") +
-              "</div>"
-            : "");
       html += btn("leave-button", "leave", "离开房间", null, state.busy);
     } else {
       if (r.phase === "proposal" && !r.canUseTools && !r.flexible)
@@ -2469,6 +2492,27 @@
           (s.busy ? " disabled" : "") +
           ' /></div></div><div class="settings-help">开启后公开出手人、目标等过程。最终出局和复活结果始终公示，新身份仅本人可见。</div>';
       }
+      var transfers = room.players.filter(function (p) {
+        return p.seat !== room.me.seat;
+      });
+      html +=
+        '<div class="settings-section-title">移交房主</div><div class="settings-section">';
+      if (!transfers.length)
+        html +=
+          '<div class="settings-row"><span class="muted">暂时没有其他在座玩家。</span></div>';
+      for (var m = 0; m < transfers.length; m++) {
+        var tp = transfers[m];
+        html +=
+          '<div class="settings-row"><span>' +
+          tp.seat +
+          "号 · " +
+          esc(tp.name) +
+          "</span>" +
+          btn("transfer-button", "transferFromSettings", "移交", { seat: tp.seat }, s.busy) +
+          "</div>";
+      }
+      html +=
+        '</div><div class="settings-help">把房主移交给在座玩家；对局中也可移交，新房主立即接管流程。</div>';
       html +=
         '<div class="settings-footer">' +
         btn(
@@ -2488,6 +2532,85 @@
         "</div>";
     html += "</div></div>";
     return html;
+  }
+  // Keep option selection in a themed, keyboard-accessible modal above settings.
+  var optionDialog = null;
+  function enhanceSelects() {
+    app.querySelectorAll("select[data-change]").forEach(function (select) {
+      var key = select.dataset.change;
+      var label = /Capacity$/.test(key) ? "人数" : "板子";
+      var trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = select.className + " option-trigger";
+      trigger.dataset.optionTrigger = key;
+      trigger.disabled = select.disabled || state.busy;
+      trigger.setAttribute("aria-haspopup", "dialog");
+      trigger.setAttribute("aria-label", label + "：" + (select.selectedOptions[0] || {}).textContent);
+      trigger.textContent = (select.selectedOptions[0] || {}).textContent || "请选择";
+      select.hidden = true;
+      select.after(trigger);
+      trigger.addEventListener("click", function () { openOptions(select, label); });
+    });
+    if (optionDialog) {
+      var current = app.querySelector('select[data-change="' + optionDialog.dataset.key + '"]');
+      if (!current || current.disabled || state.busy || current.innerHTML !== optionDialog.optionSnapshot)
+        optionDialog.close();
+    }
+  }
+  function openOptions(select, label) {
+    if (optionDialog) return;
+    var key = select.dataset.change;
+    var dialog = document.createElement("dialog");
+    optionDialog = dialog;
+    dialog.className = "option-dialog";
+    dialog.dataset.key = key;
+    dialog.optionSnapshot = select.innerHTML;
+    dialog.setAttribute("aria-labelledby", "option-title");
+    dialog.innerHTML = '<div class="option-header"><div><div class="settings-eyebrow">房间配置</div><h2 id="option-title">选择' + label +
+      '</h2></div><button type="button" class="option-close" aria-label="关闭选项">×</button></div><div class="option-list"></div>';
+    var list = dialog.querySelector(".option-list");
+    Array.from(select.options).forEach(function (option) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "option-item";
+      button.disabled = option.disabled;
+      button.setAttribute("aria-pressed", String(option.selected));
+      button.innerHTML = '<span>' + esc(option.textContent) + '</span><span class="option-check" aria-hidden="true">' + (option.selected ? "✓" : "") + '</span>';
+      button.addEventListener("click", function () {
+        var current = app.querySelector('select[data-change="' + key + '"]');
+        dialog.close();
+        if (!current || current.disabled || state.busy) return;
+        current.value = option.value;
+        CHANGES[key](current);
+        var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
+        if (trigger) trigger.focus();
+      });
+      list.appendChild(button);
+    });
+    dialog.querySelector(".option-close").addEventListener("click", function () { dialog.close(); });
+    dialog.addEventListener("click", function (event) {
+      if (event.target !== dialog) return;
+      var rect = dialog.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+    });
+    dialog.addEventListener("keydown", function (event) {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      var items = Array.from(list.querySelectorAll("button:not(:disabled)"));
+      var index = items.indexOf(document.activeElement);
+      var next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      if (items[next]) items[next].focus();
+    });
+    dialog.addEventListener("close", function () {
+      optionDialog = null;
+      dialog.remove();
+      var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
+      if (trigger) trigger.focus();
+    });
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    var selected = list.querySelector('[aria-pressed="true"]') || list.querySelector("button");
+    if (selected) selected.focus();
   }
   function render() {
     var hasHostBar =
@@ -2510,6 +2633,7 @@
       (state.room ? viewRoom() : viewEntry()) +
       "</div>" +
       viewSettingsDialog();
+    enhanceSelects();
   }
 
   // ===== event delegation =====
@@ -2597,12 +2721,6 @@
       );
     },
     propose: propose,
-    toggleTransfer: function () {
-      setState({ showTransfer: !state.showTransfer });
-    },
-    transfer: function (el) {
-      transfer(Number(el.dataset.seat));
-    },
     leave: leave,
     rematch: function () {
       cmd("rematch");
@@ -2645,6 +2763,9 @@
     retrySettings: loadSettings,
     settingsSave: settingsSave,
     settingsBack: settingsBack,
+    transferFromSettings: function (el) {
+      transferFromSettings(Number(el.dataset.seat));
+    },
   };
   var CHANGES = {
     entryCapacity: function (el) {
