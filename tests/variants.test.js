@@ -645,7 +645,7 @@ test("仙女结果只发给查验者，确认后重连不再提醒且不能确�
   );
 });
 
-test("两个拓展板子的初始视野逐角色校验，隐藏身份与不可见座位", () => {
+test("两个拓展板子的初始视野逐角色校验，按板子区分身份与不可见座位", () => {
   const expectedByBoard = {
     "shadow-assist": {
       merlin: ["morgana", "assassin", "oberon", "redTraitor"],
@@ -690,6 +690,17 @@ test("两个拓展板子的初始视野逐角色校验，隐藏身份与不可�
         !JSON.stringify(publicView(r, p.uid)).includes(view.information),
       );
       if (
+        board === "chaos" &&
+        ["mordred", "morgana", "redWarlock"].includes(r.roles[p.uid])
+      ) {
+        for (const t of r.players.filter((t) => targetSeats.includes(t.seat)))
+          assert.ok(
+            view.information.includes(
+              `${t.seat}号（${privateView(r, t.uid).role}）`,
+            ),
+          );
+        assert.ok(!view.information.includes("不区分"));
+      } else if (
         [
           "mordred",
           "morgana",
@@ -715,4 +726,52 @@ test("两个拓展板子的初始视野逐角色校验，隐藏身份与不可�
       }
     }
   }
+});
+
+test("十二骑士初始见面匪互知具体身份，刀客和新B身份仍保密", () => {
+  const r = setup();
+  const meetingRoles = ["assassin", "mordred", "morgana"];
+  const meeting = r.players.filter((p) =>
+    meetingRoles.includes(r.roles[p.uid]),
+  );
+  assert.equal(meeting.length, 3);
+  for (const observer of meeting) {
+    const info = privateView(r, observer.uid).information;
+    assert.ok(info.startsWith("初始见面匪："));
+    assert.ok(!info.includes("不区分"));
+    for (const ally of meeting.filter((p) => p.uid !== observer.uid))
+      assert.ok(
+        info.includes(`${ally.seat}号（${privateView(r, ally.uid).role}）`),
+      );
+    assert.deepEqual(
+      (info.match(/\d+号/g) || []).sort(),
+      meeting
+        .filter((p) => p.uid !== observer.uid)
+        .map((p) => `${p.seat}号`)
+        .sort(),
+    );
+    assert.ok(
+      !JSON.stringify(publicView(r, observer.uid)).includes("初始见面匪"),
+    );
+  }
+  for (const p of r.players.filter((p) =>
+    [
+      "redSwordsman",
+      "redLancelot",
+      "blueLancelot",
+      "gareth",
+      "gaheris",
+    ].includes(r.roles[p.uid]),
+  ))
+    assert.ok(privateView(r, p.uid).information.startsWith("没有视野。"));
+
+  const [observer, changed] = meeting;
+  const before = privateView(r, observer.uid).information;
+  r.roles[changed.uid] = "redGuard";
+  r.knights.players[changed.uid].b = true;
+  r.knights.players[changed.uid].availableRound = 2;
+  assert.equal(privateView(r, observer.uid).information, before);
+  assert.ok(!privateView(r, observer.uid).information.includes("红守卫"));
+  assert.ok(privateView(r, changed.uid).information.startsWith("没有视野。"));
+  assert.ok(!privateView(r, changed.uid).information.includes("初始见面匪"));
 });

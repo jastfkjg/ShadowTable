@@ -443,6 +443,21 @@ function privateView(room, uid) {
       )
       .map((p) => p.seat)
       .join("、");
+  const namedInitialAllies = (allowed) =>
+    room.players
+      .filter(
+        (p) =>
+          p.uid !== uid &&
+          allowed.includes(
+            room.knights?.initialRoles[p.uid] || room.roles[p.uid],
+          ),
+      )
+      .map((p) => {
+        const initialRole =
+          room.knights?.initialRoles[p.uid] || room.roles[p.uid];
+        return `${p.seat}号（${ROLES[initialRole][0]}）`;
+      })
+      .join("、") || "无可见同伴";
   if (assisted(room)) {
     const visible = (allowed) => seats((r) => allowed.includes(r));
     if (role === "merlin")
@@ -457,7 +472,10 @@ function privateView(room, uid) {
         : ["mordred", "morgana", "redWarlock"]
       ).includes(role)
     )
-      information = `你的坏人同伴：${visible(room.board === "shadow-assist" ? ["mordred", "morgana", "assassin"] : ["mordred", "morgana", "redWarlock"])}号（不区分身份）。`;
+      information =
+        room.board === "shadow-assist"
+          ? `你的坏人同伴：${visible(["mordred", "morgana", "assassin"])}号（不区分身份）。`
+          : `你的坏人同伴：${namedInitialAllies(["mordred", "morgana", "redWarlock"])}。`;
     else if (room.board === "chaos" && role === "gawain")
       information = `蓝术士与红术士位于：${visible(["blueWarlock", "redWarlock"])}号（不区分身份）。`;
     else if (room.board === "chaos" && ["blueThief", "redThief"].includes(role))
@@ -496,7 +514,7 @@ function privateView(room, uid) {
       information = "没有视野。";
     else if (state.b) information = "没有视野。";
     else if (["assassin", "mordred", "morgana"].includes(role))
-      information = `初始见面匪：${seats((r) => ["assassin", "mordred", "morgana"].includes(r))}号（不区分角色）`;
+      information = `初始见面匪：${namedInitialAllies(["assassin", "mordred", "morgana"])}。`;
 
     const skillDescription = {
       blueGuard: "秘密守护一人，免疫一次出局才消耗。",

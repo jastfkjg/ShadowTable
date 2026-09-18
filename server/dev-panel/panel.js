@@ -463,33 +463,8 @@ if (typeof document !== "undefined") {
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
     if (!action || !actor || busy) return;
-    if (
-      ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].includes(
-        actor.room?.phase,
-      ) &&
-      actor.secret?.action?.choices?.includes(action)
-    ) {
-      const label =
-        actor.secret.action.options?.find((o) => o.value === action)?.label ||
-        action;
-      if (
-        !confirm(
-          `${actor.room.me.seat}号：${label}。确认提交？提交后不可更改。`,
-        )
-      )
-        return;
-    }
-    if (
-      action === "target" &&
-      (!targets[actor.id] ||
-        !confirm(`确认以 ${targets[actor.id]} 号为最终目标？提交后不可更改。`))
-    )
-      return;
-    if (
-      ["start", "terminate", "rematch", "closeOffline"].includes(action) &&
-      !confirm(`确认${names[action]}？`)
-    )
-      return;
+    // Test-player actions execute directly; a target must still be selected.
+    if (action === "target" && !targets[actor.id]) return;
     run(async () => {
       if (action === "retry") return companion.retry(actor);
       if (action === "forget") {

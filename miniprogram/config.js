@@ -2,5 +2,6 @@
 module.exports = {
   baseUrl: "http://127.0.0.1:8787",
   //baseUrl: "https://shadowtable.jastcraft.com",
+  //devAuth: false,
   devAuth: true,
 };
