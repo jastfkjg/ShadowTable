@@ -184,12 +184,30 @@ function createAdmin({ store, origin, key, body, limit }) {
       return true;
     }
     if (path === "/api/admin/audit" && req.method === "GET") {
+      const query = new URL(req.url, origin).searchParams;
+      const code = query.get("code");
+      fail(code === null || code === "" || /^\d{6}$/.test(code), "房间号无效");
+      const offset = Math.max(0, Math.floor(Number(query.get("offset")) || 0));
+      const where = code === null ? "" : " WHERE code=?";
+      const args = code === null ? [] : [code];
       send(200, {
         entries: store.db
           .prepare(
-            "SELECT id,action,code,reason,created FROM admin_audit ORDER BY id DESC LIMIT 100",
+            "SELECT id,action,code,reason,created,details FROM admin_audit" +
+              where +
+              " ORDER BY id DESC LIMIT 100 OFFSET ?",
           )
-          .all(),
+          .all(...args, offset)
+          .map((entry) => ({ ...entry, details: JSON.parse(entry.details) })),
+        total: store.db
+          .prepare("SELECT count(*) AS n FROM admin_audit" + where)
+          .get(...args).n,
+        rooms: store.db
+          .prepare(
+            "SELECT code FROM admin_audit WHERE code != '' GROUP BY code ORDER BY MAX(id) DESC",
+          )
+          .all()
+          .map((row) => row.code),
       });
       return true;
     }
@@ -227,10 +245,9 @@ function createAdmin({ store, origin, key, body, limit }) {
         "管理操作无效",
       );
       fail(
-        typeof b.reason === "string" &&
-          b.reason.trim().length >= 2 &&
-          b.reason.length <= 200,
-        "请填写2至200字操作原因",
+        b.reason === undefined ||
+          (typeof b.reason === "string" && b.reason.length <= 200),
+        "操作原因最多200字",
       );
       fail(b.confirm === match[1], "请填写房间号确认操作");
       store.transaction(() => {
@@ -283,7 +300,7 @@ function createAdmin({ store, origin, key, body, limit }) {
           }
           store.save(room);
         }
-        audit(b.action, room.code, b.reason.trim());
+        audit(b.action, room.code, (b.reason || "").trim());
       });
       send(200, { ok: true });
       return true;

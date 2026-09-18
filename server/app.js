@@ -2,6 +2,7 @@
 const http = require("node:http");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
+const { actionDetails } = require("./audit");
 const {
   BOARDS,
   RuleError,
@@ -245,7 +246,7 @@ function createApp({
           );
           return JSON.parse(cached.result);
         }
-        let room, response;
+        let room, response, details;
         if (path === "/api/rooms") {
           limit(`create:${uid}`, 8);
           let code;
@@ -253,10 +254,18 @@ function createApp({
             code = String(randomInt(100000, 1000000));
           } while (store.get(code));
           room = newRoom(code, uid, b.name, b.board, b.capacity);
+          details = actionDetails(room, uid, "create", b);
           response = { code };
         } else {
           room = store.get(match[1]);
           check(room, "房间不存在", 404);
+          if (room.players.some((p) => p.uid === uid))
+            details = actionDetails(
+              room,
+              uid,
+              match[2] === "commands" ? b.type : match[2],
+              b,
+            );
           if (match[2] === "delete") {
             check(room.host === uid, "只有当前房主可以删除牌桌", 403);
             check(
@@ -267,22 +276,23 @@ function createApp({
             room.players = [];
           } else if (match[2] === "join") enter(room, uid, b.name);
           else command(room, uid, b);
+          if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };
         }
         if (match?.[2] === "delete") store.remove(room.code);
         else store.save(room);
         store.addReceipt(uid, id, fingerprint, response);
-        if (uid.startsWith("test:"))
-          store.db
-            .prepare(
-              "INSERT INTO admin_audit(action,code,reason,created) VALUES(?,?,?,?)",
-            )
-            .run(
-              "companion",
-              room.code,
-              match[2] === "commands" ? b.type : match[2],
-              Date.now(),
-            );
+        store.db
+          .prepare(
+            "INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)",
+          )
+          .run(
+            uid.startsWith("test:") ? "companion" : "player",
+            room.code,
+            "",
+            Date.now(),
+            JSON.stringify(details),
+          );
         return response;
       });
       // Receipts store no role, action, or old view. Client fetches a fresh scoped view.

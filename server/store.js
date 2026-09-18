@@ -13,6 +13,14 @@ class Store {
       CREATE TABLE IF NOT EXISTS rooms(code TEXT PRIMARY KEY, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    const columns = this.db.prepare("PRAGMA table_info(admin_audit)").all();
+    if (!columns.some((column) => column.name === "details"))
+      this.db.exec(
+        "ALTER TABLE admin_audit ADD COLUMN details TEXT NOT NULL DEFAULT '{}'",
+      );
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS admin_audit_room ON admin_audit(code, id)",
+    );
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");

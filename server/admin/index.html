@@ -61,12 +61,20 @@
         <section>
           <div class="section-heading">
             <h2>操作记录</h2>
-            <span>最近 100 条</span>
+            <span id="audit-count"></span>
           </div>
           <p>
-            记录管理员登录、陪测账号创建和房间管理操作。玩家身份与秘密行动不在此展示。
+            按房间查看玩家及管理操作，包含玩家的具体选择，仅管理员可见。旧记录可能缺少玩家详情。
           </p>
+          <label for="audit-room">选择房间</label>
+          <select id="audit-room">
+            <option value="">平台操作（无房间）</option>
+          </select>
           <ol id="audit"></ol>
+          <div class="pager">
+            <button id="audit-prev">上一页</button><span id="audit-page"></span
+            ><button id="audit-next">下一页</button>
+          </div>
         </section>
       </div>
       <dialog id="confirm-dialog">
@@ -80,13 +88,8 @@
             pattern="[0-9]{6}"
             maxlength="6"
             required
-          /><label for="reason">操作原因</label
-          ><textarea
-            id="reason"
-            minlength="2"
-            maxlength="200"
-            required
-          ></textarea>
+          /><label for="reason">操作原因（选填）</label
+          ><textarea id="reason" maxlength="200"></textarea>
           <p id="action-error" role="alert"></p>
           <div class="dialog-actions">
             <button id="cancel" type="button">取消</button

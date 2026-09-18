@@ -226,7 +226,7 @@ test("现有房间开启陪测，绑定房间与管理员，关闭/退出阻止�
   assert.equal(a.app.store.get(code).players.length, 1);
   assert.equal(a.app.store.get(code).players[0].uid.startsWith("wx:"), true);
 });
-test("管理写操作有原因与状态冲突检查，概览与审计不泄露身份", async (t) => {
+test("管理写操作原因选填，保留状态冲突检查与概览身份隔离", async (t) => {
   const a = await setup(t);
   await a.login();
   const { code } = await a.room();
@@ -235,7 +235,7 @@ test("管理写操作有原因与状态冲突检查，概览与审计不泄露�
     (e) => e.status === 400,
   );
   await assert.rejects(
-    a.action(code, "delete", { reason: "" }),
+    a.action(code, "delete", { reason: "x".repeat(201) }),
     (e) => e.status === 400,
   );
   await assert.rejects(
@@ -250,9 +250,9 @@ test("管理写操作有原因与状态冲突检查，概览与审计不泄露�
   await assert.rejects(a.action(code, "test-on"), (e) => e.status === 409);
   const list = await a.api("/api/admin/rooms");
   assert.doesNotMatch(JSON.stringify(list), /SECRET|wx:|token|openid/);
-  await a.action(code, "terminate");
+  await a.action(code, "terminate", { reason: "" });
   assert.equal(a.app.store.get(code).phase, "terminated");
-  await a.action(code, "rematch");
+  await a.action(code, "rematch", { reason: undefined });
   assert.equal(a.app.store.get(code).phase, "lobby");
   await a.action(code, "delete");
   assert.equal(a.app.store.get(code), null);
@@ -292,4 +292,66 @@ test("生产可用管理平台，开发入口仍关闭", async (t) => {
   assert.equal((await a.raw("/admin/companion")).status, 200);
   assert.equal((await a.raw("/dev")).status, 404);
   assert.equal((await a.raw("/api/dev-login", {})).status, 404);
+});
+
+test("操作记录按房间分页，保存玩家操作快照，重试不重复记账", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code, token } = await a.room();
+  const other = await a.room();
+  await a.action(code, "test-on", { reason: " " });
+  const actor = await a.api("/api/admin/actors", { code });
+  await a.api(
+    `/api/rooms/${code}/join`,
+    { name: "陪测甲" },
+    a.auth(actor.token),
+  );
+  const room = a.app.store.get(code);
+  room.phase = "teamVote";
+  room.submissions = {};
+  room.game = 2;
+  room.round = 3;
+  a.app.store.save(room);
+  const request = {
+    type: "submit",
+    stage: room.stage,
+    value: "reject",
+    token: "DO_NOT_LOG",
+  };
+  const headers = { ...a.auth(token), "Idempotency-Key": randomUUID() };
+  await a.api(`/api/rooms/${code}/commands`, request, headers);
+  await a.api(`/api/rooms/${code}/commands`, request, headers);
+  await a.api(
+    `/api/rooms/${code}/commands`,
+    { type: "submit", stage: room.stage, value: "approve" },
+    a.auth(actor.token),
+  );
+  await assert.rejects(
+    a.api(`/api/rooms/${code}/commands`, request, a.auth(token)),
+  );
+  const audit = await a.api(`/api/admin/audit?code=${code}`);
+  assert.ok(audit.entries.every((entry) => entry.code === code));
+  assert.ok(audit.rooms.includes(other.code));
+  const votes = audit.entries.filter(
+    (entry) => entry.details.command === "submit",
+  );
+  assert.equal(votes.length, 2);
+  assert.equal(votes[0].action, "companion");
+  assert.equal(votes[0].details.player.name, "陪测甲");
+  assert.equal(votes[1].details.player.name, "真人");
+  assert.equal(votes[1].details.player.seat, 1);
+  assert.equal(votes[1].details.choice, "反对");
+  assert.equal(votes[1].details.game, 2);
+  assert.equal(votes[1].details.round, 3);
+  assert.doesNotMatch(JSON.stringify(audit), /DO_NOT_LOG|wx:|test:/);
+  const next = await a.api(`/api/admin/audit?code=${code}&offset=1`);
+  assert.equal(next.entries[0].id, audit.entries[1].id);
+  const platform = await a.api("/api/admin/audit?code=");
+  assert.ok(platform.entries.every((entry) => entry.code === ""));
+  await a.action(code, "delete", { reason: undefined });
+  assert.ok(
+    (await a.api(`/api/admin/audit?code=${code}`)).entries.some(
+      (entry) => entry.details.choice === "反对",
+    ),
+  );
 });

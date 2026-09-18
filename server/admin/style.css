@@ -76,6 +76,7 @@ label {
   margin: 12px 0 6px;
 }
 input,
+select,
 textarea {
   width: 100%;
   font: inherit;
@@ -125,6 +126,7 @@ a {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible,
 a:focus-visible {
   outline: 3px solid #2563eb;

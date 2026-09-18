@@ -1,2 +1,5 @@
-// 本地联调默认地址。真机/上线前改为已配置 request 合法域名的 HTTPS 服务。
-module.exports = { baseUrl: "http://127.0.0.1:8787", devAuth: true };
+// 云端服务；需在微信后台配置 request 合法域名，并在服务端配置微信凭据。
+module.exports = {
+  baseUrl: "https://shadowtable.jastcraft.com",
+  devAuth: false,
+};
