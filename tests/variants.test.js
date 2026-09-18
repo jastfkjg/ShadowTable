@@ -50,7 +50,6 @@ function configure(r, map) {
 function skills(r, actions = {}) {
   begin(r, "skills");
   submitAll(r, actions);
-  run(r, "p1", "settleTool");
 }
 test("混沌契约票型权限、第三方身份与四类匿名汇总", () => {
   const r = setup("chaos");
@@ -68,7 +67,6 @@ test("混沌契约票型权限、第三方身份与四类匿名汇总", () => {
       assert.deepEqual(a.choices, expected[r.roles[p.uid]]);
   }
   submitAll(r);
-  run(r, "p1", "settleTool");
   assert.equal(r.history.at(-1).counts.thiefFail, 1);
   assert.equal(r.history.at(-1).success, false);
   assert.equal(
@@ -114,7 +112,6 @@ test("所有角色同时提交，守护免死仅消耗触发的守卫；目标�
   assert.deepEqual(publicView(r, "p4"), hidden);
   for (const p of r.players.filter((p) => p.uid !== "p1"))
     run(r, p.uid, "submit", { value: p.uid === "p2" ? "target:3" : "pass" });
-  run(r, "p1", "settleTool");
   assert.equal(r.phase, "tools");
   assert.equal(r.knights.deck.length, 12);
   assert.equal(r.knights.players.p1.used, true);
@@ -170,7 +167,6 @@ test("猎人插入全员确认，恢复后继续结算；重复/旧阶段请求�
   assert.equal(publicView(r, "p1").operationProgress.total, 12);
   const old = r.stage;
   submitAll(r, { p2: "target:3" });
-  run(r, "p1", "settleTool");
   assert.equal(r.phase, "tools");
   assert.equal(r.knights.players.p3.alive, false);
   assert.equal(r.knights.players.p4.alive, true);
@@ -249,7 +245,6 @@ test("转换只改阵营，当前红兰斯强制失败；仙女先知视野仅�
   skills(r);
   begin(r, "fairy");
   submitAll(r, { p1: "target:4" });
-  run(r, "p1", "settleTool");
   assert.ok(privateView(r, "p1").information.includes("4号查验结果：坏人"));
   assert.ok(!privateView(r, "p2").information.includes("查验结果"));
   assert.equal(r.knights.nightRound, 2);
@@ -262,7 +257,6 @@ test("最终盘刀由选定带刀人录入，支持空刀；重开清理全部�
   begin(r, "assassination", { actor: 1 });
   assert.ok(privateView(r, "p1").action.targets.some((t) => t.seat === 0));
   submitAll(r, { p1: 0 });
-  run(r, "p1", "settleTool");
   assert.equal(r.history.at(-1).hit, true);
   run(r, "p1", "finishTools");
   run(r, "p1", "rematch");
@@ -287,7 +281,6 @@ test("房主选择盘刀人不能通过错误响应探测隐藏阵营", () => {
   assert.deepEqual(privateView(r, "p1").action.choices, ["confirm"]);
   assert.throws(() => run(r, "p1", "submit", { value: 0 }), /不合法/);
   submitAll(r);
-  run(r, "p1", "settleTool");
   assert.equal(r.phase, "tools");
   assert.equal(r.history.at(-1).kind, "variant");
 });
@@ -483,7 +476,6 @@ test("旧过程记录默认隐藏，技能链未结束时不公示中途存活�
     true,
   );
   submitAll(r);
-  run(r, "p1", "settleTool");
   assert.equal(
     publicView(r, "p3").players.find((p) => p.seat === 2).alive,
     false,
@@ -548,7 +540,6 @@ test("仙女可在首轮技能前连续查验，只由当前持有者提交", ()
       /不合法/,
     );
     run(r, `p${holder}`, "submit", { value: `target:${target}` });
-    run(r, "p1", "settleTool");
     assert.equal(r.knights.fairy, target);
   }
   assert.equal(r.knights.round, 1);
@@ -583,7 +574,6 @@ test("各辅助板子任务只等待队员，非队员无法提交", () => {
       /没有秘密操作/,
     );
     submitAll(r);
-    run(r, "p1", "settleTool");
     assert.equal(r.phase, "tools");
   }
 });
@@ -609,7 +599,6 @@ test("先知被动视野仅在技能结束后更新，可随时私密查看", ()
   r.knights.players.p3.alive = false;
   assert.match(privateView(r, "p2").information, /B牌坏人：3号/);
   submitAll(r);
-  run(r, "p1", "settleTool");
   assert.match(privateView(r, "p2").information, /B牌坏人：无/);
   assert.equal(r.knights.players.p2.used, false);
 });
@@ -631,7 +620,6 @@ test("仙女结果只发给查验者，确认后重连不再提醒且不能确�
   r.knights.fairy = 1;
   begin(r, "fairy");
   run(r, "p1", "submit", { value: "target:2" });
-  run(r, "p1", "settleTool");
   assert.equal(publicView(r, "p1").me.fairyResultPending, true);
   assert.equal(publicView(r, "p2").me.fairyResultPending, false);
   assert.equal(privateView(r, "p2").fairyResult, null);

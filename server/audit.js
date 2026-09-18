@@ -41,6 +41,13 @@ function actionDetails(room, uid, type, input) {
   const spec = type === "submit" && player ? actionSpec(room, uid) : null;
   const details = {
     player: player ? { name: player.name, seat: player.seat } : null,
+    stage: room.stage,
+    phaseKey: room.phase,
+    participants: room.players.map((p) => ({
+      seat: p.seat,
+      name: p.name,
+      required: room.phase !== "lobby" && !!actionSpec(room, p.uid),
+    })),
     game: room.game,
     round: room.round,
     phase: roomSummary(room, room.host).phaseName,
@@ -75,6 +82,71 @@ function actionDetails(room, uid, type, input) {
         ? `${target.seat}号 ${target.name}`
         : values[input.value] || String(input.value));
   }
+  if (details.choice && spec?.options) {
+    details.choice = details.choice.replace(/(\d+)号/g, (match, seat) => {
+      const target = room.players.find((p) => p.seat === Number(seat));
+      return target ? `${seat}号·${target.name}` : match;
+    });
+    if (String(input.value).startsWith("swap:")) {
+      const targets = String(input.value)
+        .split(":")
+        .slice(1)
+        .map((seat) => {
+          const target = room.players.find((p) => p.seat === Number(seat));
+          return `${seat}号${target ? "·" + target.name : ""}`;
+        });
+      details.choice = "秘密换号 " + targets.join(" ↔ ");
+    }
+  }
   return details;
 }
-module.exports = { actionDetails };
+// Group before paginating so a phase is never split across pages.
+function auditGroups(store, code, offset) {
+  const args = code === null ? [] : [code];
+  const cte = `WITH source AS (
+    SELECT *, CASE
+      WHEN json_extract(details, '$.stage') IS NOT NULL THEN code || ':stage:' || json_extract(details, '$.stage')
+      WHEN json_extract(details, '$.phase') IS NOT NULL THEN code || ':legacy:' || json_extract(details, '$.game') || ':' || json_extract(details, '$.phase') || ':' || coalesce(json_extract(details, '$.round'), '')
+      ELSE code || ':event:' || id END AS base_key
+    FROM admin_audit ${code === null ? "" : "WHERE code=?"}
+  ), boundaries AS (
+    SELECT *, CASE WHEN base_key = lag(base_key) OVER (ORDER BY id) THEN 0 ELSE 1 END AS boundary FROM source
+  ), numbered AS (
+    SELECT *, sum(boundary) OVER (ORDER BY id) AS segment FROM boundaries
+  ), grouped AS (
+    SELECT *, CASE WHEN json_extract(details, '$.stage') IS NOT NULL THEN base_key ELSE base_key || ':' || segment END AS group_key FROM numbered
+  ) `;
+  const total = store.db
+    .prepare(cte + "SELECT count(DISTINCT group_key) AS n FROM grouped")
+    .get(...args).n;
+  const rows = store.db
+    .prepare(
+      cte +
+        `SELECT * FROM grouped WHERE group_key IN (
+    SELECT group_key FROM grouped GROUP BY group_key ORDER BY max(id) DESC LIMIT 20 OFFSET ?
+  ) ORDER BY id DESC`,
+    )
+    .all(...args, offset);
+  const groups = new Map();
+  for (const row of rows) {
+    const entry = {
+      id: row.id,
+      action: row.action,
+      code: row.code,
+      reason: row.reason,
+      created: row.created,
+      details: JSON.parse(row.details),
+    };
+    if (!groups.has(row.group_key))
+      groups.set(row.group_key, {
+        key: row.group_key,
+        entries: [],
+        active:
+          !!entry.details.stage &&
+          store.get(row.code)?.stage === entry.details.stage,
+      });
+    groups.get(row.group_key).entries.push(entry);
+  }
+  return { groups: [...groups.values()], total, pageSize: 20 };
+}
+module.exports = { actionDetails, auditGroups };

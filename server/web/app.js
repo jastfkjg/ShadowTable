@@ -41,7 +41,7 @@
     });
   }
   function voteSummary(votes) {
-    return [true, false]
+    return (votes.some(function (v) { return v.approve === null; }) ? [true, false, null] : [true, false])
       .map(function (approve) {
         var seats = votes
           .filter(function (v) {
@@ -56,7 +56,7 @@
         return (
           seats.length +
           "票" +
-          (approve ? "赞成" : "反对") +
+          (approve === null ? "弃权" : approve ? "赞成" : "反对") +
           "：" +
           (seats.length ? seats.join("，") : "无")
         );
@@ -64,14 +64,14 @@
       .join("\n");
   }
   function toolHistory(h, key) {
-    if (["skillDetail", "skillResult"].indexOf(h.kind) !== -1)
+    if (["skillDetail", "skillResult", "toolCutoff"].indexOf(h.kind) !== -1)
       return { key: key, text: h.text, detail: h.detail || "" };
     if (h.kind === "variant") return { key: key, text: h.text, detail: "" };
     if (h.kind === "toolVote")
       return {
         key: key,
-        text: "投票" + (h.approved ? "通过" : "未通过"),
-        voteGroups: [true, false].map(function (approve) {
+        text: "投票" + (h.approved ? "通过" : "未通过") + (h.earlyClosed ? " · 提前截止" : ""),
+        voteGroups: (h.votes.some(function (v) { return v.approve === null; }) ? [true, false, null] : [true, false]).map(function (approve) {
           var seats = h.votes
             .filter(function (v) {
               return v.approve === approve;
@@ -83,10 +83,10 @@
               return a - b;
             });
           return {
-            label: approve ? "赞成" : "反对",
+            label: approve === null ? "弃权" : approve ? "赞成" : "反对",
             count: seats.length,
             seats: seats.length ? seats.join("、") + " 号" : "无",
-            tone: approve ? "approve" : "reject",
+            tone: approve === null ? "abstain" : approve ? "approve" : "reject",
           };
         }),
         teamLabel: h.team.length ? h.team.join("、") + " 号" : "",
@@ -157,8 +157,8 @@
     if (h.kind === "toolCanceled")
       return {
         key: key,
-        text: "未结算的操作已作废",
-        detail: "未公开或计入本次提交",
+        text: h.text || "未结算的操作已作废",
+        detail: h.detail || "未公开或计入本次提交",
       };
     return null;
   }
@@ -321,6 +321,7 @@
     needsLogin: false,
     seats: [],
     history: [],
+    latestResult: null,
     canStart: false,
     startHint: "",
     canSettle: false,
@@ -467,6 +468,7 @@
       toolPlayers: [],
       seats: [],
       history: [],
+      latestResult: null,
       selected: [],
       code: "",
       error: "",
@@ -679,6 +681,10 @@
       );
     });
     patch.history = history;
+    patch.latestResult = history.filter(function (_, i) {
+      var h = room.history[i];
+      return ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].indexOf(h.kind) !== -1 || (h.kind === "variant" && h.number);
+    }).pop() || null;
     patch.canStart =
       room.players.length === room.capacity &&
       room.players.every(function (p) {
@@ -711,7 +717,7 @@
         ? "还差 " +
           (room.operationProgress.total - room.operationProgress.completed) +
           " 人提交"
-        : "参与者已全部提交，可以结算"
+        : room.flexible ? "提交已收齐，正在同步结果" : "参与者已全部提交，可以结算"
       : "正在确认操作进度";
     patch.questSummary = {
       total: history.filter(function (h) {
@@ -2168,15 +2174,17 @@
           btn("secondary", "reveal", "立即遮盖", null, state.busy || !state.network) +
           "</div>";
     }
-    if (r.needsSubmission)
+    if (r.operationStatus || r.needsSubmission)
       html +=
-        '<div class="action-entry"><span>' +
-        (r.me.submitted ? "本轮操作已提交" : "待完成操作") +
-        "</span>" +
-        (!r.me.submitted
+        '<div class="action-entry" role="status"><div class="action-status-copy"><div>' +
+        esc(r.operationStatus ? r.operationStatus.title : r.me.submitted ? "已提交，等待其他玩家" : "请完成本次操作") +
+        '</div><div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "") + '</div></div>' +
+        (r.needsSubmission && !r.me.submitted
           ? btn("secondary", "openAction", "立即操作", null, state.busy || state.actionLoading || !state.network)
           : "") +
         "</div>";
+    if (state.latestResult && r.phase !== "lobby")
+      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="small muted">最近操作结果 · 公开记录中可回看</div><div class="latest-result-title">' + esc(state.latestResult.text) + '</div><div class="history-detail">' + esc(state.latestResult.detail) + '</div></div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -2422,6 +2430,9 @@
     var r = state.room;
     if (!r.canUseTools || !r.hasActiveOperation || r.phase === "offlineFinal")
       return "";
+    if (r.closeWaiting) return '<div class="host-action-bar"><div class="host-action-bar-inner"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
+      btn("secondary bar-cancel bar-cutoff", "closeWaiting", "结束等待", null, state.busy || !state.network) +
+      (r.closeWaiting.mode !== "cancel" ? btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy || !state.network) : "") + '</div></div>';
     return (
       '<div class="host-action-bar"><div class="host-action-bar-inner">' +
       btn(
@@ -2810,6 +2821,11 @@
         "停止线上任务推进，在线下完成起刀、内奸及最终胜负。本系统不会代判。",
         "offline",
       );
+    },
+    closeWaiting: function () {
+      var policy = state.room && state.room.closeWaiting;
+      if (!policy) return;
+      return confirmCommand(policy.title, policy.description, "closeWaiting", { confirm: true });
     },
     settleTool: function () {
       cmd("settleTool");

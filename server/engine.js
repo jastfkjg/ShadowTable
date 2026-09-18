@@ -755,7 +755,9 @@ function settleActivity(room) {
         kind: "skillResult",
         number,
         ...result,
-        text: "技能最终结果",
+        text: room.activity.earlyClosed
+          ? "技能最终结果 · 含提前截止"
+          : "技能最终结果",
         detail: `本轮出局：${list(result.eliminated)}；抽牌复活：${list(result.redrawn)}；原牌复活：${list(result.restored)}；最终仍出局：${list(result.out)}`,
       });
     }
@@ -769,7 +771,10 @@ function settleActivity(room) {
   if (room.phase === "teamVote") {
     const votes = participants.map((p) => ({
       seat: p.seat,
-      approve: room.submissions[p.uid] === "approve",
+      approve:
+        room.submissions[p.uid] === "abstain"
+          ? null
+          : room.submissions[p.uid] === "approve",
     }));
     room.history.push({
       kind: "toolVote",
@@ -777,6 +782,7 @@ function settleActivity(room) {
       team: [...room.team],
       votes,
       approved: votes.filter((v) => v.approve).length > votes.length / 2,
+      ...(room.activity.earlyClosed ? { earlyClosed: true } : {}),
     });
   } else if (room.phase === "quest") {
     const fails = participants.filter(
@@ -835,6 +841,48 @@ function settleActivity(room) {
   room.activity = null;
   room.team = [];
   stage(room, "tools");
+}
+// These policies depend only on the public phase, never on a secret role or choice.
+function closeWaitingPolicy(room) {
+  if (
+    !room.flexible ||
+    !room.activity ||
+    !hasActiveOperation(room) ||
+    room.phase === "offlineFinal"
+  )
+    return null;
+  if (room.phase === "teamVote")
+    return {
+      mode: "abstain",
+      title: "提前截止投票？",
+      description:
+        "未提交者记为弃权；赞成票仍需超过本次全部有投票资格玩家的一半才通过。已提交的票不会更改。",
+    };
+  if (["skillPrepare", "skillTurn", "hunterTurn"].includes(room.phase))
+    return {
+      mode: "pass",
+      title: "结束本阶段等待？",
+      description:
+        "本阶段未提交者按不使用技能／确认处理，不额外消耗技能次数；已提交的行动照常结算。后续如有追加行动，仍会等待新的提交。",
+    };
+  return {
+    mode: "cancel",
+    title: "作废本次操作并结束等待？",
+    description:
+      room.phase === "quest"
+        ? "本次任务作废，不补成功或失败票，不公布已提交票数，也不计入任务结果。可重新发起或在线下处理。"
+        : "本次操作作废，不代选目标、不产生查验或命中结果。可重新发起或在线下处理。",
+  };
+}
+function settleIfComplete(room) {
+  // Legacy sequential games retain their original transitions; current clients use tools.
+  if (!room.flexible || !room.activity || room.phase === "offlineFinal") return;
+  const participants = room.players.filter((p) => actionSpec(room, p.uid));
+  if (
+    participants.length &&
+    participants.every((p) => Object.hasOwn(room.submissions, p.uid))
+  )
+    settleActivity(room);
 }
 function phaseName(room) {
   if (KNIGHT_PHASES.includes(room.phase))
@@ -902,6 +950,8 @@ function operationProgress(room, uid) {
 }
 function publicView(room, uid) {
   const p = member(room, uid);
+  const action = actionSpec(room, uid);
+  const awaiting = !!action && !Object.hasOwn(room.submissions || {}, uid);
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
     code: room.code,
@@ -920,6 +970,23 @@ function publicView(room, uid) {
     ),
     showSkillDetails: room.showSkillDetails === true,
     operationProgress: operationProgress(room, uid),
+    closeWaiting: room.host === uid ? closeWaitingPolicy(room) : null,
+    operationStatus:
+      action || hasActiveOperation(room)
+        ? {
+            title: action
+              ? awaiting
+                ? "请完成本次操作"
+                : "已提交，等待其他玩家"
+              : "本次你无需操作",
+            detail:
+              room.phase === "offlineFinal"
+                ? "等待线下处理完成，由房主记录。"
+                : room.flexible
+                  ? "参与者全部提交后自动结算；下一项由房主发起。"
+                  : "等待本阶段完成后由房主推进。",
+          }
+        : null,
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
     hasActiveOperation: hasActiveOperation(room),
@@ -1028,6 +1095,7 @@ function command(room, uid, input) {
       "closeOffline",
       "beginActivity",
       "settleTool",
+      "closeWaiting",
       "cancelActivity",
       "finishTools",
     ].includes(type)
@@ -1075,6 +1143,51 @@ function command(room, uid, input) {
     );
     state.identityRevision = input.revision;
     state.identityAcknowledged = input.revision;
+    return;
+  }
+  if (type === "closeWaiting") {
+    const policy = closeWaitingPolicy(room);
+    requireRule(policy, "当前操作不支持结束等待");
+    requireRule(input.confirm === true, "请确认结束等待的处理规则");
+    const next = structuredClone(room);
+    const participants = next.players.filter((p) => actionSpec(next, p.uid));
+    const missing = participants.filter(
+      (p) => !Object.hasOwn(next.submissions, p.uid),
+    );
+    if (participants.length && !missing.length) settleIfComplete(next);
+    else if (policy.mode === "cancel" || !participants.length) {
+      knights.cancel(next);
+      next.history.push({
+        kind: "toolCanceled",
+        number: next.activity.number,
+        text: next.phase === "quest" ? "任务已作废" : "操作已作废",
+        detail: participants.length
+          ? policy.description
+          : "本阶段没有参与者，操作已作废。",
+      });
+      next.activity = null;
+      next.team = [];
+      stage(next, "tools");
+    } else {
+      for (const player of missing) {
+        if (policy.mode === "pass")
+          requireRule(
+            actionSpec(next, player.uid).choices.includes("pass"),
+            "本阶段不支持跳过",
+          );
+        next.submissions[player.uid] = policy.mode;
+      }
+      next.activity.earlyClosed = true;
+      if (policy.mode === "pass")
+        next.history.push({
+          kind: "toolCutoff",
+          number: next.activity.number,
+          text: "房主结束本阶段等待",
+          detail: "未提交者按不使用技能／确认处理，已提交行动照常结算。",
+        });
+      settleIfComplete(next);
+    }
+    Object.assign(room, next);
     return;
   }
   if (type === "settleTool") {
@@ -1287,7 +1400,11 @@ function command(room, uid, input) {
         : spec.choices.includes(input.value),
       "该操作或目标不合法",
     );
-    room.submissions[uid] = input.value;
+    // Last submission and settlement commit together, including any hunter interruption.
+    const next = room.flexible && room.activity ? structuredClone(room) : room;
+    next.submissions[uid] = input.value;
+    settleIfComplete(next);
+    Object.assign(room, next);
     return;
   }
   requireRule(type === "advance", "未知操作");

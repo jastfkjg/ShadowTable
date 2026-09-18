@@ -308,6 +308,7 @@ test("操作记录按房间分页，保存玩家操作快照，重试不重复�
   );
   const room = a.app.store.get(code);
   room.phase = "teamVote";
+  room.stage = randomUUID();
   room.submissions = {};
   room.game = 2;
   room.round = 3;
@@ -332,6 +333,10 @@ test("操作记录按房间分页，保存玩家操作快照，重试不重复�
   const audit = await a.api(`/api/admin/audit?code=${code}`);
   assert.ok(audit.entries.every((entry) => entry.code === code));
   assert.ok(audit.rooms.includes(other.code));
+  const grouped = await a.api(`/api/admin/audit?grouped=1&code=${code}`);
+  assert.equal(grouped.pageSize, 20);
+  assert.equal(grouped.groups[0].entries.length, 2);
+  assert.equal(grouped.groups[0].active, true);
   const votes = audit.entries.filter(
     (entry) => entry.details.command === "submit",
   );

@@ -32,7 +32,6 @@ test("发牌后直接按需操作：任务无需先投票，非队员无需确�
     run(r, "p1", "submit", { value: "success" });
     assert.throws(() => run(r, "p1", "settleTool"), /尚未完成/);
     run(r, "p2", "submit", { value: "success" });
-    run(r, "p1", "settleTool");
     assert.equal(r.phase, "tools");
     assert.equal(r.result, null);
     assert.equal(r.history.at(-1).kind, "toolQuest");
@@ -50,7 +49,6 @@ test("独立投票不必选队伍，结算前保密，连续否决不会结束�
     assert.deepEqual(publicView(r, "p3"), view);
     for (const p of r.players.filter((p) => p.uid !== "p2"))
       run(r, p.uid, "submit", { value: "reject" });
-    run(r, "p1", "settleTool");
     assert.equal(r.phase, "tools");
     assert.equal(r.result, null);
     assert.equal(r.history.at(-1).votes.length, 6);
@@ -107,7 +105,6 @@ test("任务校验队员、失败门槛和角色出牌权限，失败只汇总�
   assert.throws(() => run(r, good.uid, "submit", { value: "fail" }), /不合法/);
   run(r, good.uid, "submit", { value: "success" });
   run(r, evil.uid, "submit", { value: "fail" });
-  run(r, "p1", "settleTool");
   assert.deepEqual(r.history.at(-1), {
     kind: "toolQuest",
     number: 1,
@@ -129,7 +126,6 @@ test("刀逆仆和刀梅林可独立发起，只有刺客操作，逆仆结果�
   r.players
     .filter((p) => p.uid !== assassin.uid)
     .forEach((p) => run(r, p.uid, "submit", { value: "confirm" }));
-  run(r, "p1", "settleTool");
   assert.equal(r.convertedReverse, reverse.uid);
   assert.deepEqual(r.history.at(-1), { kind: "toolReverse", number: 1 });
   begin(r, "assassination");
@@ -137,7 +133,6 @@ test("刀逆仆和刀梅林可独立发起，只有刺客操作，逆仆结果�
   r.players
     .filter((p) => p.uid !== assassin.uid)
     .forEach((p) => run(r, p.uid, "submit", { value: "confirm" }));
-  run(r, "p1", "settleTool");
   assert.equal(r.history.at(-1).hit, true);
   assert.equal(r.result, null);
   assert.equal(r.phase, "tools");
@@ -215,7 +210,6 @@ test("房主只获得完成状态，任务非队员不计入进度，普通玩�
     ),
   );
   run(r, "p1", "submit", { value: "success" });
-  run(r, "p1", "settleTool");
   assert.equal(publicView(r, "p1").operationProgress, null);
 });
 

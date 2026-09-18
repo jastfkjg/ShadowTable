@@ -1069,3 +1069,14 @@ button.room-open {
   flex: 0 0 152rpx;
   font-size: 26rpx;
 }
+
+/* Current action stays separate from the last durable public result. */
+.action-status-copy { flex: 1; min-width: 0; }
+.action-status-copy .small { margin-top: 8rpx; }
+.latest-result { margin: 32rpx 0; padding: 32rpx; border: 1px solid var(--accent); border-radius: 24rpx; background: var(--surface); }
+.latest-result-title { margin: 16rpx 0; font-size: 40rpx; font-weight: 600; }
+.latest-result .history-detail { white-space: pre-line; overflow-wrap: anywhere; }
+.host-waiting-copy { flex: 1; min-width: 0; }
+.history-vote-count.abstain { color: var(--muted); }
+
+.host-action-bar-inner .bar-cutoff { flex: 0 0 192rpx; padding: 16rpx 12rpx; font-size: 28rpx; }

@@ -56,7 +56,7 @@ async function refresh() {
     let [{ rooms, total }, auditResult] = await Promise.all([
       api("rooms?offset=" + offset),
       api(
-        "audit?code=" +
+        "audit?grouped=1&code=" +
           encodeURIComponent(auditCode || "") +
           "&offset=" +
           auditOffset,
@@ -114,7 +114,7 @@ async function refresh() {
     ];
     if (auditCode === null && codes.length) {
       auditCode = codes[0];
-      auditResult = await api("audit?code=" + auditCode);
+      auditResult = await api("audit?grouped=1&code=" + auditCode);
     }
     $("audit-room").replaceChildren();
     for (const code of ["", ...codes]) {
@@ -133,14 +133,99 @@ async function refresh() {
     $("audit-room").disabled = false;
   }
 }
-function renderAudit({ entries, total }) {
+function renderAudit({ groups, total, pageSize }) {
   $("audit").replaceChildren();
-  $("audit").start = auditOffset + 1;
-  $("audit-count").textContent = `共 ${total} 条 · 每页 100 条`;
-  $("audit-page").textContent = `第 ${auditOffset / 100 + 1} 页`;
+  $("audit-count").textContent = `共 ${total} 组 · 每页 ${pageSize} 组`;
+  $("audit-page").textContent = `第 ${auditOffset / pageSize + 1} 页`;
   $("audit-prev").disabled = auditOffset === 0;
-  $("audit-next").disabled = auditOffset + 100 >= total;
-  if (!entries.length) $("audit").append(el("p", "暂无操作记录"));
+  $("audit-next").disabled = auditOffset + pageSize >= total;
+  if (!groups.length) $("audit").append(el("p", "暂无操作记录"));
+  for (const group of groups) {
+    const entries = group.entries;
+    const d = entries[0].details;
+    const block = el("div", "", "audit-stage");
+    const header = el("div", "", "audit-stage-heading");
+    const title = d.phase
+      ? `${d.phaseKey === "skillPrepare" ? "放技能阶段" : d.phase} · 第 ${d.game} 局${d.round ? " · 第 " + d.round + " 轮" : ""}`
+      : "管理操作";
+    header.append(
+      el("h3", title),
+      el("time", new Date(entries[0].created).toLocaleString()),
+    );
+    block.append(header);
+    const players = new Map();
+    for (const entry of [...entries].reverse()) {
+      for (const player of entry.details.participants || [])
+        players.set(player.seat, player);
+      if (entry.details.player && !players.has(entry.details.player.seat))
+        players.set(entry.details.player.seat, entry.details.player);
+    }
+    const summary = el("div", "", "audit-players");
+    for (const player of [...players.values()].sort(
+      (a, b) => a.seat - b.seat,
+    )) {
+      const actions = [...entries]
+        .reverse()
+        .filter((entry) => entry.details.player?.seat === player.seat);
+      const submissions = actions.filter(
+        (entry) => entry.details.command === "submit",
+      );
+      const primary = submissions.length
+        ? submissions
+        : actions.filter(
+            (entry) =>
+              !["ackIdentity", "ackFairyResult"].includes(
+                entry.details.command,
+              ),
+          );
+      let text;
+      if (player.required && !submissions.length)
+        text = group.active ? "未提交" : "未提交（阶段已结束）";
+      else if (primary.length)
+        text = [
+          ...new Set(
+            primary.map((entry) => {
+              const detail = entry.details;
+              if (detail.value === "pass") return "未使用技能";
+              if (detail.choice) return detail.choice;
+              if (detail.command === "ready")
+                return detail.parameters.ready ? "已准备" : "取消准备";
+              if (detail.command === "seat")
+                return `换到${detail.parameters.seat}号`;
+              return detail.label;
+            }),
+          ),
+        ].join("、");
+      else if (player.required)
+        text = group.active ? "未提交" : "未提交（阶段已结束）";
+      else if (actions.length)
+        text = [...new Set(actions.map((entry) => entry.details.label))].join(
+          "、",
+        );
+      else text = player.required === false ? "无需操作" : "未记录操作";
+      const line = el("span", "", "audit-player");
+      line.append(
+        el("strong", `${player.seat}号·${player.name}`),
+        document.createTextNode(" " + text),
+      );
+      summary.append(line);
+    }
+    if (players.size) block.append(summary);
+    if (!d.stage && d.phase)
+      block.append(
+        el("p", "旧记录按连续阶段归组，未提交情况无法追溯。", "audit-note"),
+      );
+    const log = el("div", "", "audit-detail-log");
+    appendAuditEntries(log, entries);
+    if (players.size) {
+      const disclosure = el("details", "");
+      disclosure.append(el("summary", `展开 ${entries.length} 条明细`), log);
+      block.append(disclosure);
+    } else block.append(log);
+    $("audit").append(block);
+  }
+}
+function appendAuditEntries(container, entries) {
   const fields = {
     seat: "目标座位",
     team: "队伍座位",
@@ -157,7 +242,7 @@ function renderAudit({ entries, total }) {
     revision: "版本",
   };
   for (const entry of entries) {
-    const item = el("li", "");
+    const item = el("div", "", "audit-entry");
     const d = entry.details || {};
     item.append(el("time", new Date(entry.created).toLocaleString()));
     const actor = d.player
@@ -183,7 +268,7 @@ function renderAudit({ entries, total }) {
         `${fields[key] || key}：${typeof value === "boolean" ? (value ? "是" : "否") : Array.isArray(value) ? value.join("、") : value}`,
     );
     if (parameters.length) item.append(el("div", parameters.join(" · ")));
-    $("audit").append(item);
+    container.append(item);
   }
 }
 $("audit-room").addEventListener("change", () => {
@@ -193,12 +278,12 @@ $("audit-room").addEventListener("change", () => {
 });
 $("audit-prev").addEventListener("click", () => {
   if (loading) return;
-  auditOffset = Math.max(0, auditOffset - 100);
+  auditOffset = Math.max(0, auditOffset - 20);
   refresh();
 });
 $("audit-next").addEventListener("click", () => {
   if (loading) return;
-  auditOffset += 100;
+  auditOffset += 20;
   refresh();
 });
 function openAction(room, action) {

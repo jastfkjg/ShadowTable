@@ -7,6 +7,7 @@ const {
 } = require("node:crypto");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
+const { auditGroups } = require("../audit");
 const { RuleError, command, roomSummary } = require("../engine");
 const digest = (s) => createHash("sha256").update(s).digest();
 const fail = (ok, message, status = 400) => {
@@ -190,18 +191,26 @@ function createAdmin({ store, origin, key, body, limit }) {
       const offset = Math.max(0, Math.floor(Number(query.get("offset")) || 0));
       const where = code === null ? "" : " WHERE code=?";
       const args = code === null ? [] : [code];
+      const grouped = query.get("grouped") === "1";
       send(200, {
-        entries: store.db
-          .prepare(
-            "SELECT id,action,code,reason,created,details FROM admin_audit" +
-              where +
-              " ORDER BY id DESC LIMIT 100 OFFSET ?",
-          )
-          .all(...args, offset)
-          .map((entry) => ({ ...entry, details: JSON.parse(entry.details) })),
-        total: store.db
-          .prepare("SELECT count(*) AS n FROM admin_audit" + where)
-          .get(...args).n,
+        ...(grouped
+          ? auditGroups(store, code, offset)
+          : {
+              entries: store.db
+                .prepare(
+                  "SELECT id,action,code,reason,created,details FROM admin_audit" +
+                    where +
+                    " ORDER BY id DESC LIMIT 100 OFFSET ?",
+                )
+                .all(...args, offset)
+                .map((entry) => ({
+                  ...entry,
+                  details: JSON.parse(entry.details),
+                })),
+              total: store.db
+                .prepare("SELECT count(*) AS n FROM admin_audit" + where)
+                .get(...args).n,
+            }),
         rooms: store.db
           .prepare(
             "SELECT code FROM admin_audit WHERE code != '' GROUP BY code ORDER BY MAX(id) DESC",

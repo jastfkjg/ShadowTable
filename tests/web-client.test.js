@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { newRoom, enter, publicView, BOARDS } = require("../server/engine");
+const { newRoom, enter, command, publicView, BOARDS } = require("../server/engine");
 
 function client(fetch) {
   let scheduled;
@@ -21,7 +21,7 @@ function client(fetch) {
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { state, schedule, loadSettings, refresh,
+    window.test = { state, schedule, loadSettings, refresh, viewRoom, viewHostBar,
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
     };
@@ -78,4 +78,37 @@ test("网页房主变更后关闭管理操作并撤销设置权限", async () =>
   assert.equal(c.state.toolType, "");
   assert.equal(c.state.settings.authorized, false);
   assert.match(c.state.settings.error, /房主已变更/);
+});
+
+
+test("网页恢复后保留最近结果、弃权票和无需操作提示，进入下一项仍可回看", async () => {
+  const room = newRoom("123456", "p1", "房主");
+  const run = (uid, type, extra = {}) => command(room, uid, { type, stage: room.stage, ...extra });
+  for (let i = 2; i <= 6; i++) enter(room, `p${i}`, `玩家${i}`);
+  room.players.forEach(p => run(p.uid, "ready", { ready: true }));
+  run("p1", "start", { flexible: true });
+  run("p1", "beginActivity", { kind: "vote" });
+  run("p1", "submit", { value: "approve" });
+  run("p1", "closeWaiting", { confirm: true });
+  const c = client(async () => response(publicView(room, "p1")));
+  await c.refresh();
+  assert.match(c.state.latestResult.text, /提前截止/);
+  assert.equal(c.state.latestResult.voteGroups[2].label, "弃权");
+  assert.equal(c.state.latestResult.voteGroups[2].count, 5);
+  run("p1", "beginActivity", { kind: "quest", team: [2], threshold: 1 });
+  await c.refresh();
+  assert.match(c.state.latestResult.text, /提前截止/);
+  const html = c.viewRoom();
+  assert.match(html, /最近操作结果/);
+  assert.match(html, /本次你无需操作/);
+  assert.match(c.viewHostBar(), /结束等待/);
+  assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
+  assert.ok(!c.viewHostBar().includes('data-action="cancelTool"'));
+  run("p2", "submit", { value: "success" });
+  await c.refresh();
+  assert.equal(c.state.latestResult.text, "任务成功");
+  run("p1", "finishTools");
+  run("p1", "rematch");
+  await c.refresh();
+  assert.equal(c.state.latestResult, null);
 });

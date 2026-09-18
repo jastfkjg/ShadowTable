@@ -17,34 +17,34 @@ function factionTone(faction) {
   return "";
 }
 function voteSummary(votes) {
-  return [true, false]
+  return (votes.some((v) => v.approve === null) ? [true, false, null] : [true, false])
     .map((approve) => {
       const seats = votes
         .filter((v) => v.approve === approve)
         .map((v) => v.seat)
         .sort((a, b) => a - b);
-      return `${seats.length}票${approve ? "赞成" : "反对"}：${seats.length ? seats.join("，") : "无"}`;
+      return `${seats.length}票${approve === null ? "弃权" : approve ? "赞成" : "反对"}：${seats.length ? seats.join("，") : "无"}`;
     })
     .join("\n");
 }
 function toolHistory(h, key) {
-  if (["skillDetail", "skillResult"].includes(h.kind))
+  if (["skillDetail", "skillResult", "toolCutoff"].includes(h.kind))
     return { key, text: h.text, detail: h.detail || "" };
   if (h.kind === "variant") return { key, text: h.text, detail: "" };
   if (h.kind === "toolVote")
     return {
       key,
-      text: "投票" + (h.approved ? "通过" : "未通过"),
-      voteGroups: [true, false].map((approve) => {
+      text: "投票" + (h.approved ? "通过" : "未通过") + (h.earlyClosed ? " · 提前截止" : ""),
+      voteGroups: (h.votes.some((v) => v.approve === null) ? [true, false, null] : [true, false]).map((approve) => {
         const seats = h.votes
           .filter((v) => v.approve === approve)
           .map((v) => v.seat)
           .sort((a, b) => a - b);
         return {
-          label: approve ? "赞成" : "反对",
+          label: approve === null ? "弃权" : approve ? "赞成" : "反对",
           count: seats.length,
           seats: seats.length ? seats.join("、") + " 号" : "无",
-          tone: approve ? "approve" : "reject",
+          tone: approve === null ? "abstain" : approve ? "approve" : "reject",
         };
       }),
       teamLabel: h.team.length ? h.team.join("、") + " 号" : "",
@@ -91,7 +91,7 @@ function toolHistory(h, key) {
   if (h.kind === "toolOffline")
     return { key, text: "线下刀人已完成", detail: "以线下结算为准" };
   if (h.kind === "toolCanceled")
-    return { key, text: "未结算的操作已作废", detail: "未公开或计入本次提交" };
+    return { key, text: h.text || "未结算的操作已作废", detail: h.detail || "未公开或计入本次提交" };
   return null;
 }
 Page({
@@ -103,6 +103,7 @@ Page({
     hasPendingRequest: false,
     notice: "",
     room: null,
+    latestResult: null,
     boards: [],
     availableBoards: [],
     entryMode: "join",
@@ -434,10 +435,14 @@ Page({
       settleHint: room.operationProgress
         ? room.operationProgress.completed < room.operationProgress.total
           ? `还差 ${room.operationProgress.total - room.operationProgress.completed} 人提交`
-          : "参与者已全部提交，可以结算"
+          : room.flexible ? "提交已收齐，正在同步结果" : "参与者已全部提交，可以结算"
         : "正在确认操作进度",
       seats,
       history,
+      latestResult: history.filter((_, i) =>
+        ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].includes(room.history[i].kind) ||
+        (room.history[i].kind === "variant" && room.history[i].number)
+      ).pop() || null,
       questSummary: {
         total: history.filter((h) => h.questResult).length,
         success: history.filter((h) => h.questResult === "success").length,
@@ -509,6 +514,7 @@ Page({
       toolSeats: [],
       seats: [],
       history: [],
+      latestResult: null,
       selected: [],
       code: "",
       error: "",
@@ -936,6 +942,11 @@ Page({
     if (!this.foreground || this.data.room?.stage !== room.stage) return;
     this.closeTool();
     this.cmd("beginActivity", extra);
+  },
+  async closeWaiting() {
+    const policy = this.data.room?.closeWaiting;
+    if (!policy) return;
+    return this.confirmCommand(policy.title, policy.description, "closeWaiting", { confirm: true });
   },
   settleTool() {
     this.cmd("settleTool");

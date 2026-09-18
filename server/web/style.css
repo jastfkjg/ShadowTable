@@ -1224,3 +1224,14 @@ button.transfer-button {
   .dialog-backdrop, .error-dialog { animation: none; }
   #toast { transition: none; }
 }
+
+/* Current action stays separate from the last durable public result. */
+.action-status-copy { flex: 1; min-width: 0; }
+.action-status-copy .small { margin-top: 4px; }
+.latest-result { margin: 16px 0; padding: 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--surface); }
+.latest-result-title { margin: 8px 0; font-size: 20px; font-weight: 600; }
+.latest-result .history-detail { white-space: pre-line; overflow-wrap: anywhere; }
+.host-waiting-copy { flex: 1; min-width: 0; }
+.history-vote-count.abstain { color: var(--muted); }
+
+.host-action-bar-inner .bar-cutoff { flex: 0 0 96px; padding: 8px 6px; font-size: 14px; }

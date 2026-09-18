@@ -171,12 +171,65 @@ a:focus-visible {
   border-top: 1px solid var(--line);
 }
 #audit {
-  padding-left: 24px;
+  margin-top: 20px;
 }
-#audit li {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+.audit-stage {
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
   overflow-wrap: anywhere;
+}
+.audit-stage-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.audit-stage h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.audit-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+.audit-player {
+  line-height: 1.7;
+}
+.audit-player strong {
+  font-weight: 600;
+}
+.audit-stage summary {
+  cursor: pointer;
+  color: var(--muted);
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 14px;
+}
+.audit-stage summary:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+.audit-detail-log {
+  border-left: 2px solid var(--line);
+  padding-left: 12px;
+}
+.audit-entry {
+  padding: 6px 0;
+  font-size: 14px;
+}
+.audit-entry > time {
+  margin-right: 8px;
+}
+.audit-entry > div {
+  display: inline;
+  margin-right: 8px;
+}
+.audit-note {
+  font-size: 13px;
+  margin: 8px 0 0;
 }
 time {
   color: var(--muted);

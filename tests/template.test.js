@@ -209,7 +209,7 @@ test("投票和私密操作只在弹窗显示，已提交后弹窗消失且入�
   const done = render({ ...data, room: { ...room, me: { submitted: true } } });
   assert.equal(byHandler(done, "submitChoice"), undefined);
   assert.equal(byHandler(done, "openAction"), undefined);
-  assert.ok(JSON.stringify(done).includes("本轮操作已提交"));
+  assert.ok(JSON.stringify(done).includes("已提交，等待其他玩家"));
 });
 
 test("房主工具入口覆盖任意发牌后阶段，普通玩家不能看见管理入口", () => {
@@ -506,4 +506,26 @@ test("移交入口仅在管理员设置页显示，玩家列表按需弹出", ()
     assert.equal(byHandler(renderSettings({ ...data, pendingTransfer: true }), "openTransfer").attr.disabled, true);
     assert.equal(byHandler(renderSettings({ ...data, transferPlayers: [] }), "openTransfer").attr.disabled, true);
   }
+});
+
+test("自动结算牌桌展示个人状态和持久结果，房主可结束等待而不需点结算", () => {
+  const room = {
+    phase: "quest", flexible: true, canUseTools: true, hasActiveOperation: true,
+    closeWaiting: { mode: "cancel" },
+    operationStatus: { title: "本次你无需操作", detail: "参与者全部提交后自动结算" },
+    needsSubmission: false, team: [2, 3], me: { isHost: true, submitted: false },
+  };
+  const data = { ...base, room, settleHint: "还差 1 人提交", latestResult: { text: "投票通过 · 提前截止", detail: "4票赞成\n2票弃权" } };
+  const tree = render(data);
+  assert.equal(byHandler(tree, "settleTool"), undefined);
+  assert.equal(byHandler(tree, "cancelTool"), undefined);
+  assert.equal(byHandler(tree, "openAction"), undefined);
+  assert.equal(byHandler(tree, "closeWaiting").attr.disabled, false);
+  assert.ok(JSON.stringify(tree).includes("本次你无需操作"));
+  assert.ok(JSON.stringify(tree).includes("2票弃权"));
+  assert.equal(byHandler(render({ ...data, network: false }), "closeWaiting").attr.disabled, true);
+  const submitted = render({ ...data, room: { ...room, canUseTools: false, closeWaiting: null, needsSubmission: true, me: { submitted: true }, operationStatus: { title: "已提交，等待其他玩家" } } });
+  assert.equal(byHandler(submitted, "closeWaiting"), undefined);
+  assert.equal(byHandler(submitted, "openAction"), undefined);
+  assert.ok(JSON.stringify(submitted).includes("已提交，等待其他玩家"));
 });

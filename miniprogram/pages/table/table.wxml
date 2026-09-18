@@ -208,9 +208,14 @@
         <button class="secondary" bindtap="reveal" disabled="{{busy || !network}}">立即遮盖</button>
       </view>
     </block>
-    <view wx:if="{{room.needsSubmission}}" class="action-entry">
-      <text>{{room.me.submitted?'本轮操作已提交':'待完成操作'}}</text>
-      <button wx:if="{{!room.me.submitted}}" class="secondary" bindtap="openAction" disabled="{{busy || actionLoading || !network}}" loading="{{actionLoading}}">立即操作</button>
+    <view wx:if="{{room.operationStatus || room.needsSubmission}}" class="action-entry" role="status">
+      <view class="action-status-copy"><view>{{room.operationStatus ? room.operationStatus.title : room.me.submitted?'已提交，等待其他玩家':'请完成本次操作'}}</view><view class="small muted">{{room.operationStatus.detail}}</view></view>
+      <button wx:if="{{room.needsSubmission && !room.me.submitted}}" class="secondary" bindtap="openAction" disabled="{{busy || actionLoading || !network}}" loading="{{actionLoading}}">立即操作</button>
+    </view>
+    <view wx:if="{{latestResult && room.phase!=='lobby'}}" class="latest-result" role="status" aria-label="最近操作结果">
+      <view class="small muted">最近操作结果 · 公开记录中可回看</view>
+      <view class="latest-result-title">{{latestResult.text}}</view>
+      <view class="history-detail">{{latestResult.detail}}</view>
     </view>
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
@@ -353,8 +358,10 @@
     </view>
     <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
       <view class="host-action-bar-inner">
-        <button class="primary bar-settle" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
-        <button class="secondary bar-cancel" bindtap="cancelTool" disabled="{{busy}}">作废</button>
+        <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
+        <button wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{busy || !network}}">结束等待</button>
+        <button wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
+        <button wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{busy}}">作废</button>
       </view>
     </view>
   </block>

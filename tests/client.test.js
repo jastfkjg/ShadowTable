@@ -701,22 +701,22 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
       assert.equal(p.data.room.me.submitted, false);
       p.confirmChoice();
       await settle(p);
-      assert.equal(p.data.room.me.submitted, true);
+      assert.equal(p.data.room.me.submitted || p.data.room.phase === "tools", true);
       assert.equal(p.data.actionDialog, false);
       assert.equal(p.data.draftChoice, "");
     }
     assert.equal(ps[2].data.room.needsSubmission, false);
-    host.settleTool();
-    await settle(host);
+    await host.refresh();
     assert.equal(host.data.room.phase, "tools");
     assert.ok(host.data.history.at(-1).text.includes("任务成功"));
+    assert.equal(host.data.latestResult.text, "任务成功");
     host.openTool({ currentTarget: { dataset: { kind: "vote" } } });
     await host.launchTool();
     await settle(host);
     await refresh();
+    assert.equal(host.data.latestResult.text, "任务成功");
     for (const p of ps) await cmd(p, "submit", { value: "approve" });
-    host.settleTool();
-    await settle(host);
+    await host.refresh();
     assert.ok(host.data.history.at(-1).text.includes("投票通过"));
     host.openTool({ currentTarget: { dataset: { kind: "assassination" } } });
     await host.launchTool();
@@ -728,8 +728,7 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     await cmd(assassin, "submit", { value: merlin.data.room.me.seat });
     for (const p of ps.filter((p) => p !== assassin))
       await cmd(p, "submit", { value: "confirm" });
-    host.settleTool();
-    await settle(host);
+    await host.refresh();
     assert.equal(host.data.room.result, null);
     assert.ok(host.data.history.at(-1).detail.includes("命中梅林"));
     await host.finishTools();
@@ -940,8 +939,7 @@ test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下�
       );
       await cmd(p, "submit", { value: "pass" });
     }
-    host.settleTool();
-    await settle(host);
+    await host.refresh();
     await refresh();
     assert.equal(host.data.room.phase, "tools");
     assert.ok(host.data.history.at(-1).text.includes("技能最终结果"));
@@ -1134,4 +1132,21 @@ test("房主提示随入座准备与提交进度刷新，非房主不推算秘�
   room.operationProgress = null;
   await p.refresh();
   assert.equal(p.data.canSettle, false);
+});
+
+test("结束等待需确认且绑定原阶段，追加行动出现时不误截止", async () => {
+  const p = page({});
+  const calls = [];
+  p.cmd = (...args) => calls.push(args);
+  p.data.room = { stage: "s1", closeWaiting: { title: "提前截止投票？", description: "未提交记弃权" } };
+  p.confirm = async () => false;
+  await p.closeWaiting();
+  assert.equal(calls.length, 0);
+  p.confirm = async () => { p.data.room.stage = "s2"; return true; };
+  await p.closeWaiting();
+  assert.equal(calls.length, 0);
+  assert.match(p.data.error, /阶段已变化/);
+  p.confirm = async () => true;
+  await p.closeWaiting();
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [["closeWaiting", { confirm: true }]]);
 });
