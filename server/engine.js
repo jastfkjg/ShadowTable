@@ -74,7 +74,7 @@ const BOARDS = [
     available: true,
     counts: [12],
     description:
-      "同时秘密提交技能，依序结算，B牌复活；按需发起转换、仙女和夜晚",
+      "同时秘密提交技能，同时生效，B牌复活；按需发起转换、仙女和夜晚",
   },
 ];
 const ROLES = {
@@ -939,7 +939,7 @@ function phaseName(room) {
   if (KNIGHT_PHASES.includes(room.phase))
     return {
       skillPrepare: "同时秘密使用技能",
-      skillTurn: "技能依序结算",
+      skillTurn: "技能结算",
       hunterTurn: "出局技能确认",
       fairy: "仙女查验",
     }[room.phase];

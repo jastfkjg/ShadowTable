@@ -125,7 +125,7 @@ function action(room, uid) {
     if (eligible(room, uid) && role === "paladin")
       options.push({
         value: "revive",
-        label: "轮到我时复活上一位出局者（若合法）",
+        label: "本轮主动技能结算后复活上一位出局者（若合法）",
       });
     return {
       kind: "choice",
@@ -210,12 +210,14 @@ function begin(room, kind, check) {
     k.witches = {};
     k.swap = null;
     k.hunters = [];
+    // Seat order only breaks ties for protection, revival and card draws.
+    // Committed skills use the initial snapshot, so mutual attacks both resolve.
     k.order = room.players
       .slice()
       .sort(
         (a, b) =>
-          ((a.seat - room.leader + 12) % 12) -
-          ((b.seat - room.leader + 12) % 12),
+          (Number(room.roles[a.uid] === "paladin") -
+            Number(room.roles[b.uid] === "paladin")) || a.seat - b.seat,
       )
       .map((p) => p.uid);
     k.cursor = 0;
@@ -356,7 +358,11 @@ function settle(room, check, allRoles) {
   const role = room.roles[actor],
     value = hunter
       ? val(actor)
-      : eligible(room, actor)
+      : (k.snapshot?.players[actor]
+          ? k.snapshot.players[actor].alive &&
+            !k.snapshot.players[actor].used &&
+            k.snapshot.players[actor].availableRound <= k.round
+          : eligible(room, actor))
         ? k.planned[actor]
         : "pass";
   if (value === "revive") {
@@ -413,7 +419,8 @@ function settle(room, check, allRoles) {
     );
   }
   if (k.swap?.triggered) k.players[k.swap.uid].used = true;
-  if (k.hunters.length) {
+  // Finish all committed skills before resolving death-triggered shots.
+  if (k.hunters.length && k.cursor >= k.order.length) {
     resetStage(room, "hunterTurn");
     return false;
   }

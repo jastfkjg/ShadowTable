@@ -100,6 +100,27 @@ test("十二骑士A/B牌配比、分层随机牌堆与公开视图不泄露B角�
   assert.ok(!view.includes("blueAwakened"));
   assert.equal(r.knights.conversions.filter(Boolean).length, 2);
 });
+test("互刀与456789循环刀全部生效，不受车长和玩家排列影响", () => {
+  for (const seats of [[4, 5], [4, 5, 6, 7, 8, 9]]) {
+    for (let leader = 1; leader <= 12; leader++) {
+      const r = setup();
+      configure(r, Object.fromEntries(seats.map((seat) => [`p${seat}`, "gareth"])));
+      r.leader = leader;
+      if (leader % 2 === 0) r.players.reverse();
+      r.knights.deck = [];
+      skills(r, Object.fromEntries(seats.map((seat, i) => [
+        `p${seat}`, `target:${seats[(i + 1) % seats.length]}`,
+      ])));
+      assert.equal(r.phase, "tools");
+      assert.deepEqual(r.knights.summary.eliminated, seats);
+      for (const seat of seats) {
+        assert.equal(r.knights.players[`p${seat}`].alive, false);
+        assert.equal(r.knights.players[`p${seat}`].used, true);
+      }
+    }
+  }
+});
+
 test("所有角色同时提交，守护免死仅消耗触发的守卫；目标和角色不公开", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "redGuard", p3: "redKnight" });
@@ -158,7 +179,7 @@ test("女巫替死能被守护；替死猎人不触发开枪", () => {
     assert.equal(r.knights.players.p3.alive, guard);
   }
 });
-test("猎人插入全员确认，恢复后继续结算；重复/旧阶段请求拒绝", () => {
+test("主动刀先同时生效，再确认猎人开枪；重复/旧阶段请求拒绝", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "redHunter", p3: "blueAwakened" });
   r.knights.deck = [];
@@ -169,14 +190,14 @@ test("猎人插入全员确认，恢复后继续结算；重复/旧阶段请求�
   submitAll(r, { p2: "target:3" });
   assert.equal(r.phase, "tools");
   assert.equal(r.knights.players.p3.alive, false);
-  assert.equal(r.knights.players.p4.alive, true);
+  assert.equal(r.knights.players.p4.alive, false);
   assert.throws(
     () => command(r, "p2", { stage: old, type: "submit", value: "pass" }),
     /阶段已变化/,
   );
   begin(r, "vote");
   assert.equal(privateView(r, "p2").action, null);
-  assert.equal(publicView(r, "p1").operationProgress.total, 10);
+  assert.equal(publicView(r, "p1").operationProgress.total, 9);
   run(r, "p1", "cancelActivity");
   assert.throws(
     () => begin(r, "quest", { team: [2], threshold: 1 }),
@@ -222,6 +243,19 @@ test("圣骑士恢复原牌不重置技能；莫德雷德决斗视为好人", ()
     assert.equal(t.knights.players.p2.alive, role === "blueKnight");
   }
 });
+test("仙女查验莫德雷德为坏人，不使用骑士决斗的好人特例", () => {
+  const r = setup();
+  configure(r, { p2: "mordred" });
+  r.knights.fairy = 1;
+  begin(r, "fairy");
+  submitAll(r, { p1: "target:2" });
+  const result = privateView(r, "p1").fairyResult;
+  assert.equal(result.information, "2号查验结果：坏人（第1轮）");
+  assert.equal(r.knights.fairy, 2);
+  assert.equal(privateView(r, "p2").fairyResult, null);
+  assert.ok(!JSON.stringify(publicView(r, "p1")).includes("查验结果：坏人"));
+});
+
 test("转换只改阵营，当前红兰斯强制失败；仙女先知视野仅本人获取", () => {
   const r = setup();
   configure(r, {
