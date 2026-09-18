@@ -1235,3 +1235,5 @@ button.transfer-button {
 .history-vote-count.abstain { color: var(--muted); }
 
 .host-action-bar-inner .bar-cutoff { flex: 0 0 96px; padding: 8px 6px; font-size: 14px; }
+
+button.kick-entry { color: var(--evil); }

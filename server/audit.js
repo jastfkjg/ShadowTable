@@ -14,6 +14,7 @@ const labels = {
   finishTools: "结束本局",
   leave: "离开座位",
   transfer: "转交房主",
+  kick: "移出玩家",
   seat: "更换座位",
   ready: "准备",
   configure: "修改板子",
@@ -108,7 +109,7 @@ function auditGroups(store, code, offset) {
       WHEN json_extract(details, '$.stage') IS NOT NULL THEN code || ':stage:' || json_extract(details, '$.stage')
       WHEN json_extract(details, '$.phase') IS NOT NULL THEN code || ':legacy:' || json_extract(details, '$.game') || ':' || json_extract(details, '$.phase') || ':' || coalesce(json_extract(details, '$.round'), '')
       ELSE code || ':event:' || id END AS base_key
-    FROM admin_audit ${code === null ? "" : "WHERE code=?"}
+    FROM admin_audit WHERE action != 'actor' ${code === null ? "" : "AND code=?"}
   ), boundaries AS (
     SELECT *, CASE WHEN base_key = lag(base_key) OVER (ORDER BY id) THEN 0 ELSE 1 END AS boundary FROM source
   ), numbered AS (

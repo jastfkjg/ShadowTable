@@ -19,6 +19,8 @@ Page({
     showTransferPicker: false,
     pendingTransfer: false,
     pendingSave: false,
+    pendingKick: false,
+    showKickPicker: false,
   },
   onLoad(query) {
     this.alive = true;
@@ -26,7 +28,13 @@ Page({
   },
   onShow() {
     this.foreground = true;
-    if (!this.pending && !this.transferPending && !this.data.dirty) this.load();
+    if (
+      !this.pending &&
+      !this.transferPending &&
+      !this.kickPending &&
+      !this.data.dirty
+    )
+      this.load();
   },
   onHide() {
     this.foreground = false;
@@ -114,7 +122,13 @@ Page({
     this.updateDirty();
   },
   async save() {
-    if (this.data.busy || this.transferPending || !this.data.authorized) return;
+    if (
+      this.data.busy ||
+      this.transferPending ||
+      this.kickPending ||
+      !this.data.authorized
+    )
+      return;
     if (this.pending) return this.sendPending();
     if (!this.data.dirty) return;
     if (this.data.visible && !this.original.showSkillDetails) {
@@ -184,6 +198,7 @@ Page({
       this.data.busy ||
       this.pending ||
       this.transferPending ||
+      this.kickPending ||
       !this.data.authorized ||
       !this.data.transferPlayers.length
     )
@@ -199,6 +214,7 @@ Page({
       this.data.busy ||
       this.pending ||
       this.transferPending ||
+      this.kickPending ||
       !this.data.authorized
     )
       return;
@@ -264,17 +280,129 @@ Page({
       if (this.alive) this.setData({ busy: false });
     }
   },
+  openKick() {
+    if (
+      this.data.busy ||
+      this.pending ||
+      this.transferPending ||
+      this.kickPending ||
+      !this.data.authorized ||
+      !this.data.room?.canKick ||
+      !this.data.transferPlayers.length
+    )
+      return;
+    this.setData({ showKickPicker: true });
+  },
+  closeKick() {
+    if (!this.data.busy) this.setData({ showKickPicker: false });
+  },
+  async kick(e) {
+    if (
+      this.data.busy ||
+      this.pending ||
+      this.transferPending ||
+      this.kickPending ||
+      !this.data.authorized ||
+      !this.data.room?.canKick
+    )
+      return;
+    const target = this.data.transferPlayers.find(
+      (p) => p.seat === Number(e.currentTarget.dataset.seat),
+    );
+    if (!target) return;
+    const data = {
+      type: "kick",
+      stage: this.original.stage,
+      seat: target.seat,
+      targetId: target.managementId,
+      confirm: true,
+    };
+    this.setData({ busy: true });
+    const answer = await new Promise((resolve) =>
+      wx.showModal({
+        title: "移出玩家？",
+        content: `将 ${target.seat}号 · ${target.name} 移出房间，其他玩家和已有对局记录保留。准备阶段可凭房间码重新加入。`,
+        confirmText: "移出",
+        confirmColor: "#b5473a",
+        cancelText: "取消",
+        success: resolve,
+        fail: () => resolve({ confirm: false }),
+      }),
+    );
+    if (!this.alive) return;
+    this.setData({ busy: false });
+    if (!answer.confirm || !this.foreground) return;
+    this.kickPending = { id: api.requestId(), data };
+    this.setData({ showKickPicker: false });
+    return this.sendKick();
+  },
+  async sendKick() {
+    if (!this.kickPending || this.data.busy) return;
+    const pending = this.kickPending;
+    const draft = this.data.dirty
+      ? {
+          capacity: this.data.capacity,
+          boardId: this.data.boardId,
+          visible: this.data.visible,
+        }
+      : null;
+    this.setData({ busy: true, error: "", pendingKick: true });
+    try {
+      await api.login();
+      await api.request(
+        "/api/rooms/" + this.code + "/commands",
+        "POST",
+        pending.data,
+        pending.id,
+      );
+      this.kickPending = null;
+      if (!this.alive) return;
+      this.setData({ busy: false, pendingKick: false });
+      await this.load();
+      if (this.data.authorized && draft) {
+        this.setData({ visible: draft.visible });
+        this.updateChoices(draft.capacity, draft.boardId);
+      }
+      if (this.foreground && this.data.authorized)
+        wx.showToast({ title: "玩家已移出", icon: "success" });
+    } catch (e) {
+      if (e.status && e.status < 500 && ![401, 429].includes(e.status))
+        this.kickPending = null;
+      if (!this.alive) return;
+      this.setData({
+        error: e.message,
+        pendingKick: !!this.kickPending,
+        authorized: e.status === 403 ? false : this.data.authorized,
+      });
+      if (e.status === 409) {
+        this.setData({ busy: false });
+        await this.load();
+        this.setData({
+          error: "房间或座位已变化，已刷新，请重新选择要移出的玩家。",
+        });
+      }
+    } finally {
+      if (this.alive) this.setData({ busy: false });
+    }
+  },
   async back() {
     if (this.data.busy) return;
-    if (this.data.dirty || this.pending || this.transferPending) {
+    if (
+      this.data.dirty ||
+      this.pending ||
+      this.transferPending ||
+      this.kickPending
+    ) {
       const answer = await new Promise((resolve) =>
         wx.showModal({
           title: "返回牌桌？",
-          content: this.transferPending
-            ? "移交结果尚未确认，返回后请核对最新房主。"
-            : this.pending
-              ? "保存结果尚未确认，返回后请重新进入设置核对。"
-              : "未保存的修改将放弃。",
+          content: this.kickPending
+            ? "移出结果尚未确认，返回后请核对房间成员。"
+            : this.transferPending
+              ? "移交结果尚未确认，返回后请核对最新房主。"
+              : this.pending
+                ? "保存结果尚未确认，返回后请重新进入设置核对。"
+                : "未保存的修改将放弃。",
           success: resolve,
         }),
       );

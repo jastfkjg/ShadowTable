@@ -189,10 +189,12 @@ function createAdmin({ store, origin, key, body, limit }) {
       const code = query.get("code");
       fail(code === null || code === "" || /^\d{6}$/.test(code), "房间号无效");
       const offset = Math.max(0, Math.floor(Number(query.get("offset")) || 0));
-      const where = code === null ? "" : " WHERE code=?";
+      const where =
+        " WHERE action != 'actor'" + (code === null ? "" : " AND code=?");
       const args = code === null ? [] : [code];
       const grouped = query.get("grouped") === "1";
       send(200, {
+        filtered: true,
         ...(grouped
           ? auditGroups(store, code, offset)
           : {
@@ -212,9 +214,7 @@ function createAdmin({ store, origin, key, body, limit }) {
                 .get(...args).n,
             }),
         rooms: store.db
-          .prepare(
-            "SELECT code FROM admin_audit WHERE code != '' GROUP BY code ORDER BY MAX(id) DESC",
-          )
+          .prepare("SELECT code FROM rooms ORDER BY code")
           .all()
           .map((row) => row.code),
       });

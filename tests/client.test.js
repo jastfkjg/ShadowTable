@@ -1150,3 +1150,19 @@ test("结束等待需确认且绑定原阶段，追加行动出现时不误截�
   await p.closeWaiting();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [["closeWaiting", { confirm: true }]]);
 });
+
+test("小程序收到移出通知后清除私密展示并返回首页，显示明确原因", async () => {
+  const p = page({ request: async path => {
+    if (path === "/api/me/rooms") return { rooms: [] };
+    throw Object.assign(new Error("你已被房主移出房间"), { status: 403 });
+  } });
+  p.roomCode = "123456";
+  p.data.room = { code: "123456" };
+  p.data.secret = { role: "梅林" };
+  p.data.revealed = true;
+  await p.refresh();
+  assert.equal(p.data.room, null);
+  assert.equal(p.data.secret, null);
+  assert.equal(p.data.revealed, false);
+  assert.equal(p.data.notice, "你已被房主移出房间");
+});

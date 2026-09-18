@@ -284,3 +284,71 @@ test("移交选择弹窗按需打开，取消不提交，空房或保存中不�
   p.openTransfer();
   assert.equal(p.data.showTransferPicker, false);
 });
+
+function kickRoom() {
+  return { ...room(), phase: "lobby", canKick: true, me: { isHost: true, seat: 1 }, players: [{ seat: 1, name: "房主", managementId: "m1" }, { seat: 2, name: "同名玩家", managementId: "m2" }, { seat: 3, name: "同名玩家", managementId: "m3" }] };
+}
+const chooseKick = p => p.kick({ currentTarget: { dataset: { seat: 2 } } });
+test("设置页移出需确认，取消无请求，进行中不打开选择列表", async () => {
+  const writes = [];
+  let prompt;
+  const p = page({ login: async () => {}, request: async (path, method, data) => {
+    if (method === "POST") writes.push(data);
+    return path === "/api/boards" ? { boards: BOARDS } : kickRoom();
+  } }, { showModal: options => { prompt = options; options.success({ confirm: false }); } });
+  await p.load();
+  p.openKick();
+  assert.equal(p.data.showKickPicker, true);
+  await chooseKick(p);
+  assert.match(prompt.content, /2号 · 同名玩家/);
+  assert.equal(prompt.confirmText, "移出");
+  assert.equal(writes.length, 0);
+  p.closeKick();
+  p.data.room.canKick = false;
+  p.openKick();
+  await chooseKick(p);
+  assert.equal(p.data.showKickPicker, false);
+  assert.equal(writes.length, 0);
+});
+test("移出请求丢失响应时重试原编号和成员，成功保留未保存设置", async () => {
+  let r = kickRoom(), dropped = true;
+  const writes = [];
+  const p = page({ login: async () => {}, requestId: () => "kick-request", request: async (path, method, data, id) => {
+    if (method === "POST") {
+      writes.push({ id, data });
+      r = { ...r, stage: "s2", players: r.players.filter(p => p.seat !== 2) };
+      if (dropped) { dropped = false; throw new Error("响应丢失"); }
+      return { accepted: true };
+    }
+    return path === "/api/boards" ? { boards: BOARDS } : r;
+  } });
+  await p.load();
+  p.toggleVisibility({ detail: { value: true } });
+  await chooseKick(p);
+  assert.equal(p.data.pendingKick, true);
+  p.openTransfer();
+  assert.equal(p.data.showTransferPicker, false);
+  await p.save();
+  assert.equal(writes.length, 1);
+  await p.sendKick();
+  assert.equal(p.data.pendingKick, false);
+  assert.equal(p.data.visible, true);
+  assert.equal(p.data.dirty, true);
+  assert.equal(p.data.transferPlayers.length, 1);
+  assert.deepEqual(writes[0], writes[1]);
+  assert.equal(writes[0].data.targetId, "m2");
+  assert.equal(writes[0].data.stage, "s1");
+});
+test("移出确认后房间变化时刷新列表，不自动重试新成员", async () => {
+  let r = kickRoom(), count = 0;
+  const p = page({ login: async () => {}, requestId: () => "kick-request", request: async (path, method) => {
+    if (method === "POST") { count++; r = { ...r, stage: "s2", phase: "tools", canKick: false }; throw Object.assign(new Error("状态变化"), { status: 409 }); }
+    return path === "/api/boards" ? { boards: BOARDS } : r;
+  } });
+  await p.load();
+  await chooseKick(p);
+  assert.equal(count, 1);
+  assert.equal(p.data.pendingKick, false);
+  assert.equal(p.data.room.canKick, false);
+  assert.match(p.data.error, /房间或座位已变化/);
+});

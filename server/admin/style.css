@@ -280,3 +280,67 @@ dialog::backdrop {
     justify-content: space-between;
   }
 }
+
+.room-picker-trigger {
+  width: min(100%, 320px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  border-color: var(--line);
+}
+.room-picker-trigger::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: 16px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+}
+#room-picker {
+  max-height: calc(100dvh - 32px);
+  box-shadow: 0 20px 64px #17243426;
+}
+#room-picker h2 {
+  margin: 0;
+}
+#room-picker-count {
+  font-size: 14px;
+  margin: 8px 0 20px;
+}
+.room-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  max-height: min(360px, 45dvh);
+  overflow-y: auto;
+  padding: 4px;
+}
+.room-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  text-align: left;
+  border-color: var(--line);
+  border-radius: 8px;
+}
+.room-option[aria-pressed="true"] {
+  background: #e9f1ed;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.room-option-title {
+  font-weight: 600;
+}
+.room-option-hint {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.room-picker-empty {
+  text-align: center;
+  padding: 24px 0;
+}

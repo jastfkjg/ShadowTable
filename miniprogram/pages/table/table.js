@@ -262,6 +262,13 @@ Page({
   },
   handleError(e) {
     this.mask();
+    if (e.status === 403 && e.message === "你已被房主移出房间") {
+      this.pending = null;
+      this.clearRoom();
+      this.setData({ notice: e.message, hasPendingRequest: false });
+      this.loadRooms().catch(error => this.handleError(error));
+      return;
+    }
     if (e.status === 429) {
       this.rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
       if (!this.pending && this.roomCode) {
@@ -329,7 +336,7 @@ Page({
       if (e.status === 404 || e.status === 403) {
         this.clearRoom();
         this.setData({
-          notice: e.status === 404 ? "牌桌已删除或不存在" : "你已离开这张牌桌",
+          notice: e.status === 404 ? "牌桌已删除或不存在" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
         await this.loadRooms();
         return;

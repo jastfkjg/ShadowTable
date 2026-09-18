@@ -6,7 +6,7 @@ const { newRoom, enter, command, publicView, BOARDS } = require("../server/engin
 
 function client(fetch) {
   let scheduled;
-  const element = { addEventListener() {}, hidden: true };
+  const element = { addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
     document: { hidden: false, getElementById: () => element, addEventListener() {} },
@@ -21,7 +21,8 @@ function client(fetch) {
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { state, schedule, loadSettings, refresh, viewRoom, viewHostBar,
+    window.test = { state, schedule, loadSettings, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+      setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
     };
@@ -111,4 +112,78 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   run("p1", "rematch");
   await c.refresh();
   assert.equal(c.state.latestResult, null);
+});
+
+
+test("网页移出失败可重试原请求，成功更新成员列表和保留设置草稿", async () => {
+  const r = newRoom("123456", "p1", "房主", "knights", 12);
+  enter(r, "p2", "玩家2");
+  let dropped = true;
+  const writes = [];
+  const c = client(async (path, options) => {
+    if (options.method === "POST") {
+      writes.push({ id: options.headers["Idempotency-Key"], data: JSON.parse(options.body) });
+      if (dropped) { dropped = false; throw new Error("断线"); }
+      command(r, "p1", writes[0].data);
+      return response({ accepted: true });
+    }
+    return response(path === "/api/boards" ? { boards: BOARDS } : publicView(r, "p1"));
+  });
+  c.setConfirm(async () => true);
+  c.state.room = publicView(r, "p1");
+  c.state.showRoomSettings = true;
+  c.state.settings = { busy: false };
+  await c.loadSettings();
+  Object.assign(c.state.settings, { dirty: true, visible: true });
+  await c.kickFromSettings(2);
+  assert.equal(c.state.settings.pendingKick, true);
+  assert.match(c.viewSettingsDialog(), /data-action="retryKick"/);
+  await c.sendKick();
+  assert.deepEqual(writes[0], writes[1]);
+  assert.equal(c.state.settings.pendingKick, false);
+  assert.equal(c.state.settings.dirty, true);
+  assert.equal(c.state.settings.visible, true);
+  assert.equal(c.state.settings.room.players.length, 1);
+});
+
+test("被移出时网页清空身份和房间并显示原因，设置中对局开始后禁用移出", async () => {
+  const c = client(async path => path === "/api/me/rooms" ? response({ rooms: [] }) : ({ status: 403, json: async () => ({ error: "你已被房主移出房间" }) }));
+  c.state.room = { code: "123456" };
+  c.state.secret = { role: "梅林" };
+  c.state.revealed = true;
+  await c.refresh();
+  assert.equal(c.state.room, null);
+  assert.equal(c.state.secret, null);
+  assert.equal(c.state.revealed, false);
+  assert.equal(c.state.notice, "你已被房主移出房间");
+  const r = newRoom("123456", "p1", "房主");
+  enter(r, "p2", "玩家");
+  const active = publicView(r, "p1");
+  active.canKick = false;
+  active.phase = "tools";
+  const host = client(async () => response(active));
+  host.state.showRoomSettings = true;
+  host.state.settings = { authorized: true, room: publicView(r, "p1"), boards: [], choices: [], capacities: [] };
+  await host.refresh();
+  assert.match(host.viewSettingsDialog(), /data-change="settingsKick" disabled/);
+  assert.match(host.viewSettingsDialog(), /对局进行中不能移出/);
+});
+
+
+test("旧服务缺少移出权限时提示更新服务，不误报对局进行中", async () => {
+  const r = newRoom("123456", "p1", "房主");
+  enter(r, "p2", "玩家");
+  const legacy = publicView(r, "p1");
+  delete legacy.canKick;
+  const c = client(async path => response(path === "/api/boards" ? { boards: BOARDS } : legacy));
+  c.state.showRoomSettings = true;
+  c.state.settings = { busy: false };
+  await c.loadSettings();
+  const html = c.viewSettingsDialog();
+  assert.match(html, /服务端尚未支持移出玩家/);
+  assert.doesNotMatch(html, /对局进行中不能移出玩家/);
+  assert.match(html, /data-change="settingsKick" disabled/);
+  legacy.canKick = true;
+  await c.loadSettings();
+  assert.doesNotMatch(c.viewSettingsDialog(), /data-change="settingsKick" disabled/);
 });

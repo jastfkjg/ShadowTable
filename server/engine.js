@@ -1,5 +1,5 @@
 "use strict";
-const { randomInt, randomUUID } = require("node:crypto");
+const { randomInt, randomUUID, createHash } = require("node:crypto");
 const variants = require("./variants");
 const knights = require("./knights");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "hunterTurn", "fairy"];
@@ -124,8 +124,21 @@ function shuffle(xs) {
 }
 function member(room, uid) {
   const p = room.players.find((p) => p.uid === uid);
-  requireRule(p, "你不在该房间", 403);
+  requireRule(
+    p,
+    room.removedPlayers?.includes(uid) ? "你已被房主移出房间" : "你不在该房间",
+    403,
+  );
   return p;
+}
+function managementId(room, player) {
+  // Old saved rooms have no membership token. Never expose account identifiers.
+  return (
+    player.membershipId ||
+    createHash("sha256")
+      .update(JSON.stringify([room.code, player.uid]))
+      .digest("hex")
+  );
 }
 function board(id, capacity) {
   const b = BOARDS.find((b) => b.id === id);
@@ -152,7 +165,15 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     phase: "lobby",
     stage: randomUUID(),
     game: 0,
-    players: [{ uid, name: nickname(name), seat: 1, ready: false }],
+    players: [
+      {
+        uid,
+        membershipId: randomUUID(),
+        name: nickname(name),
+        seat: 1,
+        ready: false,
+      },
+    ],
     history: [],
   };
 }
@@ -169,7 +190,15 @@ function enter(room, uid, name) {
   const seat = Array.from({ length: room.capacity }, (_, i) => i + 1).find(
     (s) => !room.players.some((p) => p.seat === s),
   );
-  room.players.push({ uid, name: nickname(name), seat, ready: false });
+  room.players.push({
+    uid,
+    membershipId: randomUUID(),
+    name: nickname(name),
+    seat,
+    ready: false,
+  });
+  if (room.removedPlayers)
+    room.removedPlayers = room.removedPlayers.filter((id) => id !== uid);
 }
 function stage(room, phase) {
   room.phase = phase;
@@ -1007,6 +1036,9 @@ function publicView(room, uid) {
         : null,
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
+    canKick:
+      room.host === uid &&
+      ["lobby", "ended", "terminated"].includes(room.phase),
     hasActiveOperation: hasActiveOperation(room),
     activity: room.activity
       ? {
@@ -1048,6 +1080,7 @@ function publicView(room, uid) {
     },
     players: room.players.map((p) => ({
       seat: p.seat,
+      ...(room.host === uid ? { managementId: managementId(room, p) } : {}),
       name: p.name,
       ready: p.ready,
       isHost: p.uid === room.host,
@@ -1109,6 +1142,7 @@ function command(room, uid, input) {
       "terminate",
       "rematch",
       "transfer",
+      "kick",
       "offline",
       "closeOffline",
       "beginActivity",
@@ -1258,6 +1292,28 @@ function command(room, uid, input) {
     room.flexible = true;
     room.activity = null;
     end(room, null, "房主已结束本局，以线下确认的胜负为准。");
+    return;
+  }
+  if (type === "kick") {
+    requireRule(
+      ["lobby", "ended", "terminated"].includes(room.phase),
+      "仅准备阶段或对局结束后可以移出玩家",
+      409,
+    );
+    requireRule(input.confirm === true, "请确认移出玩家");
+    const target = room.players.find((player) => player.seat === input.seat);
+    requireRule(
+      target && input.targetId === managementId(room, target),
+      "该座位玩家已变化，请刷新后重新选择",
+      409,
+    );
+    requireRule(target.uid !== room.host, "不能移出房主，请先移交房主");
+    room.removedPlayers = [
+      ...new Set([...(room.removedPlayers || []), target.uid]),
+    ];
+    room.players = room.players.filter((player) => player.uid !== target.uid);
+    // Revoke stale submissions and management confirmations without changing the result.
+    stage(room, room.phase);
     return;
   }
   if (type === "leave") {

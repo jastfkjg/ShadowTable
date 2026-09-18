@@ -331,3 +331,35 @@ test("同IP十二人正常轮询不互相限流，单账号仍限流并返回冷
     await a.close();
   }
 });
+
+test("HTTP移出成员撤销访问与房间列表，重试只执行一次且不影响重新加入", async () => {
+  const a = await launch();
+  try {
+    const [host, guest, other] = await users(a, 3);
+    const created = await a.req("/api/rooms", host, { name: "房主", board: "classic", capacity: 6 });
+    const path = "/api/rooms/" + created.data.code;
+    await a.req(path + "/join", guest, { name: "玩家" });
+    await a.req(path + "/join", other, { name: "玩家" });
+    const room = (await a.req(path, host)).data;
+    const input = { type: "kick", stage: room.stage, seat: 2, targetId: room.players[1].managementId, confirm: true };
+    assert.equal((await a.req(path + "/commands", other, input)).status, 403);
+    const id = randomUUID();
+    const results = await Promise.all([a.req(path + "/commands", host, input, id), a.req(path + "/commands", host, input, id)]);
+    assert.ok(results.every(r => r.status === 200));
+    assert.equal((await a.req(path, host)).data.players.length, 2);
+    for (const url of [path, path + "/private"]) {
+      const res = await a.req(url, guest);
+      assert.equal(res.status, 403);
+      assert.equal(res.data.error, "你已被房主移出房间");
+    }
+    assert.equal((await a.req("/api/me/rooms", guest)).data.rooms.length, 0);
+    assert.equal((await a.req(path + "/commands", guest, { type: "ready", stage: room.stage, ready: true })).status, 403);
+    assert.equal(a.store.get(created.data.code).players.length, 2);
+    assert.equal((await a.req(path + "/join", guest, { name: "重新加入" })).status, 200);
+    assert.equal((await a.req(path + "/commands", host, input, id)).status, 200);
+    assert.equal((await a.req(path, guest)).status, 200);
+    const current = (await a.req(path, host)).data;
+    assert.equal((await a.req(path + "/commands", host, { ...input, stage: current.stage })).status, 409);
+    assert.equal((await a.req(path, host)).data.players.length, 3);
+  } finally { await a.close(); }
+});

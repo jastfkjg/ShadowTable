@@ -8,12 +8,12 @@ const labels = {
   rematch: "同房重开",
   delete: "删除房间",
   login: "管理员登录",
-  actor: "创建陪测账号",
   companion: "陪测玩家",
   player: "玩家",
 };
 let auditOffset = 0;
 let auditCode = null;
+let auditRooms = [];
 let offset = 0,
   pending = null,
   loading = false;
@@ -47,21 +47,54 @@ function el(tag, text, cls) {
 function feedback(error) {
   $("feedback").textContent = error.message || error;
 }
+async function currentRoomCodes(page) {
+  const codes = page.rooms.map((room) => room.code);
+  for (let start = 0; start < page.total; start += 50) {
+    if (start === offset) continue;
+    const next = await api("rooms?offset=" + start);
+    codes.push(...next.rooms.map((room) => room.code));
+  }
+  return [...new Set(codes)].sort();
+}
+async function fetchAudit(code, start) {
+  const path = "audit?grouped=1&code=" + encodeURIComponent(code || "");
+  const result = await api(path + "&offset=" + start);
+  if (result.filtered) return result;
+  // Older running servers may still return account-creation events.
+  // Filter before local pagination so counts and page boundaries stay correct.
+  let groups = start === 0 ? [...result.groups] : [];
+  for (let cursor = 0; cursor < result.total; cursor += result.pageSize) {
+    if (cursor === start) {
+      if (start !== 0) groups.push(...result.groups);
+      continue;
+    }
+    const page = await api(path + "&offset=" + cursor);
+    groups.push(...page.groups);
+  }
+  groups = groups
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => entry.action !== "actor"),
+    }))
+    .filter((group) => group.entries.length);
+  return {
+    groups: groups.slice(start, start + result.pageSize),
+    total: groups.length,
+    pageSize: result.pageSize,
+  };
+}
 async function refresh() {
   if (loading) return;
   loading = true;
   $("refresh").disabled = true;
   $("audit-room").disabled = true;
   try {
-    let [{ rooms, total }, auditResult] = await Promise.all([
+    let [roomPage, auditResult] = await Promise.all([
       api("rooms?offset=" + offset),
-      api(
-        "audit?grouped=1&code=" +
-          encodeURIComponent(auditCode || "") +
-          "&offset=" +
-          auditOffset,
-      ),
+      fetchAudit(auditCode, auditOffset),
     ]);
+    const { rooms, total } = roomPage;
+    auditRooms = await currentRoomCodes(roomPage);
     showSession(true);
     $("count").textContent = `共 ${total} 个房间`;
     $("rooms").replaceChildren();
@@ -109,20 +142,14 @@ async function refresh() {
     $("prev").disabled = offset === 0;
     $("next").disabled = offset + 50 >= total;
     $("page").textContent = `第 ${offset / 50 + 1} 页`;
-    const codes = [
-      ...new Set([...rooms.map((room) => room.code), ...auditResult.rooms]),
-    ];
-    if (auditCode === null && codes.length) {
-      auditCode = codes[0];
-      auditResult = await api("audit?grouped=1&code=" + auditCode);
+    if (auditCode === null || (auditCode && !auditRooms.includes(auditCode))) {
+      auditCode = auditRooms[0] || "";
+      auditOffset = 0;
+      auditResult = await fetchAudit(auditCode, 0);
     }
-    $("audit-room").replaceChildren();
-    for (const code of ["", ...codes]) {
-      const option = el("option", code ? "房间 " + code : "平台操作（无房间）");
-      option.value = code;
-      $("audit-room").append(option);
-    }
-    $("audit-room").value = auditCode || "";
+    $("audit-room").textContent = auditCode
+      ? "房间 " + auditCode
+      : "平台操作（无房间）";
     renderAudit(auditResult);
     feedback("已更新 · " + new Date().toLocaleTimeString());
   } catch (error) {
@@ -147,7 +174,7 @@ function renderAudit({ groups, total, pageSize }) {
     const header = el("div", "", "audit-stage-heading");
     const title = d.phase
       ? `${d.phaseKey === "skillPrepare" ? "放技能阶段" : d.phase} · 第 ${d.game} 局${d.round ? " · 第 " + d.round + " 轮" : ""}`
-      : "管理操作";
+      : d.label || labels[entries[0].action] || "房间操作";
     header.append(
       el("h3", title),
       el("time", new Date(entries[0].created).toLocaleString()),
@@ -271,11 +298,46 @@ function appendAuditEntries(container, entries) {
     container.append(item);
   }
 }
-$("audit-room").addEventListener("change", () => {
-  auditCode = $("audit-room").value;
-  auditOffset = 0;
-  refresh();
+function renderRoomOptions() {
+  const query = $("room-search").value.trim();
+  const codes = auditRooms.filter((code) => code.includes(query));
+  $("room-picker-count").textContent = `共 ${auditRooms.length} 个现有房间`;
+  $("room-options").replaceChildren();
+  for (const code of [...(query ? [] : [""]), ...codes]) {
+    const button = el("button", "", "room-option");
+    button.setAttribute("aria-pressed", String(code === auditCode));
+    button.append(
+      el("span", code ? "房间 " + code : "平台操作", "room-option-title"),
+      el(
+        "span",
+        code === auditCode ? "已选择" : code ? "查看记录" : "无房间",
+        "room-option-hint",
+      ),
+    );
+    button.addEventListener("click", () => {
+      if (loading) return;
+      auditCode = code;
+      auditOffset = 0;
+      $("room-picker").close();
+      refresh();
+    });
+    $("room-options").append(button);
+  }
+  if (query && !codes.length)
+    $("room-options").append(
+      el("p", "没有匹配的现有房间", "room-picker-empty"),
+    );
+}
+$("audit-room").addEventListener("click", () => {
+  $("room-search").value = "";
+  renderRoomOptions();
+  $("room-picker").showModal();
+  $("room-search").focus();
 });
+$("room-search").addEventListener("input", renderRoomOptions);
+$("room-picker-close").addEventListener("click", () =>
+  $("room-picker").close(),
+);
 $("audit-prev").addEventListener("click", () => {
   if (loading) return;
   auditOffset = Math.max(0, auditOffset - 20);

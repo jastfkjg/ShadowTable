@@ -67,9 +67,14 @@
             按阶段汇总玩家操作，按座位查看具体选择；展开可查看时间和操作明细。仅管理员可见。
           </p>
           <label for="audit-room">选择房间</label>
-          <select id="audit-room">
-            <option value="">平台操作（无房间）</option>
-          </select>
+          <button
+            id="audit-room"
+            class="room-picker-trigger"
+            aria-haspopup="dialog"
+            aria-controls="room-picker"
+          >
+            平台操作（无房间）
+          </button>
           <div id="audit"></div>
           <div class="pager">
             <button id="audit-prev">上一页</button><span id="audit-page"></span
@@ -77,6 +82,22 @@
           </div>
         </section>
       </div>
+      <dialog id="room-picker" aria-labelledby="room-picker-title">
+        <div class="section-heading">
+          <h2 id="room-picker-title">选择房间</h2>
+          <button id="room-picker-close" aria-label="关闭房间选择">关闭</button>
+        </div>
+        <p id="room-picker-count"></p>
+        <label for="room-search">搜索房间号</label>
+        <input
+          id="room-search"
+          type="search"
+          inputmode="numeric"
+          placeholder="输入房间号"
+          autocomplete="off"
+        />
+        <div id="room-options" class="room-options"></div>
+      </dialog>
       <dialog id="confirm-dialog">
         <form id="action-form">
           <h2 id="action-title"></h2>

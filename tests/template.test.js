@@ -529,3 +529,24 @@ test("自动结算牌桌展示个人状态和持久结果，房主可结束等�
   assert.equal(byHandler(submitted, "openAction"), undefined);
   assert.ok(JSON.stringify(submitted).includes("已提交，等待其他玩家"));
 });
+
+test("房间设置仅在可移出阶段开放成员选择，对局中说明原因，待确认请求可重试", () => {
+  const renderSettings = factory("pages/settings/settings.wxml");
+  const data = { loading: false, authorized: true, room: { phase: "lobby", canKick: true }, transferPlayers: [{ seat: 2, name: "玩家2" }] };
+  assert.equal(byHandler(renderSettings(data), "openKick").attr.disabled, false);
+  const playing = renderSettings({ ...data, room: { phase: "tools", canKick: false } });
+  assert.equal(byHandler(playing, "openKick").attr.disabled, true);
+  assert.ok(JSON.stringify(playing).includes("对局进行中不能移出玩家"));
+  const legacy = renderSettings({ ...data, room: { phase: "lobby" } });
+  assert.equal(byHandler(legacy, "openKick").attr.disabled, true);
+  assert.ok(JSON.stringify(legacy).includes("服务端尚未支持移出玩家"));
+  assert.ok(!JSON.stringify(legacy).includes("对局进行中不能移出玩家"));
+  const picker = renderSettings({ ...data, showKickPicker: true });
+  assert.equal(byHandler(picker, "kick").attr["data-seat"], 2);
+  assert.ok(byHandler(picker, "closeKick"));
+  const pending = renderSettings({ ...data, pendingKick: true });
+  assert.equal(byHandler(pending, "openKick").attr.disabled, true);
+  assert.equal(byHandler(pending, "openTransfer").attr.disabled, true);
+  assert.ok(byHandler(pending, "sendKick"));
+  assert.equal(byHandler(renderSettings({ ...data, authorized: false }), "openKick"), undefined);
+});

@@ -180,3 +180,6 @@ switch {
   font-size: 28rpx;
   font-weight: 400;
 }
+
+button.kick-entry, .kick-label { color: var(--evil); }
+.kick-label { flex-shrink: 0; font-size: 28rpx; }

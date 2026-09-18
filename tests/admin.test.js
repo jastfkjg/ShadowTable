@@ -360,3 +360,42 @@ test("操作记录按房间分页，保存玩家操作快照，重试不重复�
     ),
   );
 });
+
+test("操作记录只列出现有房间，创建陪测账号不计入明细和分组分页", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code } = await a.room();
+  const other = await a.room();
+  await a.action(code, "test-on");
+  const insert = a.app.store.db.prepare(
+    "INSERT INTO admin_audit(action,code,reason,created) VALUES(?,?,'',1)",
+  );
+  for (let i = 0; i < 25; i++) insert.run("actor", code);
+  // A room without audit history must still be selectable.
+  a.app.store.db
+    .prepare("DELETE FROM admin_audit WHERE code=?")
+    .run(other.code);
+  const flat = await a.api(`/api/admin/audit?code=${code}`);
+  assert.ok(flat.entries.length > 0);
+  assert.ok(flat.entries.every((entry) => entry.action !== "actor"));
+  assert.equal(flat.total, flat.entries.length);
+  assert.ok(flat.rooms.includes(other.code));
+  const grouped = await a.api(`/api/admin/audit?grouped=1&code=${code}`);
+  assert.ok(
+    grouped.groups.every((group) =>
+      group.entries.every((entry) => entry.action !== "actor"),
+    ),
+  );
+  assert.equal(grouped.total, grouped.groups.length);
+  const next = await a.api(`/api/admin/audit?grouped=1&code=${code}&offset=20`);
+  assert.deepEqual(next.groups, []);
+  await a.action(code, "delete");
+  const remaining = await a.api("/api/admin/audit?grouped=1");
+  assert.ok(!remaining.rooms.includes(code));
+  assert.ok(remaining.rooms.includes(other.code));
+  assert.ok(
+    remaining.groups.every((group) =>
+      group.entries.every((entry) => entry.action !== "actor"),
+    ),
+  );
+});

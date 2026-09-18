@@ -267,6 +267,7 @@
   var actionDraftStage = null;
   var toolStage = null;
   var settingsOriginal = null;
+  var settingsKickPending = null;
 
   var state = {
     loading: true,
@@ -351,12 +352,13 @@
       toastEl.classList.remove("show");
     }, 1600);
   }
-  function confirm(title, content, showCancel) {
+  function confirm(title, content, showCancel, confirmLabel) {
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
       modalTitle.textContent = title;
       modalMessage.textContent = content;
+      modalOk.textContent = confirmLabel || "确定";
       modalCancel.hidden = showCancel === false;
       modal.hidden = false;
       (showCancel === false ? modalOk : modalCancel).focus();
@@ -419,6 +421,13 @@
   }
   function handleError(e) {
     mask();
+    if (e.status === 403 && e.message === "你已被房主移出房间") {
+      pending = null;
+      clearRoom();
+      setState({ notice: e.message, hasPendingRequest: false });
+      loadRooms().catch(handleError);
+      return;
+    }
     if (e.status === 429) {
       rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
       if (!pending && roomCode) {
@@ -580,7 +589,7 @@
       if (e.status === 404 || e.status === 403) {
         clearRoom();
         setState({
-          notice: e.status === 404 ? "牌桌已删除或不存在" : "你已离开这张牌桌",
+          notice: e.status === 404 ? "牌桌已删除或不存在" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
         await loadRooms();
         return;
@@ -732,6 +741,8 @@
     };
     patch.teamText = room.team.join("、") || "尚未选择";
     if (!room.me.isHost || stageChanged) patch.toolType = "";
+    if (state.settings && state.settings.authorized && state.settings.room?.code === room.code)
+      state.settings.room = room;
     if (state.settings && !room.me.isHost) {
       state.settings.authorized = false;
       state.settings.error = "房主已变更，你不再拥有管理权限。";
@@ -1497,6 +1508,7 @@
       boardId: "",
       visible: false,
       dirty: false,
+      pendingKick: !!settingsKickPending && settingsKickPending.code === roomCode,
     };
   }
   function toggleRoomSettings() {
@@ -1596,7 +1608,7 @@
   }
   async function settingsSave() {
     var s = state.settings;
-    if (!s || s.busy || !s.authorized || !s.dirty) return;
+    if (!s || s.busy || s.pendingKick || !s.authorized || !s.dirty) return;
     if (s.visible && !settingsOriginal.showSkillDetails) {
       var ok = await confirm(
         "公开技能过程？",
@@ -1639,14 +1651,61 @@
   }
   async function settingsBack() {
     var s = state.settings;
-    if (s && s.dirty) {
-      if (!(await confirm("返回牌桌？", "未保存的修改将放弃。"))) return;
+    if (s && (s.dirty || s.pendingKick)) {
+      if (!(await confirm("返回牌桌？", s.pendingKick ? "移出结果尚未确认，请重新进入房间设置重试确认。" : "未保存的修改将放弃。"))) return;
     }
     closeSettings();
   }
+  async function kickFromSettings(seat) {
+    var s = state.settings;
+    if (!s || s.busy || s.pendingKick || !s.authorized || !s.room || !s.room.canKick || state.busy || pending) return;
+    var target = s.room.players.find(function (p) { return p.seat === seat && p.seat !== s.room.me.seat; });
+    if (!target) return;
+    var code = roomCode;
+    var data = { type: "kick", stage: s.room.stage, seat: seat, targetId: target.managementId, confirm: true };
+    setSettings({ busy: true });
+    var ok = await confirm("移出玩家？", "将 " + seat + "号 · " + target.name + " 移出房间，其他玩家和已有对局记录保留。准备阶段可凭房间码重新加入。", true, "移出");
+    if (state.settings !== s) return;
+    setSettings({ busy: false });
+    if (!ok || !alive || !foreground || code !== roomCode) return;
+    settingsKickPending = { id: requestId(), data: data, code: code };
+    return sendKick();
+  }
+  async function sendKick() {
+    var s = state.settings;
+    var requestData = settingsKickPending;
+    if (!s || s.busy || !requestData || requestData.code !== roomCode) return;
+    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible } : null;
+    setSettings({ busy: true, pendingKick: true, error: "" });
+    try {
+      await login();
+      await request("/api/rooms/" + requestData.code + "/commands", "POST", requestData.data, requestData.id);
+      settingsKickPending = null;
+      if (!alive || state.settings !== s) return;
+      setSettings({ busy: false, pendingKick: false });
+      await loadSettings();
+      if (state.settings === s && s.authorized && draft) {
+        setSettings({ visible: draft.visible });
+        updateSettingsChoices(draft.capacity, draft.boardId);
+      }
+      if (foreground) toast("玩家已移出");
+      await refresh();
+    } catch (e) {
+      if (e.status && e.status < 500 && e.status !== 401 && e.status !== 429) settingsKickPending = null;
+      if (!alive || state.settings !== s) return;
+      setSettings({ error: e.message, pendingKick: !!settingsKickPending, authorized: e.status === 403 ? false : s.authorized });
+      if (e.status === 409) {
+        setSettings({ busy: false });
+        await loadSettings();
+        setSettings({ error: "房间或座位已变化，已刷新，请重新选择要移出的玩家。" });
+      }
+    } finally {
+      if (alive && state.settings === s) setSettings({ busy: false });
+    }
+  }
   async function transferFromSettings(seat) {
     var s = state.settings;
-    if (!s || s.busy || !s.authorized || !s.room || state.busy || pending)
+    if (!s || s.busy || s.pendingKick || !s.authorized || !s.room || state.busy || pending)
       return;
     var target = s.room.players.filter(function (p) {
       return p.seat === seat && p.seat !== s.room.me.seat;
@@ -2458,8 +2517,8 @@
         '<div class="settings-error">' +
         esc(s.error) +
         '</div><div class="dialog-actions">' +
-        btn("secondary", "retrySettings", "重新加载") +
-        btn("secondary", "settingsBack", "返回牌桌") +
+        (s.pendingKick ? btn("secondary", "retryKick", "重试确认移出结果", null, s.busy) : btn("secondary", "retrySettings", "重新加载")) +
+        btn("secondary", "settingsBack", "返回牌桌", null, s.busy) +
         "</div>";
     else if (s.authorized && s.room) {
       var room = s.room;
@@ -2471,13 +2530,13 @@
         '</div><div class="muted">' +
         room.capacity +
         "人 · " +
-        (room.phase === "lobby" ? "准备中" : "已发牌") +
+        (room.phase === "lobby" ? "准备中" : room.phase === "ended" ? "本局已结束" : room.phase === "terminated" ? "本局已终止" : "对局进行中") +
         "</div></div>";
       html += '<div class="settings-section-title">房间配置</div><div class="settings-section">';
       if (room.phase === "lobby") {
         html +=
           '<div class="settings-row"><span>人数</span><select class="settings-select" data-change="settingsCapacity"' +
-          (s.busy ? " disabled" : "") +
+          (s.busy || s.pendingKick ? " disabled" : "") +
           ">";
         for (var i = 0; i < s.capacities.length; i++)
           html +=
@@ -2491,7 +2550,7 @@
         html += "</select></div>";
         html +=
           '<div class="settings-row"><span>板子</span><select class="settings-select" data-change="settingsBoard"' +
-          (s.busy ? " disabled" : "") +
+          (s.busy || s.pendingKick ? " disabled" : "") +
           ">";
         for (var j = 0; j < s.choices.length; j++)
           html +=
@@ -2524,27 +2583,34 @@
           "</span></span>" +
           '<input type="checkbox" data-change="settingsVisibility"' +
           (s.visible ? " checked" : "") +
-          (s.busy ? " disabled" : "") +
+          (s.busy || s.pendingKick ? " disabled" : "") +
           ' /></div></div><div class="settings-help">开启后公开出手人、目标等过程。最终出局和复活结果始终公示，新身份仅本人可见。</div>';
       }
       var transfers = room.players.filter(function (p) {
         return p.seat !== room.me.seat;
       });
       html += '<div class="transfer-entry"><select class="secondary" data-change="settingsTransfer"' +
-        (s.busy || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移交房主</option>';
+        (s.busy || s.pendingKick || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移交房主</option>';
       transfers.forEach(function (player) {
         html += '<option value="' + player.seat + '">' + player.seat + '号 · ' + esc(player.name) + '</option>';
       });
       html += '</select><div class="settings-help">' +
         (transfers.length ? "任意阶段均可移交，新房主立即接管流程。" : "其他玩家入座后可移交房主。") + '</div></div>';
+      html += '<div class="transfer-entry"><select class="secondary kick-entry" data-change="settingsKick"' +
+        (s.busy || s.pendingKick || !room.canKick || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移出玩家</option>';
+      transfers.forEach(function (player) {
+        html += '<option value="' + player.seat + '">' + player.seat + '号 · ' + esc(player.name) + '</option>';
+      });
+      html += '</select><div class="settings-help">' + (typeof room.canKick !== "boolean" ? "服务端尚未支持移出玩家，请重启服务并刷新页面。" : !room.canKick ? "对局进行中不能移出玩家，请在本局结束后操作。" : transfers.length ? "选择玩家后需确认，其他成员和对局记录保留。" : "暂无可移出的玩家。") + '</div></div>';
+      if (s.pendingKick) html += btn("secondary", "retryKick", "重试确认移出结果", null, s.busy);
       html +=
         '<div class="settings-footer">' +
         btn(
           "primary",
           "settingsSave",
-          s.busy ? "正在保存…" : s.dirty ? "保存设置" : "设置已保存",
+          s.busy ? (s.pendingKick ? "正在移出…" : "正在处理…") : s.dirty ? "保存设置" : "设置已保存",
           null,
-          s.busy || !s.dirty,
+          s.busy || s.pendingKick || !s.dirty,
         ) +
         btn("text-button", "settingsBack", "返回牌桌", null, s.busy) +
         "</div>";
@@ -2562,14 +2628,14 @@
   function enhanceSelects(root) {
     root.querySelectorAll("select[data-change]").forEach(function (select) {
       var key = select.dataset.change;
-      var label = key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子";
+      var label = key === "settingsKick" ? "要移出的玩家" : key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子";
       var trigger = document.createElement("button");
       trigger.type = "button";
       trigger.className = select.className + " option-trigger";
       trigger.dataset.optionTrigger = key;
       trigger.disabled = select.disabled || state.busy;
       trigger.setAttribute("aria-haspopup", "dialog");
-      trigger.setAttribute("aria-label", key === "settingsTransfer" ? "移交房主" : label + "：" + (select.selectedOptions[0] || {}).textContent);
+      trigger.setAttribute("aria-label", key === "settingsKick" ? "移出玩家" : key === "settingsTransfer" ? "移交房主" : label + "：" + (select.selectedOptions[0] || {}).textContent);
       trigger.textContent = (select.selectedOptions[0] || {}).textContent || "请选择";
       select.hidden = true;
       select.after(trigger);
@@ -2609,7 +2675,7 @@
           if (!current || current.disabled || state.busy) return;
           current.value = option.value;
           CHANGES[key](current);
-          if (key === "settingsTransfer") current.value = "";
+          if (key === "settingsTransfer" || key === "settingsKick") current.value = "";
           var trigger = app.querySelector('[data-option-trigger="' + key + '"]');
           if (modal.hidden && trigger) trigger.focus();
         }, { once: true });
@@ -2850,11 +2916,13 @@
     retrySettings: loadSettings,
     settingsSave: settingsSave,
     settingsBack: settingsBack,
+    retryKick: sendKick,
     transferFromSettings: function (el) {
       transferFromSettings(Number(el.dataset.seat));
     },
   };
   var CHANGES = {
+    settingsKick: function (el) { kickFromSettings(Number(el.value)); },
     settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },
     entryCapacity: function (el) {
       if (state.busy) return;
@@ -2898,7 +2966,7 @@
     if (picker && !picker.disabled) {
       var key = picker.dataset.optionTrigger;
       var select = app.querySelector('select[data-change="' + key + '"]');
-      if (select) openOptions(select, key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子");
+      if (select) openOptions(select, key === "settingsKick" ? "要移出的玩家" : key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子");
       return;
     }
     var t = e.target.closest("[data-action]");
