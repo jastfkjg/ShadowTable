@@ -585,6 +585,7 @@ function privateView(room, uid) {
     game: room.game,
     stage: room.stage,
     identityRevision: identityRevision(room, uid),
+    skillStatus: room.knights ? knights.skillStatus(room, uid) : null,
     passiveVision: !!room.knights && role === "prophet",
     fairyResult: room.knights?.players[uid].fairyInfo
       ? {
@@ -901,6 +902,7 @@ function closeWaitingPolicy(room) {
   if (room.phase === "teamVote")
     return {
       mode: "abstain",
+      label: "未交者记弃权并结算",
       title: "提前截止投票？",
       description:
         "未提交者记为弃权；赞成票仍需超过本次全部有投票资格玩家的一半才通过。已提交的票不会更改。",
@@ -908,12 +910,14 @@ function closeWaitingPolicy(room) {
   if (["skillPrepare", "skillTurn", "hunterTurn"].includes(room.phase))
     return {
       mode: "pass",
+      label: "未交者跳过技能",
       title: "结束本阶段等待？",
       description:
         "本阶段未提交者按不使用技能／确认处理，不额外消耗技能次数；已提交的行动照常结算。后续如有追加行动，仍会等待新的提交。",
     };
   return {
     mode: "cancel",
+    label: room.phase === "quest" ? "作废本次任务" : room.phase === "fairy" ? "作废本次查验" : "作废本次操作",
     title: "作废本次操作并结束等待？",
     description:
       room.phase === "quest"
@@ -1027,7 +1031,9 @@ function publicView(room, uid) {
                 : "已提交，等待其他玩家"
               : "本次你无需操作",
             detail:
-              room.phase === "offlineFinal"
+              room.phase === "hunterTurn"
+                ? "进入追加技能确认，上一阶段提交已完成。所有玩家均需再次操作；没有可用行动时请选择确认，收齐后继续结算。"
+                : room.phase === "offlineFinal"
                 ? "等待线下处理完成，由房主记录。"
                 : room.flexible
                   ? "参与者全部提交后自动结算；下一项由房主发起。"

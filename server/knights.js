@@ -64,6 +64,27 @@ function eligible(room, uid) {
   const p = room.knights.players[uid];
   return p.alive && !p.used && p.availableRound <= room.knights.round;
 }
+// Private, caller-only status; never include this in public room state.
+function skillStatus(room, uid) {
+  const k = room.knights, p = k.players[uid], role = room.roles[uid];
+  if (["ended", "terminated"].includes(room.phase))
+    return { title: "本局已结束", detail: "本局不再使用技能。" };
+  if (room.phase === "hunterTurn" && k.hunters[0] === uid)
+    return { title: "可使用出局技能", detail: "本次可选择开枪目标，或选择不使用技能。" };
+  if (!p.alive)
+    return { title: "已出局", detail: "当前不能主动使用技能；仍需参与统一确认。" };
+  if (role === "prophet")
+    return { title: "被动视野", detail: "技能全部结算后自动更新，无需主动释放。" };
+  if (!skillRoles.includes(role))
+    return { title: "无主动技能", detail: "本身份没有技能阶段的主动动作，按提示确认即可。" };
+  if (p.used)
+    return { title: "技能已用完", detail: "当前身份的技能次数已消耗，按提示确认即可。" };
+  if (p.availableRound > k.round)
+    return { title: "新技能尚未启用", detail: "下一技能周期可用，本次按提示确认即可。" };
+  if (hunters.includes(role))
+    return { title: "等待出局触发", detail: "出局后按规则获得开枪机会；替女巫出局不触发。" };
+  return { title: "技能可用", detail: "可在技能提交阶段选择使用；守护、替死、换号按各自触发规则消耗。" };
+}
 function action(room, uid) {
   const k = room.knights,
     p = k.players[uid],
@@ -462,6 +483,7 @@ function updateNight(room, allRoles) {
   k.nightRound = k.round;
 }
 module.exports = {
+  skillStatus,
   updateNight,
   init,
   side,

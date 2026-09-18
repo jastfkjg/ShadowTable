@@ -20,6 +20,7 @@
       <view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view>
       <view class="muted">{{identityChange.faction}}</view>
       <view class="private-info">{{identityChange.information}}</view>
+<view wx:if="{{identityChange.skillStatus}}" class="private-info"><view class="label">技能状态 · {{identityChange.skillStatus.title}}</view>{{identityChange.skillStatus.detail}}</view>
       <button class="primary" bindtap="acknowledgeIdentity" disabled="{{busy}}">记住了，遮盖身份</button>
     </block>
     <block wx:else>
@@ -58,9 +59,11 @@
           <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
           <view class="muted">{{actionSecret.faction}}</view>
           <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
+<view wx:if="{{actionSecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{actionSecret.skillStatus.title}}</view>{{actionSecret.skillStatus.detail}}</view>
         </view>
         <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && !actionSecret}}" disabled="{{busy || !network}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
+      <view wx:if="{{room.phase==='hunterTurn'}}" class="small muted">{{room.operationStatus.detail}}</view>
       <view class="action-choice-list">
         <button wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>
@@ -205,6 +208,7 @@
         <view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view>
         <text class="muted">{{secret.faction}}</text>
         <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
+<view wx:if="{{secret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{secret.skillStatus.title}}</view>{{secret.skillStatus.detail}}</view>
         <button class="secondary" bindtap="reveal" disabled="{{busy || !network}}">立即遮盖</button>
       </view>
     </block>
@@ -359,7 +363,7 @@
     <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
       <view class="host-action-bar-inner">
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
-        <button wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{busy || !network}}">结束等待</button>
+        <button wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
         <button wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>
         <button wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{busy}}">作废</button>
       </view>

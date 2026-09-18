@@ -102,7 +102,7 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   const html = c.viewRoom();
   assert.match(html, /最近操作结果/);
   assert.match(html, /本次你无需操作/);
-  assert.match(c.viewHostBar(), /结束等待/);
+  assert.match(c.viewHostBar(), /作废本次任务/);
   assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
   assert.ok(!c.viewHostBar().includes('data-action="cancelTool"'));
   run("p2", "submit", { value: "success" });

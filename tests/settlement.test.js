@@ -346,3 +346,41 @@ test("必选目标行动提前结束时不代选也不公开已提交的秘密�
   assert.equal(room.history[0].target, undefined);
   assert.equal(room.history[0].hit, undefined);
 });
+
+
+test("本人技能状态随技能资格变化，其他玩家与房主公共响应不泄露", () => {
+  const room = knightsRoom();
+  room.roles.p2 = "blueGuard";
+  const state = room.knights.players.p2;
+  const before = JSON.stringify(publicView(room, "p1"));
+  assert.equal(privateView(room, "p2").skillStatus.title, "技能可用");
+  state.used = true;
+  assert.equal(privateView(room, "p2").skillStatus.title, "技能已用完");
+  assert.equal(JSON.stringify(publicView(room, "p1")), before);
+  assert.equal(privateView(room, "p1").skillStatus.title, "无主动技能");
+  state.used = false;
+  state.availableRound = room.knights.round + 1;
+  assert.equal(privateView(room, "p2").skillStatus.title, "新技能尚未启用");
+  begin(room, "skills");
+  submitAll(room);
+  begin(room, "skills");
+  assert.equal(privateView(room, "p2").skillStatus.title, "技能可用");
+});
+
+test("猎人追加说明全员一致，私密技能状态仅提示当前猎人开枪", () => {
+  const room = knightsRoom();
+  room.roles.p1 = "blueAwakened";
+  room.roles.p2 = "blueHunter";
+  begin(room, "skills");
+  submitAll(room, { p1: "target:2" });
+  assert.equal(room.phase, "hunterTurn");
+  assert.equal(privateView(room, "p2").skillStatus.title, "可使用出局技能");
+  assert.equal(privateView(room, "p3").skillStatus.title, "无主动技能");
+  const detail = publicView(room, "p1").operationStatus.detail;
+  assert.match(detail, /上一阶段提交已完成/);
+  for (const p of room.players) {
+    assert.equal(publicView(room, p.uid).operationStatus.detail, detail);
+    assert.ok(privateView(room, p.uid).action);
+  }
+  assert.equal(publicView(room, "p1").closeWaiting.label, "未交者跳过技能");
+});

@@ -66,10 +66,12 @@ test("WXML私密卡被遮盖时不把角色和行动渲染到树，非房主无�
     role: "梅林",
     faction: "好人阵营",
     information: "坏人2号",
+    skillStatus: { title: "技能已用完", detail: "私密技能原因" },
     action: { label: "选择任务牌" },
   };
   const hidden = render({ ...base, room, secret });
   assert.ok(!JSON.stringify(hidden).includes("梅林"));
+  assert.ok(!JSON.stringify(hidden).includes("私密技能原因"));
   assert.equal(byHandler(hidden, "advance"), undefined);
   assert.equal(byHandler(hidden, "submitChoice"), undefined);
   const shown = render({
@@ -80,6 +82,7 @@ test("WXML私密卡被遮盖时不把角色和行动渲染到树，非房主无�
     choiceButtons: [{ value: "success", label: "任务成功" }],
   });
   assert.ok(JSON.stringify(shown).includes("梅林"));
+  assert.ok(JSON.stringify(shown).includes("私密技能原因"));
   assert.equal(byHandler(shown, "submitChoice"), undefined);
   const submitted = render({
     ...base,

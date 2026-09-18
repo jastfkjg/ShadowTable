@@ -1166,6 +1166,7 @@
             faction: secret.faction,
             factionTone: factionTone(secret.faction),
             information: secret.information,
+            skillStatus: secret.skillStatus,
           },
         });
       }
@@ -1823,6 +1824,7 @@
           '</div><div class="private-info">' +
           esc(ic.information) +
           "</div>" +
+          viewSkillStatus(ic) +
           btn("primary", "acknowledgeIdentity", "记住了，遮盖身份", null, state.busy)
         : '<div class="private-info muted">身份已遮盖，请确认周围无人查看。</div>' +
           btn("primary", "revealChangedIdentity", "查看新身份", null, state.busy)) +
@@ -1883,6 +1885,11 @@
       "</div></div></div>"
     );
   }
+  function viewSkillStatus(secret) {
+    if (!secret || !secret.skillStatus) return "";
+    return '<div class="private-info"><div class="label">技能状态 · ' +
+      esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>';
+  }
   function viewActionDialog() {
     var r = state.room;
     if (
@@ -1911,7 +1918,7 @@
           esc(s.faction) +
           '</div><div class="private-info"><div class="label">你的视角</div>' +
           esc(s.information) +
-          "</div></div>";
+          "</div>" + viewSkillStatus(s) + "</div>";
       }
       html +=
         btn(
@@ -1923,6 +1930,7 @@
         ) +
         "</div>";
     }
+    if (r.phase === "hunterTurn") html += '<div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "进入追加技能确认，上一阶段提交已完成。") + '</div>';
     html += '<div class="action-choice-list">';
     for (var i = 0; i < state.actionChoices.length; i++) {
       var c = state.actionChoices[i];
@@ -2230,6 +2238,7 @@
             ? '<span class="label">' + esc(state.secret.outcome) + "</span>"
             : "") +
           "</div>" +
+          viewSkillStatus(state.secret) +
           btn("secondary", "reveal", "立即遮盖", null, state.busy || !state.network) +
           "</div>";
     }
@@ -2490,7 +2499,7 @@
     if (!r.canUseTools || !r.hasActiveOperation || r.phase === "offlineFinal")
       return "";
     if (r.closeWaiting) return '<div class="host-action-bar"><div class="host-action-bar-inner"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
-      btn("secondary bar-cancel bar-cutoff", "closeWaiting", "结束等待", null, state.busy || !state.network) +
+      btn("secondary bar-cancel bar-cutoff", "closeWaiting", r.closeWaiting.label || "结束等待", null, state.busy || !state.network) +
       (r.closeWaiting.mode !== "cancel" ? btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy || !state.network) : "") + '</div></div>';
     return (
       '<div class="host-action-bar"><div class="host-action-bar-inner">' +

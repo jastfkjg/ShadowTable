@@ -1172,6 +1172,7 @@ Page({
             faction: secret.faction,
             factionTone: factionTone(secret.faction),
             information: secret.information,
+            skillStatus: secret.skillStatus,
           },
         });
       }
