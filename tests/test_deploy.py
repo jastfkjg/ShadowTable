@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -51,9 +52,18 @@ with open(os.environ['CALLS'] + '.curl', 'a') as f: f.write(' '.join(sys.argv[1:
 if os.environ.get('FAIL_MODE') == 'public': sys.exit(7)
 print('{"ok": true}')
 ''',
+            # GNU readlink -f succeeds when only the final component is missing.
+            # Model the Linux deployment host even when tests run on macOS.
+            'readlink': '''#!/usr/bin/env python3
+from pathlib import Path
+import sys
+print(Path(sys.argv[-1]).resolve())
+''',
             'flock': '#!/bin/sh\nexit 0\n',
             'sleep': '#!/bin/sh\nexit 0\n',
         }
+        if sys.platform.startswith("linux"):
+            del stubs["readlink"]  # Exercise the real GNU utility in CI.
         for name, code in stubs.items():
             file = bin_dir / name
             file.write_text(code)
@@ -125,8 +135,25 @@ print('{"ok": true}')
         result, calls = self.run_deploy('startup')
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.home / 'current').exists())
-        self.assertEqual(sum('stop' in c for c in calls), 2)
+        self.assertIn('No previous container release', result.stderr)
+        self.assertEqual(sum('stop' in c for c in calls), 2, result.stderr)
         self.assertFalse(any('up' in c and any('/old/' in a for a in c) for c in calls))
+
+    def test_first_deployment_success_promotes_without_previous(self):
+        (self.home / 'current').unlink()
+        result, calls = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.home / 'current').resolve(), self.release)
+        self.assertFalse((self.home / 'previous').exists())
+        self.assertTrue(any('up' in c for c in calls))
+
+    def test_dangling_current_rejected_before_downtime(self):
+        (self.home / 'current').unlink()
+        (self.home / 'current').symlink_to(self.home / 'releases/missing')
+        result, calls = self.run_deploy()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Legacy release detected', result.stderr)
+        self.assertFalse(any('stop' in c for c in calls))
 
     def test_legacy_release_rejected_before_downtime(self):
         (self.old / 'compose.yaml').unlink()

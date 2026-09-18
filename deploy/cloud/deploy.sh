@@ -15,7 +15,12 @@ origin=$(compose config --format json | python3 "$release/validate_config.py")
 compose pull
 # Verify persistent directory permissions using the actual container user.
 compose run --rm --no-deps -T app node -e "const fs=require('node:fs');fs.accessSync('/data',fs.constants.R_OK|fs.constants.W_OK)"
-previous=$(readlink -f /opt/shadowtable/current 2>/dev/null || true)
+# GNU readlink -f may return a path even when its final component is absent.
+# An absent current is a first deployment; a dangling link is invalid state.
+previous=""
+if [[ -e /opt/shadowtable/current || -L /opt/shadowtable/current ]]; then
+    previous=$(readlink -f /opt/shadowtable/current)
+fi
 if [[ -n "$previous" && ! -f "$previous/compose.yaml" ]]; then
     echo 'Legacy release detected. Complete the documented systemd migration first.' >&2
     exit 1
