@@ -36,6 +36,7 @@ Page({
         wx.setNavigationBarTitle({ title: board.name });
         this.setData({
           title: board.name,
+          titleHasCapacity: /[（(]\d+人[）)]/.test(board.name),
           capacity: this.capacity,
           summary: detail ? detail.summary : "",
           sections: detail ? detail.sections : [],
@@ -58,6 +59,24 @@ Page({
   retry() {
     this.setData({ loading: true, error: "" });
     this.load();
+  },
+  toggleRole(e) {
+    const section = Number(e.currentTarget.dataset.section);
+    const role = Number(e.currentTarget.dataset.role);
+    const item = this.data.sections[section]?.items[role];
+    if (item?.brief) this.setData({ [`sections[${section}].items[${role}].expanded`]: !item.expanded });
+  },
+  jumpSection(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    if (!Number.isInteger(index) || !this.data.sections[index]) return;
+    const query = wx.createSelectorQuery();
+    query.select(".detail-sticky").boundingClientRect();
+    query.select("#detail-section-" + index).boundingClientRect();
+    query.selectViewport().scrollOffset();
+    query.exec(([header, section, viewport]) => {
+      if (this.alive && header && section && viewport)
+        wx.pageScrollTo({ scrollTop: viewport.scrollTop + section.top - header.height - 16, duration: 0 });
+    });
   },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();

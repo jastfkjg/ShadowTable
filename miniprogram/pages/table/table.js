@@ -578,7 +578,7 @@ Page({
     const target = this.data.memberRooms.find(
       (r) => r.code === e.currentTarget.dataset.code,
     );
-    if (target?.isHost && target.seat === null) {
+    if (target?.isHost && target.seat === null && !target.isMember) {
       if (!this.data.name.trim()) {
         this.setData({
           code: target.code,
@@ -803,10 +803,13 @@ Page({
         after,
       );
   },
-  seat(e) {
+  async seat(e) {
     const seat = Number(e.currentTarget.dataset.seat),
       r = this.data.room;
     if (r.phase === "lobby") {
+      if (seat === r.me.seat) {
+        return this.confirmCommand("站起围观？", "站起后释放座位并取消准备，你仍留在房间，可点击空位重新坐下。", "stand");
+      }
       if (!this.data.seats.find((s) => s.seat === seat).occupied)
         this.cmd("seat", { seat });
     } else if (r.phase === "proposal" && r.leader === r.me.seat) {

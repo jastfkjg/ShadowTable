@@ -1,3 +1,9 @@
+<view class="detail-sticky">
+  <view class="detail-toolbar"><text>板子详情</text><button class="detail-close" bindtap="back">返回牌桌</button></view>
+  <scroll-view wx:if="{{hasDetail}}" scroll-x class="detail-nav">
+    <button wx:for="{{sections}}" wx:key="title" class="detail-nav-item" bindtap="jumpSection" data-index="{{index}}">{{item.navTitle || item.title}}</button>
+  </scroll-view>
+</view>
 <view class="page board-detail-page">
   <view wx:if="{{loading}}" class="muted">正在加载板子详情…</view>
   <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
@@ -7,20 +13,27 @@
   </block>
   <block wx:if="{{!loading && !error}}">
     <view class="detail-header">
-      <view class="detail-title">{{title}} <text class="detail-capacity muted">{{capacity}}人</text></view>
+      <view class="detail-title">{{title}} <text wx:if="{{!titleHasCapacity}}" class="detail-capacity muted">{{capacity}}人</text></view>
       <view wx:if="{{summary}}" class="detail-summary">{{summary}}</view>
     </view>
     <block wx:if="{{hasDetail}}">
-      <block wx:for="{{sections}}" wx:key="title" wx:for-item="sec">
-        <view class="detail-section-title">{{sec.title}}</view>
+      <block wx:for="{{sections}}" wx:key="title" wx:for-item="sec" wx:for-index="secIndex">
+        <view id="detail-section-{{secIndex}}" class="detail-section-title"><text class="detail-section-number">{{secIndex+1}}.</text>{{sec.title}}</view>
         <block wx:if="{{sec.kind === 'roles'}}">
           <view class="role-list">
             <view wx:for="{{sec.items}}" wx:key="name" wx:for-item="role" class="role-card">
+              <block wx:if="{{role.brief}}">
+                <button class="role-quick-toggle" bindtap="toggleRole" data-section="{{secIndex}}" data-role="{{index}}" aria-expanded="{{role.expanded || false}}">
+                  <text class="role-quick-name tone-{{role.tone}}">{{role.name}}</text><text class="role-quick-brief">{{role.brief}}</text><text class="role-quick-arrow">{{role.expanded?'−':'+'}}</text>
+                </button>
+                <view wx:if="{{role.expanded}}" class="role-quick-detail">{{role.text}}</view>
+              </block>
+              <block wx:else>
               <view class="role-card-heading">
-                <text class="role-card-name">{{role.name}}</text>
-                <text wx:if="{{role.meta}}" class="role-card-meta tone-{{role.tone}}">{{role.meta}}</text>
+                <text class="role-card-name tone-{{role.tone}}">{{role.name}}</text>
               </view>
               <view class="role-card-text">{{role.text}}</view>
+              </block>
             </view>
           </view>
         </block>

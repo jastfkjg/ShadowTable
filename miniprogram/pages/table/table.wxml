@@ -167,7 +167,7 @@
       <button class="copy-room" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}">
         <text>房间 {{room.code}}</text><text class="copy-label">复制</text>
       </button>
-      <text class="summary-seat">你在 {{room.me.seat}} 号</text>
+      <text wx:if="{{room.me.seat!==null}}" class="summary-seat">你在 {{room.me.seat}} 号</text>
     </view>
     <view class="row subline room-subline">
       <view class="room-board-info">
@@ -201,7 +201,7 @@
         <text wx:if="{{room.leader}}">队长 {{room.leader}} 号 · 连续否决 {{room.rejects}} / 5</text>
       </view>
     </view>
-    <block wx:if="{{room.phase!=='lobby'}}">
+    <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <button wx:if="{{!revealed}}" class="identity-compact" bindtap="reveal" disabled="{{busy || !network}}" aria-label="查看我的身份">
         <text>我的身份</text><text class="identity-compact-action">查看 ›</text>
       </button>
@@ -226,7 +226,7 @@
       <view class="panel"
         >
         <text class="muted small">{{startHint}}</text>
-        <button class="primary" bindtap="ready" disabled="{{busy}}">
+        <button wx:if="{{room.me.seat!==null}}" class="primary" bindtap="ready" disabled="{{busy}}">
           {{room.me.ready?'取消准备':'我准备好了'}}</button
         ><button
           wx:if="{{room.me.isHost}}"
@@ -241,7 +241,7 @@
     <view class="section-title"
       >座位
       <text class="small muted"
-        >{{room.phase==='lobby'?'点空位换座':'金色为队员，「你」为自己'}}</text
+        >{{room.phase==='lobby'?'点自己站起，点空位坐下':'金色为队员，「你」为自己'}}</text
       ></view
     >
     <view class="seats"
@@ -252,7 +252,7 @@
         data-seat="{{item.seat}}"
         aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')}}"
         bindtap="seat"
-        disabled="{{busy || (room.phase==='lobby'?item.occupied:!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
+        disabled="{{busy || (room.phase==='lobby'?(item.occupied && !item.mine):!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
       >
         <view class="seat-number"
           >{{item.seat}}<text class="seat-flag"
@@ -270,6 +270,7 @@
       </button>
     </block>
     <block wx:else>
+      <button wx:if="{{room.me.seat===null && !room.me.isHost}}" class="leave-button" bindtap="leave" disabled="{{busy}}">离开房间</button>
       <view wx:if="{{room.phase==='proposal' && !room.canUseTools && !room.flexible}}" class="panel"
         ><view class="label">本轮需要 {{room.teamSize}} 人</view
         ><text class="muted"

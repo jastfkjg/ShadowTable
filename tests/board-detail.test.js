@@ -89,14 +89,14 @@ test("板子详情回归：可用板子仍保留角色配置，十二骑士技�
       "十二骑士的角色技能未按 A/B 牌堆与阵营分组",
     );
     assert.ok(
-      roleSections[0].title.includes("A牌") &&
+      roleSections[0].title.includes("B牌") &&
         roleSections[0].title.includes("好人"),
-      "角色技能首组应为 A牌好人",
+      "角色技能首组应为 B牌好人",
     );
     assert.ok(
-      roleSections[roleSections.length - 1].title.includes("B牌") &&
-        roleSections[roleSections.length - 1].title.includes("坏人"),
-      "角色技能末组应为 B牌坏人",
+      roleSections[1].title.includes("B牌") &&
+        roleSections[1].title.includes("坏人"),
+      "角色技能第二组应为 B牌坏人",
     );
     const cards = roleSections.flatMap((s) => s.items);
     assert.ok(cards.length >= 10, "十二骑士技能卡少于 10 张");
@@ -181,10 +181,7 @@ test("/api/boards 提供 knights-10 板子与详情，A牌描述与技能卡均�
         .every((i) => !i.name.includes("兰斯洛特")),
       "knights-10 技能卡仍含兰斯洛特",
     );
-    const team = board.detail.sections
-      .find((s) => s.title === "组队与表决")
-      .items[0];
-    assert.ok(team.includes("3 / 4 / 4 / 5 / 5"), "knights-10 任务人数表应为10人标准");
+    assert.ok(!board.detail.sections.some(s => ["组队与表决", "目标与胜负"].includes(s.title)), "复杂板不展示基础规则");
     assert.equal(
       data.boards.find((b) => b.id === "knights").counts[0],
       12,
@@ -283,11 +280,19 @@ test("/api/boards 提供 knights-11 板子与详情，A牌描述点明梅林视�
       cards.find((i) => i.name === "蓝刀客 · 兰斯洛特").text.includes("梅林视为坏人"),
       "蓝兰斯洛特卡未说明梅林视野",
     );
-    const team = board.detail.sections
-      .find((s) => s.title === "组队与表决")
-      .items[0];
-    assert.ok(team.includes("3 / 4 / 5 / 6 / 6"), "knights-11 任务人数表应为11人标准");
+    assert.ok(!board.detail.sections.some(s => ["组队与表决", "目标与胜负"].includes(s.title)), "复杂板不展示基础规则");
   } finally {
     await a.close();
+  }
+});
+ test("骑士技能速查覆盖全部12张B牌，保留完整技能与提前起刀特例", () => {
+  const details = require("../server/board-info");
+  for (const id of ["knights", "knights-10", "knights-11"]) {
+    const sections = details[id].sections;
+    const cards = sections.slice(0, 2).flatMap(s => s.items);
+    assert.equal(cards.length, 12);
+    assert.ok(cards.every(c => c.brief && c.text.length > c.brief.length));
+    assert.ok(sections.find(s => s.title === "补充约定").items.some(t => t.includes("提前起刀")));
+    assert.ok(!sections.some(s => ["目标与胜负", "组队与表决"].includes(s.title)));
   }
 });

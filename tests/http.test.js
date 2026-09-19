@@ -205,6 +205,7 @@ test("我的房间列表只返回本人成员关系，无他人房间、身份�
         "seat",
         "testRoom",
         "isHost",
+        "isMember",
       ].sort(),
     );
     assert.deepEqual((await a.req("/api/me/rooms", outsider)).data.rooms, []);
@@ -361,5 +362,33 @@ test("HTTP移出成员撤销访问与房间列表，重试只执行一次且不�
     const current = (await a.req(path, host)).data;
     assert.equal((await a.req(path + "/commands", host, { ...input, stage: current.stage })).status, 409);
     assert.equal((await a.req(path, host)).data.players.length, 3);
+  } finally { await a.close(); }
+});
+
+test("围观成员可恢复房间，抢同一空位只成功一人，重复站起请求幂等", async () => {
+  const a = await launch();
+  try {
+    const [host, first, second] = await users(a, 3);
+    const code = (await a.req("/api/rooms", host, { name: "房主" })).data.code;
+    const path = "/api/rooms/" + code;
+    await a.req(path + "/join", first, { name: "甲" });
+    await a.req(path + "/join", second, { name: "乙" });
+    const stage = (await a.req(path, host)).data.stage;
+    const id = randomUUID();
+    const stand = { type: "stand", stage };
+    assert.equal((await a.req(path + "/commands", first, stand, id)).status, 200);
+    assert.equal((await a.req(path + "/commands", first, stand, id)).status, 200);
+    assert.equal((await a.req(path + "/commands", second, stand)).status, 200);
+    const summaries = (await a.req("/api/me/rooms", first)).data.rooms;
+    assert.equal(summaries[0].seat, null);
+    assert.equal(summaries[0].isMember, true);
+    const results = await Promise.all([first, second].map(token =>
+      a.req(path + "/commands", token, { type: "seat", seat: 2, stage })));
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+    const view = (await a.req(path, host)).data;
+    assert.equal(view.players.filter(p => p.seat === 2).length, 1);
+    const loser = results[0].status === 409 ? first : second;
+    assert.equal((await a.req(path, loser)).data.me.seat, null);
+    assert.equal((await a.req(path + "/private", loser)).status, 403);
   } finally { await a.close(); }
 });

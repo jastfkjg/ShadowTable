@@ -1188,3 +1188,23 @@ test("圣骑士追加复活与猎人自爆均二次确认，取消或阶段变�
     assert.equal(writes.length, 1);
   }
 });
+
+test("小程序点自己的座位确认站起，点空位坐下，点他人不换座", async () => {
+  const p = page({});
+  p.data.room = { code: "123456", phase: "lobby", stage: "s", me: { seat: 1 } };
+  p.data.seats = [{ seat: 1, occupied: true }, { seat: 2, occupied: false }, { seat: 3, occupied: true }];
+  const calls = [];
+  p.cmd = (type, extra) => calls.push({ type, extra });
+  p.confirm = async () => false;
+  await p.seat({ currentTarget: { dataset: { seat: 1 } } });
+  assert.equal(calls.length, 0);
+  p.confirm = async () => true;
+  await p.seat({ currentTarget: { dataset: { seat: 1 } } });
+  assert.equal(calls[0].type, "stand");
+  p.data.room.me.seat = null;
+  await p.seat({ currentTarget: { dataset: { seat: 2 } } });
+  assert.equal(calls[1].type, "seat");
+  assert.equal(calls[1].extra.seat, 2);
+  await p.seat({ currentTarget: { dataset: { seat: 3 } } });
+  assert.equal(calls.length, 2);
+});

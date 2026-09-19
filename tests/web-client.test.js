@@ -187,3 +187,26 @@ test("旧服务缺少移出权限时提示更新服务，不误报对局进行�
   await c.loadSettings();
   assert.doesNotMatch(c.viewSettingsDialog(), /data-change="settingsKick" disabled/);
 });
+
+test("网页围观不显示准备或私密身份，自己的座位可点击站起", () => {
+  const r = newRoom("123456", "host", "房主");
+  const c = client();
+  c.state.room = publicView(r, "host");
+  c.state.seats = [{ seat: 1, name: "房主", mine: true, occupied: true }];
+  let html = c.viewRoom();
+  assert.match(html, /点自己站起/);
+  assert.match(html, /data-action="seat" data-seat="1">/);
+  command(r, "host", { type: "stand", stage: r.stage });
+  c.state.room = publicView(r, "host");
+  html = c.viewRoom();
+  assert.doesNotMatch(html, /data-action="ready"/);
+  assert.doesNotMatch(html, /你在 null/);
+  for (let i = 1; i <= 6; i++) {
+    enter(r, `p${i}`, `玩家${i}`);
+    command(r, `p${i}`, { type: "ready", ready: true, stage: r.stage });
+  }
+  command(r, "host", { type: "start", stage: r.stage, flexible: true });
+  c.state.room = publicView(r, "host");
+  html = c.viewRoom();
+  assert.doesNotMatch(html, /查看我的身份|data-action="reveal"/);
+});

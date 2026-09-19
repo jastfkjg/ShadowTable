@@ -143,7 +143,8 @@ function shuffle(xs) {
   return xs;
 }
 function member(room, uid) {
-  const p = room.players.find((p) => p.uid === uid);
+  const p = room.players.find((p) => p.uid === uid) ||
+    room.spectators?.find((p) => p.uid === uid);
   requireRule(
     p,
     room.removedPlayers?.includes(uid) ? "你已被房主移出房间" : "你不在该房间",
@@ -198,25 +199,20 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
   };
 }
 function enter(room, uid, name) {
-  if (room.players.some((p) => p.uid === uid)) return;
+  if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid)) return;
   requireRule(room.phase === "lobby", "游戏已开始，无法加入");
-  requireRule(room.players.length < room.capacity, "房间已满");
-  requireRule(
-    uid === room.host ||
-      room.players.some((p) => p.uid === room.host) ||
-      room.players.length < room.capacity - 1,
-    "请为未入座的房主保留一个座位",
-  );
   const seat = Array.from({ length: room.capacity }, (_, i) => i + 1).find(
     (s) => !room.players.some((p) => p.seat === s),
-  );
-  room.players.push({
+  ) ?? null;
+  const player = {
     uid,
     membershipId: randomUUID(),
     name: nickname(name),
     seat,
     ready: false,
-  });
+  };
+  if (seat === null) (room.spectators ||= []).push(player);
+  else room.players.push(player);
   if (room.removedPlayers)
     room.removedPlayers = room.removedPlayers.filter((id) => id !== uid);
 }
@@ -411,6 +407,7 @@ function knightKnifeAllowed(room, uid) {
 }
 function actionSpec(room, uid) {
   const p = member(room, uid);
+  if (p.seat === null) return null;
   if (room.knights && KNIGHT_PHASES.includes(room.phase))
     return knights.action(room, uid);
   if (
@@ -477,7 +474,7 @@ function actionSpec(room, uid) {
   }
 }
 function privateView(room, uid) {
-  member(room, uid);
+  requireRule(member(room, uid).seat !== null, "围观玩家没有身份", 403);
   requireRule(room.roles && room.phase !== "lobby", "身份尚未分配");
   const role = room.roles[uid],
     name = ROLES[role][0],
@@ -607,7 +604,7 @@ function privateView(room, uid) {
     identityRevision: identityRevision(room, uid),
     skillStatus: room.knights ? knights.skillStatus(room, uid) : null,
     passiveVision: !!room.knights && role === "prophet",
-    fairyResult: room.knights?.players[uid].fairyInfo
+    fairyResult: room.knights?.players[uid]?.fairyInfo
       ? {
           revision: room.knights.players[uid].fairyRevision || 1,
           information: room.knights.players[uid].fairyInfo,
@@ -980,7 +977,8 @@ function phaseName(room) {
     : PHASES[room.phase];
 }
 function roomSummary(room, uid) {
-  const p = room.players.find((p) => p.uid === uid);
+  const p = room.players.find((p) => p.uid === uid) ||
+    room.spectators?.find((p) => p.uid === uid);
   requireRule(p || room.host === uid, "你不在该房间", 403);
   return {
     code: room.code,
@@ -990,6 +988,7 @@ function roomSummary(room, uid) {
     phaseName: phaseName(room),
     game: room.game,
     seat: p?.seat ?? null,
+    isMember: !!p,
     isHost: room.host === uid,
   };
 }
@@ -1099,12 +1098,12 @@ function publicView(room, uid) {
       submitted: Object.hasOwn(room.submissions || {}, uid),
       identityRevision: identityRevision(room, uid),
       fairyResultPending:
-        !!room.knights?.players[uid].fairyInfo &&
+        !!room.knights?.players[uid]?.fairyInfo &&
         (room.knights.players[uid].fairyRevision || 1) >
           (room.knights.players[uid].fairyAcknowledged || 0),
       identityChanged:
         identityRevision(room, uid) >
-        (room.knights?.players[uid].identityAcknowledged || 0),
+        (room.knights?.players[uid]?.identityAcknowledged || 0),
     },
     players: room.players.map((p) => ({
       seat: p.seat,
@@ -1139,7 +1138,7 @@ function publicView(room, uid) {
     ),
     result: room.result || null,
     proposalSubmitted: !!room.proposalSubmitted,
-    needsSubmission: room.flexible
+    needsSubmission: p.seat !== null && (room.flexible
       ? !!actionSpec(room, uid)
       : [
           "identity",
@@ -1147,7 +1146,7 @@ function publicView(room, uid) {
           "quest",
           "assassination",
           "reverseStrike",
-        ].includes(room.phase),
+        ].includes(room.phase)),
     canAdvance:
       room.host === uid &&
       (room.flexible
@@ -1344,9 +1343,19 @@ function command(room, uid, input) {
     stage(room, room.phase);
     return;
   }
+  if (type === "stand") {
+    requireRule(room.phase === "lobby", "对局中不可站起");
+    requireRule(p.seat !== null, "你已在围观");
+    room.players = room.players.filter((player) => player.uid !== uid);
+    p.seat = null;
+    p.ready = false;
+    (room.spectators ||= []).push(p);
+    return;
+  }
   if (type === "leave") {
-    requireRule(room.phase === "lobby", "对局中不可离开座位，请联系房主终止");
+    requireRule(room.phase === "lobby" || (p.seat === null && uid !== room.host), "对局中不可离开座位，请联系房主终止");
     room.players = room.players.filter((p) => p.uid !== uid);
+    room.spectators = (room.spectators || []).filter((p) => p.uid !== uid);
     return;
   }
   if (type === "transfer") {
@@ -1371,11 +1380,16 @@ function command(room, uid, input) {
       "座位已被占用",
       409,
     );
+    if (p.seat === null) {
+      room.spectators = room.spectators.filter((player) => player.uid !== uid);
+      room.players.push(p);
+    }
     p.seat = input.seat;
     p.ready = false;
     return;
   }
   if (type === "ready") {
+    requireRule(p.seat !== null, "请先入座再准备");
     requireRule(room.phase === "lobby", "当前不能准备");
     requireRule(typeof input.ready === "boolean", "准备状态无效");
     p.ready = input.ready;

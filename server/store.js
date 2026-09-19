@@ -44,10 +44,11 @@ class Store {
       .prepare(
         `SELECT state FROM rooms
       WHERE json_extract(state, '$.host') = ? OR EXISTS (SELECT 1 FROM json_each(rooms.state, '$.players')
+        WHERE json_extract(value, '$.uid') = ?) OR EXISTS (SELECT 1 FROM json_each(rooms.state, '$.spectators')
         WHERE json_extract(value, '$.uid') = ?)
       ORDER BY code`,
       )
-      .all(uid, uid)
+      .all(uid, uid, uid)
       .map((row) => JSON.parse(row.state));
   }
   save(room) {

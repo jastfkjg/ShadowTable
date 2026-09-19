@@ -901,7 +901,7 @@
     var target = state.memberRooms.filter(function (r) {
       return r.code === code;
     })[0];
-    if (target && target.isHost && target.seat === null) {
+    if (target && target.isHost && target.seat === null && !target.isMember) {
       if (!(state.name || "").trim()) {
         setState({ code: target.code, entryMode: "join", error: "请填写昵称后重新入座" });
         return;
@@ -975,7 +975,9 @@
       var s = state.seats.filter(function (x) {
         return x.seat === seatNum;
       })[0];
-      if (s && !s.occupied) cmd("seat", { seat: seatNum });
+      if (s && s.mine) {
+        confirmCommand("站起围观？", "站起后释放座位并取消准备，你仍留在房间，可点击空位重新坐下。", "stand");
+      } else if (s && !s.occupied) cmd("seat", { seat: seatNum });
     } else if (r.phase === "proposal" && r.leader === r.me.seat) {
       var selected =
         state.selected.indexOf(seatNum) !== -1
@@ -1788,7 +1790,7 @@
   function seatDisabled(s) {
     var r = state.room;
     if (state.busy) return true;
-    if (r.phase === "lobby") return s.occupied;
+    if (r.phase === "lobby") return s.occupied && !s.mine;
     return !(
       r.phase === "proposal" &&
       !r.flexible &&
@@ -2176,7 +2178,7 @@
       esc(r.code) +
       '</span><span class="copy-label">复制</span></button><div class="summary-right">' +
       '<button type="button" class="copy-label room-invite" data-action="copyInviteLink">邀请链接</button><span class="summary-seat">' +
-      (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "未入座") +
+      (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "") +
       "</span></div></div>";
     html +=
       '<div class="row subline room-subline"><div class="room-board-info">' +
@@ -2224,7 +2226,7 @@
           "</div>"
         : "") +
       "</div>";
-    if (r.phase !== "lobby") {
+    if (r.phase !== "lobby" && r.me.seat !== null) {
       if (!state.revealed)
         html +=
           '<button type="button" class="identity-compact" data-action="reveal"' +
@@ -2264,7 +2266,7 @@
         '<div class="panel"><span class="muted small">' +
         esc(state.startHint) +
         "</span>" +
-        btn("primary", "ready", r.me.ready ? "取消准备" : "我准备好了", null, state.busy) +
+        (r.me.seat !== null ? btn("primary", "ready", r.me.ready ? "取消准备" : "我准备好了", null, state.busy) : "") +
         (r.me.isHost
           ? btn("secondary", "start", "发放身份", null, state.busy || !state.network || !state.canStart)
           : "") +
@@ -2272,7 +2274,7 @@
     }
     html +=
       '<div class="section-title">座位<span class="small muted">' +
-      (r.phase === "lobby" ? "点空位换座" : "金色为队员，「你」为自己") +
+      (r.phase === "lobby" ? "点自己站起，点空位坐下" : "金色为队员，「你」为自己") +
       "</span></div>" +
       '<div class="seats">';
     for (var i = 0; i < state.seats.length; i++) {
@@ -2301,6 +2303,8 @@
     if (r.phase === "lobby") {
       html += btn("leave-button", "leave", "离开房间", null, state.busy);
     } else {
+      if (r.me.seat === null && !r.me.isHost)
+        html += btn("leave-button", "leave", "离开房间", null, state.busy);
       if (r.phase === "proposal" && !r.canUseTools && !r.flexible)
         html +=
           '<div class="panel"><div class="label">本轮需要 ' +
@@ -2638,36 +2642,51 @@
     html += "</div></div>";
     return html;
   }
+  function detailText(text) {
+    var split = text.indexOf("：");
+    return split > 0 && split <= 24
+      ? "<strong>" + esc(text.slice(0, split)) + "</strong>：" + esc(text.slice(split + 1))
+      : esc(text);
+  }
   function viewBoardDetails() {
     if (!state.showBoardDetails) return "";
     var b = state.boardDetail;
     var html =
-      '<div class="dialog-backdrop"><div class="board-detail-dialog" role="dialog" aria-modal="true">' +
-      '<div class="dialog-title">板子详情</div>';
+      '<div class="dialog-backdrop"><div class="board-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="board-detail-title">' +
+      '<header class="detail-toolbar"><div id="board-detail-title">板子详情</div>' +
+      btn("detail-close", "closeBoardDetails", "关闭 ×") + "</header>";
+    if (b && b.detail) {
+      html += '<nav class="detail-nav" aria-label="章节目录">' + b.detail.sections.map(function (sec, index) {
+        return btn("detail-nav-item", "jumpBoardSection", sec.navTitle || sec.title, { value: index });
+      }).join("") + "</nav>";
+    }
+    html += '<div class="detail-scroll" tabindex="0" aria-label="板子规则正文">';
     if (b)
       html +=
         '<div class="detail-board-name">' +
         esc(b.name) +
-        ' <span class="detail-capacity muted">· ' +
-        b.capacity +
-        '人</span></div>' +
+        (/[（(]\d+人[）)]/.test(b.name) ? "" : ' <span class="detail-capacity muted">· ' + b.capacity + '人</span>') + '</div>' +
         (b.detail ? '<div class="detail-summary">' + esc(b.detail.summary) + "</div>" : "");
     if (b && b.detail) {
-      b.detail.sections.forEach(function (sec) {
-        html += '<div class="detail-section-title">' + esc(sec.title) + "</div>";
+      b.detail.sections.forEach(function (sec, index) {
+        html += '<section class="detail-section" id="board-section-' + index + '"><h2 class="detail-section-title"><span class="detail-section-number">' + String(index + 1).padStart(2, "0") + "</span>" + esc(sec.title) + "</h2>";
         if (sec.kind === "roles") {
           html +=
             '<div class="role-grid">' +
             sec.items
-              .map(function (role) {
+              .map(function (role, roleIndex) {
+                if (role.brief) {
+                  var key = index + ":" + roleIndex;
+                  var expanded = !!(state.expandedBoardRoles || {})[key];
+                  return '<div class="role-quick"><button type="button" class="role-quick-toggle" data-action="toggleBoardRole" data-value="' + key + '" aria-expanded="' + expanded + '"><span class="role-quick-name tone-' + esc(role.tone || "") + '">' + esc(role.name) + '</span><span class="role-quick-brief">' + esc(role.brief) + '</span><span class="role-quick-arrow" aria-hidden="true">' + (expanded ? "−" : "+") + "</span></button>" + (expanded ? '<div class="role-quick-detail">' + detailText(role.text) + "</div>" : "") + "</div>";
+                }
                 return (
-                  '<div class="role-card"><div class="role-card-heading"><span class="role-card-name">' +
+                  '<div class="role-card"><div class="role-card-heading"><span class="role-card-name tone-' + esc(role.tone || "") + '">' +
                   esc(role.name) +
                   "</span>" +
-                  (role.meta ? '<span class="role-card-meta' + (role.tone ? " tone-" + role.tone : "") + '">' + esc(role.meta) + "</span>" : "") +
                   "</div>" +
                   '<div class="role-card-text">' +
-                  esc(role.text) +
+                  detailText(role.text) +
                   "</div></div>"
                 );
               })
@@ -2676,16 +2695,17 @@
         } else if (sec.kind === "blocks") {
           html += sec.items
             .map(function (blk) {
-              return '<div class="detail-block">' + esc(blk) + "</div>";
+              return '<div class="detail-block">' + detailText(blk) + "</div>";
             })
             .join("");
         } else {
           html += sec.items
             .map(function (line) {
-              return '<div class="detail-line">' + esc(line) + "</div>";
+              return '<div class="detail-line">' + detailText(line) + "</div>";
             })
             .join("");
         }
+        html += "</section>";
       });
     } else {
       html +=
@@ -2702,7 +2722,7 @@
     html +=
       '<div class="dialog-actions">' +
       btn("primary", "closeBoardDetails", "知道了") +
-      "</div></div></div>";
+      "</div></div></div></div>";
     return html;
   }
   // Keep option selection in a themed, keyboard-accessible modal above settings.
@@ -2945,6 +2965,7 @@
       });
       setState({
         showBoardDetails: true,
+        expandedBoardRoles: {},
         showRoomRules: false,
         boardDetail: board
           ? {
@@ -2958,9 +2979,23 @@
             }
           : null,
       });
+      var close = app.querySelector('[data-action="closeBoardDetails"]');
+      if (close) close.focus();
+    },
+    toggleBoardRole: function (el) {
+      var expanded = Object.assign({}, state.expandedBoardRoles || {});
+      expanded[el.dataset.value] = !expanded[el.dataset.value];
+      setState({ expandedBoardRoles: expanded });
+    },
+    jumpBoardSection: function (el) {
+      var target = document.getElementById("board-section-" + Number(el.dataset.value));
+      var scroll = app.querySelector(".detail-scroll");
+      if (target && scroll) scroll.scrollTop += target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 16;
     },
     closeBoardDetails: function () {
       setState({ showBoardDetails: false, boardDetail: null });
+      var trigger = app.querySelector('[data-action="openRoomRules"]');
+      if (trigger) trigger.focus();
     },
     toggleRoomSettings: toggleRoomSettings,
     seat: function (el) {
@@ -3119,6 +3154,20 @@
     render();
   });
 
+  document.addEventListener("keydown", function (event) {
+    if (!state.showBoardDetails || !modal.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      ACTIONS.closeBoardDetails();
+    } else if (event.key === "Tab") {
+      var dialog = app.querySelector(".board-detail-dialog");
+      if (!dialog) return;
+      var controls = Array.from(dialog.querySelectorAll('button:not(:disabled), [tabindex="0"]'));
+      var first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
   // ===== boot =====
   var codeMatch = /(?:\?|&)code=(\d{6})/.exec(location.search || "");
   if (codeMatch) inviteCode = codeMatch[1];

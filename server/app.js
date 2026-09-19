@@ -262,7 +262,7 @@ function createApp({
         } else {
           room = store.get(match[1]);
           check(room, "房间不存在", 404);
-          if (room.players.some((p) => p.uid === uid))
+          if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid))
             details = actionDetails(
               room,
               uid,

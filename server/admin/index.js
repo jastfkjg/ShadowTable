@@ -283,6 +283,7 @@ function createAdmin({ store, origin, key, body, limit }) {
               room.host = humans[0].uid;
             }
             room.players = humans;
+            room.spectators = (room.spectators || []).filter((p) => !p.uid.startsWith("test:"));
             // Invalidate all credentials, including actors not seated yet.
             store.db
               .prepare("DELETE FROM sessions WHERE uid LIKE ?")
@@ -292,7 +293,7 @@ function createAdmin({ store, origin, key, body, limit }) {
             fail(room.phase === "lobby", "仅准备阶段可以更改测试标记", 409);
             fail(
               b.action !== "test-off" ||
-                !room.players.some((p) => p.uid.startsWith("test:")),
+                ![...room.players, ...(room.spectators || [])].some((p) => p.uid.startsWith("test:")),
               "请先清空陪测玩家",
               409,
             );

@@ -12,10 +12,11 @@ const labels = {
   beginActivity: "发起操作",
   cancelActivity: "作废当前操作",
   finishTools: "结束本局",
-  leave: "离开座位",
+  leave: "离开房间",
   transfer: "转交房主",
   kick: "移出玩家",
-  seat: "更换座位",
+  seat: "入座或换座",
+  stand: "站起围观",
   ready: "准备",
   configure: "修改板子",
   start: "开始对局",
@@ -38,7 +39,7 @@ const values = {
 };
 // Snapshot only review-relevant fields; never persist credentials or arbitrary request fields.
 function actionDetails(room, uid, type, input) {
-  const player = room.players.find((p) => p.uid === uid);
+  const player = [...room.players, ...(room.spectators || [])].find((p) => p.uid === uid);
   const spec = type === "submit" && player ? actionSpec(room, uid) : null;
   const details = {
     player: player

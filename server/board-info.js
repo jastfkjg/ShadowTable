@@ -444,6 +444,44 @@ module.exports["knights-11"] = (() => {
     sections,
   };
 })();
+// 扩展板优先查技能；完整技能保留在展开说明中。
+module.exports["classic-11"].sections = module.exports["classic-11"].sections
+  .filter(sec => sec.title !== "组队与任务")
+  .map(sec => sec.title === "目标与胜负"
+    ? { ...sec, title: "逆仆结算", items: sec.items.slice(1) }
+    : sec);
+const skillBriefs = {
+  "圣骑士": "复活本轮出局的 1 人；不能救自己或女巫替死者。",
+  "魔术师": "秘密交换两人号码；参与攻击结算才消耗。",
+  "月下先知": "每轮技能全部结算后，查看在场 B 牌坏人。",
+  "觉醒蓝刀客": "攻击 1 人，按 A 刀规则结算；下轮启用。",
+  "觉醒红刀客": "攻击 1 人，按 A 刀规则结算；下轮启用。",
+  "蓝骑士": "决斗 1 人：同阵营或莫德雷德使自己出局，否则对方出局。",
+  "红骑士": "决斗 1 人：同阵营或莫德雷德使自己出局，否则对方出局。",
+  "蓝守卫": "守护 1 人，可守自己；挡一刀才消耗。",
+  "红守卫": "守护 1 人，可守自己；挡一刀才消耗。",
+  "蓝猎人": "自爆开枪或出局后开枪，共用一次；替女巫死不触发被动枪。",
+  "红猎人": "自爆开枪或出局后开枪，共用一次；替女巫死不触发被动枪。",
+  "女巫": "指定 1 人替死，可选自己；替死可被守护，不触发被动枪。",
+};
+for (const id of ["knights", "knights-10", "knights-11"]) {
+  const detail = module.exports[id];
+  const specialKnife = detail.sections.find(s => s.title === "目标与胜负").items[2];
+  detail.sections.find(s => s.title === "补充约定").items.push(specialKnife);
+  const kept = detail.sections.filter(s => !["目标与胜负", "组队与表决"].includes(s.title));
+  detail.sections = [
+    ...kept.filter(s => s.kind === "roles" && s.title.includes("B牌")),
+    ...kept.filter(s => s.kind === "roles" && s.title.includes("A牌")),
+    ...kept.filter(s => s.kind !== "roles"),
+  ];
+  detail.summary = "B 牌技能速查 · 点角色展开完整规则。新抽身份从下一轮技能环节启用。";
+  for (const sec of detail.sections) {
+    sec.navTitle = sec.title.replace("角色技能 · ", "").replace("（好人）", "").replace("（坏人）", "");
+    if (sec.kind === "roles")
+      for (const role of sec.items)
+        if (skillBriefs[role.name]) role.brief = skillBriefs[role.name];
+  }
+}
 // 阵营徽标色调：roles 卡按 meta 推导 tone（渲染器可选用，不影响通用文本渲染）。
 for (const board of Object.values(module.exports)) {
   for (const sec of board.sections) {
