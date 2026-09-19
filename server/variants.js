@@ -68,6 +68,21 @@ const decks = {
     "mordred",
     "morgana",
   ],
+  // 十二骑士 11 人局：A 牌去掉红兰斯洛特（7 蓝 4 红共 11 张），
+  // 蓝兰斯洛特被梅林视为坏人；其余规则与 12 人局一致。
+  "knights-11": [
+    "merlin",
+    "percival",
+    "servant",
+    "servant",
+    "gareth",
+    "gaheris",
+    "blueLancelot",
+    "redSwordsman",
+    "assassin",
+    "mordred",
+    "morgana",
+  ],
 };
 function chaosQuest(values, threshold) {
   const counts = Object.fromEntries(

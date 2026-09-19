@@ -401,6 +401,49 @@ module.exports["knights-10"] = (() => {
     sections,
   };
 })();
+// 十二骑士 11 人局由 12 人局内容派生：A 牌去掉红兰斯洛特（7 蓝 4 红共 11 张），
+// 蓝兰斯洛特被梅林视为坏人；组队任务人数按服务端 TEAMS[11]（3/4/5/6/6）改写。
+module.exports["knights-11"] = (() => {
+  const base = module.exports.knights;
+  const sections = base.sections.map((sec) => {
+    if (sec.title === "AB 牌堆与身份构成")
+      return {
+        title: sec.title,
+        kind: "blocks",
+        items: [
+          "A 牌 11 张（初始身份）：蓝方 7 张——蓝刀客×3（加雷斯、加赫雷斯、蓝兰斯洛特）、忠臣×2、派西维尔、梅林；红方 4 张——红刀客·奥伯伦、刺客、莫德雷德、莫甘娜。11 人局无红兰斯洛特；蓝兰斯洛特被梅林视为坏人。",
+          "B 牌 12 张：蓝方 7 张、红方 5 张，分 3 层混洗——先 2 红 2 蓝，再 2 红 3 蓝，最后 1 红 2 蓝；与 12 人局完全一致。",
+        ],
+      };
+    if (sec.title === "组队与表决")
+      return {
+        ...sec,
+        items: [
+          "任务人数 3 / 4 / 5 / 6 / 6，第 4 轮需两张失败。",
+          "组队表决严格过半才通过，平票视为否决；连续 5 次否决红方胜利。",
+        ],
+      };
+    if (sec.kind === "roles")
+      return {
+        ...sec,
+        items: sec.items
+          .filter(
+            (item) => !(item.name.includes("兰斯洛特") && item.meta === "红方"),
+          )
+          .map((item) =>
+            item.name === "蓝刀客 · 兰斯洛特"
+              ? { ...item, text: item.text + " 11 人局转换前被梅林视为坏人。" }
+              : item,
+          ),
+      };
+    return sec;
+  });
+  return {
+    summary:
+      "十二骑士 11 人局：A 牌去掉红兰斯洛特（7 蓝 4 红共 11 张），蓝兰斯洛特被梅林视为坏人；B 牌堆与全部技能规则与 12 人局一致。",
+    sections,
+  };
+})();
 // 阵营徽标色调：roles 卡按 meta 推导 tone（渲染器可选用，不影响通用文本渲染）。
 for (const board of Object.values(module.exports)) {
   for (const sec of board.sections) {

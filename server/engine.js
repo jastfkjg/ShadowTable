@@ -22,8 +22,9 @@ const TEAMS = {
   11: [3, 4, 5, 6, 6],
   12: [3, 4, 5, 6, 6],
 };
-// 十二骑士系列板子共享技能、B牌、女巫、圣骑士等规则；10 人局仅 A 牌去兰斯洛特。
-const KNIGHTS_BOARDS = ["knights", "knights-10"];
+// 十二骑士系列板子共享技能、B牌、女巫、圣骑士等规则；10 人局仅 A 牌去红蓝兰斯洛特，
+// 11 人局去红兰斯洛特且蓝兰斯洛特对梅林可见。
+const KNIGHTS_BOARDS = ["knights", "knights-10", "knights-11"];
 const isKnights = (board) => KNIGHTS_BOARDS.includes(board);
 const BOARDS = [
   {
@@ -86,6 +87,14 @@ const BOARDS = [
     counts: [10],
     description:
       "十二骑士10人局：A牌去掉红蓝兰斯洛特（6蓝4红），B牌堆与技能规则不变",
+  },
+  {
+    id: "knights-11",
+    name: "阿瓦隆 · 十二骑士（11人）",
+    available: true,
+    counts: [11],
+    description:
+      "十二骑士11人局：A牌去掉红兰斯洛特（7蓝4红），蓝兰斯洛特被梅林视为坏人，B牌堆与技能规则不变",
   },
 ];
 const ROLES = {
@@ -524,7 +533,7 @@ function privateView(room, uid) {
   } else if (role === "reverse")
     information = `刺客位于：${seats((r) => r === "assassin")}号。${room.convertedReverse === uid ? "你已被命中，现随坏人阵营结算。" : "你只能投任务成功；被逆仆刀命中后转入坏人阵营。"}`;
   else if (role === "merlin")
-    information = `你看见的举手座位：${seats((r) => (ROLES[r][1] === "evil" && r !== "mordred") || r === "reverse")}${room.board !== "classic" ? "（莫德雷德不在视野中）" : ""}`;
+    information = `你看见的举手座位：${seats((r) => (ROLES[r][1] === "evil" && r !== "mordred") || r === "reverse" || (room.board === "knights-11" && r === "blueLancelot"))}${room.board === "knights-11" ? "（蓝兰斯洛特对你可见，视为坏人；莫德雷德不在视野中）" : room.board !== "classic" ? "（莫德雷德不在视野中）" : ""}`;
   else if (role === "percival")
     information = `梅林与莫甘娜位于：${seats((r) => ["merlin", "morgana"].includes(r))}号。你无法区分谁是梅林。`;
   else if (role === "oberon")

@@ -194,3 +194,100 @@ test("/api/boards 提供 knights-10 板子与详情，A牌描述与技能卡均�
     await a.close();
   }
 });
+test("十二骑士11人局开局：A牌去红兰斯洛特为7蓝4红，蓝兰斯洛特对梅林可见，B牌堆不变", () => {
+  const room = newRoom("765432", "p1", "房主", "knights-11", 11);
+  for (let i = 2; i <= 11; i++) enter(room, `p${i}`, `玩家${i}`);
+  room.players.forEach((p) =>
+    command(room, p.uid, {
+      type: "ready",
+      stage: room.stage,
+      ready: true,
+    }),
+  );
+  command(room, "p1", { type: "start", stage: room.stage, flexible: true });
+  assert.equal(room.phase, "tools");
+  assert.ok(room.knights, "11人局应进入骑士技能模式");
+  assert.equal(room.knights.deck.length, 12, "B牌堆应与12人局一致（12张）");
+  assert.equal(room.knights.conversions.length, 7, "转换牌堆不变");
+  const display = room.players.map((p) => privateView(room, p.uid).role);
+  assert.equal(new Set(display).size, 10, "两位忠臣显示名相同，去重后应为 10 种");
+  assert.equal(
+    display.filter((r) => r === "亚瑟的忠臣").length,
+    2,
+    "应有两位忠臣",
+  );
+  assert.ok(display.includes("蓝兰斯洛特"), "A牌应有蓝兰斯洛特");
+  assert.ok(!display.includes("红兰斯洛特"), "A牌应无红兰斯洛特");
+  const roles = new Set(display);
+  for (const expected of [
+    "梅林",
+    "派西维尔",
+    "亚瑟的忠臣",
+    "蓝刀客·加雷斯",
+    "蓝刀客·加赫雷斯",
+    "蓝兰斯洛特",
+    "红刀客·奥伯伦",
+    "刺客",
+    "莫德雷德",
+    "莫甘娜",
+  ])
+    assert.ok(roles.has(expected), `缺少初始身份 ${expected}`);
+  const seatIn = (seat, text) => {
+    const head = text.indexOf("：") + 1;
+    const tail = text.indexOf("（");
+    return text
+      .slice(head, tail === -1 ? undefined : tail)
+      .split("、")
+      .includes(String(seat));
+  };
+  const merlin = room.players.find((p) => room.roles[p.uid] === "merlin");
+  const lance = room.players.find((p) => room.roles[p.uid] === "blueLancelot");
+  const mordred = room.players.find((p) => room.roles[p.uid] === "mordred");
+  const info = privateView(room, merlin.uid).information;
+  assert.ok(seatIn(lance.seat, info), `梅林视野应含蓝兰斯洛特座位 ${lance.seat}，实际「${info}」`);
+  assert.ok(!seatIn(mordred.seat, info), `梅林视野不应含莫德雷德座位 ${mordred.seat}，实际「${info}」`);
+  assert.ok(info.includes("蓝兰斯洛特"), "梅林提示应点名蓝兰斯洛特");
+});
+test("/api/boards 提供 knights-11 板子与详情，A牌描述点明梅林视野规则", async () => {
+  const a = await launch();
+  try {
+    const { data } = await a.boards();
+    const board = data.boards.find((b) => b.id === "knights-11");
+    assert.ok(board, "缺少 knights-11 板子");
+    assert.equal(board.available, true);
+    assert.deepEqual(board.counts, [11]);
+    assert.ok(board.roleConfigurations && board.roleConfigurations[11]);
+    assert.ok(board.detail, "knights-11 缺板子详情");
+    const deck = board.detail.sections
+      .find((s) => s.title === "AB 牌堆与身份构成")
+      .items.join("");
+    assert.ok(deck.startsWith("A 牌 11 张"), "knights-11 A牌应为 11 张");
+    assert.ok(deck.includes("无红兰斯洛特"), "A牌描述未说明去掉红兰斯洛特");
+    assert.ok(
+      deck.includes("蓝兰斯洛特被梅林视为坏人"),
+      "A牌描述未说明梅林视野规则",
+    );
+    const roleSections = board.detail.sections.filter((s) => s.kind === "roles");
+    assert.ok(roleSections.length >= 4, "knights-11 角色技能未分组");
+    const cards = roleSections.flatMap((s) => s.items);
+    assert.ok(
+      cards.some((i) => i.name === "蓝刀客 · 兰斯洛特"),
+      "knights-11 应保留蓝兰斯洛特技能卡",
+    );
+    assert.equal(
+      cards.filter((i) => i.name.includes("红刀客 · 兰斯洛特")).length,
+      0,
+      "knights-11 技能卡仍含红兰斯洛特",
+    );
+    assert.ok(
+      cards.find((i) => i.name === "蓝刀客 · 兰斯洛特").text.includes("梅林视为坏人"),
+      "蓝兰斯洛特卡未说明梅林视野",
+    );
+    const team = board.detail.sections
+      .find((s) => s.title === "组队与表决")
+      .items[0];
+    assert.ok(team.includes("3 / 4 / 5 / 6 / 6"), "knights-11 任务人数表应为11人标准");
+  } finally {
+    await a.close();
+  }
+});
