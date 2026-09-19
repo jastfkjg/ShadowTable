@@ -1194,7 +1194,7 @@
       return;
     }
     if (
-      ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].indexOf(
+      ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"].indexOf(
         room.phase,
       ) !== -1
     ) {
@@ -1930,7 +1930,7 @@
         ) +
         "</div>";
     }
-    if (r.phase === "hunterTurn") html += '<div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "进入追加技能确认，上一阶段提交已完成。") + '</div>';
+    if (["paladinTurn", "hunterTurn"].indexOf(r.phase) !== -1) html += '<div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "进入追加技能确认，上一阶段提交已完成。") + '</div>';
     html += '<div class="action-choice-list">';
     for (var i = 0; i < state.actionChoices.length; i++) {
       var c = state.actionChoices[i];

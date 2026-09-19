@@ -384,3 +384,44 @@ test("猎人追加说明全员一致，私密技能状态仅提示当前猎人�
   }
   assert.equal(publicView(room, "p1").closeWaiting.label, "未交者跳过技能");
 });
+
+test("SQLite重新打开后继续圣骑士优先、猎人开枪、再次复活，不重复消耗", () => {
+  const { Store } = require("../server/store");
+  const { mkdtempSync, rmSync } = require("node:fs");
+  const { tmpdir } = require("node:os");
+  const { join } = require("node:path");
+  const directory = mkdtempSync(join(tmpdir(), "shadowtable-revival-"));
+  let store;
+  try {
+    const file = join(directory, "room.sqlite");
+    store = new Store(file);
+    let room = knightsRoom();
+    Object.assign(room.roles, { p1: "blueAwakened", p2: "redHunter", p3: "paladin" });
+    begin(room, "skills");
+    submitAll(room, { p1: "target:2" });
+    assert.equal(room.phase, "paladinTurn");
+    run(room, "p3", "submit", { value: "pass" });
+    store.save(room);
+    store.close();
+    store = new Store(file);
+    room = store.get(room.code);
+    assert.equal(publicView(room, "p3").me.submitted, true);
+    for (const p of room.players.filter(p => p.uid !== "p3")) run(room, p.uid, "submit", { value: "pass" });
+    assert.equal(room.phase, "hunterTurn");
+    submitAll(room, { p2: "target:4" });
+    assert.equal(room.phase, "paladinTurn");
+    run(room, "p3", "submit", { value: "revive:4" });
+    store.save(room);
+    store.close();
+    store = new Store(file);
+    room = store.get(room.code);
+    for (const p of room.players.filter(p => p.uid !== "p3")) run(room, p.uid, "submit", { value: "pass" });
+    assert.equal(room.phase, "tools");
+    assert.equal(room.knights.players.p3.used, true);
+    assert.equal(room.knights.players.p4.alive, true);
+    assert.equal(room.history.filter(h => h.kind === "skillResult").length, 1);
+  } finally {
+    store?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

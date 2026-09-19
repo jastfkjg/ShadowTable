@@ -201,32 +201,6 @@ a:focus-visible {
 .audit-player strong {
   font-weight: 600;
 }
-.audit-stage summary {
-  cursor: pointer;
-  color: var(--muted);
-  min-height: 44px;
-  padding: 10px 0;
-  font-size: 14px;
-}
-.audit-stage summary:focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 3px;
-}
-.audit-detail-log {
-  border-left: 2px solid var(--line);
-  padding-left: 12px;
-}
-.audit-entry {
-  padding: 6px 0;
-  font-size: 14px;
-}
-.audit-entry > time {
-  margin-right: 8px;
-}
-.audit-entry > div {
-  display: inline;
-  margin-right: 8px;
-}
 .audit-note {
   font-size: 13px;
   margin: 8px 0 0;

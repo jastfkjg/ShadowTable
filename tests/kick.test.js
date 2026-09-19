@@ -82,11 +82,11 @@ test("对局进行中所有阶段都禁止踢人，不能通过请求强行终�
         "offlineFinal",
       ],
     ],
-    ["knights", 12, ["skillPrepare", "hunterTurn", "fairy"]],
+    ["knights", 12, ["skillPrepare", "paladinTurn", "hunterTurn", "fairy"]],
   ]) {
     for (const phase of phases) {
       const r = setup(true, board, n);
-      if (["skillPrepare", "hunterTurn"].includes(phase)) {
+      if (["skillPrepare", "paladinTurn", "hunterTurn"].includes(phase)) {
         run(r, "p1", "beginActivity", { kind: "skills" });
         r.knights.hunters = ["p2"];
       }

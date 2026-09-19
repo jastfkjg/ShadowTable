@@ -270,3 +270,24 @@ summary {
 #identity-change::backdrop {
   background: rgba(0, 0, 0, 0.7);
 }
+
+.swap-picker {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.swap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5em, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.swap-grid button {
+  min-height: 44px;
+  margin: 0;
+  padding: 9px 4px;
+  white-space: nowrap;
+}
+.swap-grid button[aria-pressed="true"] {
+  outline: 2px solid currentColor;
+  font-weight: 700;
+}

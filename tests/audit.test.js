@@ -21,14 +21,18 @@ test("阶段快照记录完整座位和目标昵称，区分放弃技能与尚�
   assert.equal(strike.choice, "对 2号·玩家乙开刀");
   assert.equal(strike.stage, room.stage);
   assert.deepEqual(strike.participants, [
-    { seat: 1, name: "玩家甲", required: true },
-    { seat: 2, name: "玩家乙", required: true },
+    { seat: 1, name: "玩家甲", role: "刺客", required: true },
+    { seat: 2, name: "玩家乙", role: "魔术师", required: true },
   ]);
   const pass = actionDetails(room, "b", "submit", { value: "pass" });
   assert.equal(pass.value, "pass");
   const swap = actionDetails(room, "b", "submit", { value: "swap:1:2" });
   assert.equal(swap.choice, "秘密换号 1号·玩家甲 ↔ 2号·玩家乙");
+  assert.equal(swap.player.role, "魔术师");
+  room.roles.b = "redHunter";
   room.players[1].name = "改名后";
+  assert.equal(swap.player.role, "魔术师");
+  assert.equal(strike.participants[1].role, "魔术师");
   assert.equal(strike.participants[1].name, "玩家乙");
 });
 
@@ -86,4 +90,48 @@ test("旧记录只合并连续同阶段，不将跨阶段的同名操作合并",
     [1, 1, 1, 2],
   );
   assert.ok(result.groups.every((group) => !group.active));
+});
+
+test("技能记录保存发起时间，猎人和圣骑士追加阶段沿用同次技能时间", () => {
+  const { enter, command } = require("../server/engine");
+  const room = newRoom("123456", "p1", "房主", "knights", 12);
+  for (let i = 2; i <= 12; i++) enter(room, `p${i}`, `玩家${i}`);
+  const run = (uid, type, extra = {}) =>
+    command(room, uid, { type, stage: room.stage, ...extra });
+  for (const p of room.players) run(p.uid, "ready", { ready: true });
+  run("p1", "start", { flexible: true });
+  for (const p of room.players) {
+    room.roles[p.uid] = "servant";
+    Object.assign(room.knights.players[p.uid], {
+      armor: false,
+      used: false,
+      b: false,
+    });
+  }
+  Object.assign(room.roles, {
+    p1: "blueAwakened",
+    p2: "redHunter",
+    p3: "paladin",
+  });
+  const before = Date.now();
+  run("p1", "beginActivity", { kind: "skills" });
+  const startedAt = room.activity.startedAt;
+  assert.ok(startedAt >= before && startedAt <= Date.now());
+  assert.equal(
+    actionDetails(room, "p1", "submit", { value: "target:2" })
+      .activityStartedAt,
+    startedAt,
+  );
+  for (const p of room.players)
+    run(p.uid, "submit", { value: p.uid === "p1" ? "target:2" : "pass" });
+  assert.equal(room.phase, "paladinTurn");
+  assert.equal(
+    actionDetails(room, "p3", "submit", { value: "pass" }).activityStartedAt,
+    startedAt,
+  );
+  for (const p of room.players) run(p.uid, "submit", { value: "pass" });
+  assert.equal(room.phase, "hunterTurn");
+  const shot = actionDetails(room, "p2", "submit", { value: "target:4" });
+  assert.equal(shot.activityStartedAt, startedAt);
+  assert.equal(shot.player.role, "红猎人");
 });

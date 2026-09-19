@@ -1166,3 +1166,22 @@ test("小程序收到移出通知后清除私密展示并返回首页，显示�
   assert.equal(p.data.revealed, false);
   assert.equal(p.data.notice, "你已被房主移出房间");
 });
+
+test("圣骑士追加复活与猎人自爆均二次确认，取消或阶段变化不提交", async () => {
+  for (const [phase, value] of [["paladinTurn", "revive:4"], ["skillPrepare", "detonate:4"]]) {
+    const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass", value], options: [{ value, label: "选择4号" }] } }) });
+    p.data.room = { code: "123456", stage: "s1", phase, needsSubmission: true, me: { submitted: false } };
+    const writes = [];
+    p.cmd = (...args) => writes.push(args);
+    await p.openAction();
+    p.confirm = async () => false;
+    await p.submitChoice({ currentTarget: { dataset: { value } } });
+    assert.equal(writes.length, 0);
+    p.confirm = async () => true;
+    await p.submitChoice({ currentTarget: { dataset: { value } } });
+    assert.equal(writes[0][1].value, value);
+    p.confirm = async () => { p.data.room.stage = "s2"; return true; };
+    await p.submitChoice({ currentTarget: { dataset: { value } } });
+    assert.equal(writes.length, 1);
+  }
+});

@@ -71,3 +71,141 @@ test("新版接口保留服务端分页，不额外读取全部日志", async ()
   assert.equal(await c.fetchAudit("123456", 20), result);
   assert.equal(calls, 1);
 });
+
+function auditRenderer() {
+  function node(tag, text = "", className = "") {
+    return {
+      tag,
+      text,
+      className,
+      children: [],
+      append(...items) {
+        this.children.push(...items);
+      },
+      replaceChildren() {
+        this.children = [];
+      },
+    };
+  }
+  const elements = new Map();
+  const context = {
+    $: (id) => {
+      if (!elements.has(id)) elements.set(id, node("div"));
+      return elements.get(id);
+    },
+    el: node,
+    document: { createTextNode: (text) => node("text", text) },
+    labels: { login: "管理员登录" },
+    auditOffset: 0,
+  };
+  const source = fs.readFileSync(
+    require.resolve("../server/admin/app.js"),
+    "utf8",
+  );
+  vm.runInNewContext(
+    source.slice(
+      source.indexOf("function renderAudit("),
+      source.indexOf("function renderRoomOptions("),
+    ) + ";this.render = renderAudit;",
+    context,
+  );
+  const flatten = (n) => [n, ...n.children.flatMap(flatten)];
+  return {
+    render: context.render,
+    nodes: () => flatten(elements.get("audit")),
+  };
+}
+
+test("操作记录显示行动当时身份和发起时间，不使用后续身份、不展示局轮或明细", () => {
+  const c = auditRenderer();
+  const startedAt = new Date("2026-09-19T02:44:00Z").getTime();
+  const actor = { seat: 1, name: "zzz", role: "魔术师", required: true };
+  c.render({
+    groups: [
+      {
+        active: false,
+        entries: [
+          {
+            created: startedAt + 90000,
+            details: {
+              game: 1,
+              round: 2,
+              stage: "s1",
+              phaseKey: "skillPrepare",
+              phase: "同时秘密使用技能",
+              activityStartedAt: startedAt,
+              participants: [{ ...actor, role: "红猎人" }],
+              player: { seat: 2, name: "other", role: "忠臣" },
+              command: "submit",
+              value: "pass",
+            },
+          },
+          {
+            created: startedAt + 30000,
+            details: {
+              game: 1,
+              round: 2,
+              stage: "s1",
+              phaseKey: "skillPrepare",
+              phase: "同时秘密使用技能",
+              activityStartedAt: startedAt,
+              participants: [actor],
+              player: actor,
+              command: "submit",
+              choice: "秘密换号 3号 ↔ 4号",
+            },
+          },
+        ],
+      },
+    ],
+    total: 1,
+    pageSize: 20,
+  });
+  const nodes = c.nodes();
+  const text = nodes.map((n) => n.text).join(" ");
+  assert.match(text, /1号·zzz·魔术师/);
+  assert.doesNotMatch(text, /zzz·红猎人|第 1 局|第 2 轮|明细/);
+  assert.equal(
+    nodes.find((n) => n.tag === "time").text,
+    "发起于 " + new Date(startedAt).toLocaleString(),
+  );
+  assert.ok(!nodes.some((n) => ["details", "summary"].includes(n.tag)));
+});
+
+test("旧记录不猜身份，时间取首次记录；管理员操作保留简短说明", () => {
+  const c = auditRenderer();
+  c.render({
+    groups: [
+      {
+        entries: [
+          {
+            created: 3000,
+            details: {
+              stage: "s1",
+              phase: "技能",
+              game: 1,
+              player: { seat: 1, name: "旧玩家" },
+              command: "submit",
+              value: "pass",
+            },
+          },
+          { created: 1000, details: { stage: "s1", phase: "技能", game: 1 } },
+        ],
+      },
+      {
+        entries: [
+          { created: 4000, action: "login", reason: "测试登录", details: {} },
+        ],
+      },
+    ],
+    total: 2,
+    pageSize: 20,
+  });
+  const nodes = c.nodes();
+  assert.match(nodes.map((n) => n.text).join(" "), /1号·旧玩家·身份未记录/);
+  assert.equal(
+    nodes.find((n) => n.tag === "time").text,
+    "记录于 " + new Date(1000).toLocaleString(),
+  );
+  assert.match(nodes.map((n) => n.text).join(" "), /管理员登录 · 测试登录/);
+});

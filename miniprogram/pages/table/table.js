@@ -1393,7 +1393,7 @@ Page({
       return;
     }
     if (
-      ["skillPrepare", "skillTurn", "hunterTurn", "fairy"].includes(
+      ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"].includes(
         this.data.room?.phase,
       )
     ) {

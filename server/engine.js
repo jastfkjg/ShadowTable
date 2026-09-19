@@ -2,7 +2,7 @@
 const { randomInt, randomUUID, createHash } = require("node:crypto");
 const variants = require("./variants");
 const knights = require("./knights");
-const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "hunterTurn", "fairy"];
+const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
 const COUNTS = {
   6: [4, 2],
@@ -548,17 +548,17 @@ function privateView(room, uid) {
     const skillDescription = {
       blueGuard: "秘密守护一人，免疫一次出局才消耗。",
       redGuard: "秘密守护一人，免疫一次出局才消耗。",
-      witch: "秘密指定替死者；替死者能被守护，不能当轮开枪或被复活。",
+      witch: "秘密指定替死者；替死者能被守护，不触发被动开枪且不能被圣骑士复活。",
       magician:
-        "秘密交换两个号码，本轮技能按换号结算；有人因换号出局且你不在其中，你也会出局。",
+        "秘密交换两个号码，本轮技能按换号结算；交换号码参与实际结算即消耗技能，不会连带出局。",
       paladin:
-        "预先选择复活意向，轮到你时恢复上一位合法出局者的原牌，不重置技能。",
+        "有人出局后优先选择一名本轮出局者恢复原牌，不重置技能；不能复活自己或女巫替死者。",
       blueKnight: "决斗坏人，刀错自己出局；莫德雷德视为好人。",
       redKnight: "决斗好人，刀错自己出局；莫德雷德视为好人。",
       blueAwakened: "可击杀任意一人一次。",
       redAwakened: "可击杀任意一人一次。",
-      blueHunter: "出局后可开枪带走一人；女巫替死不能开枪。",
-      redHunter: "出局后可开枪带走一人；女巫替死不能开枪。",
+      blueHunter: "可主动自爆并开枪，或被动出局后开枪；两者共用一次技能，复活不重置。女巫替死不触发被动开枪。",
+      redHunter: "可主动自爆并开枪，或被动出局后开枪；两者共用一次技能，复活不重置。女巫替死不触发被动开枪。",
       prophet:
         "被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。",
     }[role];
@@ -688,7 +688,7 @@ function beginActivity(room, input) {
       }
       knights.begin(room, kind, requireRule);
       room.toolSequence++;
-      room.activity = { kind, number: room.toolSequence, threshold: null };
+      room.activity = { kind, number: room.toolSequence, threshold: null, startedAt: Date.now() };
     } else {
       convertKnights(room);
       stage(room, "tools");
@@ -759,6 +759,7 @@ function beginActivity(room, input) {
   room.activity = {
     kind,
     number: room.toolSequence,
+    startedAt: Date.now(),
     threshold: kind === "quest" ? input.threshold : null,
     ...(room.knights && kind === "assassination" ? { actor: input.actor } : {}),
   };
@@ -907,7 +908,7 @@ function closeWaitingPolicy(room) {
       description:
         "未提交者记为弃权；赞成票仍需超过本次全部有投票资格玩家的一半才通过。已提交的票不会更改。",
     };
-  if (["skillPrepare", "skillTurn", "hunterTurn"].includes(room.phase))
+  if (["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase))
     return {
       mode: "pass",
       label: "未交者跳过技能",
@@ -941,6 +942,7 @@ function phaseName(room) {
       skillPrepare: "同时秘密使用技能",
       skillTurn: "技能结算",
       hunterTurn: "出局技能确认",
+      paladinTurn: "追加技能确认",
       fairy: "仙女查验",
     }[room.phase];
   if (room.flexible)
@@ -1031,7 +1033,7 @@ function publicView(room, uid) {
                 : "已提交，等待其他玩家"
               : "本次你无需操作",
             detail:
-              room.phase === "hunterTurn"
+              ["paladinTurn", "hunterTurn"].includes(room.phase)
                 ? "进入追加技能确认，上一阶段提交已完成。所有玩家均需再次操作；没有可用行动时请选择确认，收齐后继续结算。"
                 : room.phase === "offlineFinal"
                 ? "等待线下处理完成，由房主记录。"
@@ -1631,4 +1633,5 @@ module.exports = {
   roomSummary,
   privateView,
   actionSpec,
+  roleName: (role) => ROLES[role]?.[0] || null,
 };

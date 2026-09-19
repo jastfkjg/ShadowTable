@@ -173,11 +173,20 @@ function renderAudit({ groups, total, pageSize }) {
     const block = el("div", "", "audit-stage");
     const header = el("div", "", "audit-stage-heading");
     const title = d.phase
-      ? `${d.phaseKey === "skillPrepare" ? "放技能阶段" : d.phase} · 第 ${d.game} 局${d.round ? " · 第 " + d.round + " 轮" : ""}`
+      ? d.phaseKey === "skillPrepare"
+        ? "放技能阶段"
+        : d.phase
       : d.label || labels[entries[0].action] || "房间操作";
+    const startedAt = entries.find((entry) => entry.details.activityStartedAt)
+      ?.details.activityStartedAt;
+    const timestamp =
+      startedAt || Math.min(...entries.map((entry) => entry.created));
     header.append(
       el("h3", title),
-      el("time", new Date(entries[0].created).toLocaleString()),
+      el(
+        "time",
+        `${startedAt ? "发起于" : "记录于"} ${new Date(timestamp).toLocaleString()}`,
+      ),
     );
     block.append(header);
     const players = new Map();
@@ -230,9 +239,16 @@ function renderAudit({ groups, total, pageSize }) {
           "、",
         );
       else text = player.required === false ? "无需操作" : "未记录操作";
+      // Prefer the actor snapshot over later participant snapshots (e.g. after drawing B).
+      const actor =
+        primary.at(-1)?.details.player ||
+        actions.at(-1)?.details.player ||
+        player;
+      const role =
+        actor.role === undefined && d.game ? "身份未记录" : actor.role;
       const line = el("span", "", "audit-player");
       line.append(
-        el("strong", `${player.seat}号·${player.name}`),
+        el("strong", `${actor.seat}号·${actor.name}${role ? "·" + role : ""}`),
         document.createTextNode(" " + text),
       );
       summary.append(line);
@@ -242,60 +258,25 @@ function renderAudit({ groups, total, pageSize }) {
       block.append(
         el("p", "旧记录按连续阶段归组，未提交情况无法追溯。", "audit-note"),
       );
-    const log = el("div", "", "audit-detail-log");
-    appendAuditEntries(log, entries);
-    if (players.size) {
-      const disclosure = el("details", "");
-      disclosure.append(el("summary", `展开 ${entries.length} 条明细`), log);
-      block.append(disclosure);
-    } else block.append(log);
-    $("audit").append(block);
-  }
-}
-function appendAuditEntries(container, entries) {
-  const fields = {
-    seat: "目标座位",
-    team: "队伍座位",
-    ready: "准备",
-    board: "板子",
-    capacity: "人数",
-    visible: "展示技能过程",
-    kind: "操作类型",
-    actor: "行动座位",
-    threshold: "失败票门槛",
-    replace: "替换当前操作",
-    flexible: "自由流程",
-    keepPlaying: "继续对局",
-    revision: "版本",
-  };
-  for (const entry of entries) {
-    const item = el("div", "", "audit-entry");
-    const d = entry.details || {};
-    item.append(el("time", new Date(entry.created).toLocaleString()));
-    const actor = d.player
-      ? `${d.player.seat}号 ${d.player.name}（${labels[entry.action]}）`
-      : entry.action === "companion"
-        ? "陪测玩家（旧记录）"
-        : "管理员";
-    item.append(
-      el(
-        "div",
-        `${actor} · ${d.label || labels[entry.action] || entry.action}${d.choice ? "：" + d.choice : ""}${entry.reason ? " · " + entry.reason : ""}`,
-      ),
-    );
-    if (d.game !== undefined)
-      item.append(
+    if (!players.size)
+      block.append(
         el(
-          "div",
-          `第 ${d.game} 局 · ${d.phase}${d.round ? " · 第 " + d.round + " 轮" : ""}`,
+          "p",
+          [
+            ...new Set(
+              entries.map((entry) =>
+                [
+                  entry.details.label || labels[entry.action] || entry.action,
+                  entry.reason,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+              ),
+            ),
+          ].join("；"),
         ),
       );
-    const parameters = Object.entries(d.parameters || {}).map(
-      ([key, value]) =>
-        `${fields[key] || key}：${typeof value === "boolean" ? (value ? "是" : "否") : Array.isArray(value) ? value.join("、") : value}`,
-    );
-    if (parameters.length) item.append(el("div", parameters.join(" · ")));
-    container.append(item);
+    $("audit").append(block);
   }
 }
 function renderRoomOptions() {

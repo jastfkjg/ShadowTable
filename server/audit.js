@@ -1,5 +1,5 @@
 "use strict";
-const { actionSpec, roomSummary } = require("./engine");
+const { actionSpec, roomSummary, roleName } = require("./engine");
 const labels = {
   create: "创建房间",
   join: "加入房间",
@@ -41,12 +41,20 @@ function actionDetails(room, uid, type, input) {
   const player = room.players.find((p) => p.uid === uid);
   const spec = type === "submit" && player ? actionSpec(room, uid) : null;
   const details = {
-    player: player ? { name: player.name, seat: player.seat } : null,
+    player: player
+      ? {
+          name: player.name,
+          seat: player.seat,
+          role: roleName(room.roles?.[uid]),
+        }
+      : null,
     stage: room.stage,
+    activityStartedAt: room.activity?.startedAt || null,
     phaseKey: room.phase,
     participants: room.players.map((p) => ({
       seat: p.seat,
       name: p.name,
+      role: roleName(room.roles?.[p.uid]),
       required: room.phase !== "lobby" && !!actionSpec(room, p.uid),
     })),
     game: room.game,

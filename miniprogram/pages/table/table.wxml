@@ -63,7 +63,7 @@
         </view>
         <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && !actionSecret}}" disabled="{{busy || !network}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
-      <view wx:if="{{room.phase==='hunterTurn'}}" class="small muted">{{room.operationStatus.detail}}</view>
+      <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="small muted">{{room.operationStatus.detail}}</view>
       <view class="action-choice-list">
         <button wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>

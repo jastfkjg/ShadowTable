@@ -236,7 +236,8 @@ if (typeof document !== "undefined") {
   });
   let busy = false;
   const teams = {},
-    targets = {};
+    targets = {},
+    swaps = {};
   const names = {
     confirm: "确认",
     approve: "赞成",
@@ -328,8 +329,12 @@ if (typeof document !== "undefined") {
           actions = button("ready", r.me.ready ? "取消准备" : "准备");
         else if (r?.me.submitted)
           actions = '<span class="submitted">已提交</span>';
-        else if (spec?.choices)
+        else if (spec?.choices) {
+          const swapChoices = spec.choices.filter((v) =>
+            /^swap:\d+:\d+$/.test(v),
+          );
           actions = spec.choices
+            .filter((v) => !swapChoices.includes(v))
             .map((v) =>
               button(
                 v,
@@ -344,7 +349,18 @@ if (typeof document !== "undefined") {
               ),
             )
             .join("");
-        else if (spec?.targets) {
+          if (swapChoices.length) {
+            if (swaps[actor.id]?.stage !== r.stage)
+              swaps[actor.id] = { stage: r.stage, seats: [] };
+            const selected = swaps[actor.id].seats;
+            const seats = [
+              ...new Set(
+                swapChoices.flatMap((v) => v.split(":").slice(1).map(Number)),
+              ),
+            ].sort((a, b) => a - b);
+            actions += `<div class="swap-picker"><p>选择两个号码 · 已选 ${selected.length} / 2；再次点击可取消</p><div class="swap-grid">${seats.map((seat) => `<button data-action="swapSeat:${seat}" aria-pressed="${selected.includes(seat)}" ${selected.length === 2 && !selected.includes(seat) ? "disabled" : ""}>${selected.includes(seat) ? "✓ " : ""}${seat}号</button>`).join("")}</div>${button("confirmSwap", "确认换号", selected.length !== 2)}</div>`;
+          }
+        } else if (spec?.targets) {
           actions =
             `<label>最终目标<select data-target><option value="">选择座位</option>${spec.targets.map((t) => `<option value="${t.seat}" ${String(targets[actor.id]) === String(t.seat) ? "selected" : ""}>${t.seat}号 · ${escape(t.name)}</option>`).join("")}</select></label>` +
             button("target", "确认目标");
@@ -463,10 +479,44 @@ if (typeof document !== "undefined") {
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
     if (!action || !actor || busy) return;
+    if (action.startsWith("swapSeat:")) {
+      if (swaps[actor.id]?.stage !== actor.room.stage) return;
+      const seat = Number(action.split(":")[1]);
+      const selected = swaps[actor.id].seats;
+      swaps[actor.id].seats = selected.includes(seat)
+        ? selected.filter((s) => s !== seat)
+        : selected.length < 2
+          ? [...selected, seat]
+          : selected;
+      render();
+      return;
+    }
     // Test-player actions execute directly; a target must still be selected.
     if (action === "target" && !targets[actor.id]) return;
     run(async () => {
       if (action === "retry") return companion.retry(actor);
+      if (action === "confirmSwap") {
+        const draft = swaps[actor.id];
+        if (draft?.stage !== actor.room.stage || draft.seats.length !== 2)
+          return;
+        const seats = [...draft.seats].sort((a, b) => a - b);
+        const value = actor.secret?.action?.choices?.find(
+          (v) =>
+            v.startsWith("swap:") &&
+            v
+              .split(":")
+              .slice(1)
+              .map(Number)
+              .sort((a, b) => a - b)
+              .join(":") === seats.join(":"),
+        );
+        if (
+          !value ||
+          !confirm(`确认交换 ${seats[0]} 号与 ${seats[1]} 号？提交后不可更改。`)
+        )
+          return;
+        return companion.command(actor, "submit", { value });
+      }
       if (action === "forget") {
         companion.actors = companion.actors.filter((a) => a !== actor);
         companion.save();
