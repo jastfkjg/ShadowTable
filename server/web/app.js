@@ -1597,7 +1597,7 @@
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
-      visible: selected.id === "knights" ? s.visible : false,
+      visible: ["knights", "knights-10"].includes(selected.id) ? s.visible : false,
     });
     updateSettingsDirty();
   }
@@ -1609,7 +1609,7 @@
         !!r &&
         (s.capacity !== r.capacity ||
           s.boardId !== r.board ||
-          s.visible !== (r.board === "knights" && r.showSkillDetails === true)),
+          s.visible !== (["knights", "knights-10"].includes(r.board) && r.showSkillDetails === true)),
     });
   }
   async function settingsSave() {
@@ -2591,7 +2591,7 @@
           ? "保存人数或板子变更后，全员需要重新准备。"
           : "对局中不能修改人数和板子。") +
         "</div>";
-      if (s.boardId === "knights") {
+      if (["knights", "knights-10"].includes(s.boardId)) {
         html +=
           '<div class="settings-section-title">信息公开</div><div class="settings-section"><div class="settings-row"><span><span>公开技能过程</span><span class="settings-caption">' +
           (s.visible ? "保存后所有玩家可见" : "仅公示最终结果") +

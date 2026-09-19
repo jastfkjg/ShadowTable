@@ -22,6 +22,9 @@ const TEAMS = {
   11: [3, 4, 5, 6, 6],
   12: [3, 4, 5, 6, 6],
 };
+// 十二骑士系列板子共享技能、B牌、女巫、圣骑士等规则；10 人局仅 A 牌去兰斯洛特。
+const KNIGHTS_BOARDS = ["knights", "knights-10"];
+const isKnights = (board) => KNIGHTS_BOARDS.includes(board);
 const BOARDS = [
   {
     id: "classic",
@@ -75,6 +78,14 @@ const BOARDS = [
     counts: [12],
     description:
       "同时秘密提交技能，同时生效，B牌复活；按需发起转换、仙女和夜晚",
+  },
+  {
+    id: "knights-10",
+    name: "阿瓦隆 · 十二骑士（10人）",
+    available: true,
+    counts: [10],
+    description:
+      "十二骑士10人局：A牌去掉红蓝兰斯洛特（6蓝4红），B牌堆与技能规则不变",
   },
 ];
 const ROLES = {
@@ -342,8 +353,8 @@ function start(room, flexible = false) {
   room.flexible = flexible;
   room.activity = null;
   room.toolSequence = 0;
-  if (room.board === "knights") knights.init(room, shuffle);
-  if (["knights", "chaos"].includes(room.board)) room.flexible = true;
+  if (isKnights(room.board)) knights.init(room, shuffle);
+  if (isKnights(room.board) || room.board === "chaos") room.flexible = true;
   stage(room, room.flexible ? "tools" : "identity");
 }
 function faction(room, uid) {
@@ -679,7 +690,7 @@ function beginActivity(room, input) {
     409,
   );
   if (["skills", "conversion", "fairy"].includes(kind)) {
-    requireRule(room.board === "knights", "当前板子不支持此操作");
+    requireRule(isKnights(room.board), "当前板子不支持此操作");
     requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
     const k = room.knights;
     if (["skills", "fairy"].includes(kind)) {
@@ -1112,7 +1123,7 @@ function publicView(room, uid) {
         room.showSkillDetails === true ||
         !(
           h.kind === "skillDetail" ||
-          (room.board === "knights" &&
+          (isKnights(room.board) &&
             h.kind === "variant" &&
             /^\d+号(?:使用技能|开枪|使用复活)/.test(h.text || ""))
         ),
@@ -1172,14 +1183,14 @@ function command(room, uid, input) {
         board: input.board,
         capacity: input.capacity,
       });
-    if (next.board === "knights") next.showSkillDetails = input.visible;
+    if (isKnights(next.board)) next.showSkillDetails = input.visible;
     else requireRule(input.visible === false, "当前板子没有技能过程设置");
     Object.assign(room, next);
     return;
   }
   if (type === "setSkillVisibility") {
     requireRule(uid === room.host, "只有房主可以管理流程", 403);
-    requireRule(room.board === "knights", "当前板子没有技能过程设置");
+    requireRule(isKnights(room.board), "当前板子没有技能过程设置");
     requireRule(typeof input.visible === "boolean", "显示设置无效");
     room.showSkillDetails = input.visible;
     return;

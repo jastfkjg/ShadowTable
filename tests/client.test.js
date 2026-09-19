@@ -547,7 +547,10 @@ test("10人自动选经典基础；关闭业务提示不离开当前房间", asy
     const p = await a.actor();
     await p.bootstrap();
     p.selectCapacity(10);
-    assert.equal(p.data.availableBoards.length, 1);
+    assert.deepEqual(
+      Array.from(p.data.availableBoards, (b) => b.id),
+      ["classic-court", "knights-10"],
+    );
     assert.equal(p.data.boardId, "classic-court");
     assert.equal(p.data.boardName, "阿瓦隆 · 经典基础");
     p.roomCode = "123456";

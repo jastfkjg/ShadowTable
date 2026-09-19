@@ -366,6 +366,41 @@ module.exports = {
     ],
   },
 };
+// 十二骑士 10 人局由 12 人局内容派生：A 牌去掉红蓝兰斯洛特；
+// 组队任务人数按服务端 TEAMS[10]（3/4/4/5/5）改写，其余章节保持一致。
+module.exports["knights-10"] = (() => {
+  const base = module.exports.knights;
+  const sections = base.sections.map((sec) => {
+    if (sec.title === "AB 牌堆与身份构成")
+      return {
+        title: sec.title,
+        kind: "blocks",
+        items: [
+          "A 牌 10 张（初始身份）：蓝方 6 张——蓝刀客×2（加雷斯、加赫雷斯）、忠臣×2、派西维尔、梅林；红方 4 张——红刀客·奥伯伦、刺客、莫德雷德、莫甘娜。10 人局无红蓝兰斯洛特。",
+          "B 牌 12 张：蓝方 7 张、红方 5 张，分 3 层混洗——先 2 红 2 蓝，再 2 红 3 蓝，最后 1 红 2 蓝；与 12 人局完全一致。",
+        ],
+      };
+    if (sec.title === "组队与表决")
+      return {
+        ...sec,
+        items: [
+          "任务人数 3 / 4 / 4 / 5 / 5，第 4 轮需两张失败。",
+          "组队表决严格过半才通过，平票视为否决；连续 5 次否决红方胜利。",
+        ],
+      };
+    if (sec.kind === "roles")
+      return {
+        ...sec,
+        items: sec.items.filter((item) => !item.name.includes("兰斯洛特")),
+      };
+    return sec;
+  });
+  return {
+    summary:
+      "十二骑士 10 人局：A 牌去掉红蓝兰斯洛特（6 蓝 4 红共 10 张），B 牌堆与全部技能规则与 12 人局一致。",
+    sections,
+  };
+})();
 // 阵营徽标色调：roles 卡按 meta 推导 tone（渲染器可选用，不影响通用文本渲染）。
 for (const board of Object.values(module.exports)) {
   for (const sec of board.sections) {

@@ -54,6 +54,20 @@ const decks = {
     "mordred",
     "morgana",
   ],
+  // 十二骑士 10 人局：A 牌去掉红蓝兰斯洛特（6 蓝 4 红共 10 张），
+  // 其余规则与 12 人局一致，B 牌堆由 knights 逻辑按全部 B 角色组成。
+  "knights-10": [
+    "merlin",
+    "percival",
+    "servant",
+    "servant",
+    "gareth",
+    "gaheris",
+    "redSwordsman",
+    "assassin",
+    "mordred",
+    "morgana",
+  ],
 };
 function chaosQuest(values, threshold) {
   const counts = Object.fromEntries(

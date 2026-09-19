@@ -87,7 +87,7 @@ Page({
       choices,
       capacityIndex: Math.max(0, this.data.capacities.indexOf(capacity)),
       boardIndex: choices.indexOf(selected),
-      visible: selected.id === "knights" ? this.data.visible : false,
+      visible: ["knights", "knights-10"].includes(selected.id) ? this.data.visible : false,
     });
     this.updateDirty();
   },
@@ -99,7 +99,8 @@ Page({
         (this.data.capacity !== r.capacity ||
           this.data.boardId !== r.board ||
           this.data.visible !==
-            (r.board === "knights" && r.showSkillDetails === true)),
+            (["knights", "knights-10"].includes(r.board) &&
+              r.showSkillDetails === true)),
     });
   },
   pickCapacity(e) {
