@@ -12,7 +12,7 @@
 | 方法/路径                      | 用途                               |
 | ------------------------------ | ---------------------------------- |
 | GET /health                    | 存活检查                           |
-| GET /api/boards                | 板子清单与可用状态                 |
+| GET /api/boards                | 板子清单、可用状态与板子详情      |
 | POST /api/login                | 微信 code 换本应用会话             |
 | POST /api/dev-login            | 显式 DEV_AUTH 开启时的匿名联调登录 |
 | POST /api/rooms                | 创建；name、board、capacity        |

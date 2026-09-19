@@ -3,6 +3,7 @@ const http = require("node:http");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails } = require("./audit");
+const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
   RuleError,
@@ -155,7 +156,9 @@ function createApp({
       if (req.method === "GET" && path === "/health")
         return send(200, { ok: true });
       if (req.method === "GET" && path === "/api/boards")
-        return send(200, { boards: BOARDS });
+        return send(200, {
+          boards: BOARDS.map((b) => ({ ...b, detail: BOARD_INFO[b.id] || null })),
+        });
       if (
         req.method === "POST" &&
         ["/api/login", "/api/dev-login", "/api/guest-login"].includes(path)

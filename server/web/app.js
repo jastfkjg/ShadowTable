@@ -282,6 +282,8 @@
     entryMode: "join",
     showRules: false,
     showRoomRules: false,
+    showBoardDetails: false,
+    boardDetail: null,
     actionDialog: false,
     actionSecret: null,
     actionLoading: false,
@@ -483,6 +485,8 @@
       error: "",
       entryMode: "join",
       showRoomRules: false,
+      showBoardDetails: false,
+      boardDetail: null,
       showRoomSettings: false,
       showTransfer: false,
       settings: null,
@@ -777,7 +781,8 @@
       !state.actionLoading &&
       !state.toolType &&
       !state.showRoomRules &&
-      !state.showRoomSettings
+      !state.showRoomSettings &&
+      !state.showBoardDetails
     )
       await openAction();
   }
@@ -2202,6 +2207,7 @@
           .join("") +
         "</div>" +
         '<div class="dialog-actions">' +
+        btn("secondary", "openBoardDetails", "板子详情") +
         btn("primary", "closeRoomRules", "知道了") +
         "</div></div></div>";
     }
@@ -2632,6 +2638,73 @@
     html += "</div></div>";
     return html;
   }
+  function viewBoardDetails() {
+    if (!state.showBoardDetails) return "";
+    var b = state.boardDetail;
+    var html =
+      '<div class="dialog-backdrop"><div class="board-detail-dialog" role="dialog" aria-modal="true">' +
+      '<div class="dialog-title">板子详情</div>';
+    if (b)
+      html +=
+        '<div class="detail-board-name">' +
+        esc(b.name) +
+        ' <span class="detail-capacity muted">· ' +
+        b.capacity +
+        '人</span></div>' +
+        (b.detail ? '<div class="detail-summary">' + esc(b.detail.summary) + "</div>" : "");
+    if (b && b.detail) {
+      b.detail.sections.forEach(function (sec) {
+        html += '<div class="detail-section-title">' + esc(sec.title) + "</div>";
+        if (sec.kind === "roles") {
+          html +=
+            '<div class="role-grid">' +
+            sec.items
+              .map(function (role) {
+                return (
+                  '<div class="role-card"><div class="role-card-heading"><span class="role-card-name">' +
+                  esc(role.name) +
+                  "</span>" +
+                  (role.meta ? '<span class="role-card-meta' + (role.tone ? " tone-" + role.tone : "") + '">' + esc(role.meta) + "</span>" : "") +
+                  "</div>" +
+                  '<div class="role-card-text">' +
+                  esc(role.text) +
+                  "</div></div>"
+                );
+              })
+              .join("") +
+            "</div>";
+        } else if (sec.kind === "blocks") {
+          html += sec.items
+            .map(function (blk) {
+              return '<div class="detail-block">' + esc(blk) + "</div>";
+            })
+            .join("");
+        } else {
+          html += sec.items
+            .map(function (line) {
+              return '<div class="detail-line">' + esc(line) + "</div>";
+            })
+            .join("");
+        }
+      });
+    } else {
+      html +=
+        '<div class="configuration-roles">' +
+        ((b && b.roleConfiguration) || [])
+          .map(function (x) {
+            return (
+              '<div class="role-line">' + esc(x.label) + "：" + esc(x.roles) + "</div>"
+            );
+          })
+          .join("") +
+        '</div><div class="muted small detail-none">本板子暂无详细说明，以上为角色配置。</div>';
+    }
+    html +=
+      '<div class="dialog-actions">' +
+      btn("primary", "closeBoardDetails", "知道了") +
+      "</div></div></div>";
+    return html;
+  }
   // Keep option selection in a themed, keyboard-accessible modal above settings.
   var optionDialog = null;
   function enhanceSelects(root) {
@@ -2787,7 +2860,8 @@
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.room ? viewRoom() : viewEntry()) +
       "</div>" +
-      viewSettingsDialog();
+      viewSettingsDialog() +
+      viewBoardDetails();
     enhanceSelects(next);
     patchDOM(app, next);
     validateOptionDialog();
@@ -2863,6 +2937,30 @@
     },
     closeRoomRules: function () {
       setState({ showRoomRules: false });
+    },
+    openBoardDetails: function () {
+      if (!state.room) return;
+      var board = state.boards.find(function (b) {
+        return b.id === state.room.board;
+      });
+      setState({
+        showBoardDetails: true,
+        showRoomRules: false,
+        boardDetail: board
+          ? {
+              name: board.name,
+              capacity: state.room.capacity,
+              detail: board.detail,
+              roleConfiguration:
+                state.room.roleConfiguration ||
+                (board.roleConfigurations || {})[state.room.capacity] ||
+                [],
+            }
+          : null,
+      });
+    },
+    closeBoardDetails: function () {
+      setState({ showBoardDetails: false, boardDetail: null });
     },
     toggleRoomSettings: toggleRoomSettings,
     seat: function (el) {

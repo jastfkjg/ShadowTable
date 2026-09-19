@@ -186,6 +186,7 @@
           <view wx:for="{{room.roleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
         <view class="dialog-actions">
+          <button class="secondary" bindtap="openBoardDetails">板子详情</button>
           <button class="primary" bindtap="closeRoomRules">知道了</button>
         </view>
       </view>

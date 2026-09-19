@@ -626,6 +626,17 @@ Page({
   openRoomRules() {
     this.setData({ showRoomRules: true });
   },
+  openBoardDetails() {
+    if (!this.data.room) return;
+    this.setData({ showRoomRules: false });
+    wx.navigateTo({
+      url:
+        "/pages/board-details/board-details?board=" +
+        this.data.room.board +
+        "&capacity=" +
+        this.data.room.capacity,
+    });
+  },
   closeRoomRules() {
     this.setData({ showRoomRules: false });
   },

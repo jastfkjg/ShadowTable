@@ -1061,6 +1061,136 @@ button.leave-button {
   color: var(--text);
 }
 
+/* Board details dialog */
+.board-detail-dialog {
+  width: 100%;
+  max-width: 640px;
+  max-height: 84vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 22px 20px calc(18px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  animation: dialog-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.board-detail-dialog .detail-board-name {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.detail-capacity {
+  font-size: 13px;
+  font-weight: 400;
+}
+.detail-summary {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 6px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.detail-section-title {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 650;
+  margin: 22px 0 10px;
+}
+.detail-line {
+  position: relative;
+  padding: 10px 12px 10px 22px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.detail-line::before {
+  content: "•";
+  position: absolute;
+  left: 10px;
+  color: var(--accent);
+}
+.detail-block {
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: break-word;
+}
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.role-card {
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.role-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.role-card-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--accent);
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.role-card-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+.role-card-meta.tone-good {
+  color: var(--good);
+  border-color: var(--good);
+}
+.role-card-meta.tone-evil {
+  color: var(--evil);
+  border-color: var(--evil);
+}
+.role-card-meta.tone-third {
+  color: var(--third);
+  border-color: var(--third);
+}
+.role-card-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.board-detail-dialog .detail-none {
+  margin-top: 10px;
+}
+.board-detail-dialog .dialog-actions {
+  margin-top: 22px;
+}
+
 /* Settings dialog */
 .settings-header {
   margin-bottom: 24px;
