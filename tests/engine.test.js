@@ -48,8 +48,8 @@ function completeQuest(r, team, fails = []) {
   );
   advance(r);
 }
-test("6–9人配置和视野按角色隔离，随机首队长有效", () => {
-  for (let n = 6; n <= 9; n++) {
+test("5–9人配置和视野按角色隔离，随机首队长有效", () => {
+  for (let n = 5; n <= 9; n++) {
     const r = setup(n),
       roles = Object.values(r.roles);
     assert.equal(
@@ -648,4 +648,19 @@ test("睁眼坏人可见同伴座位和具体身份，奥伯伦及好人身份�
       assert.ok(pub.players.every((player) => player.role === undefined));
     }
   }
+});
+
+test("5人经典局使用指定阵容并按五轮任务人数开局", () => {
+  const r = setup(5);
+  assert.deepEqual(Object.values(r.roles).sort(), ["merlin", "percival", "servant", "morgana", "assassin"].sort());
+  assert.deepEqual(publicView(r, "p1").roleConfiguration, [
+    { faction: "good", label: "好人阵营", roles: "梅林，派西维尔，忠臣" },
+    { faction: "evil", label: "坏人阵营", roles: "莫甘娜，刺客" },
+  ]);
+  assert.deepEqual(TEAMS[5], [2, 3, 2, 3, 3]);
+  all(r);
+  advance(r);
+  completeQuest(r, r.players.slice(0, 2).map((p) => p.seat));
+  advance(r);
+  assert.equal(r.round, 2);
 });

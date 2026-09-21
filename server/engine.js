@@ -5,6 +5,7 @@ const knights = require("./knights");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
 const COUNTS = {
+  5: [3, 2],
   6: [4, 2],
   7: [4, 3],
   8: [5, 3],
@@ -14,6 +15,7 @@ const COUNTS = {
   12: [7, 5],
 };
 const TEAMS = {
+  5: [2, 3, 2, 3, 3],
   6: [2, 3, 4, 3, 4],
   7: [2, 3, 3, 4, 4],
   8: [3, 4, 4, 5, 5],
@@ -31,7 +33,7 @@ const BOARDS = [
     id: "classic",
     name: "阿瓦隆 · 经典基础",
     available: true,
-    counts: [6, 7, 8, 9],
+    counts: [5, 6, 7, 8, 9],
     namesByCapacity: { 9: "阿瓦隆 · 9人逆仆" },
     description: "按人数配置梅林、派西维尔及坏人角色；9人含逆仆",
   },
@@ -231,9 +233,10 @@ function roleDeck(boardId, capacity) {
     const goodRoles = [
       "merlin",
       "percival",
-      ...Array(capacity <= 7 ? 2 : 3).fill("servant"),
+      ...Array(capacity === 5 ? 1 : capacity <= 7 ? 2 : 3).fill("servant"),
     ];
     const evilRoles = {
+      5: ["morgana", "assassin"],
       6: ["morgana", "assassin"],
       7: ["morgana", "assassin", "oberon"],
       8: ["mordred", "morgana", "oberon"],
