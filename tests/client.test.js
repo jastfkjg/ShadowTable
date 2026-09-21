@@ -1262,3 +1262,65 @@ test("板子详情导航同时支持创建页与牌桌并携带返回来源", ()
   p.openBoardDetails();
   assert.equal(url, "/pages/board-details/board-details?board=classic&capacity=6&from=room");
 });
+
+test("网络错误非阻塞，恢复成功清除提示但不重新揭示身份", async () => {
+  const room = { code: "123456", stage: "s", phase: "tools", capacity: 6, players: [], team: [], history: [], me: { seat: 1 } };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  p.data.loading = false;
+  p.data.boards = [{}];
+  p.data.revealed = true;
+  p.data.secret = { role: "梅林" };
+  p.handleError(new Error("timeout"));
+  assert.equal(p.data.error, "");
+  assert.equal(p.data.reconnecting, true);
+  assert.equal(p.data.secret, null);
+  await p.recoverConnection();
+  assert.equal(p.data.reconnecting, false);
+  assert.equal(p.data.serverConnected, true);
+  assert.equal(p.data.revealed, false);
+});
+
+test("自动确认不确定提交沿用请求编号和内容，不允许重复写入", async () => {
+  const calls = [];
+  const room = { code: "123456", stage: "s", phase: "tools", capacity: 6, players: [], team: [], history: [], me: { seat: 1 } };
+  const p = page({ login: async () => {}, requestId: () => "original", request: async (path, method, data, id) => {
+    if (method === "POST") { calls.push({ data, id }); if (calls.length === 1) throw new Error("response lost"); }
+    return structuredClone(room);
+  } });
+  p.roomCode = room.code;
+  p.data.loading = false;
+  await p.mutate("/submit", { value: "success" });
+  assert.equal(p.data.reconnecting, true);
+  await p.mutate("/submit", { value: "fail" });
+  assert.equal(calls.length, 1);
+  await p.recoverConnection();
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].id, "original");
+  assert.equal(calls[1].data.value, "success");
+  assert.equal(p.pending, null);
+  assert.equal(p.data.reconnecting, false);
+});
+
+test("后台、冷却期及登录失效不自动重试，配置错误保留人工提示", async () => {
+  const p = page({});
+  p.data.loading = false;
+  let retries = 0;
+  p.retry = async () => { retries++; };
+  p.handleError(new Error("offline"));
+  p.foreground = false;
+  await p.recoverConnection();
+  p.foreground = true;
+  p.handleError(Object.assign(new Error("rate"), { status: 429, retryAfterMs: 60000 }));
+  await p.recoverConnection();
+  assert.equal(retries, 0);
+  p.rateLimitUntil = 0;
+  p.handleError(Object.assign(new Error("login"), { status: 401 }));
+  await p.recoverConnection();
+  assert.equal(retries, 0);
+  assert.equal(p.data.reconnecting, false);
+  assert.equal(p.data.needsLogin, true);
+  p.handleError(Object.assign(new Error("invalid domain"), { retryable: false }));
+  assert.equal(p.data.reconnecting, false);
+  assert.equal(p.data.error, "invalid domain");
+});

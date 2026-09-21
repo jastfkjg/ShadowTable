@@ -99,6 +99,7 @@ Page({
     loading: true,
     busy: false,
     error: "",
+    reconnecting: false,
     recoverableError: false,
     hasPendingRequest: false,
     notice: "",
@@ -162,7 +163,9 @@ Page({
       this.setData({ network: res.isConnected });
       if (!res.isConnected) {
         this.mask();
-        this.handleError(new Error("连接已断开，请恢复网络后重试"));
+        this.handleError(new Error("连接已断开"));
+      } else if (this.data.reconnecting) {
+        this.recoverConnection();
       }
     };
     wx.onNetworkStatusChange(this.networkListener);
@@ -171,7 +174,8 @@ Page({
   onShow() {
     this.foreground = true;
     if (this.alive) {
-      if (this.roomCode) this.refresh().catch((e) => this.handleError(e));
+      if (this.data.reconnecting || this.pending) this.recoverConnection();
+      else if (this.roomCode) this.refresh().catch((e) => this.handleError(e));
       this.schedule();
     }
   },
@@ -262,7 +266,10 @@ Page({
   },
   async loadRooms() {
     const { rooms } = await api.request("/api/me/rooms");
-    if (this.alive) this.setData({ memberRooms: rooms, serverConnected: true });
+    if (this.alive) {
+      this.connectionRecovered();
+      this.setData({ memberRooms: rooms, serverConnected: true, network: true });
+    }
   },
   handleError(e) {
     this.mask();
@@ -273,18 +280,16 @@ Page({
       this.loadRooms().catch(error => this.handleError(error));
       return;
     }
-    if (e.status === 429) {
-      this.rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
-      if (!this.pending && this.roomCode) {
-        this.setData({
-          error: "",
-          notice: "请求较多，冷却后会自动刷新",
-          serverConnected: true,
-        });
-        this.schedule();
-        return;
-      }
+    if ((!e.status || e.status >= 500 || e.status === 429) && e.retryable !== false) {
+      this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+      if (e.status === 429) this.rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
+      this.setData({ reconnecting: true, error: "", recoverableError: false, serverConnected: false,
+        hasPendingRequest: !!this.pending,
+        notice: e.status === 429 && !this.pending ? "请求较多，冷却后会自动刷新" : "" });
+      this.schedule();
+      return;
     }
+    this.setData({ reconnecting: false });
     this.setData({
       error: e.message,
       serverConnected: !!e.status && e.status < 500 && e.status !== 401,
@@ -302,26 +307,35 @@ Page({
       hasPendingRequest: false,
     });
   },
+  connectionRecovered() {
+    this.reconnectAttempts = 0;
+    this.updateChangedData({ reconnecting: false });
+  },
+  async recoverConnection() {
+    if (!this.alive || !this.foreground || this.recovering || this.data.busy || this.data.loading || this.data.needsLogin) return;
+    if (Date.now() < (this.rateLimitUntil || 0)) { this.schedule(); return; }
+    this.recovering = true;
+    try {
+      await this.retry();
+    } finally {
+      this.recovering = false;
+      this.schedule();
+    }
+  },
   schedule() {
     clearTimeout(this.timer);
-    if (this.foreground && this.alive && this.roomCode)
-      this.timer = setTimeout(
-        async () => {
-          if (
-            this.roomCode &&
-            !this.data.busy &&
-            !this.pending &&
-            !this.data.error
-          )
-            try {
-              await this.refresh();
-            } catch (e) {
-              this.handleError(e);
-            }
-          this.schedule();
-        },
-        Math.max(2500, (this.rateLimitUntil || 0) - Date.now()),
-      );
+    if (!this.foreground || !this.alive || (!this.roomCode && !this.data.reconnecting)) return;
+    const delay = this.data.reconnecting
+      ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, (this.reconnectAttempts || 1) - 1))) * (0.8 + Math.random() * 0.2)
+      : 2500;
+    this.timer = setTimeout(async () => {
+      if (this.data.reconnecting) {
+        if (this.data.network) await this.recoverConnection();
+      } else if (this.roomCode && !this.data.busy && !this.pending && !this.data.error && !this.recovering) {
+        try { await this.refresh(); } catch (e) { this.handleError(e); }
+      }
+      this.schedule();
+    }, Math.max(delay, (this.rateLimitUntil || 0) - Date.now()));
   },
   async refresh() {
     if (!this.roomCode) return;
@@ -353,6 +367,7 @@ Page({
       sequence !== this.refreshSequence
     )
       return;
+    this.connectionRecovered();
     const stageChanged = this.data.room?.stage !== room.stage;
     // Haptic nudge on game-stage transitions; stronger when it is now our turn.
     if (stageChanged && this.data.room)
@@ -730,6 +745,7 @@ Page({
   async mutate(path, data, after) {
     if (this.data.busy) return;
     if (this.pending) {
+      if (this.data.reconnecting) return;
       this.setData({ error: "上次请求尚未确认，请先重试原请求" });
       return;
     }
@@ -752,6 +768,7 @@ Page({
         pending.id,
       );
       this.pending = null;
+      this.connectionRecovered();
       this.setData({
         serverConnected: true,
         hasPendingRequest: false,

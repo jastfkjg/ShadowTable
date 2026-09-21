@@ -112,6 +112,7 @@
       </view>
     </view>
   </view>
+  <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
   <view wx:if="{{notice}}" class="notice">{{notice}}</view>
   <block wx:if="{{!room}}">
     <form class="panel entry-panel" bindsubmit="submitEntry">

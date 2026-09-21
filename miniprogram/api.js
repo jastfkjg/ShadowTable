@@ -52,7 +52,9 @@ function request(path, method = "GET", data, requestId) {
           )
         )
           message = "暂时无法连接游戏服务，请检查网络或稍后重试原请求";
-        reject(new Error(message));
+        const failure = new Error(message);
+        if (/url not in domain list|不在.*合法域名/i.test(detail)) failure.retryable = false;
+        reject(failure);
       },
     }),
   );
