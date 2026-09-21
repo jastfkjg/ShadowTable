@@ -1080,3 +1080,16 @@ button.room-open {
 .history-vote-count.abstain { color: var(--muted); }
 
 .host-action-bar-inner .bar-cutoff { flex: 0 0 192rpx; padding: 16rpx 12rpx; font-size: 28rpx; }
+
+/* Public history and seat status */
+.seat-out { display: inline-block; margin-top: 6rpx; padding: 0 10rpx; border: 1rpx solid var(--evil); border-radius: 6rpx; color: var(--evil); font-size: 24rpx; }
+.seat-flag { float: none; display: block; min-height: 32rpx; padding-top: 0; }
+.history-heading { display: flex; justify-content: space-between; align-items: center; gap: 16rpx; }
+button.history-toggle { width: auto; flex-shrink: 0; margin: 0; min-height: 88rpx; padding: 8rpx 12rpx; background: transparent; color: var(--accent); font-size: 26rpx; }
+.history-filters, .quest-timeline { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 16rpx 0; }
+button.history-filter, button.quest-step { width: auto; margin: 0; min-height: 88rpx; padding: 12rpx 20rpx; font-size: 26rpx; background: var(--surface); color: var(--text); border: 1rpx solid var(--border); }
+button.history-filter.active { color: var(--accent); border-color: var(--accent); }
+button.quest-step.success { color: var(--good); }
+button.quest-step.failure { color: var(--evil); }
+
+.seat-name { white-space: normal; overflow: visible; word-break: break-all; text-overflow: clip; }

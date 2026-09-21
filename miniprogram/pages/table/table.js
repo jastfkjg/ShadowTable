@@ -104,6 +104,10 @@ Page({
     notice: "",
     room: null,
     latestResult: null,
+    historyExpanded: false,
+    historyFilter: "all",
+    visibleHistory: [],
+    questTimeline: [],
     boards: [],
     availableBoards: [],
     entryMode: "join",
@@ -419,8 +423,24 @@ Page({
                 : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
         },
     );
+    history.forEach((entry, i) => {
+      const source = room.history[i];
+      entry.category = ["toolVote", "team"].includes(source.kind) ? "vote"
+        : ["toolQuest", "quest"].includes(source.kind) ? "quest"
+        : ["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind) ? "skill" : "other";
+      entry.recordLabel = `记录 ${i + 1}`;
+      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
+    });
+    const historyExpanded = this.data.room?.code === room.code && this.data.room?.phase !== "lobby" && room.phase !== "lobby" ? this.data.historyExpanded : false;
+    const historyFilter = historyExpanded ? this.data.historyFilter : "all";
+    const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
       ...privacyUpdate,
+      actionEntryLabel,
+      historyExpanded,
+      historyFilter,
+      visibleHistory: this.filteredHistory(history, historyExpanded, historyFilter),
+      questTimeline: history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 })),
       notice:
         this.data.notice === "请求较多，冷却后会自动刷新"
           ? ""
@@ -620,6 +640,24 @@ Page({
       notice: "",
     });
   },
+  filteredHistory(history, expanded, filter) {
+    const entries = history.filter(h => filter === "all" || h.category === filter);
+    return expanded ? entries.slice().reverse() : entries.slice(-3).reverse();
+  },
+  toggleHistory() {
+    const historyExpanded = !this.data.historyExpanded;
+    this.setData({ historyExpanded, historyFilter: "all", visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all") });
+  },
+  filterHistory(e) {
+    const historyFilter = e.currentTarget.dataset.filter;
+    if (!["all", "vote", "quest", "skill", "other"].includes(historyFilter)) return;
+    this.setData({ historyFilter, visibleHistory: this.filteredHistory(this.data.history, true, historyFilter) });
+  },
+  showQuestRecord(e) {
+    const entry = this.data.questTimeline.find(h => h.key === Number(e.currentTarget.dataset.key));
+    if (!entry) return;
+    wx.showModal({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
+  },
   toggleRules() {
     this.setData({ showRules: !this.data.showRules });
   },
@@ -627,14 +665,15 @@ Page({
     this.setData({ showRoomRules: true });
   },
   openBoardDetails() {
-    if (!this.data.room) return;
     this.setData({ showRoomRules: false });
+    const room = this.data.room;
     wx.navigateTo({
       url:
         "/pages/board-details/board-details?board=" +
-        this.data.room.board +
+        encodeURIComponent(room ? room.board : this.data.boardId) +
         "&capacity=" +
-        this.data.room.capacity,
+        (room ? room.capacity : this.data.capacity) +
+        "&from=" + (room ? "room" : "create"),
     });
   },
   closeRoomRules() {

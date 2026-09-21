@@ -1208,3 +1208,57 @@ test("小程序点自己的座位确认站起，点空位坐下，点他人不�
   await p.seat({ currentTarget: { dataset: { seat: 3 } } });
   assert.equal(calls.length, 2);
 });
+
+test("公开记录默认最近三条，分类保留完整记录且刷新后保持筛选", async () => {
+  const room = { code: "123456", stage: "t1", phase: "tools", capacity: 6, players: [], team: [], me: { seat: 1 }, history: [
+    { kind: "toolVote", approved: true, team: [1], votes: [{ seat: 1, approve: true }] },
+    { kind: "toolQuest", success: false, team: [1, 2], fails: 2, threshold: 2 },
+    { kind: "skillResult", text: "技能最终结果", detail: "无出局" },
+    { kind: "toolCanceled", text: "已作废" },
+  ] };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.history.length, 4);
+  assert.equal(p.data.visibleHistory.length, 3);
+  assert.equal(p.data.visibleHistory[0].text, "已作废");
+  assert.equal(p.data.questTimeline[0].thresholdLabel, "至少 2 张失败票才失败");
+  p.toggleHistory();
+  assert.equal(p.data.visibleHistory.length, 4);
+  p.filterHistory({ currentTarget: { dataset: { filter: "quest" } } });
+  await p.refresh();
+  assert.equal(p.data.visibleHistory.length, 1);
+  assert.equal(p.data.visibleHistory[0].questResult, "failure");
+  p.toggleHistory();
+  assert.equal(p.data.historyFilter, "all");
+  assert.equal(p.data.visibleHistory.length, 3);
+  room.phase = "lobby";
+  room.history = [];
+  await p.refresh();
+  assert.equal(p.data.questTimeline.length, 0);
+});
+
+test("行动入口按公开阶段命名，特殊技能不暴露角色", async () => {
+  const room = { code: "123456", stage: "s", phase: "identity", capacity: 6, players: [], team: [], history: [], me: { seat: 1 } };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  for (const [phase, label] of [["identity", "查看身份"], ["teamVote", "参与表决"], ["quest", "提交任务牌"], ["hunterTurn", "完成本轮操作"]]) {
+    room.phase = phase;
+    await p.refresh();
+    assert.equal(p.data.actionEntryLabel, label);
+  }
+});
+
+test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
+  let definition, url;
+  vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/table.js"), "utf8"), {
+    require: () => ({}), Page: p => definition = p,
+    wx: { navigateTo: o => url = o.url },
+  });
+  const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };
+  p.openBoardDetails();
+  assert.equal(url, "/pages/board-details/board-details?board=knights-11&capacity=11&from=create");
+  p.data.room = { board: "classic", capacity: 6 };
+  p.openBoardDetails();
+  assert.equal(url, "/pages/board-details/board-details?board=classic&capacity=6&from=room");
+});

@@ -1,6 +1,7 @@
 const api = require("../../api");
 Page({
   data: {
+    backLabel: "返回牌桌",
     loading: true,
     error: "",
     title: "",
@@ -12,6 +13,7 @@ Page({
   },
   onLoad(query) {
     this.alive = true;
+    this.setData({ backLabel: query.from === "create" ? "返回创建" : "返回牌桌" });
     this.boardId = query.board || "";
     this.capacity = Number(query.capacity) || 0;
     this.load();

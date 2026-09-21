@@ -252,6 +252,10 @@ scenes.knightSkills = {
   actionChoices: skillAction.options,
   actionTargets: [],
 };
+const detailsRender = factory("pages/board-details/board-details.wxml");
+const boardDetail = require("../server/board-info").knights;
+scenes.boardDetails = { loading: false, error: "", hasDetail: true, title: "阿瓦隆 · 十二骑士", capacity: 12, backLabel: "返回创建", ...boardDetail };
+const detailsCss = fs.readFileSync(path.join(root, "pages/board-details/board-details.wxss"), "utf8").replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const settingsRender = factory("pages/settings/settings.wxml");
 scenes.roomSettings = {
   loading: false,
@@ -280,7 +284,7 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}</style>${html(name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name === "boardDetails" ? detailsCss : ""}</style>${html(name === "boardDetails" ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");

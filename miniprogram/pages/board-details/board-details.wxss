@@ -122,8 +122,8 @@
 .detail-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12rpx 32rpx; font-size: 30rpx; font-weight: 600; }
 button.detail-close { margin: 0; min-height: 88rpx; padding: 12rpx 24rpx; font-size: 26rpx; background: var(--surface); color: var(--text); }
 .detail-nav { white-space: nowrap; width: 100%; padding-bottom: 12rpx; }
-button.detail-nav-item { display: inline-flex; margin: 0 0 0 16rpx; min-height: 88rpx; padding: 12rpx 20rpx; background: var(--surface); color: var(--accent); font-size: 26rpx; }
-.detail-nav-item:last-child { margin-right: 24rpx; }
+
+
 .detail-header { padding: 0 0 8rpx; }
 .detail-title { font-size: 40rpx; }
 .detail-capacity { display: block; margin: 8rpx 0 0; }
@@ -147,3 +147,14 @@ button.role-quick-toggle { display: flex; align-items: baseline; gap: 16rpx; wid
 .role-quick-brief { flex: 1; min-width: 0; font-size: 28rpx; line-height: 1.65; }
 .role-quick-arrow { flex: 0 0 24rpx; color: var(--muted); }
 .role-quick-detail { padding: 20rpx; background: var(--surface); border-radius: 12rpx; color: var(--muted); font-size: 28rpx; line-height: 1.75; }
+
+/* Explicit sizing avoids the native mini-program button width defaults. */
+button.detail-close { width: auto; flex: 0 0 auto; min-height: 88rpx; padding: 12rpx 0 12rpx 24rpx; background: transparent; border-radius: 0; color: var(--accent); font-weight: 400; }
+.detail-toolbar { font-size: 26rpx; color: var(--muted); }
+.detail-nav { padding-bottom: 0; }
+.detail-nav-inner { display: inline-flex; align-items: center; padding: 0 32rpx; gap: 32rpx; }
+.detail-nav-label { flex-shrink: 0; white-space: nowrap; color: var(--muted); font-size: 24rpx; }
+.detail-nav-item { display: inline-flex; align-items: center; min-height: 88rpx; color: var(--text); font-size: 26rpx; white-space: nowrap; }
+.detail-nav-arrow { margin-left: 8rpx; color: var(--accent); font-size: 22rpx; }
+.detail-section-title { display: flex; align-items: baseline; border-top: 0; border-left: 6rpx solid var(--accent); border-radius: 0 12rpx 12rpx 0; background: var(--surface); padding: 20rpx; margin: 40rpx 0 16rpx; font-size: 34rpx; line-height: 1.5; font-weight: 650; color: var(--text); }
+.detail-section-number { color: var(--accent); flex-shrink: 0; font-size: 26rpx; font-weight: 600; }
