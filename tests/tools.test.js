@@ -103,10 +103,12 @@ test("任务校验队员、失败门槛和角色出牌权限，失败只汇总�
     evil = r.players.find((p) => r.roles[p.uid] === "assassin");
   begin(r, "quest", { team: [good.seat, evil.seat], threshold: 2 });
   assert.throws(() => run(r, good.uid, "submit", { value: "fail" }), /不合法/);
+  const startedAt = r.activity.startedAt;
   run(r, good.uid, "submit", { value: "success" });
   run(r, evil.uid, "submit", { value: "fail" });
   assert.deepEqual(r.history.at(-1), {
     kind: "toolQuest",
+    startedAt,
     number: 1,
     team: [good.seat, evil.seat].sort((a, b) => a - b),
     fails: 1,
@@ -121,13 +123,14 @@ test("刀逆仆和刀梅林可独立发起，只有刺客操作，逆仆结果�
     reverse = r.players.find((p) => r.roles[p.uid] === "reverse"),
     merlin = r.players.find((p) => r.roles[p.uid] === "merlin");
   begin(r, "reverseStrike");
+  const startedAt = r.activity.startedAt;
   assert.equal(privateView(r, merlin.uid).action.kind, "confirm");
   run(r, assassin.uid, "submit", { value: reverse.seat });
   r.players
     .filter((p) => p.uid !== assassin.uid)
     .forEach((p) => run(r, p.uid, "submit", { value: "confirm" }));
   assert.equal(r.convertedReverse, reverse.uid);
-  assert.deepEqual(r.history.at(-1), { kind: "toolReverse", number: 1 });
+  assert.deepEqual(r.history.at(-1), { kind: "toolReverse", number: 1, startedAt });
   begin(r, "assassination");
   run(r, assassin.uid, "submit", { value: merlin.seat });
   r.players
@@ -236,4 +239,27 @@ test("刀人进度不暴露刺客、目标或选择，所有玩家都有完成�
   );
   assert.equal(publicView(r, "p1").history.length, 0);
   assert.throws(() => run(r, "p1", "settleTool"), /尚未完成/);
+});
+
+test("转换结果公开标记且记录发起时间，不泄露身份；旧记录不补时间", () => {
+  const r = setup(12, "knights");
+  const legacy = { kind: "variant", text: "旧记录" };
+  r.history.push(legacy);
+  r.knights.conversions = [true];
+  const before = Date.now();
+  begin(r, "conversion");
+  const entry = publicView(r, "p2").history.at(-1);
+  assert.equal(entry.resultType, "conversion");
+  assert.equal(entry.text, "本轮阵营转换");
+  assert.ok(entry.startedAt >= before && entry.startedAt <= Date.now());
+  assert.deepEqual(Object.keys(entry).sort(), ["kind", "resultType", "startedAt", "text"]);
+  assert.equal(legacy.startedAt, undefined);
+});
+
+test("公开记录隐藏旧的结束等待事件，保留最终技能结算", () => {
+  const r = setup();
+  r.history.push({ kind: "toolCutoff", text: "房主结束本阶段等待" }, { kind: "skillResult", text: "技能最终结果 · 含提前截止" });
+  const history = publicView(r, "p2").history;
+  assert.equal(history.some(h => h.kind === "toolCutoff"), false);
+  assert.equal(history.at(-1).kind, "skillResult");
 });

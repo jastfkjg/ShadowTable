@@ -326,6 +326,8 @@
     seats: [],
     history: [],
     latestResult: null,
+    seatsExpanded: true,
+    historyExpanded: false,
     canStart: false,
     startHint: "",
     canSettle: false,
@@ -694,10 +696,20 @@
         }
       );
     });
+    history.forEach(function (entry, i) {
+      var source = room.history[i];
+      var time = source.startedAt ? new Date(source.startedAt) : null;
+      entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
+      entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
+      entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
+    });
+    patch.seatsExpanded = state.room?.code === room.code ? state.seatsExpanded : true;
+    patch.historyExpanded = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.historyExpanded : false;
     patch.history = history;
     patch.latestResult = history.filter(function (_, i) {
       var h = room.history[i];
-      return ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].indexOf(h.kind) !== -1 || (h.kind === "variant" && h.number);
+      return ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].indexOf(h.kind) !== -1 || (h.kind === "variant" && (h.number || h.resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(h.text)));
     }).pop() || null;
     patch.canStart =
       room.players.length === room.capacity &&
@@ -1336,11 +1348,18 @@
       state._fairyLoading = false;
     }
   }
-  function acknowledgeFairyResult() {
-    if (state.busy || !state.fairyResultRevealed || !state.fairyResult) return;
-    var revision = state.fairyResult.revision;
-    setState({ fairyResult: null, fairyResultRevealed: false });
-    cmd("ackFairyResult", { revision: revision });
+  async function acknowledgeFairyResult() {
+    if (state.busy || state._fairyAckConfirm || !state.fairyResultRevealed || !state.fairyResult) return;
+    var result = state.fairyResult, gen = generation;
+    state._fairyAckConfirm = true;
+    try {
+      if (!(await confirm("关闭查验结果？", "关闭后不会再显示本次查验结果，请确认已记住。"))) return;
+      if (!alive || !foreground || generation !== gen || state.fairyResult !== result || !state.fairyResultRevealed) return;
+      setState({ fairyResult: null, fairyResultRevealed: false });
+      return cmd("ackFairyResult", { revision: result.revision });
+    } finally {
+      state._fairyAckConfirm = false;
+    }
   }
   async function showIdentityChange() {
     var room = state.room;
@@ -1806,8 +1825,8 @@
       '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
       '<div class="dialog-title">仙女查验结果</div><div class="small muted">仅供本人查看</div>' +
       (state.fairyResultRevealed
-        ? '<div class="private-info">' +
-          esc(state.fairyResult.information) +
+        ? '<div class="fairy-result-summary">' +
+          esc(state.fairyResult.summary || state.fairyResult.information) +
           "</div>" +
           btn("primary", "acknowledgeFairyResult", "记住了，遮盖结果", null, state.busy)
         : '<div class="private-info muted">结果已遮盖，请确认周围无人查看。</div>' +
@@ -1915,6 +1934,7 @@
       '<div class="dialog-title">' +
       (r.phase === "identity" ? "查看身份" : esc(state.actionLabel)) +
       "</div>";
+    if (r.phase === "teamVote") html += '<div class="action-team">' + (r.team.length ? '任务队伍：' + esc(r.team.join("、")) + '号' : '本次为全员表决（未指定任务队伍）') + '</div>';
     if (r.phase === "identity") {
       html += '<div class="action-identity">';
       if (state.actionSecret) {
@@ -2263,7 +2283,7 @@
           : "") +
         "</div>";
     if (state.latestResult && r.phase !== "lobby")
-      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="small muted">最近操作结果 · 公开记录中可回看</div><div class="latest-result-title">' + esc(state.latestResult.text) + '</div><div class="history-detail">' + esc(state.latestResult.detail) + '</div></div>';
+      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="small muted">最近操作结果 · 公开记录中可回看</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -2275,11 +2295,10 @@
           : "") +
         "</div>";
     }
-    html +=
-      '<div class="section-title">座位<span class="small muted">' +
-      (r.phase === "lobby" ? "点自己站起，点空位坐下" : "金色为队员，「你」为自己") +
-      "</span></div>" +
-      '<div class="seats">';
+    html += '<div class="section-title history-heading">座位' + btn("history-toggle", "toggleSeats", state.seatsExpanded ? "收起座位" : "展开座位") + '</div>';
+    if (state.seatsExpanded) {
+    if (r.phase === "lobby") html += '<div class="small muted">点自己站起，点空位坐下</div>';
+    html += '<div class="seats">';
     for (var i = 0; i < state.seats.length; i++) {
       var s = state.seats[i];
       html +=
@@ -2304,6 +2323,7 @@
         "</span></button>";
     }
     html += "</div>";
+    }
     if (r.phase === "lobby") {
       html += btn("leave-button", "leave", "离开房间", null, state.busy);
     } else {
@@ -2443,21 +2463,15 @@
           '</span></span><span class="quest-summary-item"><span class="quest-result-icon failure">×</span><span>失败 ' +
           state.questSummary.failure +
           "</span></span></div>";
-      if (state.history.length) html += '<div class="section-title">公开记录</div>';
-      for (var hh = 0; hh < state.history.length; hh++) {
-        var h = state.history[hh];
-        html +=
-          '<div class="history-row"><div class="history-title">' +
-          (h.questResult
-            ? '<span class="quest-result-icon ' +
-              h.questResult +
-              '">' +
-              (h.questResult === "success" ? "✓" : "×") +
-              "</span>"
-            : "") +
-          "<span>" +
-          esc(h.text) +
-          "</span></div>";
+      var quests = state.history.filter(function (h) { return h.questResult; });
+      if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
+        return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
+      }).join("") + '</div>';
+      if (state.history.length) html += '<div class="section-title">公开记录 · 共' + state.history.length + '条</div>';
+      var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
+      for (var hh = 0; hh < visibleHistory.length; hh++) {
+        var h = visibleHistory[hh];
+        html += '<div class="history-row"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.voteGroups && h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
         if (h.voteGroups) {
           html += h.voteGroups
             .map(function (g) {
@@ -2474,8 +2488,6 @@
               );
             })
             .join("");
-          if (h.teamLabel)
-            html += '<div class="history-team">队伍 · ' + esc(h.teamLabel) + "</div>";
         } else if (h.cards) {
           html +=
             '<div class="history-team">队伍 · ' +
@@ -2497,6 +2509,7 @@
           html += '<div class="muted small history-detail">' + esc(h.detail) + "</div>";
         html += "</div>";
       }
+      if (state.history.length > 3) html += btn("history-more", "toggleHistory", state.historyExpanded ? "收起记录" : "展开更早的 " + (state.history.length - 3) + " 条记录");
     }
     if (r.canUseTools)
       html +=
@@ -2506,11 +2519,14 @@
     html += viewHostBar();
     return html;
   }
+  function resultIcon(tone) {
+    return tone ? '<span class="quest-result-icon ' + tone + '" aria-hidden="true">' + (tone === "success" ? "✓" : "×") + '</span>' : '';
+  }
   function viewHostBar() {
     var r = state.room;
     if (!r.canUseTools || !r.hasActiveOperation || r.phase === "offlineFinal")
       return "";
-    if (r.closeWaiting) return '<div class="host-action-bar"><div class="host-action-bar-inner"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
+    if (r.closeWaiting) return '<div class="host-action-bar"><div class="host-action-bar-inner has-waiting"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
       btn("secondary bar-cancel bar-cutoff", "closeWaiting", r.closeWaiting.label || "结束等待", null, state.busy || !state.network) +
       (r.closeWaiting.mode !== "cancel" ? btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy || !state.network) : "") + '</div></div>';
     return (
@@ -3054,6 +3070,12 @@
       );
     },
     retrySettings: loadSettings,
+    toggleSeats: function () { setState({ seatsExpanded: !state.seatsExpanded }); },
+    toggleHistory: function () { setState({ historyExpanded: !state.historyExpanded }); },
+    showQuestRecord: function (el) {
+      var entry = state.history.find(function (h) { return h.key === Number(el.dataset.key); });
+      if (entry) confirm(entry.text, entry.detail, false);
+    },
     settingsSave: settingsSave,
     settingsBack: settingsBack,
     retryKick: sendKick,
@@ -3178,6 +3200,14 @@
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
+  var historyScrollY = 0;
+  window.addEventListener("scroll", function () {
+    var movingDown = window.scrollY > historyScrollY;
+    historyScrollY = window.scrollY;
+    if (!movingDown || !state.room || state.historyExpanded || state.history.length <= 3) return;
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24)
+      setState({ historyExpanded: true });
+  }, { passive: true });
   // ===== boot =====
   var codeMatch = /(?:\?|&)code=(\d{6})/.exec(location.search || "");
   if (codeMatch) inviteCode = codeMatch[1];

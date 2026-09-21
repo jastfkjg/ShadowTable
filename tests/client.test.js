@@ -1042,11 +1042,11 @@ test("仙女结果返回前切后台不显示，返回后默认遮盖，确认�
   assert.equal(p.data.fairyResultRevealed, false);
   const sent = [];
   p.cmd = (...args) => sent.push(args);
-  p.acknowledgeFairyResult();
+  await p.acknowledgeFairyResult();
   assert.equal(sent.length, 0);
   p.revealFairyResult();
   assert.equal(p.data.fairyResultRevealed, true);
-  p.acknowledgeFairyResult();
+  await p.acknowledgeFairyResult();
   assert.equal(sent[0][0], "ackFairyResult");
   assert.equal(sent[0][1].revision, 2);
   assert.equal(p.data.fairyResult, null);
@@ -1352,4 +1352,55 @@ test("身份遮盖不依赖网络或忙碌状态，未确认提交不开放新�
   await p.openAction();
   assert.equal(p.data.toolType, "");
   assert.equal(p.data.actionDialog, false);
+});
+
+test("小程序最近结果包含转换，时间到分钟，收起座位和触底展开记录保持到下一次刷新", async () => {
+  const { newRoom, publicView } = require("../server/engine");
+  const r = newRoom("123456", "host", "房主", "classic", 8);
+  r.phase = "tools";
+  r.history = Array.from({ length: 4 }, (_, i) => ({ kind: "variant", text: i === 3 ? "本轮阵营转换" : "已完成", ...(i === 3 ? { resultType: "conversion", startedAt: new Date(2026, 8, 21, 23, 40).getTime() } : {}) }));
+  const p = page({ request: async () => publicView(r, "host") });
+  p.roomCode = r.code;
+  await p.refresh();
+  assert.equal(p.data.latestResult.text, "本轮阵营转换");
+  assert.equal(p.data.latestResult.timeLabel, "23:40");
+  assert.equal(p.data.history[0].timeLabel, "");
+  assert.equal(p.data.visibleHistory.length, 3);
+  p.toggleSeats();
+  p.onReachBottom();
+  assert.equal(p.data.visibleHistory.length, 4);
+  assert.equal(p.data.visibleHistory[0].key, 3);
+  await p.refresh();
+  assert.equal(p.data.seatsExpanded, false);
+  assert.equal(p.data.historyExpanded, true);
+  p.toggleHistory();
+  p.onReachBottom();
+  assert.equal(p.data.visibleHistory.length, 3);
+  p.onPageScroll({ scrollTop: 100 });
+  p.onReachBottom();
+  assert.equal(p.data.visibleHistory.length, 4);
+});
+
+test("仙女结果关闭确认可取消，确认期间换结果或切后台不误确认", async () => {
+  const p = page({});
+  const result = { revision: 3, summary: "6号 · 坏人" };
+  const sent = [];
+  p.cmd = (...args) => sent.push(args);
+  p.data.fairyResult = result;
+  p.data.fairyResultRevealed = true;
+  p.confirm = async (title, content) => {
+    assert.match(content, /关闭后不会再显示本次查验结果/);
+    return false;
+  };
+  await p.acknowledgeFairyResult();
+  assert.equal(p.data.fairyResult, result);
+  assert.equal(sent.length, 0);
+  p.confirm = async () => { p.foreground = false; return true; };
+  await p.acknowledgeFairyResult();
+  assert.equal(sent.length, 0);
+  p.foreground = true;
+  p.confirm = async () => true;
+  await p.acknowledgeFairyResult();
+  assert.equal(sent[0][1].revision, 3);
+  assert.equal(p.data.fairyResult, null);
 });

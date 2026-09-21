@@ -607,3 +607,28 @@ test("湖仙设置所有板子可见，5/6人及查验进行中禁用开关", ()
     }
   }
 });
+
+test("结果卡和表决展示队伍，座位可折叠，公开记录底部展开且没有冗余说明", () => {
+  const entry = { key: 3, text: "投票通过", resultTone: "success", resultTeam: "1、4号", latestDetail: "2票赞成", timeLabel: "23:38", recordLabel: "记录 4" };
+  const data = { ...base, room: { phase: "teamVote", team: [1, 4], me: { submitted: false }, needsSubmission: true }, teamText: "1、4", actionDialog: true, seatsExpanded: false, latestResult: entry, history: [entry, entry, entry, entry], visibleHistory: [entry], questTimeline: [{ key: 1, number: 2, text: "任务成功", questResult: "success" }] };
+  const tree = render(data);
+  const text = JSON.stringify(tree);
+  assert.ok(text.includes("任务队伍：1、4号"));
+  assert.ok(text.includes("共4条"));
+  assert.ok(text.includes("23:38"));
+  assert.ok(text.includes("第2次"));
+  assert.ok(!text.includes("最近三条"));
+  assert.ok(!nodes(tree).some(n => n.attr?.class === "seats"));
+  assert.ok(byHandler(tree, "toggleSeats"));
+  assert.ok(byHandler(tree, "toggleHistory"));
+  assert.ok(nodes(tree).some(n => n.attr?.class?.includes("quest-result-icon success")));
+});
+
+test("查验结果突出座位阵营，仅保留一个关闭入口", () => {
+  const tree = render({ ...base, fairyResult: { revision: 1, information: "6号查验结果：坏人（第1轮）", summary: "6号 · 坏人" }, fairyResultRevealed: true });
+  const text = JSON.stringify(tree);
+  assert.ok(text.includes("6号 · 坏人"));
+  assert.ok(!text.includes("第1轮"));
+  assert.ok(!text.includes("立即遮盖"));
+  assert.ok(byHandler(tree, "acknowledgeFairyResult"));
+});

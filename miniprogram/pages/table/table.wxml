@@ -3,8 +3,7 @@
     <view class="dialog-title">仙女查验结果</view>
     <view class="small muted">仅供本人查看</view>
     <block wx:if="{{fairyResultRevealed}}">
-      <view class="private-info">{{fairyResult.information}}</view>
-      <button class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
+      <view class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
       <button class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button>
     </block>
     <block wx:else>
@@ -56,6 +55,7 @@
   <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog action-dialog" role="dialog" aria-modal="true" aria-label="当前操作">
       <view class="dialog-title">{{room.phase==='identity'?'查看身份':actionLabel}}</view>
+      <view wx:if="{{room.phase==='teamVote'}}" class="action-team">{{room.team.length?'任务队伍：'+teamText+'号':'本次为全员表决（未指定任务队伍）'}}</view>
       <view wx:if="{{room.phase==='identity'}}" class="action-identity">
         <view wx:if="{{actionSecret}}" class="action-identity-details">
           <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
@@ -223,8 +223,8 @@
     </view>
     <view wx:if="{{latestResult && room.phase!=='lobby'}}" class="latest-result" role="status" aria-label="最近操作结果">
       <view class="small muted">最近操作结果 · 公开记录中可回看</view>
-      <view class="latest-result-title">{{latestResult.text}}</view>
-      <view class="history-detail">{{latestResult.detail}}</view>
+      <view class="latest-result-title result-heading"><text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text><text>{{latestResult.text}}</text><text wx:if="{{latestResult.resultTeam}}" class="result-team">队伍 {{latestResult.resultTeam}}</text></view>
+      <view class="history-detail">{{latestResult.latestDetail || latestResult.detail}}</view>
     </view>
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
@@ -267,13 +267,9 @@
       <view wx:elif="{{room.flexible && room.phase==='tools'}}" class="panel">
         <view class="label">等待房主发起操作</view>
       </view>
-    <view class="section-title"
-      >座位
-      <text class="small muted"
-        >{{room.phase==='lobby'?'点自己站起，点空位坐下':'任务队员、房主与出局状态已标注'}}</text
-      ></view
-    >
-    <view class="seats"
+    <view class="section-title history-heading"><text>座位</text><button class="history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'展开座位'}}</button></view>
+    <view wx:if="{{seatsExpanded !== false && room.phase==='lobby'}}" class="small muted">点自己站起，点空位坐下</view>
+    <view wx:if="{{seatsExpanded !== false}}" class="seats"
       ><button
         wx:for="{{seats}}"
         wx:key="seat"
@@ -346,23 +342,21 @@
         <view class="quest-summary-item"><text class="quest-result-icon failure" aria-hidden="true">×</text><text>失败 {{questSummary.failure}}</text></view>
       </view>
       <view wx:if="{{questTimeline.length}}" class="quest-timeline">
-        <button wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">{{item.number}} · {{item.questResult==='success'?'✓':'×'}}</button>
+        <button wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
       </view>
-      <view wx:if="{{history.length}}" class="section-title history-heading"><text>公开记录 · {{history.length}}</text><button class="history-toggle" bindtap="toggleHistory">{{historyExpanded?'收起':'查看全部'}}</button></view>
+      <view wx:if="{{history.length}}" class="section-title history-heading"><text>公开记录 · 共{{history.length}}条</text></view>
       <view wx:if="{{historyExpanded}}" class="history-filters">
         <button wx:for="{{['all','vote','quest','skill','other']}}" wx:key="*this" class="history-filter {{historyFilter===item?'active':''}}" bindtap="filterHistory" data-filter="{{item}}">{{item==='all'?'全部':item==='vote'?'投票':item==='quest'?'任务':item==='skill'?'技能':'其他'}}</button>
       </view>
       <view wx:if="{{historyExpanded && !visibleHistory.length}}" class="small muted">暂无此类公开记录</view>
-      <view wx:if="{{history.length && !historyExpanded}}" class="small muted">最近三条 · 最新在前</view
-      ><view wx:for="{{visibleHistory}}" wx:key="key" class="history-row"
-        ><view class="small muted">{{item.recordLabel}}</view><view class="history-title"><text wx:if="{{item.questResult}}" class="quest-result-icon {{item.questResult}}" aria-hidden="true">{{item.questResult==='success'?'✓':'×'}}</text><text>{{item.text}}</text></view
+      <view wx:for="{{visibleHistory}}" wx:key="key" class="history-row"
+        ><view class="history-meta small muted"><text>{{item.recordLabel}}</text><text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text></view><view class="history-title"><text wx:if="{{item.resultTone || item.questResult}}" class="quest-result-icon {{item.resultTone || item.questResult}}" aria-hidden="true">{{(item.resultTone || item.questResult)==='success'?'✓':'×'}}</text><text>{{item.text}}</text><text wx:if="{{item.voteGroups && item.teamLabel}}" class="result-team">队伍 {{item.teamLabel}}</text></view
         >
         <block wx:if="{{item.voteGroups}}">
           <view wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="history-vote-line">
             <view class="history-vote-count {{group.tone}}"><text class="history-count">{{group.count}}</text><text>票{{group.label}}</text></view>
             <view class="history-vote-seats">{{group.seats}}</view>
           </view>
-          <view wx:if="{{item.teamLabel}}" class="history-team">队伍 · {{item.teamLabel}}</view>
         </block>
         <block wx:elif="{{item.cards}}">
           <view class="history-team">队伍 · {{item.teamLabel}}</view>
@@ -370,12 +364,13 @@
         </block>
         <view wx:else class="muted small history-detail">{{item.detail}}</view></view
       >
+      <button wx:if="{{history.length > 3}}" class="history-more" bindtap="toggleHistory">{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}</button>
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
       <button class="finish-game-button" bindtap="finishTools" disabled="{{hasPendingRequest || busy}}">结束本局</button>
     </view>
     <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
-      <view class="host-action-bar-inner">
+      <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}}">
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
         <button wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
         <button wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy}}">{{canSettle?'结算当前操作':settleHint}}</button>

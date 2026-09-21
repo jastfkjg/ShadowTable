@@ -21,7 +21,7 @@ function client(fetch) {
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { state, schedule, loadSettings, settingsSave, CHANGES, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+    window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
@@ -294,4 +294,52 @@ test("网页自动保存失败保留原请求重试，未确认时禁止再次�
   assert.ok(writes[0].id);
   assert.equal(c.state.settings.pendingSave, false);
   assert.equal(c.state.settings.error, "");
+});
+
+test("结果图标、记录时间与最近转换可见；座位可收起，记录从三条展开", async () => {
+  const r = newRoom("123456", "host", "房主", "classic", 8);
+  r.phase = "tools";
+  r.history = [
+    { kind: "toolQuest", number: 1, team: [1, 3], fails: 1, success: false },
+    { kind: "toolQuest", number: 2, team: [1, 3], fails: 0, success: true },
+    { kind: "toolVote", number: 3, team: [1, 4], approved: true, votes: [{ seat: 1, approve: true }], startedAt: new Date(2026, 8, 21, 23, 38).getTime() },
+    { kind: "variant", resultType: "conversion", text: "本轮阵营转换", startedAt: new Date(2026, 8, 21, 23, 40).getTime() },
+  ];
+  const c = client(async () => response(publicView(r, "host")));
+  await c.refresh();
+  assert.equal(c.state.latestResult.text, "本轮阵营转换");
+  assert.equal(c.state.history[2].resultTone, "success");
+  assert.equal(c.state.history[0].resultTone, "failure");
+  assert.equal(c.state.history[2].timeLabel, "23:38");
+  assert.equal(c.state.history[0].timeLabel, "");
+  let html = c.viewRoom();
+  assert.match(html, /公开记录 · 共4条/);
+  assert.match(html, /第1次 · × 失败/);
+  assert.equal((html.match(/class="history-row"/g) || []).length, 3);
+  assert.match(html, /展开更早的 1 条记录/);
+  c.ACTIONS.toggleHistory();
+  html = c.viewRoom();
+  assert.equal((html.match(/class="history-row"/g) || []).length, 4);
+  assert.ok(html.indexOf("记录 4") < html.indexOf("记录 1"));
+  c.ACTIONS.toggleSeats();
+  assert.doesNotMatch(c.viewRoom(), /class="seats"/);
+  c.ACTIONS.toggleSeats();
+  assert.match(c.viewRoom(), /class="seats"/);
+  c.state.room = { ...c.state.room, phase: "teamVote", team: [1, 4], needsSubmission: true };
+  c.state.actionDialog = true;
+  c.state.actionLabel = "是否同意这支队伍？";
+  assert.match(c.viewActionDialog(), /任务队伍：1、4号/);
+});
+
+test("网页仙女关闭需确认，取消保留结果，等待确认时新结果不被旧确认清除", async () => {
+  const c = client(async () => { throw new Error("不应提交"); });
+  const result = { revision: 1, summary: "6号 · 坏人" };
+  c.state.fairyResult = result;
+  c.state.fairyResultRevealed = true;
+  c.setConfirm(async (title, text) => { assert.match(text, /关闭后不会再显示/); return false; });
+  await c.ACTIONS.acknowledgeFairyResult();
+  assert.equal(c.state.fairyResult, result);
+  c.setConfirm(async () => { c.state.fairyResult = { revision: 2 }; return true; });
+  await c.ACTIONS.acknowledgeFairyResult();
+  assert.equal(c.state.fairyResult.revision, 2);
 });

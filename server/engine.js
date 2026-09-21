@@ -618,6 +618,7 @@ function privateView(room, uid) {
       ? {
           revision: fairyResult.fairyRevision || 1,
           information: fairyResult.fairyInfo,
+          summary: fairyResult.fairyInfo.replace(/（第\d+轮）$/, "").replace("号查验结果：", "号 · "),
         }
       : null,
     role: name,
@@ -678,6 +679,7 @@ function convertKnights(room) {
   room.history.push({
     kind: "variant",
     text: change ? "本轮阵营转换" : "本轮不转换",
+    resultType: "conversion",
   });
 }
 function beginActivity(room, input) {
@@ -1156,13 +1158,13 @@ function publicView(room, uid) {
     quests: room.quests || [],
     history: room.history.filter(
       (h) =>
-        room.showSkillDetails === true ||
+        h.kind !== "toolCutoff" && (room.showSkillDetails === true ||
         !(
           h.kind === "skillDetail" ||
           (isKnights(room.board) &&
             h.kind === "variant" &&
             /^\d+号(?:使用技能|开枪|使用复活)/.test(h.text || ""))
-        ),
+        )),
     ),
     result: room.result || null,
     proposalSubmitted: !!room.proposalSubmitted,
@@ -1185,6 +1187,14 @@ function publicView(room, uid) {
   };
 }
 function command(room, uid, input) {
+  const previous = new Set(room.history);
+  const startedAt = room.activity?.startedAt || Date.now();
+  applyCommand(room, uid, input);
+  for (const entry of room.history) {
+    if (!previous.has(entry) && !entry.startedAt) entry.startedAt = startedAt;
+  }
+}
+function applyCommand(room, uid, input) {
   const p = member(room, uid);
   requireRule(input && typeof input === "object", "请求格式错误");
   requireRule(input.stage === room.stage, "阶段已变化，请刷新后重新操作", 409);
@@ -1298,13 +1308,6 @@ function command(room, uid, input) {
         next.submissions[player.uid] = policy.mode;
       }
       next.activity.earlyClosed = true;
-      if (policy.mode === "pass")
-        next.history.push({
-          kind: "toolCutoff",
-          number: next.activity.number,
-          text: "房主结束本阶段等待",
-          detail: "未提交者按不使用技能／确认处理，已提交行动照常结算。",
-        });
       settleIfComplete(next);
     }
     Object.assign(room, next);

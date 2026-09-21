@@ -106,6 +106,7 @@ Page({
     room: null,
     latestResult: null,
     historyExpanded: false,
+    seatsExpanded: true,
     historyFilter: "all",
     visibleHistory: [],
     questTimeline: [],
@@ -443,6 +444,11 @@ Page({
         : ["toolQuest", "quest"].includes(source.kind) ? "quest"
         : ["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind) ? "skill" : "other";
       entry.recordLabel = `记录 ${i + 1}`;
+      const time = source.startedAt ? new Date(source.startedAt) : null;
+      entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
+      entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
+      entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
       entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
     });
     const historyExpanded = this.data.room?.code === room.code && this.data.room?.phase !== "lobby" && room.phase !== "lobby" ? this.data.historyExpanded : false;
@@ -451,6 +457,7 @@ Page({
     this.updateChangedData({
       ...privacyUpdate,
       actionEntryLabel,
+      seatsExpanded: this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       historyExpanded,
       historyFilter,
       visibleHistory: this.filteredHistory(history, historyExpanded, historyFilter),
@@ -482,7 +489,7 @@ Page({
       history,
       latestResult: history.filter((_, i) =>
         ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].includes(room.history[i].kind) ||
-        (room.history[i].kind === "variant" && room.history[i].number)
+        (room.history[i].kind === "variant" && (room.history[i].number || room.history[i].resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(room.history[i].text)))
       ).pop() || null,
       questSummary: {
         total: history.filter((h) => h.questResult).length,
@@ -658,8 +665,19 @@ Page({
     const entries = history.filter(h => filter === "all" || h.category === filter);
     return expanded ? entries.slice().reverse() : entries.slice(-3).reverse();
   },
+  toggleSeats() {
+    this.setData({ seatsExpanded: !this.data.seatsExpanded });
+  },
+  onPageScroll(e) {
+    if (e.scrollTop > (this.lastScrollTop || 0)) this.historyAutoExpandReady = true;
+    this.lastScrollTop = e.scrollTop;
+  },
+  onReachBottom() {
+    if (this.historyAutoExpandReady !== false && !this.data.historyExpanded && this.data.history.length > 3) this.toggleHistory();
+  },
   toggleHistory() {
     const historyExpanded = !this.data.historyExpanded;
+    this.historyAutoExpandReady = historyExpanded;
     this.setData({ historyExpanded, historyFilter: "all", visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all") });
   },
   filterHistory(e) {
@@ -1326,16 +1344,24 @@ Page({
     if (this.data.busy || !this.foreground || !this.data.fairyResult) return;
     this.setData({ fairyResultRevealed: true });
   },
-  acknowledgeFairyResult() {
+  async acknowledgeFairyResult() {
     if (
-      this.data.busy ||
+      this.data.busy || this.fairyAckConfirm ||
       !this.data.fairyResultRevealed ||
       !this.data.fairyResult
     )
       return;
-    const revision = this.data.fairyResult.revision;
-    this.setData({ fairyResult: null, fairyResultRevealed: false });
-    this.cmd("ackFairyResult", { revision });
+    const result = this.data.fairyResult;
+    const generation = this.generation;
+    this.fairyAckConfirm = true;
+    try {
+      if (!(await this.confirm("关闭查验结果？", "关闭后不会再显示本次查验结果，请确认已记住。"))) return;
+      if (!this.alive || !this.foreground || generation !== this.generation || this.data.fairyResult !== result || !this.data.fairyResultRevealed) return;
+      this.setData({ fairyResult: null, fairyResultRevealed: false });
+      return this.cmd("ackFairyResult", { revision: result.revision });
+    } finally {
+      this.fairyAckConfirm = false;
+    }
   },
   async showIdentityChange() {
     const room = this.data.room;
