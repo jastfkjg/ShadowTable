@@ -6,7 +6,9 @@ const { randomUUID } = require("node:crypto");
 const { createApp } = require("../server/app");
 function page(api, storage = new Map()) {
   let definition;
+  const scrolls = [];
   const wx = {
+    pageScrollTo: options => scrolls.push(options),
     getStorageSync: (k) => storage.get(k),
     setStorageSync: (k, v) => storage.set(k, v),
     removeStorageSync: (k) => storage.delete(k),
@@ -27,12 +29,14 @@ function page(api, storage = new Map()) {
   );
   const p = {
     ...definition,
+    scrolls,
     data: structuredClone(definition.data),
     alive: true,
     foreground: true,
     generation: 0,
-    setData(data) {
+    setData(data, callback) {
       Object.assign(this.data, data);
+      if (callback) callback();
     },
   };
   p.schedule = () => {};
@@ -1405,4 +1409,24 @@ test("仙女结果关闭确认可取消，确认期间换结果或切后台不�
   await p.acknowledgeFairyResult();
   assert.equal(sent[0][1].revision, 3);
   assert.equal(p.data.fairyResult, null);
+});
+
+test("查看最近结果清除记录筛选并在渲染后定位目标记录", () => {
+  const p = page({});
+  p.data.room = { code: "123456", game: 1 };
+  p.data.history = Array.from({ length: 6 }, (_, key) => ({ key, category: "skill", text: "阵营转换" }));
+  p.data.latestResult = p.data.history[0];
+  p.data.historyFilter = "quest";
+  p.showLatestRecord();
+  assert.equal(p.data.historyExpanded, true);
+  assert.equal(p.data.historyFilter, "all");
+  assert.equal(p.data.visibleHistory.length, 6);
+  assert.equal(p.data.focusedHistoryKey, 0);
+  assert.equal(p.scrolls[0].selector, "#history-record-0");
+  p.data.historyExpanded = false;
+  p.data.latestResult = p.data.history[5];
+  p.showLatestRecord();
+  assert.equal(p.data.historyExpanded, false);
+  assert.equal(p.data.visibleHistory.length, 3);
+  assert.equal(p.scrolls[1].selector, "#history-record-5");
 });

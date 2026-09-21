@@ -6,10 +6,11 @@ const { newRoom, enter, command, publicView, BOARDS } = require("../server/engin
 
 function client(fetch) {
   let scheduled;
-  const element = { addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
+  const scrolls = [], lookups = [];
+  const element = { focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
-    document: { hidden: false, getElementById: () => element, addEventListener() {} },
+    document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener() {} },
     window: { addEventListener() {} },
     localStorage: { getItem: () => "session", setItem() {}, removeItem() {} },
     navigator: {},
@@ -27,7 +28,7 @@ function client(fetch) {
       stop() { foreground = false; }
     };
   })();`, context);
-  return { ...context.window.test, scheduled: () => scheduled };
+  return { ...context.window.test, scrolls, lookups, scheduled: () => scheduled };
 }
 const response = (body) => ({ status: 200, json: async () => body });
 
@@ -342,4 +343,54 @@ test("网页仙女关闭需确认，取消保留结果，等待确认时新结�
   c.setConfirm(async () => { c.state.fairyResult = { revision: 2 }; return true; });
   await c.ACTIONS.acknowledgeFairyResult();
   assert.equal(c.state.fairyResult.revision, 2);
+});
+
+test("网页阶段集中待办，房主工具与任务进度优先，最近结果仅展示公开数据", async () => {
+  const room = newRoom("123456", "p1", "房主");
+  const run = (uid, type, extra = {}) => command(room, uid, { type, stage: room.stage, ...extra });
+  for (let i = 2; i <= 6; i++) enter(room, `p${i}`, `玩家${i}`);
+  room.players.forEach(p => run(p.uid, "ready", { ready: true }));
+  run("p1", "start", { flexible: true });
+  run("p1", "beginActivity", { kind: "quest", team: [2], threshold: 1 });
+  run("p2", "submit", { value: "success" });
+  const c = client(async () => response(publicView(room, "p1")));
+  await c.refresh();
+  let html = c.viewRoom();
+  assert.equal((html.match(/等待房主发起操作/g) || []).length, 1);
+  assert.ok(html.indexOf('data-action="openTool"') < html.indexOf("玩家与座位"));
+  assert.ok(html.indexOf("任务进度") < html.indexOf("玩家与座位"));
+  c.ACTIONS.showLatestRecord();
+  assert.equal(c.lookups.at(-1), "history-record-" + c.state.latestResult.key);
+  assert.equal(c.scrolls.length, 1);
+  assert.equal(c.state.focusedHistoryKey, c.state.latestResult.key);
+  run("p1", "beginActivity", { kind: "vote" });
+  await c.refresh();
+  html = c.viewRoom();
+  assert.ok(html.indexOf('data-action="openAction"') < html.indexOf('data-action="reveal"'));
+  assert.match(html, /class="primary" data-action="openAction"/);
+});
+
+test("网页断网或等待请求时仍可立即遮盖身份", async () => {
+  const c = client();
+  c.state.room = publicView(newRoom("123456", "p1", "房主"), "p1");
+  c.state.room.phase = "tools";
+  c.state.revealed = true;
+  c.state.secret = { role: "私密身份", information: "私密视野" };
+  c.state.busy = true;
+  c.state.network = false;
+  assert.match(c.viewRoom(), /data-action="reveal">立即遮盖/);
+  await c.ACTIONS.reveal();
+  assert.equal(c.state.revealed, false);
+  assert.doesNotMatch(c.viewRoom(), /私密身份|私密视野/);
+});
+
+test("查看结果定位更早的公开记录，并展开被折叠的目标", () => {
+  const c = client();
+  c.state.history = [0, 1, 2, 3, 4].map(key => ({ key, text: "公开记录" }));
+  c.state.latestResult = c.state.history[0];
+  c.ACTIONS.showLatestRecord();
+  assert.equal(c.state.historyExpanded, true);
+  assert.equal(c.state.focusedHistoryKey, 0);
+  assert.equal(c.lookups.at(-1), "history-record-0");
+  assert.equal(c.scrolls[0].block, "start");
 });

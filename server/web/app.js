@@ -329,6 +329,7 @@
     latestResult: null,
     seatsExpanded: true,
     historyExpanded: false,
+    focusedHistoryKey: null,
     canStart: false,
     startHint: "",
     canSettle: false,
@@ -707,6 +708,7 @@
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
     patch.historyExpanded = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.historyExpanded : false;
+    patch.focusedHistoryKey = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.focusedHistoryKey : null;
     patch.history = history;
     patch.latestResult = history.filter(function (_, i) {
       var h = room.history[i];
@@ -2205,7 +2207,7 @@
       "</span></div></div>";
     html +=
       '<div class="row subline room-subline"><div class="room-board-info">' +
-      (r.testRoom ? '<span class="small">测试房间 · 陪测已开启</span>' : "") +
+      (r.testRoom ? '<span class="small room-test-label">测试房间 · 陪测已开启</span>' : "") +
       '<span class="room-board-name">' +
       esc(r.boardName) +
       " · " +
@@ -2213,7 +2215,7 @@
       '人</span><button type="button" class="room-rules-button" data-action="openRoomRules">配置说明</button></div>' +
       (r.me.isHost
         ? '<button type="button" class="room-rules-button" data-action="toggleRoomSettings">房间设置</button>'
-        : '<span class="room-host-label">玩家</span>') +
+        : "") +
       "</div>";
     if (state.showRoomRules) {
       html +=
@@ -2247,8 +2249,17 @@
             ? "<span>队长 " + r.leader + " 号 · 连续否决 " + r.rejects + " / 5</span>"
             : "") +
           "</div>"
-        : "") +
-      "</div>";
+        : "");
+    if (r.operationStatus || r.needsSubmission)
+      html +=
+        '<div class="action-entry" role="status"><div class="action-status-copy"><div>' +
+        esc(r.operationStatus ? r.operationStatus.title : r.me.submitted ? "已提交，等待其他玩家" : "请完成本次操作") +
+        '</div><div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "") + '</div></div>' +
+        (r.needsSubmission && !r.me.submitted
+          ? btn("primary", "openAction", "立即操作", null, state.busy || state.actionLoading || !state.network)
+          : "") +
+        "</div>";
+    html += "</div>";
     if (r.phase !== "lobby" && r.me.seat !== null) {
       if (!state.revealed)
         html +=
@@ -2270,20 +2281,11 @@
             : "") +
           "</div>" +
           viewSkillStatus(state.secret) +
-          btn("secondary", "reveal", "立即遮盖", null, state.busy || !state.network) +
+          btn("secondary", "reveal", "立即遮盖") +
           "</div>";
     }
-    if (r.operationStatus || r.needsSubmission)
-      html +=
-        '<div class="action-entry" role="status"><div class="action-status-copy"><div>' +
-        esc(r.operationStatus ? r.operationStatus.title : r.me.submitted ? "已提交，等待其他玩家" : "请完成本次操作") +
-        '</div><div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "") + '</div></div>' +
-        (r.needsSubmission && !r.me.submitted
-          ? btn("secondary", "openAction", "立即操作", null, state.busy || state.actionLoading || !state.network)
-          : "") +
-        "</div>";
     if (state.latestResult && r.phase !== "lobby")
-      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="small muted">最近操作结果 · 公开记录中可回看</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
+      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">最近操作结果</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -2295,7 +2297,62 @@
           : "") +
         "</div>";
     }
-    html += '<div class="section-title history-heading">座位' + (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : btn("history-toggle", "toggleSeats", state.seatsExpanded ? "收起座位" : "展开座位")) + '</div>';
+    if (r.canUseTools) {
+      html +=
+        '<div class="panel host-panel"><div class="label">房主操作</div>' +
+        (r.knights
+          ? '<div class="small muted">第' +
+            r.knights.round +
+            "轮 · B牌剩余" +
+            r.knights.remainingCards +
+            '张</div><div class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</div>'
+          : "") +
+        '<div class="tool-actions">' +
+        btn("secondary", "openTool", "投票", { kind: "vote" }, state.busy) +
+        btn("secondary", "openTool", "做任务", { kind: "quest" }, state.busy) +
+        (r.knights
+          ? btn("secondary", "openTool", "使用技能", { kind: "skills" }, state.busy) +
+            btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
+          : "") +
+        (r.fairyEnabled ? btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy) : "") +
+        (r.hasReverse && !r.knifeOffline
+          ? btn("secondary", "openTool", "刀逆仆", { kind: "reverseStrike" }, state.busy)
+          : "") +
+        "</div>";
+      if (r.operationProgress) {
+        html +=
+          '<div class="operation-progress"><div class="progress-heading"><span>当前操作进度</span><span>' +
+          r.operationProgress.completed +
+          " / " +
+          r.operationProgress.total +
+          " 已完成</span></div>";
+        for (var q = 0; q < (r.operationProgress.players || []).length; q++) {
+          var pp = r.operationProgress.players[q];
+          if (!pp.required) continue;
+          html +=
+            '<div class="progress-player"><span class="progress-player-name">' +
+            pp.seat +
+            "号 · " +
+            esc(pp.name) +
+            '</span><span class="progress-state' +
+            (pp.completed ? " completed" : "") +
+            '">' +
+            (pp.completed ? "已完成" : "未完成") +
+            "</span></div>";
+        }
+        html += "</div>";
+      }
+      html += "</div>";
+    }
+    if (r.phase !== "lobby" && state.questSummary.total) {
+      html += '<div class="task-progress"><div class="section-title">任务进度</div>';
+      var quests = state.history.filter(function (h) { return h.questResult; });
+      if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
+        return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
+      }).join("") + '</div>';
+      html += '</div>';
+    }
+    html += '<div class="section-title history-heading"><div>玩家与座位<span class="seat-summary">' + r.capacity + '人' + (r.me.seat != null ? ' · 我在' + r.me.seat + '号' : '') + '</span></div>' + (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "展开座位") + '</button>' ) + '</div>';
     if (r.phase === "lobby" || state.seatsExpanded) {
     html += '<div class="seats">';
     for (var i = 0; i < state.seats.length; i++) {
@@ -2406,71 +2463,11 @@
             ? btn("primary", "closeOffline", "线下已完成，记录结果", null, state.busy)
             : "") +
           "</div>";
-      if (r.canUseTools) {
-        html +=
-          '<div class="panel host-panel"><div class="label">房主操作</div>' +
-          (r.knights
-            ? '<div class="small muted">第' +
-              r.knights.round +
-              "轮 · B牌剩余" +
-              r.knights.remainingCards +
-              '张</div><div class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</div>'
-            : "") +
-          '<div class="tool-actions">' +
-          btn("secondary", "openTool", "投票", { kind: "vote" }, state.busy) +
-          btn("secondary", "openTool", "做任务", { kind: "quest" }, state.busy) +
-          (r.knights
-            ? btn("secondary", "openTool", "使用技能", { kind: "skills" }, state.busy) +
-              btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
-            : "") +
-          (r.fairyEnabled ? btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy) : "") +
-          (r.hasReverse && !r.knifeOffline
-            ? btn("secondary", "openTool", "刀逆仆", { kind: "reverseStrike" }, state.busy)
-            : "") +
-          "</div>";
-        if (r.operationProgress) {
-          html +=
-            '<div class="operation-progress"><div class="progress-heading"><span>当前操作进度</span><span>' +
-            r.operationProgress.completed +
-            " / " +
-            r.operationProgress.total +
-            " 已完成</span></div>";
-          for (var q = 0; q < (r.operationProgress.players || []).length; q++) {
-            var pp = r.operationProgress.players[q];
-            if (!pp.required) continue;
-            html +=
-              '<div class="progress-player"><span class="progress-player-name">' +
-              pp.seat +
-              "号 · " +
-              esc(pp.name) +
-              '</span><span class="progress-state' +
-              (pp.completed ? " completed" : "") +
-              '">' +
-              (pp.completed ? "已完成" : "未完成") +
-              "</span></div>";
-          }
-          html += "</div>";
-        }
-        html += "</div>";
-      } else if (r.flexible && r.phase === "tools")
-        html += '<div class="panel"><div class="label">等待房主发起操作</div></div>';
-      if (state.questSummary.total)
-        html +=
-          '<div class="quest-summary"><span class="small muted">任务结果</span>' +
-          '<span class="quest-summary-item"><span class="quest-result-icon success">✓</span><span>成功 ' +
-          state.questSummary.success +
-          '</span></span><span class="quest-summary-item"><span class="quest-result-icon failure">×</span><span>失败 ' +
-          state.questSummary.failure +
-          "</span></span></div>";
-      var quests = state.history.filter(function (h) { return h.questResult; });
-      if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
-        return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
-      }).join("") + '</div>';
       if (state.history.length) html += '<div class="section-title">公开记录 · 共' + state.history.length + '条</div>';
       var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
       for (var hh = 0; hh < visibleHistory.length; hh++) {
         var h = visibleHistory[hh];
-        html += '<div class="history-row"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
+        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
         if (h.voteGroups) {
           html += h.voteGroups
             .map(function (g) {
@@ -3069,6 +3066,19 @@
     retrySettings: loadSettings,
     toggleSeats: function () { if (state.room && state.room.phase !== "lobby") setState({ seatsExpanded: !state.seatsExpanded }); },
     toggleHistory: function () { setState({ historyExpanded: !state.historyExpanded }); },
+    showLatestRecord: function () {
+      var entry = state.latestResult;
+      if (!entry) return;
+      setState({
+        historyExpanded: state.historyExpanded || !state.history.slice(-3).some(function (h) { return h.key === entry.key; }),
+        focusedHistoryKey: entry.key,
+      });
+      var target = document.getElementById("history-record-" + entry.key);
+      if (target) {
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: "start", behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      }
+    },
     showQuestRecord: function (el) {
       var entry = state.history.find(function (h) { return h.key === Number(el.dataset.key); });
       if (entry) confirm(entry.text, entry.detail, false);

@@ -632,3 +632,20 @@ test("查验结果突出座位阵营，仅保留一个关闭入口", () => {
   assert.ok(!text.includes("立即遮盖"));
   assert.ok(byHandler(tree, "acknowledgeFairyResult"));
 });
+
+test("牌桌阶段集中待办、结果可回看，任务进度与座位明确分区", () => {
+  const room = { phase: "tools", phaseName: "等待房主发起操作", flexible: true, capacity: 12, me: { seat: 1 }, team: [] };
+  const data = { ...base, room, seatsExpanded: false, questSummary: { total: 1, success: 1, failure: 0 }, questTimeline: [{ key: 1, number: 1, questResult: "success" }], latestResult: { text: "任务成功", detail: "成功1张" } };
+  const tree = render(data), text = JSON.stringify(tree);
+  assert.equal((text.match(/等待房主发起操作/g) || []).length, 1);
+  assert.ok(byHandler(tree, "showLatestRecord"));
+  assert.ok(text.indexOf("任务进度") < text.indexOf("玩家与座位"));
+  assert.ok(!text.includes("本阶段你无需操作"));
+  const located = render({ ...data, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
+  const record = nodes(located).find(n => n.attr?.id === "history-record-0");
+  assert.equal(record.attr.class, "history-row history-row-focused");
+  const pending = render({ ...data, room: { ...room, phase: "quest", needsSubmission: true }, actionEntryLabel: "提交任务牌" });
+  const phase = nodes(pending).find(n => n.attr?.class === "phase-strip");
+  assert.ok(byHandler(phase, "openAction"));
+  assert.equal(byHandler(phase, "openAction").attr.class, "primary");
+});

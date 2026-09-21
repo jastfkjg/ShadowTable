@@ -107,6 +107,7 @@ Page({
     room: null,
     latestResult: null,
     historyExpanded: false,
+    focusedHistoryKey: null,
     seatsExpanded: true,
     historyFilter: "all",
     visibleHistory: [],
@@ -460,6 +461,7 @@ Page({
       actionEntryLabel,
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       historyExpanded,
+      focusedHistoryKey: this.data.room?.code === room.code && this.data.room?.game === room.game && room.phase !== "lobby" ? this.data.focusedHistoryKey : null,
       historyFilter,
       visibleHistory: this.filteredHistory(history, historyExpanded, historyFilter),
       questTimeline: history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 })),
@@ -678,6 +680,21 @@ Page({
     const historyFilter = e.currentTarget.dataset.filter;
     if (!["all", "vote", "quest", "skill", "other"].includes(historyFilter)) return;
     this.setData({ historyFilter, visibleHistory: this.filteredHistory(this.data.history, true, historyFilter) });
+  },
+  showLatestRecord() {
+    const entry = this.data.latestResult;
+    if (!entry) return;
+    const room = this.data.room;
+    const historyExpanded = this.data.historyExpanded || !this.data.history.slice(-3).some(h => h.key === entry.key);
+    this.setData({
+      historyExpanded,
+      historyFilter: "all",
+      focusedHistoryKey: entry.key,
+      visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all"),
+    }, () => {
+      if (this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
+      wx.pageScrollTo({ selector: `#history-record-${entry.key}`, duration: 250 });
+    });
   },
   showQuestRecord(e) {
     const entry = this.data.questTimeline.find(h => h.key === Number(e.currentTarget.dataset.key));
