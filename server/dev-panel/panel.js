@@ -1,11 +1,30 @@
 "use strict";
 // Independent normal player sessions; no omniscient server endpoint or rule bypass.
+async function pooled(items, task, limit = 4) {
+  let next = 0;
+  const errors = [];
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length && !errors.length) {
+        const item = items[next++];
+        try {
+          await task(item);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+    }),
+  );
+  // Wait for every in-flight operation before reporting a failure.
+  if (errors.length) throw errors[0];
+}
 class Companion {
   constructor({ request, save = () => {}, state = { code: "", actors: [] } }) {
     this.request = request;
     this.saveState = save;
     this.code = state.code;
     this.actors = state.actors;
+    this.revision = 0;
   }
   save() {
     this.saveState({
@@ -54,15 +73,21 @@ class Companion {
   async retry(actor) {
     const pending = actor.pending;
     if (!pending) return;
+    this.revision++;
     try {
       await this.request(pending.path, actor.token, pending.data, pending.id);
+      this.revision++;
       actor.pending = null;
       actor.error = "";
+      // Apply only an acknowledged ready command, never an optimistic toggle.
+      if (pending.data?.type === "ready" && actor.room?.phase === "lobby")
+        actor.room.me.ready = pending.data.ready;
       if (pending.after === "join") actor.joined = true;
       if (pending.after === "leave")
         this.actors = this.actors.filter((a) => a !== actor);
       this.save();
     } catch (e) {
+      this.revision++;
       if (e.status && e.status < 500 && e.status !== 401 && e.status !== 429)
         actor.pending = null;
       actor.error = e.message;
@@ -70,14 +95,20 @@ class Companion {
       throw e;
     }
   }
-  async refresh() {
-    for (const actor of this.actors) {
+  async refresh(actors = this.actors) {
+    await pooled([...actors], async (actor) => {
+      if (actor.pending || !actor.joined) return;
+      const revision = this.revision;
+      const read = (actor.read = (actor.read || 0) + 1);
+      const current = () =>
+        revision === this.revision &&
+        read === actor.read &&
+        !actor.pending &&
+        this.actors.includes(actor);
       const previousSecret = actor.secret;
-      actor.secret = null;
-      if (actor.pending) continue;
-      if (!actor.joined) continue;
       try {
         const room = await this.request("/api/rooms/" + this.code, actor.token);
+        if (!current()) return;
         const secret =
           room.phase === "lobby"
             ? null
@@ -88,19 +119,23 @@ class Companion {
                   "/api/rooms/" + this.code + "/private",
                   actor.token,
                 );
+        if (!current()) return;
         if (secret && secret.stage !== room.stage) {
           actor.room = null;
-          continue;
+          actor.secret = null;
+          return;
         }
         actor.room = room;
         actor.secret = secret;
         actor.error = "";
       } catch (e) {
+        if (!current()) return;
         actor.room = null;
+        actor.secret = null;
         actor.error = e.message;
         if (e.status === 403 || e.status === 404) actor.joined = false;
       }
-    }
+    });
     this.save();
   }
   async command(actor, type, extra = {}) {
@@ -160,20 +195,25 @@ class Companion {
   }
   async batch(value) {
     let count = 0;
+    if (value === "ready") {
+      const actors = this.actors.filter(
+        (a) => a.room?.phase === "lobby" && !a.room.me.ready && !a.pending,
+      );
+      await pooled(actors, async (actor) => {
+        await this.command(actor, "ready", { ready: true });
+        count++;
+      });
+      return count;
+    }
     // Frozen stage per actor: never turn a bulk action into a later phase's action.
     for (const actor of [...this.actors]) {
       if (!actor.room || actor.pending) continue;
-      if (value === "ready") {
-        if (actor.room.phase !== "lobby" || actor.room.me.ready) continue;
-        await this.command(actor, "ready", { ready: true });
-      } else {
-        if (
-          actor.room.me.submitted ||
-          !actor.secret?.action?.choices?.includes(value)
-        )
-          continue;
-        await this.command(actor, "submit", { value });
-      }
+      if (
+        actor.room.me.submitted ||
+        !actor.secret?.action?.choices?.includes(value)
+      )
+        continue;
+      await this.command(actor, "submit", { value });
       count++;
     }
     return count;
@@ -235,6 +275,8 @@ if (typeof document !== "undefined") {
     },
   });
   let busy = false;
+  let refreshing = false;
+  const acting = new Set();
   const teams = {},
     targets = {},
     swaps = {};
@@ -268,7 +310,7 @@ if (typeof document !== "undefined") {
   let changedActor = null;
   function showChangedIdentity() {
     const dialog = $("identity-change");
-    if (busy || document.hidden || dialog.open) return;
+    if (busy || acting.size || document.hidden || dialog.open) return;
     const actor = companion.actors.find(
       (a) => a.room?.me.identityChanged && a.secret && !a.pending,
     );
@@ -302,6 +344,7 @@ if (typeof document !== "undefined") {
       $("identity-change-info").textContent = "";
     } else showChangedIdentity();
   });
+  let lastPlayersHtml, lastLocks;
   function render() {
     showChangedIdentity();
     $("identity-change-confirm").disabled = busy;
@@ -316,12 +359,14 @@ if (typeof document !== "undefined") {
     $("connection").textContent = busy
       ? "正在确认操作…"
       : "每4秒更新 · 只控制陪测账号";
-    $("players").innerHTML = companion.actors
+    const playersHtml = companion.actors
       .map((actor) => {
         const r = actor.room,
           spec = actor.secret?.action;
         let actions = "";
-        if (actor.pending) actions = button("retry", "重试未确认操作");
+        if (acting.has(actor.id))
+          actions = button("waiting", "正在确认…", true);
+        else if (actor.pending) actions = button("retry", "重试未确认操作");
         else if (!actor.joined)
           actions =
             button("join", "重新入座") + button("forget", "移除失效账号");
@@ -388,13 +433,25 @@ if (typeof document !== "undefined") {
           $("reveal").checked && actor.secret
             ? `<p class="role">${escape(actor.secret.role)} · ${escape(actor.secret.faction)}</p><p>${escape(actor.secret.information)}</p>`
             : "";
-        return `<article class="player" data-actor="${actor.id}"><h3>${r ? r.me.seat + "号 · " : ""}${escape(actor.name)}</h3><p>${r?.me.isHost ? "房主 · " : ""}${escape(spec?.label || (r?.phase === "lobby" ? "等待准备" : "等待下一阶段"))}</p>${role}${actor.error ? `<p class="error">${escape(actor.error)}</p>` : ""}<div class="actions">${actions}</div></article>`;
+        return `<article class="player" data-actor="${actor.id}" aria-busy="${acting.has(actor.id)}"><h3>${r ? r.me.seat + "号 · " : ""}${escape(actor.name)}</h3><p>${r?.me.isHost ? "房主 · " : ""}${escape(spec?.label || (r?.phase === "lobby" ? (r.me.ready ? "已准备" : "等待准备") : "等待下一阶段"))}</p>${role}${actor.error ? `<p class="error">${escape(actor.error)}</p>` : ""}<div class="actions">${actions}</div></article>`;
       })
       .join("");
+    const locks = `${busy}:${[...acting].join(",")}`;
+    if (lastPlayersHtml !== playersHtml || lastLocks !== locks) {
+      $("players").innerHTML = playersHtml;
+      lastPlayersHtml = playersHtml;
+      lastLocks = locks;
+    }
     document.querySelectorAll("button").forEach((b) => {
-      if (busy) b.disabled = true;
+      if (
+        busy ||
+        (acting.size &&
+          (b.dataset.action !== "ready" ||
+            acting.has(b.closest("[data-actor]")?.dataset.actor)))
+      )
+        b.disabled = true;
     });
-    if (!busy) {
+    if (!busy && !acting.size) {
       ["join", "refresh"].forEach((id) => ($(id).disabled = false));
       $("join").disabled =
         !!room &&
@@ -420,14 +477,19 @@ if (typeof document !== "undefined") {
         );
     }
   }
-  async function run(fn, message = "操作已确认") {
-    if (busy) return;
-    busy = true;
+  async function run(
+    fn,
+    message = "操作已确认",
+    { actor, refresh = true } = {},
+  ) {
+    if (busy || (actor ? acting.has(actor.id) : acting.size)) return;
+    if (actor) acting.add(actor.id);
+    else busy = true;
     $("feedback").textContent = "";
     render();
     try {
       const result = await fn();
-      await companion.refresh();
+      if (refresh) await companion.refresh();
       $("feedback").className = "success";
       $("feedback").textContent =
         typeof result === "number"
@@ -438,7 +500,8 @@ if (typeof document !== "undefined") {
       $("feedback").textContent =
         e.message + "；请检查各玩家状态。未确认请求需使用原操作重试。";
     } finally {
-      busy = false;
+      if (actor) acting.delete(actor.id);
+      else busy = false;
       render();
     }
   }
@@ -449,7 +512,8 @@ if (typeof document !== "undefined") {
   });
   $("fill").onclick = () =>
     run(() => companion.fill(), "测试玩家已补齐；请全员准备后在小程序开局");
-  $("refresh").onclick = () => run(() => companion.refresh(), "状态已刷新");
+  $("refresh").onclick = () =>
+    run(() => companion.refresh(), "状态已刷新", { refresh: false });
   $("reveal").onchange = render;
   document
     .querySelectorAll("[data-batch]")
@@ -478,7 +542,16 @@ if (typeof document !== "undefined") {
     const actor = companion.actors.find(
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
-    if (!action || !actor || busy) return;
+    if (!action || !actor || busy || acting.has(actor.id)) return;
+    if (action === "ready") {
+      run(
+        () =>
+          companion.command(actor, "ready", { ready: !actor.room.me.ready }),
+        "准备状态已确认",
+        { actor, refresh: false },
+      );
+      return;
+    }
     if (action.startsWith("swapSeat:")) {
       if (swaps[actor.id]?.stage !== actor.room.stage) return;
       const seat = Number(action.split(":")[1]);
@@ -529,10 +602,6 @@ if (typeof document !== "undefined") {
           { name: actor.name },
           "join",
         );
-      if (action === "ready")
-        return companion.command(actor, "ready", {
-          ready: !actor.room.me.ready,
-        });
       if (action === "propose")
         return companion.command(actor, "propose", {
           team: teams[actor.id]?.seats || [],
@@ -557,21 +626,24 @@ if (typeof document !== "undefined") {
   };
   render();
   if (companion.actors.length)
-    run(() => companion.refresh(), "已恢复本标签页的测试玩家");
+    run(() => companion.refresh(), "已恢复本标签页的测试玩家", {
+      refresh: false,
+    });
   setInterval(async () => {
     if (
       busy ||
+      refreshing ||
       Date.now() < retryAt ||
       document.hidden ||
       !companion.actors.length ||
       document.activeElement?.matches("input,select")
     )
       return;
-    busy = true;
+    refreshing = true;
     try {
       await companion.refresh();
     } finally {
-      busy = false;
+      refreshing = false;
       render();
     }
   }, 4000);

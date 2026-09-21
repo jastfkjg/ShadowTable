@@ -54,7 +54,7 @@ test("设置页仅管理员可进入，不读取他人的设置表单", async ()
   assert.ok(p.data.error.includes("仅房主管理员"));
   assert.equal(p.data.room, null);
 });
-test("开关先修改草稿，点击保存才原子提交；保存后显示服务端状态", async () => {
+test("开关调整后自动提交并显示服务端状态，无需手动保存", async () => {
   let r = room();
   const writes = [];
   const p = page({
@@ -71,10 +71,7 @@ test("开关先修改草稿，点击保存才原子提交；保存后显示服�
   });
   await p.load();
   assert.equal(p.data.dirty, false);
-  p.toggleVisibility({ detail: { value: true } });
-  assert.equal(writes.length, 0);
-  assert.equal(p.data.dirty, true);
-  await p.save();
+  await p.toggleVisibility({ detail: { value: true } });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].type, "updateSettings");
   assert.equal(writes[0].visible, true);
@@ -96,8 +93,7 @@ test("设置保存网络未确认时重试保持原请求，阶段变化后刷�
     },
   });
   await p.load();
-  p.toggleVisibility({ detail: { value: true } });
-  await p.save();
+  await p.toggleVisibility({ detail: { value: true } });
   assert.equal(p.data.pendingSave, true);
   failed = false;
   await p.save();
@@ -121,8 +117,7 @@ test("保存时阶段已变化会刷新设置，不重复提交旧阶段", async
     },
   });
   await p.load();
-  p.toggleVisibility({ detail: { value: true } });
-  await p.save();
+  await p.toggleVisibility({ detail: { value: true } });
   assert.equal(p.original.stage, "s2");
   assert.equal(p.data.dirty, false);
   assert.equal(p.pending, null);
@@ -156,8 +151,7 @@ test("设置保存401后重新登录并沿用原请求编号与内容恢复", as
     },
   });
   await p.load();
-  p.toggleVisibility({ detail: { value: true } });
-  await p.save();
+  await p.toggleVisibility({ detail: { value: true } });
   assert.equal(p.data.pendingSave, true);
   const beforeRetry = logins;
   await p.save();
@@ -323,7 +317,8 @@ test("移出请求丢失响应时重试原编号和成员，成功保留未保�
     return path === "/api/boards" ? { boards: BOARDS } : r;
   } });
   await p.load();
-  p.toggleVisibility({ detail: { value: true } });
+  p.setData({ visible: true });
+  p.updateDirty();
   await chooseKick(p);
   assert.equal(p.data.pendingKick, true);
   p.openTransfer();
@@ -351,4 +346,83 @@ test("移出确认后房间变化时刷新列表，不自动重试新成员", as
   assert.equal(p.data.pendingKick, false);
   assert.equal(p.data.room.canKick, false);
   assert.match(p.data.error, /房间或座位已变化/);
+});
+
+test("湖仙随人数应用默认，切板保留选择，开关自动保存", async () => {
+  let r = { ...room(), board: "classic", capacity: 7, phase: "lobby", fairyEnabled: false };
+  const writes = [];
+  const p = page({
+    login: async () => {}, requestId: () => "fairy-settings",
+    request: async (path, method, data) => {
+      if (method === "POST") {
+        writes.push(data);
+        r = { ...r, board: data.board, capacity: data.capacity, fairyEnabled: data.fairyEnabled };
+        return { ok: true };
+      }
+      return path === "/api/boards" ? { boards: BOARDS } : r;
+    },
+  });
+  await p.load();
+  assert.equal(p.data.fairyEnabled, false);
+  await p.toggleFairy({ detail: { value: true } });
+  assert.equal(writes[0].fairyEnabled, true);
+  assert.equal(p.data.dirty, false);
+  p.updateChoices(6, "classic");
+  assert.equal(p.data.fairyEnabled, false);
+  p.toggleFairy({ detail: { value: true } });
+  assert.equal(p.data.fairyEnabled, false);
+  p.updateChoices(8, "classic");
+  assert.equal(p.data.fairyEnabled, true);
+  p.updateChoices(10, "classic-court");
+  await p.toggleFairy({ detail: { value: false } });
+  p.updateChoices(10, "knights-10");
+  assert.equal(p.data.fairyEnabled, false);
+});
+
+test("人数和板子自动保存，保存中阻止重复修改且不隐藏设置表单", async () => {
+  let r = { ...room(), board: "classic", capacity: 7, phase: "lobby" };
+  let finish;
+  const writes = [];
+  const p = page({ login: async () => {}, requestId: () => "id",
+    request: async (path, method, data) => {
+      if (method === "POST") {
+        writes.push(data);
+        await new Promise(resolve => { finish = resolve; });
+        r = { ...r, board: data.board, capacity: data.capacity, fairyEnabled: data.fairyEnabled };
+        return {};
+      }
+      return path === "/api/boards" ? { boards: BOARDS } : r;
+    },
+  });
+  await p.load();
+  const saving = p.pickCapacity({ detail: { value: p.data.capacities.indexOf(10) } });
+  await new Promise(setImmediate);
+  assert.equal(p.data.busy, true);
+  assert.equal(p.data.loading, false);
+  assert.equal(p.data.authorized, true);
+  p.toggleFairy({ detail: { value: false } });
+  assert.equal(p.data.fairyEnabled, true);
+  finish();
+  await saving;
+  assert.equal(p.original.capacity, 10);
+  const boardSave = p.pickBoard({ detail: { value: p.data.choices.findIndex(b => b.id === "knights-10") } });
+  await new Promise(setImmediate);
+  finish();
+  await boardSave;
+  assert.equal(writes.length, 2);
+  assert.equal(p.original.board, "knights-10");
+  assert.equal(p.data.dirty, false);
+  assert.equal(p.data.busy, false);
+});
+
+test("自动保存后核对发现房主已变更，撤销设置权限", async () => {
+  let host = true;
+  const p = page({ login: async () => {}, requestId: () => "id", request: async (path, method) => {
+    if (method === "POST") { host = false; return {}; }
+    return path === "/api/boards" ? { boards: BOARDS } : { ...room(), me: { isHost: host } };
+  } });
+  await p.load();
+  await p.toggleVisibility({ detail: { value: true } });
+  assert.equal(p.data.authorized, false);
+  assert.equal(p.data.busy, false);
 });

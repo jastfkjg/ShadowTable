@@ -1487,3 +1487,20 @@ button.role-quick-toggle { display: grid; grid-template-columns: 106px minmax(0,
   button.role-quick-toggle { grid-template-columns: 84px minmax(0, 1fr) 12px; gap: 8px; padding: 10px 0; }
   .board-detail-dialog .detail-board-name { font-size: 18px; }
 }
+
+/* Public holder marker, independent of role and host privileges. */
+.seat-fairy {
+  display: inline-block;
+  padding: 0 4px;
+  margin-right: 4px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.seat-meta { min-height: 20px; }
+.fairy-setting .settings-caption { display: block; }
+.fairy-setting input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--accent); }
+.fairy-setting input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

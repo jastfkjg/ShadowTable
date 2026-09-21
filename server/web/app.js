@@ -268,6 +268,7 @@
   var toolStage = null;
   var settingsOriginal = null;
   var settingsKickPending = null;
+  var settingsSavePending = null;
 
   var state = {
     loading: true,
@@ -1515,8 +1516,10 @@
       capacity: 0,
       boardId: "",
       visible: false,
+      fairyEnabled: false,
       dirty: false,
       pendingKick: !!settingsKickPending && settingsKickPending.code === roomCode,
+      pendingSave: !!settingsSavePending && settingsSavePending.code === roomCode,
     };
   }
   function toggleRoomSettings() {
@@ -1532,19 +1535,20 @@
     loadSettings();
   }
   function closeSettings() {
+    if (state.settings?.busy) return;
     state.showRoomSettings = false;
     state.settings = null;
     render();
   }
-  async function loadSettings() {
+  async function loadSettings(quiet = false) {
     var s = state.settings;
-    if (!s || s.busy) return;
-    setSettings({ loading: true, error: "", authorized: false });
+    if (!s || (s.busy && !quiet)) return;
+    setSettings(quiet ? { error: "" } : { loading: true, error: "", authorized: false });
     try {
       if (!/^\d{6}$/.test(roomCode || "")) throw new Error("房间号无效");
       await login();
       var room = await request("/api/rooms/" + roomCode);
-      if (!room.me.isHost) throw new Error("仅房主管理员可访问房间设置");
+      if (!room.me.isHost) throw Object.assign(new Error("仅房主管理员可访问房间设置"), { status: 403 });
       var boards = (await request("/api/boards")).boards;
       if (!alive || state.settings !== s) return;
       settingsOriginal = room;
@@ -1575,11 +1579,12 @@
         capacity: room.capacity,
         boardId: room.board,
         visible: room.showSkillDetails === true,
+        fairyEnabled: room.fairyEnabled === true,
         dirty: false,
       });
       updateSettingsChoices(room.capacity, room.board);
     } catch (e) {
-      if (alive && state.settings === s) setSettings({ error: e.message });
+      if (alive && state.settings === s) setSettings({ error: e.message, authorized: e.status === 403 ? false : s.authorized });
     } finally {
       if (alive && state.settings === s) setSettings({ loading: false });
     }
@@ -1596,6 +1601,7 @@
       })[0] || choices[0];
     if (!selected) return;
     setSettings({
+      fairyEnabled: capacity !== s.capacity ? capacity >= 8 : s.fairyEnabled,
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
@@ -1609,64 +1615,59 @@
     setSettings({
       dirty:
         !!r &&
-        (s.capacity !== r.capacity ||
+        (s.fairyEnabled !== (r.fairyEnabled === true) ||
+          s.capacity !== r.capacity ||
           s.boardId !== r.board ||
           s.visible !== (["knights", "knights-10", "knights-11"].includes(r.board) && r.showSkillDetails === true)),
     });
   }
+  function settingsLocked() {
+    var s = state.settings;
+    return !s || s.loading || s.busy || s.pendingKick || s.pendingSave || !s.authorized;
+  }
   async function settingsSave() {
     var s = state.settings;
-    if (!s || s.busy || s.pendingKick || !s.authorized || !s.dirty) return;
-    if (s.visible && !settingsOriginal.showSkillDetails) {
-      var ok = await confirm(
-        "公开技能过程？",
-        "所有玩家将能查看已结算技能的出手人和目标，新身份牌面仍保密。",
-      );
-      if (!ok || !alive || !foreground) return;
+    if (!s || s.busy || s.pendingKick || !s.authorized || (!s.dirty && !s.pendingSave)) return;
+    if (!settingsSavePending || settingsSavePending.code !== roomCode) {
+      settingsSavePending = { id: requestId(), code: roomCode, data: {
+        type: "updateSettings", stage: settingsOriginal.stage,
+        board: s.boardId, capacity: s.capacity, visible: s.visible, fairyEnabled: s.fairyEnabled,
+      } };
     }
-    var id = requestId();
-    var data = {
-      type: "updateSettings",
-      stage: settingsOriginal.stage,
-      board: s.boardId,
-      capacity: s.capacity,
-      visible: s.visible,
-    };
-    setSettings({ busy: true, error: "" });
+    var saved = settingsSavePending;
+    setSettings({ busy: true, pendingSave: true, error: "" });
     try {
       await login();
-      await request("/api/rooms/" + roomCode + "/commands", "POST", data, id);
-      if (!alive) return;
-      setSettings({ dirty: false, busy: false });
-      await loadSettings();
-      if (foreground && state.settings && state.settings.authorized)
-        toast("设置已保存");
+      await request("/api/rooms/" + saved.code + "/commands", "POST", saved.data, saved.id);
+      if (settingsSavePending === saved) settingsSavePending = null;
+      if (!alive || state.settings !== s) return;
+      setSettings({ dirty: false, pendingSave: false });
+      await loadSettings(true);
     } catch (e) {
-      if (!alive) return;
-      setSettings({
-        error: e.message,
-        authorized:
-          e.status === 403 ? false : !!(state.settings && state.settings.authorized),
-      });
+      if (e.status && e.status < 500 && ![401, 429].includes(e.status) && settingsSavePending === saved)
+        settingsSavePending = null;
+      if (!alive || state.settings !== s) return;
+      setSettings({ error: e.message, pendingSave: settingsSavePending === saved,
+        authorized: e.status === 403 ? false : s.authorized });
       if (e.status === 409) {
-        setSettings({ busy: false });
-        await loadSettings();
+        await loadSettings(true);
         setSettings({ error: "房间状态已变化，已刷新设置，请重新修改。" });
       }
     } finally {
-      if (alive) setSettings({ busy: false });
+      if (alive && state.settings === s) setSettings({ busy: false });
     }
   }
   async function settingsBack() {
     var s = state.settings;
-    if (s && (s.dirty || s.pendingKick)) {
-      if (!(await confirm("返回牌桌？", s.pendingKick ? "移出结果尚未确认，请重新进入房间设置重试确认。" : "未保存的修改将放弃。"))) return;
+    if (s?.busy) return;
+    if (s && (s.dirty || s.pendingKick || s.pendingSave)) {
+      if (!(await confirm("返回牌桌？", s.pendingKick ? "移出结果尚未确认，请重新进入房间设置重试确认。" : s.pendingSave ? "保存结果尚未确认，请重新进入设置重试。" : "未保存的修改将放弃。"))) return;
     }
     closeSettings();
   }
   async function kickFromSettings(seat) {
     var s = state.settings;
-    if (!s || s.busy || s.pendingKick || !s.authorized || !s.room || !s.room.canKick || state.busy || pending) return;
+    if (!s || s.busy || s.pendingKick || s.pendingSave || !s.authorized || !s.room || !s.room.canKick || state.busy || pending) return;
     var target = s.room.players.find(function (p) { return p.seat === seat && p.seat !== s.room.me.seat; });
     if (!target) return;
     var code = roomCode;
@@ -1683,7 +1684,7 @@
     var s = state.settings;
     var requestData = settingsKickPending;
     if (!s || s.busy || !requestData || requestData.code !== roomCode) return;
-    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible } : null;
+    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled } : null;
     setSettings({ busy: true, pendingKick: true, error: "" });
     try {
       await login();
@@ -1695,6 +1696,8 @@
       if (state.settings === s && s.authorized && draft) {
         setSettings({ visible: draft.visible });
         updateSettingsChoices(draft.capacity, draft.boardId);
+        setSettings({ fairyEnabled: draft.fairyEnabled });
+        updateSettingsDirty();
       }
       if (foreground) toast("玩家已移出");
       await refresh();
@@ -1713,7 +1716,7 @@
   }
   async function transferFromSettings(seat) {
     var s = state.settings;
-    if (!s || s.busy || s.pendingKick || !s.authorized || !s.room || state.busy || pending)
+    if (!s || s.busy || s.pendingKick || s.pendingSave || !s.authorized || !s.room || state.busy || pending)
       return;
     var target = s.room.players.filter(function (p) {
       return p.seat === seat && p.seat !== s.room.me.seat;
@@ -2296,6 +2299,7 @@
         esc(s.name) +
         (s.alive === false ? " · 已出局" : "") +
         '</span><span class="seat-meta">' +
+        (r.fairyHolder === s.seat ? '<span class="seat-fairy">湖仙</span> ' : '') +
         esc(seatMeta(s)) +
         "</span></button>";
     }
@@ -2389,9 +2393,7 @@
           (r.knights
             ? '<div class="small muted">第' +
               r.knights.round +
-              "轮 · 仙女" +
-              r.knights.fairy +
-              "号 · B牌剩余" +
+              "轮 · B牌剩余" +
               r.knights.remainingCards +
               '张</div><div class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</div>'
             : "") +
@@ -2400,9 +2402,9 @@
           btn("secondary", "openTool", "做任务", { kind: "quest" }, state.busy) +
           (r.knights
             ? btn("secondary", "openTool", "使用技能", { kind: "skills" }, state.busy) +
-              btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy) +
-              btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy)
+              btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
             : "") +
+          (r.fairyEnabled ? btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy) : "") +
           (r.hasReverse && !r.knifeOffline
             ? btn("secondary", "openTool", "刀逆仆", { kind: "reverseStrike" }, state.busy)
             : "") +
@@ -2536,7 +2538,7 @@
         '<div class="settings-error">' +
         esc(s.error) +
         '</div><div class="dialog-actions">' +
-        (s.pendingKick ? btn("secondary", "retryKick", "重试确认移出结果", null, s.busy) : btn("secondary", "retrySettings", "重新加载")) +
+        (s.pendingKick ? btn("secondary", "retryKick", "重试确认移出结果", null, s.busy) : (s.pendingSave || s.dirty) && s.authorized ? btn("secondary", "settingsSave", "重试保存", null, s.busy) : btn("secondary", "retrySettings", "重新加载")) +
         btn("secondary", "settingsBack", "返回牌桌", null, s.busy) +
         "</div>";
     else if (s.authorized && s.room) {
@@ -2551,11 +2553,13 @@
         "人 · " +
         (room.phase === "lobby" ? "准备中" : room.phase === "ended" ? "本局已结束" : room.phase === "terminated" ? "本局已终止" : "对局进行中") +
         "</div></div>";
+      html += '<div class="settings-caption" role="status">' + (s.pendingSave ? (s.busy ? '正在保存…' : '保存未确认') : s.dirty ? '尚未保存' : '更改自动保存') + '</div>';
+      if (s.pendingSave && !s.busy) html += btn("secondary", "settingsSave", "重试保存");
       html += '<div class="settings-section-title">房间配置</div><div class="settings-section">';
       if (room.phase === "lobby") {
         html +=
           '<div class="settings-row"><span>人数</span><select class="settings-select" data-change="settingsCapacity"' +
-          (s.busy || s.pendingKick ? " disabled" : "") +
+          (s.busy || s.pendingKick || s.pendingSave ? " disabled" : "") +
           ">";
         for (var i = 0; i < s.capacities.length; i++)
           html +=
@@ -2569,7 +2573,7 @@
         html += "</select></div>";
         html +=
           '<div class="settings-row"><span>板子</span><select class="settings-select" data-change="settingsBoard"' +
-          (s.busy || s.pendingKick ? " disabled" : "") +
+          (s.busy || s.pendingKick || s.pendingSave ? " disabled" : "") +
           ">";
         for (var j = 0; j < s.choices.length; j++)
           html +=
@@ -2589,48 +2593,42 @@
           esc(room.boardName) +
           "</span></div>";
       }
-      html +=
-        "</div><div class=\"settings-help\">" +
-        (room.phase === "lobby"
-          ? "保存人数或板子变更后，全员需要重新准备。"
-          : "对局中不能修改人数和板子。") +
-        "</div>";
+      html += "</div>";
+      html += '<div class="settings-section-title">湖中仙女</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>启用湖中仙女</span><span class="settings-caption">' +
+        (s.capacity < 7 ? "5、6人局不支持" : s.fairyEnabled ? "持有者对所有玩家公开" : "本房间不使用仙女查验") +
+        '</span></span><input type="checkbox" aria-label="启用湖中仙女" data-change="settingsFairy"' +
+        (s.fairyEnabled ? " checked" : "") +
+        (s.busy || s.pendingKick || s.pendingSave || s.capacity < 7 || room.phase === "fairy" ? " disabled" : "") +
+        ' /></label></div>' +
+        (room.phase === "fairy" ? '<div class="settings-help">请先完成或作废当前查验。</div>' : '');
       if (["knights", "knights-10", "knights-11"].includes(s.boardId)) {
         html +=
           '<div class="settings-section-title">信息公开</div><div class="settings-section"><div class="settings-row"><span><span>公开技能过程</span><span class="settings-caption">' +
-          (s.visible ? "保存后所有玩家可见" : "仅公示最终结果") +
+          (s.visible ? "所有玩家可见" : "仅公示最终结果") +
           "</span></span>" +
           '<input type="checkbox" data-change="settingsVisibility"' +
           (s.visible ? " checked" : "") +
-          (s.busy || s.pendingKick ? " disabled" : "") +
-          ' /></div></div><div class="settings-help">开启后公开出手人、目标等过程。最终出局和复活结果始终公示，新身份仅本人可见。</div>';
+          (s.busy || s.pendingKick || s.pendingSave ? " disabled" : "") +
+          ' /></div></div>';
       }
       var transfers = room.players.filter(function (p) {
         return p.seat !== room.me.seat;
       });
       html += '<div class="transfer-entry"><select class="secondary" data-change="settingsTransfer"' +
-        (s.busy || s.pendingKick || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移交房主</option>';
+        (s.busy || s.pendingKick || s.pendingSave || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移交房主</option>';
       transfers.forEach(function (player) {
         html += '<option value="' + player.seat + '">' + player.seat + '号 · ' + esc(player.name) + '</option>';
       });
-      html += '</select><div class="settings-help">' +
-        (transfers.length ? "任意阶段均可移交，新房主立即接管流程。" : "其他玩家入座后可移交房主。") + '</div></div>';
+      html += '</select>' + (!transfers.length ? '<div class="settings-help">暂无可移交的玩家</div>' : '') + '</div>';
       html += '<div class="transfer-entry"><select class="secondary kick-entry" data-change="settingsKick"' +
-        (s.busy || s.pendingKick || !room.canKick || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移出玩家</option>';
+        (s.busy || s.pendingKick || s.pendingSave || !room.canKick || !transfers.length ? " disabled" : "") + '><option value="" disabled selected>移出玩家</option>';
       transfers.forEach(function (player) {
         html += '<option value="' + player.seat + '">' + player.seat + '号 · ' + esc(player.name) + '</option>';
       });
-      html += '</select><div class="settings-help">' + (typeof room.canKick !== "boolean" ? "服务端尚未支持移出玩家，请重启服务并刷新页面。" : !room.canKick ? "对局进行中不能移出玩家，请在本局结束后操作。" : transfers.length ? "选择玩家后需确认，其他成员和对局记录保留。" : "暂无可移出的玩家。") + '</div></div>';
+      html += '</select>' + (!room.canKick || !transfers.length ? '<div class="settings-help">' + (typeof room.canKick !== 'boolean' ? '暂不支持移出玩家' : !room.canKick ? '对局进行中不能移出玩家' : '暂无可移出的玩家') + '</div>' : '') + '</div>';
       if (s.pendingKick) html += btn("secondary", "retryKick", "重试确认移出结果", null, s.busy);
       html +=
         '<div class="settings-footer">' +
-        btn(
-          "primary",
-          "settingsSave",
-          s.busy ? (s.pendingKick ? "正在移出…" : "正在处理…") : s.dirty ? "保存设置" : "设置已保存",
-          null,
-          s.busy || s.pendingKick || !s.dirty,
-        ) +
         btn("text-button", "settingsBack", "返回牌桌", null, s.busy) +
         "</div>";
     } else
@@ -3074,22 +3072,34 @@
       pickBoard(el.value);
     },
     settingsCapacity: function (el) {
-      if (!state.settings || state.settings.busy || !state.settings.room) return;
+      if (settingsLocked() || !state.settings.room) return;
       if (state.settings.room.phase !== "lobby") return;
       updateSettingsChoices(Number(el.value), state.settings.boardId);
+      return settingsSave();
     },
     settingsBoard: function (el) {
-      if (!state.settings || state.settings.busy || !state.settings.room) return;
+      if (settingsLocked() || !state.settings.room) return;
       if (state.settings.room.phase !== "lobby") return;
       var b = state.settings.choices.filter(function (x) {
         return x.id === el.value;
       })[0];
-      if (b) updateSettingsChoices(state.settings.capacity, b.id);
+      if (b) {
+        updateSettingsChoices(state.settings.capacity, b.id);
+        return settingsSave();
+      }
+    },
+    settingsFairy: function (el) {
+      var s = state.settings;
+      if (settingsLocked() || s.capacity < 7 || s.room.phase === "fairy") return;
+      setSettings({ fairyEnabled: el.checked });
+      updateSettingsDirty();
+      return settingsSave();
     },
     settingsVisibility: function (el) {
-      if (!state.settings || state.settings.busy) return;
+      if (settingsLocked()) return;
       setSettings({ visible: el.checked });
       updateSettingsDirty();
+      return settingsSave();
     },
   };
   var INPUTS = {

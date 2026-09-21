@@ -14,6 +14,7 @@ Page({
     boardId: "",
     capacity: 0,
     visible: false,
+    fairyEnabled: false,
     dirty: false,
     transferPlayers: [],
     showTransferPicker: false,
@@ -42,14 +43,14 @@ Page({
   onUnload() {
     this.alive = false;
   },
-  async load() {
-    if (this.data.busy) return;
-    this.setData({ loading: true, error: "", authorized: false });
+  async load({ quiet = false } = {}) {
+    if (this.data.busy && !quiet) return;
+    this.setData(quiet ? { error: "" } : { loading: true, error: "", authorized: false });
     try {
       if (!/^\d{6}$/.test(this.code || "")) throw new Error("房间号无效");
       await api.login();
       const room = await api.request("/api/rooms/" + this.code);
-      if (!room.me.isHost) throw new Error("仅房主管理员可访问房间设置");
+      if (!room.me.isHost) throw Object.assign(new Error("仅房主管理员可访问房间设置"), { status: 403 });
       const { boards } = await api.request("/api/boards");
       if (!this.alive) return;
       this.original = room;
@@ -67,11 +68,12 @@ Page({
         capacity: room.capacity,
         boardId: room.board,
         visible: room.showSkillDetails === true,
+        fairyEnabled: room.fairyEnabled === true,
         dirty: false,
       });
       this.updateChoices(room.capacity, room.board);
     } catch (e) {
-      if (this.alive) this.setData({ error: e.message });
+      if (this.alive) this.setData({ error: e.message, authorized: e.status === 403 ? false : this.data.authorized });
     } finally {
       if (this.alive) this.setData({ loading: false });
     }
@@ -82,6 +84,7 @@ Page({
     );
     const selected = choices.find((b) => b.id === boardId) || choices[0];
     this.setData({
+      fairyEnabled: capacity !== this.data.capacity ? capacity >= 8 : this.data.fairyEnabled,
       capacity,
       boardId: selected.id,
       choices,
@@ -96,7 +99,8 @@ Page({
     this.setData({
       dirty:
         !!r &&
-        (this.data.capacity !== r.capacity ||
+        (this.data.fairyEnabled !== (r.fairyEnabled === true) ||
+          this.data.capacity !== r.capacity ||
           this.data.boardId !== r.board ||
           this.data.visible !==
             (["knights", "knights-10", "knights-11"].includes(r.board) &&
@@ -104,23 +108,36 @@ Page({
     });
   },
   pickCapacity(e) {
-    if (this.data.busy || this.data.room.phase !== "lobby") return;
+    if (this.settingsLocked() || this.data.room.phase !== "lobby") return;
     this.updateChoices(
       this.data.capacities[Number(e.detail.value)],
       this.data.boardId,
     );
+    return this.save();
   },
   pickBoard(e) {
-    if (this.data.busy || this.data.room.phase !== "lobby") return;
+    if (this.settingsLocked() || this.data.room.phase !== "lobby") return;
     this.updateChoices(
       this.data.capacity,
       this.data.choices[Number(e.detail.value)].id,
     );
+    return this.save();
+  },
+  settingsLocked() {
+    return this.data.busy || this.data.loading || !this.data.authorized ||
+      this.pending || this.transferPending || this.kickPending;
+  },
+  toggleFairy(e) {
+    if (this.settingsLocked() || this.data.capacity < 7 || this.data.room.phase === "fairy") return;
+    this.setData({ fairyEnabled: e.detail.value });
+    this.updateDirty();
+    return this.save();
   },
   toggleVisibility(e) {
-    if (this.data.busy) return;
+    if (this.settingsLocked()) return;
     this.setData({ visible: e.detail.value });
     this.updateDirty();
+    return this.save();
   },
   async save() {
     if (
@@ -132,18 +149,6 @@ Page({
       return;
     if (this.pending) return this.sendPending();
     if (!this.data.dirty) return;
-    if (this.data.visible && !this.original.showSkillDetails) {
-      const answer = await new Promise((resolve) =>
-        wx.showModal({
-          title: "公开技能过程？",
-          content:
-            "所有玩家将能查看已结算技能的出手人和目标，新身份牌面仍保密。",
-          success: resolve,
-          fail: () => resolve({ confirm: false }),
-        }),
-      );
-      if (!answer.confirm || !this.alive || !this.foreground) return;
-    }
     this.pending = {
       id: api.requestId(),
       data: {
@@ -152,6 +157,7 @@ Page({
         board: this.data.boardId,
         capacity: this.data.capacity,
         visible: this.data.visible,
+        fairyEnabled: this.data.fairyEnabled,
       },
     };
     return this.sendPending();
@@ -170,10 +176,8 @@ Page({
       );
       this.pending = null;
       if (this.alive) {
-        this.setData({ dirty: false, busy: false, pendingSave: false });
-        await this.load();
-        if (this.foreground && this.data.authorized)
-          wx.showToast({ title: "设置已保存", icon: "success" });
+        this.setData({ dirty: false, pendingSave: false });
+        await this.load({ quiet: true });
       }
     } catch (e) {
       if (e.status && e.status < 500 && ![429, 401].includes(e.status))
@@ -345,6 +349,7 @@ Page({
           capacity: this.data.capacity,
           boardId: this.data.boardId,
           visible: this.data.visible,
+        fairyEnabled: this.data.fairyEnabled,
         }
       : null;
     this.setData({ busy: true, error: "", pendingKick: true });
@@ -363,6 +368,8 @@ Page({
       if (this.data.authorized && draft) {
         this.setData({ visible: draft.visible });
         this.updateChoices(draft.capacity, draft.boardId);
+        this.setData({ fairyEnabled: draft.fairyEnabled });
+        this.updateDirty();
       }
       if (this.foreground && this.data.authorized)
         wx.showToast({ title: "玩家已移出", icon: "success" });

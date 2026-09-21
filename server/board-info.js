@@ -499,3 +499,15 @@ for (const board of Object.values(module.exports)) {
                 : undefined;
   }
 }
+// 湖仙是按人数配置的通用道具，所有板子共用。
+for (const detail of Object.values(module.exports)) {
+  detail.sections.push({
+    title: "湖中仙女",
+    kind: "lines",
+    items: [
+      "5、6 人局不支持；7 人局默认关闭，8 人及以上默认开启。房主可在房间设置中开启或禁用，同房重开保留选择。",
+      "初始由随机首车长持有，公共座位显示「湖仙」。持有者查验后将仙女传给目标，不能自验或查验历任持有者。",
+      "查验结果仅本人可见，显示目标当前真实阵营。关闭后保留本局传递记录；正在查验时须先完成或作废才能修改开关。",
+    ],
+  });
+}

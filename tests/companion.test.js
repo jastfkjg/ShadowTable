@@ -377,3 +377,114 @@ test("陪测轮询复用同阶段私密视图，阶段变化后重新获取", as
   assert.equal(privateReads, 2);
   assert.equal(c.actors[0].secret.stage, "s2");
 });
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+function simulatedPanel(count, request) {
+  return new Companion({
+    state: {
+      code: "123456",
+      actors: Array.from({ length: count }, (_, i) => ({
+        id: String(i),
+        token: String(i),
+        joined: true,
+        room: { phase: "lobby", stage: "s1", me: { ready: false } },
+      })),
+    },
+    request,
+  });
+}
+
+test("准备回执立即更新本人状态，迟到的轮询与错误不能覆盖操作", async () => {
+  for (const fail of [false, true]) {
+    const old = deferred();
+    const c = simulatedPanel(1, async (path, token, data) =>
+      data ? {} : old.promise,
+    );
+    const actor = c.actors[0];
+    const polling = c.refresh();
+    await c.command(actor, "ready", { ready: true });
+    assert.equal(actor.room.me.ready, true);
+    if (fail) old.reject(Object.assign(new Error("旧错误"), { status: 403 }));
+    else old.resolve({ phase: "lobby", stage: "s1", me: { ready: false } });
+    await polling;
+    assert.equal(actor.room.me.ready, true);
+    assert.equal(actor.joined, true);
+    assert.equal(actor.error, "");
+  }
+});
+
+test("更新的查询优先，旧私密响应不能覆盖新阶段", async () => {
+  const secret = deferred();
+  let stage = "s1";
+  const c = simulatedPanel(1, async (path) =>
+    path.endsWith("/private")
+      ? secret.promise
+      : {
+          phase: stage === "s1" ? "identity" : "lobby",
+          stage,
+          me: { ready: false },
+        },
+  );
+  const old = c.refresh();
+  await new Promise(setImmediate);
+  stage = "s2";
+  await c.refresh();
+  secret.resolve({ stage: "s1", role: "旧角色" });
+  await old;
+  assert.equal(c.actors[0].room.stage, "s2");
+  assert.equal(c.actors[0].secret, null);
+});
+
+test("11人刷新与全部准备最多并发4个请求，保留真人与已准备玩家", async () => {
+  let active = 0,
+    max = 0,
+    requests = 0;
+  const c = simulatedPanel(11, async (path, token, data) => {
+    requests++;
+    active++;
+    max = Math.max(max, active);
+    await new Promise(setImmediate);
+    active--;
+    return data ? {} : { phase: "lobby", stage: "s1", me: { ready: false } };
+  });
+  await c.refresh();
+  assert.equal(requests, 11);
+  assert.equal(max, 4);
+  requests = 0;
+  c.actors[0].room.me.ready = true;
+  assert.equal(await c.batch("ready"), 10);
+  assert.equal(requests, 10);
+  assert.ok(c.actors.every((a) => a.room.me.ready));
+  assert.equal(active, 0);
+});
+
+test("批量准备遇到失败停止派发并等待在途请求，失败保留原编号", async () => {
+  const gates = Array.from({ length: 4 }, deferred);
+  let requests = 0,
+    settled = false;
+  const c = simulatedPanel(11, (path, token) => {
+    requests++;
+    return gates[Number(token)].promise;
+  });
+  const batch = c.batch("ready");
+  const rejected = assert.rejects(batch, /网络中断/).then(() => {
+    settled = true;
+  });
+  const id = c.actors[0].pending.id;
+  gates[0].reject(new Error("网络中断"));
+  await new Promise(setImmediate);
+  assert.equal(settled, false);
+  gates.slice(1).forEach((g) => g.resolve({}));
+  await rejected;
+  assert.equal(requests, 4);
+  assert.equal(c.actors[0].pending.id, id);
+  assert.ok(c.actors.slice(1, 4).every((a) => a.room.me.ready && !a.pending));
+  assert.ok(c.actors.slice(4).every((a) => !a.pending && !a.room.me.ready));
+});

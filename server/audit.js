@@ -72,6 +72,7 @@ function actionDetails(room, uid, type, input) {
     "board",
     "capacity",
     "visible",
+    "fairyEnabled",
     "kind",
     "actor",
     "threshold",

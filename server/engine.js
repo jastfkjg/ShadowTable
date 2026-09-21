@@ -2,7 +2,9 @@
 const { randomInt, randomUUID, createHash } = require("node:crypto");
 const variants = require("./variants");
 const knights = require("./knights");
-const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"];
+const fairy = require("./fairy");
+const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
+const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
 const COUNTS = {
   5: [3, 2],
@@ -185,6 +187,7 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     host: uid,
     board: boardId,
     capacity,
+    fairyEnabled: capacity >= 8,
     phase: "lobby",
     stage: randomUUID(),
     game: 0,
@@ -343,6 +346,7 @@ function start(room, flexible = false) {
     "需要所有座位入座且全员准备",
   );
   board(room.board, room.capacity);
+  room.fairyEnabled = fairy.enabled(room);
   room.players.sort((a, b) => a.seat - b.seat);
   const roles = shuffle(roleDeck(room.board, room.capacity));
   room.roles = Object.fromEntries(
@@ -362,6 +366,7 @@ function start(room, flexible = false) {
   room.activity = null;
   room.toolSequence = 0;
   if (isKnights(room.board)) knights.init(room, shuffle);
+  fairy.init(room);
   if (isKnights(room.board) || room.board === "chaos") room.flexible = true;
   stage(room, room.flexible ? "tools" : "identity");
 }
@@ -411,6 +416,7 @@ function knightKnifeAllowed(room, uid) {
 function actionSpec(room, uid) {
   const p = member(room, uid);
   if (p.seat === null) return null;
+  if (room.phase === "fairy") return fairy.action(room, uid);
   if (room.knights && KNIGHT_PHASES.includes(room.phase))
     return knights.action(room, uid);
   if (
@@ -599,18 +605,19 @@ function privateView(room, uid) {
       if (state.nightInfo) information += ` ${state.nightInfo}`;
       else information += " 等待技能结算后自动更新。";
     }
-    if (state.fairyInfo) information += ` ${state.fairyInfo}`;
   }
+  const fairyResult = fairy.result(room, uid);
+  if (fairyResult?.fairyInfo) information += ` ${fairyResult.fairyInfo}`;
   return {
     game: room.game,
     stage: room.stage,
     identityRevision: identityRevision(room, uid),
     skillStatus: room.knights ? knights.skillStatus(room, uid) : null,
     passiveVision: !!room.knights && role === "prophet",
-    fairyResult: room.knights?.players[uid]?.fairyInfo
+    fairyResult: fairyResult?.fairyInfo
       ? {
-          revision: room.knights.players[uid].fairyRevision || 1,
-          information: room.knights.players[uid].fairyInfo,
+          revision: fairyResult.fairyRevision || 1,
+          information: fairyResult.fairyInfo,
         }
       : null,
     role: name,
@@ -640,7 +647,7 @@ function boardName(room) {
 }
 function hasActiveOperation(room) {
   return [
-    ...KNIGHT_PHASES,
+    ...SPECIAL_PHASES,
     "teamVote",
     "quest",
     "assassination",
@@ -677,7 +684,7 @@ function beginActivity(room, input) {
   requireRule(canUseTools(room), "请先发放身份，结束后需重新开局");
   const kind = input.kind;
   requireRule(
-    !KNIGHT_PHASES.includes(room.phase),
+    !SPECIAL_PHASES.includes(room.phase),
     "技能或查验进行中，请先结算或明确作废",
   );
   requireRule(
@@ -698,14 +705,23 @@ function beginActivity(room, input) {
     "当前操作尚未结算，请先结算或确认作废",
     409,
   );
-  if (["skills", "conversion", "fairy"].includes(kind)) {
+  if (kind === "fairy") {
+    requireRule(fairy.enabled(room), "本房间未开启湖中仙女");
+    requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
+    requireRule(fairy.targets(room).length > 0, "没有可查验的仙女目标");
+    room.flexible = true;
+    room.toolSequence = (room.toolSequence || 0) + 1;
+    room.activity = { kind, number: room.toolSequence, threshold: null, startedAt: Date.now() };
+    room.team = [];
+    stage(room, "fairy");
+    return;
+  }
+  if (["skills", "conversion"].includes(kind)) {
     requireRule(isKnights(room.board), "当前板子不支持此操作");
     requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
     const k = room.knights;
-    if (["skills", "fairy"].includes(kind)) {
-      if (kind === "skills") {
-        if (k.skillRound === k.round) advanceKnightRound(room);
-      }
+    if (kind === "skills") {
+      if (k.skillRound === k.round) advanceKnightRound(room);
       knights.begin(room, kind, requireRule);
       room.toolSequence++;
       room.activity = { kind, number: room.toolSequence, threshold: null, startedAt: Date.now() };
@@ -811,6 +827,14 @@ function settleActivity(room) {
     409,
   );
   const number = room.activity.number;
+  if (room.phase === "fairy") {
+    fairy.settle(room, faction);
+    room.history.push({ kind: "variant", text: "仙女查验已完成", number });
+    room.activity = null;
+    room.team = [];
+    stage(room, "tools");
+    return;
+  }
   if (KNIGHT_PHASES.includes(room.phase)) {
     if (!knights.settle(room, requireRule, ROLES)) return;
     if (room.activity.kind === "skills") knights.updateNight(room, ROLES);
@@ -830,8 +854,6 @@ function settleActivity(room) {
         detail: `本轮出局：${list(result.eliminated)}；抽牌复活：${list(result.redrawn)}；原牌复活：${list(result.restored)}；最终仍出局：${list(result.out)}`,
       });
     }
-    if (room.activity.kind === "fairy")
-      room.history.push({ kind: "variant", text: "仙女查验已完成", number });
     room.activity = null;
     room.team = [];
     stage(room, "tools");
@@ -957,7 +979,7 @@ function settleIfComplete(room) {
     settleActivity(room);
 }
 function phaseName(room) {
-  if (KNIGHT_PHASES.includes(room.phase))
+  if (SPECIAL_PHASES.includes(room.phase))
     return {
       skillPrepare: "同时秘密使用技能",
       skillTurn: "技能结算",
@@ -999,7 +1021,7 @@ function operationProgress(room, uid) {
   if (
     uid !== room.host ||
     ![
-      ...KNIGHT_PHASES,
+      ...SPECIAL_PHASES,
       "identity",
       "teamVote",
       "quest",
@@ -1026,6 +1048,7 @@ function operationProgress(room, uid) {
 function publicView(room, uid) {
   const p = member(room, uid);
   const action = actionSpec(room, uid);
+  const fairyResult = fairy.result(room, uid);
   const awaiting = !!action && !Object.hasOwn(room.submissions || {}, uid);
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
@@ -1044,6 +1067,8 @@ function publicView(room, uid) {
         : roleDeck(room.board, room.capacity),
     ),
     showSkillDetails: room.showSkillDetails === true,
+    fairyEnabled: fairy.enabled(room),
+    fairyHolder: fairy.holder(room),
     operationProgress: operationProgress(room, uid),
     closeWaiting: room.host === uid ? closeWaitingPolicy(room) : null,
     operationStatus:
@@ -1081,7 +1106,7 @@ function publicView(room, uid) {
     knights: room.knights
       ? {
           round: room.knights.round,
-          fairy: room.knights.fairy,
+          fairy: fairy.holder(room),
           remainingCards: room.knights.deck.length,
         }
       : null,
@@ -1101,9 +1126,9 @@ function publicView(room, uid) {
       submitted: Object.hasOwn(room.submissions || {}, uid),
       identityRevision: identityRevision(room, uid),
       fairyResultPending:
-        !!room.knights?.players[uid]?.fairyInfo &&
-        (room.knights.players[uid].fairyRevision || 1) >
-          (room.knights.players[uid].fairyAcknowledged || 0),
+        !!fairyResult?.fairyInfo &&
+        (fairyResult.fairyRevision || 1) >
+          (fairyResult.fairyAcknowledged || 0),
       identityChanged:
         identityRevision(room, uid) >
         (room.knights?.players[uid]?.identityAcknowledged || 0),
@@ -1196,6 +1221,19 @@ function command(room, uid, input) {
       });
     if (isKnights(next.board)) next.showSkillDetails = input.visible;
     else requireRule(input.visible === false, "当前板子没有技能过程设置");
+    if (input.fairyEnabled !== undefined) {
+      requireRule(typeof input.fairyEnabled === "boolean", "湖中仙女设置无效");
+      requireRule(next.capacity >= 7 || !input.fairyEnabled, "5、6人局不支持湖中仙女");
+      if (input.fairyEnabled !== fairy.enabled(next)) {
+        requireRule(next.phase !== "fairy", "请先完成或作废当前仙女查验");
+        next.fairyEnabled = input.fairyEnabled;
+        if (next.roles) fairy.init(next);
+        if (next.phase === "lobby") {
+          next.players.forEach((player) => (player.ready = false));
+          stage(next, "lobby");
+        }
+      }
+    }
     Object.assign(room, next);
     return;
   }
@@ -1207,7 +1245,7 @@ function command(room, uid, input) {
     return;
   }
   if (type === "ackFairyResult") {
-    const state = room.knights?.players[uid];
+    const state = fairy.result(room, uid);
     requireRule(
       state?.fairyInfo && input.revision === (state.fairyRevision || 1),
       "查验结果已变化，请重新查看",
@@ -1405,6 +1443,7 @@ function command(room, uid, input) {
       room.players.every((p) => p.seat <= input.capacity),
       "请先让超出新人数的玩家换座或离开",
     );
+    if (room.capacity !== input.capacity) room.fairyEnabled = input.capacity >= 8;
     room.board = input.board;
     room.capacity = input.capacity;
     room.players.forEach((p) => (p.ready = false));
@@ -1425,9 +1464,11 @@ function command(room, uid, input) {
       ["ended", "terminated"].includes(room.phase),
       "只能在结束后重开",
     );
+    room.fairyEnabled = fairy.enabled(room);
     for (const key of [
       "roles",
       "knights",
+      "fairy",
       "submissions",
       "leader",
       "round",

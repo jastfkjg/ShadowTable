@@ -244,7 +244,7 @@
     </block>
       <view wx:if="{{room.canUseTools}}" class="panel host-panel">
         <view class="label">房主操作</view>
-        <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · 仙女{{room.knights.fairy}}号 · B牌剩余{{room.knights.remainingCards}}张</view>
+        <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · B牌剩余{{room.knights.remainingCards}}张</view>
         <view wx:if="{{room.knights}}" class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</view>
         <view class="tool-actions">
           <button class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
@@ -252,8 +252,8 @@
           <block wx:if="{{room.knights}}">
             <button class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
             <button class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
-            <button class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
           </block>
+          <button wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
           <button wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
         </view>
         <view wx:if="{{room.operationProgress}}" class="operation-progress">
@@ -279,7 +279,7 @@
         wx:key="seat"
         class="seat {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
         data-seat="{{item.seat}}"
-        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')}}"
+        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.fairyHolder===item.seat?'，湖仙':'')}}"
         bindtap="seat"
         disabled="{{hasPendingRequest || busy || (room.phase==='lobby'?(item.occupied && !item.mine):!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
       >
@@ -289,7 +289,7 @@
           ></view
         ><view class="seat-name">{{item.name}}</view
         ><view wx:if="{{item.alive===false}}" class="seat-out">已出局</view><view class="seat-meta"
-          >{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.selected?'已选入队':item.inTeam?'任务队员':'')}}</view
+          ><text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.selected?'已选入队':item.inTeam?'任务队员':'')}}</view
         >
       </button></view
     >

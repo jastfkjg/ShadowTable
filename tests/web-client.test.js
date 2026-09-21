@@ -21,7 +21,7 @@ function client(fetch) {
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { state, schedule, loadSettings, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+    window.test = { state, schedule, loadSettings, settingsSave, CHANGES, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
@@ -170,7 +170,7 @@ test("被移出时网页清空身份和房间并显示原因，设置中对局�
 });
 
 
-test("旧服务缺少移出权限时提示更新服务，不误报对局进行中", async () => {
+test("旧服务缺少移出权限时提示不支持，不误报对局进行中", async () => {
   const r = newRoom("123456", "p1", "房主");
   enter(r, "p2", "玩家");
   const legacy = publicView(r, "p1");
@@ -180,7 +180,7 @@ test("旧服务缺少移出权限时提示更新服务，不误报对局进行�
   c.state.settings = { busy: false };
   await c.loadSettings();
   const html = c.viewSettingsDialog();
-  assert.match(html, /服务端尚未支持移出玩家/);
+  assert.match(html, /暂不支持移出玩家/);
   assert.doesNotMatch(html, /对局进行中不能移出玩家/);
   assert.match(html, /data-change="settingsKick" disabled/);
   legacy.canKick = true;
@@ -209,4 +209,89 @@ test("网页围观不显示准备或私密身份，自己的座位可点击站�
   c.state.room = publicView(r, "host");
   html = c.viewRoom();
   assert.doesNotMatch(html, /查看我的身份|data-action="reveal"/);
+});
+
+test("网页普通玩家看到湖仙座位标记，传递刷新后移动，关闭后消失", async () => {
+  const r = newRoom("123456", "p1", "房主", "classic", 8);
+  for (let i = 2; i <= 8; i++) enter(r, `p${i}`, `玩家${i}`);
+  const run = (uid, type, data = {}) => command(r, uid, { type, stage: r.stage, ...data });
+  r.players.forEach(p => run(p.uid, "ready", { ready: true }));
+  run("p1", "start", { flexible: true });
+  r.fairy.fairy = 1;
+  const c = client(async () => response(publicView(r, "p2")));
+  c.state.room = publicView(r, "p2");
+  await c.refresh();
+  const seats = html => [...html.matchAll(/<button[^>]*data-action="seat"[\s\S]*?<\/button>/g)].map(m => m[0]);
+  assert.match(seats(c.viewRoom())[0], /seat-fairy/);
+  assert.equal(seats(c.viewRoom()).filter(s => s.includes("seat-fairy")).length, 1);
+  run("p1", "beginActivity", { kind: "fairy" });
+  run("p1", "submit", { value: "target:2" });
+  await c.refresh();
+  assert.match(seats(c.viewRoom())[1], /seat-fairy/);
+  assert.doesNotMatch(seats(c.viewRoom())[0], /seat-fairy/);
+  run("p1", "updateSettings", { board: r.board, capacity: 8, visible: false, fairyEnabled: false });
+  await c.refresh();
+  assert.doesNotMatch(c.viewRoom(), /seat-fairy/);
+});
+
+test("网页人数、板子及开关更改即保存，成功后保留表单且无底部保存按钮", async () => {
+  const r = newRoom("123456", "host", "房主", "classic", 7);
+  const writes = [];
+  const c = client(async (path, options) => {
+    if (options?.method === "POST") {
+      const data = JSON.parse(options.body);
+      writes.push(data);
+      command(r, "host", data);
+      return response({ accepted: true });
+    }
+    return response(path === "/api/boards" ? { boards: BOARDS } : publicView(r, "host"));
+  });
+  c.state.showRoomSettings = true;
+  c.state.settings = { busy: false };
+  await c.loadSettings();
+  await c.CHANGES.settingsCapacity({ value: "10" });
+  assert.equal(r.capacity, 10);
+  assert.equal(c.state.settings.fairyEnabled, true);
+  await c.CHANGES.settingsBoard({ value: "knights-10" });
+  assert.equal(r.board, "knights-10");
+  await c.CHANGES.settingsFairy({ checked: false });
+  assert.equal(r.fairyEnabled, false);
+  await c.CHANGES.settingsVisibility({ checked: true });
+  assert.equal(writes.length, 4);
+  assert.equal(c.state.settings.visible, true);
+  assert.equal(c.state.settings.dirty, false);
+  assert.equal(c.state.settings.loading, false);
+  assert.equal(c.state.settings.busy, false);
+  const html = c.viewSettingsDialog();
+  assert.doesNotMatch(html, /data-action="settingsSave"|7人局默认|开启后公开|任意阶段均可移交|选择玩家后需确认/);
+});
+
+test("网页自动保存失败保留原请求重试，未确认时禁止再次修改", async () => {
+  const r = newRoom("123456", "host", "房主", "classic", 8);
+  const writes = [];
+  let fail = true;
+  const c = client(async (path, options) => {
+    if (options?.method === "POST") {
+      writes.push({ data: options.body, id: options.headers["Idempotency-Key"] });
+      if (fail) throw new Error("网络中断");
+      command(r, "host", JSON.parse(options.body));
+      return response({ accepted: true });
+    }
+    return response(path === "/api/boards" ? { boards: BOARDS } : publicView(r, "host"));
+  });
+  c.state.showRoomSettings = true;
+  c.state.settings = { busy: false };
+  await c.loadSettings();
+  await c.CHANGES.settingsFairy({ checked: false });
+  assert.equal(c.state.settings.pendingSave, true);
+  assert.match(c.viewSettingsDialog(), /重试保存/);
+  await c.CHANGES.settingsFairy({ checked: true });
+  assert.equal(c.state.settings.fairyEnabled, false);
+  assert.equal(writes.length, 1);
+  fail = false;
+  await c.settingsSave();
+  assert.deepEqual(writes[1], writes[0]);
+  assert.ok(writes[0].id);
+  assert.equal(c.state.settings.pendingSave, false);
+  assert.equal(c.state.settings.error, "");
 });

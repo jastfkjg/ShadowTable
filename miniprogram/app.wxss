@@ -1093,3 +1093,17 @@ button.quest-step.success { color: var(--good); }
 button.quest-step.failure { color: var(--evil); }
 
 .seat-name { white-space: normal; overflow: visible; word-break: break-all; text-overflow: clip; }
+
+/* Public holder marker, independent of role and host privileges. */
+.seat-fairy {
+  display: inline-block;
+  padding: 0 8rpx;
+  margin-right: 8rpx;
+  border: 1px solid var(--accent);
+  border-radius: 8rpx;
+  color: var(--accent);
+  font-size: 24rpx;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.seat-meta { min-height: 40rpx; }

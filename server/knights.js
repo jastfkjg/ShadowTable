@@ -232,21 +232,6 @@ function action(room, uid) {
       options,
     };
   }
-  if (room.phase === "fairy") {
-    if (uid !== room.players.find((p) => p.seat === k.fairy)?.uid) return null;
-    options = targets
-      .filter((t) => t.seat !== k.fairy && !k.fairyVisited.includes(t.seat))
-      .map((t) => ({
-        value: `target:${t.seat}`,
-        label: `查验 ${t.seat}号并传递仙女`,
-      }));
-    return {
-      kind: "choice",
-      label: "选择查验目标并传递仙女",
-      choices: options.map((o) => o.value),
-      options,
-    };
-  }
   return null;
 }
 function begin(room, kind, check) {
@@ -277,14 +262,6 @@ function begin(room, kind, check) {
       .map((p) => p.uid);
     k.cursor = 0;
     resetStage(room, "skillPrepare");
-  } else if (kind === "fairy") {
-    check(
-      living(room).some(
-        (p) => p.seat !== k.fairy && !k.fairyVisited.includes(p.seat),
-      ),
-      "没有可查验的仙女目标",
-    );
-    resetStage(room, "fairy");
   }
 }
 function cancel(room) {
@@ -366,19 +343,6 @@ function settle(room, check, allRoles) {
     )
       k.hunters.push(uid);
   };
-  if (room.phase === "fairy") {
-    const holder = seatUid(k.fairy),
-      target = seatUid(Number(val(holder).split(":")[1]));
-    k.players[holder].fairyRevision =
-      (k.players[holder].fairyRevision ||
-        (k.players[holder].fairyInfo ? 1 : 0)) + 1;
-    k.players[holder].fairyInfo =
-      `${room.players.find((p) => p.uid === target).seat}号查验结果：${side(room, target, allRoles) === "good" ? "好人" : "坏人"}（第${k.round}轮）`;
-    k.fairyVisited.push(k.fairy);
-    k.fairy = room.players.find((p) => p.uid === target).seat;
-    k.fairyRound = k.round;
-    return true;
-  }
   if (room.phase === "skillPrepare") {
     const magician = room.players.find(
       (p) => room.roles[p.uid] === "magician" && val(p.uid).startsWith("swap:"),

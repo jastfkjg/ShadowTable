@@ -406,7 +406,7 @@ test("技能过程开关仅房主可见，默认不可见", () => {
   assert.equal(byHandler(guest, "toggleSkillVisibility"), undefined);
 });
 
-test("独立设置页使用原生开关和统一保存，非管理员不显示设置", () => {
+test("独立设置页使用原生开关自动保存，仅失败时显示重试", () => {
   const settingsRender = factory("pages/settings/settings.wxml");
   const data = {
     loading: false,
@@ -421,6 +421,8 @@ test("独立设置页使用原生开关和统一保存，非管理员不显示�
     boardId: "knights",
     visible: false,
     dirty: false,
+    pendingTransfer: false,
+    pendingKick: false,
   };
   const tree = settingsRender(data);
   assert.ok(
@@ -428,8 +430,10 @@ test("独立设置页使用原生开关和统一保存，非管理员不显示�
       (n) => n.tag === "wx-switch" && n.attr.bindchange === "toggleVisibility",
     ),
   );
-  assert.equal(byHandler(tree, "save").attr.disabled, true);
-  const dirty = settingsRender({ ...data, dirty: true });
+  assert.equal(byHandler(tree, "save"), undefined);
+  assert.ok(!JSON.stringify(tree).includes("7人局默认关闭"));
+  assert.ok(!JSON.stringify(tree).includes("开启后公开出手人"));
+  const dirty = settingsRender({ ...data, dirty: true, error: "网络错误" });
   assert.equal(byHandler(dirty, "save").attr.disabled, false);
   assert.equal(
     byHandler(settingsRender({ ...data, authorized: false }), "save"),
@@ -542,7 +546,7 @@ test("房间设置仅在可移出阶段开放成员选择，对局中说明原�
   assert.ok(JSON.stringify(playing).includes("对局进行中不能移出玩家"));
   const legacy = renderSettings({ ...data, room: { phase: "lobby" } });
   assert.equal(byHandler(legacy, "openKick").attr.disabled, true);
-  assert.ok(JSON.stringify(legacy).includes("服务端尚未支持移出玩家"));
+  assert.ok(JSON.stringify(legacy).includes("暂不支持移出玩家"));
   assert.ok(!JSON.stringify(legacy).includes("对局进行中不能移出玩家"));
   const picker = renderSettings({ ...data, showKickPicker: true });
   assert.equal(byHandler(picker, "kick").attr["data-seat"], 2);
@@ -572,4 +576,34 @@ test("等待确认时禁用写入入口但允许遮盖身份，房主工具位�
   assert.ok(!byHandler(tree, "reveal").attr.disabled);
   const flat = nodes(tree);
   assert.ok(flat.indexOf(byHandler(tree, "openTool")) < flat.findIndex(n => n.attr?.class === "seats"));
+});
+
+test("普通玩家座位公开湖仙标记且随传递移动；关闭后无标记和查验入口", () => {
+  const room = { phase: "tools", code: "123456", capacity: 8, flexible: true,
+    me: { seat: 2, isHost: false }, fairyEnabled: true, fairyHolder: 1, team: [] };
+  const seats = [1, 2].map(seat => ({ seat, name: `玩家${seat}`, occupied: true }));
+  for (const holder of [1, 2, null]) {
+    const tree = render({ ...base, room: { ...room, fairyHolder: holder }, seats });
+    const marked = nodes(tree).filter(n => n.attr?.bindtap === "seat" && JSON.stringify(n).includes('seat-fairy'));
+    assert.deepEqual(marked.map(n => n.attr["data-seat"]), holder ? [holder] : []);
+  }
+  const host = { ...room, canUseTools: true, me: { isHost: true }, fairyEnabled: false, fairyHolder: null };
+  const disabled = render({ ...base, room: host, seats });
+  assert.ok(!nodes(disabled).some(n => n.attr?.["data-kind"] === "fairy"));
+  const enabled = render({ ...base, room: { ...host, fairyEnabled: true }, seats });
+  assert.ok(nodes(enabled).some(n => n.attr?.["data-kind"] === "fairy"));
+});
+
+test("湖仙设置所有板子可见，5/6人及查验进行中禁用开关", () => {
+  const settingsRender = factory("pages/settings/settings.wxml");
+  for (const capacity of [5, 6, 7, 8, 12]) {
+    for (const phase of ["lobby", "tools", "fairy"]) {
+      const tree = settingsRender({ loading: false, authorized: true, capacity, boardId: "classic",
+        room: { phase }, fairyEnabled: capacity >= 8 });
+      const toggle = nodes(tree).find(n => n.attr?.bindchange === "toggleFairy");
+      assert.ok(toggle);
+      assert.equal(toggle.attr.disabled, capacity < 7 || phase === "fairy");
+      assert.equal(toggle.attr.checked, capacity >= 8);
+    }
+  }
 });
