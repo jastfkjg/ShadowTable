@@ -1,15 +1,19 @@
 <view class="detail-sticky">
-  <view class="detail-toolbar"><text>板子详情</text><button class="detail-close" bindtap="back">{{backLabel}}</button></view>
-  <scroll-view wx:if="{{hasDetail}}" scroll-x class="detail-nav">
-    <view class="detail-nav-inner"><text class="detail-nav-label">目录</text><view wx:for="{{sections}}" wx:key="title" class="detail-nav-item" bindtap="jumpSection" data-index="{{index}}" role="link" aria-label="{{'跳转到'+item.title}}">{{item.navTitle || item.title}}<text class="detail-nav-arrow">↓</text></view></view>
-  </scroll-view>
+  <view class="detail-toolbar"><text>板子详情</text><button class="detail-close" bindtap="back">返回</button></view>
+  <view wx:if="{{hasDetail}}" class="detail-nav">
+    <view class="detail-nav-heading" bindtap="toggleDirectory" role="button" aria-expanded="{{directoryExpanded}}"><text>章节目录</text><text class="detail-nav-state">{{directoryExpanded?'收起 −':'展开 ＋'}}</text></view>
+    <scroll-view wx:if="{{directoryExpanded}}" scroll-y enhanced show-scrollbar="{{true}}" class="detail-nav-scroll" style="height: {{sections.length>2?176:88}}rpx;">
+      <view class="detail-nav-inner"><view wx:for="{{sections}}" wx:key="title" class="detail-nav-item" bindtap="jumpSection" data-index="{{index}}" role="link" aria-label="{{'跳转到第'+(index+1)+'章，'+item.title}}"><text class="detail-nav-number">{{index+1}}.</text><text>{{item.navTitle || item.title}}</text></view></view>
+    </scroll-view>
+    <view wx:if="{{directoryExpanded && sections.length>4}}" class="detail-nav-hint">共 {{sections.length}} 章 · 上下滑动查看</view>
+  </view>
 </view>
 <view class="page board-detail-page">
   <view wx:if="{{loading}}" class="muted">正在加载板子详情…</view>
   <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
   <block wx:if="{{error}}">
     <button class="secondary" bindtap="retry">重新加载</button>
-    <button class="text-button" bindtap="back">{{backLabel}}</button>
+    <button class="text-button" bindtap="back">返回</button>
   </block>
   <block wx:if="{{!loading && !error}}">
     <view class="detail-header">
@@ -49,6 +53,6 @@
       <view wx:for="{{roleConfiguration}}" wx:key="faction" class="detail-line">{{item.label}}：{{item.roles}}</view>
       <view class="muted small detail-none">本板子暂无详细说明，以上为角色配置。</view>
     </block>
-    <button class="primary" bindtap="back">{{backLabel}}</button>
+    <button class="primary" bindtap="back">返回</button>
   </block>
 </view>

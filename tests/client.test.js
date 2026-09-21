@@ -605,9 +605,7 @@ test("玩法说明随人数和板子更新，房间配置弹窗可关闭且退�
     p.data.boardRoleConfiguration[0].roles,
     "梅林，派西维尔，忠臣×2",
   );
-  p.toggleRules();
   p.selectCapacity(12);
-  assert.equal(p.data.showRules, false);
   assert.equal(
     p.data.boardRoleConfiguration[1].roles.includes("奥伯伦×2"),
     true,

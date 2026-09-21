@@ -557,9 +557,9 @@ test("房间设置仅在可移出阶段开放成员选择，对局中说明原�
 test("创建页提供板子详情入口，目录采用文字链接", () => {
   const tree = render({ ...base, entryMode: "create", availableBoards: [{ id: "classic", name: "经典" }] });
   assert.ok(byHandler(tree, "openBoardDetails"));
-  const detail = factory("pages/board-details/board-details.wxml")({ loading: false, hasDetail: true, backLabel: "返回创建", sections: [{ title: "角色技能", navTitle: "B牌 · 蓝方", kind: "roles", items: [] }] });
+  const detail = factory("pages/board-details/board-details.wxml")({ loading: false, hasDetail: true, directoryExpanded: true, sections: [{ title: "角色技能", navTitle: "B牌 · 蓝方", kind: "roles", items: [] }] });
   const link = byHandler(detail, "jumpSection");
   assert.equal(link.tag, "wx-view");
   assert.equal(link.attr.role, "link");
-  assert.ok(JSON.stringify(detail).includes("返回创建"));
+  assert.ok(JSON.stringify(detail).includes("返回"));
 });

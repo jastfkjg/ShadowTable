@@ -139,11 +139,11 @@
             <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
           </button>
         </view>
-        <button class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
-        <button class="text-button rules-toggle" bindtap="toggleRules">{{showRules?'收起配置':'角色配置'}}</button>
-        <view wx:if="{{showRules}}" class="rules-detail">
+        <view class="field-title">角色配置</view>
+        <view class="rules-detail">
           <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
+        <button class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
         <button class="primary" form-type="submit" data-action="create" loading="{{busy}}" disabled="{{loading || busy}}">创建 {{capacity}} 人房间</button>
       </block>
       <block wx:else>

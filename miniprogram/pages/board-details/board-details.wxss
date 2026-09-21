@@ -151,10 +151,16 @@ button.role-quick-toggle { display: flex; align-items: baseline; gap: 16rpx; wid
 /* Explicit sizing avoids the native mini-program button width defaults. */
 button.detail-close { width: auto; flex: 0 0 auto; min-height: 88rpx; padding: 12rpx 0 12rpx 24rpx; background: transparent; border-radius: 0; color: var(--accent); font-weight: 400; }
 .detail-toolbar { font-size: 26rpx; color: var(--muted); }
-.detail-nav { padding-bottom: 0; }
-.detail-nav-inner { display: inline-flex; align-items: center; padding: 0 32rpx; gap: 32rpx; }
-.detail-nav-label { flex-shrink: 0; white-space: nowrap; color: var(--muted); font-size: 24rpx; }
-.detail-nav-item { display: inline-flex; align-items: center; min-height: 88rpx; color: var(--text); font-size: 26rpx; white-space: nowrap; }
-.detail-nav-arrow { margin-left: 8rpx; color: var(--accent); font-size: 22rpx; }
+.detail-nav { white-space: normal; padding: 0 32rpx 8rpx; box-sizing: border-box; }
+.detail-nav-heading { display: flex; align-items: center; justify-content: space-between; min-height: 88rpx; border-top: 1rpx solid var(--border); color: var(--muted); font-size: 26rpx; }
+.detail-nav-state { color: var(--accent); font-size: 24rpx; }
+.detail-nav-inner { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24rpx; }
+.detail-nav-item { display: flex; align-items: center; min-height: 88rpx; padding: 8rpx 0; box-sizing: border-box; color: var(--text); font-size: 26rpx; gap: 12rpx; line-height: 1.4; }
+.detail-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8rpx 16rpx; }
+.detail-capacity { display: inline; margin: 0; white-space: nowrap; }
 .detail-section-title { display: flex; align-items: baseline; border-top: 0; border-left: 6rpx solid var(--accent); border-radius: 0 12rpx 12rpx 0; background: var(--surface); padding: 20rpx; margin: 40rpx 0 16rpx; font-size: 34rpx; line-height: 1.5; font-weight: 650; color: var(--text); }
 .detail-section-number { color: var(--accent); flex-shrink: 0; font-size: 26rpx; font-weight: 600; }
+
+.detail-nav-scroll { max-height: 24vh; }
+.detail-nav-number { flex-shrink: 0; color: var(--accent); font-size: 24rpx; min-width: 28rpx; }
+.detail-nav-hint { padding: 8rpx 0; color: var(--muted); font-size: 22rpx; }

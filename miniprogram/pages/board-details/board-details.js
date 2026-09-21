@@ -1,7 +1,7 @@
 const api = require("../../api");
 Page({
   data: {
-    backLabel: "返回牌桌",
+    directoryExpanded: false,
     loading: true,
     error: "",
     title: "",
@@ -13,7 +13,6 @@ Page({
   },
   onLoad(query) {
     this.alive = true;
-    this.setData({ backLabel: query.from === "create" ? "返回创建" : "返回牌桌" });
     this.boardId = query.board || "";
     this.capacity = Number(query.capacity) || 0;
     this.load();
@@ -40,7 +39,7 @@ Page({
           title: board.name,
           titleHasCapacity: /[（(]\d+人[）)]/.test(board.name),
           capacity: this.capacity,
-          summary: detail ? detail.summary : "",
+          summary: detail && !/^B\s*牌技能速查/.test(detail.summary) ? detail.summary : "",
           sections: detail ? detail.sections : [],
           hasDetail: !!detail,
           roleConfiguration: fallback,
@@ -68,9 +67,13 @@ Page({
     const item = this.data.sections[section]?.items[role];
     if (item?.brief) this.setData({ [`sections[${section}].items[${role}].expanded`]: !item.expanded });
   },
+  toggleDirectory() {
+    this.setData({ directoryExpanded: !this.data.directoryExpanded });
+  },
   jumpSection(e) {
     const index = Number(e.currentTarget.dataset.index);
     if (!Number.isInteger(index) || !this.data.sections[index]) return;
+    this.setData({ directoryExpanded: false }, () => {
     const query = wx.createSelectorQuery();
     query.select(".detail-sticky").boundingClientRect();
     query.select("#detail-section-" + index).boundingClientRect();
@@ -78,6 +81,7 @@ Page({
     query.exec(([header, section, viewport]) => {
       if (this.alive && header && section && viewport)
         wx.pageScrollTo({ scrollTop: viewport.scrollTop + section.top - header.height - 16, duration: 0 });
+    });
     });
   },
   back() {

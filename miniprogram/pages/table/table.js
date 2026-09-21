@@ -112,7 +112,6 @@ Page({
     boards: [],
     availableBoards: [],
     entryMode: "join",
-    showRules: false,
     showRoomRules: false,
     actionDialog: false,
     actionSecret: null,
@@ -673,9 +672,6 @@ Page({
     if (!entry) return;
     wx.showModal({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
   },
-  toggleRules() {
-    this.setData({ showRules: !this.data.showRules });
-  },
   openRoomRules() {
     this.setData({ showRoomRules: true });
   },
@@ -718,8 +714,7 @@ Page({
       boardRoleConfiguration: b.roleConfigurations?.[capacity] || [],
       boardIndex: availableBoards.indexOf(b),
       boardAssisted: b.mode === "assisted",
-      showRules: false,
-    });
+      });
   },
   pickBoard(e) {
     if (this.data.busy) return;
@@ -732,8 +727,7 @@ Page({
       boardRoleConfiguration: b.roleConfigurations?.[this.data.capacity] || [],
       boardIndex: index,
       boardAssisted: b.mode === "assisted",
-      showRules: false,
-    });
+      });
   },
   pickCapacity(e) {
     if (this.data.busy) return;
