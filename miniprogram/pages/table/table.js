@@ -71,6 +71,7 @@ function toolHistory(h, key) {
               magic: "魔法",
             }[kind] || kind,
           count,
+          tone: kind === "success" ? "success" : ["fail", "thiefFail"].includes(kind) ? "failure" : "",
         })),
       detail: h.counts
         ? `${h.team.join("、")}号 · 成功${h.counts.success} / 失败${h.counts.fail} / 盗贼失败${h.counts.thiefFail} / 魔法${h.counts.magic}`
@@ -457,7 +458,7 @@ Page({
     this.updateChangedData({
       ...privacyUpdate,
       actionEntryLabel,
-      seatsExpanded: this.data.room?.code === room.code ? this.data.seatsExpanded : true,
+      seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       historyExpanded,
       historyFilter,
       visibleHistory: this.filteredHistory(history, historyExpanded, historyFilter),
@@ -666,18 +667,11 @@ Page({
     return expanded ? entries.slice().reverse() : entries.slice(-3).reverse();
   },
   toggleSeats() {
+    if (!this.data.room || this.data.room.phase === "lobby") return;
     this.setData({ seatsExpanded: !this.data.seatsExpanded });
-  },
-  onPageScroll(e) {
-    if (e.scrollTop > (this.lastScrollTop || 0)) this.historyAutoExpandReady = true;
-    this.lastScrollTop = e.scrollTop;
-  },
-  onReachBottom() {
-    if (this.historyAutoExpandReady !== false && !this.data.historyExpanded && this.data.history.length > 3) this.toggleHistory();
   },
   toggleHistory() {
     const historyExpanded = !this.data.historyExpanded;
-    this.historyAutoExpandReady = historyExpanded;
     this.setData({ historyExpanded, historyFilter: "all", visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all") });
   },
   filterHistory(e) {

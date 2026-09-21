@@ -1354,7 +1354,7 @@ test("身份遮盖不依赖网络或忙碌状态，未确认提交不开放新�
   assert.equal(p.data.actionDialog, false);
 });
 
-test("小程序最近结果包含转换，时间到分钟，收起座位和触底展开记录保持到下一次刷新", async () => {
+test("小程序最近结果包含转换，时间到分钟，收起座位和点击展开记录保持到下一次刷新", async () => {
   const { newRoom, publicView } = require("../server/engine");
   const r = newRoom("123456", "host", "房主", "classic", 8);
   r.phase = "tools";
@@ -1367,18 +1367,20 @@ test("小程序最近结果包含转换，时间到分钟，收起座位和触�
   assert.equal(p.data.history[0].timeLabel, "");
   assert.equal(p.data.visibleHistory.length, 3);
   p.toggleSeats();
-  p.onReachBottom();
+  p.onReachBottom?.();
+  assert.equal(p.data.visibleHistory.length, 3);
+  p.toggleHistory();
   assert.equal(p.data.visibleHistory.length, 4);
   assert.equal(p.data.visibleHistory[0].key, 3);
   await p.refresh();
   assert.equal(p.data.seatsExpanded, false);
   assert.equal(p.data.historyExpanded, true);
   p.toggleHistory();
-  p.onReachBottom();
+  p.onReachBottom?.();
   assert.equal(p.data.visibleHistory.length, 3);
-  p.onPageScroll({ scrollTop: 100 });
-  p.onReachBottom();
-  assert.equal(p.data.visibleHistory.length, 4);
+  p.onPageScroll?.({ scrollTop: 100 });
+  p.onReachBottom?.();
+  assert.equal(p.data.visibleHistory.length, 3);
 });
 
 test("仙女结果关闭确认可取消，确认期间换结果或切后台不误确认", async () => {

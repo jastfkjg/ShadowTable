@@ -32,13 +32,14 @@
 </view>
 <view class="page {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view class="brand">
-    <text class="brand-mark">桌边助手</text>
-    <view class="brand-actions">
-      <button wx:if="{{room}}" class="switch-table" bindtap="returnHome" disabled="{{busy}}" aria-label="返回首页，保留当前座位">回首页</button>
-      <button class="connection-button" bindtap="connectionInfo" aria-label="{{!network || needsLogin ? '连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '连接正常' : '连接未确认'}}">
-        <view class="connection-dot {{!network || needsLogin ? 'offline' : loading || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
+    <view class="brand-identity">
+      <text class="brand-mark">桌边助手</text>
+      <button class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
+        <view class="connection-dot {{reconnecting?'pending':!network || needsLogin ? 'offline' : loading || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
+        <text wx:if="{{reconnecting || !network || needsLogin}}" class="connection-label">{{reconnecting?'重连中':'连接断开'}}</text>
       </button>
     </view>
+    <button wx:if="{{room}}" class="switch-table home-entry" bindtap="returnHome" disabled="{{busy}}" aria-label="返回首页，保留当前座位"><view class="home-icon" aria-hidden="true"></view><text>首页</text></button>
   </view>
   <view wx:if="{{loading}}" class="status" role="status">正在连接牌桌…</view>
   <view wx:if="{{error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
@@ -267,9 +268,8 @@
       <view wx:elif="{{room.flexible && room.phase==='tools'}}" class="panel">
         <view class="label">等待房主发起操作</view>
       </view>
-    <view class="section-title history-heading"><text>座位</text><button class="history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'展开座位'}}</button></view>
-    <view wx:if="{{seatsExpanded !== false && room.phase==='lobby'}}" class="small muted">点自己站起，点空位坐下</view>
-    <view wx:if="{{seatsExpanded !== false}}" class="seats"
+    <view class="section-title history-heading"><text>座位</text><text wx:if="{{room.phase==='lobby'}}" class="small muted">点自己站起，点空位坐下</text><button wx:else class="history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'展开座位'}}</button></view>
+    <view wx:if="{{room.phase==='lobby' || seatsExpanded !== false}}" class="seats"
       ><button
         wx:for="{{seats}}"
         wx:key="seat"
@@ -350,7 +350,7 @@
       </view>
       <view wx:if="{{historyExpanded && !visibleHistory.length}}" class="small muted">暂无此类公开记录</view>
       <view wx:for="{{visibleHistory}}" wx:key="key" class="history-row"
-        ><view class="history-meta small muted"><text>{{item.recordLabel}}</text><text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text></view><view class="history-title"><text wx:if="{{item.resultTone || item.questResult}}" class="quest-result-icon {{item.resultTone || item.questResult}}" aria-hidden="true">{{(item.resultTone || item.questResult)==='success'?'✓':'×'}}</text><text>{{item.text}}</text><text wx:if="{{item.voteGroups && item.teamLabel}}" class="result-team">队伍 {{item.teamLabel}}</text></view
+        ><view class="history-meta small muted"><text>{{item.recordLabel}}</text><text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text></view><view class="history-title"><text wx:if="{{item.resultTone || item.questResult}}" class="quest-result-icon {{item.resultTone || item.questResult}}" aria-hidden="true">{{(item.resultTone || item.questResult)==='success'?'✓':'×'}}</text><text>{{item.text}}</text><text wx:if="{{item.teamLabel}}" class="result-team">队伍 {{item.teamLabel}}</text></view
         >
         <block wx:if="{{item.voteGroups}}">
           <view wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="history-vote-line">
@@ -359,12 +359,11 @@
           </view>
         </block>
         <block wx:elif="{{item.cards}}">
-          <view class="history-team">队伍 · {{item.teamLabel}}</view>
-          <view wx:if="{{item.thresholdLabel}}" class="small muted">{{item.thresholdLabel}}</view><view class="history-cards"><view wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="history-card-count"><text>{{card.label}}</text><text class="history-count">{{card.count}}</text><text>张</text></view></view>
+          <view class="history-cards"><view wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="history-card-count"><text>{{card.label}}</text><text class="history-count {{card.tone}}">{{card.count}}</text><text>张</text></view></view>
         </block>
         <view wx:else class="muted small history-detail">{{item.detail}}</view></view
       >
-      <button wx:if="{{history.length > 3}}" class="history-more" bindtap="toggleHistory">{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}</button>
+      <button wx:if="{{history.length > 3}}" class="history-more" bindtap="toggleHistory" aria-expanded="{{historyExpanded}}" aria-label="{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}"><text class="history-more-label">{{historyExpanded?'收起记录':'更早记录'}}</text><view class="history-more-chevron {{historyExpanded?'is-expanded':''}}" aria-hidden="true"></view></button>
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
       <button class="finish-game-button" bindtap="finishTools" disabled="{{hasPendingRequest || busy}}">结束本局</button>

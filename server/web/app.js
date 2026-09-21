@@ -117,6 +117,7 @@
                   magic: "魔法",
                 }[kind] || kind,
               count: entry[1],
+              tone: kind === "success" ? "success" : ["fail", "thiefFail"].includes(kind) ? "failure" : "",
             };
           }),
         detail: h.counts
@@ -704,7 +705,7 @@
       entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
-    patch.seatsExpanded = state.room?.code === room.code ? state.seatsExpanded : true;
+    patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
     patch.historyExpanded = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.historyExpanded : false;
     patch.history = history;
     patch.latestResult = history.filter(function (_, i) {
@@ -1878,16 +1879,15 @@
             ? "连接正常"
             : "连接未确认";
     return (
-      '<div class="brand"><span class="brand-mark">桌边助手</span>' +
-      '<div class="brand-actions">' +
-      (state.room
-        ? btn("switch-table", "returnHome", "回首页", null, state.busy)
-        : "") +
-      '<button type="button" class="connection-button" data-action="connectionInfo" aria-label="' +
-      esc(label) +
-      '"><span class="connection-dot ' +
-      dot +
-      '"></span></button></div></div>'
+      '<div class="brand"><div class="brand-identity"><span class="brand-mark">桌边助手</span>' +
+      '<button type="button" class="connection-button" data-action="connectionInfo" aria-label="服务器' +
+      esc(state.reconnecting ? "重连中" : label) +
+      '"><span class="connection-dot ' + (state.reconnecting ? "pending" : dot) + '"></span>' +
+      (state.reconnecting || !state.network || state.needsLogin ? '<span class="connection-label">' + (state.reconnecting ? '重连中' : '连接断开') + '</span>' : '') +
+      '</button></div>' +
+      (state.room ? '<button type="button" class="switch-table home-entry" data-action="returnHome" aria-label="返回首页，保留当前座位"' + (state.busy ? ' disabled' : '') + '><span class="home-icon" aria-hidden="true"></span><span>首页</span></button>' : '') +
+      '</div>'
+
     );
   }
   function viewErrorDialog() {
@@ -2295,9 +2295,8 @@
           : "") +
         "</div>";
     }
-    html += '<div class="section-title history-heading">座位' + btn("history-toggle", "toggleSeats", state.seatsExpanded ? "收起座位" : "展开座位") + '</div>';
-    if (state.seatsExpanded) {
-    if (r.phase === "lobby") html += '<div class="small muted">点自己站起，点空位坐下</div>';
+    html += '<div class="section-title history-heading">座位' + (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : btn("history-toggle", "toggleSeats", state.seatsExpanded ? "收起座位" : "展开座位")) + '</div>';
+    if (r.phase === "lobby" || state.seatsExpanded) {
     html += '<div class="seats">';
     for (var i = 0; i < state.seats.length; i++) {
       var s = state.seats[i];
@@ -2471,7 +2470,7 @@
       var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
       for (var hh = 0; hh < visibleHistory.length; hh++) {
         var h = visibleHistory[hh];
-        html += '<div class="history-row"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.voteGroups && h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
+        html += '<div class="history-row"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
         if (h.voteGroups) {
           html += h.voteGroups
             .map(function (g) {
@@ -2490,15 +2489,13 @@
             .join("");
         } else if (h.cards) {
           html +=
-            '<div class="history-team">队伍 · ' +
-            esc(h.teamLabel) +
-            '</div><div class="history-cards">' +
+            '<div class="history-cards">' +
             h.cards
               .map(function (c) {
                 return (
                   '<div class="history-card-count"><span>' +
                   esc(c.label) +
-                  '</span><span class="history-count">' +
+                  '</span><span class="history-count ' + esc(c.tone || "") + '">' +
                   c.count +
                   "</span><span>张</span></div>"
                 );
@@ -2509,7 +2506,7 @@
           html += '<div class="muted small history-detail">' + esc(h.detail) + "</div>";
         html += "</div>";
       }
-      if (state.history.length > 3) html += btn("history-more", "toggleHistory", state.historyExpanded ? "收起记录" : "展开更早的 " + (state.history.length - 3) + " 条记录");
+      if (state.history.length > 3) html += '<button type="button" class="history-more" data-action="toggleHistory" aria-expanded="' + !!state.historyExpanded + '" aria-label="' + (state.historyExpanded ? '收起记录' : '展开更早的 ' + (state.history.length - 3) + ' 条记录') + '"><span class="history-more-label">' + (state.historyExpanded ? '收起记录' : '更早记录') + '</span><span class="history-more-chevron' + (state.historyExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
     }
     if (r.canUseTools)
       html +=
@@ -3070,7 +3067,7 @@
       );
     },
     retrySettings: loadSettings,
-    toggleSeats: function () { setState({ seatsExpanded: !state.seatsExpanded }); },
+    toggleSeats: function () { if (state.room && state.room.phase !== "lobby") setState({ seatsExpanded: !state.seatsExpanded }); },
     toggleHistory: function () { setState({ historyExpanded: !state.historyExpanded }); },
     showQuestRecord: function (el) {
       var entry = state.history.find(function (h) { return h.key === Number(el.dataset.key); });
@@ -3200,14 +3197,6 @@
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
-  var historyScrollY = 0;
-  window.addEventListener("scroll", function () {
-    var movingDown = window.scrollY > historyScrollY;
-    historyScrollY = window.scrollY;
-    if (!movingDown || !state.room || state.historyExpanded || state.history.length <= 3) return;
-    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24)
-      setState({ historyExpanded: true });
-  }, { passive: true });
   // ===== boot =====
   var codeMatch = /(?:\?|&)code=(\d{6})/.exec(location.search || "");
   if (codeMatch) inviteCode = codeMatch[1];
