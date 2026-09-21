@@ -563,3 +563,13 @@ test("创建页提供板子详情入口，目录采用文字链接", () => {
   assert.equal(link.attr.role, "link");
   assert.ok(JSON.stringify(detail).includes("返回"));
 });
+
+test("等待确认时禁用写入入口但允许遮盖身份，房主工具位于座位之前", () => {
+  const room = { phase: "tools", code: "123456", capacity: 6, canUseTools: true, flexible: true, me: { seat: 1, isHost: true }, team: [] };
+  const tree = render({ ...base, room, hasPendingRequest: true, busy: true, network: false, revealed: true, secret: { role: "梅林" } });
+  assert.equal(byHandler(tree, "openTool").attr.disabled, true);
+  assert.equal(byHandler(tree, "finishTools").attr.disabled, true);
+  assert.ok(!byHandler(tree, "reveal").attr.disabled);
+  const flat = nodes(tree);
+  assert.ok(flat.indexOf(byHandler(tree, "openTool")) < flat.findIndex(n => n.attr?.class === "seats"));
+});

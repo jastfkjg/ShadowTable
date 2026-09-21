@@ -67,6 +67,10 @@ Page({
     const item = this.data.sections[section]?.items[role];
     if (item?.brief) this.setData({ [`sections[${section}].items[${role}].expanded`]: !item.expanded });
   },
+  blockScroll() {},
+  closeDirectory() {
+    this.setData({ directoryExpanded: false });
+  },
   toggleDirectory() {
     this.setData({ directoryExpanded: !this.data.directoryExpanded });
   },

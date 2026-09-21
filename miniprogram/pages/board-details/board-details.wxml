@@ -1,11 +1,15 @@
 <view class="detail-sticky">
   <view class="detail-toolbar"><text>板子详情</text><button class="detail-close" bindtap="back">返回</button></view>
   <view wx:if="{{hasDetail}}" class="detail-nav">
-    <view class="detail-nav-heading" bindtap="toggleDirectory" role="button" aria-expanded="{{directoryExpanded}}"><text>章节目录</text><text class="detail-nav-state">{{directoryExpanded?'收起 −':'展开 ＋'}}</text></view>
-    <scroll-view wx:if="{{directoryExpanded}}" scroll-y enhanced show-scrollbar="{{true}}" class="detail-nav-scroll" style="height: {{sections.length>2?176:88}}rpx;">
-      <view class="detail-nav-inner"><view wx:for="{{sections}}" wx:key="title" class="detail-nav-item" bindtap="jumpSection" data-index="{{index}}" role="link" aria-label="{{'跳转到第'+(index+1)+'章，'+item.title}}"><text class="detail-nav-number">{{index+1}}.</text><text>{{item.navTitle || item.title}}</text></view></view>
+    <view class="detail-nav-heading" bindtap="toggleDirectory" role="button" aria-expanded="{{directoryExpanded}}"><text>章节目录</text><text class="detail-nav-state">查看全部 ›</text></view>
+  </view>
+</view>
+<view wx:if="{{directoryExpanded}}" class="directory-backdrop" catchtap="closeDirectory" catchtouchmove="blockScroll">
+  <view class="directory-panel" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="章节目录">
+    <view class="directory-header"><view>章节目录 <text class="small muted">共 {{sections.length}} 章</text></view><button class="directory-close" bindtap="closeDirectory" aria-label="关闭章节目录">关闭</button></view>
+    <scroll-view scroll-y class="directory-list" style="height: {{sections.length * 92}}rpx;" enhanced show-scrollbar="{{true}}">
+      <view wx:for="{{sections}}" wx:key="title" class="directory-item" bindtap="jumpSection" data-index="{{index}}" role="link" aria-label="{{'跳转到第'+(index+1)+'章，'+item.title}}"><text class="detail-nav-number">{{index+1}}.</text><text>{{item.navTitle || item.title}}</text></view>
     </scroll-view>
-    <view wx:if="{{directoryExpanded && sections.length>4}}" class="detail-nav-hint">共 {{sections.length}} 章 · 上下滑动查看</view>
   </view>
 </view>
 <view class="page board-detail-page">

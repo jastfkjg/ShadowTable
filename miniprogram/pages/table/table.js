@@ -923,7 +923,7 @@ Page({
   },
   openTool(e) {
     const room = this.data.room;
-    if (!room?.canUseTools || this.data.busy) return;
+    if (!room?.canUseTools || this.data.busy || this.pending) return;
     const toolType = e.currentTarget.dataset.kind;
     const toolSeats = ["vote", "quest"].includes(toolType)
       ? [...room.team]
@@ -1137,6 +1137,7 @@ Page({
   async openAction() {
     const room = this.data.room;
     if (
+      this.pending ||
       !room?.needsSubmission ||
       room.me.submitted ||
       !this.foreground ||
@@ -1317,6 +1318,9 @@ Page({
     } finally {
       this.fairyResultLoading = false;
     }
+  },
+  hidePrivatePreview() {
+    this.setData({ fairyResultRevealed: false, identityChangeRevealed: false });
   },
   revealFairyResult() {
     if (this.data.busy || !this.foreground || !this.data.fairyResult) return;

@@ -1322,3 +1322,29 @@ test("后台、冷却期及登录失效不自动重试，配置错误保留人�
   assert.equal(p.data.reconnecting, false);
   assert.equal(p.data.error, "invalid domain");
 });
+
+test("身份遮盖不依赖网络或忙碌状态，未确认提交不开放新操作", async () => {
+  const p = page({ request: async () => { throw new Error("不应请求网络"); } });
+  p.data.busy = true;
+  p.data.network = false;
+  p.data.revealed = true;
+  p.data.secret = { role: "梅林" };
+  await p.reveal();
+  assert.equal(p.data.secret, null);
+  p.data.actionSecret = { role: "梅林" };
+  await p.revealActionIdentity();
+  assert.equal(p.data.actionSecret, null);
+  p.data.fairyResultRevealed = true;
+  p.data.identityChangeRevealed = true;
+  p.hidePrivatePreview();
+  assert.equal(p.data.fairyResultRevealed, false);
+  assert.equal(p.data.identityChangeRevealed, false);
+  p.data.busy = false;
+  p.data.network = true;
+  p.pending = { id: "unconfirmed" };
+  p.data.room = { canUseTools: true, needsSubmission: true, me: {} };
+  p.openTool({ currentTarget: { dataset: { kind: "quest" } } });
+  await p.openAction();
+  assert.equal(p.data.toolType, "");
+  assert.equal(p.data.actionDialog, false);
+});
