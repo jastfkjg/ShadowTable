@@ -1435,6 +1435,7 @@ Page({
     return {
       title: "桌边助手 · 一起入座",
       path: "/pages/table/table?code=" + (this.roomCode || ""),
+      imageUrl: "/assets/share-cover.jpg",
     };
   },
 });
