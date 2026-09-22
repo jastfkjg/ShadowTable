@@ -1543,10 +1543,10 @@ button.home-entry { display: flex; align-items: center; justify-content: center;
 button.home-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* Table hierarchy: context, current action, private identity, public results. */
-.room-summary { margin: 8px 0 0; gap: 8px; }
-.row.room-subline { flex-wrap: wrap; align-items: flex-start; gap: 0 8px; margin: 0 0 14px; }
+.room-summary { margin: 4px 0 0; gap: 8px; }
+.row.room-subline { flex-wrap: wrap; align-items: flex-start; gap: 0 8px; margin: 0 0 8px; }
 .room-board-info { flex-wrap: wrap; gap: 0 8px; }
-.room-board-name { white-space: normal; overflow: visible; overflow-wrap: anywhere; padding: 6px 0; }
+.room-board-name { white-space: normal; overflow: visible; overflow-wrap: anywhere; padding: 4px 0; }
 .room-test-label { order: 3; flex-basis: 100%; font-size: 11px; line-height: 1.5; color: var(--muted); }
 .phase-strip { padding: 12px 0; margin: 8px 0 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
 .phase-heading { flex-wrap: wrap; gap: 4px 12px; }
@@ -1555,14 +1555,14 @@ button.home-entry:focus-visible { outline: 2px solid var(--accent); outline-offs
 .phase-strip .action-entry button { margin: 0; min-height: 44px; flex-shrink: 0; }
 .action-status-copy { min-width: 0; flex: 1 1 160px; }
 button.identity-compact { min-height: 48px; margin: 0 0 16px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--surface); }
-.latest-result { margin: 16px 0 24px; padding: 12px 16px 20px; border: 1px solid var(--accent); border-radius: 14px; background: var(--surface); }
+.latest-result { margin: 16px 0 24px; padding: 8px 16px 16px; border: 1px solid var(--accent); border-radius: 14px; background: var(--surface); }
 .result-summary-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; }
-.latest-result-title { margin: 8px 0 0; font-size: 24px; font-weight: 700; line-height: 1.4; letter-spacing: 0.2px; }
+.latest-result-title { margin: 2px 0 0; font-size: 24px; font-weight: 700; line-height: 1.4; letter-spacing: 0.2px; }
 .latest-result .history-detail { margin-top: 10px; font-size: 14px; color: var(--text); }
 .latest-result .history-detail:empty { display: none; }
 button.history-toggle { width: auto; min-height: 44px; padding: 8px 4px; margin: 0; flex-shrink: 0; }
 .seat-summary { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
-.task-progress { margin: 20px 0; }
+.task-progress { margin: 20px 0 12px; }
 .task-progress .section-title { margin: 0 0 8px; }
 .task-progress .quest-summary { margin: 8px 0; flex-wrap: wrap; }
 .task-progress .quest-timeline { margin: 8px 0 0; }
@@ -1572,4 +1572,36 @@ button.history-toggle { width: auto; min-height: 44px; padding: 8px 4px; margin:
 .result-summary-heading > .small { color: var(--accent); font-size: 12px; letter-spacing: 0.5px; }
 .result-summary-heading button.history-toggle { font-size: 12px; color: var(--muted); }
 .history-row { scroll-margin-top: 20px; }
-.history-row-focused { background: var(--surface); border-radius: 8px; padding-left: 14px; padding-right: 14px; }
+.history-row-focused { animation: record-locate 2.4s ease-out forwards; }
+
+.history-meta { font-size: 11px; opacity: 0.8; }
+.history-row { border-radius: 0; }
+@keyframes record-locate {
+  0%, 65% { background-color: var(--surface); }
+  100% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-row-focused { animation-timing-function: steps(1, end); }
+}
+
+/* Shared stage/result panel. Order changes only with the game phase. */
+button.home-entry { background: transparent; padding: 8px; min-height: 44px; }
+.brand { padding-bottom: 12px; }
+.room-summary { flex-wrap: wrap; margin-top: 4px; }
+button.room-identity { width: auto; min-height: 44px; margin: 0; padding: 8px 0 8px 8px; color: var(--accent); background: transparent; font-size: 13px; }
+.table-dynamics { margin: 12px 0 16px; padding: 8px 16px 14px; border: 1px solid var(--accent); border-radius: 14px; background: var(--surface); }
+.table-dynamics .latest-result { margin: 0; padding: 0 0 12px; border: 0; border-radius: 0; background: transparent; }
+.table-dynamics .phase-strip { margin: 0; padding: 8px 0 0; border: 0; }
+.result-first .latest-result + .phase-strip { border-top: 1px solid var(--border); padding-top: 12px; }
+.result-first .phase-name { font-size: 14px; font-weight: 500; }
+.operation-first .phase-name { font-size: 20px; }
+.operation-first .latest-result { margin-top: 14px; padding-top: 8px; padding-bottom: 0; border-top: 1px solid var(--border); }
+.operation-first .latest-result-title { font-size: 15px; font-weight: 500; margin: 0; }
+.operation-first .latest-result .history-detail { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.table-dynamics.is-lobby { border: 0; padding: 0; background: transparent; }
+.table-dynamics + .task-progress { margin-top: 16px; }
+
+.table-dynamics .action-entry button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.phase-team { margin-top: 8px; font-size: 13px; }
+.phase-team .label { display: block; margin: 0; font-size: 14px; }
+.phase-team .muted { display: block; font-size: 12px; }

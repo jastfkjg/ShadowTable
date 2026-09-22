@@ -2202,9 +2202,10 @@
       '<div class="room-summary"><button type="button" class="copy-room" data-action="copyRoomCode"><span>房间 ' +
       esc(r.code) +
       '</span><span class="copy-label">复制</span></button><div class="summary-right">' +
-      '<button type="button" class="copy-label room-invite" data-action="copyInviteLink">邀请链接</button><span class="summary-seat">' +
-      (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "") +
-      "</span></div></div>";
+      (r.phase !== "lobby" && r.me.seat !== null
+        ? btn("room-identity", "reveal", r.me.seat + "号 · " + (state.revealed ? "遮盖身份" : "我的身份 ›"), null, !state.revealed && (state.busy || !state.network))
+        : '<span class="summary-seat">' + (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "") + '</span>') +
+      "</div></div>";
     html +=
       '<div class="row subline room-subline"><div class="room-board-info">' +
       (r.testRoom ? '<span class="small room-test-label">测试房间 · 陪测已开启</span>' : "") +
@@ -2216,7 +2217,7 @@
       (r.me.isHost
         ? '<button type="button" class="room-rules-button" data-action="toggleRoomSettings">房间设置</button>'
         : "") +
-      "</div>";
+      '<button type="button" class="room-rules-button" data-action="copyInviteLink">邀请</button></div>';
     if (state.showRoomRules) {
       html +=
         '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
@@ -2238,35 +2239,8 @@
         btn("primary", "closeRoomRules", "知道了") +
         "</div></div></div>";
     }
-    html +=
-      '<div class="phase-strip"><div class="phase-heading"><span class="phase-label">当前阶段</span><span class="phase-name">' +
-      esc(r.phaseName) +
-      "</span></div>" +
-      (!r.flexible && (r.round || r.leader)
-        ? '<div class="phase-detail">' +
-          (r.round ? "<span>任务 " + r.round + "</span>" : "") +
-          (r.leader
-            ? "<span>队长 " + r.leader + " 号 · 连续否决 " + r.rejects + " / 5</span>"
-            : "") +
-          "</div>"
-        : "");
-    if (r.operationStatus || r.needsSubmission)
-      html +=
-        '<div class="action-entry" role="status"><div class="action-status-copy"><div>' +
-        esc(r.operationStatus ? r.operationStatus.title : r.me.submitted ? "已提交，等待其他玩家" : "请完成本次操作") +
-        '</div><div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "") + '</div></div>' +
-        (r.needsSubmission && !r.me.submitted
-          ? btn("primary", "openAction", "立即操作", null, state.busy || state.actionLoading || !state.network)
-          : "") +
-        "</div>";
-    html += "</div>";
     if (r.phase !== "lobby" && r.me.seat !== null) {
-      if (!state.revealed)
-        html +=
-          '<button type="button" class="identity-compact" data-action="reveal"' +
-          (state.busy || !state.network ? " disabled" : "") +
-          '><span>我的身份</span><span class="identity-compact-action">查看 ›</span></button>';
-      else if (state.secret)
+      if (state.revealed && state.secret)
         html +=
           '<div class="identity open"><div class="identity-title faction-' +
           (state.secret.factionTone || "") +
@@ -2284,8 +2258,44 @@
           btn("secondary", "reveal", "立即遮盖") +
           "</div>";
     }
+    var operationFirst = !["tools", "ended", "lobby"].includes(r.phase);
+    var phaseHtml =
+      '<div class="phase-strip"><div class="phase-heading"><span class="phase-label">当前阶段</span><span class="phase-name">' +
+      esc(r.phaseName) +
+      "</span></div>" +
+      (!r.flexible && (r.round || r.leader)
+        ? '<div class="phase-detail">' +
+          (r.round ? "<span>任务 " + r.round + "</span>" : "") +
+          (r.leader
+            ? "<span>队长 " + r.leader + " 号 · 连续否决 " + r.rejects + " / 5</span>"
+            : "") +
+          "</div>"
+        : "");
+      if (
+        r.phase === "teamVote" ||
+        r.phase === "quest" ||
+        r.phase === "teamResult"
+      )
+        phaseHtml +=
+          '<div class="phase-team"><span class="label">' +
+          (r.team.length ? "任务队伍 " + esc(state.teamText) + " 号" : "全员投票") +
+          '</span><span class="muted">' +
+          (r.phase === "teamVote" ? "全员表决，结算后公开票型" : "仅公开票数，不公开出牌人") +
+          "</span></div>";
+    if (r.operationStatus || r.needsSubmission)
+      phaseHtml +=
+        '<div class="action-entry" role="status"><div class="action-status-copy"><div>' +
+        esc(r.operationStatus ? r.operationStatus.title : r.me.submitted ? "已提交，等待其他玩家" : "请完成本次操作") +
+        '</div><div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "") + '</div></div>' +
+        (r.needsSubmission && !r.me.submitted
+          ? btn("primary", "openAction", "立即操作", null, state.busy || state.actionLoading || !state.network)
+          : "") +
+        "</div>";
+    phaseHtml += "</div>";
+    var resultHtml = "";
     if (state.latestResult && r.phase !== "lobby")
-      html += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">最近操作结果</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
+      resultHtml += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">' + (operationFirst ? '上次结果' : '最近结果') + '</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
+    html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + (operationFirst ? phaseHtml + resultHtml : resultHtml + phaseHtml) + '</div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -2344,15 +2354,13 @@
       }
       html += "</div>";
     }
-    if (r.phase !== "lobby" && state.questSummary.total) {
-      html += '<div class="task-progress"><div class="section-title">任务进度</div>';
-      var quests = state.history.filter(function (h) { return h.questResult; });
-      if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
-        return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
-      }).join("") + '</div>';
-      html += '</div>';
-    }
-    html += '<div class="section-title history-heading"><div>玩家与座位<span class="seat-summary">' + r.capacity + '人' + (r.me.seat != null ? ' · 我在' + r.me.seat + '号' : '') + '</span></div>' + (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "展开座位") + '</button>' ) + '</div>';
+    var quests = r.phase === "lobby" ? [] : state.history.filter(function (h) { return h.questResult; });
+    html += '<div class="task-progress"><div class="section-title history-heading"><span>' + (quests.length ? '任务进度' : '玩家与座位') + '</span>' +
+      (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
+    if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
+      return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
+    }).join("") + '</div>';
+    html += '</div>';
     if (r.phase === "lobby" || state.seatsExpanded) {
     html += '<div class="seats">';
     for (var i = 0; i < state.seats.length; i++) {
@@ -2404,17 +2412,6 @@
               )
             : "") +
           "</div>";
-      if (
-        r.phase === "teamVote" ||
-        r.phase === "quest" ||
-        r.phase === "teamResult"
-      )
-        html +=
-          '<div class="panel"><span class="label">' +
-          (r.team.length ? "任务队伍 " + esc(state.teamText) + " 号" : "全员投票") +
-          '</span><span class="muted">' +
-          (r.phase === "teamVote" ? "全员表决，结算后公开票型" : "仅公开票数，不公开出牌人") +
-          "</span></div>";
       if (r.result) {
         var resultCls =
           r.result.winner === "good"
@@ -3075,6 +3072,10 @@
       });
       var target = document.getElementById("history-record-" + entry.key);
       if (target) {
+        // Restart the brief highlight when the same record is revisited.
+        target.classList.remove("history-row-focused");
+        void target.offsetWidth;
+        target.classList.add("history-row-focused");
         target.focus({ preventScroll: true });
         target.scrollIntoView({ block: "start", behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       }

@@ -686,14 +686,17 @@ Page({
     if (!entry) return;
     const room = this.data.room;
     const historyExpanded = this.data.historyExpanded || !this.data.history.slice(-3).some(h => h.key === entry.key);
-    this.setData({
-      historyExpanded,
-      historyFilter: "all",
-      focusedHistoryKey: entry.key,
-      visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all"),
-    }, () => {
+    this.setData({ focusedHistoryKey: null }, () => {
       if (this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
-      wx.pageScrollTo({ selector: `#history-record-${entry.key}`, duration: 250 });
+      this.setData({
+        historyExpanded,
+        historyFilter: "all",
+        focusedHistoryKey: entry.key,
+        visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all"),
+      }, () => {
+        if (this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
+        wx.pageScrollTo({ selector: `#history-record-${entry.key}`, duration: 250 });
+      });
     });
   },
   showQuestRecord(e) {

@@ -639,7 +639,11 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
   const tree = render(data), text = JSON.stringify(tree);
   assert.equal((text.match(/等待房主发起操作/g) || []).length, 1);
   assert.ok(byHandler(tree, "showLatestRecord"));
-  assert.ok(text.indexOf("任务进度") < text.indexOf("玩家与座位"));
+  const progress = nodes(tree).find(n => n.attr?.class === "task-progress");
+  assert.ok(JSON.stringify(progress).includes("任务进度"));
+  assert.ok(byHandler(progress, "toggleSeats"));
+  assert.ok(byHandler(progress, "showQuestRecord"));
+  assert.ok(!text.includes("我在1号"));
   assert.ok(!text.includes("本阶段你无需操作"));
   const located = render({ ...data, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
   const record = nodes(located).find(n => n.attr?.id === "history-record-0");
@@ -648,4 +652,22 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
   const phase = nodes(pending).find(n => n.attr?.class === "phase-strip");
   assert.ok(byHandler(phase, "openAction"));
   assert.equal(byHandler(phase, "openAction").attr.class, "primary");
+});
+
+
+test("动态区等待时结果在前，操作中阶段在前，提交后不重排，身份入口位于房间信息", () => {
+  const room = { code: "123456", phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: 1 }, capacity: 6 };
+  const latestResult = { key: 0, text: "任务成功" };
+  for (const [phase, submitted] of [["tools", false], ["quest", false], ["quest", true]]) {
+    const tree = render({ ...base, room: { ...room, phase, needsSubmission: phase === "quest", me: { seat: 1, submitted } }, latestResult });
+    const dynamic = nodes(tree).find(n => n.attr?.class?.startsWith("table-dynamics "));
+    const children = nodes(dynamic);
+    const phaseIndex = children.findIndex(n => n.attr?.class === "phase-strip");
+    const resultIndex = children.findIndex(n => n.attr?.class === "latest-result");
+    assert.ok(phase === "tools" ? resultIndex < phaseIndex : phaseIndex < resultIndex);
+    const summary = nodes(tree).find(n => n.attr?.class === "room-summary");
+    assert.ok(byHandler(summary, "reveal"));
+  }
+  const empty = render({ ...base, room });
+  assert.ok(!nodes(empty).some(n => n.attr?.class === "latest-result"));
 });
