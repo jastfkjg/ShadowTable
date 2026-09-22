@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const flush = () => new Promise(setImmediate);
 
-function panel() {
+function panel({ overrides = {}, search = "", saved } = {}) {
   const elements = new Map();
   const element = (id) => {
     if (!elements.has(id))
@@ -18,12 +18,14 @@ function panel() {
         addEventListener(event, fn) {
           this.handlers[event] = fn;
         },
+        close() {},
         closest() {
           return null;
         },
       });
     return elements.get(id);
   };
+  let stored;
   let poll,
     hold = false;
   const pending = [],
@@ -42,6 +44,7 @@ function panel() {
     players: actors,
     capacity: 12,
     me: { seat: Number(token) + 2, ready: false },
+    ...overrides,
   });
   const response = (body) => ({
     status: 200,
@@ -60,10 +63,14 @@ function panel() {
             ? [element("fill"), element("refresh"), element("leave")]
             : [],
       },
-      location: { pathname: "/admin/companion" },
+      URLSearchParams,
+      confirm: () => true,
+      location: { pathname: "/admin/companion", search },
       sessionStorage: {
-        getItem: () => JSON.stringify({ code: "123456", actors }),
-        setItem() {},
+        getItem: () => JSON.stringify(saved || { code: "123456", actors }),
+        setItem(key, value) {
+          stored = JSON.parse(value);
+        },
       },
       crypto: { randomUUID },
       AbortSignal,
@@ -72,7 +79,12 @@ function panel() {
       },
       fetch: (path, options) => {
         const token = options.headers.Authorization.slice(7);
-        calls.push({ path, method: options.method, token });
+        calls.push({
+          path,
+          method: options.method,
+          token,
+          data: options.body && JSON.parse(options.body),
+        });
         const body =
           options.method === "POST" ? { accepted: true } : room(token);
         if (hold)
@@ -88,18 +100,19 @@ function panel() {
   );
   return {
     element,
+    stored: () => stored,
     calls,
     pending,
     poll: () => poll(),
     hold: (value) => {
       hold = value;
     },
-    click: (id) =>
+    click: (id, action = "ready") =>
       element("players").handlers.click({
         target: {
           closest: (selector) =>
             selector === "[data-action]"
-              ? { dataset: { action: "ready" } }
+              ? { dataset: { action } }
               : { dataset: { actor: id } },
         },
       }),
@@ -137,4 +150,57 @@ test("轮询期间准备不丢点击：仅锁本人，回执立即显示且不�
     2,
     "迟到的旧轮询不能覆盖已确认状态",
   );
+});
+
+test("房主在自由操作阶段可发起投票，普通玩家没有管理入口", async () => {
+  const p = panel({
+    overrides: {
+      phase: "tools",
+      flexible: true,
+      canUseTools: true,
+      me: { seat: 2, isHost: true },
+      players: [{ seat: 2, alive: true }],
+    },
+  });
+  await flush();
+  assert.match(p.element("players").innerHTML, /发起任务/);
+  assert.match(p.element("players").innerHTML, /终止本局/);
+  p.click("0", "begin:vote");
+  await flush();
+  assert.equal(
+    p.calls.find((c) => c.method === "POST").data.type,
+    "beginActivity",
+  );
+  assert.equal(p.calls.find((c) => c.method === "POST").data.kind, "vote");
+  const normal = panel();
+  await flush();
+  assert.doesNotMatch(normal.element("players").innerHTML, /房主操作台/);
+});
+
+test("按房间入口恢复会话，切换保留原房间未确认请求", async () => {
+  const pending = {
+    path: "/api/rooms/123456/commands",
+    id: "original",
+    data: { type: "ready" },
+  };
+  const p = panel({
+    search: "?room=654321",
+    saved: {
+      code: "123456",
+      actors: [{ id: "old", token: "old", joined: true, pending }],
+    },
+  });
+  await flush();
+  assert.equal(p.element("code").value, "654321");
+  assert.equal(p.calls.length, 0);
+  p.element("code").value = "123456";
+  await p.element("switch-room").onclick();
+  await flush();
+  assert.equal(p.stored().code, "123456");
+  assert.equal(p.stored().actors[0].pending.id, "original");
+  p.element("code").value = "654321";
+  await p.element("switch-room").onclick();
+  await flush();
+  assert.equal(p.stored().rooms["123456"].actors[0].pending.id, "original");
+  assert.equal(p.stored().actors.length, 0);
 });

@@ -291,3 +291,20 @@ summary {
   outline: 2px solid currentColor;
   font-weight: 700;
 }
+
+.actions fieldset {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.actions fieldset button {
+  margin: 4px;
+}
+.actions select {
+  max-width: 100%;
+}
+#switch-room {
+  margin-top: 12px;
+}

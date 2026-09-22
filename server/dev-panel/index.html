@@ -23,6 +23,7 @@
           <div class="join-row">
             <input
               id="code"
+              list="saved-rooms"
               name="code"
               inputmode="numeric"
               pattern="[0-9]{6}"
@@ -31,6 +32,8 @@
               placeholder="输入6位房间号"
             /><button class="primary" id="join">添加测试玩家</button>
           </div>
+          <datalist id="saved-rooms"></datalist>
+          <button id="switch-room" type="button">打开 / 切换房间</button>
         </form>
         <p>
           先在小程序创建房间。这里仅操作本面板创建的测试账号，你的玩家仍由小程序控制。
@@ -53,6 +56,7 @@
           ><button data-batch="reject">全部反对</button
           ><button data-batch="success">任务全成功</button
           ><button data-batch="fail">合法失败牌</button>
+          <button id="forget-unavailable">移除失效记录（仅本地）</button>
           <button id="leave" class="danger">清空陪测玩家</button>
         </div>
         <div class="options">
@@ -65,14 +69,14 @@
         <div id="players" class="players"></div>
         <footer>
           <p>
-            清空后可重新添加陪测玩家，真人和牌桌保留。真人担任房主时，需先在小程序回到准备阶段。关闭网页仅暂停控制，刷新可恢复。
+            清空后可重新添加陪测玩家，真人和牌桌保留。真人担任房主时，需先在小程序回到准备阶段。切换房间保留原房间会话和未确认请求，刷新可恢复。失效记录可单独移除；服务器残留座位需从管理平台清理。
           </p>
         </footer>
       </section>
       <details>
         <summary>怎么测试刀人、任务失败和守护？</summary>
         <p>
-          逐人选择投票、任务牌或技能目标。测试队长可勾选队员提交队伍；房主仍在小程序里推进。
+          逐人选择投票、任务牌或技能目标。测试队长可勾选队员提交队伍；陪测担任房主时，可在对应玩家卡片发起投票、任务、技能并管理流程。
         </p>
         <p>
           十二骑士技能同时秘密提交，选定后需确认；复活抽牌后会显示对应玩家的新身份。最终刀梅林在线下进行。

@@ -266,6 +266,24 @@ test("清空陪测：终止和进行中均可重置，转交真人房主并重�
       await panel.refresh();
       await panel.command(bot, "start");
       await panel.refresh();
+      // The companion host can launch and complete the current tool workflow.
+      await panel.command(bot, "beginActivity", { kind: "vote", team: [] });
+      await panel.refresh();
+      assert.equal(bot.room.phase, "teamVote");
+      await panel.batch("approve");
+      await command("submit", { value: "approve" });
+      await panel.refresh();
+      assert.equal(bot.room.phase, "tools");
+      assert.equal(bot.room.canUseTools, true);
+      await panel.command(bot, "beginActivity", {
+        kind: "quest",
+        team: [bot.room.me.seat],
+        threshold: 1,
+      });
+      await panel.refresh();
+      await panel.command(bot, "submit", { value: "success" });
+      await panel.refresh();
+      assert.equal(bot.room.phase, "tools");
       if (terminated) {
         await panel.command(bot, "terminate");
         await panel.refresh();
@@ -487,4 +505,21 @@ test("批量准备遇到失败停止派发并等待在途请求，失败保留�
   assert.equal(c.actors[0].pending.id, id);
   assert.ok(c.actors.slice(1, 4).every((a) => a.room.me.ready && !a.pending));
   assert.ok(c.actors.slice(4).every((a) => !a.pending && !a.room.me.ready));
+});
+
+test("失效房间或凭据的未确认请求可显式移除，网络错误保留", async () => {
+  for (const status of [401, 403, 404, 500]) {
+    const pending = { id: "original", path: "/commands", data: {} };
+    const actor = { id: "a", token: "t", joined: true, pending };
+    const companion = new Companion({
+      state: { code: "123456", actors: [actor] },
+      request: async () => {
+        throw Object.assign(new Error("不可访问"), { status });
+      },
+    });
+    await companion.refresh();
+    assert.equal(actor.pending.id, "original");
+    assert.equal(companion.forgetUnavailable(), status === 500 ? 0 : 1);
+    assert.equal(companion.actors.length, status === 500 ? 1 : 0);
+  }
 });

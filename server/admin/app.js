@@ -114,6 +114,11 @@ async function refresh() {
           `${room.boardName} · ${room.players}/${room.capacity} 人 · ${room.phaseName} · 第 ${room.game} 局`,
         ),
       );
+      if (room.testRoom) {
+        const link = el("a", "打开陪测台 →");
+        link.href = "/admin/companion?room=" + encodeURIComponent(room.code);
+        actions.append(link);
+      }
       for (const action of [
         room.testRoom ? "test-off" : "test-on",
         "clear-testers",
