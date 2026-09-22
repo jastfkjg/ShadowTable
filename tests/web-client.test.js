@@ -321,7 +321,7 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   c.ACTIONS.toggleHistory();
   html = c.viewRoom();
   assert.equal((html.match(/class="history-row"/g) || []).length, 4);
-  assert.ok(html.indexOf("记录 4") < html.indexOf("记录 1"));
+  assert.ok(html.indexOf("#4") < html.indexOf("#1"));
   c.ACTIONS.toggleSeats();
   assert.doesNotMatch(c.viewRoom(), /class="seats"/);
   c.ACTIONS.toggleSeats();

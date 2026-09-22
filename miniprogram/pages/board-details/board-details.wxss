@@ -120,7 +120,8 @@
 }
 .detail-sticky { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1rpx solid var(--border); }
 .detail-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12rpx 32rpx; font-size: 30rpx; font-weight: 600; }
-button.detail-close { margin: 0; min-height: 88rpx; padding: 12rpx 24rpx; font-size: 26rpx; background: var(--surface); color: var(--text); }
+button.detail-close,
+button.detail-close[disabled]:not([type]) { margin: 0; min-height: 88rpx; padding: 12rpx 24rpx; font-size: 26rpx; background: var(--surface); color: var(--text); }
 .detail-nav { white-space: nowrap; width: 100%; padding-bottom: 12rpx; }
 
 
@@ -140,7 +141,8 @@ button.detail-close { margin: 0; min-height: 88rpx; padding: 12rpx 24rpx; font-s
 .detail-summary { margin-top: 12rpx; font-size: 26rpx; line-height: 1.6; }
 .detail-section-title { padding-top: 24rpx; margin-top: 28rpx; margin-bottom: 8rpx; font-size: 30rpx; }
 .role-card { padding: 12rpx 0; }
-button.role-quick-toggle { display: flex; align-items: baseline; gap: 16rpx; width: 100%; margin: 0; min-height: 88rpx; padding: 8rpx 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; font-weight: 400; }
+button.role-quick-toggle,
+button.role-quick-toggle[disabled]:not([type]) { display: flex; align-items: baseline; gap: 16rpx; width: 100%; margin: 0; min-height: 88rpx; padding: 8rpx 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; font-weight: 400; }
 .role-quick-name { flex: 0 0 168rpx; font-size: 28rpx; font-weight: 600; }
 .role-card-name.tone-good, .role-quick-name.tone-good { color: #9ccaff; }
 .role-card-name.tone-evil, .role-quick-name.tone-evil { color: var(--evil); }
@@ -149,7 +151,9 @@ button.role-quick-toggle { display: flex; align-items: baseline; gap: 16rpx; wid
 .role-quick-detail { padding: 20rpx; background: var(--surface); border-radius: 12rpx; color: var(--muted); font-size: 28rpx; line-height: 1.75; }
 
 /* Explicit sizing avoids the native mini-program button width defaults. */
-button.detail-close { width: auto; flex: 0 0 auto; min-height: 88rpx; padding: 12rpx 0 12rpx 24rpx; background: transparent; border-radius: 0; color: var(--accent); font-weight: 400; }
+button.detail-close,
+/* Explicit sizing avoids the native mini-program button width defaults. */
+button.detail-close[disabled]:not([type]) { width: auto; flex: 0 0 auto; min-height: 88rpx; padding: 12rpx 0 12rpx 24rpx; background: transparent; border-radius: 0; color: var(--accent); font-weight: 400; }
 .detail-toolbar { font-size: 26rpx; color: var(--muted); }
 .detail-nav { white-space: normal; padding: 0 32rpx 8rpx; box-sizing: border-box; }
 .detail-nav-heading { display: flex; align-items: center; justify-content: space-between; min-height: 88rpx; border-top: 1rpx solid var(--border); color: var(--muted); font-size: 26rpx; }
@@ -168,6 +172,7 @@ button.detail-close { width: auto; flex: 0 0 auto; min-height: 88rpx; padding: 1
 .directory-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.65); display: flex; align-items: flex-end; }
 .directory-panel { width: 100%; box-sizing: border-box; background: var(--bg); border-radius: 24rpx 24rpx 0 0; padding: 16rpx 32rpx calc(24rpx + env(safe-area-inset-bottom)); }
 .directory-header { display: flex; align-items: center; justify-content: space-between; font-size: 32rpx; font-weight: 600; border-bottom: 1rpx solid var(--border); }
-button.directory-close { width: auto; margin: 0; min-height: 88rpx; background: transparent; color: var(--accent); padding: 12rpx 0 12rpx 24rpx; font-size: 26rpx; }
+button.directory-close,
+button.directory-close[disabled]:not([type]) { width: auto; margin: 0; min-height: 88rpx; background: transparent; color: var(--accent); padding: 12rpx 0 12rpx 24rpx; font-size: 26rpx; }
 .directory-list { max-height: 65vh; }
 .directory-item { display: flex; align-items: center; gap: 16rpx; min-height: 92rpx; padding: 12rpx 0; box-sizing: border-box; font-size: 28rpx; border-bottom: 1rpx solid var(--border); }

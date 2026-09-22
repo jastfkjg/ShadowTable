@@ -114,7 +114,8 @@ switch {
   border-bottom: 1rpx solid var(--border);
   box-sizing: border-box;
 }
-.transfer-dialog button.transfer-option {
+.transfer-dialog button.transfer-option,
+.transfer-dialog button.transfer-option[disabled]:not([type]) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -161,14 +162,16 @@ switch {
   color: var(--muted);
   font-size: 36rpx;
 }
-.transfer-dialog button.transfer-option-hover {
+.transfer-dialog button.transfer-option-hover,
+.transfer-dialog button.transfer-option-hover[disabled]:not([type]) {
   background: rgba(229, 198, 139, 0.08);
 }
 .transfer-footer {
   flex-shrink: 0;
   padding: 20rpx 24rpx;
 }
-.transfer-dialog button.transfer-cancel {
+.transfer-dialog button.transfer-cancel,
+.transfer-dialog button.transfer-cancel[disabled]:not([type]) {
   width: 100%;
   min-width: 0;
   min-height: 88rpx;
@@ -181,5 +184,6 @@ switch {
   font-weight: 400;
 }
 
-button.kick-entry, .kick-label { color: var(--evil); }
+button.kick-entry, .kick-label,
+button.kick-entry[disabled]:not([type]) { color: var(--evil); }
 .kick-label { flex-shrink: 0; font-size: 28rpx; }

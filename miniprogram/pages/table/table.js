@@ -469,6 +469,13 @@ Page({
       const time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      if (source.kind === "skillResult" && Array.isArray(source.eliminated) && Array.isArray(source.redrawn) && Array.isArray(source.restored) && Array.isArray(source.out)) {
+        entry.historyText = "技能结算";
+        entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
+        entry.resultRows = [["最终仍出局", source.out], ["本轮出局", source.eliminated], ["抽牌复活", source.redrawn], ["原牌复活", source.restored]]
+          .filter(function (row, index) { return index !== 0 || row[1].length > 0; })
+          .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
+      }
       entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
       entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
@@ -684,27 +691,32 @@ Page({
     }
   },
   async openRoom(e) {
-    if (this.data.busy || this.pending) return;
+    if (this.data.busy || this.pending || this.data.enteringCode || this.data.loading) return;
     const target = this.data.memberRooms.find(
       (r) => r.code === e.currentTarget.dataset.code,
     );
-    if (target?.isHost && target.seat === null && !target.isMember) {
-      if (!this.data.name.trim()) {
-        this.setData({
-          code: target.code,
-          entryMode: "join",
-          error: "请填写昵称后重新入座",
-        });
-        return;
-      }
-      return this.mutate(
-        "/api/rooms/" + target.code + "/join",
-        { name: this.data.name },
-        "enter",
-      );
-    }
     if (target?.available === false) return;
-    return this.mutate("/api/me/rooms/" + e.currentTarget.dataset.code, { action: "visit" }, "entryVisit");
+    this.setData({ enteringCode: e.currentTarget.dataset.code });
+    try {
+      if (target?.isHost && target.seat === null && !target.isMember) {
+        if (!this.data.name.trim()) {
+          this.setData({
+            code: target.code,
+            entryMode: "join",
+            error: "请填写昵称后重新入座",
+          });
+          return;
+        }
+        return await this.mutate(
+          "/api/rooms/" + target.code + "/join",
+          { name: this.data.name },
+          "enter",
+        );
+      }
+      return await this.mutate("/api/me/rooms/" + e.currentTarget.dataset.code, { action: "visit" }, "entryVisit");
+    } finally {
+      this.setData({ enteringCode: "" });
+    }
   },
   inputName(e) {
     this.setData({ name: e.detail.value });
@@ -843,7 +855,7 @@ Page({
   async executePending() {
     const pending = this.pending;
     if (!pending || this.data.busy) return;
-    this.setData({ busy: true, error: "", notice: "" });
+    this.setData({ busy: true, busyAction: pending.after === "enter" ? "enter" : pending.data.type || pending.after, error: "", notice: "" });
     try {
       await api.login();
       const result = await api.request(
@@ -894,7 +906,7 @@ Page({
       this.setData({ notice: "" });
       this.handleError(e);
     } finally {
-      this.setData({ busy: false });
+      this.setData({ busy: false, busyAction: "" });
       this.schedule();
     }
   },
@@ -1317,7 +1329,7 @@ Page({
     )
       return;
     const generation = this.actionGeneration;
-    this.setData({ busy: true });
+    this.setData({ busy: true, busyAction: "actionIdentity" });
     try {
       const secret = await api.request(
         "/api/rooms/" + this.roomCode + "/private",
@@ -1345,7 +1357,7 @@ Page({
       if (generation === this.actionGeneration && this.foreground)
         this.handleError(e);
     } finally {
-      this.setData({ busy: false });
+      this.setData({ busy: false, busyAction: "" });
     }
   },
   async reveal() {
@@ -1356,7 +1368,7 @@ Page({
     if (this.data.busy || !this.data.network) return;
     const generation = ++this.generation,
       stage = this.data.room.stage;
-    this.setData({ busy: true, error: "" });
+    this.setData({ busy: true, busyAction: "identity", error: "" });
     try {
       const secret = await api.request(
         "/api/rooms/" + this.roomCode + "/private",
@@ -1385,7 +1397,7 @@ Page({
     } catch (e) {
       this.handleError(e);
     } finally {
-      this.setData({ busy: false });
+      this.setData({ busy: false, busyAction: "" });
     }
   },
   async showFairyResult() {

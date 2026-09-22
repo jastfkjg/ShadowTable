@@ -8,7 +8,8 @@
 .help-number { flex-shrink: 0; font-size: 28rpx; color: var(--accent); line-height: 1.7; }
 .help-step-title { font-size: 30rpx; font-weight: 600; margin-bottom: 8rpx; }
 .help-section { border-top: 1rpx solid var(--border); }
-button.help-toggle { width: 100%; margin: 0; padding: 28rpx 0; border-radius: 0; background: transparent; color: var(--accent); justify-content: space-between; gap: 24rpx; text-align: left; }
+button.help-toggle,
+button.help-toggle[disabled]:not([type]) { width: 100%; margin: 0; padding: 28rpx 0; border-radius: 0; background: transparent; color: var(--accent); justify-content: space-between; gap: 24rpx; text-align: left; }
 .help-toggle-copy { flex: 1; min-width: 0; }
 .help-caption { font-size: 26rpx; color: var(--muted); font-weight: 400; margin-top: 8rpx; }
 .help-answers { padding-bottom: 8rpx; }
@@ -17,6 +18,7 @@ button.help-toggle { width: 100%; margin: 0; padding: 28rpx 0; border-radius: 0;
 .help-board { margin-top: 32rpx; }
 .help-board-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; margin-top: 16rpx; }
 .help-board-links-single { grid-template-columns: minmax(0, 1fr); }
-button.help-board-link { width: 100%; margin: 0; min-width: 0; min-height: 96rpx; padding: 16rpx 24rpx; background: var(--surface); color: var(--accent); font-size: 28rpx; }
+button.help-board-link,
+button.help-board-link[disabled]:not([type]) { width: 100%; margin: 0; min-width: 0; min-height: 96rpx; padding: 16rpx 24rpx; background: var(--surface); color: var(--accent); font-size: 28rpx; }
 .help-board-error { margin-top: 24rpx; }
 .help-board-error button { margin-top: 16rpx; }

@@ -691,3 +691,15 @@ test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限�
   assert.ok(JSON.stringify(fresh).includes("9/22 11:10"));
   assert.equal(nodes(fresh).find(n => n.attr?.["data-kind"] === "leave").attr.disabled, false);
 });
+
+test("读取身份只让身份入口加载，不触发提交或结算动画", () => {
+  const data = { ...base, busy: true, busyAction: "identity", room: { phase: "tools", me: { seat: 1 }, canUseTools: true, hasActiveOperation: true }, canSettle: true };
+  const tree = render(data);
+  assert.equal(byHandler(tree, "reveal").attr.loading, true);
+  const settle = byHandler(tree, "settleTool");
+  assert.ok(settle);
+  assert.equal(settle.attr.loading, false);
+  const action = render({ ...data, busyAction: "actionIdentity", room: { phase: "identity", needsSubmission: true, me: { seat: 1 } }, actionDialog: true, stagedChoice: true, draftChoice: "confirm" });
+  assert.equal(byHandler(action, "revealActionIdentity").attr.loading, true);
+  assert.equal(byHandler(action, "confirmChoice").attr.loading, false);
+});

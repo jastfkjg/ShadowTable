@@ -729,6 +729,13 @@ function roomListItems(rooms) {
       var time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      if (source.kind === "skillResult" && Array.isArray(source.eliminated) && Array.isArray(source.redrawn) && Array.isArray(source.restored) && Array.isArray(source.out)) {
+        entry.historyText = "技能结算";
+        entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
+        entry.resultRows = [["最终仍出局", source.out], ["本轮出局", source.eliminated], ["抽牌复活", source.redrawn], ["原牌复活", source.restored]]
+          .filter(function (row, index) { return index !== 0 || row[1].length > 0; })
+          .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
+      }
       entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
@@ -2518,7 +2525,10 @@ function roomListItems(rooms) {
       var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
       for (var hh = 0; hh < visibleHistory.length; hh++) {
         var h = visibleHistory[hh];
-        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-meta small muted"><span>记录 ' + (h.key + 1) + '</span><time>' + esc(h.timeLabel) + '</time></div><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.text) + '</span>' + (h.teamLabel ? '<span class="result-team">队伍 ' + esc(h.teamLabel) + '</span>' : '') + '</div>';
+        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-heading-line"><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span></div><span class="history-number">#' + (h.key + 1) + '</span></div>';
+        if (h.timeLabel || h.historyNote) html += '<div class="small muted history-subtitle">' + esc(h.historyNote || '') + ' ' + esc(h.timeLabel || '') + '</div>';
+        if (h.teamLabel) html += '<div class="result-team">队伍 ' + esc(h.teamLabel) + '</div>';
+        if (h.resultRows) html += '<div class="history-result-rows">' + h.resultRows.map(function (row) { return '<div class="history-result-line' + (row.final ? ' is-final' : '') + '"><span class="history-result-label">' + esc(row.label) + '</span><span class="history-result-value">' + esc(row.value) + '</span></div>'; }).join('') + '</div>';
         if (h.voteGroups) {
           html += h.voteGroups
             .map(function (g) {
@@ -2550,7 +2560,7 @@ function roomListItems(rooms) {
               })
               .join("") +
             "</div>";
-        } else
+        } else if (h.detail && !h.resultRows)
           html += '<div class="muted small history-detail">' + esc(h.detail) + "</div>";
         html += "</div>";
       }

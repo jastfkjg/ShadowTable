@@ -1485,3 +1485,43 @@ test("个人记录写入响应丢失时保留原幂等键，重试确认后再�
     assert.equal(p.data.undoRoom.code, '123456');
   } finally { clearTimeout(p.undoRoomTimer); }
 });
+
+test("列表进入期间仅标记目标房间，阻止重复进入且失败后清除状态", async () => {
+  for (const fail of [false, true]) {
+    const p = page({});
+    p.data.loading = false;
+    p.data.memberRooms = [{ code: "123456", isMember: true }];
+    let finish, calls = 0;
+    p.mutate = () => { calls++; return new Promise((resolve, reject) => { finish = () => fail ? reject(new Error("失败")) : resolve(); }); };
+    const event = { currentTarget: { dataset: { code: "123456" } } };
+    const request = p.openRoom(event);
+    assert.equal(p.data.enteringCode, "123456");
+    await p.openRoom(event);
+    assert.equal(calls, 1);
+    finish();
+    if (fail) await assert.rejects(request, /失败/);
+    else await request;
+    assert.equal(p.data.enteringCode, "");
+  }
+});
+
+test("技能记录分行且仅在有人仍出局时展示最终结果", async () => {
+  const event = { kind: "skillResult", text: "技能最终结果 · 含提前截止", eliminated: [3, 5], redrawn: [3, 5], restored: [], out: [], detail: "原始公开摘要" };
+  const room = { code: "123456", stage: "t1", phase: "tools", capacity: 6, players: [], team: [], me: { seat: 1 }, history: [event] };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  let result = p.data.history[0];
+  assert.equal(result.historyText, "技能结算");
+  assert.equal(result.historyNote, "提前截止");
+  assert.equal(result.resultRows.length, 3);
+  assert.equal(result.resultRows[0].value, "3、5 号");
+  assert.ok(!result.resultRows.some(row => row.final));
+  event.out = [5];
+  await p.refresh();
+  result = p.data.history[0];
+  assert.equal(result.resultRows[0].label, "最终仍出局");
+  assert.equal(result.resultRows[0].value, "5 号");
+  assert.equal(result.resultRows[0].final, true);
+  assert.equal(result.detail, "原始公开摘要");
+});
