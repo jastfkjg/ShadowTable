@@ -187,16 +187,37 @@
         <button class="primary" form-type="submit" data-action="join" loading="{{busy}}" disabled="{{hasPendingRequest || loading || busy}}">加入房间</button>
       </block>
     </form>
-    <block wx:if="{{memberRooms.length}}">
-      <view class="section-title">我的牌桌</view>
-      <view wx:for="{{memberRooms}}" wx:key="code" class="member-room">
-        <button class="secondary room-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading}}">
-          <view class="member-room-code">{{item.code}}</view><view class="member-room-board">{{item.boardName}}<text wx:if="{{item.capacity}}"> · {{item.capacity}}人</text></view>
-        </button>
-        <button wx:if="{{item.isHost}}" class="room-delete" data-code="{{item.code}}" bindtap="deleteRoom" disabled="{{hasPendingRequest || busy || loading}}" aria-label="{{'删除牌桌'+item.code}}">删除</button>
-      </view>
-
-    </block>
+    <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button class="history-toggle" bindtap="refreshRooms" disabled="{{busy || loading || hasPendingRequest}}">刷新</button></view>
+    <view wx:if="{{memberRooms.length>=6 || roomListFilter!=='all'}}" class="room-filters">
+      <button wx:for="{{roomFilters}}" wx:key="id" class="room-filter {{roomListFilter===item.id?'active':''}}" bindtap="filterRooms" data-filter="{{item.id}}" aria-pressed="{{roomListFilter===item.id}}">{{item.label}}</button>
+    </view>
+    <view wx:if="{{undoRoom}}" class="room-undo" role="status"><text>已移除 {{undoRoom.code}} 的列表记录</text><button class="history-toggle" bindtap="undoRemoveRoom" disabled="{{busy || hasPendingRequest}}">撤销</button></view>
+    <view wx:for="{{visibleMemberRooms}}" wx:key="code" class="member-room room-list-item {{item.available===false?'is-unavailable':''}}">
+      <button class="room-list-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading || hasPendingRequest || item.available===false}}" aria-label="{{'进入房间'+item.code+'，'+item.statusLabel}}">
+        <view class="room-list-top"><text class="room-list-title">{{item.note || '房间 '+item.code}}</text><text class="room-status {{item.status}}">{{item.statusLabel}}</text></view>
+        <view wx:if="{{item.note}}" class="small muted">房间 {{item.code}}</view>
+        <view class="room-list-board">{{item.boardName}} · {{item.peopleLabel}}</view>
+        <view class="room-list-meta"><text class="room-host-name">房主：{{item.hostName || '未知'}}</text><text>{{item.relationLabel}}</text></view>
+        <view class="room-list-time">最近活动 {{item.activityLabel}}</view>
+      </button>
+      <button class="room-more" data-code="{{item.code}}" bindtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
+    </view>
+    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><text class="small muted">加入朋友的房间，或创建一桌开始游戏</text><view class="room-empty-actions"><button class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
+    <view wx:elif="{{memberRooms.length && !visibleMemberRooms.length}}" class="room-empty"><text>没有符合条件的牌桌</text><button class="history-toggle" bindtap="filterRooms" data-filter="all">查看全部</button></view>
+    <view wx:if="{{roomMenu && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="牌桌管理">
+      <view class="dialog-title">房间 {{roomMenu.code}}</view>
+      <view class="small muted">个人备注和移除记录仅对你生效</view>
+      <button class="room-menu-action" bindtap="roomMenuAction" data-kind="note" disabled="{{busy || hasPendingRequest}}">{{roomMenu.note?'编辑个人备注':'添加个人备注'}}</button>
+      <button class="room-menu-action" bindtap="roomMenuAction" data-kind="hide" disabled="{{busy || hasPendingRequest}}">移除记录<text class="small muted">不退出房间，不释放座位；重新进入后恢复</text></button>
+      <button wx:if="{{roomMenu.available!==false && roomMenu.isMember}}" class="room-menu-action" bindtap="roomMenuAction" data-kind="leave" disabled="{{busy || hasPendingRequest || !roomMenu.canLeave}}">离开房间<text class="small muted">{{roomMenu.canLeave?'退出成员关系并释放座位':'对局中不能离开座位，请联系房主'}}</text></button>
+      <button wx:if="{{roomMenu.available!==false && roomMenu.isHost}}" class="room-menu-action danger" bindtap="roomMenuAction" data-kind="delete" disabled="{{busy || hasPendingRequest}}">解散房间<text class="small muted">所有成员退出，对局记录删除</text></button>
+      <button class="secondary" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button>
+    </view></view>
+    <view wx:if="{{noteRoom && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注">
+      <view class="dialog-title">个人备注 · {{noteRoom.code}}</view><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label>
+      <input id="room-note" class="input" value="{{roomNoteDraft}}" bindinput="inputRoomNote" maxlength="30" placeholder="例如：周五朋友局" focus="{{true}}" disabled="{{busy || hasPendingRequest}}" />
+      <view class="dialog-actions"><button class="secondary" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button><button class="primary" bindtap="saveRoomNote" disabled="{{busy || hasPendingRequest}}">保存</button></view>
+    </view></view>
   </block>
   <block wx:else>
     <view class="room-summary">

@@ -184,6 +184,7 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
   board(boardId, capacity);
   return {
     code,
+    createdAt: Date.now(),
     host: uid,
     board: boardId,
     capacity,
@@ -1013,6 +1014,14 @@ function roomSummary(room, uid) {
     boardName: boardName(room),
     capacity: room.capacity,
     phaseName: phaseName(room),
+    phase: room.phase,
+    status: room.phase === "lobby" ? "lobby" : room.phase === "ended" ? "ended" : "playing",
+    occupied: room.players.length,
+    hostName: [...room.players, ...(room.spectators || [])].find(p => p.uid === room.host)?.name || "房主未入座",
+    relation: room.host === uid ? "房主" : p?.seat != null ? "玩家" : "旁观者",
+    canLeave: !!p && (room.phase === "lobby" || (p.seat === null && uid !== room.host)),
+    createdAt: room.createdAt || 0,
+    updatedAt: room.updatedAt || 0,
     game: room.game,
     seat: p?.seat ?? null,
     isMember: !!p,

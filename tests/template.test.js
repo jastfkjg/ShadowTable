@@ -98,20 +98,22 @@ test("WXSS官方编译器封装可编译全局样式", () => {
   assert.ok(output.length > 100);
 });
 
-test("默认加入且标语移除，牌桌删除仅房主可见", () => {
-  const tree = render({
-    ...base,
-    memberRooms: [
-      { code: "123456", isHost: true },
-      { code: "234567", isHost: false },
-    ],
-  });
-  assert.equal(byHandler(tree, "create"), undefined);
+test("我的牌桌统一更多入口，只有房主菜单显示解散，非房主仍可移除记录", () => {
+  const rooms = [{ code: "123456", isHost: true, available: true }, { code: "234567", isHost: false, available: true }];
+  const data = { ...base, memberRooms: rooms, visibleMemberRooms: rooms };
+  const tree = render(data);
   assert.ok(byHandler(tree, "join"));
-  assert.equal(JSON.stringify(tree).includes("面对面，暗中行事"), false);
-  const buttons = nodes(tree).filter((n) => n.attr?.bindtap === "deleteRoom");
-  assert.equal(buttons.length, 1);
-  assert.equal(buttons[0].attr["data-code"], "123456");
+  assert.equal(nodes(tree).filter(n => n.attr?.bindtap === "openRoomMenu").length, 2);
+  assert.equal(byHandler(tree, "deleteRoom"), undefined);
+  for (const room of rooms) {
+    const menu = render({ ...data, roomMenu: room });
+    const actions = nodes(menu).filter(n => n.attr?.bindtap === "roomMenuAction").map(n => n.attr["data-kind"]);
+    assert.ok(actions.includes("hide"));
+    assert.ok(actions.includes("note"));
+    assert.equal(actions.includes("delete"), room.isHost);
+  }
+  const empty = render({ ...base, memberRooms: [], visibleMemberRooms: [] });
+  assert.ok(JSON.stringify(empty).includes("还没有牌桌"));
 });
 
 test("业务错误居中弹窗只提供关闭，连接错误才提供重试", () => {

@@ -205,7 +205,7 @@ test("我的房间列表只返回本人成员关系，无他人房间、身份�
         "seat",
         "testRoom",
         "isHost",
-        "isMember",
+        "isMember", "phase", "status", "occupied", "hostName", "relation", "canLeave", "createdAt", "updatedAt", "note", "lastEnteredAt", "available",
       ].sort(),
     );
     assert.deepEqual((await a.req("/api/me/rooms", outsider)).data.rooms, []);
@@ -215,7 +215,7 @@ test("我的房间列表只返回本人成员关系，无他人房间、身份�
       type: "leave",
       stage: room.stage,
     });
-    assert.equal((await a.req("/api/me/rooms", first)).data.rooms.length, 1);
+    assert.equal((await a.req("/api/me/rooms", first)).data.rooms.filter(r => r.available).length, 1);
     assert.equal((await a.req("/api/me/rooms", null)).status, 401);
   } finally {
     await a.close();
@@ -244,7 +244,7 @@ test("删除牌桌仅当前房主可执行，检查阶段且重试幂等", async
     assert.equal((await a.req(path, guest)).status, 404);
     assert.equal((await a.req(path + "/private", host)).status, 404);
     for (const token of [host, guest])
-      assert.deepEqual((await a.req("/api/me/rooms", token)).data.rooms, []);
+      assert.equal((await a.req("/api/me/rooms", token)).data.rooms[0].status, "unavailable");
   } finally {
     await a.close();
   }
@@ -353,7 +353,7 @@ test("HTTP移出成员撤销访问与房间列表，重试只执行一次且不�
       assert.equal(res.status, 403);
       assert.equal(res.data.error, "你已被房主移出房间");
     }
-    assert.equal((await a.req("/api/me/rooms", guest)).data.rooms.length, 0);
+    assert.equal((await a.req("/api/me/rooms", guest)).data.rooms.filter(r => r.available).length, 0);
     assert.equal((await a.req(path + "/commands", guest, { type: "ready", stage: room.stage, ready: true })).status, 403);
     assert.equal(a.store.get(created.data.code).players.length, 2);
     assert.equal((await a.req(path + "/join", guest, { name: "重新加入" })).status, 200);
@@ -391,4 +391,106 @@ test("围观成员可恢复房间，抢同一空位只成功一人，重复站�
     assert.equal((await a.req(path, loser)).data.me.seat, null);
     assert.equal((await a.req(path + "/private", loser)).status, 403);
   } finally { await a.close(); }
+});
+
+test("个人牌桌隐藏、备注和撤销不改变房间及座位，重试幂等且不能修改他人记录", async () => {
+  const a = await launch();
+  try {
+    const [host, guest, outsider] = await users(a, 3);
+    const code = (await a.req('/api/rooms', host, { name: '房主' })).data.code;
+    const path = '/api/rooms/' + code, personal = '/api/me/rooms/' + code;
+    await a.req(path + '/join', guest, { name: '成员' });
+    const before = structuredClone(a.store.get(code));
+    assert.equal((await a.req(personal, outsider, { action: 'hide' })).status, 404);
+    assert.equal((await a.req(personal, guest, { action: 'note', note: '周五朋友局' })).status, 200);
+    assert.equal((await a.req(personal, guest, { action: 'note', note: '字'.repeat(31) })).status, 400);
+    const id = randomUUID();
+    await a.req(personal, guest, { action: 'hide' }, id);
+    assert.deepEqual((await a.req('/api/me/rooms', guest)).data.rooms, []);
+    assert.equal((await a.req('/api/me/rooms', host)).data.rooms[0].note, '');
+    assert.deepEqual(a.store.get(code), before);
+    assert.equal((await a.req(path, guest)).status, 200);
+    await a.req(personal, guest, { action: 'restore' });
+    await a.req(personal, guest, { action: 'hide' }, id); // replay cannot undo the later restore
+    assert.equal((await a.req('/api/me/rooms', guest)).data.rooms[0].note, '周五朋友局');
+    await a.req(personal, guest, { action: 'hide' });
+    await a.req(path + '/join', guest, { name: '成员' });
+    const restored = (await a.req('/api/me/rooms', guest)).data.rooms[0];
+    assert.equal(restored.available, true);
+    assert.equal(restored.seat, 2);
+    assert.equal(restored.note, '周五朋友局');
+    assert.equal(restored.hostName, '房主');
+    assert.ok(restored.lastEnteredAt > 0);
+    await a.req(personal, guest, { action: 'note', note: '' });
+    assert.equal((await a.req('/api/me/rooms', guest)).data.rooms[0].note, '');
+  } finally { await a.close(); }
+});
+
+test("个人记录跨重启保存，解散后可清理且无法进入，不返回其他房间或私密信息", async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shadow-entries-'));
+  let a = await launch({ database: join(dir, 'rooms.sqlite') });
+  try {
+    const [host, guest] = await users(a, 2);
+    const code = (await a.req('/api/rooms', host, { name: '甲' })).data.code;
+    const path = '/api/rooms/' + code, personal = '/api/me/rooms/' + code;
+    await a.req(path + '/join', guest, { name: '乙' });
+    await a.req(personal, guest, { action: 'note', note: '我的备注' });
+    await a.req(personal, guest, { action: 'hide' });
+    await a.close();
+    a = await launch({ database: join(dir, 'rooms.sqlite') });
+    assert.deepEqual((await a.req('/api/me/rooms', guest)).data.rooms, []);
+    await a.req(personal, guest, { action: 'restore' });
+    assert.equal((await a.req('/api/me/rooms', guest)).data.rooms[0].note, '我的备注');
+    const room = (await a.req(path, host)).data;
+    await a.req(path + '/delete', host, { stage: room.stage });
+    const entries = (await a.req('/api/me/rooms', guest)).data.rooms;
+    assert.equal(entries[0].available, false);
+    assert.equal(entries[0].status, 'unavailable');
+    assert.equal(entries[0].canLeave, false);
+    assert.equal((await a.req(personal, guest, { action: 'visit' })).status, 404);
+    assert.ok(!JSON.stringify(entries).includes('membershipId'));
+    await a.req(personal, guest, { action: 'hide' });
+    assert.deepEqual((await a.req('/api/me/rooms', guest)).data.rooms, []);
+  } finally { await a.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("列表进行中优先，同状态按最近进入排列，房间活动不改变访问排序", async () => {
+  const a = await launch();
+  try {
+    const [host] = await users(a, 1);
+    const codes = [];
+    for (let i=0; i<3; i++) codes.push((await a.req('/api/rooms', host, { name: '房主' })).data.code);
+    const uid = a.store.get(codes[0]).host;
+    codes.forEach((code,i) => a.store.db.prepare('UPDATE room_entries SET entered=? WHERE uid=? AND code=?').run(100+i, uid, code));
+    const room = a.store.get(codes[0]); room.phase='tools'; a.store.save(room);
+    const list = () => a.req('/api/me/rooms', host);
+    assert.deepEqual((await list()).data.rooms.map(r=>r.code), [codes[0],codes[2],codes[1]]);
+    a.store.save(a.store.get(codes[1]));
+    assert.deepEqual((await list()).data.rooms.map(r=>r.code), [codes[0],codes[2],codes[1]]);
+    await a.req('/api/me/rooms/'+codes[1], host, {action:'visit'});
+    assert.deepEqual((await list()).data.rooms.map(r=>r.code), [codes[0],codes[1],codes[2]]);
+  } finally { await a.close(); }
+});
+
+test("旧数据库自动补齐个人记录，不改变旧房间阶段和座位", async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shadow-entry-migration-'));
+  let a = await launch({database:join(dir,'rooms.sqlite')});
+  try {
+    const [host] = await users(a,1);
+    const code = (await a.req('/api/rooms',host,{name:'旧房主'})).data.code;
+    const legacy = a.store.get(code);
+    delete legacy.createdAt; delete legacy.updatedAt;
+    a.store.db.prepare('UPDATE rooms SET state=? WHERE code=?').run(JSON.stringify(legacy),code);
+    a.store.db.exec('DROP TABLE room_entries');
+    await a.close();
+    a = await launch({database:join(dir,'rooms.sqlite')});
+    const list=(await a.req('/api/me/rooms',host)).data.rooms;
+    assert.equal(list[0].code,code);
+    assert.equal(list[0].available,true);
+    assert.equal(list[0].seat,1);
+    assert.deepEqual(a.store.get(code),legacy);
+    await a.req('/api/me/rooms/'+code,host,{action:'hide'});
+    assert.deepEqual((await a.req('/api/me/rooms',host)).data.rooms,[]);
+    assert.deepEqual(a.store.get(code),legacy);
+  } finally { await a.close(); rmSync(dir,{recursive:true,force:true}); }
 });

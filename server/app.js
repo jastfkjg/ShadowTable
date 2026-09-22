@@ -204,9 +204,10 @@ function createApp({
       }
       limit(`uid:${uid}`, 180);
       if (req.method === "GET" && path === "/api/me/rooms") {
-        const rooms = store.roomsFor(uid).map((room) => roomSummary(room, uid));
+        const rooms = store.personalRooms(uid);
         return send(200, { rooms });
       }
+      const personal = path.match(/^\/api\/me\/rooms\/(\d{6})$/);
       const match = path.match(
         /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management))?$/,
       );
@@ -227,7 +228,7 @@ function createApp({
       }
       check(
         req.method === "POST" &&
-          (path === "/api/rooms" ||
+          (path === "/api/rooms" || personal ||
             (match && ["join", "commands", "delete"].includes(match[2]))),
         "接口不存在",
         404,
@@ -248,6 +249,23 @@ function createApp({
             409,
           );
           return JSON.parse(cached.result);
+        }
+        if (personal) {
+          const code = personal[1], room = store.get(code);
+          const member = room && (room.host === uid || [...room.players, ...(room.spectators || [])].some(p => p.uid === uid));
+          if (member) store.trackRoom(room, uid);
+          check(store.entry(uid, code), "没有这条个人牌桌记录", 404);
+          check(["hide", "restore", "note", "visit"].includes(b.action), "未知记录操作");
+          if (b.action === "visit") {
+            check(member, "房间已失效，请刷新列表", 404);
+            store.visitRoom(uid, code);
+          } else if (b.action === "note") {
+            check(typeof b.note === "string" && b.note.trim().length <= 30, "备注最多30个字符");
+            store.db.prepare("UPDATE room_entries SET note=? WHERE uid=? AND code=?").run(b.note.trim(), uid, code);
+          } else store.db.prepare("UPDATE room_entries SET hidden=? WHERE uid=? AND code=?").run(b.action === "hide" ? 1 : 0, uid, code);
+          const response = { code, accepted: true };
+          store.addReceipt(uid, id, fingerprint, response);
+          return response;
         }
         let room, response, details;
         if (path === "/api/rooms") {
@@ -283,7 +301,10 @@ function createApp({
           response = { code: room.code, accepted: true };
         }
         if (match?.[2] === "delete") store.remove(room.code);
-        else store.save(room);
+        else {
+          store.save(room);
+          if (path === "/api/rooms" || match?.[2] === "join") store.visitRoom(uid, room.code);
+        }
         store.addReceipt(uid, id, fingerprint, response);
         store.db
           .prepare(

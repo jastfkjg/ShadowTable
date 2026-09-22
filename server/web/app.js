@@ -307,6 +307,11 @@
     showRoomSettings: false,
     showTransfer: false,
     memberRooms: [],
+    roomListFilter: "all",
+    roomMenu: null,
+    noteRoom: null,
+    roomNoteDraft: "",
+    undoRoom: null,
     boardId: "classic",
     boardName: "阿瓦隆 · 经典基础",
     boardRoleConfiguration: [],
@@ -340,8 +345,18 @@
   };
 
   function setState(patch) {
+    var previousMenu = state.roomMenu || state.noteRoom;
     for (var k in patch) state[k] = patch[k];
     render();
+    if (typeof app.querySelector === "function") {
+      if (patch.roomMenu || patch.noteRoom) {
+        var first = app.querySelector('.room-list-dialog input, .room-list-dialog button:not(:disabled)');
+        if (first) first.focus();
+      } else if (previousMenu && !state.roomMenu && !state.noteRoom) {
+        var origin = app.querySelector('[data-action="openRoomMenu"][data-code="' + previousMenu.code + '"]');
+        if (origin) origin.focus();
+      }
+    }
   }
   function setSettings(patch) {
     if (!state.settings) return;
@@ -531,9 +546,20 @@
       showRules: false,
     });
   }
+function roomListItems(rooms) {
+  return rooms.map(r => {
+    const time = r.updatedAt ? new Date(r.updatedAt) : null;
+    return { ...r,
+      statusLabel: ({ lobby: "待开局", playing: "进行中", ended: "已结束", unavailable: "已失效" })[r.status] || r.phaseName || "待开局",
+      peopleLabel: r.status === "lobby" ? `${r.occupied || 0}/${r.capacity}人已入座` : `${r.capacity}人`,
+      relationLabel: r.available === false ? r.phaseName : `${r.isHost ? "我是房主" : r.relation === "旁观者" ? "旁观者" : "玩家"}${r.seat != null ? " · 我在" + r.seat + "号" : ""}`,
+      activityLabel: time ? `${time.getMonth()+1}/${time.getDate()} ${String(time.getHours()).padStart(2,"0")}:${String(time.getMinutes()).padStart(2,"0")}` : "暂无活动时间",
+    };
+  });
+}
   async function loadRooms() {
     var data = await request("/api/me/rooms");
-    if (alive) setState({ memberRooms: data.rooms, serverConnected: true });
+    if (alive) setState({ memberRooms: roomListItems(data.rooms), serverConnected: true });
   }
   function nicknameValue() {
     var el = document.getElementById("nickname");
@@ -830,15 +856,24 @@
       });
       if (p.after === "enter") storage.remove("pendingEntry");
       mask();
-      if (p.after === "enter") {
+      if (p.after === "enter" || p.after === "entryVisit") {
         roomCode = result.code;
         storage.set("roomCode", result.code);
         storage.set("nickname", state.name);
       }
-      if (p.after === "leave" || p.after === "delete") {
+      if (["entryHide", "entryRestore", "entryNote"].includes(p.after)) {
+        setState({ roomMenu: null, noteRoom: null });
+        if (p.after === "entryHide") {
+          var undo = { code: result.code, until: Date.now() + 8000 };
+          setState({ undoRoom: undo, notice: "已移除列表记录，房间及你的成员关系、座位不变" });
+          clearTimeout(undoRoomTimer);
+          undoRoomTimer = setTimeout(function () { if (alive && state.undoRoom && state.undoRoom.until === undo.until) setState({ undoRoom: null }); }, 8000);
+        } else setState({ undoRoom: null, notice: p.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
+        await loadRooms();
+      } else if (p.after === "leave" || p.after === "delete") {
         clearRoom();
         setState({
-          notice: p.after === "delete" ? "牌桌已删除" : "已离开房间",
+          notice: p.after === "delete" ? "房间已解散" : "已离开房间",
         });
         await loadRooms();
       } else {
@@ -928,17 +963,33 @@
         "enter",
       );
     }
-    mask();
-    roomCode = code;
-    setState({ loading: true, error: "" });
-    try {
-      await refresh();
-      if (roomCode) storage.set("roomCode", roomCode);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setState({ loading: false });
-      schedule();
+    if (target && target.available === false) return;
+    return mutate("/api/me/rooms/" + code, { action: "visit" }, "entryVisit");
+  }
+  var undoRoomTimer;
+  async function refreshRooms() {
+    if (state.busy || pending || state.loading) return;
+    setState({ loading: true });
+    try { await loadRooms(); } catch (e) { handleError(e); }
+    finally { setState({ loading: false }); }
+  }
+  async function roomMenuAction(kind) {
+    var room = state.roomMenu;
+    if (!room || state.busy || pending) return;
+    setState({ roomMenu: null });
+    if (kind === "note") return setState({ noteRoom: room, roomNoteDraft: room.note || "" });
+    if (kind === "hide") return mutate("/api/me/rooms/" + room.code, { action: "hide" }, "entryHide");
+    if (kind === "delete" && room.isHost && room.available !== false) return deleteRoom(room.code);
+    if (kind === "leave" && room.canLeave) {
+      if (!(await confirm("离开房间 " + room.code + "？", "你将退出成员关系并释放座位。房间不会解散；房主离开后仍保留管理权。"))) return;
+      if (state.busy || pending) return;
+      setState({ busy: true });
+      try {
+        var fresh = await request("/api/rooms/" + room.code);
+        setState({ busy: false });
+        await mutate("/api/rooms/" + room.code + "/commands", { type: "leave", stage: fresh.stage }, "leave");
+      } catch (e) { handleError(e); }
+      finally { setState({ busy: false }); }
     }
   }
   async function deleteRoom(code) {
@@ -949,7 +1000,7 @@
       if (!room.isHost) throw new Error("只有当前房主可以删除牌桌");
       if (
         !(await confirm(
-          "删除牌桌 " + code + "？",
+          "解散房间 " + code + "？",
           "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
         ))
       )
@@ -2172,27 +2223,31 @@
         btn("primary", "join", "加入房间", null, state.loading || state.busy);
     }
     html += "</form>";
-    if (state.memberRooms.length) {
-      html += '<div class="section-title">我的牌桌</div>';
-      for (var k = 0; k < state.memberRooms.length; k++) {
-        var m = state.memberRooms[k];
-        html +=
-          '<div class="member-room"><button type="button" class="secondary room-open" data-action="openRoom" data-code="' +
-          esc(m.code) +
-          '"' +
-          (state.busy || state.loading ? " disabled" : "") +
-          '><span class="member-room-code">' +
-          esc(m.code) +
-          '</span><span class="member-room-board">' +
-          esc(m.boardName) +
-          (m.capacity ? " · " + m.capacity + "人" : "") +
-          "</span></button>" +
-          (m.isHost
-            ? btn("room-delete", "deleteRoom", "删除", { code: m.code }, state.busy || state.loading)
-            : "") +
-          "</div>";
-      }
+    html += '<div class="section-title history-heading"><span>我的牌桌' + (state.memberRooms.length ? '<span class="room-count">' + state.memberRooms.length + '</span>' : '') + '</span>' + btn("history-toggle", "refreshRooms", "刷新", null, state.busy || state.loading || !!pending) + '</div>';
+    if (state.memberRooms.length >= 6 || state.roomListFilter !== "all") {
+      html += '<div class="room-filters">' + [["all","全部"],["playing","进行中"],["lobby","待开局"],["ended","已结束"],["unavailable","已失效"]].map(function (f) {
+        return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';
+      }).join('') + '</div>';
     }
+    if (state.undoRoom) html += '<div class="room-undo" role="status"><span>已移除 ' + esc(state.undoRoom.code) + ' 的列表记录</span>' + btn("history-toggle", "undoRemoveRoom", "撤销", null, state.busy || !!pending) + '</div>';
+    var visible = state.memberRooms.filter(function (r) { return state.roomListFilter === "all" || r.status === state.roomListFilter; });
+    visible.forEach(function (m) {
+      html += '<div class="member-room room-list-item ' + (m.available === false ? 'is-unavailable' : '') + '"><button type="button" class="room-list-open" data-action="openRoom" data-code="' + esc(m.code) + '"' + (state.busy || state.loading || pending || m.available === false ? ' disabled' : '') + '><span class="room-list-top"><span class="room-list-title">' + esc(m.note || '房间 ' + m.code) + '</span><span class="room-status ' + esc(m.status) + '">' + esc(m.statusLabel) + '</span></span>' +
+        (m.note ? '<span class="small muted">房间 ' + esc(m.code) + '</span>' : '') + '<span class="room-list-board">' + esc(m.boardName) + ' · ' + esc(m.peopleLabel) + '</span><span class="room-list-meta"><span class="room-host-name">房主：' + esc(m.hostName || '未知') + '</span><span>' + esc(m.relationLabel) + '</span></span><span class="room-list-time">最近活动 ' + esc(m.activityLabel) + '</span></button>' +
+        '<button type="button" class="room-more" data-action="openRoomMenu" data-code="' + esc(m.code) + '" aria-label="管理房间' + esc(m.code) + '的个人记录"' + (state.busy || state.loading || pending ? ' disabled' : '') + '>⋯</button></div>';
+    });
+    if (!state.memberRooms.length && !state.loading) html += '<div class="room-empty"><div>还没有牌桌</div><span class="small muted">加入朋友的房间，或创建一桌开始游戏</span><div class="room-empty-actions">' + btn("secondary","switchEntry","加入房间",{mode:"join",scroll:"true"},state.busy || !!pending) + btn("secondary","switchEntry","创建房间",{mode:"create",scroll:"true"},state.busy || !!pending) + '</div></div>';
+    else if (!visible.length) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
+    if (state.roomMenu && !state.error) {
+      var m = state.roomMenu, locked = state.busy || !!pending;
+      html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="牌桌管理"><div class="dialog-title">房间 ' + esc(m.code) + '</div><div class="small muted">个人备注和移除记录仅对你生效</div>' +
+        btn("room-menu-action", "roomMenuAction", m.note ? "编辑个人备注" : "添加个人备注", {kind:"note"}, locked) +
+        btn("room-menu-action", "roomMenuAction", "移除记录", {kind:"hide"}, locked) + '<div class="small muted">不退出房间，不释放座位；重新进入后恢复</div>' +
+        (m.available !== false && m.isMember ? btn("room-menu-action", "roomMenuAction", "离开房间", {kind:"leave"}, locked || !m.canLeave) + '<div class="small muted">' + (m.canLeave ? '退出成员关系并释放座位' : '对局中不能离开座位，请联系房主') + '</div>' : '') +
+        (m.available !== false && m.isHost ? btn("room-menu-action danger", "roomMenuAction", "解散房间", {kind:"delete"}, locked) + '<div class="small muted">所有成员退出，对局记录删除</div>' : '') +
+        btn("secondary","closeRoomMenu","取消",null,locked) + '</div></div>';
+    }
+    if (state.noteRoom && !state.error) html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注"><div class="dialog-title">个人备注 · ' + esc(state.noteRoom.code) + '</div><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label><input id="room-note" class="input" data-input="roomNote" maxlength="30" placeholder="例如：周五朋友局" value="' + esc(state.roomNoteDraft) + '"' + (state.busy || pending ? ' disabled' : '') + ' /><div class="dialog-actions">' + btn("secondary","closeRoomMenu","取消",null,state.busy || !!pending) + btn("primary","saveRoomNote","保存",null,state.busy || !!pending) + '</div></div></div>';
     return html;
   }
   function viewRoom() {
@@ -2937,7 +2992,13 @@
     },
     launchTool: launchTool,
     switchEntry: function (el) {
+      if (state.busy || pending) return;
       switchEntry(el.dataset.mode);
+      if (el.dataset.scroll) {
+        var field = app.querySelector(el.dataset.mode === "join" ? "#code" : "#nickname");
+        if (field) field.focus({ preventScroll: true });
+        app.querySelector(".entry-panel").scrollIntoView({ block: "start" });
+      }
     },
     toggleRules: function () {
       setState({ showRules: !state.showRules });
@@ -2947,6 +3008,13 @@
     openRoom: function (el) {
       openRoom(el.dataset.code);
     },
+    refreshRooms: refreshRooms,
+    filterRooms: function (el) { if (["all", "playing", "lobby", "ended", "unavailable"].includes(el.dataset.filter)) setState({ roomListFilter: el.dataset.filter }); },
+    openRoomMenu: function (el) { if (!state.busy && !pending) setState({ roomMenu: state.memberRooms.find(function (r) { return r.code === el.dataset.code; }) || null }); },
+    closeRoomMenu: function () { if (!state.busy && !pending) setState({ roomMenu: null, noteRoom: null }); },
+    roomMenuAction: function (el) { return roomMenuAction(el.dataset.kind); },
+    saveRoomNote: function () { if (state.noteRoom) return mutate("/api/me/rooms/" + state.noteRoom.code, { action: "note", note: state.roomNoteDraft }, "entryNote"); },
+    undoRemoveRoom: function () { if (state.undoRoom && Date.now() < state.undoRoom.until) return mutate("/api/me/rooms/" + state.undoRoom.code, { action: "restore" }, "entryRestore"); },
     deleteRoom: function (el) {
       deleteRoom(el.dataset.code);
     },
@@ -3133,6 +3201,7 @@
     },
   };
   var INPUTS = {
+    roomNote: function (el) { state.roomNoteDraft = el.value; },
     name: function (el) {
       state.name = el.value;
     },
@@ -3207,6 +3276,18 @@
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
+  });
+  document.addEventListener("keydown", function (event) {
+    if (!(state.roomMenu || state.noteRoom) || state.error || !modal.hidden) return;
+    if (event.key === "Escape") { event.preventDefault(); ACTIONS.closeRoomMenu(); return; }
+    if (event.key !== "Tab") return;
+    var dialog = app.querySelector(".room-list-dialog");
+    if (!dialog) return;
+    var controls = Array.from(dialog.querySelectorAll("button:not(:disabled), input:not(:disabled)"));
+    if (!controls.length) { event.preventDefault(); return; }
+    var first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
   // ===== boot =====
   var codeMatch = /(?:\?|&)code=(\d{6})/.exec(location.search || "");

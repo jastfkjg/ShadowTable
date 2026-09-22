@@ -538,13 +538,13 @@ test("房主删除后双方回到入口，成员不再轮询已删牌桌", async
     await settle(guest);
     await host.returnHome();
     await host.deleteRoom({ currentTarget: { dataset: { code } } });
-    assert.equal(host.data.notice, "牌桌已删除");
-    assert.equal(host.data.memberRooms.length, 0);
+    assert.equal(host.data.notice, "房间已解散");
+    assert.equal(host.data.memberRooms[0].available, false);
     await guest.refresh();
     assert.equal(guest.roomCode, null);
     assert.equal(guest.data.room, null);
     assert.equal(guest.data.error, "");
-    assert.equal(guest.data.memberRooms.length, 0);
+    assert.equal(guest.data.memberRooms[0].available, false);
   } finally {
     await a.close();
   }
@@ -1429,4 +1429,59 @@ test("查看最近结果清除记录筛选并在渲染后定位目标记录", ()
   assert.equal(p.data.historyExpanded, false);
   assert.equal(p.data.visibleHistory.length, 3);
   assert.equal(p.scrolls[1].selector, "#history-record-5");
+});
+
+test("首页个人牌桌备注、移除撤销和重新进入保持座位，列表操作复用幂等请求", async () => {
+  const a = await server();
+  let guest;
+  try {
+    const host = await a.actor(); guest = await a.actor();
+    await host.bootstrap(); await guest.bootstrap();
+    host.setData({ name: '房主' }); host.create(); await settle(host);
+    const code = host.roomCode;
+    guest.setData({ name: '玩家', code }); guest.join(); await settle(guest);
+    await guest.returnHome();
+    assert.equal(guest.data.memberRooms[0].seat, 2);
+    guest.openRoomMenu({currentTarget:{dataset:{code}}});
+    await guest.roomMenuAction({currentTarget:{dataset:{kind:'note'}}});
+    guest.inputRoomNote({detail:{value:'周五朋友局'}});
+    await guest.saveRoomNote();
+    assert.equal(guest.data.memberRooms[0].note, '周五朋友局');
+    guest.openRoomMenu({currentTarget:{dataset:{code}}});
+    await guest.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+    assert.equal(guest.data.memberRooms.length, 0);
+    assert.equal(guest.data.undoRoom.code, code);
+    await guest.undoRemoveRoom();
+    assert.equal(guest.data.memberRooms[0].note, '周五朋友局');
+    await guest.openRoom({currentTarget:{dataset:{code}}});
+    assert.equal(guest.data.room.me.seat, 2);
+    assert.equal(guest.roomCode, code);
+  } finally { clearTimeout(guest?.undoRoomTimer); await a.close(); }
+});
+
+test("个人记录写入响应丢失时保留原幂等键，重试确认后再刷新列表", async () => {
+  const calls = [];
+  let fail = true;
+  const p = page({
+    login: async () => {}, requestId: () => 'personal-entry-request-0001',
+    request: async (path, method, data, id) => {
+      if (method === 'POST') {
+        calls.push({path, data, id});
+        if (fail) { fail = false; throw new Error('连接中断'); }
+        return { code: '123456', accepted: true };
+      }
+      return {rooms:[]};
+    },
+  });
+  p.setData({ loading: false, roomMenu: {code:'123456',available:true} });
+  try {
+    await p.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+    assert.ok(p.pending);
+    assert.equal(p.data.undoRoom, null);
+    await p.executePending();
+    assert.equal(p.pending, null);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[0], calls[1]);
+    assert.equal(p.data.undoRoom.code, '123456');
+  } finally { clearTimeout(p.undoRoomTimer); }
 });
