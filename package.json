@@ -11,7 +11,7 @@
     "start": "node server/index.js",
     "dev": "DEV_AUTH=1 DEV_PANEL=1 WEB_ORIGIN=http://127.0.0.1:8787 node server/index.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check server/engine.js && node --check server/knights.js && node --check server/fairy.js && node --check server/board-info.js && node --check server/variants.js && node --check server/app.js && node --check miniprogram/pages/table/table.js && node --check miniprogram/pages/settings/settings.js && node --check miniprogram/pages/board-details/board-details.js && node --check server/dev-panel/panel.js && node --check server/dev-panel/index.js && node --check server/admin/index.js && node --check server/admin/app.js && node --check server/web/index.js && node --check server/web/app.js"
+    "check": "node --check server/engine.js && node --check server/knights.js && node --check server/fairy.js && node --check server/board-info.js && node --check server/variants.js && node --check server/app.js && node --check miniprogram/pages/table/table.js && node --check miniprogram/pages/settings/settings.js && node --check miniprogram/pages/board-details/board-details.js && node --check server/dev-panel/panel.js && node --check server/dev-panel/index.js && node --check server/admin/index.js && node --check server/admin/app.js && node --check server/web/index.js && node --check server/web/app.js && node --check miniprogram/pages/help/help.js"
   },
   "devDependencies": {
     "miniprogram-compiler": "0.2.3",

@@ -109,7 +109,7 @@ test("我的牌桌统一更多入口，只有房主菜单显示解散，非房�
     const menu = render({ ...data, roomMenu: room });
     const actions = nodes(menu).filter(n => n.attr?.bindtap === "roomMenuAction").map(n => n.attr["data-kind"]);
     assert.ok(actions.includes("hide"));
-    assert.ok(actions.includes("note"));
+    assert.ok(!actions.includes("note"));
     assert.equal(actions.includes("delete"), room.isHost);
   }
   const empty = render({ ...base, memberRooms: [], visibleMemberRooms: [] });
@@ -672,4 +672,22 @@ test("动态区等待时结果在前，操作中阶段在前，提交后不重�
   }
   const empty = render({ ...base, room });
   assert.ok(!nodes(empty).some(n => n.attr?.class === "latest-result"));
+});
+
+test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限制", () => {
+  const legacy = { code: "438671", isHost: true, isMember: true, capacity: 12, phaseName: "入座与准备" };
+  const data = { ...base, memberRooms: [legacy], visibleMemberRooms: [legacy], roomMenu: legacy };
+  const tree = render(data);
+  const text = JSON.stringify(tree);
+  assert.ok(!text.includes("房主：未知"));
+  assert.ok(!text.includes("最近活动"));
+  assert.ok(!text.includes("对局中不能离开"));
+  assert.ok(text.includes("离开权限暂未同步"));
+  const leave = nodes(tree).find(n => n.attr?.["data-kind"] === "leave");
+  assert.equal(leave.attr.disabled, true);
+  const current = { ...legacy, hostName: "小王", updatedAt: 123, activityLabel: "9/22 11:10", canLeave: true };
+  const fresh = render({ ...data, visibleMemberRooms: [current], roomMenu: current });
+  assert.ok(JSON.stringify(fresh).includes("小王"));
+  assert.ok(JSON.stringify(fresh).includes("9/22 11:10"));
+  assert.equal(nodes(fresh).find(n => n.attr?.["data-kind"] === "leave").attr.disabled, false);
 });

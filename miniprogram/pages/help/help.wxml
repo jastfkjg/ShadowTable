@@ -1,0 +1,41 @@
+<view class="page help-page">
+  <view class="help-intro">
+    <view class="help-eyebrow">桌边助手 · 使用帮助</view>
+    <view class="help-title">一起坐下，轻松开局</view>
+    <view class="help-copy">线下讨论，线上发牌、投票和结算。房主根据现场进度发起操作，大家按提示参与。</view>
+  </view>
+  <view class="help-quick">
+    <view class="help-heading">第一次使用</view>
+    <view class="help-step"><text class="help-number">01</text><view><view class="help-step-title">加入牌桌</view><view class="help-copy">打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。</view></view></view>
+    <view class="help-step"><text class="help-number">02</text><view><view class="help-step-title">入座并准备</view><view class="help-copy">选择座位、点击准备，等待房主发牌。满座时会先进入围观。</view></view></view>
+    <view class="help-step"><text class="help-number">03</text><view><view class="help-step-title">私下查看身份</view><view class="help-copy">记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。</view></view></view>
+    <view class="help-step"><text class="help-number">04</text><view><view class="help-step-title">线下讨论，按提示操作</view><view class="help-copy">需要你投票、出任务牌或使用技能时，页面会提示；提交后等待结算。</view></view></view>
+  </view>
+  <block wx:for="{{sections}}" wx:key="id">
+    <view wx:if="{{item.id !== 'faq'}}" class="help-section">
+      <button class="help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
+      <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
+    </view>
+  </block>
+  <view class="help-section help-boards">
+    <button class="help-toggle" bindtap="toggleBoards" aria-expanded="{{boardsExpanded}}"><view class="help-toggle-copy"><view class="help-heading">板子与角色</view><view class="help-caption">按玩法与人数，查看角色和规则</view></view><text aria-hidden="true">{{boardsExpanded?'−':'+'}}</text></button>
+    <view wx:if="{{boardsExpanded}}" class="help-board-content">
+    <view class="help-copy">先了解玩法特色，再按人数查看角色与完整规则。各板子的线上操作与线下结算分工，以详情说明为准。</view>
+    <view wx:if="{{loadingBoards}}" class="help-caption" role="status">正在加载板子介绍…</view>
+    <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
+    <view wx:elif="{{!boards.length}}" class="help-copy">暂无可用板子。</view>
+    <view wx:for="{{boards}}" wx:key="id" class="help-board">
+      <view class="help-step-title">{{item.name}}</view>
+      <view class="help-copy">{{item.description}}</view>
+      <view class="help-caption">选择人数，查看规则 ›</view>
+      <view class="help-board-links {{item.choices.length === 1 ? 'help-board-links-single' : ''}}"><button wx:for="{{item.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{item.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view>
+    </view>
+    </view>
+  </view>
+  <block wx:for="{{sections}}" wx:key="id">
+    <view wx:if="{{item.id === 'faq'}}" class="help-section">
+      <button class="help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
+      <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
+    </view>
+  </block>
+</view>

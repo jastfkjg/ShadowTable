@@ -865,7 +865,7 @@ function roomListItems(rooms) {
         setState({ roomMenu: null, noteRoom: null });
         if (p.after === "entryHide") {
           var undo = { code: result.code, until: Date.now() + 8000 };
-          setState({ undoRoom: undo, notice: "已移除列表记录，房间及你的成员关系、座位不变" });
+          setState({ undoRoom: undo, notice: "已从列表移除" });
           clearTimeout(undoRoomTimer);
           undoRoomTimer = setTimeout(function () { if (alive && state.undoRoom && state.undoRoom.until === undo.until) setState({ undoRoom: null }); }, 8000);
         } else setState({ undoRoom: null, notice: p.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
@@ -2229,7 +2229,7 @@ function roomListItems(rooms) {
         return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';
       }).join('') + '</div>';
     }
-    if (state.undoRoom) html += '<div class="room-undo" role="status"><span>已移除 ' + esc(state.undoRoom.code) + ' 的列表记录</span>' + btn("history-toggle", "undoRemoveRoom", "撤销", null, state.busy || !!pending) + '</div>';
+    if (state.undoRoom) html += '<div class="room-undo" role="status"><span>已从列表移除 ' + esc(state.undoRoom.code) + '</span>' + btn("history-toggle", "undoRemoveRoom", "撤销", null, state.busy || !!pending) + '</div>';
     var visible = state.memberRooms.filter(function (r) { return state.roomListFilter === "all" || r.status === state.roomListFilter; });
     visible.forEach(function (m) {
       html += '<div class="member-room room-list-item ' + (m.available === false ? 'is-unavailable' : '') + '"><button type="button" class="room-list-open" data-action="openRoom" data-code="' + esc(m.code) + '"' + (state.busy || state.loading || pending || m.available === false ? ' disabled' : '') + '><span class="room-list-top"><span class="room-list-title">' + esc(m.note || '房间 ' + m.code) + '</span><span class="room-status ' + esc(m.status) + '">' + esc(m.statusLabel) + '</span></span>' +
@@ -2240,11 +2240,10 @@ function roomListItems(rooms) {
     else if (!visible.length) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
     if (state.roomMenu && !state.error) {
       var m = state.roomMenu, locked = state.busy || !!pending;
-      html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="牌桌管理"><div class="dialog-title">房间 ' + esc(m.code) + '</div><div class="small muted">个人备注和移除记录仅对你生效</div>' +
-        btn("room-menu-action", "roomMenuAction", m.note ? "编辑个人备注" : "添加个人备注", {kind:"note"}, locked) +
-        btn("room-menu-action", "roomMenuAction", "移除记录", {kind:"hide"}, locked) + '<div class="small muted">不退出房间，不释放座位；重新进入后恢复</div>' +
-        (m.available !== false && m.isMember ? btn("room-menu-action", "roomMenuAction", "离开房间", {kind:"leave"}, locked || !m.canLeave) + '<div class="small muted">' + (m.canLeave ? '退出成员关系并释放座位' : '对局中不能离开座位，请联系房主') + '</div>' : '') +
-        (m.available !== false && m.isHost ? btn("room-menu-action danger", "roomMenuAction", "解散房间", {kind:"delete"}, locked) + '<div class="small muted">所有成员退出，对局记录删除</div>' : '') +
+      html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="牌桌管理"><div class="dialog-title">房间 ' + esc(m.code) + '</div>' +
+        btn("room-menu-action", "roomMenuAction", "从列表移除", {kind:"hide"}, locked) +
+        (m.available !== false && m.isMember ? btn("room-menu-action", "roomMenuAction", "离开房间", {kind:"leave"}, locked || !m.canLeave) + (!m.canLeave ? '<div class="small muted">' + (m.canLeave === false ? '当前状态暂不可离开' : '离开权限暂未同步') + '</div>' : '') : '') +
+        (m.available !== false && m.isHost ? btn("room-menu-action danger", "roomMenuAction", "解散房间", {kind:"delete"}, locked) : '') +
         btn("secondary","closeRoomMenu","取消",null,locked) + '</div></div>';
     }
     if (state.noteRoom && !state.error) html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注"><div class="dialog-title">个人备注 · ' + esc(state.noteRoom.code) + '</div><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label><input id="room-note" class="input" data-input="roomNote" maxlength="30" placeholder="例如：周五朋友局" value="' + esc(state.roomNoteDraft) + '"' + (state.busy || pending ? ' disabled' : '') + ' /><div class="dialog-actions">' + btn("secondary","closeRoomMenu","取消",null,state.busy || !!pending) + btn("primary","saveRoomNote","保存",null,state.busy || !!pending) + '</div></div></div>';

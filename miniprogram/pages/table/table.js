@@ -760,6 +760,9 @@ Page({
     if (!entry) return;
     wx.showModal({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
   },
+  openHelp() {
+    wx.navigateTo({ url: "/pages/help/help" });
+  },
   openRoomRules() {
     this.setData({ showRoomRules: true });
   },
@@ -867,7 +870,7 @@ Page({
         this.setData({ roomMenu: null, noteRoom: null });
         if (pending.after === "entryHide") {
           const undo = { code: result.code, until: Date.now() + 8000 };
-          this.setData({ undoRoom: undo, notice: "已移除列表记录，房间及你的成员关系、座位不变" });
+          this.setData({ undoRoom: undo, notice: "已从列表移除" });
           clearTimeout(this.undoRoomTimer);
           this.undoRoomTimer = setTimeout(() => { if (this.alive && this.data.undoRoom?.until === undo.until) this.setData({ undoRoom: null }); }, 8000);
         } else this.setData({ undoRoom: null, notice: pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });

@@ -2,7 +2,8 @@
   "pages": [
     "pages/table/table",
     "pages/settings/settings",
-    "pages/board-details/board-details"
+    "pages/board-details/board-details",
+    "pages/help/help"
   ],
   "window": {
     "navigationBarTitleText": "桌边助手 · ShadowTable",
