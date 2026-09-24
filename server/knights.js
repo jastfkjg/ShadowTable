@@ -135,57 +135,45 @@ function skillStatus(room, uid) {
     p = k.players[uid],
     role = room.roles[uid];
   if (["ended", "terminated"].includes(room.phase))
-    return { title: "本局已结束", detail: "本局不再使用技能。" };
+    return { title: "本局已结束", detail: "" };
   if (room.phase === "hunterTurn" && k.hunters[0] === uid)
     return {
       title: "可使用出局技能",
-      detail: "本次可选择开枪目标，或选择不使用技能。",
+      detail: "可开枪或跳过。",
     };
   if (!p.alive)
     return {
       title: "已出局",
-      detail: "当前不能主动使用技能；仍需参与统一确认。",
+      detail: "仍需参与技能确认。",
     };
   if (role === "prophet")
     return {
       title: "被动视野",
-      detail: "技能全部结算后自动更新，无需主动释放。",
+      detail: "",
     };
   if (!skillRoles.includes(role))
     return {
       title: "无主动技能",
-      detail: "本身份没有技能阶段的主动动作，按提示确认即可。",
+      detail: "",
     };
   if (p.used)
     return {
       title: "技能已用完",
-      detail: "当前身份的技能次数已消耗，按提示确认即可。",
+      detail: "",
     };
   if (role === "paladin")
     return {
       title: "被动反伤",
-      detail:
-        "本技能环节反伤所有刀、决斗、枪的击杀者，自身存活；触发后后续环节失效。无法反伤红女巫，替女巫出局时本轮反伤仍结算。",
+      detail: "",
     };
   if (p.availableRound > k.round)
     return {
       title: "新技能尚未启用",
-      detail: "下一技能周期可用，本次按提示确认即可。",
-    };
-  if (hunters.includes(role))
-    return {
-      title: "技能可用",
-      detail:
-        "主动自爆带走相邻一人，或预选场上其他一人于出局时开枪；也可不使用技能。替女巫出局不触发被动枪。",
-    };
-  if (role === "gargoyle")
-    return {
-      title: "技能可用",
-      detail: "每轮可查验一名在场玩家是否拥有主动击杀能力，不获知身份。",
+      detail: "下次技能环节可用。",
     };
   return {
     title: "技能可用",
-    detail: "可在技能提交阶段选择使用；守护、替死、换号按各自触发规则消耗。",
+    detail: "",
   };
 }
 function action(room, uid) {
