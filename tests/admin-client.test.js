@@ -209,3 +209,125 @@ test("旧记录不猜身份，时间取首次记录；管理员操作保留简�
   );
   assert.match(nodes.map((n) => n.text).join(" "), /管理员登录 · 测试登录/);
 });
+
+function actionClient(api) {
+  const elements = new Map();
+  const $ = (id) => {
+    if (!elements.has(id))
+      elements.set(id, {
+        textContent: "",
+        disabled: false,
+        open: false,
+        handlers: {},
+        reset() {},
+        focus() {},
+        addEventListener(name, fn) {
+          this.handlers[name] = fn;
+        },
+        showModal() {
+          this.open = true;
+        },
+        close() {
+          this.open = false;
+          this.handlers.close?.();
+        },
+      });
+    return elements.get(id);
+  };
+  const messages = [];
+  const context = {
+    $,
+    api,
+    actionBusy: false,
+    loading: false,
+    pending: null,
+    labels: {
+      "test-on": "开启陪测",
+      "clear-testers": "清理陪测座位",
+      "test-off": "关闭陪测",
+      terminate: "终止对局",
+      rematch: "同房重开",
+      delete: "删除房间",
+    },
+    refresh: async () => {},
+    feedback: (text) => messages.push(text),
+  };
+  const source = fs.readFileSync(
+    require.resolve("../server/admin/app.js"),
+    "utf8",
+  );
+  vm.runInNewContext(
+    source.slice(
+      source.indexOf("function openAction("),
+      source.indexOf('$("refresh").addEventListener'),
+    ) + ";this.open = openAction;",
+    context,
+  );
+  return {
+    $,
+    messages,
+    open: context.open,
+    submit: () => $("action-form").handlers.submit({ preventDefault() {} }),
+  };
+}
+
+test("开启和清理直接发送，不弹确认；请求中拦截重复点击并恢复状态", async () => {
+  for (const action of ["test-on", "clear-testers"]) {
+    const calls = [];
+    let finish;
+    const c = actionClient((path, body) => {
+      calls.push({ path, body });
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const room = { code: "123456", stage: "s1" };
+    const request = c.open(room, action);
+    c.open(room, action);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].body.action, action);
+    assert.equal(calls[0].body.stage, "s1");
+    assert.equal(calls[0].body.confirm, undefined);
+    assert.equal(c.$("confirm-dialog").open, false);
+    assert.equal(c.$("rooms").inert, true);
+    finish({ ok: true });
+    await request;
+    assert.equal(c.$("rooms").inert, false);
+    assert.equal(c.$("refresh").disabled, false);
+    assert.match(c.messages.at(-1), /完成/);
+  }
+});
+
+test("终止重开删除和关闭陪测可取消，仅点击确认后发送布尔确认", async () => {
+  for (const action of ["terminate", "rematch", "delete", "test-off"]) {
+    const calls = [];
+    const c = actionClient(async (path, body) => {
+      calls.push({ path, body });
+    });
+    const room = { code: "123456", stage: "s1" };
+    c.open(room, action);
+    assert.equal(calls.length, 0);
+    assert.equal(c.$("confirm-dialog").open, true);
+    c.$("cancel").handlers.click();
+    await c.submit();
+    assert.equal(calls.length, 0);
+    c.open(room, action);
+    await c.submit();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].body.confirm, true);
+    assert.equal(c.$("confirm-dialog").open, false);
+  }
+});
+
+test("直接执行失败时展示错误并允许重试", async () => {
+  let calls = 0;
+  const c = actionClient(async () => {
+    if (++calls === 1) throw new Error("房间状态已变化");
+  });
+  const room = { code: "123456", stage: "s1" };
+  await c.open(room, "clear-testers");
+  assert.match(c.messages.at(-1), /房间状态已变化/);
+  assert.equal(c.$("rooms").inert, false);
+  await c.open(room, "clear-testers");
+  assert.equal(calls, 2);
+});

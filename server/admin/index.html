@@ -52,6 +52,9 @@
           <p>
             现有正式房间可在准备阶段开启陪测。开启后小程序会显示测试标记，原玩家和房间号保留。
           </p>
+          <div class="room-list-heading" aria-hidden="true">
+            <span>房间</span><span>当前状态</span><span>操作</span>
+          </div>
           <div id="rooms"></div>
           <div class="pager">
             <button id="prev">上一页</button><span id="page"></span
@@ -98,19 +101,14 @@
         />
         <div id="room-options" class="room-options"></div>
       </dialog>
-      <dialog id="confirm-dialog">
+      <dialog
+        id="confirm-dialog"
+        aria-labelledby="action-title"
+        aria-describedby="action-description"
+      >
         <form id="action-form">
           <h2 id="action-title"></h2>
           <p id="action-description"></p>
-          <label for="confirm-code">输入房间号确认</label
-          ><input
-            id="confirm-code"
-            inputmode="numeric"
-            pattern="[0-9]{6}"
-            maxlength="6"
-            required
-          /><label for="reason">操作原因（选填）</label
-          ><textarea id="reason" maxlength="200"></textarea>
           <p id="action-error" role="alert"></p>
           <div class="dialog-actions">
             <button id="cancel" type="button">取消</button

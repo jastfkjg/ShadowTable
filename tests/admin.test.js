@@ -81,7 +81,7 @@ async function setup(t, opts = {}) {
     api("/api/admin/rooms/" + code, {
       action: type,
       stage: app.store.get(code)?.stage,
-      confirm: code,
+      ...(["test-on", "clear-testers"].includes(type) ? {} : { confirm: true }),
       reason: "验证管理操作",
       ...extra,
     });
@@ -398,4 +398,24 @@ test("操作记录只列出现有房间，创建陪测账号不计入明细和�
       group.entries.every((entry) => entry.action !== "actor"),
     ),
   );
+});
+
+test("陪测开启与清理无需确认；终止、重开、删除和关闭陪测必须明确确认", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code } = await a.room();
+  await a.action(code, "test-on");
+  assert.equal(a.app.store.get(code).testRoom, true);
+  await a.action(code, "clear-testers");
+  for (const action of ["terminate", "rematch", "delete", "test-off"]) {
+    const before = a.app.store.get(code);
+    for (const confirm of [undefined, false, "true"])
+      await assert.rejects(a.action(code, action, { confirm }), e => e.status === 400);
+    assert.deepEqual(a.app.store.get(code), before);
+  }
+  // Cached older admin clients remain compatible during a rolling update.
+  await a.action(code, "test-off", { confirm: code });
+  assert.equal(a.app.store.get(code).testRoom, false);
+  await a.action(code, "delete", { confirm: true });
+  assert.equal(a.app.store.get(code), null);
 });

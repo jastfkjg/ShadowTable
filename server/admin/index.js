@@ -258,7 +258,11 @@ function createAdmin({ store, origin, key, body, limit }) {
           (typeof b.reason === "string" && b.reason.length <= 200),
         "操作原因最多200字",
       );
-      fail(b.confirm === match[1], "请填写房间号确认操作");
+      if (!["test-on", "clear-testers"].includes(b.action))
+        fail(
+          b.confirm === true || b.confirm === match[1],
+          "请确认管理操作",
+        );
       store.transaction(() => {
         const room = store.get(match[1]);
         fail(room, "房间不存在", 404);

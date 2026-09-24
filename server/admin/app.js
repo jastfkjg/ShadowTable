@@ -16,7 +16,8 @@ let auditCode = null;
 let auditRooms = [];
 let offset = 0,
   pending = null,
-  loading = false;
+  loading = false,
+  actionBusy = false;
 async function api(path, data) {
   const response = await fetch("/api/admin/" + path, {
     method: data ? "POST" : "GET",
@@ -102,48 +103,7 @@ async function refresh() {
       $("rooms").append(
         el("p", "暂无房间。可先在小程序创建牌桌，再刷新列表。"),
       );
-    for (const room of rooms) {
-      const row = el("div", "", "room"),
-        details = el("div", ""),
-        actions = el("div", "", "actions");
-      details.append(
-        el("strong", room.code),
-        el("span", room.testRoom ? "陪测已开启" : "正式房间", "badge"),
-        el(
-          "p",
-          `${room.boardName} · ${room.players}/${room.capacity} 人 · ${room.phaseName} · 第 ${room.game} 局`,
-        ),
-      );
-      if (room.testRoom) {
-        const link = el("a", "打开陪测台 →");
-        link.href = "/admin/companion?room=" + encodeURIComponent(room.code);
-        actions.append(link);
-      }
-      for (const action of [
-        room.testRoom ? "test-off" : "test-on",
-        "clear-testers",
-        "terminate",
-        "rematch",
-        "delete",
-      ]) {
-        const button = el(
-          "button",
-          labels[action],
-          action === "delete" ? "danger" : "",
-        );
-        button.disabled =
-          action.startsWith("test-") || action === "clear-testers"
-            ? room.phase !== "lobby"
-            : action === "rematch"
-              ? !["ended", "terminated"].includes(room.phase)
-              : action === "terminate" &&
-                ["lobby", "ended", "terminated"].includes(room.phase);
-        button.addEventListener("click", () => openAction(room, action));
-        actions.append(button);
-      }
-      row.append(details, actions);
-      $("rooms").append(row);
-    }
+    for (const room of rooms) $("rooms").append(renderRoom(room));
     $("prev").disabled = offset === 0;
     $("next").disabled = offset + 50 >= total;
     $("page").textContent = `第 ${offset / 50 + 1} 页`;
@@ -161,10 +121,116 @@ async function refresh() {
     feedback(error);
   } finally {
     loading = false;
-    $("refresh").disabled = false;
+    $("refresh").disabled = actionBusy;
     $("audit-room").disabled = false;
   }
 }
+function renderRoom(room) {
+  const row = el("div", "", "room");
+  const details = el("div", "", "room-details");
+  const title = el("div", "", "room-title");
+  title.append(
+    el("strong", room.code),
+    el(
+      "span",
+      room.testRoom ? "陪测已开启" : "正式房间",
+      room.testRoom ? "badge badge-test" : "badge",
+    ),
+  );
+  details.append(title, el("p", room.boardName, "room-board"));
+  const state = el("div", "", "room-state");
+  const ended = ["ended", "terminated"].includes(room.phase);
+  state.append(
+    el(
+      "span",
+      room.phaseName,
+      "room-phase" +
+        (room.phase === "lobby" || ended ? "" : " room-phase-active"),
+    ),
+    el(
+      "p",
+      `${room.players}/${room.capacity} 人 · 第 ${room.game} 局`,
+      "room-counts",
+    ),
+  );
+  const actions = el("div", "", "actions");
+  actions.setAttribute("role", "group");
+  actions.setAttribute("aria-label", `房间 ${room.code} 的操作`);
+  if (room.testRoom) {
+    const link = el("a", "打开陪测台", "companion-link");
+    link.href = "/admin/companion?room=" + encodeURIComponent(room.code);
+    link.setAttribute("aria-label", `打开房间 ${room.code} 的陪测台`);
+    actions.append(link);
+  }
+  const mainAction =
+    room.phase === "lobby"
+      ? room.testRoom
+        ? "test-off"
+        : "test-on"
+      : ended
+        ? "rematch"
+        : "terminate";
+  const more = el("details", "", "room-more");
+  const trigger = el("summary", "更多操作");
+  trigger.setAttribute("aria-label", `房间 ${room.code} 的更多操作`);
+  const menu = el("div", "", "room-action-menu");
+  const actionButton = (action) => {
+    const button = el(
+      "button",
+      labels[action],
+      action === "delete" ? "danger" : "",
+    );
+    button.type = "button";
+    button.disabled =
+      (action.startsWith("test-") || action === "clear-testers") &&
+      room.phase !== "lobby";
+    button.addEventListener("click", () => {
+      more.open = false;
+      // Keep the return focus on a visible control after the dialog closes.
+      if (action !== mainAction) trigger.focus();
+      openAction(room, action);
+    });
+    return button;
+  };
+  const primary = actionButton(mainAction);
+  primary.classList.add("room-main-action");
+  actions.append(primary);
+  menu.append(el("p", "陪测管理", "room-menu-label"));
+  for (const action of [
+    room.testRoom ? "test-off" : "test-on",
+    "clear-testers",
+  ])
+    if (action !== mainAction) menu.append(actionButton(action));
+  if (room.phase !== "lobby")
+    menu.append(el("p", "陪测设置仅在准备阶段可用", "room-menu-hint"));
+  const destructive = el("div", "", "room-menu-danger");
+  destructive.append(actionButton("delete"));
+  menu.append(destructive);
+  more.append(trigger, menu);
+  trigger.addEventListener("click", () => {
+    for (const other of document.querySelectorAll(".room-more[open]"))
+      if (other !== more) other.open = false;
+  });
+  more.addEventListener("focusout", (event) => {
+    if (!more.contains(event.relatedTarget)) more.open = false;
+  });
+  actions.append(more);
+  row.append(details, state, actions);
+  return row;
+}
+document.addEventListener("click", (event) => {
+  for (const more of document.querySelectorAll(".room-more[open]"))
+    if (!more.contains(event.target)) more.open = false;
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  for (const more of document.querySelectorAll(".room-more[open]")) {
+    const focused = more.contains(document.activeElement);
+    more.open = false;
+    if (focused) more.querySelector("summary").focus();
+  }
+});
+
 function renderAudit({ groups, total, pageSize }) {
   $("audit").replaceChildren();
   $("audit-count").textContent = `共 ${total} 组 · 每页 ${pageSize} 组`;
@@ -335,6 +401,9 @@ $("audit-next").addEventListener("click", () => {
   refresh();
 });
 function openAction(room, action) {
+  if (actionBusy) return;
+  if (["test-on", "clear-testers"].includes(action))
+    return executeAction(room, action, false);
   pending = { room, action };
   $("action-title").textContent = `${labels[action]} · ${room.code}`;
   $("action-description").textContent = {
@@ -348,8 +417,12 @@ function openAction(room, action) {
   }[action];
   $("action-form").reset();
   $("action-error").textContent = "";
+  $("submit-action").textContent = labels[action];
+  $("submit-action").className = ["delete", "terminate"].includes(action)
+    ? "danger"
+    : "primary";
   $("confirm-dialog").showModal();
-  $("confirm-code").focus();
+  $("cancel").focus();
 }
 $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -375,32 +448,51 @@ $("logout").addEventListener("click", async () => {
     feedback(error);
   }
 });
-$("action-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!pending || $("submit-action").disabled) return;
-  if ($("confirm-code").value !== pending.room.code) {
-    $("action-error").textContent = "房间号不匹配";
-    return;
-  }
+async function executeAction(room, action, confirmed) {
+  if (actionBusy) return;
+  actionBusy = true;
+  $("rooms").inert = true;
+  $("refresh").disabled = true;
   $("submit-action").disabled = true;
+  $("cancel").disabled = true;
+  $("action-error").textContent = "";
+  feedback(`正在${labels[action]} · ${room.code}`);
   try {
-    await api("rooms/" + pending.room.code, {
-      action: pending.action,
-      stage: pending.room.stage,
-      confirm: $("confirm-code").value,
-      reason: $("reason").value,
+    await api("rooms/" + room.code, {
+      action,
+      stage: room.stage,
+      ...(confirmed ? { confirm: true } : {}),
     });
-    $("confirm-dialog").close();
+    if (confirmed) $("confirm-dialog").close();
     pending = null;
     await refresh();
+    feedback(`房间 ${room.code} · ${labels[action]}完成`);
   } catch (error) {
-    $("action-error").textContent =
-      error.message + "；结果不确定时请取消并刷新列表确认。";
+    const message = error.message + "；结果不确定时请刷新列表确认。";
+    if (confirmed) $("action-error").textContent = message;
+    feedback(message);
   } finally {
+    actionBusy = false;
+    $("rooms").inert = false;
+    $("refresh").disabled = loading;
     $("submit-action").disabled = false;
+    $("cancel").disabled = false;
   }
+}
+$("action-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!pending || actionBusy) return;
+  return executeAction(pending.room, pending.action, true);
 });
-$("cancel").addEventListener("click", () => $("confirm-dialog").close());
+$("confirm-dialog").addEventListener("cancel", (event) => {
+  if (actionBusy) event.preventDefault();
+});
+$("confirm-dialog").addEventListener("close", () => {
+  pending = null;
+});
+$("cancel").addEventListener("click", () => {
+  if (!actionBusy) $("confirm-dialog").close();
+});
 $("refresh").addEventListener("click", refresh);
 $("prev").addEventListener("click", () => {
   offset = Math.max(0, offset - 50);
