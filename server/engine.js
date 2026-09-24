@@ -465,6 +465,7 @@ function actionSpec(room, uid) {
                 { seat: 0, name: "空刀（场上没有梅林）" },
                 ...knights
                   .living(room)
+                  .filter((t) => t.uid !== uid)
                   .map((t) => ({ seat: t.seat, name: t.name })),
               ],
             }

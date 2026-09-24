@@ -1076,3 +1076,47 @@ test("女巫替死圣骑士保留原出局抽牌顺序，本轮仍反伤后续�
   assert.equal(r.roles.p4, "blueGuard");
   assert.deepEqual(r.knights.summary.eliminated, [3, 4]);
 });
+
+test("全部十二骑士板子的攻击选项屏蔽本人号码，服务端拒绝自刀且不改变状态", () => {
+  const attackRoles = ["gareth", "gaheris", "blueLancelot", "redLancelot", "redSwordsman", "assassin", "blueAwakened", "redAwakened", "blueKnight", "redKnight"];
+  for (const size of [10, 11, 12]) {
+    const r = newRoom("123456", "p1", "房主", size === 12 ? "knights" : `knights-${size}`, size);
+    for (let i = 2; i <= size; i++) enter(r, `p${i}`, `玩家${i}`);
+    r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
+    run(r, "p1", "start", { flexible: true });
+    for (const role of attackRoles) for (const seat of [1, 5, size]) {
+      const uid = `p${seat}`;
+      configure(r, { [uid]: role });
+      begin(r, "skills");
+      const spec = privateView(r, uid).action;
+      assert.equal(spec.choices.length, size); // pass + every other player
+      assert.ok(!spec.choices.includes(`target:${seat}`), `${size}/${role}/${seat}`);
+      assert.ok(!spec.options.some(o => o.value === `target:${seat}`));
+      const before = structuredClone(r);
+      assert.throws(() => run(r, uid, "submit", { value: `target:${seat}` }), /不合法/);
+      assert.deepEqual(r, before);
+      run(r, "p1", "cancelActivity");
+    }
+  }
+});
+
+test("非攻击技能仍可选本人：蓝守卫、女巫与石像鬼", () => {
+  for (const [role, value] of [["blueGuard", "target:1"], ["witch", "target:1"], ["gargoyle", "inspect:1"]]) {
+    const r = setup();
+    configure(r, { p1: role });
+    begin(r, "skills");
+    assert.ok(privateView(r, "p1").action.choices.includes(value));
+    run(r, "p1", "submit", { value });
+  }
+});
+
+test("十二骑士最终盘刀屏蔽本人号码并拒绝提交，仍可选择他人或空刀", () => {
+  const r = setup();
+  configure(r, { p1: "assassin" });
+  begin(r, "assassination", { actor: 1 });
+  const spec = privateView(r, "p1").action;
+  assert.ok(!spec.targets.some(t => t.seat === 1));
+  assert.ok(spec.targets.some(t => t.seat === 0));
+  assert.ok(spec.targets.some(t => t.seat === 2));
+  assert.throws(() => run(r, "p1", "submit", { value: 1 }), /不合法/);
+});

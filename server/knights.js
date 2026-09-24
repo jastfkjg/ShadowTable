@@ -182,6 +182,8 @@ function action(room, uid) {
     p = k.players[uid],
     role = room.roles[uid];
   const targets = living(room).map((p) => ({ seat: p.seat, name: p.name }));
+  const ownSeat = room.players.find((p) => p.uid === uid).seat;
+  const attackTargets = targets.filter((t) => t.seat !== ownSeat);
   const pass = {
     value: "pass",
     label: role === "paladin" ? "确认" : "不使用技能 / 确认",
@@ -212,7 +214,7 @@ function action(room, uid) {
         ))
     )
       options.push(
-        ...targets.map((t) => ({
+        ...attackTargets.map((t) => ({
           value: `target:${t.seat}`,
           label: `对 ${t.seat}号${["blueKnight", "redKnight"].includes(role) ? "决斗" : "开刀"}`,
         })),
@@ -265,7 +267,7 @@ function action(room, uid) {
         )
       )
         options.push(
-          ...targets.map((t) => ({
+          ...attackTargets.map((t) => ({
             value: `target:${t.seat}`,
             label: `对 ${t.seat}号 ${room.phase === "hunterTurn" ? "开枪" : "使用刀 / 决斗"}`,
           })),
