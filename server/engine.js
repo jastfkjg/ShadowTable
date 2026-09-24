@@ -602,9 +602,16 @@ function privateView(room, uid) {
       ].includes(role)
     )
       information += " 可刀刀客或B角色一次；刀错不出局，仍消耗技能。";
-    if (role === "gargoyle" && state.gargoyleInfo) {
-      const result = state.gargoyleInfo;
-      information += ` ${result.initial ? "抽牌随机查验" : `第${result.round}轮查验`}：${result.seat}号${result.canKill ? "拥有" : "没有"}主动击杀能力。`;
+    if (role === "gargoyle") {
+      const history = knights.gargoyleHistory(state);
+      const partialHistory = history.some((result) => result.number === null);
+      if (history.length) information += "\n\n查验记录";
+      for (const result of history) {
+        const label = result.number === null
+          ? "历史查验（旧版仅保留最近一次）"
+          : `第${result.number}次查验${result.initial ? "（抽牌随机）" : partialHistory ? "（更新后）" : ""}`;
+        information += `\n${label}：${result.seat}号${result.canKill ? "拥有" : "没有"}主动击杀能力。`;
+      }
     }
     if (role === "prophet") {
       information = skillDescription;
@@ -859,7 +866,12 @@ function settleActivity(room) {
         text: room.activity.earlyClosed
           ? "技能最终结果 · 含提前截止"
           : "技能最终结果",
-        detail: `本轮出局：${list(result.eliminated)}；抽牌复活：${list(result.redrawn)}；原牌复活：${list(result.restored)}；最终仍出局：${list(result.out)}`,
+        detail: [
+          `本轮出局：${list(result.eliminated)}`,
+          `抽牌复活：${list(result.redrawn)}`,
+          ...(result.restored.length ? [`原牌复活：${list(result.restored)}`] : []),
+          ...(result.out.length ? [`最终仍出局：${list(result.out)}`] : []),
+        ].join("；"),
       });
     }
     room.activity = null;

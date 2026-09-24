@@ -20,6 +20,43 @@ const CHOICES = {
   thiefFail: "盗贼失败",
   pass: "不使用技能 / 确认",
 };
+// Derive private skill controls only from the server's allowed choices.
+function skillView(room, choices, hunterModes, hunterMode, swapOptions) {
+  const skillAction = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
+  const targets = choices.filter(c => /^(target|inspect|detonate|passive):\d+$/.test(c.value)).map(c => {
+    const seat = Number(c.value.split(":")[1]);
+    const player = (room.players || []).find(p => p.seat === seat);
+    return { ...c, seat, name: player ? player.name : "" };
+  });
+  let title = "使用技能";
+  let hint = "请选择一名目标，或本轮不使用技能";
+  if (swapOptions.length) {
+    title += " · 秘密换号";
+    hint = "选择两个座位交换号码，再次点击可取消";
+  } else if (hunterModes) {
+    title += hunterMode === "detonate" ? " · 主动自爆" : hunterMode === "passive" ? " · 被动开枪" : " · 猎人";
+    hint = hunterMode === "detonate" ? "第 2 步：选择相邻一人，自己将自爆出局" : hunterMode === "passive" ? "第 2 步：选择出局时开枪的目标；替女巫出局不触发" : "第 1 步：选择主动技能、被动技能，或本轮不开枪";
+  } else if (targets.length) {
+    const label = targets[0].label;
+    const name = ["指定替死者", "秘密守护", "查验", "复活", "开枪", "决斗", "开刀"].find(word => label.includes(word));
+    if (name) title += " · " + name;
+    if (name === "查验") hint = "选择一名玩家，查验其是否拥有主动击杀能力";
+  } else {
+    hint = "本阶段没有可选目标，请确认本轮选择";
+  }
+  return {
+    skillAction, skillTitle: title, skillHint: hint, skillTargets: targets,
+    skillBodyHeight: Math.ceil((swapOptions.length ? new Set(swapOptions.flatMap(v => v.split(":").slice(1))).size : targets.length) / 3) * 164 + (swapOptions.length ? 60 : 0),
+    skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({
+      ...c, label: c.value === "pass" ? (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
+    })),
+  };
+}
+function skillDraftLabel(choice, hunterModes) {
+  if (choice.value === "pass") return hunterModes ? "本轮不开枪" : choice.label === "确认" ? "本轮确认" : "不使用技能";
+  if (choice.value.startsWith("inspect:")) return "查验 " + choice.value.split(":")[1] + " 号";
+  return choice.label;
+}
 function factionTone(faction) {
   if (!faction) return "";
   if (faction.includes("好人")) return "good";
@@ -120,6 +157,7 @@ Page({
     historyExpanded: false,
     focusedHistoryKey: null,
     seatsExpanded: true,
+    operationProgressExpanded: false,
     historyFilter: "all",
     visibleHistory: [],
     questTimeline: [],
@@ -129,6 +167,9 @@ Page({
     showRoomRules: false,
     actionDialog: false,
     actionSecret: null,
+    dealtIdentityDialog: false,
+    dealtIdentitySecret: null,
+    identityHintVisible: false,
     actionLoading: false,
     actionLabel: "",
     actionChoices: [],
@@ -139,6 +180,7 @@ Page({
     draftChoice: "",
     draftLabel: "",
     stagedChoice: false,
+    skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -207,6 +249,12 @@ Page({
     clearTimeout(this.timer);
     this.mask();
   },
+  onPageScroll() {
+    this.showIdentityHintWhenVisible();
+  },
+  onResize() {
+    this.showIdentityHintWhenVisible();
+  },
   onUnload() {
     clearTimeout(this.undoRoomTimer);
     this.alive = false;
@@ -227,6 +275,9 @@ Page({
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
+      dealtIdentityDialog: false,
+      dealtIdentitySecret: null,
+      identityHintVisible: false,
       fairyResult: null,
       fairyResultRevealed: false,
       identityChange: null,
@@ -243,6 +294,7 @@ Page({
       draftChoice: "",
       draftLabel: "",
       stagedChoice: false,
+    skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -397,12 +449,16 @@ Page({
       return;
     this.connectionRecovered();
     const stageChanged = this.data.room?.stage !== room.stage;
+    const privacyChanged = stageChanged || this.data.room?.me.identityRevision !== room.me.identityRevision;
     // Haptic nudge on game-stage transitions; stronger when it is now our turn.
     if (stageChanged && this.data.room)
       this.buzz(room.needsSubmission && !room.me.submitted ? "medium" : "light");
     const selected = stageChanged ? [] : this.data.selected;
-    const privacyUpdate = stageChanged
+    const privacyUpdate = privacyChanged
       ? {
+          dealtIdentityDialog: false,
+          dealtIdentitySecret: null,
+          identityHintVisible: false,
           fairyResult: null,
           fairyResultRevealed: false,
           identityChange: null,
@@ -424,13 +480,14 @@ Page({
           draftChoice: "",
           draftLabel: "",
           stagedChoice: false,
+    skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
           swapOptions: [],
           swapSeats: [],
           swapPlayers: [],
         }
       : {};
     // Invalidate pending identity reads before committing the new stage in one update.
-    if (stageChanged) {
+    if (privacyChanged) {
       this.generation = (this.generation || 0) + 1;
       this.actionGeneration = (this.actionGeneration || 0) + 1;
     }
@@ -449,7 +506,7 @@ Page({
         selected: selected.includes(seat),
       };
     });
-    const history = room.history.map(
+    let history = room.history.map(
       (h, i) =>
         toolHistory(h, i) || {
           key: i,
@@ -482,13 +539,15 @@ Page({
         entry.historyText = "技能结算";
         entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
         entry.resultRows = [["最终仍出局", source.out], ["本轮出局", source.eliminated], ["抽牌复活", source.redrawn], ["原牌复活", source.restored]]
-          .filter(function (row, index) { return index !== 0 || row[1].length > 0; })
+          .filter(function (row, index) { return (index !== 0 && index !== 3) || row[1].length > 0; })
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
+        entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
       entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
       entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
     });
+    history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     const historyExpanded = this.data.room?.code === room.code && this.data.room?.phase !== "lobby" && room.phase !== "lobby" ? this.data.historyExpanded : false;
     const historyFilter = historyExpanded ? this.data.historyFilter : "all";
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
@@ -496,6 +555,7 @@ Page({
       ...privacyUpdate,
       actionEntryLabel,
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
+      operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
       historyExpanded,
       focusedHistoryKey: this.data.room?.code === room.code && this.data.room?.game === room.game && room.phase !== "lobby" ? this.data.focusedHistoryKey : null,
       historyFilter,
@@ -526,9 +586,9 @@ Page({
         : "正在确认操作进度",
       seats,
       history,
-      latestResult: history.filter((_, i) =>
-        ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].includes(room.history[i].kind) ||
-        (room.history[i].kind === "variant" && (room.history[i].number || room.history[i].resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(room.history[i].text)))
+      latestResult: history.filter((entry) =>
+        ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].includes(room.history[entry.key].kind) ||
+        (room.history[entry.key].kind === "variant" && (room.history[entry.key].number || room.history[entry.key].resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(room.history[entry.key].text)))
       ).pop() || null,
       questSummary: {
         total: history.filter((h) => h.questResult).length,
@@ -575,6 +635,8 @@ Page({
       !this.data.fairyResult
     )
       await this.showFairyResult();
+    if (this.showDealtIdentity()) return;
+    this.showIdentityHintWhenVisible();
     if (
       !room.me.identityChanged &&
       !room.me.fairyResultPending &&
@@ -748,6 +810,10 @@ Page({
   toggleSeats() {
     if (!this.data.room || this.data.room.phase === "lobby") return;
     this.setData({ seatsExpanded: !this.data.seatsExpanded });
+  },
+  toggleOperationProgress() {
+    if (!this.data.room?.canUseTools || !this.data.room.operationProgress) return;
+    this.setData({ operationProgressExpanded: !this.data.operationProgressExpanded });
   },
   toggleHistory() {
     const historyExpanded = !this.data.historyExpanded;
@@ -1253,6 +1319,7 @@ Page({
       draftChoice: "",
       draftLabel: "",
       stagedChoice: false,
+    skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -1296,21 +1363,7 @@ Page({
       );
       // Identity is fetched separately only after an explicit reveal tap.
       const hunterChoices = response.action.hunterModes ? response.action.options : [];
-      this.setData({
-        actionDialog: true,
-        actionLabel: response.action.label,
-        hunterModes: !!response.action.hunterModes,
-        hunterMode: "",
-        hunterChoices,
-        stagedChoice: ["teamVote", "quest"].includes(room.phase),
-        draftChoice: "",
-        draftLabel: "",
-        swapOptions,
-        swapSeats: [],
-        swapPlayers: (room.players || [])
-          .filter((p) => swapSeats.has(p.seat))
-          .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
-        actionChoices: response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "不使用技能" }] : (response.action.choices || [])
+      const actionChoices = response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "本轮不开枪" }] : (response.action.choices || [])
           .filter((v) => !swapOptions.includes(v))
           .map((value) => ({
             value,
@@ -1318,7 +1371,23 @@ Page({
               response.action.options?.find((o) => o.value === value)?.label ||
               CHOICES[value] ||
               value,
-          })),
+          }));
+      this.setData({
+        actionDialog: true,
+        actionLabel: response.action.label,
+        hunterModes: !!response.action.hunterModes,
+        hunterMode: "",
+        hunterChoices,
+        stagedChoice: ["teamVote", "quest", "skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase),
+        draftChoice: "",
+        draftLabel: "",
+        swapOptions,
+        swapSeats: [],
+        swapPlayers: (room.players || [])
+          .filter((p) => swapSeats.has(p.seat))
+          .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
+        actionChoices,
+        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {
@@ -1376,7 +1445,90 @@ Page({
       this.setData({ busy: false, busyAction: "" });
     }
   },
+  identityDealKey() {
+    const room = this.data.room;
+    if (!room?.flexible || !room.game || room.me.seat == null ||
+      ["lobby", "ended", "terminated"].includes(room.phase)) return "";
+    return `${room.code}:${room.game}:${room.me.seat}`;
+  },
+  identityReceipts() {
+    if (!this.dealtIdentityReceipts) {
+      const saved = wx.getStorageSync("dealtIdentityReceipts");
+      this.dealtIdentityReceipts = Array.isArray(saved) ? saved : [];
+    }
+    return this.dealtIdentityReceipts;
+  },
+  rememberDealtIdentity() {
+    const key = this.identityDealKey();
+    if (!key) return;
+    this.dealtIdentityReceipts = [...this.identityReceipts().filter(k => k !== key), key].slice(-50);
+    // Only non-secret reminder receipts are persisted, never role/vision data.
+    try { wx.setStorageSync("dealtIdentityReceipts", this.dealtIdentityReceipts); } catch (e) {}
+  },
+  identityOverlayBlocked() {
+    return !this.alive || !this.foreground || !this.data.room || this.data.error ||
+      this.data.actionDialog || this.data.actionLoading || this.data.identityChange ||
+      this.data.fairyResult || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
+  },
+  showDealtIdentity() {
+    const key = this.identityDealKey();
+    if (!key || this.data.room.me.identityRevision > 0 || this.identityOverlayBlocked()) return false;
+    if (this.data.dealtIdentityDialog) return true;
+    if (this.identityReceipts().includes(key)) return false;
+    this.mask();
+    this.setData({ dealtIdentityDialog: true });
+    return true;
+  },
+  async revealDealtIdentity() {
+    if (!this.data.dealtIdentityDialog || this.data.busy || !this.data.network || !this.foreground) return;
+    const key = this.identityDealKey(), stage = this.data.room.stage;
+    const generation = ++this.generation;
+    this.setData({ busy: true, busyAction: "dealtIdentity" });
+    try {
+      const secret = await api.request("/api/rooms/" + this.roomCode + "/private");
+      if (!this.alive || !this.foreground || generation !== this.generation ||
+        !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
+        this.data.room.stage !== stage || secret.stage !== stage) return;
+      this.rememberDealtIdentity();
+      this.setData({ dealtIdentitySecret: {
+        role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
+        information: secret.information, skillStatus: secret.skillStatus,
+      } });
+    } catch (e) {
+      if (generation === this.generation && this.foreground) this.handleError(e);
+    } finally {
+      this.setData({ busy: false, busyAction: "" });
+    }
+  },
+  closeDealtIdentity() {
+    if (!this.data.dealtIdentityDialog) return;
+    this.rememberDealtIdentity();
+    this.mask();
+    if (!wx.getStorageSync("identityEntryHintSeen")) this.identityHintPending = this.identityDealKey();
+    this.showIdentityHintWhenVisible();
+  },
+  showIdentityHintWhenVisible() {
+    const key = this.identityHintPending;
+    if (!key || key !== this.identityDealKey() || this.identityOverlayBlocked() ||
+      this.data.dealtIdentityDialog || this.data.revealed || !wx.createSelectorQuery || this.identityHintChecking) return;
+    this.identityHintChecking = true;
+    wx.createSelectorQuery().in(this).select(".room-identity-anchor").boundingClientRect()
+      .selectViewport().boundingClientRect().exec(([anchor, viewport]) => {
+        this.identityHintChecking = false;
+        if (!anchor || !viewport || anchor.height <= 0 || anchor.top < 0 || anchor.bottom > viewport.height ||
+          key !== this.identityHintPending || key !== this.identityDealKey() || this.identityOverlayBlocked() ||
+          this.data.dealtIdentityDialog || this.data.revealed) return;
+        this.identityHintPending = "";
+        try { wx.setStorageSync("identityEntryHintSeen", true); } catch (e) {}
+        this.setData({ identityHintVisible: true });
+      });
+  },
+  dismissIdentityHint() {
+    this.identityHintPending = "";
+    this.setData({ identityHintVisible: false });
+  },
   async reveal() {
+    this.dismissIdentityHint();
     if (this.data.revealed) {
       this.mask();
       return;
@@ -1397,6 +1549,7 @@ Page({
         this.data.room.stage === stage
       ) {
         secret.factionTone = factionTone(secret.faction);
+        this.rememberDealtIdentity();
         this.setData({
           revealed: true,
           secret,
@@ -1517,9 +1670,11 @@ Page({
   toggleSwapSeat(e) {
     if (
       this.data.busy ||
+      this.data.hasPendingRequest ||
       !this.data.network ||
       !this.foreground ||
       !this.data.actionDialog ||
+      this.data.room?.me.submitted ||
       this.data.room?.stage !== this.actionDraftStage
     )
       return;
@@ -1530,7 +1685,10 @@ Page({
       : this.data.swapSeats.length < 2
         ? [...this.data.swapSeats, seat]
         : this.data.swapSeats;
+    const pair = selected.slice().sort((a, b) => a - b).join(":");
+    const draft = this.data.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
     this.setData({
+      ...(this.data.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
       swapSeats: selected,
       swapPlayers: this.data.swapPlayers.map((p) => ({
         ...p,
@@ -1569,6 +1727,7 @@ Page({
   confirmChoice() {
     if (
       this.data.busy ||
+      this.data.hasPendingRequest ||
       !this.foreground ||
       !this.data.actionDialog ||
       !this.data.stagedChoice ||
@@ -1578,20 +1737,28 @@ Page({
     )
       return;
     const value = this.data.draftChoice;
-    if (!this.data.actionChoices.some((c) => c.value === value)) return;
+    if (!value || value.startsWith("mode:") ||
+      !(this.data.actionChoices.some(c => c.value === value) ||
+        (this.data.skillAction && this.data.swapOptions.includes(value)))) return;
     this.cmd("submit", { value });
   },
   async submitChoice(e) {
     const value = e.currentTarget.dataset.value;
     if (this.data.hunterModes && value.startsWith("mode:")) {
-      if (this.data.busy || !this.data.network || !this.data.actionDialog || this.data.room.stage !== this.actionDraftStage) return;
+      if (this.data.busy || this.data.hasPendingRequest || !this.data.network || !this.foreground || !this.data.actionDialog || !this.data.room || this.data.room.me.submitted || this.data.room.stage !== this.actionDraftStage) return;
+      if (!this.data.actionChoices.some(c => c.value === value)) return;
       const mode = value.split(":")[1];
-      this.setData({ hunterMode: mode, actionChoices: mode ? this.data.hunterChoices.filter((o) => o.value.startsWith(mode + ":")).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "不使用技能"}] });
+      const actionChoices = mode ? this.data.hunterChoices.filter((o) => o.value.startsWith(mode + ":")).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "本轮不开枪"}];
+      this.setData({ hunterMode: mode, actionChoices, draftChoice: "", draftLabel: "",
+        ...skillView(this.data.room, actionChoices, true, mode, this.data.swapOptions) });
       return;
     }
-    if (["teamVote", "quest"].includes(this.data.room?.phase)) {
+    if (this.data.stagedChoice) {
       if (
         this.data.busy ||
+        this.data.hasPendingRequest ||
+        !this.data.network ||
+        this.data.room.me.submitted ||
         !this.foreground ||
         !this.data.actionDialog ||
         this.data.room.stage !== this.actionDraftStage
@@ -1599,7 +1766,8 @@ Page({
         return;
       const choice = this.data.actionChoices.find((c) => c.value === value);
       if (choice)
-        this.setData({ draftChoice: value, draftLabel: choice.label });
+        this.setData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes) : choice.label,
+          swapSeats: [], swapPlayers: this.data.swapPlayers.map(p => ({ ...p, selected: false })) });
       return;
     }
     if (

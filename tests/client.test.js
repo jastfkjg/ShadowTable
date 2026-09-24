@@ -4,7 +4,7 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const { createApp } = require("../server/app");
-function page(api, storage = new Map()) {
+function page(api, storage = new Map(), layout) {
   let definition;
   const scrolls = [];
   const wx = {
@@ -13,6 +13,14 @@ function page(api, storage = new Map()) {
     setStorageSync: (k, v) => storage.set(k, v),
     removeStorageSync: (k) => storage.delete(k),
     showModal: (o) => o.success({ confirm: true }),
+  };
+  if (layout) wx.createSelectorQuery = () => {
+    const query = {
+      in() { return query; }, select() { return query; }, selectViewport() { return query; },
+      boundingClientRect() { return query; },
+      exec(callback) { callback([layout.anchor, { height: layout.height }]); },
+    };
+    return query;
   };
   vm.runInNewContext(
     fs.readFileSync(
@@ -88,6 +96,97 @@ async function cmd(p, type, extra = {}) {
   p.cmd(type, extra);
   await settle(p);
 }
+function dealtRoom(overrides = {}) {
+  return { code: "123456", game: 1, phase: "tools", stage: "deal-1", flexible: true,
+    capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
+    team: [], history: [], ...overrides };
+}
+test("首次发牌自动遮盖提醒且不读取身份，稍后查看后刷新不重弹、下一局再提醒", async () => {
+  let room = dealtRoom(), reads = 0;
+  const storage = new Map();
+  const api = { request: async path => {
+    if (path.endsWith("/private")) { reads++; return { stage: room.stage, role: "梅林", information: "秘密视野" }; }
+    return structuredClone(room);
+  } };
+  const p = page(api, storage);
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.dealtIdentityDialog, true);
+  assert.equal(p.data.dealtIdentitySecret, null);
+  assert.equal(reads, 0);
+  p.closeDealtIdentity();
+  await p.refresh();
+  assert.equal(p.data.dealtIdentityDialog, false);
+  const resumed = page(api, storage);
+  resumed.roomCode = room.code;
+  await resumed.refresh();
+  assert.equal(resumed.data.dealtIdentityDialog, false);
+  await resumed.reveal();
+  assert.equal(resumed.data.secret.role, "梅林");
+  assert.equal(JSON.stringify([...storage]).includes("梅林"), false);
+  room = dealtRoom({ game: 2, stage: "deal-2" });
+  await resumed.refresh();
+  assert.equal(resumed.data.dealtIdentityDialog, true);
+  assert.equal(resumed.data.secret, null);
+});
+test("身份入口教学等按钮可见才显示，关闭或后续对局不重复教学", async () => {
+  const storage = new Map(), room = dealtRoom();
+  const layout = { height: 667, anchor: { top: -50, bottom: -6, height: 44 } };
+  const p = page({ request: async () => structuredClone(room) }, storage, layout);
+  p.roomCode = room.code;
+  await p.refresh();
+  p.closeDealtIdentity();
+  assert.equal(p.data.identityHintVisible, false);
+  assert.equal(storage.has("identityEntryHintSeen"), false);
+  Object.assign(layout.anchor, { top: 100, bottom: 144 });
+  p.data.showRoomRules = true;
+  p.onPageScroll();
+  assert.equal(p.data.identityHintVisible, false);
+  p.data.showRoomRules = false;
+  p.onPageScroll();
+  assert.equal(p.data.identityHintVisible, true);
+  assert.equal(storage.get("identityEntryHintSeen"), true);
+  p.dismissIdentityHint();
+  room.game++; room.stage = "deal-2";
+  await p.refresh();
+  p.closeDealtIdentity();
+  assert.equal(p.data.identityHintVisible, false);
+});
+test("身份揭示请求在关闭、后台或换局后返回都不能泄露旧身份", async () => {
+  for (const reason of ["close", "background", "rematch"]) {
+    let finish;
+    const room = dealtRoom();
+    const p = page({ request: path => path.endsWith("/private")
+      ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(structuredClone(room)) });
+    p.roomCode = room.code;
+    await p.refresh();
+    const read = p.revealDealtIdentity();
+    if (reason === "close") p.closeDealtIdentity();
+    if (reason === "background") p.onHide();
+    if (reason === "rematch") { room.game++; room.stage = "deal-2"; await p.refresh(); }
+    finish({ stage: "deal-1", role: "梅林", information: "秘密视野" });
+    await read;
+    assert.equal(p.data.dealtIdentitySecret, null, reason);
+    assert.equal(p.data.secret, null, reason);
+  }
+});
+test("身份揭示后关闭立即清空秘密，后台恢复不重弹；旁观、结束、换牌和旧顺序模式不弹首次提醒", async () => {
+  let room = dealtRoom();
+  const p = page({ request: async path => path.endsWith("/private")
+    ? { stage: room.stage, role: "梅林", faction: "好人阵营", information: "秘密视野" } : structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh(); await p.revealDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret.role, "梅林");
+  p.closeDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret, null);
+  p.onHide(); p.foreground = true; await p.refresh();
+  assert.equal(p.data.dealtIdentityDialog, false);
+  for (const override of [{ me: { seat: null } }, { phase: "ended" }, { phase: "terminated" }, { flexible: false }, { me: { seat: 1, identityRevision: 1 } }]) {
+    room = dealtRoom({ game: 3, stage: "deal-3", ...override });
+    await p.refresh();
+    assert.equal(p.data.dealtIdentityDialog, false);
+  }
+});
 test("六个小程序页面控制器经真实HTTP完成一局并同房重开", async () => {
   const a = await server();
   try {
@@ -947,7 +1046,10 @@ test("十二骑士手机端经HTTP同时提交技能、结算复活并进入下�
           (c) => c.label && !c.label.startsWith("target:"),
         ),
       );
-      await cmd(p, "submit", { value: "pass" });
+      await p.submitChoice({ currentTarget: { dataset: { value: "pass" } } });
+      assert.equal(p.data.room.me.submitted, false);
+      p.confirmChoice();
+      await settle(p);
     }
     await host.refresh();
     await refresh();
@@ -1177,22 +1279,23 @@ test("小程序收到移出通知后清除私密展示并返回首页，显示�
   assert.equal(p.data.notice, "你已被房主移出房间");
 });
 
-test("石像鬼查验与猎人两种开枪均二次确认，取消或阶段变化不提交", async () => {
-  for (const [phase, value] of [["skillPrepare", "inspect:4"], ["skillPrepare", "detonate:4"], ["skillPrepare", "passive:4"]]) {
+test("查验与猎人开枪先暂选，单独确认提交，过期草稿不能提交", async () => {
+  for (const value of ["inspect:4", "detonate:4", "passive:4"]) {
     const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass", value], options: [{ value, label: "选择4号" }] } }) });
-    p.data.room = { code: "123456", stage: "s1", phase, needsSubmission: true, me: { submitted: false } };
+    p.data.room = { code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false } };
     const writes = [];
     p.cmd = (...args) => writes.push(args);
+    p.confirm = () => { throw new Error("技能确认不应再弹第二层对话框"); };
     await p.openAction();
-    p.confirm = async () => false;
     await p.submitChoice({ currentTarget: { dataset: { value } } });
     assert.equal(writes.length, 0);
-    p.confirm = async () => true;
-    await p.submitChoice({ currentTarget: { dataset: { value } } });
+    assert.equal(p.data.draftChoice, value);
+    p.data.room.stage = "s2";
+    p.confirmChoice();
+    assert.equal(writes.length, 0);
+    p.data.room.stage = "s1";
+    p.confirmChoice();
     assert.equal(writes[0][1].value, value);
-    p.confirm = async () => { p.data.room.stage = "s2"; return true; };
-    await p.submitChoice({ currentTarget: { dataset: { value } } });
-    assert.equal(writes.length, 1);
   }
 });
 
@@ -1358,6 +1461,24 @@ test("身份遮盖不依赖网络或忙碌状态，未确认提交不开放新�
   assert.equal(p.data.actionDialog, false);
 });
 
+test("房主进度默认收起，同一操作刷新保留展开，新操作重置", async () => {
+  const room = { code: "123456", stage: "s1", phase: "skillPrepare", capacity: 12, players: [], team: [], me: { seat: 1 }, history: [], canUseTools: true, operationProgress: { total: 12, completed: 1, players: [] } };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.operationProgressExpanded, false);
+  p.toggleOperationProgress();
+  room.operationProgress.completed = 2;
+  await p.refresh();
+  assert.equal(p.data.operationProgressExpanded, true);
+  p.toggleOperationProgress();
+  assert.equal(p.data.operationProgressExpanded, false);
+  p.toggleOperationProgress();
+  room.stage = "s2";
+  await p.refresh();
+  assert.equal(p.data.operationProgressExpanded, false);
+});
+
 test("小程序最近结果包含转换，时间到分钟，收起座位和点击展开记录保持到下一次刷新", async () => {
   const { newRoom, publicView } = require("../server/engine");
   const r = newRoom("123456", "host", "房主", "classic", 8);
@@ -1514,16 +1635,21 @@ test("技能记录分行且仅在有人仍出局时展示最终结果", async ()
   let result = p.data.history[0];
   assert.equal(result.historyText, "技能结算");
   assert.equal(result.historyNote, "提前截止");
-  assert.equal(result.resultRows.length, 3);
+  assert.equal(result.resultRows.length, 2);
   assert.equal(result.resultRows[0].value, "3、5 号");
   assert.ok(!result.resultRows.some(row => row.final));
+  assert.equal(p.data.latestResult.latestDetail, "本轮出局：3、5 号；抽牌复活：3、5 号");
   event.out = [5];
   await p.refresh();
   result = p.data.history[0];
   assert.equal(result.resultRows[0].label, "最终仍出局");
   assert.equal(result.resultRows[0].value, "5 号");
   assert.equal(result.resultRows[0].final, true);
-  assert.equal(result.detail, "原始公开摘要");
+  assert.match(p.data.latestResult.latestDetail, /最终仍出局：5 号/);
+  event.restored = [4];
+  await p.refresh();
+  assert.match(p.data.latestResult.latestDetail, /原牌复活：4 号/);
+  assert.equal(p.data.history[0].resultRows.at(-1).value, "4 号");
 });
 
 test("猎人先三选一，再显示对应号码；切换模式不提交，关闭后清除私密草稿", async () => {
@@ -1539,7 +1665,11 @@ test("猎人先三选一，再显示对应号码；切换模式不提交，关�
   p.cmd = (...args) => writes.push(args);
   const choose = value => p.submitChoice({currentTarget: {dataset: {value}}});
   await p.openAction();
-  assert.deepEqual(Array.from(p.data.actionChoices, o => o.label), ["主动技能", "被动技能", "不使用技能"]);
+  assert.deepEqual(Array.from(p.data.actionChoices, o => o.label), ["主动技能", "被动技能", "本轮不开枪"]);
+  assert.equal(p.data.skillOtherChoices[2].label, "本轮不开枪");
+  await choose("pass");
+  assert.equal(p.data.draftLabel, "本轮不开枪");
+  assert.equal(writes.length, 0);
   await choose("mode:detonate");
   assert.deepEqual(Array.from(p.data.actionChoices, o => o.value), ["detonate:1", "detonate:11", "mode:"]);
   await choose("mode:");
@@ -1548,8 +1678,76 @@ test("猎人先三选一，再显示对应号码；切换模式不提交，关�
   assert.equal(writes.length, 0);
   p.confirm = async () => true;
   await choose("passive:5");
+  assert.equal(writes.length, 0);
+  p.confirmChoice();
   assert.equal(writes[0][1].value, "passive:5");
   p.closeAction();
   assert.equal(p.data.hunterChoices.length, 0);
   assert.equal(p.data.hunterMode, "");
+});
+
+test("技能目标与放弃互斥，断网或未确认请求阻止提交，关闭清除草稿", async () => {
+  const options = [{ value: "pass", label: "不使用技能 / 确认" }, { value: "target:2", label: "对 2号开刀" }];
+  const p = page({ request: async () => ({ stage: "s1", action: { choices: options.map(c => c.value), options } }) });
+  p.data.room = { stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, players: [{ seat: 2, name: "玩家乙" }] };
+  const writes = [];
+  p.cmd = (...args) => writes.push(args);
+  const choose = value => p.submitChoice({ currentTarget: { dataset: { value } } });
+  await p.openAction();
+  assert.equal(p.data.skillTitle, "使用技能 · 开刀");
+  p.confirmChoice();
+  await choose("target:2");
+  await choose("pass");
+  assert.equal(p.data.draftChoice, "pass");
+  assert.equal(p.data.draftLabel, "不使用技能");
+  for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }]) {
+    Object.assign(p.data, patch);
+    p.confirmChoice();
+    Object.assign(p.data, { network: true, hasPendingRequest: false, busy: false });
+  }
+  assert.equal(writes.length, 0);
+  p.confirmChoice();
+  assert.equal(writes[0][1].value, "pass");
+  p.onHide();
+  assert.equal(p.data.draftChoice, "");
+  assert.equal(p.data.skillTargets.length, 0);
+});
+
+test("技能换号与不使用互斥，仅完整合法的双人选择可以提交", async () => {
+  const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass", "swap:1:2", "swap:1:3", "swap:2:3"] } }) });
+  p.data.room = { stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, players: [1, 2, 3].map(seat => ({ seat, name: "玩家" + seat })) };
+  const writes = [];
+  p.cmd = (...args) => writes.push(args);
+  const seat = seat => p.toggleSwapSeat({ currentTarget: { dataset: { seat } } });
+  await p.openAction();
+  seat(2);
+  p.confirmChoice();
+  assert.equal(writes.length, 0);
+  seat(1);
+  assert.equal(p.data.draftChoice, "swap:1:2");
+  await p.submitChoice({ currentTarget: { dataset: { value: "pass" } } });
+  assert.equal(p.data.swapSeats.length, 0);
+  assert.ok(p.data.swapPlayers.every(p => !p.selected));
+  seat(3);
+  assert.equal(p.data.draftChoice, "");
+  seat(1);
+  p.confirmChoice();
+  assert.equal(writes[0][1].value, "swap:1:3");
+});
+
+test("公开记录隐藏轮次推进，保留转换与最新结果的原记录定位", async () => {
+  const history = [
+    { kind: "variant", text: "进入第2轮" },
+    { kind: "variant", text: "本轮不转换", resultType: "conversion" },
+    { kind: "skillResult", text: "技能最终结果", detail: "无人出局", startedAt: 1234567890000 },
+    { kind: "variant", text: "进入第3轮" },
+  ];
+  const room = { code: "123456", stage: "t1", phase: "tools", capacity: 6, players: [], team: [], me: { seat: 1 }, history };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.deepEqual(Array.from(p.data.history, h => h.key), [1, 2]);
+  assert.equal(p.data.visibleHistory.length, 2);
+  assert.equal(p.data.latestResult.key, 2);
+  assert.ok(p.data.latestResult.timeLabel);
 });

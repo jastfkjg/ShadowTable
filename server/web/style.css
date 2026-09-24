@@ -580,6 +580,7 @@ button.seat.selected[disabled] {
   margin: 13px 0 6px;
 }
 .private-info {
+  white-space: pre-line;
   margin-top: 12px;
   text-align: left;
   font-size: 14px;
@@ -712,6 +713,10 @@ button.tool-seat-option.active {
   font-weight: 600;
   margin-bottom: 4px;
 }
+button.progress-toggle { width:100%; min-height:44px; margin:0; padding:4px 0; border:0; border-radius:0; background:transparent; color:var(--text); text-align:left; flex-wrap:wrap; }
+.progress-title { flex:1; }
+.progress-count { white-space:nowrap; }
+.progress-disclosure { color:var(--muted); font-size:12px; font-weight:400; white-space:nowrap; }
 .progress-player {
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
@@ -1589,15 +1594,20 @@ button.home-entry { background: transparent; padding: 8px; min-height: 44px; }
 .brand { padding-bottom: 12px; }
 .room-summary { flex-wrap: wrap; margin-top: 4px; }
 button.room-identity { width: auto; min-height: 44px; margin: 0; padding: 8px 0 8px 8px; color: var(--accent); background: transparent; font-size: 13px; }
+.room-identity-anchor { position: relative; flex-shrink: 0; }
+button.room-identity.identity-entry-highlight { outline: 1px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.identity-entry-hint { position: absolute; top: calc(100% + 8px); right: 0; z-index: 950; display: flex; align-items: center; width: 244px; max-width: calc(100vw - 40px); padding: 6px 4px 6px 12px; box-sizing: border-box; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 13px; line-height: 1.6; }
+.identity-entry-hint::before { content: ''; position: absolute; top: -5px; right: 18px; width: 8px; height: 8px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); background: var(--surface); transform: rotate(45deg); }
+.identity-entry-hint > span { flex: 1; }
+button.identity-hint-close { flex-shrink: 0; width: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; color: var(--muted); background: transparent; font-size: 18px; }
+.identity-privacy-note { margin-top: 4px; }
+.identity-return-note { margin: 12px 0; line-height: 1.6; }
 .table-dynamics { margin: 12px 0 16px; padding: 8px 16px 14px; border: 1px solid var(--accent); border-radius: 14px; background: var(--surface); }
 .table-dynamics .latest-result { margin: 0; padding: 0 0 12px; border: 0; border-radius: 0; background: transparent; }
 .table-dynamics .phase-strip { margin: 0; padding: 8px 0 0; border: 0; }
 .result-first .latest-result + .phase-strip { border-top: 1px solid var(--border); padding-top: 12px; }
 .result-first .phase-name { font-size: 14px; font-weight: 500; }
 .operation-first .phase-name { font-size: 20px; }
-.operation-first .latest-result { margin-top: 14px; padding-top: 8px; padding-bottom: 0; border-top: 1px solid var(--border); }
-.operation-first .latest-result-title { font-size: 15px; font-weight: 500; margin: 0; }
-.operation-first .latest-result .history-detail { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .table-dynamics.is-lobby { border: 0; padding: 0; background: transparent; }
 .table-dynamics + .task-progress { margin-top: 16px; }
 
@@ -1626,13 +1636,52 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .room-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; margin-bottom: 12px; background: var(--surface); border-radius: 8px; font-size: 12px; }
 .room-empty { padding: 20px 12px; text-align: center; color: var(--muted); }
 .room-empty-actions { display: flex; gap: 12px; margin-top: 16px; }
-button.room-menu-action { display: flex; flex-direction: column; align-items: flex-start; padding: 12px 0; margin: 0; min-height: 48px; border-radius: 0; border-bottom: 1px solid var(--border); background: transparent; text-align: left; }
-button.room-menu-action.danger { color: var(--evil); }
-.room-list-dialog > button.secondary { margin-top: 20px; }
+.room-menu-dialog {
+  --menu-divider: rgba(177, 191, 198, 0.14);
+  --menu-hover: rgba(177, 191, 198, 0.08);
+  --menu-danger-bg: rgba(242, 182, 174, 0.06);
+  --menu-danger-border: rgba(242, 182, 174, 0.22);
+  max-width: 380px;
+  padding: 24px 20px 16px;
+  border-color: var(--menu-divider);
+  border-radius: 20px;
+}
+.room-menu-header { margin: 0 4px 20px; }
+.room-menu-heading { color: var(--muted); font-size: 13px; font-weight: 400; }
+.room-menu-code { margin-top: 4px; font-size: 24px; line-height: 1.4; font-weight: 600; letter-spacing: 0.5px; font-variant-numeric: tabular-nums; }
+.room-menu-options { border: 1px solid var(--menu-divider); border-radius: 12px; background: var(--bg); }
+button.room-menu-action {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 14px 16px;
+  margin: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.room-menu-options > .room-menu-action + .room-menu-action { border-top: 1px solid var(--menu-divider); border-top-left-radius: 0; border-top-right-radius: 0; }
+.room-menu-copy { display: block; flex: 1; min-width: 0; }
+.room-menu-label { display: block; font-size: 16px; line-height: 1.5; font-weight: 600; }
+.room-menu-description { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.6; font-weight: 400; overflow-wrap: anywhere; }
+.room-menu-chevron { flex-shrink: 0; color: var(--muted); font-size: 22px; font-weight: 400; line-height: 1; }
+button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-danger-border); background: var(--menu-danger-bg); color: var(--evil); }
+.room-menu-action.danger .room-menu-chevron { color: var(--evil); }
+.room-menu-dialog > button.room-menu-cancel { margin-top: 16px; min-height: 48px; border: 0; border-radius: 12px; background: var(--menu-hover); color: var(--muted); font-size: 15px; font-weight: 500; }
+@media (hover: hover) {
+  .room-menu-dialog button:not(:disabled):hover { background: var(--menu-hover); }
+}
+.room-menu-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .room-list-dialog .input { margin: 12px 0; }
 
 .history-heading-line { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
-.history-heading-line .history-title { min-width:0; margin:0; }
+.history-heading-line .history-title { min-width:0; margin:0; align-items:baseline; }
 .history-number { flex-shrink:0; color:var(--muted); font-size:12px; font-weight:400; }
 .history-row { padding:14px 0; border-bottom-color:rgba(177,191,198,.22); }
 .history-subtitle { margin-top:4px; }
@@ -1641,3 +1690,50 @@ button.room-menu-action.danger { color: var(--evil); }
 .history-result-label { flex:0 0 84px; }
 .history-result-value { min-width:0; overflow-wrap:anywhere; }
 .history-result-line.is-final { color:var(--text); font-weight:600; margin-bottom:10px; }
+.latest-result-note { margin-top:4px; }
+.latest-result .history-result-line { margin-top:8px; line-height:1.65; }
+.latest-result .history-result-value { color:var(--text); }
+.latest-result .history-result-label { flex-basis:6em; }
+
+/* Skill selection: scrollable choices, persistent private confirmation. */
+.error-dialog.skill-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  overflow: hidden;
+  padding: 0;
+}
+.skill-header { flex-shrink: 0; padding: 22px 20px 16px; }
+.skill-title { font-size: 20px; line-height: 1.35; font-weight: 700; color: var(--text); }
+.skill-hint { margin-top: 10px; font-size: 14px; line-height: 1.6; color: var(--text); }
+.skill-body { min-height: 0; max-height: 42vh; flex-shrink: 1; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 0 20px; }
+.skill-target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.skill-dialog button.skill-option {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; min-width: 0; min-height: 72px; margin: 0; padding: 10px 8px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text); line-height: 1.4;
+}
+.skill-seat { font-size: 17px; font-weight: 600; }
+.skill-name { display: block; width: 100%; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 400; }
+.skill-check { position: absolute; top: 4px; right: 7px; font-size: 12px; font-weight: 700; }
+.skill-other-choices { display: flex; flex-direction: column; flex-shrink: 0; gap: 10px; padding: 14px 20px 0; }
+.skill-dialog button.skill-other { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 48px; margin: 0; padding: 10px 14px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 12px; text-align: left; font-size: 14px; line-height: 1.5; }
+.skill-other-mark { width: 24px; flex-shrink: 0; font-size: 18px; }
+.skill-dialog button.is-selected { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.skill-context { margin-bottom: 10px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.skill-footer { flex-shrink: 0; margin-top: 16px; padding: 16px 20px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--surface); }
+.skill-summary { font-size: 14px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.skill-dialog button.skill-confirm { width: 100%; min-height: 48px; margin: 12px 0 0; padding: 10px 12px; font-size: 16px; line-height: 1.5; white-space: normal; }
+.skill-dialog button.skill-later { width: 100%; min-height: 44px; margin: 2px 0 0; font-size: 13px; }
+.skill-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Very short viewports must keep every control reachable. */
+@media (max-height: 480px) {
+  .error-dialog.skill-dialog { display: block; overflow-y: auto; max-height: calc(100vh - 24px); }
+  .skill-dialog .skill-body { height: auto !important; max-height: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-dialog { animation: none; }
+}
+
+.history-time { white-space:nowrap; color:var(--muted); font-size:12px; font-weight:400; }

@@ -4,15 +4,17 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const { newRoom, enter, command, publicView, BOARDS } = require("../server/engine");
 
-function client(fetch) {
+function client(fetch, storage = new Map([["session", "session"]]), layout) {
   let scheduled;
+  const events = {};
   const scrolls = [], lookups = [];
   const element = { focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
+  if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
-    document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener() {} },
-    window: { addEventListener() {} },
-    localStorage: { getItem: () => "session", setItem() {}, removeItem() {} },
+    document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
+    window: { innerHeight: layout?.height, addEventListener() {} },
+    localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
     setTimeout(fn) { scheduled = fn; return 1; },
@@ -23,14 +25,141 @@ function client(fetch) {
     render = function () {};
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+      viewDealtIdentity, showIdentityHintWhenVisible,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
     };
   })();`, context);
-  return { ...context.window.test, scrolls, lookups, scheduled: () => scheduled };
+  return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test("网页房主进度可展开收起，刷新保留状态，新操作默认收起", async () => {
+  const room = dealtWebRoom({ phase: "skillPrepare", canUseTools: true, knights: { round: 3, remainingCards: 6 }, operationProgress: { total: 2, completed: 1, players: [{ seat: 1, name: "甲", required: true, completed: true }, { seat: 2, name: "乙", required: true, completed: false }] } });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.equal(c.state.operationProgressExpanded, false);
+  assert.match(c.viewRoom(), /1 \/ 2 已完成/);
+  assert.doesNotMatch(c.viewRoom(), /class="progress-player"|再次发起技能/);
+  c.ACTIONS.toggleOperationProgress();
+  assert.match(c.viewRoom(), /class="progress-player"/);
+  assert.match(c.viewRoom(), /aria-expanded="true"/);
+  room.operationProgress.completed = 2;
+  await c.refresh();
+  assert.equal(c.state.operationProgressExpanded, true);
+  c.ACTIONS.toggleOperationProgress();
+  assert.doesNotMatch(c.viewRoom(), /class="progress-player"/);
+  c.ACTIONS.toggleOperationProgress();
+  room.stage = "next";
+  await c.refresh();
+  assert.equal(c.state.operationProgressExpanded, false);
+});
+test("网页最近结果与历史记录隐藏空的原牌复活及最终仍出局，保留旧版实际复活", async () => {
+  const event = { kind: "skillResult", text: "技能最终结果", eliminated: [3, 5], redrawn: [3, 5], restored: [], out: [], detail: "本轮出局：3、5号；抽牌复活：3、5号；原牌复活：无；最终仍出局：无" };
+  const room = dealtWebRoom({ history: [event] });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.equal(c.state.latestResult.latestDetail, "本轮出局：3、5 号；抽牌复活：3、5 号");
+  assert.equal(c.state.history[0].resultRows.length, 2);
+  assert.doesNotMatch(c.viewRoom(), /原牌复活|最终仍出局/);
+  event.out = [5];
+  await c.refresh();
+  assert.equal(c.state.history[0].resultRows[0].final, true);
+  assert.match(c.state.latestResult.latestDetail, /最终仍出局：5 号/);
+  assert.match(c.viewRoom(), /最终仍出局<\/span><span class="history-result-value">5 号/);
+  event.restored = [4];
+  await c.refresh();
+  assert.match(c.state.latestResult.latestDetail, /原牌复活：4 号/);
+  assert.equal(c.state.history[0].resultRows.at(-1).value, "4 号");
+});
+function dealtWebRoom(overrides = {}) {
+  return { code: "123456", game: 1, phase: "tools", stage: "deal-1", flexible: true,
+    capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
+    team: [], history: [], ...overrides };
+}
+test("网页首次提醒无需秘密请求，主动揭示后关闭并清空，刷新不重弹且重开再提醒", async () => {
+  let room = dealtWebRoom(), reads = 0;
+  const storage = new Map([["session", "session"]]);
+  const fetch = async path => {
+    if (path.endsWith("/private")) { reads++; return response({ stage: room.stage, role: "梅林", faction: "好人阵营", information: "秘密视野" }); }
+    return response(structuredClone(room));
+  };
+  const c = client(fetch, storage);
+  await c.refresh();
+  assert.equal(c.state.dealtIdentityDialog, true);
+  assert.match(c.viewDealtIdentity(), /身份已发放/);
+  assert.match(c.viewDealtIdentity(), /稍后查看/);
+  assert.ok(!c.viewDealtIdentity().includes("梅林"));
+  assert.equal(reads, 0);
+  await c.ACTIONS.revealDealtIdentity();
+  assert.match(c.viewDealtIdentity(), /梅林/);
+  assert.match(c.viewDealtIdentity(), /秘密视野/);
+  c.ACTIONS.closeDealtIdentity();
+  assert.equal(c.state.dealtIdentitySecret, null);
+  assert.ok(!JSON.stringify([...storage]).includes("秘密视野"));
+  const resumed = client(fetch, storage);
+  await resumed.refresh();
+  assert.equal(resumed.state.dealtIdentityDialog, false);
+  room = dealtWebRoom({ game: 2, stage: "deal-2" });
+  await resumed.refresh();
+  assert.equal(resumed.state.dealtIdentityDialog, true);
+});
+test("网页稍后查看保留手动入口，定位教学只在真实入口可见时显示一次", async () => {
+  const room = dealtWebRoom(), storage = new Map([["session", "session"]]);
+  const layout = { height: 667, anchor: { top: -50, bottom: -6, height: 44 } };
+  const c = client(async path => response(path.endsWith("/private")
+    ? { stage: room.stage, role: "梅林", information: "秘密" } : structuredClone(room)), storage, layout);
+  await c.refresh();
+  c.ACTIONS.closeDealtIdentity();
+  assert.equal(c.state.identityHintVisible, false);
+  assert.equal(storage.has("identityEntryHintSeen"), false);
+  Object.assign(layout.anchor, { top: 100, bottom: 144 });
+  c.state.showRoomRules = true;
+  c.showIdentityHintWhenVisible();
+  assert.equal(c.state.identityHintVisible, false);
+  c.state.showRoomRules = false;
+  c.showIdentityHintWhenVisible();
+  assert.equal(c.state.identityHintVisible, true);
+  assert.match(c.viewRoom(), /随时点这里/);
+  await c.ACTIONS.reveal();
+  assert.equal(c.state.identityHintVisible, false);
+  assert.equal(c.state.secret.role, "梅林");
+  room.game++; room.stage = "deal-2";
+  await c.refresh();
+  c.ACTIONS.closeDealtIdentity();
+  assert.equal(c.state.identityHintVisible, false);
+});
+test("网页关闭、切后台及阶段变化后的旧身份请求被丢弃", async () => {
+  for (const reason of ["close", "background", "stage"]) {
+    let finish;
+    const room = dealtWebRoom();
+    const c = client(async path => path.endsWith("/private")
+      ? new Promise(resolve => { finish = resolve; }) : response(structuredClone(room)));
+    await c.refresh();
+    const read = c.ACTIONS.revealDealtIdentity();
+    if (reason === "close") c.ACTIONS.closeDealtIdentity();
+    if (reason === "background") { c.document.hidden = true; c.events.visibilitychange(); }
+    if (reason === "stage") { room.stage = "next-stage"; await c.refresh(); }
+    finish(response({ stage: "deal-1", role: "梅林", information: "秘密" }));
+    await read;
+    assert.equal(c.state.dealtIdentitySecret, null, reason);
+  }
+});
+test("网页未查看的后台发牌会补提醒，旁观、终局与换过身份的玩家不收到初次发牌提醒", async () => {
+  let room = dealtWebRoom({ phase: "lobby", game: 0 });
+  const c = client(async () => response(structuredClone(room)));
+  c.document.hidden = true; c.events.visibilitychange();
+  room = dealtWebRoom(); await c.refresh();
+  assert.equal(c.state.dealtIdentityDialog, false);
+  c.document.hidden = false; c.events.visibilitychange(); await c.refresh();
+  assert.equal(c.state.dealtIdentityDialog, true);
+  c.ACTIONS.closeDealtIdentity();
+  for (const extra of [{ me: { seat: null } }, { phase: "ended" }, { phase: "terminated" }, { flexible: false }, { me: { seat: 1, identityRevision: 1 } }]) {
+    const other = client(async () => response(dealtWebRoom(extra)));
+    await other.refresh();
+    assert.equal(other.state.dealtIdentityDialog, false);
+  }
+});
 
 test("网页轮询等待当前请求完成再调度，切后台后不继续轮询", async () => {
   const c = client();
@@ -101,7 +230,9 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   await c.refresh();
   assert.match(c.state.latestResult.text, /提前截止/);
   const html = c.viewRoom();
-  assert.match(html, /最近操作结果/);
+  assert.doesNotMatch(html, /最近操作结果|上次结果/);
+  assert.match(html, /id="history-record-0"/);
+  assert.match(html, /票弃权/);
   assert.match(html, /本次你无需操作/);
   assert.match(c.viewHostBar(), /作废本次任务/);
   assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
@@ -366,8 +497,13 @@ test("网页阶段集中待办，房主工具与任务进度优先，最近结�
   run("p1", "beginActivity", { kind: "vote" });
   await c.refresh();
   html = c.viewRoom();
-  assert.ok(html.indexOf('data-action="openAction"') < html.indexOf('class="latest-result"'));
+  assert.doesNotMatch(html, /class="latest-result"|上次结果/);
+  assert.match(html, /id="history-record-0"/);
   assert.match(html, /class="primary" data-action="openAction"/);
+  for (const phase of ["quest", "skillPrepare", "fairy", "identity"]) {
+    c.state.room.phase = phase;
+    assert.doesNotMatch(c.viewRoom(), /class="latest-result"|上次结果/);
+  }
 });
 
 test("网页断网或等待请求时仍可立即遮盖身份", async () => {
@@ -400,14 +536,74 @@ test("网页猎人技能三选一后只显示该模式号码，返回及阶段�
   const c = client(async () => response({stage: "s1", action: {hunterModes: true, choices: options.map(o => o.value), options}}));
   c.state.room = {code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: {submitted: false}};
   await c.ACTIONS.openAction();
-  assert.deepEqual(Array.from(c.state.actionChoices, o => o.label), ["主动技能", "被动技能", "不使用技能"]);
+  assert.deepEqual(Array.from(c.state.actionChoices, o => o.label), ["主动技能", "被动技能", "本轮不开枪"]);
+  c.ACTIONS.submitChoice({dataset: {value: "pass"}});
+  assert.match(c.viewActionDialog(), /本轮若出局，将不会触发被动开枪。是否确认？/);
+  assert.match(c.viewActionDialog(), /确认本轮不开枪/);
   c.ACTIONS.submitChoice({dataset: {value: "mode:detonate"}});
   assert.deepEqual(Array.from(c.state.actionChoices, o => o.value), ["detonate:1", "detonate:11", "mode:"]);
   assert.match(c.viewActionDialog(), /第 2 步：选择相邻一人/);
+  assert.ok(!c.viewActionDialog().includes("本轮若出局，将不会触发被动开枪"));
   c.ACTIONS.submitChoice({dataset: {value: "mode:"}});
   c.ACTIONS.submitChoice({dataset: {value: "mode:passive"}});
   assert.deepEqual(Array.from(c.state.actionChoices, o => o.value), ["passive:5", "mode:"]);
   c.ACTIONS.closeAction();
   assert.equal(c.state.hunterChoices.length, 0);
   assert.equal(c.state.hunterMode, "");
+});
+
+test("网页技能先选再确认，过期和后台草稿不提交", async () => {
+  const writes = [];
+  const options = [{ value: "pass", label: "不使用技能 / 确认" }, { value: "target:2", label: "对 2号开刀" }];
+  const c = client(async (path, init) => {
+    if (init.method === "POST") { writes.push(JSON.parse(init.body)); return response({}); }
+    return response({ stage: "s1", action: { choices: options.map(c => c.value), options } });
+  });
+  c.state.room = { stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, players: [{ seat: 2, name: '<玩家乙>' }] };
+  c.setRefresh(async () => {});
+  c.setConfirm(() => { throw new Error("不应出现第二层确认框"); });
+  await c.ACTIONS.openAction();
+  assert.match(c.viewActionDialog(), /skill-target-grid/);
+  assert.match(c.viewActionDialog(), /&lt;玩家乙&gt;/);
+  c.ACTIONS.confirmChoice();
+  c.ACTIONS.submitChoice({ dataset: { value: "target:2" } });
+  assert.equal(writes.length, 0);
+  assert.match(c.viewActionDialog(), /确认对 2号开刀/);
+  c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
+  assert.match(c.viewActionDialog(), /确认不使用技能/);
+  c.state.room.stage = "s2";
+  c.ACTIONS.confirmChoice();
+  assert.equal(writes.length, 0);
+  c.state.room.stage = "s1";
+  c.state.hasPendingRequest = true;
+  c.ACTIONS.confirmChoice();
+  assert.equal(writes.length, 0);
+  c.state.hasPendingRequest = false;
+  c.ACTIONS.confirmChoice();
+  for (let i = 0; i < 20 && c.state.busy; i++) await Promise.resolve();
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].value, "pass");
+  c.stop();
+  c.ACTIONS.confirmChoice();
+  assert.equal(writes.length, 1);
+  c.ACTIONS.closeAction();
+  assert.equal(c.state.skillTargets.length, 0);
+  assert.equal(c.state.draftChoice, "");
+});
+
+test("网页隐藏轮次推进，时间在标题右侧，记录定位和最新结果保持对应", async () => {
+  const room = dealtWebRoom({ history: [
+    { kind: "variant", text: "进入第2轮" },
+    { kind: "variant", text: "本轮不转换", resultType: "conversion" },
+    { kind: "skillResult", text: "技能最终结果", detail: "无人出局", startedAt: 1234567890000 },
+    { kind: "variant", text: "进入第3轮" },
+  ] });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.deepEqual(Array.from(c.state.history, h => h.key), [1, 2]);
+  assert.equal(c.state.latestResult.key, 2);
+  const html = c.viewRoom();
+  assert.ok(!html.includes("进入第"));
+  assert.match(html, /history-title"><span>技能最终结果<\/span><span class="history-time">\d{2}:\d{2}<\/span><\/div><span class="history-number">#3/);
+  assert.ok(!html.includes('history-subtitle'));
 });

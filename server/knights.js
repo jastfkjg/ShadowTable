@@ -105,13 +105,24 @@ const killers = [
   "redKnight",
   ...hunters,
 ];
+function gargoyleHistory(state) {
+  if (state.gargoyleHistory) return state.gargoyleHistory;
+  if (!state.gargoyleInfo) return [];
+  // Old saves kept only the latest result; its original inspection count is unknown.
+  return [{ ...state.gargoyleInfo, number: state.gargoyleInfo.initial ? 1 : null }];
+}
 function inspect(room, uid, target, initial = false) {
-  room.knights.players[uid].gargoyleInfo = {
+  const state = room.knights.players[uid];
+  const history = gargoyleHistory(state);
+  const result = {
+    number: history.filter((entry) => entry.number !== null).length + 1,
     seat: target.seat,
     canKill: killers.includes(room.roles[target.uid]),
     round: room.knights.round,
     initial,
   };
+  state.gargoyleHistory = [...history, result];
+  state.gargoyleInfo = result;
 }
 function drawVision(room, uid) {
   const targets = living(room);
@@ -566,6 +577,7 @@ function settle(room, check, allRoles) {
       p.b = true;
       delete p.nightInfo;
       delete p.gargoyleInfo;
+      delete p.gargoyleHistory;
     }
     p.identityRevision =
       (p.identityRevision ?? (p.availableRound > 1 ? 1 : 0)) + 1;
@@ -613,6 +625,7 @@ function updateNight(room, allRoles) {
   k.nightRound = k.round;
 }
 module.exports = {
+  gargoyleHistory,
   migrate,
   skillStatus,
   updateNight,

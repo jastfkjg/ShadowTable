@@ -36,6 +36,23 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份入口气泡，不渲染旧秘密", () => {
+  const data = { ...base, room: { phase: "tools", code: "123456", capacity: 6, team: [], me: { seat: 1 } }, dealtIdentityDialog: true };
+  const hidden = render(data);
+  assert.ok(byHandler(hidden, "revealDealtIdentity"));
+  assert.ok(byHandler(hidden, "closeDealtIdentity"));
+  assert.match(JSON.stringify(hidden), /稍后查看/);
+  const secret = { role: "梅林", faction: "好人阵营", information: "秘密视野" };
+  const shown = render({ ...data, dealtIdentitySecret: secret });
+  assert.match(JSON.stringify(shown), /秘密视野/);
+  assert.match(JSON.stringify(shown), /记住了，遮盖身份/);
+  const closed = render({ ...data, dealtIdentityDialog: false, dealtIdentitySecret: secret, identityHintVisible: true });
+  assert.ok(!JSON.stringify(closed).includes("秘密视野"));
+  assert.match(JSON.stringify(closed), /随时点这里/);
+  assert.ok(byHandler(closed, "dismissIdentityHint"));
+  const covered = render({ ...data, identityHintVisible: true });
+  assert.equal(byHandler(covered, "dismissIdentityHint"), undefined);
+});
 test("WXML入口加载/错误/禁用绑定为真实布尔条件", () => {
   const tree = render(base),
     text = JSON.stringify(tree);
@@ -288,6 +305,7 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   const tree = render({
     ...base,
     room,
+    operationProgressExpanded: true,
     history: [{ key: 0, text: "已有记录", detail: "已结算" }],
     secret: { role: "测试私密角色", information: "隐私" },
   });
@@ -298,6 +316,11 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   assert.ok(serialized.includes("未完成"));
   assert.ok(!serialized.includes("无需操作"));
   assert.ok(!serialized.includes("丙"));
+  const collapsed = render({ ...base, room, operationProgressExpanded: false });
+  assert.ok(byHandler(collapsed, "toggleOperationProgress"));
+  assert.equal(nodes(collapsed).filter(n => n.attr?.class === "progress-player").length, 0);
+  assert.match(JSON.stringify(byHandler(collapsed, "toggleOperationProgress")), /展开/);
+  assert.match(JSON.stringify(byHandler(tree, "toggleOperationProgress")), /收起/);
   const all = nodes(tree);
   const footerIndex = all.findIndex((n) => n.attr?.bindtap === "finishTools");
   assert.ok(
@@ -531,7 +554,9 @@ test("自动结算牌桌展示个人状态和持久结果，房主可结束等�
   assert.equal(byHandler(tree, "openAction"), undefined);
   assert.equal(byHandler(tree, "closeWaiting").attr.disabled, false);
   assert.ok(JSON.stringify(tree).includes("本次你无需操作"));
-  assert.ok(JSON.stringify(tree).includes("2票弃权"));
+  assert.ok(!JSON.stringify(tree).includes("2票弃权"));
+  const waiting = render({ ...data, room: { ...room, phase: "tools" } });
+  assert.ok(JSON.stringify(waiting).includes("2票弃权"));
   assert.equal(byHandler(render({ ...data, network: false }), "closeWaiting").attr.disabled, true);
   const submitted = render({ ...data, room: { ...room, canUseTools: false, closeWaiting: null, needsSubmission: true, me: { submitted: true }, operationStatus: { title: "已提交，等待其他玩家" } } });
   assert.equal(byHandler(submitted, "closeWaiting"), undefined);
@@ -657,16 +682,21 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
 });
 
 
-test("动态区等待时结果在前，操作中阶段在前，提交后不重排，身份入口位于房间信息", () => {
+test("动态区仅等待及结束时显示结果，操作中提交前后均隐藏旧结果", () => {
   const room = { code: "123456", phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: 1 }, capacity: 6 };
   const latestResult = { key: 0, text: "任务成功" };
-  for (const [phase, submitted] of [["tools", false], ["quest", false], ["quest", true]]) {
+  for (const [phase, submitted] of [["tools", false], ["ended", false], ["quest", false], ["quest", true], ["skillPrepare", false], ["skillPrepare", true], ["fairy", false], ["identity", false]]) {
     const tree = render({ ...base, room: { ...room, phase, needsSubmission: phase === "quest", me: { seat: 1, submitted } }, latestResult });
     const dynamic = nodes(tree).find(n => n.attr?.class?.startsWith("table-dynamics "));
     const children = nodes(dynamic);
     const phaseIndex = children.findIndex(n => n.attr?.class === "phase-strip");
     const resultIndex = children.findIndex(n => n.attr?.class === "latest-result");
-    assert.ok(phase === "tools" ? resultIndex < phaseIndex : phaseIndex < resultIndex);
+    if (["tools", "ended"].includes(phase)) assert.ok(resultIndex >= 0 && resultIndex < phaseIndex);
+    else {
+      assert.equal(resultIndex, -1);
+      assert.ok(phaseIndex >= 0);
+      assert.ok(!JSON.stringify(dynamic).includes("任务成功"));
+    }
     const summary = nodes(tree).find(n => n.attr?.class === "room-summary");
     assert.ok(byHandler(summary, "reveal"));
   }
@@ -702,4 +732,22 @@ test("读取身份只让身份入口加载，不触发提交或结算动画", ()
   const action = render({ ...data, busyAction: "actionIdentity", room: { phase: "identity", needsSubmission: true, me: { seat: 1 } }, actionDialog: true, stagedChoice: true, draftChoice: "confirm" });
   assert.equal(byHandler(action, "revealActionIdentity").attr.loading, true);
   assert.equal(byHandler(action, "confirmChoice").attr.loading, false);
+});
+
+test("技能网格独立选择，底部确认默认禁用并显示明确目标", () => {
+  const data = { ...base, room: { phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, team: [] },
+    actionDialog: true, skillAction: true, skillTitle: "使用技能 · 开刀", skillHint: "请选择目标", skillBodyHeight: 164,
+    skillTargets: [{ value: "target:2", label: "对 2号开刀", seat: 2, name: "玩家乙" }],
+    skillOtherChoices: [{ value: "pass", label: "本轮不使用技能" }], swapOptions: [], swapPlayers: [], swapSeats: [],
+  };
+  const initial = render(data);
+  assert.equal(nodes(initial).filter(n => n.attr?.bindtap === "submitChoice").length, 2);
+  assert.equal(byHandler(initial, "confirmChoice").attr.disabled, true);
+  assert.ok(!byHandler(initial, "confirmSwap"));
+  const selected = render({ ...data, draftChoice: "target:2", draftLabel: "对 2号开刀" });
+  assert.equal(byHandler(selected, "confirmChoice").attr.disabled, false);
+  assert.match(JSON.stringify(byHandler(selected, "confirmChoice")), /确认对 2号开刀/);
+  assert.ok(nodes(selected).some(n => n.attr?.class?.includes("skill-option is-selected")));
+  const offline = render({ ...data, draftChoice: "target:2", network: false });
+  assert.equal(byHandler(offline, "confirmChoice").attr.disabled, true);
 });

@@ -220,6 +220,8 @@ test("技能中途作废恢复出局、角色和技能；复活甲耗B牌恢复�
   assert.equal(r.knights.players.p2.armor, false);
   assert.equal(r.knights.players.p2.used, true);
   assert.equal(r.knights.deck.length, 0);
+  assert.deepEqual(r.knights.summary.redrawn, [2]);
+  assert.deepEqual(r.knights.summary.restored, []);
 });
 test("莫德雷德决斗视为好人", () => {
   for (const role of ["blueKnight", "redKnight"]) {
@@ -445,6 +447,7 @@ test("技能过程默认服务端隐藏，最终出局复活始终公示，房�
     assert.deepEqual(result.eliminated, [2]);
     assert.deepEqual(result.redrawn, [2]);
     assert.deepEqual(result.out, []);
+    assert.equal(result.detail, "本轮出局：2号；抽牌复活：2号");
     assert.ok(!JSON.stringify(result).includes("石像鬼"));
   }
   assert.throws(
@@ -477,6 +480,8 @@ test("守护、替死、换号与B牌耗尽合并后的结果不暴露秘密过�
   assert.deepEqual(result.out, [7]);
   assert.deepEqual(result.eliminated, [7]);
   assert.deepEqual(result.redrawn, []);
+  assert.match(result.detail, /最终仍出局：7号/);
+  assert.doesNotMatch(result.detail, /原牌复活/);
   assert.ok(!JSON.stringify(publicView(r, "p2").history).includes("设置守护"));
   run(r, "p1", "setSkillVisibility", { visible: true });
   assert.ok(
@@ -932,7 +937,7 @@ test("石像鬼替换红守卫且抽到立即获得持久私密随机结果，�
   const vision = r.knights.players.p2.gargoyleInfo;
   assert.ok(r.players.some(p => p.seat === vision.seat));
   assert.equal(typeof vision.canKill, "boolean");
-  assert.match(privateView(r, "p2").information, /抽牌随机查验：\d+号(拥有|没有)主动击杀能力/);
+  assert.match(privateView(r, "p2").information, /第1次查验（抽牌随机）：\d+号(拥有|没有)主动击杀能力/);
   r = JSON.parse(JSON.stringify(r));
   assert.deepEqual(r.knights.players.p2.gargoyleInfo, vision);
   skills(r, { p2: "inspect:3" });
@@ -942,11 +947,53 @@ test("石像鬼替换红守卫且抽到立即获得持久私密随机结果，�
   run(r, "p1", "setSkillVisibility", { visible: true });
   for (const p of r.players) {
     assert.ok(!JSON.stringify(publicView(r, p.uid)).includes("gargoyleInfo"));
+    assert.ok(!JSON.stringify(publicView(r, p.uid)).includes("gargoyleHistory"));
     assert.ok(!JSON.stringify(publicView(r, p.uid)).includes("3号拥有主动击杀"));
     if (p.uid !== "p2") assert.ok(!privateView(r, p.uid).information.includes("3号拥有主动击杀"));
   }
   skills(r, { p2: "inspect:4" });
   assert.match(privateView(r, "p2").information, /4号没有主动击杀能力/);
+  const history = r.knights.players.p2.gargoyleHistory;
+  assert.deepEqual(history.map(result => result.number), [1, 2, 3]);
+  assert.deepEqual(history[0], vision);
+  const information = privateView(JSON.parse(JSON.stringify(r)), "p2").information;
+  assert.match(information, /第2次查验：3号拥有主动击杀能力。\n第3次查验：4号没有主动击杀能力/);
+  assert.doesNotMatch(information, /第\d+轮查验/);
+  skills(r);
+  assert.equal(r.knights.players.p2.gargoyleHistory.length, 3);
+});
+
+test("石像鬼旧存档保留唯一已知结果，新查验追加且不虚构旧次数", () => {
+  for (const initial of [false, true]) {
+    const r = setup();
+    configure(r, { p1: "gargoyle" });
+    r.knights.players.p1.gargoyleInfo = { seat: 8, canKill: true, round: 4, initial };
+    const before = privateView(r, "p1").information;
+    assert.match(before, initial ? /第1次查验（抽牌随机）/ : /历史查验（旧版仅保留最近一次）/);
+    skills(r, { p1: "inspect:2" });
+    const information = privateView(r, "p1").information;
+    assert.match(information, /8号拥有主动击杀能力/);
+    assert.match(information, initial ? /第2次查验：2号没有/ : /第1次查验（更新后）：2号没有/);
+    assert.equal(r.knights.players.p1.gargoyleHistory.length, 2);
+  }
+});
+
+test("石像鬼查验保存当时能力，取消不增次，更换身份清除旧记录", () => {
+  const r = setup();
+  configure(r, { p1: "gargoyle", p2: "redHunter", p3: "blueAwakened" });
+  skills(r, { p1: "inspect:2" });
+  r.roles.p2 = "servant";
+  begin(r, "skills");
+  run(r, "p1", "submit", { value: "inspect:2" });
+  run(r, "p1", "cancelActivity");
+  assert.equal(r.knights.players.p1.gargoyleHistory.length, 1);
+  skills(r, { p1: "inspect:2" });
+  assert.match(privateView(r, "p1").information, /第1次查验：2号拥有主动击杀能力。\n第2次查验：2号没有主动击杀能力/);
+  r.knights.deck = ["blueGuard"];
+  skills(r, { p3: "target:1" });
+  assert.equal(r.roles.p1, "blueGuard");
+  assert.equal(r.knights.players.p1.gargoyleHistory, undefined);
+  assert.doesNotMatch(privateView(r, "p1").information, /查验记录/);
 });
 
 test("石像鬼查验全部击杀角色类别，不受技能耗尽影响，不泄露身份或换号，不能查已出局者", () => {

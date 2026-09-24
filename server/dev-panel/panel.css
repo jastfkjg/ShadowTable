@@ -172,6 +172,8 @@ p,
 .player .role {
   color: var(--accent);
 }
+.private-information,
+#identity-change-info { white-space: pre-line; }
 .actions {
   margin-top: 16px;
 }

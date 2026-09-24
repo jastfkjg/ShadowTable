@@ -514,7 +514,7 @@ if (typeof document !== "undefined") {
         }
         const role =
           $("reveal").checked && actor.secret
-            ? `<p class="role">${escape(actor.secret.role)} · ${escape(actor.secret.faction)}</p><p>${escape(actor.secret.information)}</p>`
+            ? `<p class="role">${escape(actor.secret.role)} · ${escape(actor.secret.faction)}</p><p class="private-information">${escape(actor.secret.information)}</p>`
             : "";
         return `<article class="player" data-actor="${actor.id}" aria-busy="${acting.has(actor.id)}"><h3>${r ? r.me.seat + "号 · " : ""}${escape(actor.name)}</h3><p>${r?.me.isHost ? "房主 · " : ""}${escape(spec?.label || (r?.phase === "lobby" ? (r.me.ready ? "已准备" : "等待准备") : "等待下一阶段"))}</p>${role}${actor.error ? `<p class="error">${escape(actor.error)}</p>` : ""}<div class="actions">${actions}</div></article>`;
       })

@@ -21,6 +21,43 @@
     thiefFail: "盗贼失败",
     pass: "不使用技能 / 确认",
   };
+  // Derive private skill controls only from the server's allowed choices.
+  function skillView(room, choices, hunterModes, hunterMode, swapOptions) {
+    const skillAction = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
+    const targets = choices.filter(c => /^(target|inspect|detonate|passive):\d+$/.test(c.value)).map(c => {
+      const seat = Number(c.value.split(":")[1]);
+      const player = (room.players || []).find(p => p.seat === seat);
+      return { ...c, seat, name: player ? player.name : "" };
+    });
+    let title = "使用技能";
+    let hint = "请选择一名目标，或本轮不使用技能";
+    if (swapOptions.length) {
+      title += " · 秘密换号";
+      hint = "选择两个座位交换号码，再次点击可取消";
+    } else if (hunterModes) {
+      title += hunterMode === "detonate" ? " · 主动自爆" : hunterMode === "passive" ? " · 被动开枪" : " · 猎人";
+      hint = hunterMode === "detonate" ? "第 2 步：选择相邻一人，自己将自爆出局" : hunterMode === "passive" ? "第 2 步：选择出局时开枪的目标；替女巫出局不触发" : "第 1 步：选择主动技能、被动技能，或本轮不开枪";
+    } else if (targets.length) {
+      const label = targets[0].label;
+      const name = ["指定替死者", "秘密守护", "查验", "复活", "开枪", "决斗", "开刀"].find(word => label.includes(word));
+      if (name) title += " · " + name;
+      if (name === "查验") hint = "选择一名玩家，查验其是否拥有主动击杀能力";
+    } else {
+      hint = "本阶段没有可选目标，请确认本轮选择";
+    }
+    return {
+      skillAction, skillTitle: title, skillHint: hint, skillTargets: targets,
+      skillBodyHeight: Math.ceil((swapOptions.length ? new Set(swapOptions.flatMap(v => v.split(":").slice(1))).size : targets.length) / 3) * 164 + (swapOptions.length ? 60 : 0),
+      skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({
+        ...c, label: c.value === "pass" ? (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
+      })),
+    };
+  }
+  function skillDraftLabel(choice, hunterModes) {
+    if (choice.value === "pass") return hunterModes ? "本轮不开枪" : choice.label === "确认" ? "本轮确认" : "不使用技能";
+    if (choice.value.startsWith("inspect:")) return "查验 " + choice.value.split(":")[1] + " 号";
+    return choice.label;
+  }
   function factionTone(faction) {
     if (!faction) return "";
     if (faction.indexOf("好人") !== -1) return "good";
@@ -288,6 +325,9 @@
     boardDetail: null,
     actionDialog: false,
     actionSecret: null,
+    dealtIdentityDialog: false,
+    dealtIdentitySecret: null,
+    identityHintVisible: false,
     actionLoading: false,
     actionLabel: "",
     actionChoices: [],
@@ -298,6 +338,7 @@
     draftChoice: "",
     draftLabel: "",
     stagedChoice: false,
+      skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -336,6 +377,7 @@
     history: [],
     latestResult: null,
     seatsExpanded: true,
+    operationProgressExpanded: false,
     historyExpanded: false,
     focusedHistoryKey: null,
     canStart: false,
@@ -424,6 +466,9 @@
     generation++;
     actionGeneration++;
     setState({
+      dealtIdentityDialog: false,
+      dealtIdentitySecret: null,
+      identityHintVisible: false,
       fairyResult: null,
       fairyResultRevealed: false,
       identityChange: null,
@@ -440,6 +485,7 @@
       draftChoice: "",
       draftLabel: "",
       stagedChoice: false,
+      skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -639,6 +685,7 @@ function roomListItems(rooms) {
     }
     if (!alive || code !== roomCode || sequence !== refreshSequence) return;
     var stageChanged = state.room && state.room.stage !== room.stage;
+    var privacyChanged = stageChanged || (state.room && state.room.me.identityRevision !== room.me.identityRevision);
     if (stageChanged)
       buzz(room.needsSubmission && !room.me.submitted ? [50, 40, 50] : [25]);
     var selected = stageChanged ? [] : state.selected;
@@ -652,13 +699,16 @@ function roomListItems(rooms) {
       needsLogin: false,
       selected: selected,
     };
-    if (stageChanged) {
+    if (privacyChanged) {
       generation++;
       actionGeneration++;
       patch.fairyResult = null;
       patch.fairyResultRevealed = false;
       patch.identityChange = null;
       patch.identityChangeRevealed = false;
+      patch.dealtIdentityDialog = false;
+      patch.dealtIdentitySecret = null;
+      patch.identityHintVisible = false;
       patch.revealed = false;
       patch.secret = null;
       patch.actionDialog = false;
@@ -673,6 +723,12 @@ function roomListItems(rooms) {
       patch.draftChoice = "";
       patch.draftLabel = "";
       patch.stagedChoice = false;
+      patch.skillAction = false;
+      patch.skillTitle = "";
+      patch.skillHint = "";
+      patch.skillTargets = [];
+      patch.skillBodyHeight = 0;
+      patch.skillOtherChoices = [];
       patch.swapOptions = [];
       patch.swapSeats = [];
       patch.swapPlayers = [];
@@ -742,18 +798,21 @@ function roomListItems(rooms) {
         entry.historyText = "技能结算";
         entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
         entry.resultRows = [["最终仍出局", source.out], ["本轮出局", source.eliminated], ["抽牌复活", source.redrawn], ["原牌复活", source.restored]]
-          .filter(function (row, index) { return index !== 0 || row[1].length > 0; })
+          .filter(function (row, index) { return (index !== 0 && index !== 3) || row[1].length > 0; })
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
+        entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
       entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
+    patch.operationProgressExpanded = !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
     patch.historyExpanded = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.historyExpanded : false;
     patch.focusedHistoryKey = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.focusedHistoryKey : null;
+    history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     patch.history = history;
-    patch.latestResult = history.filter(function (_, i) {
-      var h = room.history[i];
+    patch.latestResult = history.filter(function (entry) {
+      var h = room.history[entry.key];
       return ["toolVote", "toolQuest", "skillResult", "toolReverse", "toolKnife", "toolOffline", "toolCanceled", "team", "quest", "assassination"].indexOf(h.kind) !== -1 || (h.kind === "variant" && (h.number || h.resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(h.text)));
     }).pop() || null;
     patch.canStart =
@@ -829,6 +888,7 @@ function roomListItems(rooms) {
       !state.fairyResult
     )
       await showFairyResult();
+    if (showDealtIdentity()) return;
     if (
       !room.me.identityChanged &&
       !room.me.fairyResultPending &&
@@ -1100,7 +1160,91 @@ function roomListItems(rooms) {
   }
 
   // ===== identity / private views =====
+  var dealtIdentityReceipts;
+  var identityHintPending = "";
+  function identityDealKey() {
+    var room = state.room;
+    if (!room || !room.flexible || !room.game || room.me.seat == null ||
+      ["lobby", "ended", "terminated"].includes(room.phase)) return "";
+    return room.code + ":" + room.game + ":" + room.me.seat;
+  }
+  function identityReceipts() {
+    if (!dealtIdentityReceipts) {
+      var saved = safeParse(storage.get("dealtIdentityReceipts"));
+      dealtIdentityReceipts = Array.isArray(saved) ? saved : [];
+    }
+    return dealtIdentityReceipts;
+  }
+  function rememberDealtIdentity() {
+    var key = identityDealKey();
+    if (!key) return;
+    dealtIdentityReceipts = identityReceipts().filter(function (k) { return k !== key; }).concat(key).slice(-50);
+    // Persist reminder receipts only; secrets stay in memory.
+    storage.set("dealtIdentityReceipts", JSON.stringify(dealtIdentityReceipts));
+  }
+  function identityOverlayBlocked() {
+    return !alive || !foreground || !state.room || state.error || !modal.hidden ||
+      state.actionDialog || state.actionLoading || state.identityChange || state.fairyResult ||
+      state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
+  }
+  function showDealtIdentity() {
+    var key = identityDealKey();
+    if (!key || state.room.me.identityRevision > 0 || identityOverlayBlocked()) return false;
+    if (state.dealtIdentityDialog) return true;
+    if (identityReceipts().includes(key)) return false;
+    mask();
+    setState({ dealtIdentityDialog: true });
+    var first = app.querySelector && app.querySelector('[data-action="revealDealtIdentity"]');
+    if (first) first.focus({ preventScroll: true });
+    return true;
+  }
+  async function revealDealtIdentity() {
+    if (!state.dealtIdentityDialog || state.busy || !state.network || !foreground) return;
+    var key = identityDealKey(), stage = state.room.stage, gen = ++generation;
+    setState({ busy: true });
+    try {
+      var secret = await request("/api/rooms/" + roomCode + "/private");
+      if (!alive || !foreground || gen !== generation || !state.dealtIdentityDialog ||
+        key !== identityDealKey() || state.room.stage !== stage || secret.stage !== stage) return;
+      rememberDealtIdentity();
+      setState({ dealtIdentitySecret: {
+        role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
+        information: secret.information, skillStatus: secret.skillStatus,
+      } });
+      var close = app.querySelector && app.querySelector('.dealt-identity-dialog [data-action="closeDealtIdentity"]');
+      if (close) close.focus({ preventScroll: true });
+    } catch (e) {
+      if (gen === generation && foreground) handleError(e);
+    } finally {
+      setState({ busy: false });
+    }
+  }
+  function closeDealtIdentity() {
+    if (!state.dealtIdentityDialog) return;
+    rememberDealtIdentity();
+    mask();
+    if (!storage.get("identityEntryHintSeen")) identityHintPending = identityDealKey();
+    showIdentityHintWhenVisible();
+    var entry = app.querySelector && app.querySelector('[data-action="reveal"]');
+    if (entry) entry.focus({ preventScroll: true });
+  }
+  function showIdentityHintWhenVisible() {
+    if (!identityHintPending || identityHintPending !== identityDealKey() || identityOverlayBlocked() ||
+      state.dealtIdentityDialog || state.revealed || !app.querySelector) return;
+    var anchor = app.querySelector(".room-identity-anchor");
+    if (!anchor) return;
+    var rect = anchor.getBoundingClientRect();
+    if (rect.height <= 0 || rect.top < 0 || rect.bottom > window.innerHeight) return;
+    identityHintPending = "";
+    storage.set("identityEntryHintSeen", "1");
+    setState({ identityHintVisible: true });
+  }
+  function dismissIdentityHint() {
+    identityHintPending = "";
+    setState({ identityHintVisible: false });
+  }
   async function reveal() {
+    dismissIdentityHint();
     if (state.revealed) {
       mask();
       return;
@@ -1121,6 +1265,7 @@ function roomListItems(rooms) {
         state.room.stage === stage
       ) {
         secret.factionTone = factionTone(secret.faction);
+        rememberDealtIdentity();
         setState({ revealed: true, secret: secret });
       }
     } catch (e) {
@@ -1144,6 +1289,7 @@ function roomListItems(rooms) {
       draftChoice: "",
       draftLabel: "",
       stagedChoice: false,
+      skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -1188,25 +1334,7 @@ function roomListItems(rooms) {
         }),
       );
       var hunterChoices = response.action.hunterModes ? response.action.options : [];
-      setState({
-        actionDialog: true,
-        actionLabel: response.action.label,
-        hunterModes: !!response.action.hunterModes,
-        hunterMode: "",
-        hunterChoices: hunterChoices,
-        stagedChoice: ["teamVote", "quest"].indexOf(room.phase) !== -1,
-        draftChoice: "",
-        draftLabel: "",
-        swapOptions: swapOptions,
-        swapSeats: [],
-        swapPlayers: (room.players || [])
-          .filter(function (p) {
-            return swapSeatsSet.has(p.seat);
-          })
-          .map(function (p) {
-            return { seat: p.seat, name: p.name, selected: false };
-          }),
-        actionChoices: response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "不使用技能" }] : (response.action.choices || [])
+      const actionChoices = response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "本轮不开枪" }] : (response.action.choices || [])
           .filter(function (v) {
             return swapOptions.indexOf(v) === -1;
           })
@@ -1218,7 +1346,27 @@ function roomListItems(rooms) {
               value: value,
               label: (opt && opt.label) || CHOICES[value] || value,
             };
+          });
+      setState({
+        actionDialog: true,
+        actionLabel: response.action.label,
+        hunterModes: !!response.action.hunterModes,
+        hunterMode: "",
+        hunterChoices: hunterChoices,
+        stagedChoice: ["teamVote", "quest", "skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase),
+        draftChoice: "",
+        draftLabel: "",
+        swapOptions: swapOptions,
+        swapSeats: [],
+        swapPlayers: (room.players || [])
+          .filter(function (p) {
+            return swapSeatsSet.has(p.seat);
+          })
+          .map(function (p) {
+            return { seat: p.seat, name: p.name, selected: false };
           }),
+        actionChoices,
+        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {
@@ -1275,16 +1423,22 @@ function roomListItems(rooms) {
   }
   async function submitChoice(value) {
     if (state.hunterModes && value.indexOf("mode:") === 0) {
-      if (state.busy || !state.network || !state.actionDialog || state.room.stage !== actionDraftStage) return;
+      if (state.busy || state.hasPendingRequest || !state.network || !foreground || !state.actionDialog || !state.room || state.room.me.submitted || state.room.stage !== actionDraftStage) return;
+      if (!state.actionChoices.some(c => c.value === value)) return;
       var mode = value.split(":")[1];
-      setState({ hunterMode: mode, actionChoices: mode ? state.hunterChoices.filter(function (o) { return o.value.indexOf(mode + ":") === 0; }).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "不使用技能"}] });
+      const actionChoices = mode ? state.hunterChoices.filter(function (o) { return o.value.indexOf(mode + ":") === 0; }).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "本轮不开枪"}];
+      setState({ hunterMode: mode, actionChoices, draftChoice: "", draftLabel: "",
+        ...skillView(state.room, actionChoices, true, mode, state.swapOptions) });
       return;
     }
     var room = state.room;
     if (!room) return;
-    if (["teamVote", "quest"].indexOf(room.phase) !== -1) {
+    if (state.stagedChoice) {
       if (
         state.busy ||
+        state.hasPendingRequest ||
+        !state.network ||
+        state.room.me.submitted ||
         !foreground ||
         !state.actionDialog ||
         room.stage !== actionDraftStage
@@ -1293,7 +1447,8 @@ function roomListItems(rooms) {
       var choice = state.actionChoices.filter(function (c) {
         return c.value === value;
       })[0];
-      if (choice) setState({ draftChoice: value, draftLabel: choice.label });
+      if (choice) setState({ draftChoice: value, draftLabel: state.skillAction ? skillDraftLabel(choice, state.hunterModes) : choice.label,
+        swapSeats: [], swapPlayers: state.swapPlayers.map(p => ({ ...p, selected: false })) });
       return;
     }
     if (
@@ -1314,6 +1469,7 @@ function roomListItems(rooms) {
   function confirmChoice() {
     if (
       state.busy ||
+      state.hasPendingRequest ||
       !foreground ||
       !state.actionDialog ||
       !state.stagedChoice ||
@@ -1324,10 +1480,9 @@ function roomListItems(rooms) {
     )
       return;
     var value = state.draftChoice;
-    if (!state.actionChoices.some(function (c) {
-      return c.value === value;
-    }))
-      return;
+    if (!value || value.startsWith("mode:") ||
+      !(state.actionChoices.some(c => c.value === value) ||
+        (state.skillAction && state.swapOptions.includes(value)))) return;
     cmd("submit", { value: value });
   }
   async function submitTarget(seatNum) {
@@ -1341,10 +1496,12 @@ function roomListItems(rooms) {
   function toggleSwapSeat(seatNum) {
     if (
       state.busy ||
+      state.hasPendingRequest ||
       !state.network ||
       !foreground ||
       !state.actionDialog ||
       !state.room ||
+      state.room.me.submitted ||
       state.room.stage !== actionDraftStage
     )
       return;
@@ -1360,7 +1517,10 @@ function roomListItems(rooms) {
         : state.swapSeats.length < 2
           ? state.swapSeats.concat([seatNum])
           : state.swapSeats;
+    const pair = selected.slice().sort((a, b) => a - b).join(":");
+    const draft = state.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
     setState({
+      ...(state.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
       swapSeats: selected,
       swapPlayers: state.swapPlayers.map(function (p) {
         return { seat: p.seat, name: p.name, selected: selected.indexOf(p.seat) !== -1 };
@@ -1892,6 +2052,14 @@ function roomListItems(rooms) {
       return s.occupied ? (s.ready ? "已准备" : "未准备") : "可入座";
     return s.selected ? "已选入队" : s.inTeam ? "任务队员" : "";
   }
+
+  function roomMenuButton(kind, title, description, disabled) {
+    return '<button type="button" class="room-menu-action' + (kind === "delete" ? ' danger' : '') +
+      '" data-action="roomMenuAction" data-kind="' + kind + '"' + (disabled ? ' disabled' : '') +
+      '><span class="room-menu-copy"><span class="room-menu-label">' + esc(title) +
+      '</span>' + (description ? '<span class="room-menu-description">' + esc(description) + '</span>' : '') +
+      '</span><span class="room-menu-chevron" aria-hidden="true">›</span></button>';
+  }
   function seatDisabled(s) {
     var r = state.room;
     if (state.busy) return true;
@@ -1916,6 +2084,20 @@ function roomListItems(rooms) {
           btn("primary", "revealFairyResult", "查看查验结果", null, state.busy)) +
       "</div></div>"
     );
+  }
+  function viewDealtIdentity() {
+    if (!state.dealtIdentityDialog || state.error) return "";
+    var secret = state.dealtIdentitySecret;
+    return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
+      '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="small muted identity-privacy-note">仅供本人查看</div>' +
+      (secret ? '<div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
+        '</div><div class="private-info"><div class="label">你的视野</div>' + esc(secret.information) + '</div>' +
+        (secret.skillStatus ? '<div class="private-info"><div class="label">技能状态 · ' + esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>' : '') +
+        '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' +
+        btn("primary", "closeDealtIdentity", "记住了，遮盖身份") :
+        '<div class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</div>' +
+        btn("primary", "revealDealtIdentity", state.busy ? "正在读取…" : "查看身份", null, state.busy || !state.network) +
+        btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div>';
   }
   function viewIdentityChange() {
     if (!state.identityChange || state.error) return "";
@@ -2001,6 +2183,37 @@ function roomListItems(rooms) {
     return '<div class="private-info"><div class="label">技能状态 · ' +
       esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>';
   }
+  function viewSkillDialog() {
+    var locked = state.busy || state.hasPendingRequest || !state.network;
+    var html = '<div class="dialog-backdrop"><div class="error-dialog action-dialog skill-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-title" aria-describedby="skill-hint">' +
+      '<div class="skill-header"><div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
+      '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' +
+      '</div><div class="skill-body">';
+    if (["hunterTurn", "paladinTurn"].includes(state.room.phase) && state.room.operationStatus)
+      html += '<div class="skill-context">' + esc(state.room.operationStatus.detail) + '</div>';
+    function seatButton(c, swap) {
+      var selected = swap ? c.selected : state.draftChoice === c.value;
+      return '<button type="button" class="skill-option' + (selected ? ' is-selected' : '') + '" data-action="' + (swap ? 'toggleSwapSeat' : 'submitChoice') + '" ' +
+        (swap ? 'data-seat="' + c.seat : 'data-value="' + esc(c.value)) + '" aria-pressed="' + selected + '" aria-label="' + esc((swap ? c.seat + '号' : c.label) + ' ' + c.name) + '"' +
+        (locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + ' 号</span><span class="skill-name">' + esc(c.name) + '</span>' +
+        (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
+    }
+    if (state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
+    if (state.swapOptions.length) html += '<div class="skill-context">已选 ' + state.swapSeats.length + ' / 2</div><div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
+    html += '</div><div class="skill-other-choices">';
+    for (var c of state.skillOtherChoices) {
+      var selected = state.draftChoice === c.value;
+      html += '<button type="button" class="skill-other' + (selected ? ' is-selected' : '') + '" data-action="submitChoice" data-value="' + esc(c.value) + '"' +
+        (c.value === 'pass' ? ' aria-pressed="' + selected + '"' : '') + (locked ? ' disabled' : '') + '><span class="skill-other-mark" aria-hidden="true">' +
+        (selected ? '✓' : c.value === 'pass' ? '○' : '›') + '</span>' + esc(c.label) + '</button>';
+    }
+    html += '</div><div class="skill-footer"><div class="skill-summary" aria-live="polite">' +
+      (state.draftChoice ? '已选择：' + esc(state.draftLabel) : state.swapSeats.length ? '还需选择一个座位' : '尚未选择') + '</div>' +
+      (state.hunterModes && state.draftChoice === 'pass' ? '<div class="small">本轮若出局，将不会触发被动开枪。是否确认？</div>' : '') +
+      btn('primary skill-confirm', 'confirmChoice', state.busy ? '正在提交…' : state.draftChoice ? (state.draftLabel === '本轮确认' ? '确认本轮选择' : '确认' + state.draftLabel) : '请先选择', null, locked || !state.draftChoice) +
+      btn('text-button skill-later', 'closeAction', '稍后选择', null, state.busy) + '</div></div></div>';
+    return html;
+  }
   function viewActionDialog() {
     var r = state.room;
     if (
@@ -2011,6 +2224,7 @@ function roomListItems(rooms) {
       r.me.submitted
     )
       return "";
+    if (state.skillAction) return viewSkillDialog();
     var html =
       '<div class="dialog-backdrop"><div class="error-dialog action-dialog" role="dialog" aria-modal="true">' +
       '<div class="dialog-title">' +
@@ -2270,11 +2484,11 @@ function roomListItems(rooms) {
     else if (!visible.length) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
     if (state.roomMenu && !state.error) {
       var m = state.roomMenu, locked = state.busy || !!pending;
-      html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="牌桌管理"><div class="dialog-title">房间 ' + esc(m.code) + '</div>' +
-        btn("room-menu-action", "roomMenuAction", "从列表移除", {kind:"hide"}, locked) +
-        (m.available !== false && m.isMember ? btn("room-menu-action", "roomMenuAction", "离开房间", {kind:"leave"}, locked || !m.canLeave) + (!m.canLeave ? '<div class="small muted">' + (m.canLeave === false ? '当前状态暂不可离开' : '离开权限暂未同步') + '</div>' : '') : '') +
-        (m.available !== false && m.isHost ? btn("room-menu-action danger", "roomMenuAction", "解散房间", {kind:"delete"}, locked) : '') +
-        btn("secondary","closeRoomMenu","取消",null,locked) + '</div></div>';
+      html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog room-menu-dialog" role="dialog" aria-modal="true" aria-labelledby="room-menu-title" aria-describedby="room-menu-code"><div class="room-menu-header"><div id="room-menu-title" class="room-menu-heading">房间管理</div><div id="room-menu-code" class="room-menu-code">房间 ' + esc(m.code) + '</div></div><div class="room-menu-options">' +
+        roomMenuButton("hide", "从列表移除", "", locked) +
+        (m.available !== false && m.isMember ? roomMenuButton("leave", "离开房间", m.canLeave ? "" : m.canLeave === false ? "当前状态暂不可离开" : "离开权限暂未同步", locked || !m.canLeave) : '') + '</div>' +
+        (m.available !== false && m.isHost ? roomMenuButton("delete", "解散房间", "", locked) : '') +
+        btn("secondary room-menu-cancel","closeRoomMenu","取消",null,locked) + '</div></div>';
     }
     if (state.noteRoom && !state.error) html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注"><div class="dialog-title">个人备注 · ' + esc(state.noteRoom.code) + '</div><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label><input id="room-note" class="input" data-input="roomNote" maxlength="30" placeholder="例如：周五朋友局" value="' + esc(state.roomNoteDraft) + '"' + (state.busy || pending ? ' disabled' : '') + ' /><div class="dialog-actions">' + btn("secondary","closeRoomMenu","取消",null,state.busy || !!pending) + btn("primary","saveRoomNote","保存",null,state.busy || !!pending) + '</div></div></div>';
     return html;
@@ -2287,7 +2501,8 @@ function roomListItems(rooms) {
       esc(r.code) +
       '</span><span class="copy-label">复制</span></button><div class="summary-right">' +
       (r.phase !== "lobby" && r.me.seat !== null
-        ? btn("room-identity", "reveal", r.me.seat + "号 · " + (state.revealed ? "遮盖身份" : "我的身份 ›"), null, !state.revealed && (state.busy || !state.network))
+        ? '<div class="room-identity-anchor">' + btn("room-identity" + (state.identityHintVisible ? " identity-entry-highlight" : ""), "reveal", r.me.seat + "号 · " + (state.revealed ? "遮盖身份" : "我的身份 ›"), null, !state.revealed && (state.busy || !state.network)) +
+          (state.identityHintVisible && !state.dealtIdentityDialog && !identityOverlayBlocked() ? '<div class="identity-entry-hint"><span role="status">随时点这里，查看身份与视野。</span><button type="button" class="identity-hint-close" data-action="dismissIdentityHint" aria-label="关闭身份入口提示">×</button></div>' : '') + '</div>'
         : '<span class="summary-seat">' + (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "") + '</span>') +
       "</div></div>";
     html +=
@@ -2377,9 +2592,16 @@ function roomListItems(rooms) {
         "</div>";
     phaseHtml += "</div>";
     var resultHtml = "";
-    if (state.latestResult && r.phase !== "lobby")
-      resultHtml += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">' + (operationFirst ? '上次结果' : '最近结果') + '</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(state.latestResult.resultTone) + '<span>' + esc(state.latestResult.text) + '</span>' + (state.latestResult.resultTeam ? '<span class="result-team">队伍 ' + esc(state.latestResult.resultTeam) + '</span>' : '') + '</div><div class="history-detail">' + esc(state.latestResult.latestDetail || state.latestResult.detail) + '</div></div>';
-    html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + (operationFirst ? phaseHtml + resultHtml : resultHtml + phaseHtml) + '</div>';
+    if (state.latestResult && ["tools", "ended"].includes(r.phase)) {
+      var latest = state.latestResult;
+      resultHtml += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">最近结果</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(latest.resultTone) + '<span>' + esc(latest.resultRows ? "技能最终结果" : latest.text) + '</span>' + (latest.resultTeam ? '<span class="result-team">队伍 ' + esc(latest.resultTeam) + '</span>' : '') + '</div>';
+      if (latest.resultRows) {
+        if (latest.historyNote) resultHtml += '<div class="latest-result-note small muted">' + esc(latest.historyNote) + '</div>';
+        resultHtml += '<div class="history-result-rows">' + latest.resultRows.map(function (row) { return '<div class="history-result-line' + (row.final ? ' is-final' : '') + '"><span class="history-result-label">' + esc(row.label) + '</span><span class="history-result-value">' + esc(row.value) + '</span></div>'; }).join('') + '</div>';
+      } else resultHtml += '<div class="history-detail">' + esc(latest.latestDetail || latest.detail) + '</div>';
+      resultHtml += '</div>';
+    }
+    html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -2399,7 +2621,7 @@ function roomListItems(rooms) {
             r.knights.round +
             "轮 · B牌剩余" +
             r.knights.remainingCards +
-            '张</div><div class="small muted">再次发起技能或任务会自动进入新一轮；新身份技能随之生效。</div>'
+            '张</div>'
           : "") +
         '<div class="tool-actions">' +
         btn("secondary", "openTool", "投票", { kind: "vote" }, state.busy) +
@@ -2415,14 +2637,14 @@ function roomListItems(rooms) {
         "</div>";
       if (r.operationProgress) {
         html +=
-          '<div class="operation-progress"><div class="progress-heading"><span>当前操作进度</span><span>' +
+          '<div class="operation-progress"><button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '"><span class="progress-title">当前操作进度</span><span class="progress-count">' +
           r.operationProgress.completed +
           " / " +
           r.operationProgress.total +
-          " 已完成</span></div>";
+          ' 已完成</span><span class="progress-disclosure">' + (state.operationProgressExpanded ? "收起 ⌃" : "展开 ⌄") + '</span></button>';
         for (var q = 0; q < (r.operationProgress.players || []).length; q++) {
           var pp = r.operationProgress.players[q];
-          if (!pp.required) continue;
+          if (!state.operationProgressExpanded || !pp.required) continue;
           html +=
             '<div class="progress-player"><span class="progress-player-name">' +
             pp.seat +
@@ -2548,8 +2770,8 @@ function roomListItems(rooms) {
       var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
       for (var hh = 0; hh < visibleHistory.length; hh++) {
         var h = visibleHistory[hh];
-        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-heading-line"><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span></div><span class="history-number">#' + (h.key + 1) + '</span></div>';
-        if (h.timeLabel || h.historyNote) html += '<div class="small muted history-subtitle">' + esc(h.historyNote || '') + ' ' + esc(h.timeLabel || '') + '</div>';
+        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-heading-line"><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span>' + (h.timeLabel ? '<span class="history-time">' + esc(h.timeLabel) + '</span>' : '') + '</div><span class="history-number">#' + (h.key + 1) + '</span></div>';
+        if (h.historyNote) html += '<div class="small muted history-subtitle">' + esc(h.historyNote) + '</div>';
         if (h.teamLabel) html += '<div class="result-team">队伍 ' + esc(h.teamLabel) + '</div>';
         if (h.resultRows) html += '<div class="history-result-rows">' + h.resultRows.map(function (row) { return '<div class="history-result-line' + (row.final ? ' is-final' : '') + '"><span class="history-result-label">' + esc(row.label) + '</span><span class="history-result-value">' + esc(row.value) + '</span></div>'; }).join('') + '</div>';
         if (h.voteGroups) {
@@ -2961,6 +3183,7 @@ function roomListItems(rooms) {
     next.innerHTML =
       viewFairyResult() +
       viewIdentityChange() +
+      viewDealtIdentity() +
       '<div class="page' +
       (hasHostBar ? " has-host-bar" : "") +
       '">' +
@@ -2977,6 +3200,7 @@ function roomListItems(rooms) {
     enhanceSelects(next);
     patchDOM(app, next);
     validateOptionDialog();
+    showIdentityHintWhenVisible();
   }
 
   // ===== event delegation =====
@@ -2988,6 +3212,9 @@ function roomListItems(rooms) {
       setState({ error: "", recoverableError: false, hasPendingRequest: false });
     },
     reveal: reveal,
+    revealDealtIdentity: revealDealtIdentity,
+    closeDealtIdentity: closeDealtIdentity,
+    dismissIdentityHint: dismissIdentityHint,
     revealActionIdentity: revealActionIdentity,
     openAction: openAction,
     closeAction: closeAction,
@@ -3162,6 +3389,7 @@ function roomListItems(rooms) {
     },
     retrySettings: loadSettings,
     toggleSeats: function () { if (state.room && state.room.phase !== "lobby") setState({ seatsExpanded: !state.seatsExpanded }); },
+    toggleOperationProgress: function () { if (state.room?.canUseTools && state.room.operationProgress) setState({ operationProgressExpanded: !state.operationProgressExpanded }); },
     toggleHistory: function () { setState({ historyExpanded: !state.historyExpanded }); },
     showLatestRecord: function () {
       var entry = state.latestResult;
@@ -3272,6 +3500,21 @@ function roomListItems(rooms) {
   });
 
   // ===== lifecycle =====
+  window.addEventListener("scroll", showIdentityHintWhenVisible, { passive: true });
+  window.addEventListener("resize", showIdentityHintWhenVisible);
+  document.addEventListener("keydown", function (event) {
+    if (!state.dealtIdentityDialog || state.error) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDealtIdentity();
+    } else if (event.key === "Tab") {
+      var buttons = app.querySelectorAll('.dealt-identity-dialog button:not(:disabled)');
+      if (!buttons.length) return;
+      var index = Array.prototype.indexOf.call(buttons, document.activeElement);
+      event.preventDefault();
+      buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+    }
+  });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       foreground = false;
