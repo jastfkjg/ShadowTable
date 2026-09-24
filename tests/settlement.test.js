@@ -129,53 +129,32 @@ test("任务提前结束只作废，不补秘密票，不产生成功失败结�
   }
 });
 
-test("截止技能只填本阶段pass，未使用不消耗技能，后续猎人链继续等待", () => {
-  const room = knightsRoom();
-  Object.assign(room.roles, {
-    p1: "blueAwakened",
-    p2: "redHunter",
-    p3: "blueHunter",
-    p4: "blueGuard",
-  });
-  begin(room, "skills");
-  run(room, "p1", "submit", { value: "target:2" });
-  const stage = room.stage;
-  cutoff(room);
-  assert.equal(room.phase, "hunterTurn");
-  assert.notEqual(room.stage, stage);
-  assert.deepEqual(room.submissions, {});
-  assert.equal(room.knights.players.p4.used, false);
-  assert.equal(publicView(room, "p1").operationProgress.total, 12);
-  assert.equal(publicView(room, "p1").players[1].alive, true); // Deferred public deaths.
-  run(room, "p2", "submit", { value: "target:3" });
-  cutoff(room);
-  assert.equal(room.phase, "hunterTurn");
-  assert.deepEqual(room.submissions, {});
-  assert.equal(room.knights.hunters[0], "p3");
-  cutoff(room);
-  assert.equal(room.phase, "tools");
-  assert.equal(room.knights.players.p2.used, true);
-  assert.equal(room.knights.players.p3.used, false);
-  assert.deepEqual(room.history.at(-1).eliminated, [2, 3]);
-  const history = publicView(room, "p1").history;
-  assert.ok(!history.some((h) => h.kind === "skillDetail"));
-  assert.ok(!JSON.stringify(history).includes("target:"));
-  assert.ok(!JSON.stringify(history).includes("Hunter"));
+test("截止技能只补pass，猎人未选被动不触发，已选被动自动结算", () => {
+  for (const selected of [false, true]) {
+    const room = knightsRoom();
+    Object.assign(room.roles, {p1: "blueAwakened", p2: "redHunter", p3: "blueHunter", p4: "blueGuard"});
+    begin(room, "skills");
+    run(room, "p1", "submit", {value: "target:2"});
+    if (selected) run(room, "p2", "submit", {value: "passive:3"});
+    cutoff(room);
+    assert.equal(room.phase, "tools");
+    assert.equal(room.knights.players.p2.used, selected);
+    assert.equal(room.knights.players.p3.used, false);
+    assert.equal(room.knights.players.p4.used, false);
+    assert.deepEqual(room.history.at(-1).eliminated, selected ? [2, 3] : [2]);
+    assert.ok(!JSON.stringify(publicView(room, "p1").history).includes("passive:"));
+  }
 });
 
-test("正常自动技能链保留全员掩护，全部确认后自动完成", () => {
+test("整轮技能全员秘密提交，收齐后被动枪自动完成，不暴露中途状态", () => {
   const room = knightsRoom();
   Object.assign(room.roles, { p1: "blueAwakened", p2: "redHunter" });
   begin(room, "skills");
-  submitAll(room, { p1: "target:2" });
-  assert.equal(room.phase, "hunterTurn");
-  const hostView = publicView(room, "p1");
-  const alternate = structuredClone(room);
-  alternate.knights.hunters = ["p3"];
-  assert.deepEqual(publicView(alternate, "p1"), hostView);
-  submitAll(room, { p2: "target:3" });
+  run(room, "p2", "submit", { value: "passive:3" });
+  assert.equal(publicView(room, "p1").operationProgress.total, 12);
+  assert.ok(!JSON.stringify(publicView(room, "p1")).includes("passive:"));
+  for (const p of room.players.filter(p => p.uid !== "p2")) run(room, p.uid, "submit", {value: p.uid === "p1" ? "target:2" : "pass"});
   assert.equal(room.phase, "tools");
-  assert.equal(room.history.at(-1).kind, "skillResult");
   assert.deepEqual(room.history.at(-1).eliminated, [2, 3]);
 });
 
@@ -367,25 +346,17 @@ test("本人技能状态随技能资格变化，其他玩家与房主公共响�
   assert.equal(privateView(room, "p2").skillStatus.title, "技能可用");
 });
 
-test("猎人追加说明全员一致，私密技能状态仅提示当前猎人开枪", () => {
+test("猎人预选技能与圣骑士被动状态仅本人可见", () => {
   const room = knightsRoom();
-  room.roles.p1 = "blueAwakened";
-  room.roles.p2 = "blueHunter";
+  Object.assign(room.roles, {p1: "paladin", p2: "blueHunter"});
   begin(room, "skills");
-  submitAll(room, { p1: "target:2" });
-  assert.equal(room.phase, "hunterTurn");
-  assert.equal(privateView(room, "p2").skillStatus.title, "可使用出局技能");
-  assert.equal(privateView(room, "p3").skillStatus.title, "无主动技能");
-  const detail = publicView(room, "p1").operationStatus.detail;
-  assert.match(detail, /上一阶段提交已完成/);
-  for (const p of room.players) {
-    assert.equal(publicView(room, p.uid).operationStatus.detail, detail);
-    assert.ok(privateView(room, p.uid).action);
-  }
-  assert.equal(publicView(room, "p1").closeWaiting.label, "未交者跳过技能");
+  assert.equal(privateView(room, "p1").skillStatus.title, "被动反伤");
+  assert.deepEqual(privateView(room, "p1").action.choices, ["pass"]);
+  assert.equal(privateView(room, "p2").action.hunterModes, true);
+  for (const p of room.players) assert.ok(!JSON.stringify(publicView(room, p.uid)).includes("hunterModes"));
 });
 
-test("SQLite重新打开后继续圣骑士优先、猎人开枪、再次复活，不重复消耗", () => {
+test("SQLite重启保留预选被动枪，反伤与开枪原子结算且不重复消耗", () => {
   const { Store } = require("../server/store");
   const { mkdtempSync, rmSync } = require("node:fs");
   const { tmpdir } = require("node:os");
@@ -398,30 +369,66 @@ test("SQLite重新打开后继续圣骑士优先、猎人开枪、再次复活�
     let room = knightsRoom();
     Object.assign(room.roles, { p1: "blueAwakened", p2: "redHunter", p3: "paladin" });
     begin(room, "skills");
-    submitAll(room, { p1: "target:2" });
-    assert.equal(room.phase, "paladinTurn");
-    run(room, "p3", "submit", { value: "pass" });
+    run(room, "p1", "submit", {value: "target:2"});
+    run(room, "p2", "submit", {value: "passive:3"});
     store.save(room);
     store.close();
     store = new Store(file);
     room = store.get(room.code);
-    assert.equal(publicView(room, "p3").me.submitted, true);
-    for (const p of room.players.filter(p => p.uid !== "p3")) run(room, p.uid, "submit", { value: "pass" });
-    assert.equal(room.phase, "hunterTurn");
-    submitAll(room, { p2: "target:4" });
-    assert.equal(room.phase, "paladinTurn");
-    run(room, "p3", "submit", { value: "revive:4" });
-    store.save(room);
-    store.close();
-    store = new Store(file);
-    room = store.get(room.code);
-    for (const p of room.players.filter(p => p.uid !== "p3")) run(room, p.uid, "submit", { value: "pass" });
+    assert.equal(publicView(room, "p2").me.submitted, true);
+    for (const p of room.players.filter(p => !["p1", "p2"].includes(p.uid))) run(room, p.uid, "submit", {value: "pass"});
     assert.equal(room.phase, "tools");
     assert.equal(room.knights.players.p3.used, true);
-    assert.equal(room.knights.players.p4.alive, true);
+    assert.equal(room.knights.players.p3.alive, true);
+    assert.equal(room.knights.players.p2.used, true);
+    store.save(room);
+    store.close();
+    store = new Store(file);
+    room = store.get(room.code);
+    assert.equal(room.phase, "tools");
+    assert.deepEqual(room.knights.summary.eliminated, [2]);
     assert.equal(room.history.filter(h => h.kind === "skillResult").length, 1);
   } finally {
     store?.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("旧房间重启迁移红守卫为石像鬼，作废旧技能恢复快照且随机结果只生成一次", () => {
+  const { Store } = require("../server/store");
+  const { mkdtempSync, rmSync } = require("node:fs");
+  const { tmpdir } = require("node:os");
+  const { join } = require("node:path");
+  const directory = mkdtempSync(join(tmpdir(), "shadowtable-rules-"));
+  let store;
+  try {
+    const file = join(directory, "room.sqlite");
+    store = new Store(file);
+    let room = knightsRoom();
+    Object.assign(room.roles, {p1: "blueAwakened", p2: "redGuard", p3: "paladin"});
+    room.knights.deck = ["redGuard", "redHunter"];
+    room.knights.players.p2.used = true;
+    delete room.knights.rulesVersion;
+    begin(room, "skills");
+    room.phase = "paladinTurn"; // Old release persisted an interrupted revival.
+    room.knights.players.p4.alive = false;
+    store.save(room);
+    store.close();
+    store = new Store(file);
+    room = store.get(room.code);
+    assert.equal(room.phase, "tools");
+    assert.equal(room.roles.p2, "gargoyle");
+    assert.equal(room.knights.players.p4.alive, true);
+    assert.equal(room.knights.players.p2.used, false);
+    assert.deepEqual(room.knights.deck, ["gargoyle", "redHunter"]);
+    assert.match(room.history.at(-1).text, /规则已更新/);
+    assert.equal(publicView(room, "p2").me.identityChanged, true);
+    const info = privateView(room, "p2").information;
+    store.close();
+    store = new Store(file);
+    assert.equal(privateView(store.get(room.code), "p2").information, info);
+  } finally {
+    store?.close();
+    rmSync(directory, {recursive: true, force: true});
   }
 });

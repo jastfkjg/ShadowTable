@@ -369,18 +369,18 @@ test("十二骑士不提供主动先知查验和刀梅林入口，新身份提�
     ...base,
     room,
     identityChange: {
-      role: "红守卫",
+      role: "石像鬼",
       faction: "坏人阵营",
       information: "没有视野。",
     },
   };
   const hidden = render(popupData);
-  for (const value of ["红守卫", "坏人阵营", "没有视野。"])
+  for (const value of ["石像鬼", "坏人阵营", "没有视野。"])
     assert.ok(!JSON.stringify(hidden).includes(value));
   assert.ok(byHandler(hidden, "revealChangedIdentity"));
   assert.ok(!byHandler(hidden, "acknowledgeIdentity"));
   const popup = render({ ...popupData, identityChangeRevealed: true });
-  assert.ok(JSON.stringify(popup).includes("红守卫"));
+  assert.ok(JSON.stringify(popup).includes("石像鬼"));
   assert.ok(byHandler(popup, "acknowledgeIdentity"));
 });
 

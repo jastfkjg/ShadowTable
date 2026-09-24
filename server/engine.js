@@ -574,18 +574,18 @@ function privateView(room, uid) {
 
     const skillDescription = {
       blueGuard: "秘密守护一人，免疫一次出局才消耗。",
-      redGuard: "秘密守护一人，免疫一次出局才消耗。",
-      witch: "秘密指定替死者；替死者能被守护，不触发被动开枪且不能被圣骑士复活。",
+      gargoyle: "抽到时随机查验一名在场玩家；每轮可查验一人是否拥有主动击杀能力，不获知具体身份。",
+      witch: "秘密指定替死者；替死者能被守护，不触发被动开枪。指定圣骑士替死时，圣骑士本轮反伤仍结算并直接出局。",
       magician:
         "秘密交换两个号码，本轮技能按换号结算；交换号码参与实际结算即消耗技能，不会连带出局。",
       paladin:
-        "有人出局后优先选择一名本轮出局者恢复原牌，不重置技能；不能复活自己或女巫替死者。",
+        "被动反伤：本轮以刀、决斗、枪击杀你的玩家全部反伤出局，你正常存活；触发后的后续技能环节失去技能。不能反伤红女巫，替女巫出局时本轮反伤仍正常结算。",
       blueKnight: "决斗坏人，刀错自己出局；莫德雷德视为好人。",
       redKnight: "决斗好人，刀错自己出局；莫德雷德视为好人。",
       blueAwakened: "可击杀任意一人一次。",
       redAwakened: "可击杀任意一人一次。",
-      blueHunter: "可主动自爆并开枪，或被动出局后开枪；两者共用一次技能，复活不重置。女巫替死不触发被动开枪。",
-      redHunter: "可主动自爆并开枪，或被动出局后开枪；两者共用一次技能，复活不重置。女巫替死不触发被动开枪。",
+      blueHunter: "主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动枪。",
+      redHunter: "主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动枪。",
       prophet:
         "被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。",
     }[role];
@@ -601,6 +601,10 @@ function privateView(room, uid) {
       ].includes(role)
     )
       information += " 可刀刀客或B角色一次；刀错不出局，仍消耗技能。";
+    if (role === "gargoyle" && state.gargoyleInfo) {
+      const result = state.gargoyleInfo;
+      information += ` ${result.initial ? "抽牌随机查验" : `第${result.round}轮查验`}：${result.seat}号${result.canKill ? "拥有" : "没有"}主动击杀能力。`;
+    }
     if (role === "prophet") {
       information = skillDescription;
       if (state.nightInfo) information += ` ${state.nightInfo}`;

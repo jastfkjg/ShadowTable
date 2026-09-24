@@ -123,7 +123,7 @@ test("互刀与456789循环刀全部生效，不受车长和玩家排列影响",
 
 test("所有角色同时提交，守护免死仅消耗触发的守卫；目标和角色不公开", () => {
   const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "redGuard", p3: "redKnight" });
+  configure(r, { p1: "blueAwakened", p2: "blueGuard", p3: "redKnight" });
   const before = publicView(r, "p4");
   begin(r, "skills");
   assert.ok(privateView(r, "p1").action.choices.includes("target:3"));
@@ -146,7 +146,7 @@ test("所有角色同时提交，守护免死仅消耗触发的守卫；目标�
 test("换号影响刀的目标，魔术师不连带出局，抽B后本轮禁用新技能", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "magician" });
-  r.knights.deck = ["blueKnight", "redGuard"];
+  r.knights.deck = ["blueKnight", "gargoyle"];
   skills(r, { p1: "target:3", p2: "swap:3:4" });
   assert.equal(r.roles.p4, "blueKnight");
   assert.equal(r.roles.p2, "magician");
@@ -181,15 +181,13 @@ test("女巫替死能被守护；替死猎人不触发开枪", () => {
     assert.equal(r.knights.players.p3.alive, guard);
   }
 });
-test("主动刀先同时生效，再确认猎人开枪；重复/旧阶段请求拒绝", () => {
+test("主动刀同时生效，预选被动枪自动结算；重复/旧阶段请求拒绝", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "redHunter", p3: "blueAwakened" });
   r.knights.deck = [];
-  skills(r, { p1: "target:2", p3: "target:4" });
-  assert.equal(r.phase, "hunterTurn");
-  assert.equal(publicView(r, "p1").operationProgress.total, 12);
+  begin(r, "skills");
   const old = r.stage;
-  submitAll(r, { p2: "target:3" });
+  submitAll(r, { p1: "target:2", p2: "passive:3", p3: "target:4" });
   assert.equal(r.phase, "tools");
   assert.equal(r.knights.players.p3.alive, false);
   assert.equal(r.knights.players.p4.alive, false);
@@ -210,8 +208,8 @@ test("技能中途作废恢复出局、角色和技能；复活甲耗B牌恢复�
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "redHunter" });
   const before = structuredClone(r.knights.players);
-  skills(r, { p1: "target:2" });
-  assert.equal(r.phase, "hunterTurn");
+  begin(r, "skills");
+  run(r, "p1", "submit", { value: "target:2" });
   run(r, "p1", "cancelActivity");
   assert.deepEqual(r.knights.players, before);
   configure(r, { p1: "blueAwakened", p2: "merlin" });
@@ -223,21 +221,7 @@ test("技能中途作废恢复出局、角色和技能；复活甲耗B牌恢复�
   assert.equal(r.knights.players.p2.used, true);
   assert.equal(r.knights.deck.length, 0);
 });
-test("圣骑士恢复原牌不重置技能；莫德雷德决斗视为好人", () => {
-  const r = setup();
-  configure(r, {
-    p1: "blueAwakened",
-    p2: "paladin",
-    p3: "blueKnight",
-    p4: "mordred",
-  });
-  r.knights.players.p3.used = true;
-  skills(r, { p1: "target:3" });
-  assert.equal(r.phase, "paladinTurn");
-  submitAll(r, { p2: "revive:3" });
-  assert.equal(r.roles.p3, "blueKnight");
-  assert.equal(r.knights.players.p3.used, true);
-  assert.equal(r.knights.deck.length, 12);
+test("莫德雷德决斗视为好人", () => {
   for (const role of ["blueKnight", "redKnight"]) {
     const t = setup();
     configure(t, { p1: role, p2: "mordred" });
@@ -335,9 +319,9 @@ test("换号参与刀错结算仍消耗魔术师和刀；未触发守卫不消�
 test("复活新牌只向本人发未确认提醒，确认不影响他人且拒绝过期版本", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "servant" });
-  r.knights.deck = ["redGuard"];
+  r.knights.deck = ["gargoyle"];
   skills(r, { p1: "target:2" });
-  assert.equal(privateView(r, "p2").role, "红守卫");
+  assert.equal(privateView(r, "p2").role, "石像鬼");
   assert.equal(publicView(r, "p2").me.identityChanged, true);
   assert.equal(publicView(r, "p1").me.identityChanged, false);
   const rev = privateView(r, "p2").identityRevision;
@@ -348,7 +332,7 @@ test("复活新牌只向本人发未确认提醒，确认不影响他人且拒�
   );
   run(r, "p2", "ackIdentity", { revision: rev });
   assert.equal(publicView(r, "p2").me.identityChanged, false);
-  assert.equal(privateView(r, "p2").role, "红守卫");
+  assert.equal(privateView(r, "p2").role, "石像鬼");
   assert.ok(!privateView(r, "p2").information.includes("存活"));
   assert.ok(!privateView(r, "p2").information.includes("技能可用"));
 });
@@ -409,14 +393,14 @@ test("第五轮之后仍可发起任务", () => {
 test("连续技能启用新B身份，但不自动抽取转换牌", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "servant" });
-  r.knights.deck = ["redGuard"];
+  r.knights.deck = ["gargoyle"];
   r.knights.conversions = [true, false, false];
   skills(r, { p1: "target:2" });
   assert.equal(r.knights.players.p2.availableRound, 2);
   begin(r, "skills");
   assert.equal(r.knights.round, 2);
   assert.equal(r.knights.convertedRound, 0);
-  assert.ok(privateView(r, "p2").action.choices.includes("target:1"));
+  assert.ok(privateView(r, "p2").action.choices.includes("inspect:1"));
   assert.equal(r.knights.conversions.length, 3);
   const old = r.stage;
   run(r, "p1", "cancelActivity");
@@ -450,7 +434,7 @@ test("第五轮之后仍可发起技能", () => {
 test("技能过程默认服务端隐藏，最终出局复活始终公示，房主可切换", () => {
   const r = setup();
   configure(r, { p1: "blueAwakened", p2: "servant" });
-  r.knights.deck = ["redGuard"];
+  r.knights.deck = ["gargoyle"];
   skills(r, { p1: "target:2" });
   for (const uid of ["p1", "p3"]) {
     const v = publicView(r, uid);
@@ -461,7 +445,7 @@ test("技能过程默认服务端隐藏，最终出局复活始终公示，房�
     assert.deepEqual(result.eliminated, [2]);
     assert.deepEqual(result.redrawn, [2]);
     assert.deepEqual(result.out, []);
-    assert.ok(!JSON.stringify(result).includes("红守卫"));
+    assert.ok(!JSON.stringify(result).includes("石像鬼"));
   }
   assert.throws(
     () => run(r, "p3", "setSkillVisibility", { visible: true }),
@@ -507,13 +491,13 @@ test("旧过程记录默认隐藏，技能链未结束时不公示中途存活�
   assert.ok(
     !publicView(r, "p3").history.some((h) => h.text?.includes("目标2号")),
   );
-  skills(r, { p1: "target:2" });
-  assert.equal(r.phase, "hunterTurn");
+  begin(r, "skills");
+  run(r, "p1", "submit", { value: "target:2" });
   assert.equal(
     publicView(r, "p3").players.find((p) => p.seat === 2).alive,
     true,
   );
-  submitAll(r);
+  for (const p of r.players.slice(1)) run(r, p.uid, "submit", { value: "pass" });
   assert.equal(
     publicView(r, "p3").players.find((p) => p.seat === 2).alive,
     false,
@@ -620,7 +604,7 @@ test("先知被动视野仅在技能结束后更新，可随时私密查看", ()
   const r = setup();
   configure(r, {
     p2: "prophet",
-    p3: "redGuard",
+    p3: "gargoyle",
     p4: "redLancelot",
     p5: "redKnight",
   });
@@ -643,7 +627,7 @@ test("先知被动视野仅在技能结束后更新，可随时私密查看", ()
 
 test("新抽先知在本次技能结束即获得被动视野，不等待下一轮", () => {
   const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "servant", p3: "redGuard" });
+  configure(r, { p1: "blueAwakened", p2: "servant", p3: "gargoyle" });
   r.knights.deck = ["prophet"];
   skills(r, { p1: "target:2" });
   const view = privateView(r, "p2");
@@ -805,136 +789,179 @@ test("十二骑士初始见面匪互知具体身份，刀客和新B身份仍保�
 
   const [observer, changed] = meeting;
   const before = privateView(r, observer.uid).information;
-  r.roles[changed.uid] = "redGuard";
+  r.roles[changed.uid] = "gargoyle";
   r.knights.players[changed.uid].b = true;
   r.knights.players[changed.uid].availableRound = 2;
   assert.equal(privateView(r, observer.uid).information, before);
-  assert.ok(!privateView(r, observer.uid).information.includes("红守卫"));
+  assert.ok(!privateView(r, observer.uid).information.includes("石像鬼"));
   assert.ok(privateView(r, changed.uid).information.startsWith("没有视野。"));
   assert.ok(!privateView(r, changed.uid).information.includes("初始见面匪"));
 });
 
-test("圣骑士首阶段仅确认，追加阶段私密选择本轮出局者，复活猎人取消开枪", () => {
-  const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "blueHunter", p3: "paladin", p4: "redAwakened" });
-  r.knights.deck = [];
-  begin(r, "skills");
-  assert.deepEqual(privateView(r, "p3").action.choices, ["pass"]);
-  assert.throws(() => run(r, "p3", "submit", { value: "revive:2" }), /不合法/);
-  submitAll(r, { p1: "target:2", p4: "target:5" });
-  assert.equal(r.phase, "paladinTurn");
-  assert.deepEqual(privateView(r, "p3").action.choices, ["pass", "revive:2", "revive:5"]);
-  for (const p of r.players) {
-    const view = publicView(r, p.uid);
-    if (p.uid === r.host) assert.equal(view.operationProgress.total, 12);
-    assert.match(view.operationStatus.detail, /再次操作/);
-    assert.ok(!JSON.stringify(view).includes("revive:"));
-    if (p.uid !== "p3") assert.deepEqual(privateView(r, p.uid).action.choices, ["pass"]);
+test("所有十二骑士板子的两色猎人只能主动枪相邻号码，被动可选场上其他人", () => {
+  for (const size of [10, 11, 12]) for (const role of ["blueHunter", "redHunter"]) {
+    const r = newRoom("123456", "p1", "房主", size === 12 ? "knights" : `knights-${size}`, size);
+    for (let i = 2; i <= size; i++) enter(r, `p${i}`, `玩家${i}`);
+    r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
+    run(r, "p1", "start", { flexible: true });
+    configure(r, { [`p${size}`]: role });
+    r.knights.deck = [];
+    begin(r, "skills");
+    const action = privateView(r, `p${size}`).action;
+    assert.equal(action.hunterModes, true);
+    assert.deepEqual(action.choices.filter((v) => v.startsWith("detonate:")), ["detonate:1", `detonate:${size - 1}`]);
+    assert.equal(action.choices.filter((v) => v.startsWith("passive:")).length, size - 1);
+    for (const value of ["detonate:5", `passive:${size}`, "mode:detonate"])
+      assert.throws(() => run(r, `p${size}`, "submit", { value }), /不合法/);
+    submitAll(r, { [`p${size}`]: "detonate:1" });
+    assert.deepEqual(r.knights.summary.eliminated, [1, size]);
   }
-  assert.throws(() => run(r, "p1", "submit", { value: "revive:2" }), /不合法/);
-  assert.throws(() => run(r, "p3", "submit", { value: "revive:3" }), /不合法/);
-  submitAll(r, { p3: "revive:2" });
-  assert.equal(r.phase, "tools");
+});
+
+test("猎人邻座出局不能跳过空位；主动自爆必出局、目标仍受守护", () => {
+  const r = setup();
+  configure(r, { p1: "redHunter", p2: "blueGuard", p3: "blueGuard", p4: "blueHunter" });
+  r.knights.deck = [];
+  r.knights.players.p12.alive = false;
+  r.knights.players.p4.availableRound = 2;
+  begin(r, "skills");
+  assert.deepEqual(privateView(r, "p1").action.choices.filter(v => v.startsWith("detonate:")), ["detonate:2"]);
+  assert.deepEqual(privateView(r, "p4").action.choices, ["pass"]);
+  submitAll(r, { p1: "detonate:2", p2: "target:1", p3: "target:2" });
+  assert.equal(r.knights.players.p1.alive, false);
   assert.equal(r.knights.players.p2.alive, true);
   assert.equal(r.knights.players.p2.used, false);
   assert.equal(r.knights.players.p3.used, true);
-  assert.deepEqual(r.knights.summary.restored, [2]);
 });
 
-test("圣骑士先跳过，猎人开枪造成新出局后再次复活，并可打断猎人链", () => {
-  let r = setup();
-  configure(r, { p1: "blueAwakened", p2: "redHunter", p3: "paladin", p4: "blueHunter" });
-  r.knights.deck = [];
-  skills(r, { p1: "target:2" });
-  assert.equal(r.phase, "paladinTurn");
-  const oldStage = r.stage;
-  submitAll(r);
-  assert.equal(r.phase, "hunterTurn");
-  assert.equal(r.knights.players.p3.used, false);
-  submitAll(r, { p2: "target:4" });
-  assert.equal(r.phase, "paladinTurn");
-  r = JSON.parse(JSON.stringify(r)); // Reconnect / persisted state retains the chain.
-  assert.throws(() => command(r, "p3", { type: "submit", stage: oldStage, value: "revive:2" }), /阶段已变化/);
-  submitAll(r, { p3: "revive:4" });
-  assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p4.alive, true);
-  assert.equal(r.knights.players.p4.used, false);
-  assert.equal(r.knights.players.p2.used, true);
-});
-
-test("圣骑士跳过且猎人不开枪时结束，不重复询问；截止追加阶段不消耗复活", () => {
+test("被动猎人预选目标自动连锁，跳过或未出局不消耗且下轮可重选", () => {
   const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "redHunter", p3: "paladin" });
+  configure(r, { p1: "blueAwakened", p2: "blueHunter", p3: "redHunter", p5: "blueHunter" });
   r.knights.deck = [];
-  skills(r, { p1: "target:2" });
-  assert.equal(r.phase, "paladinTurn");
-  assert.equal(publicView(r, "p1").closeWaiting.mode, "pass");
-  run(r, "p1", "closeWaiting", { confirm: true });
-  assert.equal(r.phase, "hunterTurn");
-  submitAll(r);
+  skills(r, { p2: "passive:4" });
+  assert.equal(r.knights.players.p2.used, false);
+  skills(r, { p1: "target:2", p2: "passive:3", p3: "passive:4", p5: "pass" });
   assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p3.used, false);
+  assert.deepEqual(r.knights.summary.eliminated, [2, 3, 4]);
+  assert.equal(r.knights.players.p2.used, true);
+  assert.equal(r.knights.players.p3.used, true);
+  assert.equal(r.knights.players.p5.used, false);
 });
 
-test("圣骑士已出局不能复活自己或其他人，女巫替死者不可复活", () => {
-  for (const deadPaladin of [false, true]) {
+test("女巫替死不触发预选被动枪，但不取消已提交的主动邻座枪", () => {
+  for (const mode of ["passive", "detonate"]) {
     const r = setup();
-    configure(r, { p1: "blueAwakened", p2: "witch", p3: "blueHunter", p4: "paladin", p5: "redAwakened" });
+    configure(r, { p1: "blueAwakened", p2: "witch", p3: "blueHunter" });
     r.knights.deck = [];
-    skills(r, { p1: "target:2", p2: "target:3", p5: deadPaladin ? "target:4" : "target:6" });
+    skills(r, { p1: "target:2", p2: "target:3", p3: `${mode}:4` });
+    assert.equal(r.knights.players.p2.alive, true);
     assert.equal(r.knights.players.p3.alive, false);
-    if (deadPaladin) {
-      assert.equal(r.phase, "tools");
-      assert.equal(r.knights.players.p4.alive, false);
-      assert.equal(r.knights.players.p4.used, false);
-    } else {
-      assert.equal(r.phase, "paladinTurn");
-      assert.deepEqual(privateView(r, "p4").action.choices, ["pass", "revive:6"]);
-      assert.throws(() => run(r, "p4", "submit", { value: "revive:3" }), /不合法/);
-      submitAll(r, { p4: "revive:6" });
-      assert.equal(r.phase, "tools");
-    }
+    assert.equal(r.knights.players.p4.alive, mode !== "detonate");
+    assert.equal(r.knights.players.p3.used, mode === "detonate");
   }
 });
 
-test("主动自爆不受女巫替死影响，主动与被动共享次数，圣骑士救回不重置", () => {
-  const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "witch", p3: "blueHunter", p4: "paladin", p5: "redHunter", p7: "redAwakened" });
-  r.knights.deck = [];
-  // 3 is made a substitute before their committed active shot is processed.
-  skills(r, { p1: "target:2", p2: "target:3", p3: "detonate:6", p5: "detonate:8" });
-  assert.equal(r.phase, "paladinTurn");
-  assert.equal(r.knights.players.p6.alive, false);
-  assert.equal(r.knights.players.p8.alive, false);
-  assert.equal(r.knights.players.p3.used, true);
-  assert.equal(r.knights.players.p5.used, true);
-  assert.ok(!privateView(r, "p4").action.choices.includes("revive:3"));
-  submitAll(r, { p4: "revive:5" });
-  assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p5.alive, true);
-  assert.equal(r.knights.players.p5.used, true);
-  begin(r, "skills");
-  assert.deepEqual(privateView(r, "p5").action.choices, ["pass"]);
-  submitAll(r, { p7: "target:5" });
-  assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p5.alive, false);
+test("圣骑士只有确认，同一环节反伤刀、决斗、主动枪和被动枪，下轮才失效", () => {
+  for (const reverse of [false, true]) {
+    const r = setup();
+    configure(r, { p1: "gareth", p2: "redKnight", p3: "blueAwakened", p4: "redHunter", p5: "blueHunter", p6: "paladin", p8: "redAwakened", p9: "redAwakened" });
+    r.knights.deck = [];
+    if (reverse) r.players.reverse();
+    begin(r, "skills");
+    assert.deepEqual(privateView(r, "p6").action.choices, ["pass"]);
+    assert.throws(() => run(r, "p6", "submit", { value: "revive:1" }), /不合法/);
+    submitAll(r, { p1: "target:6", p2: "target:6", p3: "target:6", p4: "passive:6", p5: "detonate:6", p8: "target:4" });
+    assert.equal(r.phase, "tools");
+    assert.deepEqual(r.knights.summary.eliminated, [1, 2, 3, 4, 5]);
+    assert.equal(r.knights.players.p6.alive, true);
+    assert.equal(r.knights.players.p6.used, true);
+    skills(r, { p9: "target:6" });
+    assert.equal(r.knights.players.p6.alive, false);
+    assert.equal(r.knights.players.p9.alive, true);
+  }
 });
 
-test("猎人主动自爆必出局，向目标开枪仍可被守护，未启用或已用技能不能自爆", () => {
+test("圣骑士未触发保留技能，新抽圣骑士立即自带反伤，失去技能后仅确认", () => {
   const r = setup();
-  configure(r, { p1: "redHunter", p2: "blueGuard", p3: "redGuard", p4: "blueHunter" });
+  configure(r, { p1: "blueAwakened", p2: "paladin" });
   r.knights.deck = [];
-  r.knights.players.p4.availableRound = 2;
-  begin(r, "skills");
-  assert.ok(privateView(r, "p1").action.choices.includes("detonate:5"));
-  assert.deepEqual(privateView(r, "p4").action.choices, ["pass"]);
-  assert.throws(() => run(r, "p4", "submit", { value: "detonate:5" }), /不合法/);
-  submitAll(r, { p1: "detonate:5", p2: "target:1", p3: "target:5" });
-  assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p1.alive, false);
+  skills(r);
   assert.equal(r.knights.players.p2.used, false);
+  r.knights.players.p2.availableRound = r.knights.round + 2;
+  skills(r, { p1: "target:2" });
+  assert.equal(r.knights.players.p2.alive, true);
+  assert.equal(r.knights.players.p2.used, true);
+  begin(r, "skills");
+  assert.deepEqual(privateView(r, "p2").action.choices, ["pass"]);
+  submitAll(r);
+});
+
+test("女巫指定圣骑士替死：同轮反伤照常、圣骑士最终出局且女巫不受反伤", () => {
+  for (const witchFirst of [false, true]) for (const used of [false, true]) {
+    const r = setup();
+    configure(r, { p1: "blueAwakened", p2: "witch", p3: "paladin", p4: "redAwakened", p5: "blueGuard", p6: "blueHunter", p7: "redAwakened" });
+    r.knights.deck = [];
+    r.knights.players.p3.used = used;
+    skills(r, { p1: witchFirst ? "target:2" : "target:3", p2: "target:3", p4: witchFirst ? "target:3" : "target:2", p5: "target:3", p6: "passive:3", p7: "target:6" });
+    assert.equal(r.knights.players.p2.alive, true);
+    assert.equal(r.knights.players.p3.alive, false);
+    assert.equal(r.knights.players[witchFirst ? "p4" : "p1"].alive, used);
+    assert.equal(r.knights.players[witchFirst ? "p1" : "p4"].alive, true);
+    assert.equal(r.phase, "tools");
+  }
+});
+
+test("换号映射后的圣骑士正常反伤，魔术师消耗技能", () => {
+  const r = setup();
+  configure(r, { p1: "blueAwakened", p2: "paladin", p3: "magician" });
+  r.knights.deck = [];
+  skills(r, { p1: "target:4", p3: "swap:2:4" });
+  assert.deepEqual(r.knights.summary.eliminated, [1]);
   assert.equal(r.knights.players.p3.used, true);
-  assert.equal(r.knights.players.p5.alive, true);
+  assert.equal(r.knights.players.p2.used, true);
+});
+
+test("石像鬼替换红守卫且抽到立即获得持久私密随机结果，主动查验每轮可用", () => {
+  let r = setup();
+  assert.ok(r.knights.deck.includes("gargoyle"));
+  assert.ok(!r.knights.deck.includes("redGuard"));
+  configure(r, { p1: "blueAwakened", p3: "redHunter" });
+  r.knights.deck = ["gargoyle"];
+  skills(r, { p1: "target:2" });
+  assert.equal(r.roles.p2, "gargoyle");
+  const vision = r.knights.players.p2.gargoyleInfo;
+  assert.ok(r.players.some(p => p.seat === vision.seat));
+  assert.equal(typeof vision.canKill, "boolean");
+  assert.match(privateView(r, "p2").information, /抽牌随机查验：\d+号(拥有|没有)主动击杀能力/);
+  r = JSON.parse(JSON.stringify(r));
+  assert.deepEqual(r.knights.players.p2.gargoyleInfo, vision);
+  skills(r, { p2: "inspect:3" });
+  assert.equal(r.knights.players.p2.used, false);
+  assert.match(privateView(r, "p2").information, /3号拥有主动击杀能力/);
+  assert.ok(!privateView(r, "p2").information.includes("红猎人"));
+  run(r, "p1", "setSkillVisibility", { visible: true });
+  for (const p of r.players) {
+    assert.ok(!JSON.stringify(publicView(r, p.uid)).includes("gargoyleInfo"));
+    assert.ok(!JSON.stringify(publicView(r, p.uid)).includes("3号拥有主动击杀"));
+    if (p.uid !== "p2") assert.ok(!privateView(r, p.uid).information.includes("3号拥有主动击杀"));
+  }
+  skills(r, { p2: "inspect:4" });
+  assert.match(privateView(r, "p2").information, /4号没有主动击杀能力/);
+});
+
+test("石像鬼查验全部击杀角色类别，不受技能耗尽影响，不泄露身份或换号，不能查已出局者", () => {
+  for (const role of ["gareth", "gaheris", "blueLancelot", "redLancelot", "redSwordsman", "assassin", "blueAwakened", "redAwakened", "blueKnight", "redKnight", "blueHunter", "redHunter", "paladin", "witch", "blueGuard", "prophet", "magician", "merlin", "servant", "gargoyle"]) {
+    const r = setup();
+    configure(r, { p1: "gargoyle", p2: role, p3: "magician" });
+    r.knights.players.p2.used = true;
+    r.knights.players.p12.alive = false;
+    begin(r, "skills");
+    assert.ok(!privateView(r, "p1").action.choices.includes("inspect:12"));
+    submitAll(r, { p1: "inspect:2", p3: "swap:2:4" });
+    const expected = !["paladin", "witch", "blueGuard", "prophet", "magician", "merlin", "servant", "gargoyle"].includes(role);
+    assert.equal(r.knights.players.p1.gargoyleInfo.canKill, expected, role);
+    assert.equal(r.knights.players.p3.used, false);
+  }
 });
 
 test("换号导致骑士刀错自爆也消耗魔术师，不连带死亡且下轮不可再次换号", () => {
@@ -970,29 +997,29 @@ test("一次守护只挡一刀，两刀仍出局；梅林派西首刀原牌、�
     const r = setup();
     configure(r, { p1: "blueAwakened", p2: "redAwakened", p3: role, p4: "blueGuard", p5: "blueAwakened" });
     r.knights.players.p3.armor = true;
-    r.knights.deck = ["redKnight", "redGuard"];
+    r.knights.deck = ["redKnight", "gargoyle"];
     skills(r, { p1: "target:3", p2: "target:3", p4: "target:3" });
     assert.equal(r.knights.players.p4.used, true);
     assert.equal(r.roles.p3, role);
     assert.equal(r.knights.players.p3.armor, false);
     assert.equal(r.knights.deck.length, 1);
     skills(r, { p5: "target:3" });
-    assert.equal(r.roles.p3, "redGuard");
+    assert.equal(r.roles.p3, "gargoyle");
     assert.equal(r.knights.deck.length, 0);
   }
 });
 
-test("圣骑士追加阶段作废恢复所有技能与出局状态", () => {
+test("技能提交作废恢复全部状态，猎人可重新选择模式", () => {
   const r = setup();
   configure(r, { p1: "redHunter", p2: "paladin", p3: "magician" });
   const before = structuredClone(r.knights.players);
-  skills(r, { p1: "detonate:4", p3: "swap:4:5" });
-  assert.equal(r.phase, "paladinTurn");
+  begin(r, "skills");
+  run(r, "p1", "submit", { value: "detonate:2" });
+  run(r, "p3", "submit", { value: "swap:2:5" });
   run(r, "p1", "cancelActivity");
   assert.deepEqual(r.knights.players, before);
-  assert.equal(r.phase, "tools");
-  skills(r);
-  assert.equal(r.phase, "tools");
+  skills(r, { p1: "passive:4" });
+  assert.equal(r.knights.players.p1.used, false);
 });
 
 test("换号影响女巫替死落点时消耗魔术师，魔术师仍存活", () => {
@@ -1004,22 +1031,6 @@ test("换号影响女巫替死落点时消耗魔术师，魔术师仍存活", ()
   assert.equal(r.knights.players.p4.alive, true);
   assert.equal(r.knights.players.p3.alive, true);
   assert.equal(r.knights.players.p3.used, true);
-});
-
-test("猎人已被动开枪后被圣骑士复活，再次中刀不再开枪", () => {
-  const r = setup();
-  configure(r, { p1: "blueAwakened", p2: "blueHunter", p3: "paladin", p5: "redAwakened" });
-  r.knights.deck = [];
-  skills(r, { p1: "target:2" });
-  submitAll(r); // Paladin passes before the first shot.
-  submitAll(r, { p2: "target:4" });
-  assert.equal(r.phase, "paladinTurn");
-  submitAll(r, { p3: "revive:2" });
-  assert.equal(r.knights.players.p2.alive, true);
-  assert.equal(r.knights.players.p2.used, true);
-  skills(r, { p5: "target:2" });
-  assert.equal(r.phase, "tools");
-  assert.equal(r.knights.players.p2.alive, false);
 });
 
 test("五类A刀客与刺客互刀保持同时生效，刺客仅失去刀且下轮不可再刀", () => {
@@ -1054,4 +1065,14 @@ test("仙女查验转换后的两名兰斯洛特真实阵营并正常传递", ()
   submitAll(r, { p2: "target:3" });
   assert.match(privateView(r, "p2").fairyResult.information, /3号查验结果：好人/);
   assert.equal(r.knights.fairy, 3);
+});
+
+test("女巫替死圣骑士保留原出局抽牌顺序，本轮仍反伤后续攻击", () => {
+  const r = setup();
+  configure(r, {p1: "blueAwakened", p2: "witch", p3: "paladin", p4: "redAwakened"});
+  r.knights.deck = ["gargoyle", "blueGuard"];
+  skills(r, {p1: "target:2", p2: "target:3", p4: "target:3"});
+  assert.equal(r.roles.p3, "gargoyle");
+  assert.equal(r.roles.p4, "blueGuard");
+  assert.deepEqual(r.knights.summary.eliminated, [3, 4]);
 });

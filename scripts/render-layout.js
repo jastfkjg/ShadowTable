@@ -253,6 +253,15 @@ scenes.knightSkills = {
   actionChoices: skillAction.options,
   actionTargets: [],
 };
+for (const mode of ["", "detonate", "passive"]) {
+  knightRoom.roles.p1 = "blueHunter";
+  const action = privateView(knightRoom, "p1").action;
+  scenes["hunter" + (mode || "Modes")] = {
+    ...roomData(knightRoom), actionDialog: true, actionLabel: action.label,
+    hunterModes: true, hunterMode: mode,
+    actionChoices: mode ? action.options.filter(o => o.value.startsWith(mode + ":")).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "不使用技能"}], actionTargets: [],
+  };
+}
 const detailsRender = factory("pages/board-details/board-details.wxml");
 const boardDetail = require("../server/board-info").knights;
 scenes.boardDetails = { loading: false, error: "", hasDetail: true, title: "阿瓦隆 · 十二骑士", capacity: 12, directoryExpanded: false, ...boardDetail, summary: "" };

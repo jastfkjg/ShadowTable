@@ -204,3 +204,24 @@ test("按房间入口恢复会话，切换保留原房间未确认请求", async
   assert.equal(p.stored().rooms["123456"].actors[0].pending.id, "original");
   assert.equal(p.stored().actors.length, 0);
 });
+
+test("陪测猎人先选方式再选号码，切换不发送请求，仅提交最终目标", async () => {
+  const p = panel({ overrides: {
+    phase: "skillPrepare",
+    action: {hunterModes: true, choices: ["pass", "detonate:1", "detonate:11", "passive:5"], options: [{value: "passive:5", label: "出局时向5号开枪"}]},
+  }});
+  await flush();
+  assert.match(p.element("players").innerHTML, /hunterMode:detonate/);
+  assert.ok(!p.element("players").innerHTML.includes('data-action="detonate:1"'));
+  p.click("0", "hunterMode:detonate");
+  assert.ok(p.element("players").innerHTML.includes('data-action="detonate:11"'));
+  assert.ok(!p.element("players").innerHTML.includes('data-action="passive:5"'));
+  p.click("0", "hunterMode:");
+  p.click("0", "hunterMode:passive");
+  assert.ok(!p.element("players").innerHTML.includes('data-action="detonate:11"'));
+  assert.ok(p.element("players").innerHTML.includes('data-action="passive:5"'));
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+  p.click("0", "passive:5");
+  await flush();
+  assert.equal(p.calls.find(c => c.method === "POST").data.value, "passive:5");
+});

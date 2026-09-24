@@ -103,7 +103,10 @@ test("板子详情回归：可用板子仍保留角色配置，十二骑士技�
     const hunter = cards.find((item) => item.name.includes("猎人"));
     assert.ok(hunter, "十二骑士缺少猎人技能卡");
     assert.ok(hunter.text.includes("自爆"), "猎人卡未说明主动自爆");
-    assert.ok(hunter.text.includes("复活"), "猎人卡未说明复活后再出局不能开枪");
+    assert.ok(hunter.text.includes("相邻") && hunter.text.includes("预选"), "猎人卡应说明相邻主动枪与预选被动枪");
+    assert.ok(cards.some((item) => item.name === "石像鬼"));
+    assert.ok(!cards.some((item) => item.name === "红守卫"));
+    assert.match(cards.find((item) => item.name === "圣骑士").text, /反伤/);
     const hunters = cards.filter((item) => item.name.includes("猎人"));
     assert.equal(hunters.length, 2, "蓝/红猎人应拆分到各自阵营分组");
     const bGood = roleSections.find(

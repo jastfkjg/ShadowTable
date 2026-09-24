@@ -394,3 +394,20 @@ test("查看结果定位更早的公开记录，并展开被折叠的目标", ()
   assert.equal(c.lookups.at(-1), "history-record-0");
   assert.equal(c.scrolls[0].block, "start");
 });
+
+test("网页猎人技能三选一后只显示该模式号码，返回及阶段变化清除草稿", async () => {
+  const options = [{value: "pass", label: "不使用技能"}, {value: "detonate:1", label: "自爆并开枪1号"}, {value: "detonate:11", label: "自爆并开枪11号"}, {value: "passive:5", label: "出局时向5号开枪"}];
+  const c = client(async () => response({stage: "s1", action: {hunterModes: true, choices: options.map(o => o.value), options}}));
+  c.state.room = {code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: {submitted: false}};
+  await c.ACTIONS.openAction();
+  assert.deepEqual(Array.from(c.state.actionChoices, o => o.label), ["主动技能", "被动技能", "不使用技能"]);
+  c.ACTIONS.submitChoice({dataset: {value: "mode:detonate"}});
+  assert.deepEqual(Array.from(c.state.actionChoices, o => o.value), ["detonate:1", "detonate:11", "mode:"]);
+  assert.match(c.viewActionDialog(), /第 2 步：选择相邻一人/);
+  c.ACTIONS.submitChoice({dataset: {value: "mode:"}});
+  c.ACTIONS.submitChoice({dataset: {value: "mode:passive"}});
+  assert.deepEqual(Array.from(c.state.actionChoices, o => o.value), ["passive:5", "mode:"]);
+  c.ACTIONS.closeAction();
+  assert.equal(c.state.hunterChoices.length, 0);
+  assert.equal(c.state.hunterMode, "");
+});

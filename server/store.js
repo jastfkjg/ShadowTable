@@ -3,6 +3,7 @@ const { DatabaseSync } = require("node:sqlite");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { dirname } = require("node:path");
 const { roomSummary } = require("./engine");
+const { migrate: migrateKnights } = require("./knights");
 class Store {
   constructor(path) {
     if (path !== ":memory:")
@@ -23,6 +24,12 @@ class Store {
     this.db.exec(
       "CREATE INDEX IF NOT EXISTS admin_audit_room ON admin_audit(code, id)",
     );
+    this.transaction(() => {
+      for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
+        const room = JSON.parse(row.state);
+        if (migrateKnights(room)) this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), row.code);
+      }
+    });
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");

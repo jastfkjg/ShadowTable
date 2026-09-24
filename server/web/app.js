@@ -291,6 +291,9 @@
     actionLoading: false,
     actionLabel: "",
     actionChoices: [],
+    hunterModes: false,
+    hunterMode: "",
+    hunterChoices: [],
     actionTargets: [],
     draftChoice: "",
     draftLabel: "",
@@ -430,6 +433,9 @@
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
+      hunterModes: false,
+      hunterMode: "",
+      hunterChoices: [],
       actionTargets: [],
       draftChoice: "",
       draftLabel: "",
@@ -660,6 +666,9 @@ function roomListItems(rooms) {
       patch.actionLoading = false;
       patch.actionLabel = "";
       patch.actionChoices = [];
+      patch.hunterModes = false;
+      patch.hunterMode = "";
+      patch.hunterChoices = [];
       patch.actionTargets = [];
       patch.draftChoice = "";
       patch.draftLabel = "";
@@ -1128,6 +1137,9 @@ function roomListItems(rooms) {
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
+      hunterModes: false,
+      hunterMode: "",
+      hunterChoices: [],
       actionTargets: [],
       draftChoice: "",
       draftLabel: "",
@@ -1175,9 +1187,13 @@ function roomListItems(rooms) {
           return v.split(":").slice(1).map(Number);
         }),
       );
+      var hunterChoices = response.action.hunterModes ? response.action.options : [];
       setState({
         actionDialog: true,
         actionLabel: response.action.label,
+        hunterModes: !!response.action.hunterModes,
+        hunterMode: "",
+        hunterChoices: hunterChoices,
         stagedChoice: ["teamVote", "quest"].indexOf(room.phase) !== -1,
         draftChoice: "",
         draftLabel: "",
@@ -1190,7 +1206,7 @@ function roomListItems(rooms) {
           .map(function (p) {
             return { seat: p.seat, name: p.name, selected: false };
           }),
-        actionChoices: (response.action.choices || [])
+        actionChoices: response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "不使用技能" }] : (response.action.choices || [])
           .filter(function (v) {
             return swapOptions.indexOf(v) === -1;
           })
@@ -1258,6 +1274,12 @@ function roomListItems(rooms) {
     }
   }
   async function submitChoice(value) {
+    if (state.hunterModes && value.indexOf("mode:") === 0) {
+      if (state.busy || !state.network || !state.actionDialog || state.room.stage !== actionDraftStage) return;
+      var mode = value.split(":")[1];
+      setState({ hunterMode: mode, actionChoices: mode ? state.hunterChoices.filter(function (o) { return o.value.indexOf(mode + ":") === 0; }).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "不使用技能"}] });
+      return;
+    }
     var room = state.room;
     if (!room) return;
     if (["teamVote", "quest"].indexOf(room.phase) !== -1) {
@@ -2021,6 +2043,7 @@ function roomListItems(rooms) {
         "</div>";
     }
     if (["paladinTurn", "hunterTurn"].indexOf(r.phase) !== -1) html += '<div class="small muted">' + esc(r.operationStatus ? r.operationStatus.detail : "进入追加技能确认，上一阶段提交已完成。") + '</div>';
+    if (state.hunterModes) html += '<div class="small muted">' + (state.hunterMode ? (state.hunterMode === "detonate" ? "第 2 步：选择相邻一人，自己将自爆出局" : "第 2 步：选择出局时开枪的目标") : "第 1 步：选择技能方式") + '</div>';
     html += '<div class="action-choice-list">';
     for (var i = 0; i < state.actionChoices.length; i++) {
       var c = state.actionChoices[i];

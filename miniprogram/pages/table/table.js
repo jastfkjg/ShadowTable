@@ -132,6 +132,9 @@ Page({
     actionLoading: false,
     actionLabel: "",
     actionChoices: [],
+    hunterModes: false,
+    hunterMode: "",
+    hunterChoices: [],
     actionTargets: [],
     draftChoice: "",
     draftLabel: "",
@@ -233,6 +236,9 @@ Page({
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
+      hunterModes: false,
+      hunterMode: "",
+      hunterChoices: [],
       actionTargets: [],
       draftChoice: "",
       draftLabel: "",
@@ -411,6 +417,9 @@ Page({
           actionLoading: false,
           actionLabel: "",
           actionChoices: [],
+          hunterModes: false,
+          hunterMode: "",
+          hunterChoices: [],
           actionTargets: [],
           draftChoice: "",
           draftLabel: "",
@@ -1237,6 +1246,9 @@ Page({
       actionLoading: false,
       actionLabel: "",
       actionChoices: [],
+      hunterModes: false,
+      hunterMode: "",
+      hunterChoices: [],
       actionTargets: [],
       draftChoice: "",
       draftLabel: "",
@@ -1283,9 +1295,13 @@ Page({
         swapOptions.flatMap((v) => v.split(":").slice(1).map(Number)),
       );
       // Identity is fetched separately only after an explicit reveal tap.
+      const hunterChoices = response.action.hunterModes ? response.action.options : [];
       this.setData({
         actionDialog: true,
         actionLabel: response.action.label,
+        hunterModes: !!response.action.hunterModes,
+        hunterMode: "",
+        hunterChoices,
         stagedChoice: ["teamVote", "quest"].includes(room.phase),
         draftChoice: "",
         draftLabel: "",
@@ -1294,7 +1310,7 @@ Page({
         swapPlayers: (room.players || [])
           .filter((p) => swapSeats.has(p.seat))
           .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
-        actionChoices: (response.action.choices || [])
+        actionChoices: response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "不使用技能" }] : (response.action.choices || [])
           .filter((v) => !swapOptions.includes(v))
           .map((value) => ({
             value,
@@ -1567,6 +1583,12 @@ Page({
   },
   async submitChoice(e) {
     const value = e.currentTarget.dataset.value;
+    if (this.data.hunterModes && value.startsWith("mode:")) {
+      if (this.data.busy || !this.data.network || !this.data.actionDialog || this.data.room.stage !== this.actionDraftStage) return;
+      const mode = value.split(":")[1];
+      this.setData({ hunterMode: mode, actionChoices: mode ? this.data.hunterChoices.filter((o) => o.value.startsWith(mode + ":")).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "不使用技能"}] });
+      return;
+    }
     if (["teamVote", "quest"].includes(this.data.room?.phase)) {
       if (
         this.data.busy ||

@@ -300,6 +300,7 @@ if (typeof document !== "undefined") {
   const teams = {},
     targets = {},
     swaps = {},
+    hunterModes = {},
     hostDrafts = {},
     transfers = {};
   const names = {
@@ -403,7 +404,10 @@ if (typeof document !== "undefined") {
           const swapChoices = spec.choices.filter((v) =>
             /^swap:\d+:\d+$/.test(v),
           );
-          actions = spec.choices
+          if (hunterModes[actor.id]?.stage !== r.stage) hunterModes[actor.id] = {stage: r.stage, mode: ""};
+          const hunterMode = hunterModes[actor.id].mode;
+          const choices = spec.hunterModes ? (hunterMode ? spec.choices.filter((v) => v.startsWith(hunterMode + ":")) : []) : spec.choices;
+          actions = choices
             .filter((v) => !swapChoices.includes(v))
             .map((v) =>
               button(
@@ -419,6 +423,9 @@ if (typeof document !== "undefined") {
               ),
             )
             .join("");
+          if (spec.hunterModes) {
+            actions = hunterMode ? `<p>第 2 步：${hunterMode === "detonate" ? "选择相邻一人，自爆开枪" : "选择出局时开枪的目标"}</p>` + actions + button("hunterMode:", "返回选择技能方式") : '<p>第 1 步：选择技能方式</p>' + button("hunterMode:detonate", "主动技能") + button("hunterMode:passive", "被动技能") + button("pass", "不使用技能");
+          }
           if (swapChoices.length) {
             if (swaps[actor.id]?.stage !== r.stage)
               swaps[actor.id] = { stage: r.stage, seats: [] };
@@ -674,6 +681,12 @@ if (typeof document !== "undefined") {
         "准备状态已确认",
         { actor, refresh: false },
       );
+      return;
+    }
+    if (action.startsWith("hunterMode:")) {
+      if (!actor.secret?.action?.hunterModes) return;
+      hunterModes[actor.id] = {stage: actor.room.stage, mode: action.split(":")[1]};
+      render();
       return;
     }
     if (action.startsWith("swapSeat:")) {

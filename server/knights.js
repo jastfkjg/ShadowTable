@@ -1,5 +1,5 @@
 "use strict";
-const { randomUUID } = require("node:crypto");
+const { randomUUID, randomInt } = require("node:crypto");
 const { roles } = require("./variants");
 const swords = [
   "gareth",
@@ -9,7 +9,7 @@ const swords = [
   "redSwordsman",
   "assassin",
 ];
-const guards = ["blueGuard", "redGuard"];
+const guards = ["blueGuard"];
 const hunters = ["blueHunter", "redHunter"];
 const bRoles = Object.keys(roles).slice(
   Object.keys(roles).indexOf("blueAwakened"),
@@ -19,6 +19,7 @@ function init(room, shuffle) {
   const blue = shuffle(bRoles.filter((r) => roles[r][1] === "good"));
   const red = shuffle(bRoles.filter((r) => roles[r][1] === "evil"));
   room.knights = {
+    rulesVersion: 2,
     initialRoles: { ...room.roles },
     deck: [
       ...shuffle([...red.splice(0, 2), ...blue.splice(0, 2)]),
@@ -49,6 +50,38 @@ function init(room, shuffle) {
     ),
   };
 }
+// Upgrade persisted games once. Unsettled old submissions cannot safely be
+// reinterpreted as preselected passive guns; restore that cycle for resubmission.
+function migrate(room) {
+  const k = room.knights;
+  if (!k || k.rulesVersion === 2) return false;
+  if (
+    ["skillPrepare", "skillTurn", "hunterTurn", "paladinTurn"].includes(
+      room.phase,
+    )
+  ) {
+    cancel(room);
+    room.history.push({
+      kind: "toolCanceled",
+      text: "技能规则已更新，本轮旧提交已作废，请重新发起技能。",
+    });
+    room.activity = null;
+    room.team = [];
+    resetStage(room, "tools");
+  }
+  k.deck = k.deck.map((role) => (role === "redGuard" ? "gargoyle" : role));
+  for (const [uid, role] of Object.entries(room.roles)) {
+    if (role !== "redGuard") continue;
+    room.roles[uid] = "gargoyle";
+    const p = k.players[uid];
+    p.used = false;
+    p.identityRevision =
+      (p.identityRevision ?? (p.availableRound > 1 ? 1 : 0)) + 1;
+    if (p.alive) drawVision(room, uid);
+  }
+  k.rulesVersion = 2;
+  return true;
+}
 function resetStage(room, phase) {
   room.phase = phase;
   room.stage = randomUUID();
@@ -64,16 +97,26 @@ function eligible(room, uid) {
   const p = room.knights.players[uid];
   return p.alive && !p.used && p.availableRound <= room.knights.round;
 }
-function revivalTargets(room, uid) {
-  return room.knights.deaths
-    .filter(
-      (d) =>
-        d.uid !== uid &&
-        !d.substitute &&
-        d.round === room.knights.round &&
-        !room.knights.players[d.uid].alive,
-    )
-    .map((d) => room.players.find((p) => p.uid === d.uid));
+const killers = [
+  ...swords,
+  "blueAwakened",
+  "redAwakened",
+  "blueKnight",
+  "redKnight",
+  ...hunters,
+];
+function inspect(room, uid, target, initial = false) {
+  room.knights.players[uid].gargoyleInfo = {
+    seat: target.seat,
+    canKill: killers.includes(room.roles[target.uid]),
+    round: room.knights.round,
+    initial,
+  };
+}
+function drawVision(room, uid) {
+  const targets = living(room);
+  if (targets.length)
+    inspect(room, uid, targets[randomInt(targets.length)], true);
 }
 // Private, caller-only status; never include this in public room state.
 function skillStatus(room, uid) {
@@ -86,12 +129,6 @@ function skillStatus(room, uid) {
     return {
       title: "可使用出局技能",
       detail: "本次可选择开枪目标，或选择不使用技能。",
-    };
-  if (room.phase === "paladinTurn" && k.paladin === uid)
-    return {
-      title: "可选择复活",
-      detail:
-        "选择一名本轮出局玩家恢复原身份，或暂不复活；不能复活女巫替死者。",
     };
   if (!p.alive)
     return {
@@ -113,6 +150,12 @@ function skillStatus(room, uid) {
       title: "技能已用完",
       detail: "当前身份的技能次数已消耗，按提示确认即可。",
     };
+  if (role === "paladin")
+    return {
+      title: "被动反伤",
+      detail:
+        "本技能环节反伤所有刀、决斗、枪的击杀者，自身存活；触发后后续环节失效。无法反伤红女巫，替女巫出局时本轮反伤仍结算。",
+    };
   if (p.availableRound > k.round)
     return {
       title: "新技能尚未启用",
@@ -122,12 +165,12 @@ function skillStatus(room, uid) {
     return {
       title: "技能可用",
       detail:
-        "可主动自爆并开枪，或保留被动出局开枪；两者共用一次机会。替女巫出局不触发被动开枪。",
+        "主动自爆带走相邻一人，或预选场上其他一人于出局时开枪；也可不使用技能。替女巫出局不触发被动枪。",
     };
-  if (role === "paladin")
+  if (role === "gargoyle")
     return {
-      title: "等待出局触发",
-      detail: "有人出局后优先获得选人复活机会；不能复活自己或女巫替死者。",
+      title: "技能可用",
+      detail: "每轮可查验一名在场玩家是否拥有主动击杀能力，不获知身份。",
     };
   return {
     title: "技能可用",
@@ -139,7 +182,10 @@ function action(room, uid) {
     p = k.players[uid],
     role = room.roles[uid];
   const targets = living(room).map((p) => ({ seat: p.seat, name: p.name }));
-  const pass = { value: "pass", label: "不使用技能 / 确认" };
+  const pass = {
+    value: "pass",
+    label: role === "paladin" ? "确认" : "不使用技能 / 确认",
+  };
   let options = [pass];
   if (room.phase === "skillPrepare") {
     if (eligible(room, uid)) {
@@ -171,37 +217,40 @@ function action(room, uid) {
           label: `对 ${t.seat}号${["blueKnight", "redKnight"].includes(role) ? "决斗" : "开刀"}`,
         })),
       );
-    if (eligible(room, uid) && hunters.includes(role))
+    if (eligible(room, uid) && hunters.includes(role)) {
+      const seat = room.players.find((p) => p.uid === uid).seat;
+      const size = room.players.length;
+      const neighbors = [((seat + size - 2) % size) + 1, (seat % size) + 1];
       options.push(
         ...targets
-          .filter(
-            (t) => t.seat !== room.players.find((p) => p.uid === uid).seat,
-          )
+          .filter((t) => neighbors.includes(t.seat))
           .map((t) => ({
             value: `detonate:${t.seat}`,
-            label: `主动自爆出局，并向 ${t.seat}号开枪（消耗唯一技能）`,
+            label: `主动自爆并向 ${t.seat}号开枪`,
           })),
+        ...targets
+          .filter((t) => t.seat !== seat)
+          .map((t) => ({
+            value: `passive:${t.seat}`,
+            label: `被动开枪：出局时向 ${t.seat}号开枪`,
+          })),
+      );
+    }
+    if (eligible(room, uid) && role === "gargoyle")
+      options.push(
+        ...targets.map((t) => ({
+          value: `inspect:${t.seat}`,
+          label: `查验 ${t.seat}号是否拥有主动击杀能力`,
+        })),
       );
     return {
       kind: "choice",
       label: "同时秘密提交技能；不使用技能请选择确认",
       choices: options.map((o) => o.value),
       options,
-    };
-  }
-  if (room.phase === "paladinTurn") {
-    if (uid === k.paladin && eligible(room, uid))
-      options.push(
-        ...revivalTargets(room, uid).map((t) => ({
-          value: `revive:${t.seat}`,
-          label: `复活 ${t.seat}号，保留原身份与技能使用状态`,
-        })),
-      );
-    return {
-      kind: "choice",
-      label: "追加技能确认",
-      choices: options.map((o) => o.value),
-      options,
+      ...(eligible(room, uid) && hunters.includes(role)
+        ? { hunterModes: true }
+        : {}),
     };
   }
   if (["skillTurn", "hunterTurn"].includes(room.phase)) {
@@ -251,10 +300,9 @@ function begin(room, kind, check) {
     k.witches = {};
     k.swap = null;
     k.hunters = [];
-    k.deathRevision = 0;
-    k.revivalOffered = {};
-    delete k.paladin;
-    // Seat order only breaks ties for protection, revival and card draws.
+    k.reflected = [];
+    k.forcedPaladins = [];
+    // Seat order only breaks ties for protection and card draws.
     // Committed skills use the initial snapshot, so mutual attacks both resolve.
     k.order = room.players
       .slice()
@@ -300,6 +348,7 @@ function settle(room, check, allRoles) {
     substitute = false,
     visited = new Set(),
     selfDestruct = false,
+    attacker = null,
   ) => {
     if (!uid || !k.players[uid].alive || visited.has(uid)) return;
     visited.add(uid);
@@ -309,6 +358,34 @@ function settle(room, check, allRoles) {
       k.swap?.seats.includes(room.players.find((p) => p.uid === uid).seat)
     )
       k.swap.triggered = true;
+    const paladinState = k.snapshot?.players[uid];
+    if (!selfDestruct && room.roles[uid] === "paladin") {
+      if (substitute) {
+        // Witch substitution must eliminate the paladin, but only after all
+        // committed attacks and passive guns have had their reflection resolved.
+        if (!k.forcedPaladins.includes(uid)) {
+          k.forcedPaladins.push(uid);
+          // Reserve the substitution's position in the B-card draw order.
+          k.deaths = k.deaths.filter((d) => d.uid !== uid);
+          k.deaths.push({ uid, substitute: true, round: k.round });
+        }
+        return;
+      }
+      if (
+        paladinState?.alive &&
+        !paladinState.used &&
+        attacker &&
+        attacker !== uid &&
+        room.roles[attacker] !== "witch"
+      ) {
+        if (!k.reflected.includes(uid)) k.reflected.push(uid);
+        kill(attacker, false, new Set(), true);
+        k.events.push(
+          `${room.players.find((p) => p.uid === uid).seat}号反伤，${room.players.find((p) => p.uid === attacker).seat}号出局`,
+        );
+        return;
+      }
+    }
     const guard = Object.keys(k.guards).find(
       (g) => !k.players[g].used && k.guards[g] === uid,
     );
@@ -332,14 +409,16 @@ function settle(room, check, allRoles) {
     }
     k.players[uid].alive = false;
     if (!k.cycleEliminated.includes(uid)) k.cycleEliminated.push(uid);
-    k.deaths = k.deaths.filter((d) => d.uid !== uid);
-    k.deaths.push({ uid, substitute, round: k.round });
-    k.deathRevision = (k.deathRevision || 0) + 1;
+    if (!k.forcedPaladins.includes(uid)) {
+      k.deaths = k.deaths.filter((d) => d.uid !== uid);
+      k.deaths.push({ uid, substitute, round: k.round });
+    }
     if (
       !substitute &&
       hunters.includes(room.roles[uid]) &&
       !k.players[uid].used &&
-      k.players[uid].availableRound <= k.round
+      k.players[uid].availableRound <= k.round &&
+      k.planned?.[uid]?.startsWith("passive:")
     )
       k.hunters.push(uid);
   };
@@ -375,6 +454,14 @@ function settle(room, check, allRoles) {
         );
     }
     k.planned = { ...room.submissions };
+    // Inspect the submitted seats directly, before simultaneous attacks/draws.
+    for (const p of room.players)
+      if (room.roles[p.uid] === "gargoyle" && val(p.uid).startsWith("inspect:"))
+        inspect(
+          room,
+          p.uid,
+          room.players.find((t) => t.seat === Number(val(p.uid).split(":")[1])),
+        );
     // Reserve the shared hunter skill before any simultaneous deaths can queue
     // its passive shot. A committed active shot survives a witch substitution.
     for (const p of room.players)
@@ -388,44 +475,24 @@ function settle(room, check, allRoles) {
     return settle(room, check, allRoles);
   }
   const hunter = room.phase === "hunterTurn";
-  const paladin = room.phase === "paladinTurn";
-  const actor = paladin
-    ? k.paladin
-    : hunter
-      ? k.hunters.shift()
-      : k.order[k.cursor++];
+  const actor = hunter ? k.hunters.shift() : k.order[k.cursor++];
   const role = room.roles[actor],
-    value =
-      hunter || paladin
-        ? val(actor)
-        : (
-              k.snapshot?.players[actor]
-                ? k.snapshot.players[actor].alive &&
-                  !k.snapshot.players[actor].used &&
-                  k.snapshot.players[actor].availableRound <= k.round
-                : eligible(room, actor)
-            )
-          ? k.planned[actor]
-          : "pass";
-  if (paladin && value.startsWith("revive:") && eligible(room, actor)) {
-    // Revival choices refer to actual eliminated players, not attack numbers.
-    const target = revivalTargets(room, actor).find(
-      (p) => p.seat === Number(value.split(":")[1]),
-    );
-    if (target) {
-      k.players[actor].used = true;
-      k.players[target.uid].alive = true;
-      k.cycleRestored.push(target.uid);
-      k.events.push(
-        `${room.players.find((p) => p.uid === actor).seat}号使用复活，${target.seat}号恢复原身份（不公开角色）`,
-      );
-      k.hunters = k.hunters.filter((uid) => uid !== target.uid);
-    }
-  } else if (hunters.includes(role) && value.startsWith("detonate:")) {
+    value = hunter
+      ? k.planned[actor].replace("passive:", "target:")
+      : (
+            k.snapshot?.players[actor]
+              ? k.snapshot.players[actor].alive &&
+                !k.snapshot.players[actor].used &&
+                k.snapshot.players[actor].availableRound <= k.round
+              : eligible(room, actor)
+          )
+        ? k.planned[actor]
+        : "pass";
+  if (hunters.includes(role) && value.startsWith("detonate:")) {
     k.players[actor].used = true;
     kill(actor, false, new Set(), true);
     const target = targetUid(value, true);
-    kill(target);
+    kill(target, false, new Set(), false, actor);
     k.events.push(
       `${room.players.find((p) => p.uid === actor).seat}号主动自爆并开枪，目标${value.split(":")[1]}号`,
     );
@@ -439,19 +506,24 @@ function settle(room, check, allRoles) {
     const target = targetUid(value, true),
       targetRole = room.roles[target];
     k.players[actor].used = true;
-    if (hunter || ["blueAwakened", "redAwakened"].includes(role)) kill(target);
+    if (hunter || ["blueAwakened", "redAwakened"].includes(role))
+      kill(target, false, new Set(), false, actor);
     else if (["blueKnight", "redKnight"].includes(role))
       kill(
         side(room, actor, allRoles) ===
           (targetRole === "mordred" ? "good" : side(room, target, allRoles))
           ? actor
           : target,
+        false,
+        new Set(),
+        false,
+        actor,
       );
     else if (swords.includes(role)) {
       if (targetRole === "assassin") {
         k.players[target].used = true;
       } else if (swords.includes(targetRole) || k.players[target].b)
-        kill(target);
+        kill(target, false, new Set(), false, actor);
     }
     const dead = room.players
       .filter((p) => aliveBefore.has(p.uid) && !k.players[p.uid].alive)
@@ -466,34 +538,15 @@ function settle(room, check, allRoles) {
     room.submissions = k.planned;
     return settle(room, check, allRoles);
   }
-  // Offer revival once per new death batch, always before the next hunter shot.
-  // Passing retains the skill but cannot cause an endless confirmation loop.
-  k.revivalOffered ||= {};
-  const revision = k.deathRevision || k.deaths.length;
-  const reviver = room.players
-    .slice()
-    .sort((a, b) => a.seat - b.seat)
-    .find(
-      (p) =>
-        room.roles[p.uid] === "paladin" &&
-        eligible(room, p.uid) &&
-        k.revivalOffered[p.uid] !== revision &&
-        revivalTargets(room, p.uid).length,
-    );
-  if (reviver) {
-    k.paladin = reviver.uid;
-    k.revivalOffered[reviver.uid] = revision;
-    resetStage(room, "paladinTurn");
-    return false;
-  }
-  delete k.paladin;
   k.hunters = k.hunters.filter(
     (uid) => !k.players[uid].alive && !k.players[uid].used,
   );
   if (k.hunters.length) {
-    resetStage(room, "hunterTurn");
-    return false;
+    room.phase = "hunterTurn";
+    return settle(room, check, allRoles);
   }
+  for (const uid of k.reflected) k.players[uid].used = true;
+  for (const uid of k.forcedPaladins) kill(uid, true, new Set(), true);
   const drawn = [];
   // Draw once, in death order, only for players who remain dead.
   for (const death of k.deaths) {
@@ -510,12 +563,15 @@ function settle(room, check, allRoles) {
       p.faction = null;
       p.b = true;
       delete p.nightInfo;
+      delete p.gargoyleInfo;
     }
     p.identityRevision =
       (p.identityRevision ?? (p.availableRound > 1 ? 1 : 0)) + 1;
     p.alive = true;
     p.availableRound = k.round + 1;
   }
+  for (const uid of drawn)
+    if (room.roles[uid] === "gargoyle") drawVision(room, uid);
   k.deaths = k.deaths.filter((d) => !k.players[d.uid].alive);
   const seats = (ids) =>
     [...new Set(ids)]
@@ -555,6 +611,7 @@ function updateNight(room, allRoles) {
   k.nightRound = k.round;
 }
 module.exports = {
+  migrate,
   skillStatus,
   updateNight,
   init,

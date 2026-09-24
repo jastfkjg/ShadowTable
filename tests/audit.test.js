@@ -92,7 +92,7 @@ test("旧记录只合并连续同阶段，不将跨阶段的同名操作合并",
   assert.ok(result.groups.every((group) => !group.active));
 });
 
-test("技能记录保存发起时间，猎人和圣骑士追加阶段沿用同次技能时间", () => {
+test("猎人预选技能记录保存发起时间，整轮自动结算记录沿用同次时间", () => {
   const { enter, command } = require("../server/engine");
   const room = newRoom("123456", "p1", "房主", "knights", 12);
   for (let i = 2; i <= 12; i++) enter(room, `p${i}`, `玩家${i}`);
@@ -122,16 +122,11 @@ test("技能记录保存发起时间，猎人和圣骑士追加阶段沿用同�
       .activityStartedAt,
     startedAt,
   );
-  for (const p of room.players)
-    run(p.uid, "submit", { value: p.uid === "p1" ? "target:2" : "pass" });
-  assert.equal(room.phase, "paladinTurn");
-  assert.equal(
-    actionDetails(room, "p3", "submit", { value: "pass" }).activityStartedAt,
-    startedAt,
-  );
-  for (const p of room.players) run(p.uid, "submit", { value: "pass" });
-  assert.equal(room.phase, "hunterTurn");
-  const shot = actionDetails(room, "p2", "submit", { value: "target:4" });
+  const shot = actionDetails(room, "p2", "submit", { value: "passive:3" });
   assert.equal(shot.activityStartedAt, startedAt);
   assert.equal(shot.player.role, "红猎人");
+  for (const p of room.players)
+    run(p.uid, "submit", { value: {p1: "target:2", p2: "passive:3"}[p.uid] || "pass" });
+  assert.equal(room.phase, "tools");
+  assert.ok(room.history.filter((h) => h.kind === "skillResult" || h.kind === "skillDetail").every((h) => h.startedAt === startedAt));
 });

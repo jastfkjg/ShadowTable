@@ -19,7 +19,7 @@ const roles = {
   blueHunter: ["蓝猎人", "good"],
   redHunter: ["红猎人", "evil"],
   blueGuard: ["蓝守卫", "good"],
-  redGuard: ["红守卫", "evil"],
+  gargoyle: ["石像鬼", "evil"],
   paladin: ["圣骑士", "good"],
   magician: ["魔术师", "good"],
   prophet: ["月下先知", "good"],

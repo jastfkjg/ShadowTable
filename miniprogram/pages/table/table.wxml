@@ -99,6 +99,7 @@
         <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
       <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="small muted">{{room.operationStatus.detail}}</view>
+      <view wx:if="{{hunterModes}}" class="small muted">{{hunterMode ? (hunterMode==='detonate' ? '第 2 步：选择相邻一人，自己将自爆出局' : '第 2 步：选择出局时开枪的目标') : '第 1 步：选择技能方式'}}</view>
       <view class="action-choice-list">
         <button wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>

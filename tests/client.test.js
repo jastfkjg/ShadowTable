@@ -987,14 +987,14 @@ test("技能二次确认：取消和过期不提交，确认才提交", async ()
 test("新身份弹窗使用当前私密牌，后台不显示，确认使用看到的版本", async () => {
   const secret = {
     stage: "s1",
-    role: "红守卫",
+    role: "石像鬼",
     identityRevision: 2,
     information: "没有视野。",
   };
   const p = page({ request: async () => secret });
   p.data.room = { code: "123456", stage: "s1", me: { identityChanged: true } };
   await p.showIdentityChange();
-  assert.equal(p.data.identityChange.role, "红守卫");
+  assert.equal(p.data.identityChange.role, "石像鬼");
   assert.equal(p.data.identityChangeRevealed, false);
   p.acknowledgeIdentity();
   assert.ok(p.data.identityChange);
@@ -1177,8 +1177,8 @@ test("小程序收到移出通知后清除私密展示并返回首页，显示�
   assert.equal(p.data.notice, "你已被房主移出房间");
 });
 
-test("圣骑士追加复活与猎人自爆均二次确认，取消或阶段变化不提交", async () => {
-  for (const [phase, value] of [["paladinTurn", "revive:4"], ["skillPrepare", "detonate:4"]]) {
+test("石像鬼查验与猎人两种开枪均二次确认，取消或阶段变化不提交", async () => {
+  for (const [phase, value] of [["skillPrepare", "inspect:4"], ["skillPrepare", "detonate:4"], ["skillPrepare", "passive:4"]]) {
     const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass", value], options: [{ value, label: "选择4号" }] } }) });
     p.data.room = { code: "123456", stage: "s1", phase, needsSubmission: true, me: { submitted: false } };
     const writes = [];
@@ -1524,4 +1524,32 @@ test("技能记录分行且仅在有人仍出局时展示最终结果", async ()
   assert.equal(result.resultRows[0].value, "5 号");
   assert.equal(result.resultRows[0].final, true);
   assert.equal(result.detail, "原始公开摘要");
+});
+
+test("猎人先三选一，再显示对应号码；切换模式不提交，关闭后清除私密草稿", async () => {
+  const options = [
+    {value: "pass", label: "不使用技能"},
+    {value: "detonate:1", label: "主动自爆并向 1号开枪"},
+    {value: "detonate:11", label: "主动自爆并向 11号开枪"},
+    {value: "passive:5", label: "出局时向 5号开枪"},
+  ];
+  const p = page({request: async () => ({stage: "s1", action: {hunterModes: true, choices: options.map(o => o.value), options}})});
+  p.data.room = {code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: {submitted: false}};
+  const writes = [];
+  p.cmd = (...args) => writes.push(args);
+  const choose = value => p.submitChoice({currentTarget: {dataset: {value}}});
+  await p.openAction();
+  assert.deepEqual(Array.from(p.data.actionChoices, o => o.label), ["主动技能", "被动技能", "不使用技能"]);
+  await choose("mode:detonate");
+  assert.deepEqual(Array.from(p.data.actionChoices, o => o.value), ["detonate:1", "detonate:11", "mode:"]);
+  await choose("mode:");
+  await choose("mode:passive");
+  assert.deepEqual(Array.from(p.data.actionChoices, o => o.value), ["passive:5", "mode:"]);
+  assert.equal(writes.length, 0);
+  p.confirm = async () => true;
+  await choose("passive:5");
+  assert.equal(writes[0][1].value, "passive:5");
+  p.closeAction();
+  assert.equal(p.data.hunterChoices.length, 0);
+  assert.equal(p.data.hunterMode, "");
 });
