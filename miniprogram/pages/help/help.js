@@ -47,7 +47,7 @@ Page({
       const groups = new Map();
       for (const board of (boards || []).filter(b => b.available)) {
         const classic = ["classic", "classic-court", "classic-11"].includes(board.id);
-        const knights = ["knights", "knights-10", "knights-11"].includes(board.id);
+        const knights = ["knights", "knights-10", "knights-11", "knights-13"].includes(board.id);
         const id = classic ? "classic" : knights ? "knights" : board.id;
         if (!groups.has(id)) groups.set(id, {
           id,

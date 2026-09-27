@@ -290,12 +290,70 @@ test("/api/boards 提供 knights-11 板子与详情，A牌描述点明梅林视�
 });
  test("骑士技能速查覆盖全部12张B牌，保留完整技能与提前起刀特例", () => {
   const details = require("../server/board-info");
-  for (const id of ["knights", "knights-10", "knights-11"]) {
+  for (const id of ["knights", "knights-10", "knights-11", "knights-13"]) {
     const sections = details[id].sections;
     const cards = sections.slice(0, 2).flatMap(s => s.items);
     assert.equal(cards.length, 12);
     assert.ok(cards.every(c => c.brief && c.text.length > c.brief.length));
     assert.ok(sections.find(s => s.title === "补充约定").items.some(t => t.includes("提前起刀")));
     assert.ok(!sections.some(s => ["目标与胜负", "组队与表决"].includes(s.title)));
+  }
+});
+
+test("十二骑士13人局仅多一名忠臣，B牌、转换、任务与初始视野沿用12人局", () => {
+  const { TEAMS, BOARDS } = require("../server/engine");
+  const rooms = [12, 13].map((size) => {
+    const room = newRoom("654321", "p1", "房主", size === 12 ? "knights" : "knights-13", size);
+    for (let i = 2; i <= size; i++) enter(room, `p${i}`, `玩家${i}`);
+    room.players.forEach((p) => command(room, p.uid, { type: "ready", stage: room.stage, ready: true }));
+    command(room, "p1", { type: "start", stage: room.stage });
+    assert.equal(room.phase, "tools");
+    assert.equal(Object.keys(room.knights.players).length, size);
+    for (const p of room.players) assert.equal(room.knights.players[p.uid].armor, ["merlin", "percival", "morgana"].includes(room.roles[p.uid]));
+    return room;
+  });
+  const [base, room] = rooms;
+  assert.deepEqual(Object.values(room.roles).sort(), [...Object.values(base.roles), "servant"].sort());
+  assert.equal(room.players.filter(p => privateView(room, p.uid).faction === "好人阵营").length, 8);
+  assert.deepEqual([...room.knights.deck].sort(), [...base.knights.deck].sort());
+  assert.deepEqual([...room.knights.conversions].sort(), [...base.knights.conversions].sort());
+  assert.deepEqual(TEAMS[13], TEAMS[12]);
+  for (const r of rooms) {
+    // 对齐前12个座位，逐个比较私密视野，确保不误用11人局的蓝兰斯洛特规则。
+    r.roles = { ...base.knights.initialRoles, ...(r.capacity === 13 ? { p13: "servant" } : {}) };
+    r.knights.initialRoles = { ...r.roles };
+  }
+  for (const p of base.players) {
+    assert.equal(privateView(room, p.uid).information, privateView(base, p.uid).information);
+  }
+  assert.equal(privateView(room, "p13").role, "亚瑟的忠臣");
+  for (const b of BOARDS.filter(b => b.id !== "knights-13")) {
+    assert.ok(!b.counts.includes(13), `${b.id} 不应开放13人`);
+    assert.throws(() => newRoom("123456", "p1", "房主", b.id, 13));
+  }
+});
+
+test("/api/boards 提供13人入口和三忠臣说明，其余详情与12人一致", async () => {
+  const a = await launch();
+  try {
+    const { data } = await a.boards();
+    const base = data.boards.find(b => b.id === "knights");
+    const board = data.boards.find(b => b.id === "knights-13");
+    assert.equal(board.available, true);
+    assert.deepEqual(board.counts, [13]);
+    assert.ok(board.roleConfigurations[13].find(c => c.faction === "good").roles.includes("忠臣×3"));
+    assert.deepEqual(base.counts, [12]);
+    assert.ok(base.roleConfigurations[12].find(c => c.faction === "good").roles.includes("忠臣×2"));
+    for (let i = 0; i < base.detail.sections.length; i++) {
+      const section = board.detail.sections[i];
+      if (section.title === "AB 牌堆与身份构成") {
+        assert.ok(section.items[0].startsWith("A 牌 13 张"));
+        assert.ok(section.items[0].includes("忠臣×3"));
+        assert.ok(base.detail.sections[i].items[0].startsWith("A 牌 12 张"));
+        assert.deepEqual(section.items.slice(1), base.detail.sections[i].items.slice(1));
+      } else assert.deepEqual(section, base.detail.sections[i]);
+    }
+  } finally {
+    await a.close();
   }
 });

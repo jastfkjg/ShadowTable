@@ -204,7 +204,7 @@ Page({
     name: "",
     code: "",
     capacity: 6,
-    capacities: [5, 6, 7, 8, 9, 10, 11, 12],
+    capacities: [5, 6, 7, 8, 9, 10, 11, 12, 13],
     selected: [],
     revealed: false,
     secret: null,

@@ -505,7 +505,7 @@ test("先选人数：自动匹配可用板子，切板不改变人数", async ()
   try {
     const p = await a.actor();
     await p.bootstrap();
-    assert.deepEqual(Array.from(p.data.capacities), [5, 6, 7, 8, 9, 10, 11, 12]);
+    assert.deepEqual(Array.from(p.data.capacities), [5, 6, 7, 8, 9, 10, 11, 12, 13]);
     assert.equal(p.data.availableBoards.length, 1);
     p.pickCapacity({ currentTarget: { dataset: { capacity: 5 } } });
     assert.equal(p.data.boardId, "classic");
@@ -525,6 +525,10 @@ test("先选人数：自动匹配可用板子，切板不改变人数", async ()
     assert.equal(p.data.boardAssisted, false);
     p.pickCapacity({ currentTarget: { dataset: { capacity: 11 } } });
     assert.equal(p.data.boardId, "classic-11");
+    p.pickCapacity({ currentTarget: { dataset: { capacity: 13 } } });
+    assert.equal(p.data.boardId, "knights-13");
+    assert.deepEqual(Array.from(p.data.availableBoards, b => b.id), ["knights-13"]);
+    assert.ok(p.data.boardRoleConfiguration[0].roles.includes("忠臣×3"));
   } finally {
     await a.close();
   }

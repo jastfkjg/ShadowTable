@@ -84,6 +84,8 @@ const decks = {
     "morgana",
   ],
 };
+// 13 人局仅在 12 人局 A 牌基础上增加一名忠臣，B 牌及技能规则不变。
+decks["knights-13"] = [...decks.knights, "servant"];
 function chaosQuest(values, threshold) {
   const counts = Object.fromEntries(
     ["success", "fail", "thiefFail", "magic"].map((k) => [

@@ -512,3 +512,9 @@ for (const detail of Object.values(module.exports)) {
     ],
   });
 }
+
+// 从加工完成的 12 人局详情独立复制，仅改 A 牌构成，避免影响原板子。
+module.exports["knights-13"] = JSON.parse(JSON.stringify(module.exports.knights));
+module.exports["knights-13"].sections
+  .find((sec) => sec.title === "AB 牌堆与身份构成").items[0] =
+  "A 牌 13 张（初始身份）：蓝方 8 张——蓝刀客×3（加雷斯、加赫雷斯、兰斯洛特）、忠臣×3、派西维尔、梅林；红方 5 张——红刀客×2（奥伯伦、兰斯洛特）、刺客、莫德雷德、莫甘娜。仅比 12 人局增加一名忠臣，其余规则完全一致。";

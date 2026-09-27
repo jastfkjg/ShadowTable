@@ -804,7 +804,7 @@ test("十二骑士初始见面匪互知具体身份，刀客和新B身份仍保�
 });
 
 test("所有十二骑士板子的两色猎人只能主动枪相邻号码，被动可选场上其他人", () => {
-  for (const size of [10, 11, 12]) for (const role of ["blueHunter", "redHunter"]) {
+  for (const size of [10, 11, 12, 13]) for (const role of ["blueHunter", "redHunter"]) {
     const r = newRoom("123456", "p1", "房主", size === 12 ? "knights" : `knights-${size}`, size);
     for (let i = 2; i <= size; i++) enter(r, `p${i}`, `玩家${i}`);
     r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
@@ -1126,7 +1126,7 @@ test("女巫替死圣骑士保留原出局抽牌顺序，本轮仍反伤后续�
 
 test("全部十二骑士板子的攻击选项屏蔽本人号码，服务端拒绝自刀且不改变状态", () => {
   const attackRoles = ["gareth", "gaheris", "blueLancelot", "redLancelot", "redSwordsman", "assassin", "blueAwakened", "redAwakened", "blueKnight", "redKnight"];
-  for (const size of [10, 11, 12]) {
+  for (const size of [10, 11, 12, 13]) {
     const r = newRoom("123456", "p1", "房主", size === 12 ? "knights" : `knights-${size}`, size);
     for (let i = 2; i <= size; i++) enter(r, `p${i}`, `玩家${i}`);
     r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));

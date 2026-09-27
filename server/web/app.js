@@ -362,7 +362,7 @@
     name: "",
     code: "",
     capacity: 6,
-    capacities: [5, 6, 7, 8, 9, 10, 11, 12],
+    capacities: [5, 6, 7, 8, 9, 10, 11, 12, 13],
     selected: [],
     revealed: false,
     secret: null,
@@ -1867,7 +1867,7 @@ function roomListItems(rooms) {
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
-      visible: ["knights", "knights-10", "knights-11"].includes(selected.id) ? s.visible : false,
+      visible: ["knights", "knights-10", "knights-11", "knights-13"].includes(selected.id) ? s.visible : false,
     });
     updateSettingsDirty();
   }
@@ -1880,7 +1880,7 @@ function roomListItems(rooms) {
         (s.fairyEnabled !== (r.fairyEnabled === true) ||
           s.capacity !== r.capacity ||
           s.boardId !== r.board ||
-          s.visible !== (["knights", "knights-10", "knights-11"].includes(r.board) && r.showSkillDetails === true)),
+          s.visible !== (["knights", "knights-10", "knights-11", "knights-13"].includes(r.board) && r.showSkillDetails === true)),
     });
   }
   function settingsLocked() {
@@ -2917,7 +2917,7 @@ function roomListItems(rooms) {
         (s.busy || s.pendingKick || s.pendingSave || s.capacity < 7 || room.phase === "fairy" ? " disabled" : "") +
         ' /></label></div>' +
         (room.phase === "fairy" ? '<div class="settings-help">请先完成或作废当前查验。</div>' : '');
-      if (["knights", "knights-10", "knights-11"].includes(s.boardId)) {
+      if (["knights", "knights-10", "knights-11", "knights-13"].includes(s.boardId)) {
         html +=
           '<div class="settings-section-title">信息公开</div><div class="settings-section"><div class="settings-row"><span><span>公开技能过程</span><span class="settings-caption">' +
           (s.visible ? "所有玩家可见" : "仅公示最终结果") +

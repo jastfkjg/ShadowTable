@@ -15,6 +15,7 @@ const COUNTS = {
   10: [6, 4],
   11: [7, 4],
   12: [7, 5],
+  13: [8, 5],
 };
 const TEAMS = {
   5: [2, 3, 2, 3, 3],
@@ -25,10 +26,11 @@ const TEAMS = {
   10: [3, 4, 4, 5, 5],
   11: [3, 4, 5, 6, 6],
   12: [3, 4, 5, 6, 6],
+  13: [3, 4, 5, 6, 6],
 };
 // 十二骑士系列板子共享技能、B牌、女巫、圣骑士等规则；10 人局仅 A 牌去红蓝兰斯洛特，
-// 11 人局去红兰斯洛特且蓝兰斯洛特对梅林可见。
-const KNIGHTS_BOARDS = ["knights", "knights-10", "knights-11"];
+// 11 人局去红兰斯洛特且蓝兰斯洛特对梅林可见；13 人局仅比 12 人局多一张忠臣。
+const KNIGHTS_BOARDS = ["knights", "knights-10", "knights-11", "knights-13"];
 const isKnights = (board) => KNIGHTS_BOARDS.includes(board);
 const BOARDS = [
   {
@@ -99,6 +101,14 @@ const BOARDS = [
     counts: [11],
     description:
       "十二骑士11人局：A牌去掉红兰斯洛特（7蓝4红），蓝兰斯洛特被梅林视为坏人，B牌堆与技能规则不变",
+  },
+  {
+    id: "knights-13",
+    name: "阿瓦隆 · 十二骑士（13人）",
+    available: true,
+    counts: [13],
+    description:
+      "十二骑士13人局：在12人局A牌中增加一名忠臣（8蓝5红），其余规则不变",
   },
 ];
 const ROLES = {

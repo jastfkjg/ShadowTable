@@ -28,7 +28,7 @@
       </view>
     </view>
     <view wx:if="{{room.phase==='fairy'}}" class="settings-help">请先完成或作废当前查验。</view>
-    <block wx:if="{{boardId==='knights' || boardId==='knights-10' || boardId==='knights-11'}}">
+    <block wx:if="{{boardId==='knights' || boardId==='knights-10' || boardId==='knights-11' || boardId==='knights-13'}}">
       <view class="settings-section-title">信息公开</view>
       <view class="settings-section">
         <view class="settings-row">
