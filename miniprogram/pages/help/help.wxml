@@ -14,28 +14,28 @@
   </view>
   <block wx:for="{{sections}}" wx:key="id">
     <view wx:if="{{item.id !== 'faq'}}" class="help-section">
-      <button class="help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
+      <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
       <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
     </view>
   </block>
   <view class="help-section help-boards">
-    <button class="help-toggle" bindtap="toggleBoards" aria-expanded="{{boardsExpanded}}"><view class="help-toggle-copy"><view class="help-heading">板子与角色</view><view class="help-caption">按玩法与人数，查看角色和规则</view></view><text aria-hidden="true">{{boardsExpanded?'−':'+'}}</text></button>
+    <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleBoards" aria-expanded="{{boardsExpanded}}"><view class="help-toggle-copy"><view class="help-heading">板子与角色</view><view class="help-caption">按玩法与人数，查看角色和规则</view></view><text aria-hidden="true">{{boardsExpanded?'−':'+'}}</text></button>
     <view wx:if="{{boardsExpanded}}" class="help-board-content">
     <view class="help-copy">先了解玩法特色，再按人数查看角色与完整规则。各板子的线上操作与线下结算分工，以详情说明为准。</view>
     <view wx:if="{{loadingBoards}}" class="help-caption" role="status">正在加载板子介绍…</view>
-    <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
+    <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
     <view wx:elif="{{!boards.length}}" class="help-copy">暂无可用板子。</view>
     <view wx:for="{{boards}}" wx:key="id" class="help-board">
       <view class="help-step-title">{{item.name}}</view>
       <view class="help-copy">{{item.description}}</view>
       <view class="help-caption">选择人数，查看规则 ›</view>
-      <view class="help-board-links {{item.choices.length === 1 ? 'help-board-links-single' : ''}}"><button wx:for="{{item.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{item.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view>
+      <view class="help-board-links {{item.choices.length === 1 ? 'help-board-links-single' : ''}}"><button hover-class="none" wx:for="{{item.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{item.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view>
     </view>
     </view>
   </view>
   <block wx:for="{{sections}}" wx:key="id">
     <view wx:if="{{item.id === 'faq'}}" class="help-section">
-      <button class="help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
+      <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
       <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
     </view>
   </block>

@@ -46,7 +46,7 @@ function saveProfile(store, uid, input) {
   if (old.version !== input.version) throw new RuleError("资料已在其他设备更新，请重新载入后编辑", 409);
   fail(input.leaderboardVisible === undefined || typeof input.leaderboardVisible === "boolean", "排行榜展示设置无效");
   const visible = input.leaderboardVisible ?? old.leaderboardVisible;
-  fail(!visible || uid.startsWith("wx:"), "仅微信账号可参与公开排行榜");
+  fail(!visible || /^(wx|dev):/.test(uid), "微信或开发账号可参与公开排行榜");
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
   if (input.avatar === null) avatarHash = null;
   else if (input.avatar !== undefined) {

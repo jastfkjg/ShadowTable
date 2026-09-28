@@ -7,12 +7,12 @@
   <view class="rank-metrics" aria-label="排行指标"><button wx:for="{{metrics}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button></view>
   <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
   <block wx:if="{{board}}">
     <view wx:if="{{board.rows.length}}" class="rank-list">
       <view class="rank-list-heading small muted"><text>排名 / 玩家</text><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
       <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
-        <text class="rank-number {{3 >= item.rank?'rank-top':''}}">{{item.rank}}</text>
+        <view class="rank-number rank-place-{{item.rank}}" aria-label="第{{item.rank}}名"><image wx:if="{{3 >= item.rank}}" class="rank-crown" src="/assets/rank-{{item.rank}}.svg" aria-hidden="true" /><text>{{item.rank}}</text></view>
         <image wx:if="{{item.avatarUrl}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true" />
         <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
         <view class="rank-identity"><view class="rank-name">{{item.nickname}}<text wx:if="{{item.isSelf}}" class="rank-self-label"> · 我</text></view><view class="small muted">{{item.wins}}胜 · {{item.total}}局</view></view>
@@ -20,10 +20,11 @@
       </view>
     </view>
     <view wx:else class="rank-empty muted">暂无战绩</view>
-    <button wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
+    <button hover-class="none" wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
     <view class="rank-mine" aria-label="我的排名">
       <view class="rank-mine-content"><view class="rank-mine-copy"><view class="small muted">我的{{board.metricLabel}}</view><view wx:if="{{board.me.statusLabel}}" class="rank-mine-status">{{board.me.statusLabel}}</view><view class="small muted">{{board.me.wins}}胜 · {{board.me.total}}局</view></view><view class="rank-value accent">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view>
-      <button wx:if="{{board.me.status==='hidden'}}" class="rank-enable" bindtap="editProfile">参与排行 ›</button>
+      <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
+      <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button hover-class="none" bindtap="retryVisibility" disabled="{{visibilitySaving}}">重试</button></view>
     </view>
   </block>
 </view>

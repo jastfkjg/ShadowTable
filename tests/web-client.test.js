@@ -702,7 +702,7 @@ test('网页排行榜可深链，私密资料不公开，输出转义昵称并�
   assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
   const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第 1 名/);
   c.state.rankBoard=webRanks('games',{rows:[],me:{status:'hidden',rank:null,total:20,wins:10,winRate:50}});
-  assert.match(c.viewLeaderboard(),/参与排行/);assert.match(c.viewLeaderboard(),/暂无战绩/);
+  assert.match(c.viewLeaderboard(),/在排行榜公开展示/);assert.match(c.viewLeaderboard(),/暂无战绩/);
   assert.doesNotMatch(c.viewLeaderboard(),/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   c.state.rankBoard.me.status='unsupported';
   assert.doesNotMatch(c.viewLeaderboard(),/仅微信账号|参与排行/);
@@ -731,18 +731,21 @@ test('网页榜单切换和离开页面不接收旧响应，过期分页重新�
   leaving.state.page='leaderboard';const pending=leaving.loadLeaderboard();await Promise.resolve();await Promise.resolve();
   await leaving.applyRoute('#/help');finish(response(webRanks()));await pending;assert.equal(leaving.state.rankBoard,null);
 });
-test('网页公开设置保存遵循资料版本和幂等草稿，游客入口禁用', async () => {
-  let saved={nickname:'我',version:1,identityType:'wx',leaderboardVisible:false};const posts=[];
+test('网页排行榜底栏直接开关，失败重试保留请求，资料页不再编辑展示设置', async () => {
+  let visible=false;const posts=[];
   const c=client(async(url,opts)=>{
-    if(opts?.method==='POST'){
-      posts.push(opts.body);if(posts.length===1)throw Error('断线');saved={...saved,leaderboardVisible:true,version:2};
+    if(opts?.method==='POST') {
+      posts.push({body:opts.body,id:opts.headers['Idempotency-Key']});
+      if(posts.length===1)throw Error('断线');
+      visible=JSON.parse(opts.body).leaderboardVisible;return response({leaderboardVisible:visible});
     }
-    return response(url.endsWith('/profile')?saved:{total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[]});
+    return response(url.endsWith('/profile')?{nickname:'我',version:1,identityType:'dev',leaderboardVisible:visible}:webRanks('games',{me:{...webRanks().me,status:visible?'ranked':'hidden',rank:visible?1:null}}));
   });
-  await c.applyRoute('#/profile');c.CHANGES.profileLeaderboard({checked:true});assert.equal(c.state.profileDirty,true);
-  await c.saveProfile();c.CHANGES.profileLeaderboard({checked:false});assert.equal(c.state.profileDraft.leaderboardVisible,true);
-  await c.saveProfile();assert.equal(posts[0],posts[1]);assert.equal(JSON.parse(posts[0]).leaderboardVisible,true);
-  saved={...saved,identityType:'guest',leaderboardVisible:false};await c.applyRoute('#/profile');
-  c.CHANGES.profileLeaderboard({checked:true});assert.equal(c.state.profileDraft.leaderboardVisible,false);
-  assert.match(c.viewProfileEditor(),/data-change="profileLeaderboard" disabled/);
+  await c.applyRoute('#/leaderboard');
+  await c.CHANGES.rankVisibility({checked:true});assert.equal(c.state.rankVisible,false);assert.match(c.state.rankVisibilityError,/网络未确认/);
+  await c.ACTIONS.rankVisibilityRetry();assert.deepEqual(posts[0],posts[1]);assert.equal(c.state.rankVisible,true);
+  assert.match(c.viewLeaderboard(),/data-change="rankVisibility" checked/);
+  await c.CHANGES.rankVisibility({checked:false});assert.equal(c.state.rankVisible,false);assert.equal(c.state.rankBoard.me.status,'hidden');
+  c.state.rankBoard.me.status='unsupported';await c.CHANGES.rankVisibility({checked:true});assert.equal(posts.length,3);
+  await c.applyRoute('#/profile');assert.doesNotMatch(c.viewProfileEditor(),/profileLeaderboard|在排行榜公开展示/);
 });

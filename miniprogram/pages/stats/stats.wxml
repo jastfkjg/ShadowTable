@@ -1,16 +1,16 @@
 <app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page stats-page">
   <view wx:if="{{loading && !stats}}" class="status">正在读取战绩…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
     <view class="stats-overview" aria-label="总战绩">
       <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">总胜场数</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
     </view>
     <view wx:if="{{stats.total}}" class="stats-breakdown">
-      <button class="stats-breakdown-toggle" bindtap="toggleOverview" aria-expanded="{{overviewExpanded}}" aria-label="{{overviewExpanded?'收起阵营战绩':'展开阵营战绩'}}"><text>阵营战绩</text><text class="faction-chevron" aria-hidden="true">{{overviewExpanded?'⌄':'›'}}</text></button>
+      <button hover-class="none" class="disclosure-button stats-breakdown-toggle" bindtap="toggleOverview" aria-expanded="{{overviewExpanded}}" aria-label="{{overviewExpanded?'收起阵营战绩':'展开阵营战绩'}}"><text>阵营战绩</text><text class="faction-chevron" aria-hidden="true">{{overviewExpanded?'⌄':'›'}}</text></button>
       <block wx:if="{{overviewExpanded}}">
       <view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
-        <button class="faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
+        <button hover-class="none" class="disclosure-button faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
           <view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}}局 · {{item.wins}}胜 · 胜率 {{item.rateLabel}}</text></view><text class="faction-chevron" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text>
         </button>
         <view wx:if="{{item.expanded}}" class="role-list">

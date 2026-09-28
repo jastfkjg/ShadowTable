@@ -21,6 +21,24 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
+test('开发账号可主动公开并参与四榜，关闭后隐藏；游客和陪测账号仍不能公开', () => {
+  const store=new Store(':memory:');
+  try {
+    games(store,'dev:me',1,1);games(store,'dev:me',1,0,{faction:'evil'});
+    const board=new Leaderboard(store);
+    assert.equal(query(board,'dev:me').me.status,'hidden');
+    profile(store,'dev:me',true,'开发玩家');
+    for(const metric of ['games','overall','good','evil']) {
+      const result=query(board,'dev:me','metric='+metric);
+      assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
+      assert.equal(result.rows[0].nickname,'开发玩家');assert.equal(result.rows[0].isSelf,true);
+    }
+    profile(store,'dev:me',false);
+    assert.equal(query(board,'dev:me').rows.length,0);
+    assert.equal(query(board,'dev:me').me.total,2);
+    for(const uid of ['guest:me','test:me']) assert.throws(()=>profile(store,uid,true),/微信或开发账号/);
+  } finally {store.close();}
+});
 test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来源和门槛一致；隐藏及游客不公开', () => {
   const store = new Store(':memory:');
   try {
@@ -178,5 +196,15 @@ test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保
     assert.equal((await request('/api/me/profile',guestToken,{nickname:'游客',version:0,leaderboardVisible:true})).status,400);
     const guest=(await request('/api/leaderboard',guestToken)).data;
     assert.equal(guest.me.status,'unsupported');assert.equal(guest.rows[0].isSelf,false);assert.equal(before.rows[0].isSelf,true);
+    const setting='/api/me/leaderboard-visibility',offId=randomUUID();
+    assert.equal((await request(setting,token,{leaderboardVisible:'false'})).status,400);
+    assert.equal((await request(setting,guestToken,{leaderboardVisible:true})).status,400);
+    const off=await request(setting,token,{leaderboardVisible:false},offId);
+    assert.equal(off.status,200);assert.equal(off.data.nickname,'我');assert.equal(off.data.leaderboardVisible,false);
+    assert.deepEqual((await request(setting,token,{leaderboardVisible:false},offId)).data,off.data);
+    const hidden=(await request('/api/leaderboard',token)).data;
+    assert.equal(hidden.rows.length,0);assert.equal(hidden.me.total,20);
+    assert.equal((await request(setting,token,{leaderboardVisible:true})).status,200);
+    assert.equal((await request('/api/leaderboard',token)).data.rows.length,1);
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });

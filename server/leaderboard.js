@@ -46,7 +46,7 @@ class Leaderboard {
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
       .all(range.start, ...(range.end === null ? [] : [range.end]), ...(faction ? [faction] : []));
-    const eligible = aggregates.filter(row => row.uid.startsWith("wx:") && row.leaderboard_visible && row.public_id && row.total >= METRICS[metric]);
+    const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && row.total >= METRICS[metric]);
     eligible.sort((a, b) => compare(a, b, metric) || a.public_id.localeCompare(b.public_id));
     let rank = 0;
     eligible.forEach((row, index) => {
@@ -67,7 +67,7 @@ class Leaderboard {
     const own = snapshot.aggregates.get(uid), ownStats = summary(own);
     // Profiles without games do not appear in the aggregation.
     const visible = own ? !!own.leaderboard_visible : !!this.store.db.prepare("SELECT leaderboard_visible FROM profiles WHERE uid=?").get(uid)?.leaderboard_visible;
-    const status = !uid.startsWith("wx:") ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
+    const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     return {
       metric, period, periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",

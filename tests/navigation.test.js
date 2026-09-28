@@ -110,6 +110,11 @@ test('战绩逐层展开，记录逐场展开成员并可继续分页', async ()
   stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
   assert.equal(stats.data.stats.byFaction[0].expanded,true);
   assert.equal(stats.data.stats.byFaction[0].roles[0].rateLabel,'50%');
+  stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
+  stats.toggleOverview();
+  assert.equal(stats.data.overviewExpanded,false);
+  assert.equal(stats.data.stats.byFaction[0].expanded,false);
+  assert.equal(stats.data.stats.total,2);
 
   const record = (id, endedAt) => ({ id, boardName: '经典', capacity: 6, endedAt, winner: 'good', source: 'manual', excludedReason: null,
     name: '林间', seat: 1, role: '梅林', faction: 'good', outcome: 'win', members: [{seat:1,name:'林间'},{seat:2,name:'晚风'}] });
@@ -122,10 +127,32 @@ test('战绩逐层展开，记录逐场展开成员并可继续分页', async ()
   matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
   assert.equal(matches.data.records[0].expanded,true);
   assert.equal(matches.data.records[0].members[0].isSelf,true);
+  matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
+  assert.equal(matches.data.records[0].expanded,false);
+  assert.equal(matches.data.records.length,1);
+  assert.equal(reads.length,1);
   await matches.loadMore();
   assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=1']);
   assert.equal(matches.data.records.length,2);
   assert.equal(matches.data.hasMore,false);
+});
+test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅色背景与整行淡出', () => {
+  const templates=fs.readdirSync(root,{recursive:true}).filter(file=>file.endsWith('.wxml'));
+  let disclosures=0;
+  for(const file of templates) {
+    const source=fs.readFileSync(path.join(root,file),'utf8');
+    for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
+      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover)"/,file+': '+tag);
+      if(tag.includes('aria-expanded=')) {
+        disclosures++;
+        assert.match(tag,/hover-class="none"/);
+        assert.match(tag,/(?<![\w-])class="disclosure-button /);
+      }
+    }
+  }
+  assert.ok(disclosures>=10);
+  const styles=fs.readFileSync(path.join(root,'app.wxss'),'utf8');
+  assert.match(styles,/button\.disclosure-button:not\(\[disabled\]\):active\s*\{\s*opacity:\s*1;/);
 });
 test('新页面模板编译，资料与战绩只出现在个人页面，牌桌无底部导航内容', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
@@ -242,17 +269,21 @@ test('小程序排行榜快速切换忽略旧响应，分页过期自动刷新�
   await paged.retry();assert.equal(paged.data.error,'');
   p.onUnload();assert.equal(p.alive,false);
 });
-test('小程序公开设置独立标记草稿，保存重试不改变原请求，游客不能打开', async () => {
-  const writes=[];
-  const {p}=page('profile',{...apiBase,request:async(url,method,body)=>{
-    if(method!=='POST')return {...profile,leaderboardVisible:false};
-    writes.push(body);if(writes.length===1)throw Error('断线');return {...profile,leaderboardVisible:body.leaderboardVisible};
+test('排行榜底栏可开关公开展示，失败重试同一请求，游客不提交', async () => {
+  let visible=false;const writes=[];
+  const {p}=page('leaderboard',{...apiBase,request:async(url,method,body,id)=>{
+    if(method==='POST') {
+      writes.push({url,body,id});if(writes.length===1)throw Error('断线');
+      visible=body.leaderboardVisible;return {leaderboardVisible:visible};
+    }
+    return rankResult('games',{me:{...rankResult().me,status:visible?'ranked':'hidden',rank:visible?1:null}});
   }});
-  await p.load();p.changeLeaderboard({detail:{value:true}});assert.equal(p.data.dirty,true);
-  await p.save();p.changeLeaderboard({detail:{value:false}});assert.equal(p.data.leaderboardVisible,true);
-  await p.save();assert.deepEqual(writes[0],writes[1]);assert.equal(writes[0].leaderboardVisible,true);
-  const guest=page('profile',{...apiBase,request:async()=>({...profile,identityType:'guest'})}).p;
-  await guest.load();guest.changeLeaderboard({detail:{value:true}});assert.equal(guest.data.leaderboardVisible,false);
+  await p.load();assert.equal(p.data.visible,false);
+  await p.changeVisibility({detail:{value:true}});assert.equal(p.data.visible,false);assert.equal(p.data.visibilityError,'断线');
+  await p.retryVisibility();assert.deepEqual(writes[0],writes[1]);assert.equal(p.data.visible,true);
+  await p.changeVisibility({detail:{value:false}});assert.equal(p.data.visible,false);assert.equal(p.data.board.me.status,'hidden');
+  assert.equal(writes[2].url,'/api/me/leaderboard-visibility');
+  p.data.board.me.status='unsupported';await p.changeVisibility({detail:{value:true}});assert.equal(writes.length,3);
 });
 test('小程序排行榜保留空榜、错误、样本量与参与入口，移除说明性文案', () => {
   const context={window:{},global:{},console};vm.createContext(context);
@@ -261,7 +292,7 @@ test('小程序排行榜保留空榜、错误、样本量与参与入口，移�
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
   const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',statusLabel:''},rows:[]};
   const tree=render({board,error:'请求失败'});
-  assert.match(tree,/参与排行/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
+  assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
   assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
 });

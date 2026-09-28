@@ -353,7 +353,7 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
-    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '',
+    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -472,7 +472,7 @@
       const profile = await request('/api/me/profile');
       if (sequence !== profileSequence) return;
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
-        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, leaderboardVisible: !!profile.leaderboardVisible }, profileDirty: false,
+        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version }, profileDirty: false,
       } : {}) });
     } catch (e) {
       if (sequence === profileSequence) setState({ profileError: e.message });
@@ -480,7 +480,7 @@
     } finally { if (sequence === profileSequence) setState({ profileLoading: false }); }
   }
   function profileDirty() {
-    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined || !!state.profileDraft.leaderboardVisible !== !!state.profile?.leaderboardVisible) });
+    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
   }
   async function chooseProfileAvatar(el) {
     const file = el.files?.[0]; el.value = '';
@@ -505,7 +505,7 @@
     if (!profilePending) {
       const nickname = state.profileDraft.nickname.trim();
       if (!nickname || nickname.length > 16) return setState({ profileError: '请输入1–16个字符的昵称' });
-      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version, leaderboardVisible: !!state.profileDraft.leaderboardVisible,
+      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version,
         ...(state.profileDraft.avatar !== undefined ? { avatar: state.profileDraft.avatar } : {}) } };
     }
     setState({ profileSaving: true, profileError: '' });
@@ -560,12 +560,11 @@
     html += '<form class="profile-form" data-form="profile"><div class="avatar-editor">' + avatarView(draft.avatarPreview,draft.nickname,true) + '<label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '更换头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="选择新头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label>';
     if (draft.avatarPreview) html += btn('text-button','removeProfileAvatar','恢复默认头像',null,locked || state.avatarLoading);
     html += '</div><label for="profile-nickname" class="field-title">个人昵称</label><input id="profile-nickname" name="nickname" class="input" maxlength="16" autocomplete="nickname" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符"' + (locked ? ' disabled' : '') + ' /><div class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</div>';
-    html += '<div class="profile-rank-setting"><label class="profile-rank-toggle"><span>在排行榜公开展示</span><input type="checkbox" data-change="profileLeaderboard"' + (draft.leaderboardVisible ? ' checked' : '') + (locked || state.profileLoading || state.profile?.identityType !== 'wx' ? ' disabled' : '') + ' /></label><div class="small muted">' + (state.profile?.identityType === 'wx' ? '开启并保存后，将向其他登录玩家展示当前昵称、头像，以及全部已归档有效对局的统计。关闭不会删除个人战绩。' : '仅微信账号可参与公开排行榜，当前账号仍可查看榜单和个人战绩。') + '</div></div>';
     html += btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict) + (profilePending && !state.profileSaving ? '<div class="small muted">保存结果尚未确认，请重试同一次保存。</div>' : '') + '</form>';
     return html;
   }
   const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
-  var rankSequence = 0, rankFailedSelection = null;
+  var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
     const sequence = ++rankSequence, route = routeSequence;
@@ -577,7 +576,7 @@
       const result = await request('/api/leaderboard?metric=' + metric + '&period=' + period + (more ? '&offset=' + board.nextOffset + '&version=' + board.version : ''));
       if (sequence !== rankSequence || route !== routeSequence) return;
       if (more) result.rows = board.rows.concat(result.rows);
-      setState({ rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false });
+      setState({ rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false, ...(!rankVisibilityPending ? { rankVisible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
     } catch (e) {
       if (sequence !== rankSequence || route !== routeSequence) return;
       if (more && e.status === 409) {
@@ -590,6 +589,21 @@
           ...(!more && board ? { rankMetric: board.metric, rankPeriod: board.period } : {}) });
       }
     }
+  }
+  async function changeRankVisibility(visible) {
+    if (state.rankVisibilitySaving || !state.rankBoard || state.rankBoard.me.status === 'unsupported') return;
+    const route = routeSequence;
+    rankVisibilityTarget = rankVisibilityPending ? rankVisibilityPending.data.leaderboardVisible : visible;
+    rankVisibilityPending ||= { id: requestId(), data: { leaderboardVisible: rankVisibilityTarget } };
+    setState({ rankVisible: rankVisibilityTarget, rankVisibilitySaving: true, rankVisibilityError: '' });
+    try {
+      await request('/api/me/leaderboard-visibility', 'POST', rankVisibilityPending.data, rankVisibilityPending.id);
+      rankVisibilityPending = null;
+      if (route === routeSequence) await loadLeaderboard();
+    } catch (e) {
+      if (e.status && e.status < 500 && ![401,429].includes(e.status)) rankVisibilityPending = null;
+      if (route === routeSequence) setState({ rankVisible: !['hidden','unsupported'].includes(state.rankBoard.me.status), rankVisibilityError: e.message });
+    } finally { setState({ rankVisibilitySaving: false }); }
   }
   function viewLeaderboard() {
     const board = state.rankBoard, metric = state.rankMetric;
@@ -607,14 +621,14 @@
     if (board.rows.length) {
       html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (displayMetric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
       board.rows.forEach(row => {
-        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number' + (row.rank <= 3 ? ' rank-top' : '') + '">' + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + row.wins + '胜 · ' + row.total + '局</div></div><div class="rank-value">' + value(row) + '</div></li>';
+        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + row.wins + '胜 · ' + row.total + '局</div></div><div class="rank-value">' + value(row) + '</div></li>';
       });
       html += '</ol>';
     } else html += '<div class="rank-empty muted">暂无战绩</div>';
     if (board.hasMore) html += btn('rank-more','rankMore',state.rankMoreLoading ? '正在加载…' : '加载更多',null,state.rankLoading || state.rankMoreLoading);
     html += btn('text-button rank-refresh','rankRefresh','刷新榜单',null,state.rankLoading || state.rankMoreLoading);
     const me = board.me, status = me.rank ? '第 ' + me.rank + ' 名' : '';
-    html += '<aside class="rank-mine" aria-label="我的排名"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="small muted">我的' + metricLabel + '</div>' + (status ? '<div class="rank-mine-status">' + status + '</div>' : '') + '<div class="small muted">' + me.wins + '胜 · ' + me.total + '局</div></div><div class="rank-value accent">' + value(me) + '</div></div>' + (me.status === 'hidden' ? btn('rank-enable','navigate','参与排行 ›',{page:'profile'}) : '') + '</aside></section>';
+    html += '<aside class="rank-mine" aria-label="我的排名"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="small muted">我的' + metricLabel + '</div>' + (status ? '<div class="rank-mine-status">' + status + '</div>' : '') + '<div class="small muted">' + me.wins + '胜 · ' + me.total + '局</div></div><div class="rank-value accent">' + value(me) + '</div></div>' + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</aside></section>';
     return html;
   }
   function viewHelp() {
@@ -3491,6 +3505,7 @@ function roomListItems(rooms) {
     rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
     rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
+    rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
     rankRetry: () => loadLeaderboard(state.rankMoreError, rankFailedSelection || {}),
     rankRefresh: () => loadLeaderboard(),
     navigate: el => navigate(el.dataset.page),
@@ -3718,7 +3733,7 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
-    profileLeaderboard: el => { if (state.profileDraft && state.profile?.identityType === 'wx' && !state.profileSaving && !profilePending) { state.profileDraft.leaderboardVisible = el.checked; profileDirty(); } },
+    rankVisibility: el => changeRankVisibility(el.checked),
     profileAvatar: chooseProfileAvatar,
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
     settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },

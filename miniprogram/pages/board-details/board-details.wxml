@@ -6,7 +6,7 @@
 </view>
 <view wx:if="{{directoryExpanded}}" class="directory-backdrop" catchtap="closeDirectory" catchtouchmove="blockScroll">
   <view class="directory-panel" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="章节目录">
-    <view class="directory-header"><view>章节目录 <text class="small muted">共 {{sections.length}} 章</text></view><button class="directory-close" bindtap="closeDirectory" aria-label="关闭章节目录">关闭</button></view>
+    <view class="directory-header"><view>章节目录 <text class="small muted">共 {{sections.length}} 章</text></view><button hover-class="none" class="directory-close" bindtap="closeDirectory" aria-label="关闭章节目录">关闭</button></view>
     <scroll-view scroll-y class="directory-list" style="height: {{sections.length * 92}}rpx;" enhanced show-scrollbar="{{true}}">
       <view wx:for="{{sections}}" wx:key="title" class="directory-item" bindtap="jumpSection" data-index="{{index}}" role="link" aria-label="{{'跳转到第'+(index+1)+'章，'+item.title}}"><text class="detail-nav-number">{{index+1}}.</text><text>{{item.navTitle || item.title}}</text></view>
     </scroll-view>
@@ -16,8 +16,8 @@
   <view wx:if="{{loading}}" class="muted">正在加载板子详情…</view>
   <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
   <block wx:if="{{error}}">
-    <button class="secondary" bindtap="retry">重新加载</button>
-    <button class="text-button" bindtap="back">返回</button>
+    <button hover-class="none" class="secondary" bindtap="retry">重新加载</button>
+    <button hover-class="none" class="text-button" bindtap="back">返回</button>
   </block>
   <block wx:if="{{!loading && !error}}">
     <view class="detail-header">
@@ -31,7 +31,7 @@
           <view class="role-list">
             <view wx:for="{{sec.items}}" wx:key="name" wx:for-item="role" class="role-card">
               <block wx:if="{{role.brief}}">
-                <button class="role-quick-toggle" bindtap="toggleRole" data-section="{{secIndex}}" data-role="{{index}}" aria-expanded="{{role.expanded || false}}">
+                <button hover-class="none" class="disclosure-button role-quick-toggle" bindtap="toggleRole" data-section="{{secIndex}}" data-role="{{index}}" aria-expanded="{{role.expanded || false}}">
                   <text class="role-quick-name tone-{{role.tone}}">{{role.name}}</text><text class="role-quick-brief">{{role.brief}}</text><text class="role-quick-arrow">{{role.expanded?'−':'+'}}</text>
                 </button>
                 <view wx:if="{{role.expanded}}" class="role-quick-detail">{{role.text}}</view>
@@ -57,6 +57,6 @@
       <view wx:for="{{roleConfiguration}}" wx:key="faction" class="detail-line">{{item.label}}：{{item.roles}}</view>
       <view class="muted small detail-none">本板子暂无详细说明，以上为角色配置。</view>
     </block>
-    <button class="primary" bindtap="back">返回</button>
+    <button hover-class="none" class="primary" bindtap="back">返回</button>
   </block>
 </view>

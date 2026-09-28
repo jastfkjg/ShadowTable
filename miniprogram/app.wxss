@@ -38,6 +38,10 @@ button[disabled] {
 button:not([disabled]):active {
   opacity: 0.78;
 }
+/* Disclosure state already provides feedback; keep the whole row visually stable. */
+button.disclosure-button:not([disabled]):active {
+  opacity: 1;
+}
 .page {
   padding: 36rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
   max-width: 900rpx;

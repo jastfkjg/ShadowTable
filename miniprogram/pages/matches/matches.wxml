@@ -1,12 +1,12 @@
 <app-nav title="对局记录" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page matches-page">
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重新加载</button></view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted">暂无对局记录</view>
   <block wx:if="{{records.length}}">
     <view class="matches-count">共 {{total}} 场对局</view>
     <view wx:for="{{records}}" wx:key="id" class="match-entry">
-      <button class="match-toggle" bindtap="toggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.dateLabel}}，{{item.boardName}}，{{item.role}}，{{item.outcomeLabel}}，{{item.expanded?'收起成员':'展开成员'}}">
+      <button hover-class="none" class="disclosure-button match-toggle" bindtap="toggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.dateLabel}}，{{item.boardName}}，{{item.role}}，{{item.outcomeLabel}}，{{item.expanded?'收起成员':'展开成员'}}">
         <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
         <view class="match-board">{{item.boardName}} · {{item.capacity}}人</view>
         <view class="match-secondary"><text>我的身份：{{item.role}} · {{item.factionLabel}}</text><text class="match-arrow" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text></view>
@@ -19,6 +19,6 @@
         <view class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text>{{member.seat}}号</text><text>{{member.name}}{{member.isSelf?'（我）':''}}</text></view></view>
       </view>
     </view>
-    <button wx:if="{{hasMore && !error}}" class="matches-more" bindtap="loadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
+    <button hover-class="none" wx:if="{{hasMore && !error}}" class="matches-more" bindtap="loadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
   </block>
 </view>

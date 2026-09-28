@@ -93,7 +93,7 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 认证接口 `GET/POST /api/me/profile` 使用现有 uid。`profiles` 保存昵称、头像哈希、版本和修改时间；POST 要求当前 `version` 与幂等键，同事务保存资料与回执，旧版本返回 409，防止跨设备覆盖。昵称为 1–16 个字符，仅作为新牌桌昵称默认值，不回写房间与历史战绩。微信身份沿用现有登录流程，游客身份不自动合并或绑定。
 
-客户端将选择的头像居中裁切为 256px JPEG 后上传；服务端只接受 PNG/JPEG 数据，限制 256KB、1024px，按 SHA-256 去重保存在 `avatars`。`GET /api/avatars/:hash` 提供带固定图片 MIME 和缓存头的公开图片，以便小程序 image 加载；编辑预览的临时路径不写入数据库。头像不随房间删除。资料接口同时支持 `leaderboardVisible`（布尔值，默认关闭）；旧客户端省略时保留当前设置，只有微信账号允许开启。该设置沿用资料版本和幂等事务。
+客户端将选择的头像居中裁切为 256px JPEG 后上传；服务端只接受 PNG/JPEG 数据，限制 256KB、1024px，按 SHA-256 去重保存在 `avatars`。`GET /api/avatars/:hash` 提供带固定图片 MIME 和缓存头的公开图片，以便小程序 image 加载；编辑预览的临时路径不写入数据库。头像不随房间删除。资料接口同时支持 `leaderboardVisible`（布尔值，默认关闭）；旧客户端省略时保留当前设置，微信和开发账号允许开启。排行榜底栏通过 `POST /api/me/leaderboard-visibility` 直接保存该设置，提交 `{leaderboardVisible: boolean}` 与幂等键；在同一事务中读取最新资料并只更新展示设置，不覆盖昵称和头像。资料编辑页不再携带该字段。
 
 ## 排行榜（2026-09-28）
 
@@ -108,7 +108,7 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 - `rows[]`：独立 `publicId`、当前昵称、头像URL、`rank/isSelf/total/wins/losses/winRate`。不含内部UID、角色、对局明细或房间码。
 - `me`：认证用户本人的 `rank/status/remaining/total/wins/losses/winRate`。状态为 `ranked/hidden/unsupported/no_games`，未上榜名次为 `null`，零有效局胜率为 `null`。
 
-`profiles` 迁移新增 `leaderboard_visible`（默认0）和独立随机 `public_id`，旧用户不会自动公开。只有主动开启展示的微信账号参与公共名次；游客和开发账号仅查看榜单及自己的统计，不支持开启。公开设置文案明确包含全部已归档有效对局，关闭设置不会删除个人战绩。公开ID在后续改名和重启时保持稳定，不返回微信身份派生值；历史昵称和对局快照不用于公开榜单。
+`profiles` 迁移新增 `leaderboard_visible`（默认0）和独立随机 `public_id`，旧用户不会自动公开。主动开启展示的微信和开发账号参与公共名次；游客和陪测账号仅查看榜单及自己的统计，不支持开启。公开设置文案明确包含全部已归档有效对局，关闭设置不会删除个人战绩。公开ID在后续改名和重启时保持稳定，不返回微信身份派生值；历史昵称和对局快照不用于公开榜单。
 
 `server/leaderboard.js` 按四指标和两周期保留至多8份30秒内存快照，公共聚合缓存与每次按认证用户构造的 `me/isSelf` 分离。新归档或资料变更标记失效，仅在 SQLite 事务提交成功后增加缓存版本；回滚和幂等重放不误刷新，月界与系统时钟回退也触发重算。数据未变化时缓存到期重算保留分页版本，避免阅读时间较长就被迫返回首屏。数据仍来自归档表，无累计计分表或额外服务。部分索引 `match_players_rank_time` 支持有效局时间范围查询，`profiles_public_id` 保证非空公开ID唯一。
 

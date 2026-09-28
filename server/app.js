@@ -217,8 +217,9 @@ function createApp({
       limit(`uid:${uid}`, 180);
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
-      if (path === "/api/me/profile") {
-        if (req.method === "GET") return send(200, readProfile(store, uid));
+      if (path === "/api/me/profile" || path === "/api/me/leaderboard-visibility") {
+        const visibilityOnly = path === "/api/me/leaderboard-visibility";
+        if (req.method === "GET" && !visibilityOnly) return send(200, readProfile(store, uid));
         check(req.method === "POST", "接口不存在", 404);
         limit(`profile:${uid}`, 10);
         const b = await body(req, 360 * 1024), id = req.headers["idempotency-key"];
@@ -230,7 +231,10 @@ function createApp({
             check(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409);
             return JSON.parse(cached.result);
           }
-          const profile = saveProfile(store, uid, b);
+          if (visibilityOnly) check(typeof b.leaderboardVisible === "boolean" && Object.keys(b).length === 1, "排行榜展示设置无效");
+          const old = visibilityOnly ? readProfile(store, uid) : null;
+          const profile = saveProfile(store, uid, visibilityOnly
+            ? { nickname: old.nickname || "新朋友", version: old.version, leaderboardVisible: b.leaderboardVisible } : b);
           store.addReceipt(uid, id, fingerprint, profile);
           return profile;
         });

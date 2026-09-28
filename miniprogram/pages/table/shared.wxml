@@ -18,13 +18,13 @@
       >
       <view wx:if="{{room.operationStatus || room.needsSubmission}}" class="action-entry" role="status">
         <view class="action-status-copy"><view>{{room.needsSubmission && !room.me.submitted ? '请'+actionEntryLabel : room.operationStatus ? room.operationStatus.title : room.me.submitted?'已提交，等待其他玩家':'本次无需你操作'}}</view><view class="small muted">{{room.operationStatus.detail}}</view></view>
-        <button wx:if="{{room.needsSubmission && !room.me.submitted}}" class="primary" bindtap="openAction" disabled="{{hasPendingRequest || busy || actionLoading || !network}}" loading="{{actionLoading}}">{{actionEntryLabel}}</button>
+        <button hover-class="none" wx:if="{{room.needsSubmission && !room.me.submitted}}" class="primary" bindtap="openAction" disabled="{{hasPendingRequest || busy || actionLoading || !network}}" loading="{{actionLoading}}">{{actionEntryLabel}}</button>
       </view>
     </view>
 </template>
 <template name="tableResult">
     <view wx:if="{{latestResult && (room.phase==='tools' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
-      <view class="result-summary-heading"><text class="small muted">最近结果</text><button class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
+      <view class="result-summary-heading"><text class="small muted">最近结果</text><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
       <view class="latest-result-title result-heading"><text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text><text>{{latestResult.resultRows ? '技能最终结果' : latestResult.text}}</text><text wx:if="{{latestResult.resultTeam}}" class="result-team">队伍 {{latestResult.resultTeam}}</text></view>
       <view wx:if="{{latestResult.resultRows}}">
         <view wx:if="{{latestResult.historyNote}}" class="latest-result-note small muted">{{latestResult.historyNote}}</view>
@@ -43,12 +43,12 @@
       <view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view>
       <view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view>
       <view class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</view>
-      <button class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
+      <button hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
     </block>
     <block wx:else>
       <view class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</view>
-      <button class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button>
-      <button class="text-button" bindtap="closeDealtIdentity">稍后查看</button>
+      <button hover-class="none" class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button>
+      <button hover-class="none" class="text-button" bindtap="closeDealtIdentity">稍后查看</button>
     </block>
   </view>
 </view>
@@ -58,11 +58,11 @@
     <view class="small muted">仅供本人查看</view>
     <block wx:if="{{fairyResultRevealed}}">
       <view class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
-      <button class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button>
+      <button hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button>
     </block>
     <block wx:else>
       <view class="private-info muted">结果已遮盖，请确认周围无人查看。</view>
-      <button class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button>
+      <button hover-class="none" class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button>
     </block>
   </view>
 </view>
@@ -75,12 +75,12 @@
       <view class="muted">{{identityChange.faction}}</view>
       <view class="private-info">{{identityChange.information}}</view>
 <view wx:if="{{identityChange.skillStatus}}" class="private-info"><view class="label">技能状态 · {{identityChange.skillStatus.title}}</view>{{identityChange.skillStatus.detail}}</view>
-      <button class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
-      <button class="primary" bindtap="acknowledgeIdentity" disabled="{{hasPendingRequest || busy}}">记住了，遮盖身份</button>
+      <button hover-class="none" class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
+      <button hover-class="none" class="primary" bindtap="acknowledgeIdentity" disabled="{{hasPendingRequest || busy}}">记住了，遮盖身份</button>
     </block>
     <block wx:else>
       <view class="private-info muted">身份已遮盖，请确认周围无人查看。</view>
-      <button class="primary" bindtap="revealChangedIdentity" disabled="{{busy}}">查看新身份</button>
+      <button hover-class="none" class="primary" bindtap="revealChangedIdentity" disabled="{{busy}}">查看新身份</button>
     </block>
   </view>
 </view>
@@ -90,24 +90,24 @@
   <view class="brand">
     <view class="brand-identity">
       <text class="brand-mark">桌边助手</text>
-      <button class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
+      <button hover-class="none" class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
         <view class="connection-dot {{reconnecting?'pending':!network || needsLogin ? 'offline' : loading || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
         <text wx:if="{{reconnecting || !network || needsLogin}}" class="connection-label">{{reconnecting?'重连中':'连接断开'}}</text>
       </button>
     </view>
-    <button wx:if="{{!room}}" class="switch-table home-entry" bindtap="openHelp" aria-label="打开使用帮助"><text class="help-entry-icon" aria-hidden="true">?</text><text>帮助</text></button>
-    <button wx:if="{{room}}" class="switch-table home-entry" bindtap="returnHome" disabled="{{busy}}" aria-label="返回对局，保留当前座位"><view class="home-icon" aria-hidden="true"></view><text>对局</text></button>
+    <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry" bindtap="openHelp" aria-label="打开使用帮助"><text class="help-entry-icon" aria-hidden="true">?</text><text>帮助</text></button>
+    <button hover-class="none" wx:if="{{room}}" class="switch-table home-entry" bindtap="returnHome" disabled="{{busy}}" aria-label="返回对局，保留当前座位"><view class="home-icon" aria-hidden="true"></view><text>对局</text></button>
   </view>
-  <button wx:if="{{!isLobby && !room && !loading}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
+  <button hover-class="none" wx:if="{{!isLobby && !room && !loading}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
   <view wx:if="{{loading}}" class="status" role="status">正在连接牌桌…</view>
   <view wx:if="{{error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="操作提示">
       <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>
       <view class="dialog-message">{{error}}</view>
       <view class="dialog-actions">
-        <button wx:if="{{recoverableError && !hasPendingRequest}}" class="secondary" bindtap="returnHome" disabled="{{busy}}">回首页</button>
-        <button wx:if="{{recoverableError}}" class="primary" bindtap="retry" loading="{{busy}}" disabled="{{busy}}">{{needsLogin?'重新登录':'重试'}}</button>
-        <button wx:else class="primary" bindtap="dismissError">知道了</button>
+        <button hover-class="none" wx:if="{{recoverableError && !hasPendingRequest}}" class="secondary" bindtap="returnHome" disabled="{{busy}}">回首页</button>
+        <button hover-class="none" wx:if="{{recoverableError}}" class="primary" bindtap="retry" loading="{{busy}}" disabled="{{busy}}">{{needsLogin?'重新登录':'重试'}}</button>
+        <button hover-class="none" wx:else class="primary" bindtap="dismissError">知道了</button>
       </view>
     </view>
   </view>
@@ -120,27 +120,27 @@
       <scroll-view wx:if="{{skillTargets.length || swapPlayers.length}}" scroll-y class="skill-body" style="height: {{skillBodyHeight}}rpx; max-height: 42vh;">
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
         <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
-          <button wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+' '+item.name+(draftChoice===item.value?'，已选':'')}}">
+          <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+' '+item.name+(draftChoice===item.value?'，已选':'')}}">
             <view class="skill-seat">{{item.seat}} 号</view><view class="skill-name">{{item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check">✓</text>
           </button>
         </view>
         <block wx:if="{{swapOptions.length}}">
           <view class="skill-context">已选 {{swapSeats.length}} / 2</view>
           <view class="skill-target-grid">
-            <button wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">
+            <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">
               <view class="skill-seat">{{item.seat}} 号</view><view class="skill-name">{{item.name}}</view><text wx:if="{{item.selected}}" class="skill-check">✓</text>
             </button>
           </view>
         </block>
       </scroll-view>
         <view class="skill-other-choices">
-          <button wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><text class="skill-other-mark">{{draftChoice===item.value?'✓':item.value==='pass'?'○':'›'}}</text>{{item.label}}</button>
+          <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><text class="skill-other-mark">{{draftChoice===item.value?'✓':item.value==='pass'?'○':'›'}}</text>{{item.label}}</button>
         </view>
       <view class="skill-footer">
         <view class="skill-summary">{{draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
         <view wx:if="{{hunterModes && draftChoice==='pass'}}" class="small">本轮若出局，将不会触发被动开枪。是否确认？</view>
-        <button class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button>
-        <button class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
+        <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button>
+        <button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
       </view>
     </view>
     <view wx:else class="error-dialog action-dialog" role="dialog" aria-modal="true" aria-label="当前操作">
@@ -153,28 +153,28 @@
           <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
 <view wx:if="{{actionSecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{actionSecret.skillStatus.title}}</view>{{actionSecret.skillStatus.detail}}</view>
         </view>
-        <button class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
+        <button hover-class="none" class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
       <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="small muted">{{room.operationStatus.detail}}</view>
       <view wx:if="{{hunterModes}}" class="small muted">{{hunterMode ? (hunterMode==='detonate' ? '第 2 步：选择相邻一人，自己将自爆出局' : '第 2 步：选择出局时开枪的目标') : '第 1 步：选择技能方式'}}</view>
       <view class="action-choice-list">
-        <button wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
+        <button hover-class="none" wx:for="{{actionChoices}}" wx:key="value" class="{{stagedChoice ? (draftChoice===item.value ? 'primary' : 'secondary') : (swapOptions.length ? 'secondary' : 'primary')}}" aria-label="{{item.label+(stagedChoice && draftChoice===item.value ? '，已选' : '')}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}">{{stagedChoice && draftChoice===item.value?'✓ ':''}}{{room.phase==='identity'?'已记住身份与视野':item.label}}</button>
       </view>
       <block wx:if="{{swapOptions.length}}">
         <view class="small muted">选择两个座位 · 已选 {{swapSeats.length}} / 2；再次点击可取消</view>
         <view class="tool-seat-grid swap-seat-grid">
-          <button wx:for="{{swapPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}"><view>{{item.selected?'✓ ':''}}{{item.seat}}号</view><view class="swap-seat-name">{{item.name}}</view></button>
+          <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}"><view>{{item.selected?'✓ ':''}}{{item.seat}}号</view><view class="swap-seat-name">{{item.name}}</view></button>
         </view>
-        <button class="primary" bindtap="confirmSwap" disabled="{{hasPendingRequest || busy || !network || swapSeats.length!==2}}">确认换号</button>
+        <button hover-class="none" class="primary" bindtap="confirmSwap" disabled="{{hasPendingRequest || busy || !network || swapSeats.length!==2}}">确认换号</button>
       </block>
       <block wx:if="{{stagedChoice}}">
         <view class="small muted">{{draftChoice?'已选：'+draftLabel+'，确认提交后不可更改':'请先选择，再确认提交'}}</view>
-        <button class="primary" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">确认提交</button>
+        <button hover-class="none" class="primary" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">确认提交</button>
       </block>
       <scroll-view wx:if="{{actionTargets.length}}" scroll-y class="action-target-scroll">
-        <button wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
+        <button hover-class="none" wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
       </scroll-view>
-      <button class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button>
+      <button hover-class="none" class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button>
     </view>
   </view>
   <view wx:if="{{toolType && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
@@ -184,15 +184,15 @@
         <view class="small muted">{{room.knights && toolType==='assassination'?'选择线下多数决议的红方带刀人（平票先猜拳）；由本人录入目标或空刀。提前起刀只能在发言环节。':toolType==='vote'?'可选队伍，也可直接发起全员投票。':'选择任务队员。'}}</view>
         <scroll-view scroll-y class="tool-seat-scroll" style="height: {{toolPlayers.length>6?400:296}}rpx;">
         <view class="tool-seat-grid">
-          <button wx:for="{{toolPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleToolSeat" data-seat="{{item.seat}}" disabled="{{busy}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">{{item.seat}}号 · {{item.name}}</button>
+          <button hover-class="none" wx:for="{{toolPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleToolSeat" data-seat="{{item.seat}}" disabled="{{busy}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">{{item.seat}}号 · {{item.name}}</button>
         </view>
         </scroll-view>
         <view class="small muted">已选 {{toolSeats.length}} 人</view>
         <view wx:if="{{toolType==='quest'}}" class="quest-threshold">
           <view class="label">失败票门槛</view>
           <view class="threshold-options">
-            <button class="tool-seat-option {{toolThreshold===1?'active':''}}" bindtap="pickToolThreshold" data-value="1" disabled="{{busy}}" aria-label="{{'1 张失败票'+(toolThreshold===1?'，已选':'')}}">{{toolThreshold===1?'✓ ':''}}1 张</button>
-            <button class="tool-seat-option {{toolThreshold===2?'active':''}}" bindtap="pickToolThreshold" data-value="2" disabled="{{busy}}" aria-label="{{'2 张失败票'+(toolThreshold===2?'，已选':'')}}">{{toolThreshold===2?'✓ ':''}}2 张</button>
+            <button hover-class="none" class="tool-seat-option {{toolThreshold===1?'active':''}}" bindtap="pickToolThreshold" data-value="1" disabled="{{busy}}" aria-label="{{'1 张失败票'+(toolThreshold===1?'，已选':'')}}">{{toolThreshold===1?'✓ ':''}}1 张</button>
+            <button hover-class="none" class="tool-seat-option {{toolThreshold===2?'active':''}}" bindtap="pickToolThreshold" data-value="2" disabled="{{busy}}" aria-label="{{'2 张失败票'+(toolThreshold===2?'，已选':'')}}">{{toolThreshold===2?'✓ ':''}}2 张</button>
           </view>
           <view class="small muted">至少 {{toolThreshold}} 张失败票，任务才失败</view>
           <view wx:if="{{toolSeats.length>0 && toolSeats.length<toolThreshold}}" class="small threshold-hint">请至少选择 {{toolThreshold}} 名任务队员</view>
@@ -200,29 +200,29 @@
       </block>
       <view wx:else class="dialog-message">{{toolDescription?toolDescription:toolType==='offline'?'线下刀人后，由房主记录完成。':toolType==='reverseStrike'?'刺客选择逆仆，结果私密。':'刺客选择梅林，结算后公开是否命中。'}}</view>
       <view class="dialog-actions">
-        <button class="secondary" bindtap="closeTool" disabled="{{busy}}">取消</button>
-        <button class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">发起</button>
+        <button hover-class="none" class="secondary" bindtap="closeTool" disabled="{{busy}}">取消</button>
+        <button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">发起</button>
       </view>
     </view>
   </view>
-  <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
+  <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button hover-class="none" class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
   <view wx:if="{{notice}}" class="notice">{{notice}}</view>
   <view wx:if="{{resultDialog && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="登记本局胜负">
       <view class="dialog-title">登记本局胜负</view>
       <view class="small muted">请与同桌玩家确认胜方。不确定胜负时，请选择不计战绩。</view>
       <view class="result-options">
-        <button wx:for="{{room.winnerOptions}}" wx:key="value" class="secondary {{resultChoice===item.value?'is-selected':''}}" data-value="{{item.value}}" bindtap="pickResult" aria-pressed="{{resultChoice===item.value}}">{{item.label}}</button>
-        <button class="secondary {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}">不计战绩</button>
+        <button hover-class="none" wx:for="{{room.winnerOptions}}" wx:key="value" class="secondary {{resultChoice===item.value?'is-selected':''}}" data-value="{{item.value}}" bindtap="pickResult" aria-pressed="{{resultChoice===item.value}}">{{item.label}}</button>
+        <button hover-class="none" class="secondary {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}">不计战绩</button>
       </view>
-      <view class="dialog-actions"><button class="secondary" bindtap="closeResult">取消</button><button class="primary" bindtap="saveResult" disabled="{{!resultChoice || busy || hasPendingRequest}}">确认胜负并结束</button></view>
+      <view class="dialog-actions"><button hover-class="none" class="secondary" bindtap="closeResult">取消</button><button hover-class="none" class="primary" bindtap="saveResult" disabled="{{!resultChoice || busy || hasPendingRequest}}">确认胜负并结束</button></view>
     </view>
   </view>
   <block wx:if="{{isLobby}}">
-    <view wx:if="{{pendingTableCode}}" class="inline-error"><view>房间 {{pendingTableCode}} 有一项操作尚未确认。</view><button class="secondary" bindtap="resumePending">返回牌桌处理</button></view>
+    <view wx:if="{{pendingTableCode}}" class="inline-error"><view>房间 {{pendingTableCode}} 有一项操作尚未确认。</view><button hover-class="none" class="secondary" bindtap="resumePending">返回牌桌处理</button></view>
     <view wx:if="{{activeRooms.length}}" class="resume-section">
       <view class="eyebrow">正在进行</view>
-      <button wx:for="{{activeRooms}}" wx:key="code" class="resume-room" bindtap="openRoom" data-code="{{item.code}}" disabled="{{busy || loading || hasPendingRequest}}"><view><view>继续对局 · {{item.code}}</view><view class="small muted">{{item.boardName}} · {{item.peopleLabel}}</view></view><text aria-hidden="true">→</text></button>
+      <button hover-class="none" wx:for="{{activeRooms}}" wx:key="code" class="resume-room" bindtap="openRoom" data-code="{{item.code}}" disabled="{{busy || loading || hasPendingRequest}}"><view><view>继续对局 · {{item.code}}</view><view class="small muted">{{item.boardName}} · {{item.peopleLabel}}</view></view><text aria-hidden="true">→</text></button>
     </view>
     <form class="panel entry-panel" bindsubmit="submitEntry">
       <label class="label" for="nickname">本桌昵称</label>
@@ -230,20 +230,20 @@
         value="{{name}}" bindinput="inputName" bindblur="inputName"
         placeholder="默认使用个人昵称，也可为本桌修改" disabled="{{busy}}" />
       <view class="entry-tabs">
-        <button class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}">创建房间</button>
-        <button class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}">加入房间</button>
+        <button hover-class="none" class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}">创建房间</button>
+        <button hover-class="none" class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}">加入房间</button>
       </view>
       <block wx:if="{{entryMode!=='join'}}">
         <view class="field-title">人数</view>
         <view class="capacity-grid">
-          <button wx:for="{{capacities}}" wx:key="*this" class="capacity-option {{capacity===item?'active':''}}"
+          <button hover-class="none" wx:for="{{capacities}}" wx:key="*this" class="capacity-option {{capacity===item?'active':''}}"
             data-capacity="{{item}}" bindtap="pickCapacity" disabled="{{busy || loading}}"
             aria-label="{{item+'人'+(capacity===item?'，已选':'')}}">{{item}}人</button>
         </view>
         <view class="field-title">板子</view>
         <view wx:if="{{availableBoards.length===1}}" class="single-board">{{boardName}}</view>
         <view wx:else class="board-options">
-          <button wx:for="{{availableBoards}}" wx:key="id" class="board-option {{boardId===item.id?'active':''}}"
+          <button hover-class="none" wx:for="{{availableBoards}}" wx:key="id" class="board-option {{boardId===item.id?'active':''}}"
             data-index="{{index}}" bindtap="pickBoard" disabled="{{busy || loading}}">
             <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
           </button>
@@ -252,58 +252,58 @@
         <view class="rules-detail">
           <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
-        <button class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
-        <button class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">创建 {{capacity}} 人房间</button>
+        <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
+        <button hover-class="none" class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">创建 {{capacity}} 人房间</button>
       </block>
       <block wx:else>
         <label class="field-title" for="room-code">房间码</label>
         <input class="input room-input" id="room-code" name="code" type="number" maxlength="6"
           value="{{code}}" bindinput="inputCode" placeholder="输入6位房间码" disabled="{{busy}}" />
-        <button class="primary" form-type="submit" data-action="join" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">加入房间</button>
+        <button hover-class="none" class="primary" form-type="submit" data-action="join" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">加入房间</button>
       </block>
     </form>
-    <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button class="history-toggle" bindtap="refreshRooms" disabled="{{busy || loading || hasPendingRequest}}">刷新</button></view>
+    <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button hover-class="none" class="history-toggle" bindtap="refreshRooms" disabled="{{busy || loading || hasPendingRequest}}">刷新</button></view>
     <view wx:if="{{memberRooms.length>=6 || roomListFilter!=='all'}}" class="room-filters">
-      <button wx:for="{{roomFilters}}" wx:key="id" class="room-filter {{roomListFilter===item.id?'active':''}}" bindtap="filterRooms" data-filter="{{item.id}}" aria-pressed="{{roomListFilter===item.id}}">{{item.label}}</button>
+      <button hover-class="none" wx:for="{{roomFilters}}" wx:key="id" class="room-filter {{roomListFilter===item.id?'active':''}}" bindtap="filterRooms" data-filter="{{item.id}}" aria-pressed="{{roomListFilter===item.id}}">{{item.label}}</button>
     </view>
-    <view wx:if="{{undoRoom}}" class="room-undo" role="status"><text>已从列表移除 {{undoRoom.code}}</text><button class="history-toggle" bindtap="undoRemoveRoom" disabled="{{busy || hasPendingRequest}}">撤销</button></view>
+    <view wx:if="{{undoRoom}}" class="room-undo" role="status"><text>已从列表移除 {{undoRoom.code}}</text><button hover-class="none" class="history-toggle" bindtap="undoRemoveRoom" disabled="{{busy || hasPendingRequest}}">撤销</button></view>
     <view wx:for="{{visibleMemberRooms}}" wx:key="code" class="member-room room-list-item {{item.available===false?'is-unavailable':''}}">
-      <button class="room-list-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading || hasPendingRequest || item.available===false}}" aria-label="{{'进入房间'+item.code+'，'+item.statusLabel}}">
+      <button hover-class="none" class="room-list-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading || hasPendingRequest || item.available===false}}" aria-label="{{'进入房间'+item.code+'，'+item.statusLabel}}">
         <view class="room-list-top"><text class="room-list-title">{{item.note || '房间 '+item.code}}</text><text class="room-status {{item.status}}">{{enteringCode===item.code?'正在进入…':item.statusLabel}}</text></view>
         <view wx:if="{{item.note}}" class="small muted">房间 {{item.code}}</view>
         <view class="room-list-board">{{item.boardName}} · {{item.peopleLabel}}</view>
         <view class="room-list-meta"><text wx:if="{{item.hostName}}" class="room-host-name">房主：{{item.hostName}}</text><text>{{item.relationLabel}}</text></view>
         <view wx:if="{{item.updatedAt}}" class="room-list-time">最近活动 {{item.activityLabel}}</view>
       </button>
-      <button class="room-more" data-code="{{item.code}}" bindtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
+      <button hover-class="none" class="room-more" data-code="{{item.code}}" bindtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
     </view>
-    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><text class="small muted">加入朋友的房间，或创建一桌开始游戏</text><view class="room-empty-actions"><button class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
-    <view wx:elif="{{memberRooms.length && !visibleMemberRooms.length}}" class="room-empty"><text>没有符合条件的牌桌</text><button class="history-toggle" bindtap="filterRooms" data-filter="all">查看全部</button></view>
+    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><text class="small muted">加入朋友的房间，或创建一桌开始游戏</text><view class="room-empty-actions"><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
+    <view wx:elif="{{memberRooms.length && !visibleMemberRooms.length}}" class="room-empty"><text>没有符合条件的牌桌</text><button hover-class="none" class="history-toggle" bindtap="filterRooms" data-filter="all">查看全部</button></view>
     <view wx:if="{{roomMenu && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog room-menu-dialog" role="dialog" aria-modal="true" aria-label="{{'房间管理，房间'+roomMenu.code}}">
       <view class="room-menu-header"><view class="room-menu-heading">房间管理</view><view class="room-menu-code">房间 {{roomMenu.code}}</view></view>
       <view class="room-menu-options">
-        <button class="room-menu-action" bindtap="roomMenuAction" data-kind="hide" disabled="{{busy || hasPendingRequest}}"><view class="room-menu-copy"><text class="room-menu-label">从列表移除</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
-        <button wx:if="{{roomMenu.available!==false && roomMenu.isMember}}" class="room-menu-action" bindtap="roomMenuAction" data-kind="leave" disabled="{{busy || hasPendingRequest || !roomMenu.canLeave}}"><view class="room-menu-copy"><text class="room-menu-label">离开房间</text><text wx:if="{{!roomMenu.canLeave}}" class="room-menu-description">{{roomMenu.canLeave===false?'当前状态暂不可离开':'离开权限暂未同步'}}</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
+        <button hover-class="none" class="room-menu-action" bindtap="roomMenuAction" data-kind="hide" disabled="{{busy || hasPendingRequest}}"><view class="room-menu-copy"><text class="room-menu-label">从列表移除</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
+        <button hover-class="none" wx:if="{{roomMenu.available!==false && roomMenu.isMember}}" class="room-menu-action" bindtap="roomMenuAction" data-kind="leave" disabled="{{busy || hasPendingRequest || !roomMenu.canLeave}}"><view class="room-menu-copy"><text class="room-menu-label">离开房间</text><text wx:if="{{!roomMenu.canLeave}}" class="room-menu-description">{{roomMenu.canLeave===false?'当前状态暂不可离开':'离开权限暂未同步'}}</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
       </view>
-      <button wx:if="{{roomMenu.available!==false && roomMenu.isHost}}" class="room-menu-action danger" bindtap="roomMenuAction" data-kind="delete" disabled="{{busy || hasPendingRequest}}"><view class="room-menu-copy"><text class="room-menu-label">解散房间</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
-      <button class="secondary room-menu-cancel" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button>
+      <button hover-class="none" wx:if="{{roomMenu.available!==false && roomMenu.isHost}}" class="room-menu-action danger" bindtap="roomMenuAction" data-kind="delete" disabled="{{busy || hasPendingRequest}}"><view class="room-menu-copy"><text class="room-menu-label">解散房间</text></view><text class="room-menu-chevron" aria-hidden="true">›</text></button>
+      <button hover-class="none" class="secondary room-menu-cancel" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button>
     </view></view>
     <view wx:if="{{noteRoom && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注">
       <view class="dialog-title">个人备注 · {{noteRoom.code}}</view><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label>
       <input id="room-note" class="input" value="{{roomNoteDraft}}" bindinput="inputRoomNote" maxlength="30" placeholder="例如：周五朋友局" focus="{{true}}" disabled="{{busy || hasPendingRequest}}" />
-      <view class="dialog-actions"><button class="secondary" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button><button class="primary" bindtap="saveRoomNote" disabled="{{busy || hasPendingRequest}}">保存</button></view>
+      <view class="dialog-actions"><button hover-class="none" class="secondary" bindtap="closeRoomMenu" disabled="{{busy || hasPendingRequest}}">取消</button><button hover-class="none" class="primary" bindtap="saveRoomNote" disabled="{{busy || hasPendingRequest}}">保存</button></view>
     </view></view>
   </block>
   <block wx:elif="{{room}}">
     <view class="room-summary">
-      <button class="copy-room" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}">
+      <button hover-class="none" class="copy-room" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}">
         <text>房间 {{room.code}}</text><text class="copy-label">复制</text>
       </button>
       <view wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}" class="room-identity-anchor">
-        <button class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{revealed?'遮盖我的身份':'查看我的身份'}}">{{room.me.seat}}号 · {{revealed?'遮盖身份':'我的身份 ›'}}</button>
+        <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{revealed?'遮盖我的身份':'查看我的身份'}}">{{room.me.seat}}号 · {{revealed?'遮盖身份':'我的身份 ›'}}</button>
         <view wx:if="{{identityHintVisible && !dealtIdentityDialog && !actionDialog && !identityChange && !fairyResult && !error && !toolType && !showRoomRules && !showRoomSettings}}" class="identity-entry-hint">
           <text role="status">随时点这里，查看身份与视野。</text>
-          <button class="identity-hint-close" bindtap="dismissIdentityHint" aria-label="关闭身份入口提示">×</button>
+          <button hover-class="none" class="identity-hint-close" bindtap="dismissIdentityHint" aria-label="关闭身份入口提示">×</button>
         </view>
       </view>
       <text wx:elif="{{room.me.seat!==null}}" class="summary-seat">你在 {{room.me.seat}} 号</text>
@@ -312,9 +312,9 @@
       <view class="room-board-info">
         <text wx:if="{{room.testRoom}}" class="small room-test-label">测试房间 · 陪测已开启</text>
         <text class="room-board-name">{{room.boardName}} · {{room.capacity}}人</text>
-        <button class="room-rules-button" bindtap="openRoomRules" aria-label="查看当前板子的角色配置">配置说明</button>
+        <button hover-class="none" class="room-rules-button" bindtap="openRoomRules" aria-label="查看当前板子的角色配置">配置说明</button>
       </view>
-      <button wx:if="{{room.me.isHost}}" class="room-rules-button" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}">房间设置</button>
+      <button hover-class="none" wx:if="{{room.me.isHost}}" class="room-rules-button" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}">房间设置</button>
 
     </view>
     <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
@@ -325,8 +325,8 @@
           <view wx:for="{{room.roleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
         <view class="dialog-actions">
-          <button class="secondary" bindtap="openBoardDetails">板子详情</button>
-          <button class="primary" bindtap="closeRoomRules">知道了</button>
+          <button hover-class="none" class="secondary" bindtap="openBoardDetails">板子详情</button>
+          <button hover-class="none" class="primary" bindtap="closeRoomRules">知道了</button>
         </view>
       </view>
     </view>
@@ -336,7 +336,7 @@
         <text class="muted">{{secret.faction}}</text>
         <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
 <view wx:if="{{secret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{secret.skillStatus.title}}</view>{{secret.skillStatus.detail}}</view>
-        <button class="secondary" bindtap="reveal">立即遮盖</button>
+        <button hover-class="none" class="secondary" bindtap="reveal">立即遮盖</button>
       </view>
     </block>
     <view class="table-dynamics {{room.phase==='lobby'?'is-lobby':room.phase==='tools' || room.phase==='ended'?'result-first':'operation-first'}}">
@@ -347,9 +347,9 @@
       <view class="panel"
         >
         <text class="muted small">{{startHint}}</text>
-        <button wx:if="{{room.me.seat!==null}}" class="primary" bindtap="ready" disabled="{{hasPendingRequest || busy}}">
+        <button hover-class="none" wx:if="{{room.me.seat!==null}}" class="primary" bindtap="ready" disabled="{{hasPendingRequest || busy}}">
           {{room.me.ready?'取消准备':'我准备好了'}}</button
-        ><button
+        ><button hover-class="none"
           wx:if="{{room.me.isHost}}"
           class="secondary"
           bindtap="start"
@@ -363,17 +363,17 @@
         <view class="label">房主操作</view>
         <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · B牌剩余{{room.knights.remainingCards}}张</view>
         <view class="tool-actions">
-          <button class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
-          <button class="secondary" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">做任务</button>
+          <button hover-class="none" class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
+          <button hover-class="none" class="secondary" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">做任务</button>
           <block wx:if="{{room.knights}}">
-            <button class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
-            <button class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
+            <button hover-class="none" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
+            <button hover-class="none" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
           </block>
-          <button wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
-          <button wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
+          <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
+          <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
         </view>
         <view wx:if="{{room.operationProgress}}" class="operation-progress">
-          <button class="progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}"><text class="progress-title">当前操作进度</text><text class="progress-count">{{room.operationProgress.completed}} / {{room.operationProgress.total}} 已完成</text><text class="progress-disclosure">{{operationProgressExpanded?'收起 ⌃':'展开 ⌄'}}</text></button>
+          <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}"><text class="progress-title">当前操作进度</text><text class="progress-count">{{room.operationProgress.completed}} / {{room.operationProgress.total}} 已完成</text><text class="progress-disclosure">{{operationProgressExpanded?'收起 ⌃':'展开 ⌄'}}</text></button>
           <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{operationProgressExpanded && item.required}}" class="progress-player">
             <text class="progress-player-name">{{item.seat}}号 · {{item.name}}</text>
             <text class="progress-state {{item.completed?'completed':'pending'}}">{{item.completed?'已完成':'未完成'}}</text>
@@ -384,14 +384,14 @@
       <view class="section-title history-heading">
         <text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家与座位'}}</text>
         <text wx:if="{{room.phase==='lobby'}}" class="small muted">点自己站起，点空位坐下</text>
-        <button wx:else class="history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
+        <button hover-class="none" wx:else class="disclosure-button history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
       </view>
       <view wx:if="{{room.phase!=='lobby' && questTimeline.length}}" class="quest-timeline">
-        <button wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
+        <button hover-class="none" wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
       </view>
     </view>
     <view wx:if="{{room.phase==='lobby' || seatsExpanded !== false}}" class="seats"
-      ><button
+      ><button hover-class="none"
         wx:for="{{seats}}"
         wx:key="seat"
         class="seat {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
@@ -411,18 +411,18 @@
       </button></view
     >
     <block wx:if="{{room.phase==='lobby'}}">
-      <button class="leave-button" bindtap="leave" disabled="{{hasPendingRequest || busy}}">
+      <button hover-class="none" class="leave-button" bindtap="leave" disabled="{{hasPendingRequest || busy}}">
         离开房间
       </button>
     </block>
     <block wx:else>
-      <button wx:if="{{room.me.seat===null && !room.me.isHost}}" class="leave-button" bindtap="leave" disabled="{{hasPendingRequest || busy}}">离开房间</button>
+      <button hover-class="none" wx:if="{{room.me.seat===null && !room.me.isHost}}" class="leave-button" bindtap="leave" disabled="{{hasPendingRequest || busy}}">离开房间</button>
       <view wx:if="{{room.phase==='proposal' && !room.canUseTools && !room.flexible}}" class="panel"
         ><view class="label">本轮需要 {{room.teamSize}} 人</view
         ><text class="muted"
           >{{room.leader===room.me.seat?'点座位选人，再提交队伍':'等待队长选人'}}</text
         ><view class="team-line">当前队伍：{{teamText}}</view
-        ><button
+        ><button hover-class="none"
           wx:if="{{room.leader===room.me.seat}}"
           class="primary"
           bindtap="propose"
@@ -437,7 +437,7 @@
           >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
         ><text>{{room.result.reason}}</text
         ><text class="small muted">{{room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</text
-        ><button
+        ><button hover-class="none"
           wx:if="{{room.me.isHost}}"
           class="primary"
           bindtap="rematch"
@@ -448,11 +448,11 @@
       >
       <view wx:if="{{room.phase==='offlineFinal'}}" class="panel">
         <text class="label">{{room.offlineAssassination?'请莫德雷德线下刺梅林':'请线下完成特殊结算'}}</text><text class="muted">{{room.offlineAssassination?'三次任务已成功，请在线下完成刺梅林并确认胜负。':'任务记录已保留。起刀、内奸及最终胜负在线下完成，小程序不自动判定。'}}</text>
-        <button wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{hasPendingRequest || busy}}">线下已完成，记录结果</button>
+        <button hover-class="none" wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{hasPendingRequest || busy}}">线下已完成，记录结果</button>
       </view>
       <view wx:if="{{history.length}}" class="section-title history-heading"><text>公开记录 · 共{{history.length}}条</text></view>
       <view wx:if="{{historyExpanded}}" class="history-filters">
-        <button wx:for="{{['all','vote','quest','skill','other']}}" wx:key="*this" class="history-filter {{historyFilter===item?'active':''}}" bindtap="filterHistory" data-filter="{{item}}">{{item==='all'?'全部':item==='vote'?'投票':item==='quest'?'任务':item==='skill'?'技能':'其他'}}</button>
+        <button hover-class="none" wx:for="{{['all','vote','quest','skill','other']}}" wx:key="*this" class="history-filter {{historyFilter===item?'active':''}}" bindtap="filterHistory" data-filter="{{item}}">{{item==='all'?'全部':item==='vote'?'投票':item==='quest'?'任务':item==='skill'?'技能':'其他'}}</button>
       </view>
       <view wx:if="{{historyExpanded && !visibleHistory.length}}" class="small muted">暂无此类公开记录</view>
       <view wx:for="{{visibleHistory}}" wx:key="key" id="history-record-{{item.key}}" class="{{focusedHistoryKey===item.key?'history-row history-row-focused':'history-row'}}"
@@ -471,17 +471,17 @@
         </block>
         <view wx:elif="{{item.detail && !item.resultRows}}" class="muted small history-detail">{{item.detail}}</view></view
       >
-      <button wx:if="{{history.length > 3}}" class="history-more" bindtap="toggleHistory" aria-expanded="{{historyExpanded}}" aria-label="{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}"><text class="history-more-label">{{historyExpanded?'收起记录':'更早记录'}}</text><view class="history-more-chevron {{historyExpanded?'is-expanded':''}}" aria-hidden="true"></view></button>
+      <button hover-class="none" wx:if="{{history.length > 3}}" class="disclosure-button history-more" bindtap="toggleHistory" aria-expanded="{{historyExpanded}}" aria-label="{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}"><text class="history-more-label">{{historyExpanded?'收起记录':'更早记录'}}</text><view class="history-more-chevron {{historyExpanded?'is-expanded':''}}" aria-hidden="true"></view></button>
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
-      <button class="finish-game-button" bindtap="finishTools" disabled="{{hasPendingRequest || busy}}">结束本局</button>
+      <button hover-class="none" class="finish-game-button" bindtap="finishTools" disabled="{{hasPendingRequest || busy}}">结束本局</button>
     </view>
     <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
       <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}}">
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
-        <button wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
-        <button wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
-        <button wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
+        <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
+        <button hover-class="none" wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
+        <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
       </view>
     </view>
   </block>
