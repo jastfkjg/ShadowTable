@@ -4,6 +4,7 @@ const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails } = require("./audit");
 const { readProfile, saveProfile } = require("./profile");
+const { Leaderboard } = require("./leaderboard");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -75,6 +76,7 @@ function createApp({
   }
   const store = new Store(database),
     limits = new Map();
+  const leaderboard = new Leaderboard(store);
   function limit(key, max) {
     const now = clock(),
       old = limits.get(key);
@@ -213,6 +215,8 @@ function createApp({
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
       limit(`uid:${uid}`, 180);
+      if (req.method === "GET" && path === "/api/leaderboard")
+        return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
       if (path === "/api/me/profile") {
         if (req.method === "GET") return send(200, readProfile(store, uid));
         check(req.method === "POST", "接口不存在", 404);

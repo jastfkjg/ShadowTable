@@ -1,4 +1,4 @@
-<app-nav title="编辑资料" back="{{true}}" backLabel="返回我的" bindback="back" />
+<app-nav title="编辑资料" back="{{true}}" backLabel="{{backLabel || '返回我的'}}" bindback="back" />
 <view class="page personal-page">
   <view class="page-title">编辑资料</view><view class="muted">让朋友认出你。</view>
   <view wx:if="{{loading && !profile}}" class="status">正在读取资料…</view>
@@ -14,6 +14,10 @@
     <label for="profile-nickname" class="field-title">个人昵称</label>
     <input id="profile-nickname" class="input" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" bindinput="inputName" bindblur="inputName" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" />
     <view class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</view>
+    <view class="profile-rank-setting">
+      <label class="profile-rank-toggle"><text>在排行榜公开展示</text><switch checked="{{leaderboardVisible}}" bindchange="changeLeaderboard" color="#e5c68b" disabled="{{busy || pendingSave || loading || profile.identityType!=='wx'}}" aria-label="在排行榜公开展示" /></label>
+      <view class="small muted">{{profile.identityType==='wx'?'开启并保存后，将向其他登录玩家展示当前昵称、头像，以及全部已归档有效对局的统计。关闭不会删除个人战绩。':'仅微信账号可参与公开排行榜，当前账号仍可查看榜单和个人战绩。'}}</view>
+    </view>
     <button class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{pendingSave?'重试保存':'保存资料'}}</button>
     <view wx:if="{{pendingSave && !busy}}" class="small muted">保存结果尚未确认，请重试同一次保存。</view>
   </form>

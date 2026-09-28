@@ -19,6 +19,7 @@
       </view>
     </view>
     <view class="personal-links me-links">
+      <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-rank" aria-hidden="true"></view><view class="me-link-copy">排行榜</view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy">对局记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-book" aria-hidden="true"></view><view class="me-link-copy">帮助与规则</view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon me-icon-info" aria-hidden="true"></view><view class="me-link-copy">关于</view><view class="me-chevron" aria-hidden="true"></view></button>

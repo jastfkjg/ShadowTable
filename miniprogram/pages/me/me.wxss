@@ -87,6 +87,7 @@
 
 /* Inline vectors share the tab icons' 24-unit canvas and 1.7-unit stroke. */
 .me-icon { width: 44rpx; height: 44rpx; flex-shrink: 0; background: center / contain no-repeat; }
+.me-icon-rank { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21V7h8v14M2 21V12h6m8 3h6v6M1 21h22M10 3h4'/%3E%3C/svg%3E"); }
 .me-icon-history {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4v5h5M3 9a9 9 0 1 1 0 6M12 7v5l3 2'/%3E%3C/svg%3E");
 }

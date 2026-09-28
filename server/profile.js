@@ -1,5 +1,5 @@
 "use strict";
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const { RuleError } = require("./engine");
 const MAX_AVATAR_BYTES = 256 * 1024;
 function fail(ok, message) { if (!ok) throw new RuleError(message, 400); }
@@ -34,15 +34,19 @@ function decodeAvatar(value) {
   return { hash: createHash("sha256").update(data).digest("hex"), mime: "image/" + match[1], data };
 }
 function readProfile(store, uid) {
-  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated FROM profiles WHERE uid=?").get(uid);
+  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
-    identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null };
+    identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
+    leaderboardVisible: !!row?.leaderboard_visible };
 }
 function saveProfile(store, uid, input) {
   fail(typeof input.nickname === "string" && input.nickname.trim().length >= 1 && input.nickname.trim().length <= 16 && !/[\u0000-\u001f\u007f]/.test(input.nickname), "昵称需要1–16个字符，不能包含换行");
   fail(Number.isSafeInteger(input.version) && input.version >= 0, "请刷新个人资料后重试");
   const old = readProfile(store, uid);
   if (old.version !== input.version) throw new RuleError("资料已在其他设备更新，请重新载入后编辑", 409);
+  fail(input.leaderboardVisible === undefined || typeof input.leaderboardVisible === "boolean", "排行榜展示设置无效");
+  const visible = input.leaderboardVisible ?? old.leaderboardVisible;
+  fail(!visible || uid.startsWith("wx:"), "仅微信账号可参与公开排行榜");
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
   if (input.avatar === null) avatarHash = null;
   else if (input.avatar !== undefined) {
@@ -50,9 +54,11 @@ function saveProfile(store, uid, input) {
     store.db.prepare("INSERT OR IGNORE INTO avatars VALUES(?,?,?)").run(avatar.hash, avatar.mime, avatar.data);
     avatarHash = avatar.hash;
   }
-  store.db.prepare(`INSERT INTO profiles VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
-    nickname=excluded.nickname, avatar_hash=excluded.avatar_hash, version=excluded.version, updated=excluded.updated`)
-    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now());
+  store.db.prepare(`INSERT INTO profiles(uid,nickname,avatar_hash,version,updated,leaderboard_visible,public_id) VALUES(?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
+    nickname=excluded.nickname, avatar_hash=excluded.avatar_hash, version=excluded.version, updated=excluded.updated,
+    leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id)`)
+    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID());
+  store.invalidateLeaderboard();
   return readProfile(store, uid);
 }
 module.exports = { readProfile, saveProfile, decodeAvatar };

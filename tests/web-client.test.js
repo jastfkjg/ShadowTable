@@ -27,7 +27,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog,
-      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
@@ -666,4 +666,58 @@ test("网页资料保存断网重试复用请求与版本，成功回到我的",
   await c.saveProfile(); assert.equal(c.state.page,'profile'); assert.equal(c.state.profileDirty,true);
   await c.saveProfile(); assert.deepEqual(posts[0],posts[1]);
   assert.equal(JSON.parse(posts[0].body).version,2); assert.equal(c.state.page,'me'); assert.equal(c.state.profile.nickname,'新名');
+});
+
+function webRanks(metric='games',extra={}) {
+  return {metric,period:'all',threshold:metric==='games'?1:20,eligibleCount:1,maxRows:100,updatedAt:1,version:'one',hasMore:false,
+    rows:[{publicId:'public-player',nickname:'<script>坏名字</script>',avatarUrl:null,rank:1,total:20,wins:10,winRate:50,isSelf:true}],
+    me:{status:'ranked',rank:1,total:20,wins:10,winRate:50,remaining:0},...extra};
+}
+test('网页排行榜可深链，私密资料不公开，输出转义昵称并显示样本量和本人状态', async () => {
+  const c=client(async()=>response(webRanks()));
+  await c.applyRoute('#/leaderboard');
+  assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
+  const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第 1 名/);
+  c.state.rankBoard=webRanks('games',{rows:[],me:{status:'hidden',rank:null,total:20,wins:10,winRate:50}});
+  assert.match(c.viewLeaderboard(),/设置公开展示/);assert.match(c.viewLeaderboard(),/暂无符合上榜条件/);
+  c.ACTIONS.rankRules();assert.match(c.viewLeaderboard(),/第三阵营/);
+});
+test('网页榜单切换和离开页面不接收旧响应，过期分页重新加载，错误可重试', async () => {
+  let resolveOld;let reads=0;
+  const c=client(async url=>{
+    if(++reads===1)return new Promise(resolve=>resolveOld=resolve);
+    return response(webRanks(url.includes('metric=good')?'good':'games'));
+  });
+  c.state.page='leaderboard';const first=c.loadLeaderboard();await Promise.resolve();await Promise.resolve();
+  await c.ACTIONS.rankMetric({dataset:{value:'good'}});resolveOld(response(webRanks()));await first;
+  assert.equal(c.state.rankBoard.metric,'good');assert.equal(c.state.rankLoading,false);
+  let step=0;const urls=[];
+  const paged=client(async url=>{
+    urls.push(url);step++;
+    if(step===2)return {status:409,json:async()=>({error:'榜单已更新'})};
+    if(step===4)throw Error('断线');
+    return response(webRanks('games',{version:step===1?'old':'new',hasMore:step===1,nextOffset:20}));
+  });
+  await paged.applyRoute('#/leaderboard');await paged.ACTIONS.rankMore();
+  assert.match(urls[1],/offset=20&version=old/);assert.equal(paged.state.rankBoard.rows.length,1);assert.equal(paged.state.rankBoard.version,'new');assert.match(paged.state.rankNotice,/重新加载/);
+  await paged.ACTIONS.rankRefresh();assert.match(paged.state.rankError,/网络未确认/);assert.equal(paged.state.rankBoard.rows.length,1);
+  await paged.ACTIONS.rankRetry();assert.equal(paged.state.rankError,'');
+  let finish;const leaving=client(async()=>new Promise(resolve=>finish=resolve));
+  leaving.state.page='leaderboard';const pending=leaving.loadLeaderboard();await Promise.resolve();await Promise.resolve();
+  await leaving.applyRoute('#/help');finish(response(webRanks()));await pending;assert.equal(leaving.state.rankBoard,null);
+});
+test('网页公开设置保存遵循资料版本和幂等草稿，游客入口禁用', async () => {
+  let saved={nickname:'我',version:1,identityType:'wx',leaderboardVisible:false};const posts=[];
+  const c=client(async(url,opts)=>{
+    if(opts?.method==='POST'){
+      posts.push(opts.body);if(posts.length===1)throw Error('断线');saved={...saved,leaderboardVisible:true,version:2};
+    }
+    return response(url.endsWith('/profile')?saved:{total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[]});
+  });
+  await c.applyRoute('#/profile');c.CHANGES.profileLeaderboard({checked:true});assert.equal(c.state.profileDirty,true);
+  await c.saveProfile();c.CHANGES.profileLeaderboard({checked:false});assert.equal(c.state.profileDraft.leaderboardVisible,true);
+  await c.saveProfile();assert.equal(posts[0],posts[1]);assert.equal(JSON.parse(posts[0]).leaderboardVisible,true);
+  saved={...saved,identityType:'guest',leaderboardVisible:false};await c.applyRoute('#/profile');
+  c.CHANGES.profileLeaderboard({checked:true});assert.equal(c.state.profileDraft.leaderboardVisible,false);
+  assert.match(c.viewProfileEditor(),/data-change="profileLeaderboard" disabled/);
 });

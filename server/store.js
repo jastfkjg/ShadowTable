@@ -6,6 +6,9 @@ const { roomSummary } = require("./engine");
 const { migrate: migrateKnights } = require("./knights");
 class Store {
   constructor(path) {
+    this.leaderboardRevision = 0;
+    this.leaderboardDirty = false;
+    this.inTransaction = false;
     if (path !== ":memory:")
       mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path);
@@ -21,6 +24,13 @@ class Store {
       CREATE TABLE IF NOT EXISTS match_players(match_id TEXT NOT NULL, uid TEXT NOT NULL, board TEXT NOT NULL, faction TEXT NOT NULL, outcome TEXT NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
       CREATE INDEX IF NOT EXISTS match_players_user ON match_players(uid,ended DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
+    if (!profileColumns.some(column => column.name === "leaderboard_visible"))
+      this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 0");
+    if (!profileColumns.some(column => column.name === "public_id"))
+      this.db.exec("ALTER TABLE profiles ADD COLUMN public_id TEXT");
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS profiles_public_id ON profiles(public_id) WHERE public_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS match_players_rank_time ON match_players(ended, faction, uid, outcome) WHERE outcome IN ('win','loss');`);
     const columns = this.db.prepare("PRAGMA table_info(admin_audit)").all();
     if (!columns.some((column) => column.name === "details"))
       this.db.exec(
@@ -38,14 +48,24 @@ class Store {
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");
+    this.inTransaction = true;
+    this.leaderboardDirty = false;
     try {
       const result = fn();
       this.db.exec("COMMIT");
+      if (this.leaderboardDirty) this.leaderboardRevision++;
       return result;
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
+    } finally {
+      this.inTransaction = false;
+      this.leaderboardDirty = false;
     }
+  }
+  invalidateLeaderboard() {
+    if (this.inTransaction) this.leaderboardDirty = true;
+    else this.leaderboardRevision++;
   }
   get(code) {
     const row = this.db
@@ -106,8 +126,10 @@ class Store {
     const { players, ...match } = record;
     this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
     const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
-    for (const { uid, ...player } of players)
-      insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
+    for (const { uid, ...player } of players) {
+      const result = insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
+      if (result.changes) this.invalidateLeaderboard();
+    }
   }
   statsFor(uid) {
     const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;

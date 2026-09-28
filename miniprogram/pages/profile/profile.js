@@ -1,13 +1,15 @@
 const api = require("../../api");
 const { presentProfile, backToMe, personalPreview } = require("../../profile");
 Page({
-  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", initial: "友", profile: null },
+  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", initial: "友", profile: null, leaderboardVisible: false },
   onLoad() {
     this.alive = true;
+    const pages = getCurrentPages();
+    this.setData({ backLabel: pages[pages.length - 2]?.route === "pages/leaderboard/leaderboard" ? "返回排行榜" : "返回我的" });
     const preview = personalPreview("profile");
     if (preview) {
       this.original = preview;
-      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, initial: preview.initial });
+      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, initial: preview.initial, leaderboardVisible: !!preview.leaderboardVisible });
     }
     return this.load({ preserveEdits: true });
   },
@@ -23,13 +25,13 @@ Page({
       if (preserveEdits && (this.data.dirty || this.data.choosing || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, initial: shown.initial, dirty: false, pendingSave: false });
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, initial: shown.initial, leaderboardVisible: !!profile.leaderboardVisible, dirty: false, pendingSave: false });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
   },
   markDirty() {
-    const dirty = this.data.nickname.trim() !== (this.original?.nickname || "") || this.avatar !== undefined;
+    const dirty = this.data.nickname.trim() !== (this.original?.nickname || "") || this.avatar !== undefined || this.data.leaderboardVisible !== !!this.original?.leaderboardVisible;
     this.setData({ dirty });
     if (dirty) wx.enableAlertBeforeUnload?.({ message: "资料尚未保存，离开会丢失修改" });
     else wx.disableAlertBeforeUnload?.();
@@ -37,6 +39,10 @@ Page({
   inputName(e) {
     if (this.pending || this.data.busy) return;
     this.setData({ nickname: e.detail.value, initial: (e.detail.value.trim() || "友").slice(0,1), error: "" }); this.markDirty();
+  },
+  changeLeaderboard(e) {
+    if (this.pending || this.data.busy || this.data.profile?.identityType !== "wx") return;
+    this.setData({ leaderboardVisible: e.detail.value }); this.markDirty();
   },
   async chooseAvatar(e) {
     if (this.data.busy || this.pending || this.data.choosing || !e.detail.avatarUrl) return;
@@ -68,7 +74,7 @@ Page({
       const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
       this.setData({ nickname });
       if (!nickname || nickname.length > 16) return this.setData({ error: "请输入1–16个字符的昵称" });
-      this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
+      this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, leaderboardVisible: this.data.leaderboardVisible, ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
     }
     this.setData({ busy: true, error: "", pendingSave: true });
     try {

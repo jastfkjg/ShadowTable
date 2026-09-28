@@ -1,0 +1,4 @@
+.profile-rank-setting { margin-top: 32rpx; padding-top: 24rpx; border-top: 1rpx solid var(--border); }
+.profile-rank-toggle { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; min-height: 48px; margin-bottom: 12rpx; }
+.profile-rank-toggle text { min-width: 0; }
+.profile-rank-toggle switch { flex-shrink: 0; }

@@ -1796,3 +1796,46 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 .avatar-upload:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .profile-form { margin-top: 4px; }
 .page-title:focus { outline: none; }
+
+.profile-rank-setting { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.profile-rank-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; margin-bottom: 8px; cursor: pointer; }
+.profile-rank-toggle input { flex-shrink: 0; width: 24px; height: 24px; accent-color: var(--accent); }
+.leaderboard-page { padding-bottom: calc(13rem + env(safe-area-inset-bottom)); }
+.rank-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+button.rank-rule-button { width: auto; min-height: 48px; padding-right: 0; color: var(--muted); font-size: 14px; }
+.rank-period { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface); }
+.rank-period button { flex: 1; color: var(--muted); }
+.rank-period button[aria-pressed="true"] { background: var(--bg); color: var(--text); }
+.rank-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin-top: 16px; border-bottom: 1px solid var(--border); }
+button.rank-metric { padding: 12px 0; border-radius: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 14px; }
+button.rank-metric[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+button.rank-metric.good[aria-pressed="true"] { color: var(--good); border-bottom-color: var(--good); }
+button.rank-metric.evil[aria-pressed="true"] { color: var(--evil); border-bottom-color: var(--evil); }
+.rank-rules { margin-top: 16px; padding: 16px; border-radius: 12px; background: var(--surface); color: var(--muted); }
+.rank-rules p { margin: 0; }
+.rank-rules p + p { margin-top: 12px; }
+.rank-note { margin: 16px 0 20px; }
+.rank-list-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+.rank-list { padding: 0; margin: 0; list-style: none; }
+.rank-row { display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 14px 0; border-bottom: 1px solid rgba(177,191,198,.18); }
+.rank-row.is-self { background: var(--surface); }
+.rank-number { flex-shrink: 0; width: 24px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-number.rank-top { color: var(--accent); font-weight: 600; }
+.rank-avatar { flex-shrink: 0; width: 36px; height: 36px; object-fit: cover; border-radius: 50%; background: var(--surface); }
+.rank-avatar-fallback { display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+.rank-identity { min-width: 0; flex: 1; }
+.rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-value { flex-shrink: 0; font-size: 22px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.rank-unit { margin-left: 3px; font-size: 12px; color: var(--muted); font-weight: 400; }
+.rank-empty { padding: 36px 0; text-align: center; }
+button.rank-more { margin-top: 16px; color: var(--accent); }
+.rank-footer { margin: 20px 0; text-align: center; }
+.rank-mine { position: fixed; z-index: 10; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 460px; padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
+.rank-mine-content { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.rank-mine-copy { min-width: 0; }
+.rank-mine-status { font-size: 16px; overflow-wrap: anywhere; }
+button.rank-enable { justify-content: flex-start; padding-left: 0; color: var(--accent); font-size: 14px; }
+.leaderboard-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.leaderboard-page button:focus-visible, .profile-rank-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 360px) { .rank-row { gap: 8px; } .rank-metric { font-size: 13px; } }
+@media (max-height: 500px) { .rank-mine { position: static; transform: none; margin-top: 24px; } .leaderboard-page { padding-bottom: 0; } }

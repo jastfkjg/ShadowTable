@@ -353,6 +353,7 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
+    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankRulesOpen: false,
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -419,7 +420,7 @@
     var table = /^#\/table\/(\d{6})$/.exec(hash || '');
     if (table) return { page: 'table', code: table[1] };
     var name = (hash || '').replace(/^#\//, '');
-    return { page: ['lobby', 'me', 'profile', 'stats', 'help'].includes(name) ? name : 'lobby' };
+    return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help'].includes(name) ? name : 'lobby' };
   }
   async function mayNavigate() {
     if (pending || state.busy || state.profileSaving || state.avatarLoading) {
@@ -457,6 +458,7 @@
       } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats()]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
+      else if (route.page === 'leaderboard') await loadLeaderboard();
     } catch (e) { if (sequence === routeSequence) handleError(e); }
     if (sequence === routeSequence) {
       const heading = app.querySelector('[data-page-heading]');
@@ -470,7 +472,7 @@
       const profile = await request('/api/me/profile');
       if (sequence !== profileSequence) return;
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
-        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version }, profileDirty: false,
+        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, leaderboardVisible: !!profile.leaderboardVisible }, profileDirty: false,
       } : {}) });
     } catch (e) {
       if (sequence === profileSequence) setState({ profileError: e.message });
@@ -478,7 +480,7 @@
     } finally { if (sequence === profileSequence) setState({ profileLoading: false }); }
   }
   function profileDirty() {
-    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
+    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined || !!state.profileDraft.leaderboardVisible !== !!state.profile?.leaderboardVisible) });
   }
   async function chooseProfileAvatar(el) {
     const file = el.files?.[0]; el.value = '';
@@ -503,7 +505,7 @@
     if (!profilePending) {
       const nickname = state.profileDraft.nickname.trim();
       if (!nickname || nickname.length > 16) return setState({ profileError: '请输入1–16个字符的昵称' });
-      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version,
+      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version, leaderboardVisible: !!state.profileDraft.leaderboardVisible,
         ...(state.profileDraft.avatar !== undefined ? { avatar: state.profileDraft.avatar } : {}) } };
     }
     setState({ profileSaving: true, profileError: '' });
@@ -548,7 +550,7 @@
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     else if (stats) html += '<div class="personal-metrics"><div><div class="metric-value">' + stats.total + '</div><span class="small muted">有效对局</span></div><div><div class="metric-value">' + stats.wins + '</div><span class="small muted">获胜场次</span></div><div><div class="metric-value accent">' + (stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">总胜率</span></div></div>' + (!stats.total ? '<div class="small muted">第一局故事，等你开场。结束后请房主登记胜方。</div>' : '');
     else html += '<div class="status">正在读取战绩…</div>';
-    html += '</section><div class="personal-links"><button class="personal-link" type="button" data-action="navigate" data-page="stats"><span><span>对局记录</span><span class="small muted link-note">按阵营、板子查看表现</span></span><span aria-hidden="true">›</span></button>' + btn('personal-link','navigate','帮助与规则 ›',{page:'help'}) + btn('personal-link','about','关于桌边助手 ›') + '</div><div class="personal-footer">同桌相聚，每局都有故事。</div>';
+    html += '</section><div class="personal-links">' + btn('personal-link','navigate','排行榜 ›',{page:'leaderboard'}) + '<button class="personal-link" type="button" data-action="navigate" data-page="stats"><span><span>对局记录</span><span class="small muted link-note">按阵营、板子查看表现</span></span><span aria-hidden="true">›</span></button>' + btn('personal-link','navigate','帮助与规则 ›',{page:'help'}) + btn('personal-link','about','关于桌边助手 ›') + '</div><div class="personal-footer">同桌相聚，每局都有故事。</div>';
     return html;
   }
   function viewProfileEditor() {
@@ -557,7 +559,60 @@
     if (!draft) return html + (state.profileLoading ? '<div class="status">正在读取资料…</div>' : '');
     html += '<form class="profile-form" data-form="profile"><div class="avatar-editor">' + avatarView(draft.avatarPreview,draft.nickname,true) + '<label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '更换头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="选择新头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label>';
     if (draft.avatarPreview) html += btn('text-button','removeProfileAvatar','恢复默认头像',null,locked || state.avatarLoading);
-    html += '</div><label for="profile-nickname" class="field-title">个人昵称</label><input id="profile-nickname" name="nickname" class="input" maxlength="16" autocomplete="nickname" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符"' + (locked ? ' disabled' : '') + ' /><div class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</div>' + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.avatarLoading || state.profileConflict) + (profilePending && !state.profileSaving ? '<div class="small muted">保存结果尚未确认，请重试同一次保存。</div>' : '') + '</form>';
+    html += '</div><label for="profile-nickname" class="field-title">个人昵称</label><input id="profile-nickname" name="nickname" class="input" maxlength="16" autocomplete="nickname" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符"' + (locked ? ' disabled' : '') + ' /><div class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</div>';
+    html += '<div class="profile-rank-setting"><label class="profile-rank-toggle"><span>在排行榜公开展示</span><input type="checkbox" data-change="profileLeaderboard"' + (draft.leaderboardVisible ? ' checked' : '') + (locked || state.profileLoading || state.profile?.identityType !== 'wx' ? ' disabled' : '') + ' /></label><div class="small muted">' + (state.profile?.identityType === 'wx' ? '开启并保存后，将向其他登录玩家展示当前昵称、头像，以及全部已归档有效对局的统计。关闭不会删除个人战绩。' : '仅微信账号可参与公开排行榜，当前账号仍可查看榜单和个人战绩。') + '</div></div>';
+    html += btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict) + (profilePending && !state.profileSaving ? '<div class="small muted">保存结果尚未确认，请重试同一次保存。</div>' : '') + '</form>';
+    return html;
+  }
+  const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
+  var rankSequence = 0;
+  async function loadLeaderboard(more = false) {
+    if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
+    const sequence = ++rankSequence, route = routeSequence;
+    const metric = state.rankMetric, period = state.rankPeriod, board = state.rankBoard;
+    setState({ rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
+    try {
+      await login();
+      const result = await request('/api/leaderboard?metric=' + metric + '&period=' + period + (more ? '&offset=' + board.nextOffset + '&version=' + board.version : ''));
+      if (sequence !== rankSequence || route !== routeSequence) return;
+      if (more) result.rows = board.rows.concat(result.rows);
+      setState({ rankBoard: result, serverConnected: true });
+    } catch (e) {
+      if (sequence !== rankSequence || route !== routeSequence) return;
+      if (more && e.status === 409) {
+        await loadLeaderboard();
+        if (sequence + 1 === rankSequence && route === routeSequence && !state.rankError)
+          setState({ rankNotice: '榜单已更新，已重新加载。' });
+      } else setState({ rankError: e.message });
+    } finally {
+      if (sequence === rankSequence && route === routeSequence) setState({ rankLoading: false, rankMoreLoading: false });
+    }
+  }
+  function viewLeaderboard() {
+    const board = state.rankBoard, metric = state.rankMetric;
+    const metricLabel = rankMetrics.find(item => item[0] === metric)[1];
+    let html = personalTitle('排行榜', '') + '<section class="leaderboard-page" aria-label="排行榜"><div class="rank-heading"><span class="small muted">同桌相聚，各有所长</span><button type="button" class="rank-rule-button" data-action="rankRules" aria-expanded="' + state.rankRulesOpen + '">规则 ' + (state.rankRulesOpen ? '⌄' : '›') + '</button></div>';
+    html += '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
+    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankMetrics.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
+    if (state.rankRulesOpen) html += '<div class="rank-rules small"><p>仅统计已归档的有效对局，按最终阵营计算。房主登记与系统判定均计入；测试局、终止、未登记胜负、身份记录不完整和旁观不计入。</p><p>总胜率满20局、好人或坏人胜率满10局上榜，门槛只看所选周期。第三阵营计入总榜；好人对应蓝方，坏人对应红方。</p><p>胜率相同时局数更多者优先，两项相同则并列；局数榜同局数并列。排序使用未舍入的胜率，展示保留一位小数。</p><p>本月按北京时间和对局结束时间计算。全部指所有已归档对局。仅公开展示已开启此设置的微信玩家；不同板子、人数会影响胜率。</p></div>';
+    if (board) html += '<div class="rank-note small muted">' + (metric === 'games' ? '至少1局有效对局' : '满' + board.threshold + '局' + (metric === 'overall' ? '有效对局' : '该阵营有效对局') + '上榜') + ' · ' + board.eligibleCount + '人上榜</div>';
+    if (state.rankLoading) html += '<div class="status" role="status">' + (board ? '正在刷新榜单…' : '正在读取榜单…') + '</div>';
+    if (state.rankNotice) html += '<div role="status" class="small muted">' + esc(state.rankNotice) + '</div>';
+    if (state.rankError) html += '<div class="inline-error" role="alert">' + esc(state.rankError) + btn('secondary','rankRetry','重试',null,state.rankLoading || state.rankMoreLoading) + '</div>';
+    if (!board) return html + '</section>';
+    const value = row => (metric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (metric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
+    html += '<div aria-live="polite" aria-atomic="true" class="sr-only">' + metricLabel + '，' + board.eligibleCount + '人上榜</div>';
+    if (board.rows.length) {
+      html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (metric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
+      board.rows.forEach(row => {
+        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number' + (row.rank <= 3 ? ' rank-top' : '') + '">' + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + row.wins + '胜 · ' + row.total + '局</div></div><div class="rank-value">' + value(row) + '</div></li>';
+      });
+      html += '</ol>';
+    } else html += '<div class="rank-empty muted">当前周期暂无符合上榜条件的公开玩家。</div>';
+    if (board.hasMore) html += btn('rank-more','rankMore',state.rankMoreLoading ? '正在加载…' : '加载更多',null,state.rankLoading || state.rankMoreLoading);
+    html += '<div class="rank-footer small muted">' + (board.eligibleCount > board.maxRows ? '展示前100位玩家，个人名次按完整榜单计算。' : '仅展示已开启公开展示的玩家。') + '<div>更新于 ' + esc(new Date(board.updatedAt).toLocaleTimeString('zh-CN', {hour12:false})) + '</div>' + btn('text-button','rankRefresh','刷新榜单',null,state.rankLoading || state.rankMoreLoading) + '</div>';
+    const me = board.me, status = {ranked:'第 ' + me.rank + ' 名',hidden:'尚未开启公开展示',unsupported:'仅微信账号可上榜',no_games:'当前周期暂无有效对局',insufficient:'距上榜还差 ' + me.remaining + ' 局'}[me.status];
+    html += '<aside class="rank-mine" aria-label="我的排名"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="small muted">我的' + metricLabel + '</div><div class="rank-mine-status">' + status + '</div><div class="small muted">' + me.wins + '胜 · ' + me.total + '局</div></div><div class="rank-value accent">' + value(me) + '</div></div>' + (me.status === 'hidden' ? btn('rank-enable','navigate','设置公开展示 ›',{page:'profile'}) : '') + '</aside></section>';
     return html;
   }
   function viewHelp() {
@@ -3410,7 +3465,7 @@ function roomListItems(rooms) {
       viewIdentityChange() +
       viewDealtIdentity() +
       '<div class="page' +
-      (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","help"].includes(state.page) ? " personal-page" : "") +
+      (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
       '">' +
       viewBrand() +
       (state.loading ? '<div class="status">正在连接牌桌…</div>' : "") +
@@ -3419,7 +3474,7 @@ function roomListItems(rooms) {
       viewToolDialog() +
       viewResultDialog() +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'help' ? viewHelp() : state.room ? viewRoom() : viewEntry()) +
+      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.room ? viewRoom() : viewEntry()) +
       "</div>" +
       viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
@@ -3431,6 +3486,12 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric) { setState({rankMetric:el.dataset.value,rankBoard:null}); return loadLeaderboard(); } },
+    rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) { setState({rankPeriod:el.dataset.value,rankBoard:null}); return loadLeaderboard(); } },
+    rankMore: () => loadLeaderboard(true),
+    rankRetry: () => loadLeaderboard(state.rankMoreError),
+    rankRefresh: () => loadLeaderboard(),
+    rankRules: () => setState({rankRulesOpen:!state.rankRulesOpen}),
     navigate: el => navigate(el.dataset.page),
     saveProfile,
     reloadProfile: async () => { if (!state.profileDirty || await confirm('重新载入资料？', '当前未保存的修改将丢弃。')) { profilePending = null; try { await login(); await loadProfile(state.page === 'profile'); } catch (e) { setState({ profileError: e.message }); } } },
@@ -3656,6 +3717,7 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
+    profileLeaderboard: el => { if (state.profileDraft && state.profile?.identityType === 'wx' && !state.profileSaving && !profilePending) { state.profileDraft.leaderboardVisible = el.checked; profileDirty(); } },
     profileAvatar: chooseProfileAvatar,
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
     settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },
