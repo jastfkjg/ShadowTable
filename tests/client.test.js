@@ -12,6 +12,7 @@ function page(api, storage = new Map(), layout) {
     getStorageSync: (k) => storage.get(k),
     setStorageSync: (k, v) => storage.set(k, v),
     removeStorageSync: (k) => storage.delete(k),
+    switchTab() {},
     showModal: (o) => o.success({ confirm: true }),
   };
   if (layout) wx.createSelectorQuery = () => {
@@ -24,10 +25,11 @@ function page(api, storage = new Map(), layout) {
   };
   vm.runInNewContext(
     fs.readFileSync(
-      require.resolve("../miniprogram/pages/table/table.js"),
+      require.resolve("../miniprogram/pages/table/controller.js"),
       "utf8",
-    ),
+    ) + "\nPage(module.exports());",
     {
+      module: { exports: {} },
       require: () => api,
       Page: (p) => (definition = p),
       wx,
@@ -488,6 +490,7 @@ test("新邀请不会被本地旧房间覆盖，仍可从成员列表恢复旧�
         if (path === "/api/boards") return { boards: [] };
         if (path === "/api/me/rooms")
           return { rooms: [{ code: "111111", seat: 1 }] };
+        if (path === "/api/rooms/222222") throw Object.assign(new Error("你不在该房间"), { status: 403 });
         throw new Error("不应自动进入旧房间");
       },
     },
@@ -495,7 +498,8 @@ test("新邀请不会被本地旧房间覆盖，仍可从成员列表恢复旧�
   );
   p.inviteCode = "222222";
   await p.bootstrap();
-  assert.equal(p.roomCode, undefined);
+  assert.equal(p.roomCode, null);
+  assert.equal(storage.get("invitedRoom"), "222222");
   assert.equal(p.data.memberRooms[0].code, "111111");
   assert.ok(!paths.includes("/api/rooms/111111"));
 });
@@ -845,6 +849,9 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     assert.equal(host.data.room.result, null);
     assert.ok(host.data.history.at(-1).detail.includes("命中梅林"));
     await host.finishTools();
+    assert.equal(host.data.resultDialog, true);
+    host.pickResult({ currentTarget: { dataset: { value: "evil" } } });
+    await host.saveResult();
     await settle(host);
     assert.equal(host.data.room.phase, "ended");
   } finally {
@@ -1365,8 +1372,8 @@ test("行动入口按公开阶段命名，特殊技能不暴露角色", async ()
 
 test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
   let definition, url;
-  vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/table.js"), "utf8"), {
-    require: () => ({}), Page: p => definition = p,
+  vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8") + "\nPage(module.exports());", {
+    module: { exports: {} }, require: () => ({}), Page: p => definition = p,
     wx: { navigateTo: o => url = o.url },
   });
   const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };
@@ -1754,4 +1761,31 @@ test("公开记录隐藏轮次推进，保留转换与最新结果的原记录�
   assert.equal(p.data.visibleHistory.length, 2);
   assert.equal(p.data.latestResult.key, 2);
   assert.ok(p.data.latestResult.timeLabel);
+});
+
+test("小程序胜负登记取消及阶段过期不提交", async () => {
+  let reads = 0;
+  const p = page({ request: async () => {
+    reads++;
+    if (reads === 1) throw new Error("服务暂不可用");
+    return { total: 0, wins: 0, losses: 0, excluded: 0, winRate: null, byFaction: [], byBoard: [], recent: [] };
+  } });
+  p.data.room = { stage: "s1", canUseTools: true, winnerOptions: [{value: "good", label: "好人胜"}] };
+  let writes = 0;
+  p.cmd = () => { writes++; };
+  p.finishTools();
+  await p.saveResult();
+  assert.equal(writes, 0);
+  p.pickResult({ currentTarget: { dataset: { value: "good" } } });
+  p.confirm = async () => false;
+  await p.saveResult();
+  assert.equal(writes, 0);
+  p.finishTools();
+  p.pickResult({ currentTarget: { dataset: { value: "good" } } });
+  p.data.room.stage = "s2";
+  p.confirm = async () => true;
+  await p.saveResult();
+  assert.equal(writes, 0);
+  assert.match(p.data.error, /阶段已变化/);
+
 });

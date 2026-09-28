@@ -8,12 +8,13 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   let scheduled;
   const events = {};
   const scrolls = [], lookups = [];
-  const element = { focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
+  const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
   if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
-    window: { innerHeight: layout?.height, addEventListener() {} },
+    location: { hash: "#/lobby" },
+    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {} },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
@@ -25,7 +26,8 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
     render = function () {};
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewDealtIdentity, showIdentityHintWhenVisible,
+      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
@@ -606,4 +608,62 @@ test("网页隐藏轮次推进，时间在标题右侧，记录定位和最新�
   assert.ok(!html.includes("进入第"));
   assert.match(html, /history-title"><span>技能最终结果<\/span><span class="history-time">\d{2}:\d{2}<\/span><\/div><span class="history-number">#3/);
   assert.ok(!html.includes('history-subtitle'));
+});
+
+test("网页战绩空态、错误重试与第三阵营结算选择", async () => {
+  let calls = 0;
+  const c = client(async () => {
+    calls++;
+    if (calls === 1) throw new Error("网络异常");
+    return response({ identityType: "guest", total: 0, wins: 0, losses: 0, excluded: 1, winRate: null, byFaction: [], byBoard: [], recent: [] });
+  });
+  await c.ACTIONS.toggleStats();
+  assert.match(c.viewStats(), /重试/);
+  await c.ACTIONS.loadStats();
+  assert.match(c.viewStats(), /还没有有效战绩/);
+  assert.match(c.viewStats(), /游客战绩/);
+  assert.doesNotMatch(c.viewStats(), /0%/);
+  c.state.room = { stage: "s1", canUseTools: true, winnerOptions: [{value: "third", label: "盗贼阵营胜"}] };
+  c.ACTIONS.finishTools();
+  assert.match(c.viewResultDialog(), /盗贼阵营胜/);
+  assert.match(c.viewResultDialog(), /data-action="saveResult" disabled/);
+  c.ACTIONS.pickResult({ dataset: { value: "third" } });
+  assert.match(c.viewResultDialog(), /aria-pressed="true"/);
+  c.state.room.stage = "s2";
+  await c.ACTIONS.saveResult();
+  assert.match(c.state.error, /阶段已变化/);
+  assert.equal(calls, 2);
+});
+
+
+test("网页独立页面与资料草稿保护，牌桌隐藏底部导航", async () => {
+  const profile = { nickname: "林间", version: 1, identityType: "wx", avatarUrl: null };
+  const c = client(async url => response(url.endsWith('/profile') ? profile : url.endsWith('/stats') ? {total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[]} : {rooms:[]}));
+  await c.applyRoute('#/me');
+  assert.equal(c.state.page,'me'); assert.equal(c.state.profile.nickname,'林间');
+  assert.match(c.viewNavigation(),/aria-current="page"/);
+  await c.navigate('profile');
+  c.INPUTS.profileName({value:'未保存'});
+  c.setConfirm(async()=>false); await c.navigate('me');
+  assert.equal(c.state.page,'profile'); assert.equal(c.state.profileDraft.nickname,'未保存');
+  c.setConfirm(async()=>true); await c.navigate('me'); assert.equal(c.state.page,'me');
+  c.setRefresh(async()=>{}); await c.applyRoute('#/table/123456');
+  assert.equal(c.state.page,'table'); assert.equal(c.viewNavigation(),'');
+});
+
+test("网页资料保存断网重试复用请求与版本，成功回到我的", async () => {
+  let fail = true, saved = {nickname:'原名',version:2,identityType:'wx',avatarUrl:null};
+  const posts=[];
+  const c = client(async (url,opts) => {
+    if (opts?.method === 'POST') {
+      posts.push({body:opts.body,headers:opts.headers});
+      if (fail) { fail=false; throw new Error('网络中断'); }
+      saved={...saved,nickname:'新名',version:3}; return response(saved);
+    }
+    return response(url.endsWith('/profile')?saved:{total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[]});
+  });
+  await c.applyRoute('#/profile'); c.INPUTS.profileName({value:'新名'});
+  await c.saveProfile(); assert.equal(c.state.page,'profile'); assert.equal(c.state.profileDirty,true);
+  await c.saveProfile(); assert.deepEqual(posts[0],posts[1]);
+  assert.equal(JSON.parse(posts[0].body).version,2); assert.equal(c.state.page,'me'); assert.equal(c.state.profile.nickname,'新名');
 });

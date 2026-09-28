@@ -1,0 +1,25 @@
+<view class="page personal-page">
+  <view class="personal-heading"><text class="eyebrow">SHADOWTABLE</text><view class="page-title">我的</view></view>
+  <view wx:if="{{loading && !profile}}" class="status" role="status">正在读取个人资料…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
+  <block wx:if="{{profile}}">
+    <view class="profile-hero">
+      <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" aria-label="我的头像" />
+      <view wx:else class="profile-avatar avatar-fallback" aria-hidden="true">{{profile.initial}}</view>
+      <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="small muted">{{profile.identityLabel}}</view></view>
+      <button class="profile-edit" bindtap="editProfile" aria-label="编辑头像和昵称">编辑资料 ›</button>
+    </view>
+    <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
+    <view class="personal-section">
+      <view class="section-title history-heading"><text>我的战绩</text><button class="history-toggle" bindtap="openStats">查看全部 ›</button></view>
+      <view wx:if="{{stats}}" class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">有效对局</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">获胜场次</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
+      <view wx:if="{{stats && !stats.total}}" class="small muted">第一局故事，等你开场。结束后请房主登记胜方。</view>
+    </view>
+    <view class="personal-links">
+      <button class="personal-link" bindtap="openStats"><view><view>对局记录</view><view class="small muted">按阵营、板子查看表现</view></view><text aria-hidden="true">›</text></button>
+      <button class="personal-link" bindtap="openHelp"><view>帮助与规则</view><text aria-hidden="true">›</text></button>
+      <button class="personal-link" bindtap="about"><view>关于桌边助手</view><text aria-hidden="true">›</text></button>
+    </view>
+  </block>
+  <view class="personal-footer">同桌相聚，每局都有故事。</view>
+</view>

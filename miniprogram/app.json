@@ -1,5 +1,9 @@
 {
   "pages": [
+    "pages/lobby/lobby",
+    "pages/me/me",
+    "pages/profile/profile",
+    "pages/stats/stats",
     "pages/table/table",
     "pages/settings/settings",
     "pages/board-details/board-details",
@@ -13,5 +17,25 @@
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "tabBar": {
+    "color": "#b1bfc6",
+    "selectedColor": "#e5c68b",
+    "backgroundColor": "#101c24",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/lobby/lobby",
+        "text": "对局",
+        "iconPath": "assets/tab-table.png",
+        "selectedIconPath": "assets/tab-table-active.png"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的",
+        "iconPath": "assets/tab-me.png",
+        "selectedIconPath": "assets/tab-me-active.png"
+      }
+    ]
+  }
 }

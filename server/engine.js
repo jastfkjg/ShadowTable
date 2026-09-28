@@ -237,9 +237,35 @@ function stage(room, phase) {
   room.stage = randomUUID();
   room.submissions = {};
 }
-function end(room, winner, reason) {
-  room.result = { winner, reason };
+function end(room, winner, reason, source = "system") {
+  room.result = { winner, reason, source };
   stage(room, "ended");
+}
+function winnerOptions(room) {
+  // Use the public board composition, never the players' secret current sides.
+  return ["good", "evil", ...(roleDeck(room.board, room.capacity).some(role => ROLES[role][1] === "third") ? ["third"] : [])]
+    .map(value => ({ value, label: { good: "好人胜", evil: "坏人胜", third: "盗贼阵营胜" }[value] }));
+}
+function manualResult(room, input) {
+  const winner = input.winner ?? null;
+  requireRule(winner === null || winnerOptions(room).some(option => option.value === winner), "胜方不适用于当前板子");
+  return winner;
+}
+function archiveResult(room) {
+  const excludedReason = room.testRoom || room.players.some(p => /^(dev|test):/.test(p.uid))
+    ? "测试局" : room.phase === "terminated" ? "对局终止" : !room.result?.winner ? "未登记胜负"
+      : room.players.some(p => !ROLES[room.roles[p.uid]]) ? "身份记录不完整" : null;
+  room.matchRecord = {
+    id: room.matchId || randomUUID(), code: room.code, game: room.game,
+    board: room.board, boardName: boardName(room), capacity: room.capacity,
+    startedAt: room.startedAt || null, endedAt: Date.now(),
+    winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
+    players: room.players.map(p => ({
+      uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色",
+      faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
+      outcome: excludedReason ? "excluded" : faction(room, p.uid) === room.result.winner ? "win" : "loss",
+    })),
+  };
 }
 function roleDeck(boardId, capacity) {
   if (variants.decks[boardId]) return [...variants.decks[boardId]];
@@ -364,6 +390,9 @@ function start(room, flexible = false) {
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
   room.game++;
+  room.matchId = randomUUID();
+  room.startedAt = Date.now();
+  delete room.matchRecord;
   room.leader = randomInt(1, room.capacity + 1);
   room.round = 1;
   room.rejects = 0;
@@ -1129,6 +1158,7 @@ function publicView(room, uid) {
         : null,
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
+    winnerOptions: winnerOptions(room),
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),
@@ -1223,9 +1253,12 @@ function publicView(room, uid) {
   };
 }
 function command(room, uid, input) {
+  const previousPhase = room.phase;
   const previous = new Set(room.history);
   const startedAt = room.activity?.startedAt || Date.now();
   applyCommand(room, uid, input);
+  if (!["ended", "terminated"].includes(previousPhase) && ["ended", "terminated"].includes(room.phase) && room.roles)
+    archiveResult(room);
   for (const entry of room.history) {
     if (!previous.has(entry) && !entry.startedAt) entry.startedAt = startedAt;
   }
@@ -1390,6 +1423,7 @@ function applyCommand(room, uid, input) {
   }
   if (type === "finishTools") {
     requireRule(canUseTools(room), "当前没有已发牌的对局");
+    const winner = manualResult(room, input);
     requireRule(
       !hasActiveOperation(room) || input.replace === true,
       "请先结算或确认作废当前操作",
@@ -1398,7 +1432,7 @@ function applyCommand(room, uid, input) {
     if (hasActiveOperation(room)) room.history.push({ kind: "toolCanceled" });
     room.flexible = true;
     room.activity = null;
-    end(room, null, "房主已结束本局，以线下确认的胜负为准。");
+    end(room, winner, winner ? "房主已登记线下胜负，战绩已归档。" : "房主已结束本局，以线下确认的胜负为准。本局不计战绩。", "manual");
     return;
   }
   if (type === "kick") {
@@ -1521,6 +1555,9 @@ function applyCommand(room, uid, input) {
       "flexible",
       "activity",
       "toolSequence",
+      "matchId",
+      "startedAt",
+      "matchRecord",
     ])
       delete room[key];
     room.history = [];
@@ -1559,12 +1596,14 @@ function applyCommand(room, uid, input) {
       stage(room, "tools");
       return;
     }
+    const winner = manualResult(room, input);
     end(
       room,
-      null,
-      offlineAssassination(room)
+      winner,
+      winner ? "房主已登记线下胜负，战绩已归档。" : offlineAssassination(room)
         ? "莫德雷德线下刺梅林已结算，以线下胜负为准。"
         : "线下特殊结算已完成。小程序未判定最终胜方。",
+      "manual",
     );
     return;
   }

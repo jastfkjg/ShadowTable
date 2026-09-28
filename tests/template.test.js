@@ -10,7 +10,8 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   context,
 );
-const render = factory("pages/table/table.wxml");
+const renderTable = factory("pages/table/table.wxml"), renderLobby = factory("pages/lobby/lobby.wxml");
+const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
 const base = {
   loading: false,
   busy: false,
@@ -750,4 +751,15 @@ test("技能网格独立选择，底部确认默认禁用并显示明确目标",
   assert.ok(nodes(selected).some(n => n.attr?.class?.includes("skill-option is-selected")));
   const offline = render({ ...data, draftChoice: "target:2", network: false });
   assert.equal(byHandler(offline, "confirmChoice").attr.disabled, true);
+});
+
+test("结算需要主动选择胜方，支持第三阵营；零有效局不显示0%", () => {
+  const room = { code: "123456", phase: "tools", capacity: 12, canUseTools: true, me: { isHost: true }, team: [], winnerOptions: [{ value: "good", label: "好人胜" }, { value: "evil", label: "坏人胜" }, { value: "third", label: "盗贼阵营胜" }] };
+  const dialog = render({ ...base, room, resultDialog: true, resultChoice: "" });
+  assert.equal(byHandler(dialog, "saveResult").attr.disabled, true);
+  assert.match(JSON.stringify(dialog), /盗贼阵营胜|不计战绩/);
+  assert.equal(byHandler(render({ ...base, room, hasPendingRequest: false, resultDialog: true, resultChoice: "third" }), "saveResult").attr.disabled, false);
+  const stats = factory("pages/stats/stats.wxml")({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
+  assert.match(JSON.stringify(stats), /还没有有效战绩/);
+  assert.doesNotMatch(JSON.stringify(stats), /0%/);
 });

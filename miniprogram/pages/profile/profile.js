@@ -1,0 +1,91 @@
+const api = require("../../api");
+const { presentProfile, backToMe } = require("../../profile");
+Page({
+  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", initial: "友", profile: null },
+  onLoad() { this.alive = true; this.load(); },
+  onUnload() { this.alive = false; },
+  async load() {
+    if (this.data.busy) return;
+    this.setData({ loading: true, error: "", conflict: false });
+    try {
+      await api.login();
+      const profile = await api.request("/api/me/profile");
+      if (!this.alive) return;
+      this.original = profile; this.avatar = undefined; this.pending = null;
+      const shown = presentProfile(profile);
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, initial: shown.initial, dirty: false, pendingSave: false });
+      wx.disableAlertBeforeUnload?.();
+    } catch (e) { if (this.alive) this.setData({ error: e.message }); }
+    finally { if (this.alive) this.setData({ loading: false }); }
+  },
+  markDirty() {
+    const dirty = this.data.nickname.trim() !== (this.original?.nickname || "") || this.avatar !== undefined;
+    this.setData({ dirty });
+    if (dirty) wx.enableAlertBeforeUnload?.({ message: "资料尚未保存，离开会丢失修改" });
+    else wx.disableAlertBeforeUnload?.();
+  },
+  inputName(e) {
+    if (this.pending || this.data.busy) return;
+    this.setData({ nickname: e.detail.value, initial: (e.detail.value.trim() || "友").slice(0,1), error: "" }); this.markDirty();
+  },
+  async chooseAvatar(e) {
+    if (this.data.busy || this.pending || this.data.choosing || !e.detail.avatarUrl) return;
+    this.setData({ choosing: true, error: "" });
+    try {
+      const url = e.detail.avatarUrl;
+      const canvas = await new Promise((resolve, reject) => wx.createSelectorQuery().in(this).select('#avatar-canvas').fields({ node: true, size: true }).exec(rows => rows[0]?.node ? resolve(rows[0].node) : reject(new Error("无法处理头像，请重试"))));
+      canvas.width = 256; canvas.height = 256;
+      const img = canvas.createImage();
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("图片无法读取，请重新选择")); img.src = url; });
+      const side = Math.min(img.width, img.height), ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,256);
+      ctx.drawImage(img, (img.width-side)/2, (img.height-side)/2, side, side, 0,0,256,256);
+      const file = await new Promise((resolve, reject) => wx.canvasToTempFilePath({ canvas, fileType: 'jpg', quality: 0.85, destWidth: 256, destHeight: 256, success: resolve, fail: reject }, this));
+      const read = await new Promise((resolve, reject) => wx.getFileSystemManager().readFile({ filePath: file.tempFilePath, encoding: 'base64', success: resolve, fail: reject }));
+      if (!this.alive) return;
+      this.avatar = 'data:image/jpeg;base64,' + read.data;
+      this.setData({ avatarPreview: file.tempFilePath }); this.markDirty();
+    } catch (e) { if (this.alive) this.setData({ error: e.message || "头像处理失败，请重新选择" }); }
+    finally { if (this.alive) this.setData({ choosing: false }); }
+  },
+  removeAvatar() {
+    if (this.data.busy || this.pending || this.data.choosing) return;
+    this.avatar = null; this.setData({ avatarPreview: "" }); this.markDirty();
+  },
+  async save(e) {
+    if (this.data.busy || this.data.loading || this.data.choosing || this.data.conflict) return;
+    if (!this.pending) {
+      const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
+      this.setData({ nickname });
+      if (!nickname || nickname.length > 16) return this.setData({ error: "请输入1–16个字符的昵称" });
+      this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
+    }
+    this.setData({ busy: true, error: "", pendingSave: true });
+    try {
+      await api.login();
+      await api.request("/api/me/profile", "POST", this.pending.data, this.pending.id);
+      this.pending = null;
+      if (!this.alive) return;
+      this.setData({ dirty: false, pendingSave: false }); wx.disableAlertBeforeUnload?.();
+      wx.showToast({ title: "资料已保存", icon: "success" }); backToMe();
+    } catch (e) {
+      if (e.status && e.status < 500 && ![401,429].includes(e.status)) this.pending = null;
+      if (this.alive) this.setData({ error: e.message, conflict: e.status === 409, pendingSave: !!this.pending });
+    } finally { if (this.alive) this.setData({ busy: false }); }
+  },
+  async reload() {
+    if (this.data.dirty) {
+      const yes = await new Promise(resolve => wx.showModal({ title: "重新载入资料？", content: "当前未保存的修改将丢弃。", success: r => resolve(r.confirm), fail: () => resolve(false) }));
+      if (!yes) return;
+    }
+    await this.load();
+  },
+  async back() {
+    if (this.data.busy || this.data.choosing) return;
+    if (this.data.dirty || this.pending) {
+      const yes = await new Promise(resolve => wx.showModal({ title: "离开编辑资料？", content: this.pending ? "保存结果尚未确认，建议先重试保存。仍要离开吗？" : "未保存的修改将丢弃。", success: r => resolve(r.confirm), fail: () => resolve(false) }));
+      if (!yes) return;
+    }
+    wx.disableAlertBeforeUnload?.(); backToMe();
+  },
+});

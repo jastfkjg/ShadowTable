@@ -80,4 +80,4 @@ function requestId() {
     Math.random().toString(36).slice(2)
   );
 }
-module.exports = { request, login, requestId };
+module.exports = { request, login, requestId, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };

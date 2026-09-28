@@ -90,6 +90,6 @@ Page({
   },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();
-    else wx.reLaunch({ url: "/pages/table/table" });
+    else wx.switchTab({ url: "/pages/lobby/lobby" });
   },
 });

@@ -3,6 +3,7 @@ const http = require("node:http");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails } = require("./audit");
+const { readProfile, saveProfile } = require("./profile");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -18,12 +19,12 @@ const hash = (s) => createHash("sha256").update(s).digest("hex");
 const check = (ok, message, status = 400) => {
   if (!ok) throw new RuleError(message, status);
 };
-async function body(req) {
+async function body(req, maximum = 8192) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    check(size <= 8192, "请求过大", 413);
+    check(size <= maximum, "请求过大", 413);
     chunks.push(chunk);
   }
   const text = Buffer.concat(chunks).toString("utf8");
@@ -153,6 +154,14 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account and login/create limits below remain unchanged.
       limit(`ip:${req.socket.remoteAddress}`, 6000);
+      const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
+      if (req.method === "GET" && avatar) {
+        const stored = store.db.prepare("SELECT mime,data FROM avatars WHERE hash=?").get(avatar[1]);
+        check(stored, "头像不存在", 404);
+        res.setHeader("Content-Type", stored.mime);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.writeHead(200); res.end(Buffer.from(stored.data)); return;
+      }
       if (req.method === "GET" && path === "/health")
         return send(200, { ok: true });
       if (req.method === "GET" && path === "/api/boards")
@@ -203,6 +212,27 @@ function createApp({
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
       limit(`uid:${uid}`, 180);
+      if (path === "/api/me/profile") {
+        if (req.method === "GET") return send(200, readProfile(store, uid));
+        check(req.method === "POST", "接口不存在", 404);
+        limit(`profile:${uid}`, 10);
+        const b = await body(req, 360 * 1024), id = req.headers["idempotency-key"];
+        check(typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id), "缺少合法请求编号");
+        const fingerprint = hash(JSON.stringify([path, b]));
+        const result = store.transaction(() => {
+          const cached = store.receipt(uid, id);
+          if (cached) {
+            check(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409);
+            return JSON.parse(cached.result);
+          }
+          const profile = saveProfile(store, uid, b);
+          store.addReceipt(uid, id, fingerprint, profile);
+          return profile;
+        });
+        return send(200, result);
+      }
+      if (req.method === "GET" && path === "/api/me/stats")
+        return send(200, store.statsFor(uid));
       if (req.method === "GET" && path === "/api/me/rooms") {
         const rooms = store.personalRooms(uid);
         return send(200, { rooms });

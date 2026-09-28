@@ -80,6 +80,7 @@ function actionDetails(room, uid, type, input) {
     "flexible",
     "keepPlaying",
     "revision",
+    "winner",
   ])
     if (input[field] !== undefined) details.parameters[field] = input[field];
   if (spec) {

@@ -18,7 +18,7 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   ctx,
 );
-const render = factory("pages/table/table.wxml");
+const render = data => factory(data.room ? "pages/table/table.wxml" : "pages/lobby/lobby.wxml")({ ...data, isLobby: !data.room });
 const escape = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -38,12 +38,14 @@ function html(n) {
       "wx-button": "button",
       "wx-input": "input",
       "wx-label": "label",
+      "wx-image": "img",
+      "wx-form": "form",
     }[n.tag] || "div";
   if (n.tag === "wx-scroll-view")
     n.attr = { ...n.attr, style: (n.attr?.style || "") + ";overflow-y:auto" };
   const attrs = Object.entries(n.attr || {})
     .filter(([k]) =>
-      ["class", "disabled", "placeholder", "value", "role", "style"].includes(
+      ["class", "disabled", "placeholder", "value", "role", "style", "src"].includes(
         k,
       ),
     )
@@ -287,6 +289,10 @@ scenes.roomSettingsPicker = { ...scenes.roomSettings, showTransferPicker: true }
 const settingsCss = fs
   .readFileSync(path.join(root, "pages/settings/settings.wxss"), "utf8")
   .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const personalTemplates = { personalMe: "me", personalEditor: "profile", personalStats: "stats" };
+scenes.personalMe = { profile: {displayName: "林间", initial: "林", identityLabel: "微信账号"}, stats: {total: 24,wins: 15,rateLabel: "62.5%"} };
+scenes.personalEditor = {profile: {}, nickname: "林间", initial: "林",loading:false};
+scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:0,byFaction:[],byBoard:[],recent:[]},loading:false};
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace(/^page\s*\{/m, "body {")
@@ -295,7 +301,7 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");

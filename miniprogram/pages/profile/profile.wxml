@@ -1,0 +1,21 @@
+<view class="page personal-page">
+  <button class="text-button page-back" bindtap="back" disabled="{{busy}}">‹ 返回我的</button>
+  <view class="page-title">编辑资料</view><view class="muted">让朋友认出你。</view>
+  <view wx:if="{{loading}}" class="status">正在读取资料…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
+  <form wx:if="{{profile}}" bindsubmit="save">
+    <view class="avatar-editor">
+      <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="选择新头像">
+        <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" />
+        <view wx:else class="profile-avatar large avatar-fallback">{{initial}}</view>
+      </button><view class="small muted">{{choosing?'正在处理头像…':'点击头像更换'}}</view>
+      <button wx:if="{{avatarPreview}}" class="text-button" bindtap="removeAvatar" disabled="{{busy || pendingSave || choosing}}">恢复默认头像</button>
+    </view>
+    <label for="profile-nickname" class="field-title">个人昵称</label>
+    <input id="profile-nickname" class="input" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" bindinput="inputName" bindblur="inputName" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" />
+    <view class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</view>
+    <button class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{pendingSave?'重试保存':'保存资料'}}</button>
+    <view wx:if="{{pendingSave && !busy}}" class="small muted">保存结果尚未确认，请重试同一次保存。</view>
+  </form>
+  <canvas type="2d" id="avatar-canvas" class="avatar-canvas" />
+</view>

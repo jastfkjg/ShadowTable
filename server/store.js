@@ -15,6 +15,11 @@ class Store {
       CREATE TABLE IF NOT EXISTS rooms(code TEXT PRIMARY KEY, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS room_entries(uid TEXT NOT NULL, code TEXT NOT NULL, snapshot TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', entered INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(uid,code));
       CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS profiles(uid TEXT PRIMARY KEY, nickname TEXT NOT NULL, avatar_hash TEXT, version INTEGER NOT NULL, updated INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS avatars(hash TEXT PRIMARY KEY, mime TEXT NOT NULL, data BLOB NOT NULL);
+      CREATE TABLE IF NOT EXISTS matches(id TEXT PRIMARY KEY, snapshot TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS match_players(match_id TEXT NOT NULL, uid TEXT NOT NULL, board TEXT NOT NULL, faction TEXT NOT NULL, outcome TEXT NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
+      CREATE INDEX IF NOT EXISTS match_players_user ON match_players(uid,ended DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
     const columns = this.db.prepare("PRAGMA table_info(admin_audit)").all();
     if (!columns.some((column) => column.name === "details"))
@@ -85,6 +90,7 @@ class Store {
     }).sort((a,b) => (["playing", "lobby", "ended", "unavailable"].indexOf(a.status) - ["playing", "lobby", "ended", "unavailable"].indexOf(b.status)) || b.lastEnteredAt - a.lastEnteredAt || a.code.localeCompare(b.code));
   }
   save(room) {
+    if (room.matchRecord) this.archiveMatch(room.matchRecord);
     room.updatedAt = Date.now();
     this.db
       .prepare(
@@ -95,6 +101,32 @@ class Store {
   }
   remove(code) {
     this.db.prepare("DELETE FROM rooms WHERE code=?").run(code);
+  }
+  archiveMatch(record) {
+    const { players, ...match } = record;
+    this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
+    const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
+    for (const { uid, ...player } of players)
+      insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
+  }
+  statsFor(uid) {
+    const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;
+    const summary = row => {
+      const wins = Number(row.wins || 0), losses = Number(row.losses || 0), total = wins + losses;
+      return { total, wins, losses, excluded: Number(row.excluded || 0), winRate: total ? Math.round(wins / total * 1000) / 10 : null };
+    };
+    const total = this.db.prepare(`SELECT ${counts} FROM match_players WHERE uid=?`).get(uid);
+    const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
+      .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
+    const byBoard = this.db.prepare(`SELECT p.board, json_extract(m.snapshot,'$.capacity') AS capacity,
+      json_extract(m.snapshot,'$.boardName') AS name, ${counts}
+      FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=?
+      GROUP BY p.board,capacity ORDER BY p.board,capacity`).all(uid)
+      .map(row => ({ board: row.board, capacity: row.capacity, key: row.board + ":" + row.capacity,
+        label: row.name + " · " + row.capacity + "人", ...summary(row) }));
+    const recent = this.db.prepare("SELECT m.snapshot AS game, p.snapshot AS player FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
+      .map(row => ({ ...JSON.parse(row.game), ...JSON.parse(row.player) }));
+    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byBoard, recent };
   }
   session(hash) {
     return this.db
