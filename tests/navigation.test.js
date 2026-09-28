@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const { BOARDS, newRoom, publicView } = require('../server/engine');
 const { wxmlToJs } = require('miniprogram-compiler');
 const root = path.resolve(__dirname,'../miniprogram');
-function page(route, api, { storage = new Map(), appState = {}, wx: overrides = {} } = {}) {
+function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {} } = {}) {
   let definition;
   const navigations = [];
   const wx = {
@@ -21,7 +21,7 @@ function page(route, api, { storage = new Map(), appState = {}, wx: overrides = 
     const mod = { exports: {} };
     vm.runInNewContext(fs.readFileSync(file,'utf8'), {
       module: mod, require: name => load(path.resolve(path.dirname(file), name + '.js')),
-      Page: value => definition = value, wx, getApp: () => appState, getCurrentPages: () => [{},{}], setTimeout, clearTimeout,
+      Page: value => definition = value, wx, getApp: () => appState, getCurrentPages: () => pages, setTimeout, clearTimeout,
     }, { filename: file });
     return mod.exports;
   }
@@ -96,8 +96,6 @@ test('编辑资料取消离开仍保留输入；我的和战绩页可独立刷�
   await edit.p.load(); edit.p.inputName({detail:{value:'未保存'}}); await edit.p.back();
   assert.equal(edit.navigations.length,0); assert.equal(edit.p.data.nickname,'未保存');
   const me=page('me',api); await me.p.load(); assert.equal(me.p.data.profile.displayName,'林间'); assert.equal(me.p.data.stats.rateLabel,'—');
-  me.p.openStats(); assert.deepEqual(me.navigations,['/pages/stats/stats']);
-  me.p.openMatches(); assert.deepEqual(me.navigations,['/pages/stats/stats','/pages/matches/matches']);
   let reads=0; const stats=page('stats',{...apiBase,request:async()=>{if(++reads===1)throw new Error('断线');return emptyStats;}}).p;
   await stats.load(); assert.equal(stats.data.error,'断线'); await stats.load(); assert.equal(stats.data.stats.total,0); assert.equal(stats.data.error,'');
 });
@@ -164,4 +162,84 @@ test('窗口背景与自绘导航保持深色，所有页面都有顶部导航',
       assert.match(fs.readFileSync(path.join(root, 'pages/table/shared.wxml'), 'utf8'), /<app-nav/);
     } else assert.match(template, /<app-nav/);
   }
+});
+
+test('个人入口使用原生导航与即时轻按态，不触发默认白色按钮背景', () => {
+  const context = {window:{},global:{},console}; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
+  const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
+  const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
+  assert.deepEqual(links.map(n => n.attr.url), ['profile','stats','matches','help'].map(name => `/pages/${name}/${name}`));
+  for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
+    assert.equal(node.attr.hoverClass,'me-pressed');
+    assert.equal(node.attr.hoverStartTime,0);
+    assert.equal(node.attr.hoverStayTime,70);
+  }
+  assert.ok(links.every(n => n.attr.openType === 'navigate' && !n.attr.bindtap));
+});
+
+const previewProfile = { ...profile, displayName:'林间',initial:'林',avatarUrl:'' };
+const previewStats = { ...emptyStats, rateLabel:'—' };
+const priorMe = (extra = {}) => [{route:'pages/me/me',data:{profile:previewProfile,stats:previewStats},...extra},{}];
+function deferred() { let resolve, reject; const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}); return {promise,resolve,reject}; }
+
+test('资料页在网络返回前展示已有资料，后台刷新不覆盖刚输入的草稿', async () => {
+  const request = deferred();
+  const {p}=page('profile',{...apiBase,request:()=>request.promise},{pages:priorMe()});
+  const loading=p.onLoad();
+  assert.equal(p.data.nickname,'林间'); assert.equal(p.data.profile.displayName,'林间');
+  p.inputName({detail:{value:'正在编辑'}});
+  request.resolve({...profile,nickname:'远端更新',version:2}); await loading;
+  assert.equal(p.data.nickname,'正在编辑'); assert.equal(p.data.dirty,true);
+  assert.equal(p.original.version,1); // Save keeps its optimistic-concurrency version.
+  assert.equal(p.data.loading,false);
+  await p.reload();
+  assert.equal(p.data.nickname,'远端更新'); assert.equal(p.data.dirty,false);
+  assert.equal(p.original.version,2);
+});
+
+test('预览只来自直接上级的我的页，直接进入仍正常请求最新资料', async () => {
+  const request=deferred();
+  const {p}=page('profile',{...apiBase,request:()=>request.promise},{pages:[{route:'pages/table/table',data:{profile:previewProfile}},{}]});
+  const loading=p.onLoad(); assert.equal(p.data.profile,null);
+  request.resolve({...profile,nickname:'最新'}); await loading;
+  assert.equal(p.data.nickname,'最新');
+});
+
+test('战绩即时显示预览，刷新保留已展开的阵营且不修改上级数据', async () => {
+  const request=deferred();
+  const stats={...previewStats,total:1,byFaction:[{faction:'good',total:1,expanded:false,roles:[]}]};
+  const pages=priorMe();pages[0].data.stats=stats;
+  const {p}=page('stats',{...apiBase,request:()=>request.promise},{pages});
+  const loading=p.onLoad(); assert.equal(p.data.stats.total,1);
+  p.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
+  assert.equal(stats.byFaction[0].expanded,false);
+  request.resolve({...emptyStats,total:2,byFaction:[{faction:'good',total:2,winRate:50}]}); await loading;
+  assert.equal(p.data.stats.total,2);assert.equal(p.data.stats.byFaction[0].expanded,true);
+});
+
+test('预取对局记录不阻塞我的页面，过期预取结果和失败均不覆盖当前状态', async () => {
+  const first=deferred(),second=deferred();let reads=0;
+  const {p}=page('me',{...apiBase,request:async url=>url.includes('/matches')?(++reads===1?first.promise:second.promise):url.endsWith('/stats')?emptyStats:profile});
+  await p.load(); assert.equal(p.data.loading,false); assert.equal(p.matchesPreview,null);
+  await p.load();
+  first.resolve({records:[],total:9,hasMore:false}); await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(p.matchesPreview,null);
+  second.reject(new Error('预取断线')); await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(p.data.error,''); assert.equal(p.data.profile.displayName,'林间');
+});
+
+test('预取记录立即可见，首屏刷新失败后重试首屏，不误用加载更多', async () => {
+  const record={id:'one',endedAt:1000,seat:1,role:'梅林',faction:'good',outcome:'win',members:[{seat:1,name:'林间'}]};
+  const result={records:[record],total:1,hasMore:false};
+  const reads=[],request=deferred();
+  const {p}=page('matches',{...apiBase,request:url=>{reads.push(url);return reads.length===1?request.promise:Promise.resolve(result);}},{pages:priorMe({matchesPreview:result})});
+  const loading=p.onLoad();assert.equal(p.data.loaded,true);assert.equal(p.data.records[0].id,'one');
+  p.toggleRecord({currentTarget:{dataset:{id:'one'}}});
+  request.reject(new Error('刷新失败'));await loading;
+  assert.equal(p.data.records[0].expanded,true);
+  await p.retry();
+  assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=0']);
+  assert.equal(p.data.error,'');assert.equal(p.data.records[0].expanded,true);
 });

@@ -1,8 +1,8 @@
 <app-nav title="对局记录" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page matches-page">
-  <view wx:if="{{loading && !records.length}}" class="status">正在读取对局记录…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button wx:if="{{records.length}}" class="secondary" bindtap="loadMore" disabled="{{loadingMore}}">重试加载</button><button wx:else class="secondary" bindtap="load" disabled="{{loading}}">重新加载</button></view>
-  <view wx:if="{{!loading && !error && !total}}" class="matches-empty muted">暂无对局记录</view>
+  <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重新加载</button></view>
+  <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted">暂无对局记录</view>
   <block wx:if="{{records.length}}">
     <view class="matches-count">共 {{total}} 场对局</view>
     <view wx:for="{{records}}" wx:key="id" class="match-entry">

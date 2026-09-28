@@ -1,4 +1,12 @@
 const api = require("./api");
+// Only reuse the immediately preceding personal page; never persist account data.
+function personalPreview(kind) {
+  const pages = getCurrentPages();
+  const previous = pages[pages.length - 2];
+  if (previous?.route !== "pages/me/me") return null;
+  const value = kind === "matches" ? previous.matchesPreview : previous.data?.[kind];
+  return value ? JSON.parse(JSON.stringify(value)) : null;
+}
 function presentProfile(profile) {
   return { ...profile, avatarUrl: profile.avatarUrl ? api.assetUrl(profile.avatarUrl) : "",
     displayName: profile.nickname || "新朋友", initial: (profile.nickname || "友").slice(0, 1),
@@ -34,4 +42,4 @@ function backToMe() {
   if (getCurrentPages().length > 1) wx.navigateBack();
   else wx.switchTab({ url: "/pages/me/me" });
 }
-module.exports = { presentProfile, presentStats, presentMatches, backToMe };
+module.exports = { presentProfile, presentStats, presentMatches, backToMe, personalPreview };

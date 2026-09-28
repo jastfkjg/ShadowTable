@@ -1,16 +1,26 @@
 const api = require("../../api");
-const { presentProfile, backToMe } = require("../../profile");
+const { presentProfile, backToMe, personalPreview } = require("../../profile");
 Page({
   data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", initial: "友", profile: null },
-  onLoad() { this.alive = true; this.load(); },
+  onLoad() {
+    this.alive = true;
+    const preview = personalPreview("profile");
+    if (preview) {
+      this.original = preview;
+      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, initial: preview.initial });
+    }
+    return this.load({ preserveEdits: true });
+  },
   onUnload() { this.alive = false; },
-  async load() {
+  async load({ preserveEdits = false } = {}) {
     if (this.data.busy) return;
     this.setData({ loading: true, error: "", conflict: false });
     try {
       await api.login();
       const profile = await api.request("/api/me/profile");
       if (!this.alive) return;
+      // A background refresh must never replace edits started from the preview.
+      if (preserveEdits && (this.data.dirty || this.data.choosing || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
       this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, initial: shown.initial, dirty: false, pendingSave: false });
