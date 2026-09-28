@@ -1,5 +1,5 @@
+<app-nav title="编辑资料" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page">
-  <button class="text-button page-back" bindtap="back" disabled="{{busy}}">‹ 返回我的</button>
   <view class="page-title">编辑资料</view><view class="muted">让朋友认出你。</view>
   <view wx:if="{{loading}}" class="status">正在读取资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>

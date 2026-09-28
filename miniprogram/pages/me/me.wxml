@@ -1,4 +1,5 @@
-<view class="page personal-page me-page">
+<app-nav title="我的" />
+<view class="page personal-page me-page tab-page">
   <view class="me-overline">SHADOWTABLE <text>· 个人资料</text></view>
   <view wx:if="{{loading && !profile}}" class="status" role="status">正在读取个人资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>

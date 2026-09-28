@@ -1,3 +1,4 @@
+<app-nav title="房间设置" back="{{true}}" backLabel="返回牌桌" bindback="back" />
 <view class="page settings-page">
   <view wx:if="{{loading}}" class="muted">正在加载房间设置…</view>
   <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>

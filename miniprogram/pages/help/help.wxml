@@ -1,3 +1,4 @@
+<app-nav title="使用帮助" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page help-page">
   <view class="help-intro">
     <view class="help-eyebrow">桌边助手 · 使用帮助</view>

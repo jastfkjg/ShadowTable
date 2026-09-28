@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "桌边助手 · ShadowTable", "disableScroll": false }
+{ "navigationBarTitleText": "桌边助手 · ShadowTable", "disableScroll": false, "usingComponents": { "app-nav": "/components/app-nav/app-nav" } }

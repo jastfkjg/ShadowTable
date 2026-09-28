@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "对局 · 桌边助手", "enablePullDownRefresh": false }
+{ "navigationBarTitleText": "对局 · 桌边助手", "enablePullDownRefresh": false, "usingComponents": { "app-nav": "/components/app-nav/app-nav" } }

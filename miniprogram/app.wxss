@@ -44,6 +44,7 @@ button:not([disabled]):active {
   margin: auto;
   box-sizing: border-box;
 }
+.tab-page { padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
 .brand {
   display: flex;
   align-items: center;

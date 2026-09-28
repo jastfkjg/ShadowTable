@@ -84,7 +84,9 @@
     </block>
   </view>
 </view>
-<view class="page {{enteringCode ? 'is-entering-room' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
+<app-nav wx:if="{{isLobby}}" title="对局" />
+<app-nav wx:else title="牌桌" back="{{true}}" backLabel="返回对局" bindback="returnHome" />
+<view class="page {{isLobby ? 'tab-page' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view class="brand">
     <view class="brand-identity">
       <text class="brand-mark">桌边助手</text>

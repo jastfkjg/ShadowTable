@@ -1,4 +1,4 @@
-.me-page { padding-top: 32rpx; padding-bottom: calc(32rpx + env(safe-area-inset-bottom)); }
+.me-page { padding-top: 32rpx; padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
 .me-overline { color: var(--accent); font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; }
 .me-overline text { color: var(--muted); font-weight: 400; letter-spacing: 0; }
 .me-profile { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 32rpx 0 38rpx; }

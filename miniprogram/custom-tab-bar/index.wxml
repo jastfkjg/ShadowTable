@@ -1,0 +1,6 @@
+<view class="custom-tab-bar">
+  <view wx:for="{{list}}" wx:key="pagePath" class="tab-item {{selected===index?'selected':''}}" data-index="{{index}}" bindtap="switchTab" role="button" aria-label="{{item.text+(selected===index?'，当前页':'')}}">
+    <image class="tab-icon" src="{{selected===index?item.selectedIconPath:item.iconPath}}" mode="aspectFit" aria-hidden="true" />
+    <text>{{item.text}}</text>
+  </view>
+</view>

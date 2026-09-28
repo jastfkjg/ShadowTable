@@ -1,5 +1,5 @@
+<app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page">
-  <button class="text-button page-back" bindtap="back">‹ 返回我的</button>
   <view class="personal-heading"><text class="eyebrow">MY RECORDS</text><view class="page-title">我的战绩</view></view>
   <view wx:if="{{loading && !stats}}" class="status">正在读取战绩…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>

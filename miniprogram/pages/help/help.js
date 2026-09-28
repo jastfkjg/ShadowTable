@@ -38,6 +38,10 @@ Page({
     this.loadBoards();
   },
   onUnload() { this.alive = false; },
+  back() {
+    if (getCurrentPages().length > 1) wx.navigateBack();
+    else wx.switchTab({ url: "/pages/lobby/lobby" });
+  },
   async loadBoards() {
     if (this.fetchingBoards) return;
     this.fetchingBoards = true;

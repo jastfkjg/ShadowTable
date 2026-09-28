@@ -241,6 +241,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   onShow() {
     this.foreground = true;
+    if (this.data.isLobby) this.getTabBar?.()?.setData({ selected: 0 });
     if (this.alive) {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
       else if (this.data.isLobby && !this.data.loading) this.refreshLobby();

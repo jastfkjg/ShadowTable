@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "板子详情"
+  "navigationBarTitleText": "板子详情",
+  "usingComponents": { "app-nav": "/components/app-nav/app-nav" }
 }

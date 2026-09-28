@@ -1,5 +1,5 @@
+<app-nav title="板子详情" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="detail-sticky">
-  <view class="detail-toolbar"><text>板子详情</text><button class="detail-close" bindtap="back">返回</button></view>
   <view wx:if="{{hasDetail}}" class="detail-nav">
     <view class="detail-nav-heading" bindtap="toggleDirectory" role="button" aria-expanded="{{directoryExpanded}}"><text>章节目录</text><text class="detail-nav-state">查看全部 ›</text></view>
   </view>

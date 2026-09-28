@@ -110,7 +110,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.match(editor,/chooseAvatar/); assert.match(editor,/formType/);
 });
-test('原生窗口顶部和底部使用与页面一致的深色背景', () => {
+test('窗口背景与自绘导航保持深色，所有页面都有顶部导航', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
   const color = '#101c24';
   assert.equal(config.window.backgroundColor, color);
@@ -118,4 +118,14 @@ test('原生窗口顶部和底部使用与页面一致的深色背景', () => {
   assert.equal(config.window.backgroundColorBottom, color);
   assert.equal(config.window.navigationBarBackgroundColor, color);
   assert.equal(config.tabBar.backgroundColor, color);
+  assert.equal(config.window.navigationStyle, 'custom');
+  assert.equal(config.tabBar.custom, true);
+  for (const route of config.pages) {
+    const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
+    const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
+    assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);
+    if (route.endsWith('/lobby/lobby') || route.endsWith('/table/table')) {
+      assert.match(fs.readFileSync(path.join(root, 'pages/table/shared.wxml'), 'utf8'), /<app-nav/);
+    } else assert.match(template, /<app-nav/);
+  }
 });

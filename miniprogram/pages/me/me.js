@@ -3,7 +3,7 @@ const { presentProfile, presentStats } = require("../../profile");
 Page({
   data: { loading: true, error: "", profile: null, stats: null },
   onLoad() { this.alive = true; },
-  onShow() { this.load(); },
+  onShow() { this.getTabBar?.()?.setData({ selected: 1 }); this.load(); },
   onUnload() { this.alive = false; },
   async load() {
     const sequence = this.sequence = (this.sequence || 0) + 1;
