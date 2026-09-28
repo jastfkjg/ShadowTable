@@ -1,0 +1,26 @@
+.me-page { padding-top: 32rpx; padding-bottom: calc(32rpx + env(safe-area-inset-bottom)); }
+.me-overline { color: var(--accent); font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; }
+.me-overline text { color: var(--muted); font-weight: 400; letter-spacing: 0; }
+.me-profile { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 32rpx 0 38rpx; }
+.me-profile-main { display: flex; align-items: center; gap: 24rpx; min-width: 0; flex: 1; }
+.me-profile .profile-avatar { width: 112rpx; height: 112rpx; }
+.me-profile .avatar-fallback { font-size: 46rpx; }
+.me-profile .profile-identity { min-width: 0; flex: 1; }
+.me-profile .profile-name { font-size: 40rpx; line-height: 1.3; overflow-wrap: anywhere; }
+button.me-edit { width: auto; min-width: 144rpx; min-height: 88rpx; flex-shrink: 0; margin: 0; padding: 12rpx 0 12rpx 12rpx; color: var(--accent); font-size: 26rpx; white-space: nowrap; }
+.me-edit text { margin-left: 8rpx; font-size: 36rpx; line-height: 1; }
+.me-page .account-note { margin: 0 0 28rpx; }
+.me-results { padding: 24rpx 0 32rpx; }
+.me-results .section-title { margin: 0; font-size: 32rpx; }
+.me-results .personal-metrics { gap: 20rpx; padding: 20rpx 0 0; }
+.me-results .metric-value { font-size: 48rpx; line-height: 1.3; }
+.me-empty { margin-top: 20rpx; }
+.me-links { border-top: 2rpx solid var(--border); }
+button.personal-link { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 112rpx; margin: 0; padding: 20rpx 0; text-align: left; border-bottom: 2rpx solid var(--border); }
+.me-link-copy { min-width: 0; flex: 1; text-align: left; }
+.me-link-copy .small { margin-top: 4rpx; }
+.me-chevron { flex-shrink: 0; margin-left: 20rpx; color: var(--accent); font-size: 42rpx; font-weight: 400; line-height: 1; }
+@media (max-width: 340px) {
+  .me-profile { flex-wrap: wrap; }
+  button.me-edit { margin-left: 136rpx; padding-left: 0; }
+}

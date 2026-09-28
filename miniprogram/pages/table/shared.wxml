@@ -222,7 +222,6 @@
       <view class="eyebrow">正在进行</view>
       <button wx:for="{{activeRooms}}" wx:key="code" class="resume-room" bindtap="openRoom" data-code="{{item.code}}" disabled="{{busy || loading || hasPendingRequest}}"><view><view>继续对局 · {{item.code}}</view><view class="small muted">{{item.boardName}} · {{item.peopleLabel}}</view></view><text aria-hidden="true">→</text></button>
     </view>
-    <view class="lobby-heading"><view class="page-title">今晚，开一桌。</view><view class="muted">和朋友面对面，把秘密交给牌桌。</view></view>
     <form class="panel entry-panel" bindsubmit="submitEntry">
       <label class="label" for="nickname">本桌昵称</label>
       <input class="input" id="nickname" name="nickname" type="nickname" maxlength="16"

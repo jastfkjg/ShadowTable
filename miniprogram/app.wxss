@@ -8,7 +8,8 @@ page {
   --good: #a3dfbe;
   --evil: #f2b6ae;
   --third: #8ab8d9;
-  background: var(--bg);
+  min-height: 100vh;
+  background: #101c24;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
   font-size: 32rpx;
@@ -1413,14 +1414,11 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .personal-heading { padding: 48rpx 0 36rpx; }
 .personal-page .personal-heading { padding-top: 24rpx; }
 .personal-page .page-back { justify-content: flex-start; padding-left: 0; }
-.lobby-heading { padding: 44rpx 0 16rpx; }
-.profile-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 28rpx; padding: 44rpx 0 52rpx; }
 .profile-avatar { display: block; width: 136rpx; height: 136rpx; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2rpx solid var(--border); }
 .profile-avatar.large { width: 208rpx; height: 208rpx; }
 .avatar-fallback { display: flex; align-items: center; justify-content: center; color: var(--accent); background: var(--surface); font-size: 56rpx; font-weight: 600; }
 .profile-identity { flex: 1; min-width: 192rpx; overflow-wrap: anywhere; }
 .profile-name { font-size: 46rpx; font-weight: 600; line-height: 1.5; }
-.profile-edit { width: auto; flex: 0 0 auto; min-height: 88rpx; color: var(--accent); padding: 16rpx 0 16rpx 16rpx; font-size: 28rpx; }
 .account-note { margin: 0 0 48rpx; max-width: 40em; }
 .personal-section { border-top: 2rpx solid var(--border); padding: 24rpx 0 56rpx; }
 .personal-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24rpx; padding: 36rpx 0 52rpx; }
@@ -1429,7 +1427,6 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .personal-links { border-top: 2rpx solid var(--border); }
 .personal-link { width: 100%; justify-content: space-between; text-align: left; gap: 32rpx; padding: 40rpx 0; border-bottom: 2rpx solid var(--border); border-radius: 0; min-height: 128rpx; }
 .link-note { display: block; margin-top: 6rpx; }
-.personal-footer { padding: 72rpx 0 24rpx; color: var(--muted); font-size: 24rpx; text-align: center; letter-spacing: 2rpx; }
 .avatar-editor { display: flex; flex-direction: column; align-items: center; gap: 24rpx; padding: 60rpx 0; }
 .avatar-picker { padding: 0; border-radius: 50%; }
 .profile-save { width: 100%; margin-top: 64rpx; }

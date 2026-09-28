@@ -13,7 +13,10 @@
     "navigationBarTitleText": "桌边助手 · ShadowTable",
     "navigationBarBackgroundColor": "#101c24",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#101c24"
+    "backgroundColor": "#101c24",
+    "backgroundColorTop": "#101c24",
+    "backgroundColorBottom": "#101c24",
+    "backgroundTextStyle": "light"
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",

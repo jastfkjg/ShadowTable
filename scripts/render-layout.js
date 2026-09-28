@@ -289,6 +289,9 @@ scenes.roomSettingsPicker = { ...scenes.roomSettings, showTransferPicker: true }
 const settingsCss = fs
   .readFileSync(path.join(root, "pages/settings/settings.wxss"), "utf8")
   .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const meCss = fs
+  .readFileSync(path.join(root, "pages/me/me.wxss"), "utf8")
+  .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const personalTemplates = { personalMe: "me", personalEditor: "profile", personalStats: "stats" };
 scenes.personalMe = { profile: {displayName: "林间", initial: "林", identityLabel: "微信账号"}, stats: {total: 24,wins: 15,rateLabel: "62.5%"} };
 scenes.personalEditor = {profile: {}, nickname: "林间", initial: "林",loading:false};
@@ -301,7 +304,7 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");

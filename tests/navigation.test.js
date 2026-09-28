@@ -104,9 +104,18 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const context = {window:{},global:{},console}; vm.createContext(context);
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const lobby=JSON.stringify(factory('pages/lobby/lobby.wxml')({isLobby:true,room:null,memberRooms:[],visibleMemberRooms:[]}));
-  assert.match(lobby,/今晚，开一桌/); assert.doesNotMatch(lobby,/总胜率|编辑资料/);
+  assert.doesNotMatch(lobby,/今晚，开一桌|和朋友面对面|总胜率|编辑资料/);
   const me=JSON.stringify(factory('pages/me/me.wxml')({profile:{displayName:'林间',initial:'林'},stats:{total:0,wins:0,rateLabel:'—'}}));
   assert.match(me,/编辑资料/); assert.match(me,/查看全部/);
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.match(editor,/chooseAvatar/); assert.match(editor,/formType/);
+});
+test('原生窗口顶部和底部使用与页面一致的深色背景', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
+  const color = '#101c24';
+  assert.equal(config.window.backgroundColor, color);
+  assert.equal(config.window.backgroundColorTop, color);
+  assert.equal(config.window.backgroundColorBottom, color);
+  assert.equal(config.window.navigationBarBackgroundColor, color);
+  assert.equal(config.tabBar.backgroundColor, color);
 });
