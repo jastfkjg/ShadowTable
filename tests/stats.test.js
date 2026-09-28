@@ -35,6 +35,8 @@ test('个人战绩按最终阵营统计，重开、移出、删房和重启均�
     assert.equal(store.statsFor('wx:1').wins, 1);
     assert.equal(store.statsFor('wx:2').losses, 1);
     assert.equal(store.statsFor('wx:2').byFaction[0].faction, 'evil');
+    assert.equal(store.statsFor('wx:2').byRole[0].role, '亚瑟的忠臣');
+    assert.equal(store.statsFor('wx:2').byRole[0].faction, 'evil');
     assert.equal(store.statsFor('wx:2').winRate, 0);
     assert.equal(store.statsFor('wx:observer').recent.length, 0);
     run(r, 'kick', { seat: 2, targetId: r.players[1].membershipId, confirm: true });
@@ -58,10 +60,38 @@ test('个人战绩按最终阵营统计，重开、移出、删房和重启均�
     assert.equal(stats.total, 2);
     assert.equal(stats.winRate, 50);
     assert.equal(stats.byBoard[0].total, 2);
+    assert.deepEqual({ total: stats.byRole[0].total, wins: stats.byRole[0].wins, winRate: stats.byRole[0].winRate }, { total: 2, wins: 1, winRate: 50 });
     assert.equal(stats.recent.length, 2);
+    const matches = store.matchesFor('wx:1');
+    assert.equal(matches.total, 2);
+    assert.equal(matches.records[0].members.length, 6);
+    assert.equal(matches.records[0].members[0].seat, 1);
+    assert.doesNotMatch(JSON.stringify(matches), /wx:|"uid"/);
     assert.ok(stats.recent.every(m => m.source === 'manual'));
     assert.doesNotMatch(JSON.stringify(stats), /wx:2|players|uid/);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+test('对局记录分页返回完整历史，成员只包含座位与当时昵称', () => {
+  const store = new Store(':memory:');
+  try {
+    for (let i = 0; i < 22; i++) store.archiveMatch({
+      id: 'match-' + i, code: '123456', game: i, board: 'classic', boardName: '经典', capacity: 2,
+      startedAt: i, endedAt: i, winner: 'good', source: 'manual', excludedReason: null,
+      players: [
+        { uid: 'wx:me', name: '我', seat: 1, role: '梅林', faction: 'good', outcome: 'win' },
+        { uid: 'wx:friend', name: '朋友', seat: 2, role: '刺客', faction: 'evil', outcome: 'loss' },
+      ],
+    });
+    const first = store.matchesFor('wx:me'), second = store.matchesFor('wx:me', 20);
+    assert.equal(first.records.length, 20);
+    assert.equal(first.hasMore, true);
+    assert.equal(second.records.length, 2);
+    assert.equal(second.hasMore, false);
+    assert.equal(first.records[0].endedAt, 21);
+    assert.deepEqual(first.records[0].members, [{ seat: 1, name: '我' }, { seat: 2, name: '朋友' }]);
+    assert.equal(store.matchesFor('wx:stranger').total, 0);
+    assert.doesNotMatch(JSON.stringify(first), /wx:|"uid"/);
+  } finally { store.close(); }
 });
 function enterObserver(room) {
   room.spectators = [{ uid: 'wx:observer', name: '旁观者', seat: null }];
@@ -139,6 +169,11 @@ test('HTTP结算与归档同事务，重试幂等，重新微信登录仍访问�
     assert.equal((await req(path + '/commands', tokens[0], body)).status, 409);
     const stats = (await req('/api/me/stats', tokens[0])).data;
     assert.equal(stats.total, 1);
+    const matches = (await req('/api/me/matches?offset=0', tokens[0])).data;
+    assert.equal(matches.total, 1);
+    assert.equal(matches.records[0].members.length, 6);
+    assert.equal((await req('/api/me/matches', tokens[6])).data.total, 0);
+    assert.doesNotMatch(JSON.stringify(matches), /wx:|"uid"/);
     assert.equal((await req('/api/me/stats', tokens[6])).data.recent.length, 0);
     assert.doesNotMatch(JSON.stringify(stats), /wx:|players|uid|openid/);
     const nextToken = (await req('/api/login', '', { code: 'wx-user-1' })).data.token;

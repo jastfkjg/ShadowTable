@@ -1,25 +1,24 @@
 <app-nav title="我的" />
 <view class="page personal-page me-page tab-page">
-  <view class="me-overline">SHADOWTABLE <text>· 个人资料</text></view>
   <view wx:if="{{loading && !profile}}" class="status" role="status">正在读取个人资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
   <block wx:if="{{profile}}">
-    <view class="me-profile">
+    <button class="me-profile" bindtap="editProfile" aria-label="编辑头像和昵称">
       <view class="me-profile-main">
         <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" aria-label="我的头像" />
         <view wx:else class="profile-avatar avatar-fallback" aria-hidden="true">{{profile.initial}}</view>
-        <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="small muted">{{profile.identityLabel}}</view></view>
+        <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="me-identity-tag">{{profile.identityLabel}}</view><view class="me-edit">编辑资料 <text aria-hidden="true">›</text></view></view>
       </view>
-      <button class="me-edit" bindtap="editProfile" aria-label="编辑头像和昵称">编辑资料 <text aria-hidden="true">›</text></button>
-    </view>
+    </button>
     <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
-    <view class="personal-section me-results">
-      <view class="section-title history-heading"><text>我的战绩</text><button class="history-toggle" bindtap="openStats">查看全部 ›</button></view>
-      <view wx:if="{{stats}}" class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">有效对局</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">获胜场次</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
-      <view wx:if="{{stats && !stats.total}}" class="me-empty small muted">暂无有效对局。结束后请房主登记胜方。</view>
+    <view class="me-results">
+      <view class="me-results-heading"><text>我的战绩</text><button class="me-detail-link {{stats && !stats.total?'is-empty':''}}" bindtap="openStats">查看战绩 <text aria-hidden="true">›</text></button></view>
+      <view wx:if="{{stats}}" class="me-stats-panel">
+        <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜场</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">胜率</text></view></view>
+      </view>
     </view>
     <view class="personal-links me-links">
-      <button class="personal-link" bindtap="openStats"><view class="me-link-copy"><view>对局记录</view><view class="small muted">按阵营、板子查看表现</view></view><text class="me-chevron" aria-hidden="true">›</text></button>
+      <button class="personal-link" bindtap="openMatches"><view class="me-link-copy">对局记录</view><text class="me-chevron" aria-hidden="true">›</text></button>
       <button class="personal-link" bindtap="openHelp"><view class="me-link-copy">帮助与规则</view><text class="me-chevron" aria-hidden="true">›</text></button>
       <button class="personal-link" bindtap="about"><view class="me-link-copy">关于桌边助手</view><text class="me-chevron" aria-hidden="true">›</text></button>
     </view>

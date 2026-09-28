@@ -1,18 +1,24 @@
 <app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" />
-<view class="page personal-page">
-  <view class="personal-heading"><text class="eyebrow">MY RECORDS</text><view class="page-title">我的战绩</view></view>
+<view class="page personal-page stats-page">
   <view wx:if="{{loading && !stats}}" class="status">正在读取战绩…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
-    <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">有效对局</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜 · {{stats.losses}} 负</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
-    <view class="small muted">胜率 = 胜场 ÷ 有效对局。另有 {{stats.excluded}} 局不计入；旁观不计入。</view>
-    <view wx:if="{{!stats.total}}" class="empty-records"><view class="page-subtitle">下一局，留下你的故事。</view><view class="muted">还没有有效战绩。对局结束后，请房主登记胜方。</view></view>
-    <view wx:if="{{stats.byFaction.length}}" class="section-title">按阵营</view>
-    <view wx:for="{{stats.byFaction}}" wx:key="faction" class="stats-row"><text>{{item.label}}</text><text>{{item.wins}}胜 {{item.losses}}负 · {{item.rateLabel}}</text></view>
-    <view wx:if="{{stats.byBoard.length}}" class="section-title">按板子与人数</view>
-    <view wx:for="{{stats.byBoard}}" wx:key="key" class="stats-row"><text>{{item.label}}</text><text>{{item.wins}}胜 {{item.losses}}负 · {{item.rateLabel}}</text></view>
-    <view wx:if="{{stats.recent.length}}" class="section-title">最近对局 · 最多20局</view>
-    <view wx:for="{{stats.recent}}" wx:key="id" class="stats-match"><view class="stats-row"><text>{{item.boardName}} · {{item.capacity}}人</text><text class="stats-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view><view class="small muted">{{item.role}} · 最终{{item.factionLabel}}阵营 · {{item.sourceLabel}}{{item.excludedReason?' · '+item.excludedReason:''}}</view><view class="small muted">{{item.dateLabel}}</view></view>
-    <button class="text-button" bindtap="load" disabled="{{loading}}">{{loading?'正在刷新…':'刷新战绩'}}</button>
+    <view class="stats-overview" aria-label="总战绩">
+      <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">总胜场数</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
+    </view>
+    <view wx:if="{{stats.total}}" class="stats-breakdown">
+      <button class="stats-breakdown-toggle" bindtap="toggleOverview" aria-expanded="{{overviewExpanded}}" aria-label="{{overviewExpanded?'收起阵营战绩':'展开阵营战绩'}}"><text>阵营战绩</text><text class="faction-chevron" aria-hidden="true">{{overviewExpanded?'⌄':'›'}}</text></button>
+      <block wx:if="{{overviewExpanded}}">
+      <view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
+        <button class="faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
+          <view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}}局 · {{item.wins}}胜 · 胜率 {{item.rateLabel}}</text></view><text class="faction-chevron" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text>
+        </button>
+        <view wx:if="{{item.expanded}}" class="role-list">
+          <view class="role-list-heading"><text>角色</text><text>局数</text><text>胜场</text><text>胜率</text></view>
+          <view wx:for="{{item.roles}}" wx:for-item="role" wx:key="role" class="role-row"><text class="role-name">{{role.role}}</text><text>{{role.total}}</text><text>{{role.wins}}</text><text>{{role.rateLabel}}</text></view>
+        </view>
+      </view>
+      </block>
+    </view>
   </block>
 </view>

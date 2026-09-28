@@ -1,0 +1,24 @@
+<app-nav title="对局记录" back="{{true}}" backLabel="返回我的" bindback="back" />
+<view class="page personal-page matches-page">
+  <view wx:if="{{loading && !records.length}}" class="status">正在读取对局记录…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button wx:if="{{records.length}}" class="secondary" bindtap="loadMore" disabled="{{loadingMore}}">重试加载</button><button wx:else class="secondary" bindtap="load" disabled="{{loading}}">重新加载</button></view>
+  <view wx:if="{{!loading && !error && !total}}" class="matches-empty muted">暂无对局记录</view>
+  <block wx:if="{{records.length}}">
+    <view class="matches-count">共 {{total}} 场对局</view>
+    <view wx:for="{{records}}" wx:key="id" class="match-entry">
+      <button class="match-toggle" bindtap="toggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.dateLabel}}，{{item.boardName}}，{{item.role}}，{{item.outcomeLabel}}，{{item.expanded?'收起成员':'展开成员'}}">
+        <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
+        <view class="match-board">{{item.boardName}} · {{item.capacity}}人</view>
+        <view class="match-secondary"><text>我的身份：{{item.role}} · {{item.factionLabel}}</text><text class="match-arrow" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text></view>
+      </button>
+      <view wx:if="{{item.expanded}}" class="match-details">
+        <view class="match-detail-row"><text>胜方</text><text>{{item.winnerLabel}}</text></view>
+        <view class="match-detail-row"><text>结果来源</text><text>{{item.sourceLabel}}</text></view>
+        <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
+        <view class="match-members-label">同桌成员</view>
+        <view class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text>{{member.seat}}号</text><text>{{member.name}}{{member.isSelf?'（我）':''}}</text></view></view>
+      </view>
+    </view>
+    <button wx:if="{{hasMore && !error}}" class="matches-more" bindtap="loadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
+  </block>
+</view>

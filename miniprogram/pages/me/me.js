@@ -21,6 +21,7 @@ Page({
   },
   editProfile() { wx.navigateTo({ url: "/pages/profile/profile" }); },
   openStats() { wx.navigateTo({ url: "/pages/stats/stats" }); },
+  openMatches() { wx.navigateTo({ url: "/pages/matches/matches" }); },
   openHelp() { wx.navigateTo({ url: "/pages/help/help" }); },
   about() { wx.showModal({ title: "关于桌边助手", content: "ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。", showCancel: false }); },
 });

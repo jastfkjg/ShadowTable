@@ -97,8 +97,37 @@ test('编辑资料取消离开仍保留输入；我的和战绩页可独立刷�
   assert.equal(edit.navigations.length,0); assert.equal(edit.p.data.nickname,'未保存');
   const me=page('me',api); await me.p.load(); assert.equal(me.p.data.profile.displayName,'林间'); assert.equal(me.p.data.stats.rateLabel,'—');
   me.p.openStats(); assert.deepEqual(me.navigations,['/pages/stats/stats']);
+  me.p.openMatches(); assert.deepEqual(me.navigations,['/pages/stats/stats','/pages/matches/matches']);
   let reads=0; const stats=page('stats',{...apiBase,request:async()=>{if(++reads===1)throw new Error('断线');return emptyStats;}}).p;
   await stats.load(); assert.equal(stats.data.error,'断线'); await stats.load(); assert.equal(stats.data.stats.total,0); assert.equal(stats.data.error,'');
+});
+test('战绩逐层展开，记录逐场展开成员并可继续分页', async () => {
+  const detailedStats = { ...emptyStats, total: 2, wins: 1, losses: 1, winRate: 50,
+    byFaction: [{ faction: 'good', label: '好人阵营', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }],
+    byRole: [{ faction: 'good', role: '梅林', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }] };
+  const stats = page('stats',{...apiBase,request:async()=>detailedStats}).p;
+  await stats.load();
+  assert.equal(stats.data.overviewExpanded,false);
+  stats.toggleOverview(); assert.equal(stats.data.overviewExpanded,true);
+  stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
+  assert.equal(stats.data.stats.byFaction[0].expanded,true);
+  assert.equal(stats.data.stats.byFaction[0].roles[0].rateLabel,'50%');
+
+  const record = (id, endedAt) => ({ id, boardName: '经典', capacity: 6, endedAt, winner: 'good', source: 'manual', excludedReason: null,
+    name: '林间', seat: 1, role: '梅林', faction: 'good', outcome: 'win', members: [{seat:1,name:'林间'},{seat:2,name:'晚风'}] });
+  const reads=[];
+  const matches = page('matches',{...apiBase,request:async url => {
+    reads.push(url);
+    return url.endsWith('offset=0') ? {records:[record('one',1000)],total:2,hasMore:true} : {records:[record('two',500)],total:2,hasMore:false};
+  }}).p;
+  await matches.load();
+  matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
+  assert.equal(matches.data.records[0].expanded,true);
+  assert.equal(matches.data.records[0].members[0].isSelf,true);
+  await matches.loadMore();
+  assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=1']);
+  assert.equal(matches.data.records.length,2);
+  assert.equal(matches.data.hasMore,false);
 });
 test('新页面模板编译，资料与战绩只出现在个人页面，牌桌无底部导航内容', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
@@ -106,9 +135,16 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const lobby=JSON.stringify(factory('pages/lobby/lobby.wxml')({isLobby:true,room:null,memberRooms:[],visibleMemberRooms:[]}));
   assert.doesNotMatch(lobby,/今晚，开一桌|和朋友面对面|总胜率|编辑资料/);
   const me=JSON.stringify(factory('pages/me/me.wxml')({profile:{displayName:'林间',initial:'林'},stats:{total:0,wins:0,rateLabel:'—'}}));
-  assert.match(me,/编辑资料/); assert.match(me,/查看全部/);
+  assert.match(me,/编辑资料/); assert.match(me,/对局记录/);
+  assert.doesNotMatch(me,/去开一局|还没有有效战绩|逐场查看/);
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.match(editor,/chooseAvatar/); assert.match(editor,/formType/);
+  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
+  assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
+  const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
+  assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
+  const emptyMatches=JSON.stringify(factory('pages/matches/matches.wxml')({loading:false,error:'',records:[],total:0}));
+  assert.match(emptyMatches,/暂无对局记录/); assert.doesNotMatch(emptyMatches,/去开一局|逐场查看/);
 });
 test('窗口背景与自绘导航保持深色，所有页面都有顶部导航', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));

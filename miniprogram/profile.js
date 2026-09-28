@@ -6,7 +6,12 @@ function presentProfile(profile) {
 }
 function presentStats(stats) {
   const rate = row => ({ ...row, rateLabel: row.winRate === null ? "—" : row.winRate + "%" });
-  return { ...rate(stats), byFaction: stats.byFaction.map(rate), byBoard: stats.byBoard.map(rate),
+  const byRole = (stats.byRole || []).map(rate);
+  const factionOrder = { good: 0, evil: 1, third: 2, unknown: 3 };
+  return { ...rate(stats), byFaction: stats.byFaction.filter(row => row.total > 0)
+    .sort((a, b) => (factionOrder[a.faction] ?? 9) - (factionOrder[b.faction] ?? 9))
+    .map(row => ({ ...rate(row), roles: byRole.filter(role => role.faction === row.faction), expanded: false })),
+    byRole, byBoard: stats.byBoard.map(rate),
     recent: stats.recent.map(r => ({ ...r,
       dateLabel: new Date(r.endedAt).toLocaleString("zh-CN", { hour12: false }),
       outcomeLabel: r.outcome === "win" ? "胜" : r.outcome === "loss" ? "负" : "不计入",
@@ -14,8 +19,19 @@ function presentStats(stats) {
       sourceLabel: r.source === "manual" ? "房主登记" : r.source === "system" ? "系统判定" : "未判定",
     })) };
 }
+function presentMatches(records) {
+  return records.map(record => ({
+    ...record,
+    dateLabel: new Date(record.endedAt).toLocaleString("zh-CN", { hour12: false }),
+    outcomeLabel: record.outcome === "win" ? "胜利" : record.outcome === "loss" ? "失利" : "不计入战绩",
+    factionLabel: ({ good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" })[record.faction] || "未知",
+    winnerLabel: ({ good: "好人", evil: "坏人", third: "盗贼" })[record.winner] || "未登记",
+    sourceLabel: record.source === "manual" ? "房主登记" : record.source === "system" ? "系统判定" : "未判定",
+    members: record.members.map(member => ({ ...member, isSelf: member.seat === record.seat })),
+  }));
+}
 function backToMe() {
   if (getCurrentPages().length > 1) wx.navigateBack();
   else wx.switchTab({ url: "/pages/me/me" });
 }
-module.exports = { presentProfile, presentStats, backToMe };
+module.exports = { presentProfile, presentStats, presentMatches, backToMe };

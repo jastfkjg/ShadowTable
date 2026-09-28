@@ -76,7 +76,9 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 ## 个人战绩（2026-09-28）
 
-`GET /api/me/stats` 只读取认证用户的战绩，返回 `total/wins/losses/excluded/winRate`、`byFaction`、按板子与人数分组的 `byBoard`，以及最近 20 局 `recent`。胜率是百分数，保留一位小数；无有效局时为 `null`。不会返回其他玩家的身份、名单或用户 ID。
+`GET /api/me/stats` 只读取认证用户的战绩，返回 `total/wins/losses/excluded/winRate`、`byFaction`、按最终阵营和本人角色分组的 `byRole`、按板子与人数分组的 `byBoard`，以及兼容旧客户端的最近 20 局 `recent`。胜率是百分数，保留一位小数；无有效局时为 `null`。该接口不会返回其他玩家的身份、名单或用户 ID。
+
+`GET /api/me/matches?offset=N` 为小程序“对局记录”提供按结束时间倒序的分页明细，每页最多 20 场。只返回认证用户参与的归档对局，包含时间、板子、本人身份与胜负、胜方和同桌成员的座位及当时昵称，不返回其他用户 ID 或身份。未计入战绩的归档对局仍在记录中显示排除原因。
 
 每次发牌生成 UUID `matchId` 和开始时间；进入 `ended` 或 `terminated` 时冻结 `matchRecord`，记录本局参赛者、最终角色和阵营、个人胜负、胜方、来源及排除原因。SQLite `matches` 保存整局信息，`match_players` 以 `(match_id, uid)` 为主键保存个人记录，并以 `(uid, ended)` 建索引。保存房间、归档与请求回执在现有写事务中提交；重复请求或后续保存不会重复计数。冻结记录不随踢人、重开或解散而变化。
 
@@ -87,7 +89,7 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 ## 页面导航与个人资料（2026-09-28）
 
-小程序首页是 `pages/lobby/lobby`，与 `pages/me/me` 组成原生底部导航“对局 / 我的”。牌桌保持原邀请路径 `pages/table/table?code=…`，独立展示，不显示 tabBar；返回大厅不执行离席。编辑资料与个人战绩分别由 `pages/profile/profile`、`pages/stats/stats` 承载。未确认的牌桌操作仅在应用内存保存原请求及幂等键，返回大厅后需先回原桌重试，不持久化秘密行动。网页对应 `#/lobby`、`#/me`、`#/profile`、`#/stats`、`#/table/:code`，支持刷新和浏览器返回。
+小程序首页是 `pages/lobby/lobby`，与 `pages/me/me` 组成原生底部导航“对局 / 我的”。牌桌保持原邀请路径 `pages/table/table?code=…`，独立展示，不显示 tabBar；返回大厅不执行离席。编辑资料、个人战绩与对局记录分别由 `pages/profile/profile`、`pages/stats/stats`、`pages/matches/matches` 承载。未确认的牌桌操作仅在应用内存保存原请求及幂等键，返回大厅后需先回原桌重试，不持久化秘密行动。网页对应 `#/lobby`、`#/me`、`#/profile`、`#/stats`、`#/table/:code`，支持刷新和浏览器返回。
 
 认证接口 `GET/POST /api/me/profile` 使用现有 uid。`profiles` 保存昵称、头像哈希、版本和修改时间；POST 要求当前 `version` 与幂等键，同事务保存资料与回执，旧版本返回 409，防止跨设备覆盖。昵称为 1–16 个字符，仅作为新牌桌昵称默认值，不回写房间与历史战绩。微信身份沿用现有登录流程，游客身份不自动合并或绑定。
 

@@ -118,6 +118,10 @@ class Store {
     const total = this.db.prepare(`SELECT ${counts} FROM match_players WHERE uid=?`).get(uid);
     const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
       .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
+    const byRole = this.db.prepare(`SELECT faction, json_extract(snapshot,'$.role') AS role, ${counts}
+      FROM match_players WHERE uid=? AND outcome IN ('win','loss')
+      GROUP BY faction,role ORDER BY faction,wins + losses DESC,role`).all(uid)
+      .map(row => ({ faction: row.faction, role: row.role || "未知角色", ...summary(row) }));
     const byBoard = this.db.prepare(`SELECT p.board, json_extract(m.snapshot,'$.capacity') AS capacity,
       json_extract(m.snapshot,'$.boardName') AS name, ${counts}
       FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=?
@@ -126,7 +130,29 @@ class Store {
         label: row.name + " · " + row.capacity + "人", ...summary(row) }));
     const recent = this.db.prepare("SELECT m.snapshot AS game, p.snapshot AS player FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
       .map(row => ({ ...JSON.parse(row.game), ...JSON.parse(row.player) }));
-    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byBoard, recent };
+    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent };
+  }
+  matchesFor(uid, offset = 0, limit = 20) {
+    const total = this.db.prepare("SELECT count(*) AS total FROM match_players WHERE uid=?").get(uid).total;
+    const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
+      FROM match_players p JOIN matches m ON m.id=p.match_id
+      WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(uid, limit, offset);
+    const members = this.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')");
+    const records = rows.map(row => {
+      const game = JSON.parse(row.game), player = JSON.parse(row.player);
+      return {
+        id: row.match_id, boardName: game.boardName, capacity: game.capacity,
+        startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
+        source: game.source, excludedReason: game.excludedReason,
+        name: player.name, seat: player.seat, role: player.role,
+        faction: player.faction, outcome: player.outcome,
+        members: members.all(row.match_id).map(member => {
+          const { seat, name } = JSON.parse(member.snapshot);
+          return { seat, name };
+        }),
+      };
+    });
+    return { records, total, hasMore: offset + records.length < total };
   }
   session(hash) {
     return this.db

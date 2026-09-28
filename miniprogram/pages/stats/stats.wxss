@@ -1,0 +1,18 @@
+.stats-page { padding-top: 26rpx; }
+.stats-overview { border-radius: 24rpx; background: var(--surface); padding: 8rpx 28rpx 12rpx; }
+.stats-overview .personal-metrics { padding: 20rpx 0; gap: 12rpx; }
+.stats-overview .metric-value { font-size: 48rpx; line-height: 1.35; }
+.stats-breakdown { margin-top: 52rpx; }
+button.stats-breakdown-toggle { width: 100%; min-height: 96rpx; margin: 0; padding: 0; justify-content: space-between; font-size: 33rpx; font-weight: 600; }
+.faction-group { border-bottom: 1rpx solid rgba(177,191,198,.22); }
+button.faction-toggle { width: 100%; min-height: 116rpx; margin: 0; padding: 22rpx 0; justify-content: space-between; gap: 18rpx; text-align: left; border-radius: 0; }
+.faction-heading { display: flex; flex-direction: column; min-width: 0; }
+.faction-name { font-size: 32rpx; font-weight: 600; }
+.faction-detail { color: var(--muted); font-size: 25rpx; }
+.faction-chevron { flex-shrink: 0; color: var(--muted); font-size: 42rpx; line-height: 1; }
+.role-list { padding: 8rpx 20rpx 20rpx; background: var(--surface); border-radius: 16rpx; margin-bottom: 20rpx; }
+.role-list-heading, .role-row { display: grid; grid-template-columns: minmax(0,1.6fr) repeat(3,minmax(0,.7fr)); gap: 8rpx; align-items: center; }
+.role-list-heading { color: var(--muted); font-size: 24rpx; padding: 12rpx 0; }
+.role-row { padding: 16rpx 0; border-top: 1rpx solid rgba(177,191,198,.14); font-size: 26rpx; font-variant-numeric: tabular-nums; }
+.role-list-heading text:not(:first-child), .role-row text:not(:first-child) { text-align: right; }
+.role-name { min-width: 0; overflow-wrap: anywhere; }

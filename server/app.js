@@ -137,7 +137,8 @@ function createApp({
       res.end(raw ? data : JSON.stringify(data));
     };
     try {
-      const path = new URL(req.url, "http://localhost").pathname;
+      const requestUrl = new URL(req.url, "http://localhost");
+      const path = requestUrl.pathname;
       if (admin && (await admin.handle(req, res, path, send))) return;
       if (
         path === "/admin" ||
@@ -233,6 +234,11 @@ function createApp({
       }
       if (req.method === "GET" && path === "/api/me/stats")
         return send(200, store.statsFor(uid));
+      if (req.method === "GET" && path === "/api/me/matches") {
+        const rawOffset = requestUrl.searchParams.get("offset") || "0";
+        check(/^(0|[1-9]\d{0,6})$/.test(rawOffset), "对局记录页码无效");
+        return send(200, store.matchesFor(uid, Number(rawOffset)));
+      }
       if (req.method === "GET" && path === "/api/me/rooms") {
         const rooms = store.personalRooms(uid);
         return send(200, { rooms });
