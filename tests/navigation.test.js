@@ -197,7 +197,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['profile','stats','leaderboard','matches','help'].map(name => `/pages/${name}/${name}`));
+  assert.deepEqual(links.map(n => n.attr.url), ['profile','stats','matches','leaderboard','help'].map(name => `/pages/${name}/${name}`));
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
     assert.equal(node.attr.hoverStartTime,0);
