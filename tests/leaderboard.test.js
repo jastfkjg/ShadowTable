@@ -16,7 +16,7 @@ function profile(store, uid, visible = true, nickname = uid.split(':')[1]) {
 function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000, excluded = false } = {}) {
   store.transaction(() => {
     for (let i = 0; i < total; i++) store.archiveMatch({id:randomUUID(),board:'classic',boardName:'经典',capacity:6,endedAt,
-      source:i % 2 ? 'manual' : 'system',winner:'good',excludedReason:excluded ? '测试局' : null,
+      source:i % 2 ? 'manual' : 'system',winner:excluded ? null : 'good',excludedReason:excluded ? '未登记胜负' : null,
       players:[{uid,name:'历史昵称',role:'本人角色',faction,outcome:excluded ? 'excluded' : i < wins ? 'win' : 'loss'}]});
   });
 }
@@ -36,7 +36,7 @@ test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来�
     const good = query(board,'wx:me','metric=good');
     assert.equal(good.me.total,12); assert.equal(good.me.winRate,66.7); assert.equal(good.rows.length,1);
     const evil = query(board,'wx:me','metric=evil');
-    assert.equal(evil.me.total,9); assert.equal(evil.me.status,'insufficient'); assert.equal(evil.me.remaining,1); assert.equal(evil.me.rank,null);
+    assert.equal(evil.me.total,9); assert.equal(evil.me.status,'ranked'); assert.equal(evil.me.remaining,0); assert.equal(evil.me.rank,1);
     assert.equal(query(board,'wx:hidden').me.status,'hidden');
     assert.equal(query(board,'guest:guest').me.status,'unsupported');
     profile(store,'wx:new'); assert.equal(query(board,'wx:new').me.status,'no_games');
@@ -46,24 +46,41 @@ test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来�
     assert.match(all.rows[0].publicId,/^[\da-f-]{36}$/);
   } finally { store.close(); }
 });
-test('门槛边界、零胜率、原始比例排序、样本量优先与并列跳号', () => {
+test('首局即可进入总胜率和对应阵营榜，零局不生成胜率', () => {
+  const store = new Store(':memory:');
+  try {
+    const board = new Leaderboard(store);
+    profile(store,'wx:good'); profile(store,'wx:evil');
+    games(store,'wx:good',1,0); games(store,'wx:evil',1,1,{faction:'evil'});
+    for (const [uid,faction,rate] of [['wx:good','good',0],['wx:evil','evil',100]]) {
+      for (const metric of ['games','overall',faction]) {
+        const result=query(board,uid,'metric='+metric);
+        assert.equal(result.threshold,1); assert.equal(result.me.status,'ranked');
+        assert.equal(result.me.total,1); assert.equal(result.me.winRate,rate);
+      }
+      const other=query(board,uid,'metric='+(faction==='good'?'evil':'good'));
+      assert.equal(other.me.status,'no_games'); assert.equal(other.me.rank,null); assert.equal(other.me.winRate,null);
+    }
+  } finally {store.close();}
+});
+test('一局可上榜、零胜率、原始比例排序、样本量优先与并列跳号', () => {
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store);
     for (const name of ['a','b','c','d','zero','short']) profile(store,'wx:'+name);
     games(store,'wx:a',30,20); games(store,'wx:b',60,40); games(store,'wx:c',60,40);
-    games(store,'wx:d',1000,667); games(store,'wx:zero',20,0); games(store,'wx:short',19,19);
+    games(store,'wx:d',1000,667); games(store,'wx:zero',20,0); games(store,'wx:short',1,1);
     const ranked = query(board,'wx:a','metric=overall');
-    assert.deepEqual(ranked.rows.map(r=>r.rank),[1,2,2,4,5]);
-    assert.equal(ranked.rows[0].nickname,'d'); assert.equal(ranked.rows[3].nickname,'a');
-    assert.equal(ranked.rows[0].winRate,ranked.rows[3].winRate);
-    assert.equal(ranked.rows[4].winRate,0); assert.equal(query(board,'wx:short','metric=overall').me.remaining,1);
+    assert.deepEqual(ranked.rows.map(r=>r.rank),[1,2,3,3,5,6]);
+    assert.equal(ranked.rows[1].nickname,'d'); assert.equal(ranked.rows[4].nickname,'a');
+    assert.equal(ranked.rows[1].winRate,ranked.rows[4].winRate);
+    assert.equal(ranked.rows[5].winRate,0); assert.equal(query(board,'wx:short','metric=overall').me.remaining,0);
     const count = query(board,'wx:me','metric=games');
     assert.deepEqual(count.rows.map(r=>r.rank),[1,2,2,4,5,6]);
     games(store,'wx:short',1,1); assert.equal(query(board,'wx:short','metric=overall').me.rank,1);
   } finally { store.close(); }
 });
-test('本月按上海时区结束时间取半开区间，月初缓存切换，历史局数不替代当月门槛', () => {
+test('本月按上海时区结束时间取半开区间，月初缓存切换，一局月榜也有排名', () => {
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store), {start,end} = periodRange('month',NOW);
@@ -73,7 +90,7 @@ test('本月按上海时区结束时间取半开区间，月初缓存切换，�
     games(store,'wx:me',20,20,{endedAt:start-1}); games(store,'wx:me',1,1,{endedAt:start});
     games(store,'wx:me',1,0,{endedAt:end-1}); games(store,'wx:me',1,1,{endedAt:end});
     const month=query(board,'wx:me','metric=overall&period=month');
-    assert.equal(month.me.total,2); assert.equal(month.me.status,'insufficient'); assert.equal(month.me.remaining,18);
+    assert.equal(month.me.total,2); assert.equal(month.me.status,'ranked'); assert.equal(month.me.remaining,0);
     assert.equal(query(board,'wx:me','metric=overall').me.total,23);
     const last = board.read('wx:me',new URLSearchParams('period=month'),end-1);
     const next = board.read('wx:me',new URLSearchParams('period=month'),end);

@@ -252,8 +252,7 @@ function manualResult(room, input) {
   return winner;
 }
 function archiveResult(room) {
-  const excludedReason = room.testRoom || room.players.some(p => /^(dev|test):/.test(p.uid))
-    ? "测试局" : room.phase === "terminated" ? "对局终止" : !room.result?.winner ? "未登记胜负"
+  const excludedReason = room.phase === "terminated" ? "对局终止" : !room.result?.winner ? "未登记胜负"
       : room.players.some(p => !ROLES[room.roles[p.uid]]) ? "身份记录不完整" : null;
   room.matchRecord = {
     id: room.matchId || randomUUID(), code: room.code, game: room.game,

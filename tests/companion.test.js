@@ -193,6 +193,12 @@ test("陪测账号经HTTP完成任务和刺杀，不替真人提交", async () =
     await panel.batch("confirm");
     await command("advance");
     assert.equal((await view()).phase, "ended");
+    const stats = await a.request("/api/me/stats", host);
+    assert.equal(stats.total, 1);
+    assert.equal(stats.excluded, 0);
+    const matches = await a.request("/api/me/matches", host);
+    assert.equal(matches.records[0].excludedReason, null);
+    assert.ok(["win", "loss"].includes(matches.records[0].outcome));
     await command("rematch");
     await panel.refresh();
     assert.ok(panel.actors.every((p) => !p.secret && !p.room.me.ready));

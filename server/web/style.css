@@ -1801,20 +1801,18 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 .profile-rank-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; margin-bottom: 8px; cursor: pointer; }
 .profile-rank-toggle input { flex-shrink: 0; width: 24px; height: 24px; accent-color: var(--accent); }
 .leaderboard-page { padding-bottom: calc(13rem + env(safe-area-inset-bottom)); }
-.rank-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-button.rank-rule-button { width: auto; min-height: 48px; padding-right: 0; color: var(--muted); font-size: 14px; }
 .rank-period { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface); }
-.rank-period button { flex: 1; color: var(--muted); }
+.rank-period button { flex: 1 1 0%; width: 0; min-width: 0; color: var(--muted); }
 .rank-period button[aria-pressed="true"] { background: var(--bg); color: var(--text); }
-.rank-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin-top: 16px; border-bottom: 1px solid var(--border); }
-button.rank-metric { padding: 12px 0; border-radius: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 14px; }
-button.rank-metric[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); }
-button.rank-metric.good[aria-pressed="true"] { color: var(--good); border-bottom-color: var(--good); }
-button.rank-metric.evil[aria-pressed="true"] { color: var(--evil); border-bottom-color: var(--evil); }
-.rank-rules { margin-top: 16px; padding: 16px; border-radius: 12px; background: var(--surface); color: var(--muted); }
-.rank-rules p { margin: 0; }
-.rank-rules p + p { margin-top: 12px; }
-.rank-note { margin: 16px 0 20px; }
+.rank-period button:not(:disabled):active, button.rank-metric:not(:disabled):active { opacity: 1; }
+.rank-metrics { display: flex; width: 100%; margin: 16px 0 20px; border-bottom: 1px solid var(--border); }
+button.rank-metric { flex: 1 1 0%; width: 0; min-width: 0; max-width: 25%; padding: 0; border: 0; border-radius: 0; color: var(--muted); font-size: 14px; text-align: center; }
+.rank-metric-label { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 0; white-space: nowrap; }
+.rank-metric-indicator { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; border-radius: 2px; background: transparent; }
+button.rank-metric[aria-pressed="true"] { color: var(--accent); }
+button.rank-metric.good[aria-pressed="true"] { color: var(--good); }
+button.rank-metric.evil[aria-pressed="true"] { color: var(--evil); }
+.rank-metric[aria-pressed="true"] .rank-metric-indicator { background: currentColor; }
 .rank-list-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
 .rank-list { padding: 0; margin: 0; list-style: none; }
 .rank-row { display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 14px 0; border-bottom: 1px solid rgba(177,191,198,.18); }
@@ -1829,7 +1827,7 @@ button.rank-metric.evil[aria-pressed="true"] { color: var(--evil); border-bottom
 .rank-unit { margin-left: 3px; font-size: 12px; color: var(--muted); font-weight: 400; }
 .rank-empty { padding: 36px 0; text-align: center; }
 button.rank-more { margin-top: 16px; color: var(--accent); }
-.rank-footer { margin: 20px 0; text-align: center; }
+button.rank-refresh { margin: 20px 0; }
 .rank-mine { position: fixed; z-index: 10; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 460px; padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
 .rank-mine-content { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .rank-mine-copy { min-width: 0; }

@@ -1,24 +1,16 @@
 <app-nav title="排行榜" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page leaderboard-page">
-  <view class="rank-heading"><text class="muted small">同桌相聚，各有所长</text><button class="rank-rule-button" bindtap="toggleRules" aria-expanded="{{rulesOpen}}">规则 {{rulesOpen?'⌄':'›'}}</button></view>
   <view class="rank-period" aria-label="统计周期">
-    <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}">全部</button>
-    <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}">本月</button>
+    <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
+    <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
   </view>
-  <view class="rank-metrics" aria-label="排行指标"><button wx:for="{{metrics}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}">{{item.label}}</button></view>
-  <view wx:if="{{rulesOpen}}" class="rank-rules small">
-    <view>仅统计已归档的有效对局，按最终阵营计算。房主登记和系统判定均计入；测试局、终止、未登记胜负、身份记录不完整和旁观不计入。</view>
-    <view>总胜率满20局、好人或坏人胜率满10局上榜，门槛只看所选周期。第三阵营计入总榜；好人对应蓝方，坏人对应红方。</view>
-    <view>胜率相同时局数更多者优先，两项相同则并列；局数榜同局数并列。排序使用未舍入的胜率，展示保留一位小数。</view>
-    <view>本月按北京时间和对局结束时间计算。全部指所有已归档对局。仅公开展示已开启此设置的微信玩家；不同板子、人数会影响胜率。</view>
-  </view>
-  <view wx:if="{{board}}" class="rank-note small muted">{{board.ruleLabel}} · {{board.eligibleCount}}人上榜</view>
-  <view wx:if="{{loading}}" class="status" role="status">{{board?'正在刷新榜单…':'正在读取榜单…'}}</view>
+  <view class="rank-metrics" aria-label="排行指标"><button wx:for="{{metrics}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button></view>
+  <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
   <block wx:if="{{board}}">
     <view wx:if="{{board.rows.length}}" class="rank-list">
-      <view class="rank-list-heading small muted"><text>排名 / 玩家</text><text>{{metric==='games'?'有效局数':board.metricLabel}}</text></view>
+      <view class="rank-list-heading small muted"><text>排名 / 玩家</text><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
       <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
         <text class="rank-number {{3 >= item.rank?'rank-top':''}}">{{item.rank}}</text>
         <image wx:if="{{item.avatarUrl}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true" />
@@ -27,12 +19,11 @@
         <view class="rank-value">{{item.value}}<text class="rank-unit">{{item.unit}}</text></view>
       </view>
     </view>
-    <view wx:else class="rank-empty muted">当前周期暂无符合上榜条件的公开玩家。</view>
+    <view wx:else class="rank-empty muted">暂无战绩</view>
     <button wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
-    <view class="rank-footer small muted">{{board.eligibleCount > board.maxRows?'展示前100位玩家，个人名次按完整榜单计算。':'仅展示已开启公开展示的玩家。'}}<view>更新于 {{board.updatedLabel}}</view></view>
     <view class="rank-mine" aria-label="我的排名">
-      <view class="rank-mine-content"><view class="rank-mine-copy"><view class="small muted">我的{{board.metricLabel}}</view><view class="rank-mine-status">{{board.me.statusLabel}}</view><view class="small muted">{{board.me.wins}}胜 · {{board.me.total}}局</view></view><view class="rank-value accent">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view>
-      <button wx:if="{{board.me.status==='hidden'}}" class="rank-enable" bindtap="editProfile">设置公开展示 ›</button>
+      <view class="rank-mine-content"><view class="rank-mine-copy"><view class="small muted">我的{{board.metricLabel}}</view><view wx:if="{{board.me.statusLabel}}" class="rank-mine-status">{{board.me.statusLabel}}</view><view class="small muted">{{board.me.wins}}胜 · {{board.me.total}}局</view></view><view class="rank-value accent">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view>
+      <button wx:if="{{board.me.status==='hidden'}}" class="rank-enable" bindtap="editProfile">参与排行 ›</button>
     </view>
   </block>
 </view>

@@ -82,7 +82,7 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 每次发牌生成 UUID `matchId` 和开始时间；进入 `ended` 或 `terminated` 时冻结 `matchRecord`，记录本局参赛者、最终角色和阵营、个人胜负、胜方、来源及排除原因。SQLite `matches` 保存整局信息，`match_players` 以 `(match_id, uid)` 为主键保存个人记录，并以 `(uid, ended)` 建索引。保存房间、归档与请求回执在现有写事务中提交；重复请求或后续保存不会重复计数。冻结记录不随踢人、重开或解散而变化。
 
-`finishTools` 接受 `winner: good | evil | third | null`，只有当前房主可登记，`third` 仅对有盗贼阵营的板子可用。公共 `winnerOptions` 从板子配置生成，不从秘密身份推导。旧客户端缺省胜方仍按未登记处理。自由模式的结束登记和 `closeOffline` 的最终登记标记 `manual`；规则引擎的胜负标记 `system`。测试房间、含 `dev:` / `test:` 参赛身份的局、终止和无胜方的局不计入胜率，旁观者不归档。
+`finishTools` 接受 `winner: good | evil | third | null`，只有当前房主可登记，`third` 仅对有盗贼阵营的板子可用。公共 `winnerOptions` 从板子配置生成，不从秘密身份推导。旧客户端缺省胜方仍按未登记处理。自由模式的结束登记和 `closeOffline` 的最终登记标记 `manual`；规则引擎的胜负标记 `system`。陪测房间及含 `dev:` / `test:` 参赛身份的对局正常归档并计入胜率；终止、无胜方及身份不完整的局不计入，旁观者不归档。启动时会补算旧归档中仅因“测试局”被排除且胜方、身份完整的对局，同步个人记录、统计与排行榜；排行榜公开资格不变。
 
 升级不会扫描并回填已经结束的旧房间；升级前已开始、升级后结束的局可在结算时生成归档 ID，未知开始时间为 `null`。现有微信 uid 与游客 uid 不迁移、不合并；此版本没有跨端账号绑定或修改已归档结果的接口。
 
@@ -97,16 +97,16 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 ## 排行榜（2026-09-28）
 
-小程序 `pages/leaderboard/leaderboard` 和网页 `#/leaderboard` 从“我的”进入，不增加底部导航项。提供 `games`（有效局数）、`overall`（总胜率）、`good`（好人胜率）、`evil`（坏人胜率）四榜，默认全部局数榜；`period=all|month` 切换周期。本月以北京时间及归档结束时间计算，使用月初含、下月初不含的区间，与服务端系统时区无关。
+小程序 `pages/leaderboard/leaderboard` 和网页 `#/leaderboard` 从“我的”进入，不增加底部导航项。提供 `games`（有效局数）、`overall`（总胜率）、`good`（好人胜率）、`evil`（坏人胜率）四榜，页面只保留周期、指标、榜单与本人战绩，取消规则入口、宣传语及资格说明；默认全部局数榜；`period=all|month` 切换周期。本月以北京时间及归档结束时间计算，使用月初含、下月初不含的区间，与服务端系统时区无关。
 
-只聚合 `match_players.outcome IN ('win','loss')`，继承归档时的排除规则、最终阵营和个人胜负。手动与系统结果均计入。第三阵营参与总榜，阵营榜只包含对应最终阵营。局数榜至少1局，总胜率至少20局，阵营胜率至少10局；门槛只计算所选周期。胜率按原始整数胜负比例比较，避免展示值舍入影响名次；相同比例以局数降序，两项相同则并列跳号（1、2、2、4）。局数榜同局数并列，公开ID仅用于并列玩家稳定分页，不影响名次。
+只聚合 `match_players.outcome IN ('win','loss')`，继承归档时的排除规则、最终阵营和个人胜负。手动与系统结果均计入。第三阵营参与总榜，阵营榜只包含对应最终阵营。四榜均有1局有效对局即可参与；阵营榜需在所选周期内有该阵营的有效对局，不设置10局或20局门槛。胜率按原始整数胜负比例比较，避免展示值舍入影响名次；相同比例以局数降序，两项相同则并列跳号（1、2、2、4）。局数榜同局数并列，公开ID仅用于并列玩家稳定分页，不影响名次。
 
 `GET /api/leaderboard?metric=games&period=all&offset=0` 要求普通玩家认证，沿用用户限流与 `Cache-Control: no-store`。参数使用白名单并拒绝重复项；每页20人，最多展示前100位玩家。后续页必须带首屏返回的 `version`，版本变化返回409，客户端自动回到首屏重新加载，避免重复或遗漏。排名在完整合格人群上计算，前100位之外的本人仍返回真实名次。响应字段：
 
 - `metric/period/periodStart/periodEnd/timezone/threshold`：当前统计口径；全部周期的结束边界为 `null`。
 - `eligibleCount/maxRows/updatedAt/version/nextOffset/hasMore`：参与人数、展示上限、缓存生成时间及分页状态。
 - `rows[]`：独立 `publicId`、当前昵称、头像URL、`rank/isSelf/total/wins/losses/winRate`。不含内部UID、角色、对局明细或房间码。
-- `me`：认证用户本人的 `rank/status/remaining/total/wins/losses/winRate`。状态为 `ranked/hidden/unsupported/no_games/insufficient`，未上榜名次为 `null`，零有效局胜率为 `null`。
+- `me`：认证用户本人的 `rank/status/remaining/total/wins/losses/winRate`。状态为 `ranked/hidden/unsupported/no_games`，未上榜名次为 `null`，零有效局胜率为 `null`。
 
 `profiles` 迁移新增 `leaderboard_visible`（默认0）和独立随机 `public_id`，旧用户不会自动公开。只有主动开启展示的微信账号参与公共名次；游客和开发账号仅查看榜单及自己的统计，不支持开启。公开设置文案明确包含全部已归档有效对局，关闭设置不会删除个人战绩。公开ID在后续改名和重启时保持稳定，不返回微信身份派生值；历史昵称和对局快照不用于公开榜单。
 

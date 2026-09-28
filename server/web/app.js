@@ -353,7 +353,7 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
-    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankRulesOpen: false,
+    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '',
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -565,58 +565,60 @@
     return html;
   }
   const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
-  var rankSequence = 0;
-  async function loadLeaderboard(more = false) {
+  var rankSequence = 0, rankFailedSelection = null;
+  async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
     const sequence = ++rankSequence, route = routeSequence;
-    const metric = state.rankMetric, period = state.rankPeriod, board = state.rankBoard;
-    setState({ rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
+    const metric = selection.rankMetric || state.rankMetric, period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
+    rankFailedSelection = null;
+    setState({ ...selection, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
     try {
       await login();
       const result = await request('/api/leaderboard?metric=' + metric + '&period=' + period + (more ? '&offset=' + board.nextOffset + '&version=' + board.version : ''));
       if (sequence !== rankSequence || route !== routeSequence) return;
       if (more) result.rows = board.rows.concat(result.rows);
-      setState({ rankBoard: result, serverConnected: true });
+      setState({ rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false });
     } catch (e) {
       if (sequence !== rankSequence || route !== routeSequence) return;
       if (more && e.status === 409) {
         await loadLeaderboard();
         if (sequence + 1 === rankSequence && route === routeSequence && !state.rankError)
           setState({ rankNotice: '榜单已更新，已重新加载。' });
-      } else setState({ rankError: e.message });
-    } finally {
-      if (sequence === rankSequence && route === routeSequence) setState({ rankLoading: false, rankMoreLoading: false });
+      } else {
+        rankFailedSelection = { rankMetric: metric, rankPeriod: period };
+        setState({ rankError: e.message, rankLoading: false, rankMoreLoading: false,
+          ...(!more && board ? { rankMetric: board.metric, rankPeriod: board.period } : {}) });
+      }
     }
   }
   function viewLeaderboard() {
     const board = state.rankBoard, metric = state.rankMetric;
-    const metricLabel = rankMetrics.find(item => item[0] === metric)[1];
-    let html = personalTitle('排行榜', '') + '<section class="leaderboard-page" aria-label="排行榜"><div class="rank-heading"><span class="small muted">同桌相聚，各有所长</span><button type="button" class="rank-rule-button" data-action="rankRules" aria-expanded="' + state.rankRulesOpen + '">规则 ' + (state.rankRulesOpen ? '⌄' : '›') + '</button></div>';
+    const displayMetric = board?.metric || metric;
+    const metricLabel = rankMetrics.find(item => item[0] === displayMetric)[1];
+    let html = personalTitle('排行榜', '') + '<section class="leaderboard-page" aria-label="排行榜">';
     html += '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
-    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankMetrics.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
-    if (state.rankRulesOpen) html += '<div class="rank-rules small"><p>仅统计已归档的有效对局，按最终阵营计算。房主登记与系统判定均计入；测试局、终止、未登记胜负、身份记录不完整和旁观不计入。</p><p>总胜率满20局、好人或坏人胜率满10局上榜，门槛只看所选周期。第三阵营计入总榜；好人对应蓝方，坏人对应红方。</p><p>胜率相同时局数更多者优先，两项相同则并列；局数榜同局数并列。排序使用未舍入的胜率，展示保留一位小数。</p><p>本月按北京时间和对局结束时间计算。全部指所有已归档对局。仅公开展示已开启此设置的微信玩家；不同板子、人数会影响胜率。</p></div>';
-    if (board) html += '<div class="rank-note small muted">' + (metric === 'games' ? '至少1局有效对局' : '满' + board.threshold + '局' + (metric === 'overall' ? '有效对局' : '该阵营有效对局') + '上榜') + ' · ' + board.eligibleCount + '人上榜</div>';
-    if (state.rankLoading) html += '<div class="status" role="status">' + (board ? '正在刷新榜单…' : '正在读取榜单…') + '</div>';
+    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankMetrics.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '"><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>').join('') + '</div>';
+    if (state.rankLoading && !board) html += '<div class="status" role="status">正在读取榜单…</div>';
     if (state.rankNotice) html += '<div role="status" class="small muted">' + esc(state.rankNotice) + '</div>';
     if (state.rankError) html += '<div class="inline-error" role="alert">' + esc(state.rankError) + btn('secondary','rankRetry','重试',null,state.rankLoading || state.rankMoreLoading) + '</div>';
     if (!board) return html + '</section>';
-    const value = row => (metric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (metric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
+    const value = row => (displayMetric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (displayMetric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
     html += '<div aria-live="polite" aria-atomic="true" class="sr-only">' + metricLabel + '，' + board.eligibleCount + '人上榜</div>';
     if (board.rows.length) {
-      html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (metric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
+      html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (displayMetric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
       board.rows.forEach(row => {
         html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number' + (row.rank <= 3 ? ' rank-top' : '') + '">' + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + row.wins + '胜 · ' + row.total + '局</div></div><div class="rank-value">' + value(row) + '</div></li>';
       });
       html += '</ol>';
-    } else html += '<div class="rank-empty muted">当前周期暂无符合上榜条件的公开玩家。</div>';
+    } else html += '<div class="rank-empty muted">暂无战绩</div>';
     if (board.hasMore) html += btn('rank-more','rankMore',state.rankMoreLoading ? '正在加载…' : '加载更多',null,state.rankLoading || state.rankMoreLoading);
-    html += '<div class="rank-footer small muted">' + (board.eligibleCount > board.maxRows ? '展示前100位玩家，个人名次按完整榜单计算。' : '仅展示已开启公开展示的玩家。') + '<div>更新于 ' + esc(new Date(board.updatedAt).toLocaleTimeString('zh-CN', {hour12:false})) + '</div>' + btn('text-button','rankRefresh','刷新榜单',null,state.rankLoading || state.rankMoreLoading) + '</div>';
-    const me = board.me, status = {ranked:'第 ' + me.rank + ' 名',hidden:'尚未开启公开展示',unsupported:'仅微信账号可上榜',no_games:'当前周期暂无有效对局',insufficient:'距上榜还差 ' + me.remaining + ' 局'}[me.status];
-    html += '<aside class="rank-mine" aria-label="我的排名"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="small muted">我的' + metricLabel + '</div><div class="rank-mine-status">' + status + '</div><div class="small muted">' + me.wins + '胜 · ' + me.total + '局</div></div><div class="rank-value accent">' + value(me) + '</div></div>' + (me.status === 'hidden' ? btn('rank-enable','navigate','设置公开展示 ›',{page:'profile'}) : '') + '</aside></section>';
+    html += btn('text-button rank-refresh','rankRefresh','刷新榜单',null,state.rankLoading || state.rankMoreLoading);
+    const me = board.me, status = me.rank ? '第 ' + me.rank + ' 名' : '';
+    html += '<aside class="rank-mine" aria-label="我的排名"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="small muted">我的' + metricLabel + '</div>' + (status ? '<div class="rank-mine-status">' + status + '</div>' : '') + '<div class="small muted">' + me.wins + '胜 · ' + me.total + '局</div></div><div class="rank-value accent">' + value(me) + '</div></div>' + (me.status === 'hidden' ? btn('rank-enable','navigate','参与排行 ›',{page:'profile'}) : '') + '</aside></section>';
     return html;
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。测试局、终止局和未登记胜负的局不计入胜率；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p></div>';
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p></div>';
   }
 
   // ===== modal / toast =====
@@ -1216,7 +1218,7 @@ function roomListItems(rooms) {
     closeResult();
     return confirmCommand("确认结束本局？",
       (option ? "登记为「" + option.label + "」。" : "本局不计战绩。") +
-      (room.testRoom ? "测试局不计入胜率。" : "胜负确认后将归档，不能直接修改。") +
+      "胜负确认后将归档，不能直接修改。" +
       (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
       "finishTools", { replace: true, winner: choice === "none" ? null : choice });
   }
@@ -1234,7 +1236,7 @@ function roomListItems(rooms) {
     if (!state.resultDialog || !room?.canUseTools || state.error) return "";
     var options = (room.winnerOptions || []).concat([{ value: "none", label: "不计战绩" }]);
     return '<div class="dialog-backdrop"><div class="error-dialog result-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="dialog-title" id="result-dialog-title">登记本局胜负</div>' +
-      '<div class="small muted">请与同桌玩家确认胜方。' + (room.testRoom ? '测试局会保留记录，但不计入胜率。' : '不确定胜负时，请选择不计战绩。') + '</div><div class="result-options">' +
+      '<div class="small muted">请与同桌玩家确认胜方。不确定胜负时，请选择不计战绩。</div><div class="result-options">' +
       options.map(function (o) { return '<button type="button" class="secondary ' + (state.resultChoice === o.value ? 'is-selected' : '') + '" data-action="pickResult" data-value="' + esc(o.value) + '" aria-pressed="' + (state.resultChoice === o.value) + '">' + esc(o.label) + '</button>'; }).join('') +
       '</div><div class="dialog-actions">' + btn('secondary','closeResult','取消') + btn('primary','saveResult','确认胜负并结束',null,!state.resultChoice || state.busy || !!pending) + '</div></div></div>';
   }
@@ -3027,7 +3029,7 @@ function roomListItems(rooms) {
           "</div><span>" +
           esc(r.result.reason || "") +
           "</span>" +
-          '<div class="small muted">' + (r.testRoom ? "测试局 · 不计入胜率" : r.result.source === "manual" ? "房主登记" : r.result.source === "system" ? "系统判定" : "") + "</div>" +
+          '<div class="small muted">' + (r.result.source === "manual" ? "房主登记" : r.result.source === "system" ? "系统判定" : "") + "</div>" +
           (r.me.isHost
             ? btn("primary", "rematch", "同房再开一局", null, state.busy)
             : '<span class="muted">等待房主开启下一局</span>') +
@@ -3486,12 +3488,11 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
-    rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric) { setState({rankMetric:el.dataset.value,rankBoard:null}); return loadLeaderboard(); } },
-    rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) { setState({rankPeriod:el.dataset.value,rankBoard:null}); return loadLeaderboard(); } },
+    rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
+    rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
-    rankRetry: () => loadLeaderboard(state.rankMoreError),
+    rankRetry: () => loadLeaderboard(state.rankMoreError, rankFailedSelection || {}),
     rankRefresh: () => loadLeaderboard(),
-    rankRules: () => setState({rankRulesOpen:!state.rankRulesOpen}),
     navigate: el => navigate(el.dataset.page),
     saveProfile,
     reloadProfile: async () => { if (!state.profileDirty || await confirm('重新载入资料？', '当前未保存的修改将丢弃。')) { profilePending = null; try { await login(); await loadProfile(state.page === 'profile'); } catch (e) { setState({ profileError: e.message }); } } },

@@ -185,10 +185,39 @@ const priorMe = (extra = {}) => [{route:'pages/me/me',data:{profile:previewProfi
 function deferred() { let resolve, reject; const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}); return {promise,resolve,reject}; }
 
 function rankResult(metric='games', extra={}) {
-  return {metric,period:'all',threshold:metric==='games'?1:metric==='overall'?20:10,eligibleCount:1,maxRows:100,updatedAt:1,version:'one',hasMore:false,nextOffset:null,
+  return {metric,period:'all',threshold:1,eligibleCount:1,maxRows:100,updatedAt:1,version:'one',hasMore:false,nextOffset:null,
     rows:[{publicId:'player',nickname:'甲',avatarUrl:null,rank:1,total:20,wins:12,losses:8,winRate:60,isSelf:true}],
     me:{rank:1,status:'ranked',total:20,wins:12,losses:8,winRate:60,remaining:0},...extra};
 }
+test('小程序切换周期保留榜单和底栏，完成后一次更新，失败可重试目标周期', async () => {
+  const requests=[];
+  const {p}=page('leaderboard',{...apiBase,request:url=>{
+    const pending=deferred();requests.push({url,...pending});return pending.promise;
+  }});
+  const context={window:{},global:{},console};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  const render=()=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')(p.data));
+  const tick=()=>new Promise(resolve=>setImmediate(resolve));
+  const first=p.onShow();await tick();
+  assert.match(render(),/正在读取榜单/);
+  requests[0].resolve(rankResult());await first;
+  const board=p.data.board,frames=[];
+  const setData=p.setData;
+  p.setData=function(patch){setData.call(this,patch);frames.push({...this.data});};
+  const change=p.choosePeriod({currentTarget:{dataset:{id:'month'}}});await tick();
+  assert.equal(p.data.period,'month');assert.equal(p.data.board,board);
+  assert.match(render(),/rank-list/);assert.match(render(),/rank-mine/);assert.doesNotMatch(render(),/正在读取榜单/);
+  await p.choosePeriod({currentTarget:{dataset:{id:'month'}}});assert.equal(requests.length,2);
+  requests[1].resolve(rankResult('games',{period:'month',rows:[]}));await change;
+  assert.equal(frames.length,2);assert.ok(frames.every(frame=>frame.board));
+  assert.equal(p.data.board.period,'month');assert.equal(p.data.loading,false);assert.match(render(),/暂无战绩/);
+  const failed=p.choosePeriod({currentTarget:{dataset:{id:'all'}}});await tick();
+  requests[2].reject(new Error('网络中断'));await failed;
+  assert.equal(p.data.period,'month');assert.equal(p.data.board.period,'month');
+  const retry=p.retry();await tick();assert.match(requests[3].url,/period=all/);
+  requests[3].resolve(rankResult());await retry;
+  assert.equal(p.data.period,'all');assert.equal(p.data.error,'');
+});
 test('小程序排行榜快速切换忽略旧响应，分页过期自动刷新，普通错误保留已加载数据', async () => {
   const old=deferred();let reads=0;
   const {p}=page('leaderboard',{...apiBase,request:async url=>{
@@ -225,14 +254,14 @@ test('小程序公开设置独立标记草稿，保存重试不改变原请求�
   const guest=page('profile',{...apiBase,request:async()=>({...profile,identityType:'guest'})}).p;
   await guest.load();guest.changeLeaderboard({detail:{value:true}});assert.equal(guest.data.leaderboardVisible,false);
 });
-test('小程序排行榜模板包含本人状态、空榜、错误与规则，样本量和公开设置均可访问', () => {
+test('小程序排行榜保留空榜、错误、样本量与参与入口，移除说明性文案', () => {
   const context={window:{},global:{},console};vm.createContext(context);
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const rank=page('leaderboard',apiBase).p;
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
-  const board={...rankResult(),metricLabel:'局数',ruleLabel:'至少1局有效对局',me:{...rankResult().me,status:'hidden',statusLabel:'尚未开启公开展示'},rows:[]};
-  const tree=render({board,error:'请求失败',rulesOpen:true});
-  assert.match(tree,/尚未开启公开展示/);assert.match(tree,/设置公开展示/);assert.match(tree,/暂无符合上榜条件/);assert.match(tree,/请求失败/);assert.match(tree,/第三阵营/);
+  const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',statusLabel:''},rows:[]};
+  const tree=render({board,error:'请求失败'});
+  assert.match(tree,/参与排行/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
   assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
 });

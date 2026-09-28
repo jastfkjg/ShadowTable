@@ -40,11 +40,31 @@ class Store {
       "CREATE INDEX IF NOT EXISTS admin_audit_room ON admin_audit(code, id)",
     );
     this.transaction(() => {
+      this.restoreCompanionMatches();
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);
         if (migrateKnights(room)) this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), row.code);
       }
     });
+  }
+  restoreCompanionMatches() {
+    const matches = this.db.prepare("SELECT id, snapshot FROM matches WHERE json_extract(snapshot, '$.excludedReason')='测试局'").all();
+    const playersFor = this.db.prepare("SELECT uid, faction, snapshot FROM match_players WHERE match_id=?");
+    const updatePlayer = this.db.prepare("UPDATE match_players SET outcome=?, snapshot=? WHERE match_id=? AND uid=?");
+    const updateMatch = this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?");
+    for (const row of matches) {
+      const match = JSON.parse(row.snapshot), players = playersFor.all(row.id);
+      // Old test exclusions took precedence over missing results and roles.
+      if (!["good", "evil", "third"].includes(match.winner) || !players.length
+        || players.some(player => !["good", "evil", "third"].includes(player.faction)
+          || !JSON.parse(player.snapshot).role || JSON.parse(player.snapshot).role === "未知角色")) continue;
+      for (const player of players) {
+        const outcome = player.faction === match.winner ? "win" : "loss";
+        updatePlayer.run(outcome, JSON.stringify({ ...JSON.parse(player.snapshot), outcome }), row.id, player.uid);
+      }
+      updateMatch.run(JSON.stringify({ ...match, excludedReason: null }), row.id);
+      this.invalidateLeaderboard();
+    }
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");

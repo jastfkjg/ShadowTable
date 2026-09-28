@@ -6,6 +6,8 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { Store } = require('../server/store');
 const { createApp } = require('../server/app');
+const { Leaderboard } = require('../server/leaderboard');
+const { readProfile, saveProfile } = require('../server/profile');
 const { newRoom, enter, command, publicView } = require('../server/engine');
 function run(room, type, extra = {}, uid = room.host) {
   command(room, uid, { type, stage: room.stage, ...extra });
@@ -96,21 +98,64 @@ test('对局记录分页返回完整历史，成员只包含座位与当时昵�
 function enterObserver(room) {
   room.spectators = [{ uid: 'wx:observer', name: '旁观者', seat: null }];
 }
-test('终止、不计战绩、测试房间及测试身份均排除，零有效局胜率为空', () => {
+test('终止、不计战绩及身份不完整仍排除，陪测房间和陪测身份正常统计', () => {
   const store = new Store(':memory:');
   try {
     let r = deal(); finish(store, r, null);
     r = deal(); run(r, 'terminate'); store.save(r);
-    r = deal(); r.testRoom = true; finish(store, r);
-    r = deal(); r.players[1].uid = 'dev:test'; r.roles['dev:test'] = r.roles['wx:2']; finish(store, r);
+    assert.equal(store.statsFor('wx:1').winRate, null);
+    r = deal(); r.testRoom = true; r.roles['wx:1']='merlin'; finish(store, r);
+    for (const prefix of ['dev:', 'test:']) {
+      r = deal(); r.players[1].uid = prefix+'tester'; r.roles[prefix+'tester'] = 'assassin';
+      r.roles['wx:1']='merlin'; finish(store, r, 'evil');
+      assert.equal(store.statsFor(prefix+'tester').wins,1);
+    }
+    r = deal(); r.testRoom=true; delete r.roles['wx:2']; finish(store,r);
     const stats = store.statsFor('wx:1');
-    assert.equal(stats.total, 0);
-    assert.equal(stats.winRate, null);
-    assert.equal(stats.excluded, 4);
-    assert.equal(stats.recent.length, 4);
+    assert.equal(stats.total, 3);
+    assert.equal(stats.winRate, 33.3);
+    assert.equal(stats.excluded, 3);
+    assert.equal(stats.recent.length, 6);
     assert.equal(store.statsFor('wx:nobody').recent.length, 0);
-    assert.equal(store.statsFor('dev:test').total, 0);
+    saveProfile(store,'wx:1',{nickname:'房主',version:readProfile(store,'wx:1').version,leaderboardVisible:true});
+    const leaderboard=new Leaderboard(store);
+    for (const metric of ['games','overall','good']) {
+      const board=leaderboard.read('wx:1',new URLSearchParams({metric}));
+      assert.equal(board.me.total,3);assert.equal(board.rows[0].winRate,33.3);
+    }
+    assert.equal(store.matchesFor('wx:1').records.filter(record=>record.outcome!=='excluded').length,3);
   } finally { store.close(); }
+});
+test('旧陪测归档启动时补算，保留未判胜负和身份不完整局，重复启动与保存不重复计数', () => {
+  const dir=mkdtempSync(join(tmpdir(),'shadowtable-companion-stats-'));
+  const path=join(dir,'db.sqlite');let store=new Store(path);
+  try {
+    const legacy=[];
+    for (const kind of ['win','loss','none','unknown']) {
+      const r=deal();r.testRoom=true;r.roles['wx:1']='merlin';
+      if(kind==='unknown')delete r.roles['wx:2'];
+      run(r,'finishTools',{winner:kind==='none'?null:kind==='loss'?'evil':'good',replace:true});
+      r.matchRecord.excludedReason='测试局';
+      r.matchRecord.players.forEach(player=>player.outcome='excluded');
+      store.save(r);legacy.push(r);
+    }
+    saveProfile(store,'wx:1',{nickname:'房主',version:readProfile(store,'wx:1').version,leaderboardVisible:true});
+    assert.equal(store.statsFor('wx:1').total,0);
+    store.close();store=new Store(path);
+    const verify=()=>{
+      const stats=store.statsFor('wx:1');
+      assert.equal(stats.total,2);assert.equal(stats.winRate,50);assert.equal(stats.excluded,2);
+      const records=store.matchesFor('wx:1').records;
+      assert.equal(records.length,4);
+      assert.equal(records.filter(record=>record.excludedReason===null&&record.outcome!=='excluded').length,2);
+      for(const metric of ['games','overall','good']) {
+        const board=new Leaderboard(store).read('wx:1',new URLSearchParams({metric,period:'month'}));
+        assert.equal(board.rows[0].total,2);assert.equal(board.me.winRate,50);
+      }
+    };
+    verify();legacy.forEach(room=>store.save(room));verify();
+    store.close();store=new Store(path);verify();
+  } finally {store.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('胜方受板子及房主权限约束，第三阵营与系统判定来源正确', () => {
   const store = new Store(':memory:');

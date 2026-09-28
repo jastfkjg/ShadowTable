@@ -669,18 +669,43 @@ test("网页资料保存断网重试复用请求与版本，成功回到我的",
 });
 
 function webRanks(metric='games',extra={}) {
-  return {metric,period:'all',threshold:metric==='games'?1:20,eligibleCount:1,maxRows:100,updatedAt:1,version:'one',hasMore:false,
+  return {metric,period:'all',threshold:1,eligibleCount:1,maxRows:100,updatedAt:1,version:'one',hasMore:false,
     rows:[{publicId:'public-player',nickname:'<script>坏名字</script>',avatarUrl:null,rank:1,total:20,wins:10,winRate:50,isSelf:true}],
     me:{status:'ranked',rank:1,total:20,wins:10,winRate:50,remaining:0},...extra};
 }
+test('网页切换周期保留榜单且不插入加载提示，切换失败仍能重试目标周期', async () => {
+  const requests=[];
+  const c=client(url=>new Promise((resolve,reject)=>requests.push({url,resolve,reject})));
+  c.state.page='leaderboard';
+  const tick=()=>new Promise(resolve=>setImmediate(resolve));
+  const first=c.loadLeaderboard();await tick();
+  assert.match(c.viewLeaderboard(),/正在读取榜单/);
+  requests[0].resolve(response(webRanks()));await first;
+  const board=c.state.rankBoard;
+  const change=c.ACTIONS.rankPeriod({dataset:{value:'month'}});await tick();
+  assert.equal(c.state.rankPeriod,'month');assert.equal(c.state.rankBoard,board);
+  assert.match(c.viewLeaderboard(),/rank-list/);assert.match(c.viewLeaderboard(),/rank-mine/);
+  assert.doesNotMatch(c.viewLeaderboard(),/class="status"|正在读取榜单/);
+  await c.ACTIONS.rankPeriod({dataset:{value:'month'}});assert.equal(requests.length,2);
+  requests[1].resolve(response(webRanks('games',{period:'month',rows:[]})));await change;
+  assert.equal(c.state.rankBoard.period,'month');assert.equal(c.state.rankLoading,false);
+  const failed=c.ACTIONS.rankPeriod({dataset:{value:'all'}});await tick();
+  requests[2].reject(new Error('断线'));await failed;
+  assert.equal(c.state.rankPeriod,'month');assert.equal(c.state.rankBoard.period,'month');
+  const retry=c.ACTIONS.rankRetry();await tick();assert.match(requests[3].url,/period=all/);
+  requests[3].resolve(response(webRanks()));await retry;
+  assert.equal(c.state.rankPeriod,'all');assert.equal(c.state.rankError,'');
+});
 test('网页排行榜可深链，私密资料不公开，输出转义昵称并显示样本量和本人状态', async () => {
   const c=client(async()=>response(webRanks()));
   await c.applyRoute('#/leaderboard');
   assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
   const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第 1 名/);
   c.state.rankBoard=webRanks('games',{rows:[],me:{status:'hidden',rank:null,total:20,wins:10,winRate:50}});
-  assert.match(c.viewLeaderboard(),/设置公开展示/);assert.match(c.viewLeaderboard(),/暂无符合上榜条件/);
-  c.ACTIONS.rankRules();assert.match(c.viewLeaderboard(),/第三阵营/);
+  assert.match(c.viewLeaderboard(),/参与排行/);assert.match(c.viewLeaderboard(),/暂无战绩/);
+  assert.doesNotMatch(c.viewLeaderboard(),/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
+  c.state.rankBoard.me.status='unsupported';
+  assert.doesNotMatch(c.viewLeaderboard(),/仅微信账号|参与排行/);
 });
 test('网页榜单切换和离开页面不接收旧响应，过期分页重新加载，错误可重试', async () => {
   let resolveOld;let reads=0;

@@ -1301,7 +1301,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({ resultDialog: false });
     return this.confirmCommand("确认结束本局？",
       (option ? "登记为「" + option.label + "」。" : "本局不计战绩。") +
-      (room.testRoom ? "测试局不计入胜率。" : "胜负确认后将归档，不能直接修改。") +
+      "胜负确认后将归档，不能直接修改。" +
       (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
       "finishTools", { replace: true, winner: choice === "none" ? null : choice });
   },

@@ -1,7 +1,7 @@
 "use strict";
 const { randomUUID } = require("node:crypto");
 const { RuleError } = require("./engine");
-const METRICS = { games: 1, overall: 20, good: 10, evil: 10 };
+const METRICS = { games: 1, overall: 1, good: 1, evil: 1 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
 function periodRange(period, now) {
   if (period === "all") return { start: 0, end: null };
@@ -67,7 +67,7 @@ class Leaderboard {
     const own = snapshot.aggregates.get(uid), ownStats = summary(own);
     // Profiles without games do not appear in the aggregation.
     const visible = own ? !!own.leaderboard_visible : !!this.store.db.prepare("SELECT leaderboard_visible FROM profiles WHERE uid=?").get(uid)?.leaderboard_visible;
-    const status = !uid.startsWith("wx:") ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : ownStats.total < METRICS[metric] ? "insufficient" : "ranked";
+    const status = !uid.startsWith("wx:") ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     return {
       metric, period, periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",

@@ -210,7 +210,7 @@
   <view wx:if="{{resultDialog && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="登记本局胜负">
       <view class="dialog-title">登记本局胜负</view>
-      <view class="small muted">请与同桌玩家确认胜方。{{room.testRoom?'测试局会保留记录，但不计入胜率。':'不确定胜负时，请选择不计战绩。'}}</view>
+      <view class="small muted">请与同桌玩家确认胜方。不确定胜负时，请选择不计战绩。</view>
       <view class="result-options">
         <button wx:for="{{room.winnerOptions}}" wx:key="value" class="secondary {{resultChoice===item.value?'is-selected':''}}" data-value="{{item.value}}" bindtap="pickResult" aria-pressed="{{resultChoice===item.value}}">{{item.label}}</button>
         <button class="secondary {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}">不计战绩</button>
@@ -436,7 +436,7 @@
         ><view class="phase-title"
           >{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view
         ><text>{{room.result.reason}}</text
-        ><text class="small muted">{{room.testRoom?'测试局 · 不计入胜率':room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</text
+        ><text class="small muted">{{room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</text
         ><button
           wx:if="{{room.me.isHost}}"
           class="primary"
