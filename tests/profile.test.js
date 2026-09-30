@@ -63,6 +63,42 @@ async function launch(database = ':memory:') {
       return { status: res.status, headers: res.headers, data: res.headers.get('content-type').startsWith('image/') ? Buffer.from(await res.arrayBuffer()) : await res.json() };
     } };
 }
+test('牌桌展示当前头像且不泄露资料字段；改头像不改游戏状态，换座后头像跟随玩家', async () => {
+  const app = await launch();
+  try {
+    const login = async code => (await app.req('/api/login', null, { code })).data.token;
+    const host = await login('avatar-host'), player = await login('avatar-player'), outsider = await login('avatar-outsider');
+    const first = builtinAvatars[0], next = builtinAvatars[1];
+    await app.req('/api/me/profile', host, { nickname: '个人昵称', avatar: 'builtin:' + first.id, version: 0 });
+    const created = await app.req('/api/rooms', host, { name: '桌上房主', board: 'classic', capacity: 6 });
+    const path = '/api/rooms/' + created.data.code;
+    assert.equal((await app.req(path + '/join', player, { name: '桌上玩家' })).status, 200);
+    const before = (await app.req(path, host)).data;
+    assert.equal(before.players[0].avatarUrl, '/api/avatars/' + first.hash);
+    assert.equal(before.players[0].name, '桌上房主');
+    assert.equal(before.players[1].avatarUrl, null);
+    assert.equal((await app.req(path, outsider)).status, 403);
+    const peer = (await app.req(path, player)).data;
+    assert.equal(peer.players[0].avatarUrl, before.players[0].avatarUrl);
+    for (const p of peer.players) {
+      assert.deepEqual(Object.keys(p).sort(), ['alive', 'avatarUrl', 'isHost', 'name', 'ready', 'seat'].sort());
+    }
+    await app.req('/api/me/profile', host, { nickname: '改后个人昵称', avatar: 'builtin:' + next.id, version: 1 });
+    const updated = (await app.req(path, host)).data;
+    assert.equal(updated.players[0].avatarUrl, '/api/avatars/' + next.hash);
+    assert.equal(updated.stage, before.stage);
+    assert.deepEqual({ ...updated, players: updated.players.map(({ avatarUrl, ...p }) => p) },
+      { ...before, players: before.players.map(({ avatarUrl, ...p }) => p) });
+    assert.equal((await app.req(path + '/commands', host, { type: 'seat', stage: updated.stage, seat: 4 })).status, 200);
+    const moved = (await app.req(path, player)).data;
+    assert.equal(moved.players.find(p => p.seat === 4).avatarUrl, '/api/avatars/' + next.hash);
+    assert.ok(!moved.players.some(p => p.seat === 1));
+    await app.req('/api/me/profile', host, { nickname: '改后个人昵称', avatar: null, version: 2 });
+    assert.equal((await app.req(path, player)).data.players.find(p => p.seat === 4).avatarUrl, null);
+    assert.equal((await app.req(path + '/commands', host, { type: 'stand', stage: moved.stage })).status, 200);
+    assert.ok(!(await app.req(path, player)).data.players.some(p => p.seat === 4));
+  } finally { await app.close(); }
+});
 test('微信资料跨登录与重启保留，头像持久化；昵称修改不追改房间和战绩身份', async () => {
   const directory = mkdtempSync(join(tmpdir(),'shadow-profile-')), db = join(directory,'db.sqlite');
   let app = await launch(db);

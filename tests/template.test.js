@@ -37,6 +37,35 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test("座位头像固定占位且失败回退，保留座位按钮和全部公开状态", () => {
+  const room = { phase: "proposal", flexible: false, leader: 1, fairyHolder: 1, capacity: 6, me: { seat: 1 } };
+  const seat = { seat: 1, name: "甲", occupied: true, mine: true, host: true, alive: false, selected: true,
+    avatarUrl: "https://table.example/api/avatars/a", avatarInitial: "甲" };
+  const tree = render({ ...base, room, seats: [seat] });
+  const button = byHandler(tree, "seat");
+  assert.equal(button.attr.disabled, false);
+  assert.equal(button.attr["data-seat"], 1);
+  assert.equal(button.attr.ariaLabel, "1号，甲，你的座位，房主，已出局，已选入队，湖仙");
+  const image = nodes(button).find(n => n.tag === "wx-image");
+  assert.equal(image.attr.src, seat.avatarUrl);
+  assert.equal(image.attr.binderror, "seatAvatarError");
+  assert.equal(image.attr["data-url"], seat.avatarUrl);
+  assert.match(JSON.stringify(button), /你·房主/);
+  assert.match(JSON.stringify(button), /已出局/);
+  assert.match(JSON.stringify(button), /湖仙/);
+  assert.match(JSON.stringify(button), /已选入队/);
+  const failed = byHandler(render({ ...base, room, seats: [{ ...seat, avatarFailed: true }] }), "seat");
+  assert.ok(!nodes(failed).some(n => n.tag === "wx-image"));
+  assert.ok(nodes(failed).some(n => n.attr?.class === "seat-avatar-fallback"));
+  const lobby = { ...room, phase: "lobby" };
+  const empty = byHandler(render({ ...base, room: lobby, seats: [{ seat: 2, name: "空位", occupied: false, mine: false, avatarInitial: "+" }] }), "seat");
+  assert.equal(empty.attr.disabled, false);
+  assert.equal(empty.attr.ariaLabel, "2号，空位，可入座");
+  assert.match(JSON.stringify(empty), /seat-avatar-empty/);
+  assert.match(JSON.stringify(empty), /可入座/);
+  const occupied = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, mine: false }] }), "seat");
+  assert.equal(occupied.attr.disabled, true);
+});
 test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份入口气泡，不渲染旧秘密", () => {
   const data = { ...base, room: { phase: "tools", code: "123456", capacity: 6, team: [], me: { seat: 1 } }, dealtIdentityDialog: true };
   const hidden = render(data);

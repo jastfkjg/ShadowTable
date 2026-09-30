@@ -80,6 +80,69 @@ test('小程序一级导航为对局与我的，独立牌桌仍支持原邀请�
   assert.ok(!reads.includes('/api/rooms/123456'));
   const board = page('table',api).p; assert.equal(board.data.isLobby,false);
 });
+test('小程序保存新个人昵称后刷新大厅替换旧昵称草稿，新建及加入使用新默认值', async () => {
+  let current = { ...profile, nickname: '新朋友', version: 0 };
+  const writes = [];
+  const api = { ...apiBase, request: async (url, method, body) => {
+    if (url === '/api/me/profile' && method === 'POST') {
+      current = { ...current, nickname: body.nickname, avatarUrl: '/api/avatars/new', version: current.version + 1 };
+      return structuredClone(current);
+    }
+    if (method === 'POST') { writes.push({ url, body: structuredClone(body) }); return { code: '234567' }; }
+    if (url === '/api/me/profile') return structuredClone(current);
+    if (url === '/api/me/rooms') return { rooms: [] };
+    throw new Error('意外请求 ' + url);
+  } };
+  const lobby = page('lobby', api).p;
+  await lobby.refreshLobby();
+  lobby.inputName({ detail: { value: '新朋友' } });
+  const editor = page('profile', api).p;
+  await editor.load();
+  editor.inputName({ detail: { value: 'zz' } });
+  editor.chooseBuiltinAvatar({ currentTarget: { dataset: { id: 'avatar-02' } } });
+  await editor.save();
+  await lobby.refreshLobby();
+  assert.equal(lobby.data.name, 'zz');
+  assert.equal(lobby.nameEdited, false);
+  lobby.create();
+  while (lobby.data.busy) await new Promise(resolve => setImmediate(resolve));
+  await lobby.refreshLobby();
+  lobby.setData({ code: '123456' });
+  lobby.join();
+  while (lobby.data.busy) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(writes.map(w => w.body.name), ['zz', 'zz']);
+});
+test('大厅普通刷新及仅改头像保留手动桌名，延迟资料响应不覆盖刚输入的桌名', async () => {
+  let current = { ...profile, nickname: '原名', version: 1 };
+  let pendingProfile;
+  const api = { ...apiBase, request: async url => url === '/api/me/rooms' ? { rooms: [] }
+    : pendingProfile ? pendingProfile.promise : structuredClone(current) };
+  const lobby = page('lobby', api).p;
+  await lobby.refreshLobby();
+  lobby.inputName({ detail: { value: '本桌专用昵称' } });
+  current = { ...current, avatarUrl: '/api/avatars/new', version: 2 };
+  await lobby.refreshLobby();
+  assert.equal(lobby.data.name, '本桌专用昵称');
+  pendingProfile = deferred();
+  const refresh = lobby.refreshLobby();
+  await new Promise(resolve => setImmediate(resolve));
+  lobby.inputName({ detail: { value: '刚输入的桌名' } });
+  pendingProfile.resolve({ ...current, nickname: '新个人昵称', version: 3 });
+  await refresh;
+  assert.equal(lobby.data.name, '刚输入的桌名');
+});
+test('大厅重叠刷新只应用最新资料响应', async () => {
+  const old = deferred(); let reads = 0;
+  const api = { ...apiBase, request: async url => url === '/api/me/rooms' ? { rooms: [] }
+    : ++reads === 1 ? old.promise : { ...profile, nickname: '最新昵称' } };
+  const lobby = page('lobby', api).p;
+  const first = lobby.refreshLobby();
+  await new Promise(resolve => setImmediate(resolve));
+  await lobby.refreshLobby();
+  old.resolve({ ...profile, nickname: '过期昵称' });
+  await first;
+  assert.equal(lobby.data.name, '最新昵称');
+});
 test('首页进入独立牌桌，切后台时建房成功不强行跳转；直接邀请提示加入', async () => {
   const api = { ...apiBase, request: async (url,method) => method==='POST' ? {code:'234567'} : url==='/api/boards' ? {boards:BOARDS} : url==='/api/me/rooms' ? {rooms:[]} : url==='/api/me/profile' ? profile : Promise.reject(Object.assign(new Error('你不在该房间'),{status:403})) };
   const first = page('lobby',api); first.p.data.name='林间';

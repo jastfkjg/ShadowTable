@@ -362,11 +362,18 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   async refreshLobby() {
+    const sequence = this.lobbyRefreshSequence = (this.lobbyRefreshSequence || 0) + 1;
+    const nameInputRevision = this.nameInputRevision || 0;
     try {
       await api.login();
       await this.loadRooms();
       const profile = await api.request("/api/me/profile");
-      if (!this.alive) return;
+      if (!this.alive || sequence !== this.lobbyRefreshSequence) return;
+      // A changed personal nickname replaces an older table draft, while input
+      // entered during this refresh and avatar-only edits retain the user's name.
+      if (this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
+          nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
+      this.lobbyProfileNickname = profile.nickname;
       const held = typeof getApp === "function" && getApp().pendingTableRequest;
       if (held) this.setData({ pendingTableCode: held.code });
       else this.setData({ pendingTableCode: "" });
@@ -376,7 +383,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         wx.removeStorageSync("invitedRoom");
       }
       if (!this.nameEdited) this.setData({ name: profile.nickname || wx.getStorageSync("nickname") || "" });
-    } catch (e) { this.handleError(e); }
+    } catch (e) { if (this.alive && sequence === this.lobbyRefreshSequence) this.handleError(e); }
   },
   async enterTable(code) {
     const held = typeof getApp === "function" && getApp().pendingTableRequest;
@@ -537,12 +544,19 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.generation = (this.generation || 0) + 1;
       this.actionGeneration = (this.actionGeneration || 0) + 1;
     }
+    if (!this.avatarFailures || this.data.room?.code !== room.code) this.avatarFailures = new Set();
+    const currentAvatarUrls = new Set(room.players.filter(p => p.avatarUrl).map(p => api.assetUrl(p.avatarUrl)));
+    for (const url of this.avatarFailures) if (!currentAvatarUrls.has(url)) this.avatarFailures.delete(url);
     const seats = Array.from({ length: room.capacity }, (_, i) => {
       const seat = i + 1,
         p = room.players.find((p) => p.seat === seat);
+      const avatarUrl = p?.avatarUrl ? api.assetUrl(p.avatarUrl) : "";
       return {
         seat,
         name: p ? p.name : "空位",
+        avatarUrl,
+        avatarInitial: p ? Array.from(p.name || "友")[0] : "+",
+        avatarFailed: this.avatarFailures.has(avatarUrl),
         occupied: !!p,
         alive: p?.alive !== false,
         ready: !!p?.ready,
@@ -700,6 +714,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   clearRoom() {
     clearTimeout(this.timer);
+    this.avatarFailures = new Set();
     this.refreshSequence = (this.refreshSequence || 0) + 1;
     this.mask();
     this.roomCode = null;
@@ -719,6 +734,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       showRoomRules: false,
       showRoomSettings: false,
     });
+  },
+  seatAvatarError(e) {
+    const { seat, url } = e.currentTarget.dataset;
+    if (!this.alive || !url || !this.data.seats.some(s => s.seat === Number(seat) && s.avatarUrl === url)) return;
+    if (!this.avatarFailures) this.avatarFailures = new Set();
+    this.avatarFailures.add(url);
+    this.setData({ seats: this.data.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s) });
   },
   filterRooms(e) {
     const filter = e.currentTarget.dataset.filter;
@@ -842,6 +864,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   inputName(e) {
+    this.nameInputRevision = (this.nameInputRevision || 0) + 1;
     this.nameEdited = true;
     this.setData({ name: e.detail.value });
   },

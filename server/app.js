@@ -3,7 +3,7 @@ const http = require("node:http");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails } = require("./audit");
-const { readProfile, saveProfile } = require("./profile");
+const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
 const { Leaderboard } = require("./leaderboard");
 const BOARD_INFO = require("./board-info");
 const {
@@ -263,12 +263,13 @@ function createApp({
           return send(200, { ...roomSummary(room, uid), stage: room.stage });
         }
         check(!match[2] || match[2] === "private", "接口不存在", 404);
-        return send(
-          200,
-          match[2] === "private"
-            ? privateView(room, uid)
-            : publicView(room, uid),
-        );
+        if (match[2] === "private") return send(200, privateView(room, uid));
+        // Authorize and build the existing allowlisted view before enriching presentation.
+        const view = publicView(room, uid);
+        const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
+        const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
+        view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat) }));
+        return send(200, view);
       }
       check(
         req.method === "POST" &&

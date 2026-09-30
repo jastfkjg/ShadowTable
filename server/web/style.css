@@ -1509,6 +1509,20 @@ button.role-quick-toggle { display: grid; grid-template-columns: 106px minmax(0,
   white-space: nowrap;
 }
 .seat-meta { min-height: 20px; }
+
+/* Seat identity: reserve the avatar and status slots across polling updates. */
+button.seat { display: flex; gap: 6px; min-height: 124px; padding: 8px; }
+.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.seat-head .seat-number { display: block; flex-shrink: 0; }
+.seat-avatar { position: relative; display: block; flex: 0 0 36px; width: 36px; height: 36px; overflow: hidden; border-radius: 50%; background: var(--bg); color: var(--muted); }
+.seat-avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
+.seat-avatar-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.seat-avatar-empty { box-sizing: border-box; background: transparent; border: 1px dashed var(--border); }
+button.seat .seat-name { display: -webkit-box; min-height: 20px; line-height: 20px; white-space: normal; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+button.seat .seat-meta { display: flex; align-content: flex-start; align-items: flex-start; flex-wrap: wrap; gap: 4px; min-height: 36px; margin-top: auto; line-height: 16px; }
+button.seat .seat-flag { display: inline-block; min-height: 0; }
+button.seat .seat-fairy { margin-right: 0; line-height: 16px; }
+button.seat .seat-out { display: inline-block; padding: 0 4px; border: 1px solid var(--evil); border-radius: 4px; color: var(--evil); white-space: nowrap; }
 .fairy-setting .settings-caption { display: block; }
 .fairy-setting input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--accent); }
 .fairy-setting input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

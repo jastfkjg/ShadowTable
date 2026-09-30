@@ -55,6 +55,12 @@ function readProfile(store, uid) {
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
     leaderboardVisible: /^(wx|dev):/.test(uid) && (row ? !!row.leaderboard_visible : true) };
 }
+// Room presentation uses current avatars without copying profile data into game state.
+function readAvatarUrls(store, uids) {
+  if (!uids.length) return new Map();
+  const rows = store.db.prepare(`SELECT uid, avatar_hash FROM profiles WHERE uid IN (${uids.map(() => "?").join(",")})`).all(...uids);
+  return new Map(rows.map(row => [row.uid, row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null]));
+}
 function saveProfile(store, uid, input) {
   fail(typeof input.nickname === "string" && input.nickname.trim().length >= 1 && input.nickname.trim().length <= 16 && !/[\u0000-\u001f\u007f]/.test(input.nickname), "昵称需要1–16个字符，不能包含换行");
   fail(Number.isSafeInteger(input.version) && input.version >= 0, "请刷新个人资料后重试");
@@ -77,4 +83,4 @@ function saveProfile(store, uid, input) {
   store.invalidateLeaderboard();
   return readProfile(store, uid);
 }
-module.exports = { readProfile, saveProfile, decodeAvatar };
+module.exports = { readProfile, saveProfile, decodeAvatar, readAvatarUrls };

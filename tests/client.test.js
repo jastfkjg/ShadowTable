@@ -103,6 +103,42 @@ function dealtRoom(overrides = {}) {
     capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
     team: [], history: [], ...overrides };
 }
+test("座位头像失败回退跨刷新和换座保留，新头像可加载，选人及展开状态保持", async () => {
+  let room = dealtRoom({ phase: "proposal", flexible: false, leader: 1,
+    players: [{ seat: 1, name: "甲", isHost: true, avatarUrl: "/api/avatars/a" }, { seat: 2, name: "乙" }] });
+  const p = page({ request: async () => structuredClone(room), assetUrl: path => "https://table.example" + path });
+  p.roomCode = room.code;
+  await p.refresh();
+  const url = p.data.seats[0].avatarUrl;
+  assert.equal(url, "https://table.example/api/avatars/a");
+  assert.equal(p.data.seats[1].avatarInitial, "乙");
+  assert.equal(p.data.seats[2].avatarInitial, "+");
+  p.seat({ currentTarget: { dataset: { seat: 2 } } });
+  p.setData({ seatsExpanded: false });
+  p.seatAvatarError({ currentTarget: { dataset: { seat: 1, url } } });
+  await p.refresh();
+  assert.equal(p.data.seats[0].avatarFailed, true);
+  assert.deepEqual(Array.from(p.data.selected), [2]);
+  assert.equal(p.data.seats[1].selected, true);
+  assert.equal(p.data.seatsExpanded, false);
+  room.players[0].seat = 4;
+  await p.refresh();
+  assert.equal(p.data.seats[0].avatarUrl, "");
+  assert.equal(p.data.seats[3].avatarUrl, url);
+  assert.equal(p.data.seats[3].avatarFailed, true);
+  room.players[0].avatarUrl = "/api/avatars/b";
+  await p.refresh();
+  assert.equal(p.data.seats[3].avatarFailed, false);
+  p.seatAvatarError({ currentTarget: { dataset: { seat: 4, url } } });
+  assert.equal(p.data.seats[3].avatarFailed, false);
+  room.players[0].avatarUrl = "/api/avatars/a";
+  await p.refresh();
+  assert.equal(p.data.seats[3].avatarFailed, false);
+  room.players[0].avatarUrl = null;
+  await p.refresh();
+  assert.equal(p.data.seats[3].avatarUrl, "");
+  assert.equal(p.data.seats[3].avatarInitial, "甲");
+});
 test("首次发牌自动遮盖提醒且不读取身份，稍后查看后刷新不重弹、下一局再提醒", async () => {
   let room = dealtRoom(), reads = 0;
   const storage = new Map();

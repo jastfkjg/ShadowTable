@@ -26,7 +26,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
     render = function () {};
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog,
+      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
@@ -79,6 +79,39 @@ function dealtWebRoom(overrides = {}) {
     capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
     team: [], history: [], ...overrides };
 }
+test("网页座位头像失败回退且轮询不重试，换座跟随玩家，新头像不清空选人", async () => {
+  const room = dealtWebRoom({ phase: "proposal", flexible: false, leader: 1,
+    players: [{ seat: 1, name: "甲", isHost: true, avatarUrl: "/api/avatars/a" }, { seat: 2, name: "乙" }] });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.match(c.viewRoom(), /class="seat-avatar-image" src="\/api\/avatars\/a"/);
+  assert.match(c.viewRoom(), /你·房主/);
+  assert.match(c.viewRoom(), /aria-label="1号，甲，你的座位，房主"/);
+  assert.match(c.viewRoom(), /seat-avatar-empty/);
+  c.ACTIONS.seat({ dataset: { seat: "2" } });
+  c.ACTIONS.toggleSeats();
+  c.seatAvatarError({ dataset: { seat: "1", seatAvatarUrl: "/api/avatars/a" } });
+  await c.refresh();
+  assert.equal(c.state.seats[0].avatarFailed, true);
+  assert.deepEqual(Array.from(c.state.selected), [2]);
+  assert.equal(c.state.seatsExpanded, false);
+  c.ACTIONS.toggleSeats();
+  assert.doesNotMatch(c.viewRoom(), /class="seat-avatar-image"/);
+  room.players[0].seat = 4;
+  await c.refresh();
+  assert.equal(c.state.seats[0].avatarUrl, "");
+  assert.equal(c.state.seats[3].avatarFailed, true);
+  room.players[0].avatarUrl = "/api/avatars/b";
+  await c.refresh();
+  assert.equal(c.state.seats[3].avatarFailed, false);
+  c.seatAvatarError({ dataset: { seat: "4", seatAvatarUrl: "/api/avatars/a" } });
+  assert.equal(c.state.seats[3].avatarFailed, false);
+  assert.match(c.viewRoom(), /class="seat-avatar-image" src="\/api\/avatars\/b"/);
+  assert.deepEqual(Array.from(c.state.selected), [2]);
+  room.players[0].avatarUrl = "/api/avatars/a";
+  await c.refresh();
+  assert.equal(c.state.seats[3].avatarFailed, false);
+});
 test("网页首次提醒无需秘密请求，主动揭示后关闭并清空，刷新不重弹且重开再提醒", async () => {
   let room = dealtWebRoom(), reads = 0;
   const storage = new Map([["session", "session"]]);
@@ -329,7 +362,7 @@ test("网页围观不显示准备或私密身份，自己的座位可点击站�
   c.state.seats = [{ seat: 1, name: "房主", mine: true, occupied: true }];
   let html = c.viewRoom();
   assert.match(html, /点自己站起/);
-  assert.match(html, /data-action="seat" data-seat="1">/);
+  assert.match(html, /data-action="seat" data-seat="1" aria-label="[^"]*">/);
   command(r, "host", { type: "stand", stage: r.stage });
   c.state.room = publicView(r, "host");
   html = c.viewRoom();

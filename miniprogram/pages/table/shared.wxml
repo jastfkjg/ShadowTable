@@ -392,18 +392,24 @@
         wx:key="seat"
         class="seat {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
         data-seat="{{item.seat}}"
-        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.fairyHolder===item.seat?'，湖仙':'')}}"
+        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.host?'，房主':'')+(item.alive===false?'，已出局':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.fairyHolder===item.seat?'，湖仙':'')+(room.phase==='lobby'?'，'+(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):'')}}"
         bindtap="seat"
         disabled="{{hasPendingRequest || busy || (room.phase==='lobby'?(item.occupied && !item.mine):!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
       >
-        <view class="seat-number"
-          >{{item.seat}}<text class="seat-flag"
-            >{{item.mine?'你 ':''}}{{item.host?'房主':''}}</text
-          ></view
-        ><view class="seat-name">{{item.name}}</view
-        ><view wx:if="{{item.alive===false}}" class="seat-out">已出局</view><view class="seat-meta"
-          ><text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.selected?'已选入队':item.inTeam?'任务队员':'')}}</view
-        >
+        <view class="seat-head">
+          <text class="seat-number">{{item.seat}}</text>
+          <view class="seat-avatar {{item.occupied?'':'seat-avatar-empty'}}" aria-hidden="{{true}}">
+            <text class="seat-avatar-fallback">{{item.avatarInitial}}</text>
+            <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="seat-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="{{true}}" />
+          </view>
+        </view>
+        <view class="seat-name">{{item.name}}</view>
+        <view class="seat-meta">
+          <text wx:if="{{item.mine || item.host}}" class="seat-flag">{{item.mine?(item.host?'你·房主':'你'):'房主'}}</text>
+          <text wx:if="{{item.alive===false}}" class="seat-out">已出局</text>
+          <text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>
+          <text>{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.selected?'已选入队':item.inTeam?'任务队员':'')}}</text>
+        </view>
       </button></view
     >
     <block wx:if="{{room.phase==='lobby'}}">

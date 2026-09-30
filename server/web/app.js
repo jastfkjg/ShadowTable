@@ -416,6 +416,7 @@
 
   // Personal destinations use hash URLs so refresh, browser back and shared room links remain meaningful.
   var routeSequence = 0, currentRoute = '#/lobby', profileSequence = 0, profilePending = null;
+  var seatAvatarFailures = new Set();
   function routeInfo(hash) {
     var table = /^#\/table\/(\d{6})$/.exec(hash || '');
     if (table) return { page: 'table', code: table[1] };
@@ -765,6 +766,7 @@
   }
   function clearRoom() {
     clearTimeout(timer);
+    seatAvatarFailures.clear();
     refreshSequence++;
     mask();
     roomCode = null;
@@ -962,6 +964,9 @@ function roomListItems(rooms) {
       patch.swapSeats = [];
       patch.swapPlayers = [];
     }
+    if (state.room?.code !== room.code) seatAvatarFailures.clear();
+    var currentAvatarUrls = new Set((room.players || []).map(p => p.avatarUrl).filter(Boolean));
+    for (const url of seatAvatarFailures) if (!currentAvatarUrls.has(url)) seatAvatarFailures.delete(url);
     var seats = Array.from({ length: room.capacity }, function (_, i) {
       var seat = i + 1;
       var p =
@@ -971,6 +976,9 @@ function roomListItems(rooms) {
       return {
         seat: seat,
         name: p ? p.name : "空位",
+        avatarUrl: p?.avatarUrl || "",
+        avatarInitial: p ? Array.from(p.name || "友")[0] : "+",
+        avatarFailed: seatAvatarFailures.has(p?.avatarUrl || ""),
         occupied: !!p,
         alive: p ? p.alive !== false : true,
         ready: p ? !!p.ready : false,
@@ -1405,6 +1413,12 @@ function roomListItems(rooms) {
   }
 
   // ===== room actions =====
+  function seatAvatarError(el) {
+    var url = el.dataset.seatAvatarUrl, seatNum = Number(el.dataset.seat);
+    if (!alive || !url || !state.seats.some(s => s.seat === seatNum && s.avatarUrl === url)) return;
+    seatAvatarFailures.add(url);
+    setState({ seats: state.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s) });
+  }
   function seat(seatNum) {
     var r = state.room;
     if (r.phase === "lobby") {
@@ -2975,17 +2989,19 @@ function roomListItems(rooms) {
         '" data-action="seat" data-seat="' +
         s.seat +
         '"' +
+        ' aria-label="' + esc(s.seat + '号，' + s.name + (s.mine ? '，你的座位' : '') + (s.host ? '，房主' : '') + (s.alive === false ? '，已出局' : '') + (s.selected ? '，已选入队' : s.inTeam ? '，任务队员' : '') + (r.fairyHolder === s.seat ? '，湖仙' : '') + (r.phase === 'lobby' ? '，' + seatMeta(s) : '')) + '"' +
         (seatDisabled(s) ? " disabled" : "") +
-        '><span class="seat-number">' +
+        '><span class="seat-head"><span class="seat-number">' +
         s.seat +
-        '<span class="seat-flag">' +
-        (s.mine ? "你" : s.host ? "房主" : "") +
+        '</span><span class="seat-avatar' + (s.occupied ? '' : ' seat-avatar-empty') + '" aria-hidden="true"><span class="seat-avatar-fallback">' + esc(s.avatarInitial) + '</span>' +
+        (s.avatarUrl && !s.avatarFailed ? '<img class="seat-avatar-image" src="' + esc(s.avatarUrl) + '" alt="" data-seat="' + s.seat + '" data-seat-avatar-url="' + esc(s.avatarUrl) + '" />' : '') +
         '</span></span><span class="seat-name">' +
         esc(s.name) +
-        (s.alive === false ? " · 已出局" : "") +
         '</span><span class="seat-meta">' +
+        (s.mine || s.host ? '<span class="seat-flag">' + (s.mine ? (s.host ? '你·房主' : '你') : '房主') + '</span>' : '') +
+        (s.alive === false ? '<span class="seat-out">已出局</span>' : '') +
         (r.fairyHolder === s.seat ? '<span class="seat-fairy">湖仙</span> ' : '') +
-        esc(seatMeta(s)) +
+        '<span>' + esc(seatMeta(s)) + '</span>' +
         "</span></button>";
     }
     html += "</div>";
@@ -3790,6 +3806,10 @@ function roomListItems(rooms) {
     },
   };
 
+  // Image errors do not bubble; capture them without changing seat click handling.
+  app.addEventListener("error", function (e) {
+    if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
+  }, true);
   app.addEventListener("click", function (e) {
     var picker = e.target.closest("[data-option-trigger]");
     if (picker && !picker.disabled) {
