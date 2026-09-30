@@ -34,6 +34,58 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+test('头像按风格筛选，浏览分类保留选择和昵称；新风格可保存并恢复选中', async () => {
+  const presets = require('../miniprogram/builtin-avatars');
+  const pixel = presets.find(item => item.id === 'pixel-20'), crayon = presets.find(item => item.id === 'crayon-13');
+  const saved = { ...profile, avatarUrl: '/api/avatars/' + pixel.hash };
+  const writes = [];
+  const { p } = page('profile', { ...apiBase, request: async (url, method, body) => {
+    if (method === 'POST') { writes.push(body); return { ...saved, version: 2 }; }
+    return saved;
+  } });
+  await p.load();
+  assert.equal(p.data.avatarStyle, 'pixel');
+  assert.equal(p.data.selectedAvatar, pixel.id);
+  assert.equal(p.data.visibleAvatars.length, 20);
+  p.chooseAvatarStyle({ currentTarget: { dataset: { style: 'crayon' } } });
+  assert.equal(p.data.avatarStyle, 'crayon');
+  assert.equal(p.data.selectedAvatar, pixel.id);
+  assert.equal(p.data.dirty, false);
+  p.inputName({ detail: { value: '晚风' } });
+  p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: crayon.id } } });
+  p.chooseAvatarStyle({ currentTarget: { dataset: { style: 'sketch' } } });
+  assert.equal(p.data.nickname, '晚风');
+  assert.equal(p.data.avatarPreview, crayon.path);
+  p.chooseAvatarStyle({ currentTarget: { dataset: { style: 'invalid' } } });
+  assert.equal(p.data.avatarStyle, 'sketch');
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const rendered = JSON.stringify(factory('pages/profile/profile.wxml')(p.data));
+  assert.match(rendered, /sketch-01.jpg/);
+  assert.doesNotMatch(rendered, /pixel-01.jpg/);
+  // The currently selected crayon remains in the preview while browsing another style.
+  assert.match(rendered, /crayon-13.jpg/);
+  await p.save();
+  assert.equal(writes[0].avatar, 'builtin:' + crayon.id);
+  assert.equal(writes[0].nickname, '晚风');
+});
+test('从个人页预览定位头像风格，延迟资料响应不打断分类浏览', async () => {
+  const presets = require('../miniprogram/builtin-avatars');
+  const geometric = presets.find(item => item.style === 'geometric');
+  const saved = { ...profile, avatarUrl: '/api/avatars/' + geometric.hash };
+  let resolveProfile;
+  const { p } = page('profile', { ...apiBase, request: () => new Promise(resolve => { resolveProfile = resolve; }) }, {
+    pages: [{ route: 'pages/me/me', data: { profile: { ...saved, initial: '林' } } }, {}],
+  });
+  const loading = p.onLoad();
+  assert.equal(p.data.avatarStyle, 'geometric');
+  p.chooseAvatarStyle({ currentTarget: { dataset: { style: 'sketch' } } });
+  await new Promise(resolve => setImmediate(resolve));
+  resolveProfile(saved); await loading;
+  assert.equal(p.data.avatarStyle, 'sketch');
+  assert.equal(p.data.selectedAvatar, geometric.id);
+  assert.equal(p.data.dirty, false);
+});
 test('内置头像无需图片接口即可预览和保存，待确认时锁定选择并保留重试内容', async () => {
   const presets = require('../miniprogram/builtin-avatars');
   const writes=[]; let fail=true;
@@ -49,6 +101,7 @@ test('内置头像无需图片接口即可预览和保存，待确认时锁定�
   assert.equal(p.data.avatarPreview,presets[0].path); assert.equal(p.data.selectedAvatar,presets[0].id);
   assert.equal(p.data.dirty,true); assert.equal(p.data.choosing,false);
   await p.save(); assert.equal(p.data.pendingSave,true);
+  p.chooseAvatarStyle({currentTarget:{dataset:{style:'pixel'}}}); assert.equal(p.data.avatarStyle,'classic');
   pick(presets[1]); assert.equal(p.data.selectedAvatar,presets[0].id);
   p.removeAvatar(); assert.equal(p.data.selectedAvatar,presets[0].id);
   fail=false; await p.save();

@@ -167,6 +167,7 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   assert.match(catalog.headers['content-type'], /javascript/);
   vm.runInNewContext(catalog.text, context);
   assert.deepEqual(JSON.parse(JSON.stringify(context.window.shadowtableBuiltinAvatars)), builtinAvatars);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.window.shadowtableAvatarStyles)), require('../miniprogram/avatar-library').avatarStyles);
   for (const item of builtinAvatars) {
     const image = await a.raw(item.path);
     assert.equal(image.status, 200);

@@ -1,11 +1,12 @@
 const api = require("../../api");
 const { presentProfile, backToMe, personalPreview } = require("../../profile");
 const builtinAvatars = require("../../builtin-avatars");
+const { avatarStyles, avatarPreset, avatarLibrary } = require("../../avatar-library");
 function presetId(url) {
-  return builtinAvatars.find(item => url?.endsWith("/api/avatars/" + item.hash))?.id || "";
+  return avatarPreset(url)?.id || "";
 }
 Page({
-  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", builtinAvatars, initial: "友", profile: null },
+  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", ...avatarLibrary(), initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -13,7 +14,7 @@ Page({
     const preview = personalPreview("profile");
     if (preview) {
       this.original = preview;
-      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), initial: preview.initial });
+      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
     }
     return this.load({ preserveEdits: true });
   },
@@ -29,7 +30,8 @@ Page({
       if (preserveEdits && (this.data.dirty || this.data.editingNickname || this.data.choosing || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
+      const style = preserveEdits && this.avatarStyleTouched ? this.data.avatarStyle : avatarPreset(profile.avatarUrl)?.style;
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), ...avatarLibrary(style), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
@@ -63,12 +65,19 @@ Page({
   keyboardHeightChange(e) {
     this.setData({ keyboardHeight: this.data.editingNickname ? Math.max(0, e.detail.height || 0) : 0 });
   },
+  chooseAvatarStyle(e) {
+    if (this.data.busy || this.pending || this.data.choosing) return;
+    const style = e.currentTarget.dataset.style;
+    if (!avatarStyles.some(item => item.id === style) || style === this.data.avatarStyle) return;
+    this.avatarStyleTouched = true;
+    this.setData(avatarLibrary(style));
+  },
   chooseBuiltinAvatar(e) {
     if (!this.original || this.data.busy || this.pending || this.data.choosing) return;
     const preset = builtinAvatars.find(item => item.id === e.currentTarget.dataset.id);
     if (!preset) return;
     this.avatar = presetId(this.original.avatarUrl) === preset.id ? undefined : "builtin:" + preset.id;
-    this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, error: "" });
+    this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, ...avatarLibrary(preset.style), error: "" });
     this.markDirty();
   },
   async chooseAvatar(e) {

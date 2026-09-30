@@ -14,7 +14,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
-    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {}, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars') },
+    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {}, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
@@ -36,6 +36,35 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页按风格筛选头像，切换分类保留草稿和预览并且不触发保存', async () => {
+  const presets = require('../miniprogram/builtin-avatars');
+  const geometric = presets.find(item => item.id === 'geometric-20'), crayon = presets.find(item => item.id === 'crayon-13');
+  let posts = 0;
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') posts++;
+    return response({ nickname: '林间', version: 1, avatarUrl: '/api/avatars/' + geometric.hash });
+  });
+  await c.applyRoute('#/profile');
+  const rendered = () => c.viewProfileEditor();
+  assert.equal(c.state.profileDraft.avatarStyle, 'geometric');
+  assert.equal((rendered().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 20);
+  assert.match(rendered(), /data-id="geometric-20"/);
+  assert.doesNotMatch(rendered(), /data-id="avatar-01"|data-id="crayon-01"/);
+  const switchStyle = style => c.ACTIONS.chooseProfileAvatarStyle({ dataset: { style } });
+  switchStyle('crayon');
+  assert.equal(c.state.profileDirty, false);
+  assert.equal(c.state.profileDraft.avatarPreview, '/api/avatars/' + geometric.hash);
+  c.INPUTS.profileName({ value: '晚风' });
+  c.ACTIONS.chooseBuiltinProfileAvatar({ dataset: { id: crayon.id } });
+  switchStyle('pixel');
+  assert.equal(c.state.profileDraft.avatar, 'builtin:' + crayon.id);
+  assert.equal(c.state.profileDraft.nickname, '晚风');
+  assert.equal(c.state.profileDraft.avatarPreview, crayon.path);
+  assert.match(rendered(), /data-id="pixel-01"/);
+  switchStyle('invalid');
+  assert.equal(c.state.profileDraft.avatarStyle, 'pixel');
+  assert.equal(posts, 0);
+});
 test('网页内置头像只改草稿，重新选原头像取消改动，保存与断网重试保持同一选择', async () => {
   const presets = require('../miniprogram/builtin-avatars'), posts = [];
   let saved = { nickname: '林间', version: 2, identityType: 'guest', avatarUrl: '/api/avatars/' + presets[0].hash };
@@ -62,6 +91,8 @@ test('网页内置头像只改草稿，重新选原头像取消改动，保存�
   assert.equal(c.state.profileDirty, false);
   choose(presets.at(-1).id);
   await c.saveProfile();
+  c.ACTIONS.chooseProfileAvatarStyle({ dataset: { style: 'classic' } });
+  assert.equal(c.state.profileDraft.avatarStyle, 'pixel');
   choose(presets[1].id);
   assert.equal(c.state.profileDraft.avatar, 'builtin:' + presets.at(-1).id);
   await c.saveProfile();
@@ -69,7 +100,8 @@ test('网页内置头像只改草稿，重新选原头像取消改动，保存�
   assert.equal(posts[0].headers['Idempotency-Key'], posts[1].headers['Idempotency-Key']);
   assert.equal(JSON.parse(posts[1].body).avatar, 'builtin:' + presets.at(-1).id);
   await c.navigate('profile');
-  assert.match(c.viewProfileEditor(), /data-id="avatar-28" aria-label="头像 28，已选择" aria-pressed="true"/);
+  assert.equal(c.state.profileDraft.avatarStyle, 'pixel');
+  assert.match(c.viewProfileEditor(), /data-id="pixel-20" aria-label="像素风 · 红角小恶魔，已选择" aria-pressed="true"/);
 });
 test('网页昵称在头像下编辑，空值保留错误，完成后仅更新草稿', async () => {
   let writes = 0;

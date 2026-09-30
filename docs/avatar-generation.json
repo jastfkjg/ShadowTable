@@ -1,0 +1,77 @@
+{
+  "tool": "Built-in image_gen",
+  "styles": [
+    {
+      "style": "crayon",
+      "name": "彩色蜡笔",
+      "roles": [
+        "狐狸斗篷少女",
+        "向日葵德鲁伊",
+        "护目镜炼金师",
+        "兔耳信使",
+        "野猪铁匠",
+        "蓝发人鱼",
+        "蘑菇侏儒",
+        "翡翠幼龙"
+      ],
+      "subjects": "fox-hooded girl with orange fox ears; sunflower-crowned druid with curly green hair; cheerful alchemist with round bronze goggles and wild pink hair; rabbit-eared messenger with a blue scarf; stout boar blacksmith with tusks and a leather apron; blue-haired mermaid with a shell crown; tiny mushroom-cap gnome with a round nose; friendly emerald baby dragon with little horns",
+      "medium": "colored wax crayon doodles with real coarse grain, uneven childlike strokes, warm expressive color, soft silhouettes, thick scratchy fills. Cute miniature fantasy busts, simple black vertical dot eyes. No hard black outlines",
+      "prompt": "Use case: stylized-concept. Asset type: avatar sprite atlas for a fantasy tabletop companion app. Primary request: Generate one coherent sheet of EXACTLY EIGHT brand-new, distinct character avatars in the 彩色蜡笔 style.\nCanvas: 2:1 landscape, ideally 2048x1024. Exact uniform grid: FOUR columns and TWO rows of square cells. Every cell has one centered head-and-shoulders character. Place centers exactly at x=12.5%,37.5%,62.5%,87.5% and y=25%,75%. All eight share the same visual scale. Each complete silhouette occupies at most 70% of its square cell width and 72% of its height, with broad blank paper gutters. Characters must fit safely inside circular avatar crops. Absolutely no grid lines, no labels, no frames, no circles, no text, no watermark, no scenery. Uniform pale warm ivory backdrop #f8f5eb across the whole sheet.\nSubjects in exact reading order, left to right, top row then bottom row: fox-hooded girl with orange fox ears; sunflower-crowned druid with curly green hair; cheerful alchemist with round bronze goggles and wild pink hair; rabbit-eared messenger with a blue scarf; stout boar blacksmith with tusks and a leather apron; blue-haired mermaid with a shell crown; tiny mushroom-cap gnome with a round nose; friendly emerald baby dragon with little horns.\nStyle/medium: colored wax crayon doodles with real coarse grain, uneven childlike strokes, warm expressive color, soft silhouettes, thick scratchy fills. Cute miniature fantasy busts, simple black vertical dot eyes. No hard black outlines.\nConstraints: match the charming, very simple, tiny fantasy bust icon feeling of a mini-program avatar library. Strong different silhouettes. Each character should remain recognizable at 52px display size. The eight subjects must all be present once, with no duplicates. No generic wizard/princess/hooded assassin/knight repetition. Do not draw weapons outside the cells, do not overlap neighbors, no floating decorations between cells.",
+      "atlas": "output/imagegen/crayon-expansion.png"
+    },
+    {
+      "style": "sketch",
+      "name": "黑白简笔",
+      "roles": [
+        "卷发吟游诗人",
+        "单片镜学者",
+        "铃铛小丑",
+        "鸟嘴医师",
+        "辫发盾卫",
+        "独眼海盗",
+        "鸽子邮差",
+        "星项圈黑猫"
+      ],
+      "subjects": "curly-haired bard with a tiny lyre; bookish elderly scholar with a monocle and fluffy eyebrows; playful jester with a three-point bell hat; friendly plague doctor with a long bird mask and round goggles; braided shield maiden with a simple round shield; little one-eyed pirate in a bandana; pigeon postman with a bird on the shoulder and a satchel strap; round black cat familiar with a small star collar",
+      "medium": "black-and-white minimalist hand-drawn doodles, bold imperfect black ink or charcoal lines, a few rough scribble-filled dark areas, otherwise unfilled warm ivory paper. Charming simple chibi faces and small vertical black dot eyes. Absolutely no colors or gray washes",
+      "prompt": "Use case: stylized-concept. Asset type: avatar sprite atlas for a fantasy tabletop companion app. Primary request: Generate one coherent sheet of EXACTLY EIGHT brand-new, distinct character avatars in the 黑白简笔 style.\nCanvas: 2:1 landscape, ideally 2048x1024. Exact uniform grid: FOUR columns and TWO rows of square cells. Every cell has one centered head-and-shoulders character. Place centers exactly at x=12.5%,37.5%,62.5%,87.5% and y=25%,75%. All eight share the same visual scale. Each complete silhouette occupies at most 70% of its square cell width and 72% of its height, with broad blank paper gutters. Characters must fit safely inside circular avatar crops. Absolutely no grid lines, no labels, no frames, no circles, no text, no watermark, no scenery. Uniform pale warm ivory backdrop #f8f5eb across the whole sheet.\nSubjects in exact reading order, left to right, top row then bottom row: curly-haired bard with a tiny lyre; bookish elderly scholar with a monocle and fluffy eyebrows; playful jester with a three-point bell hat; friendly plague doctor with a long bird mask and round goggles; braided shield maiden with a simple round shield; little one-eyed pirate in a bandana; pigeon postman with a bird on the shoulder and a satchel strap; round black cat familiar with a small star collar.\nStyle/medium: black-and-white minimalist hand-drawn doodles, bold imperfect black ink or charcoal lines, a few rough scribble-filled dark areas, otherwise unfilled warm ivory paper. Charming simple chibi faces and small vertical black dot eyes. Absolutely no colors or gray washes.\nConstraints: match the charming, very simple, tiny fantasy bust icon feeling of a mini-program avatar library. Strong different silhouettes. Each character should remain recognizable at 52px display size. The eight subjects must all be present once, with no duplicates. No generic wizard/princess/hooded assassin/knight repetition. Do not draw weapons outside the cells, do not overlap neighbors, no floating decorations between cells.",
+      "atlas": "output/imagegen/sketch-expansion.png"
+    },
+    {
+      "style": "geometric",
+      "name": "极简几何",
+      "roles": [
+        "鹿角山灵",
+        "青铜机偶",
+        "赤色小熊猫",
+        "莲花精灵",
+        "海马守卫",
+        "赤羽凤凰",
+        "金纹胡狼",
+        "铜角牧者"
+      ],
+      "subjects": "blue mountain spirit with branching antlers; bronze automaton with a square head and one small heart plate; orange red panda with a cream muzzle; pink lotus fairy with petal hair; aqua seahorse guardian with a curled crest; red phoenix with layered triangular feathers; black-and-gold jackal guardian with long ears; copper-horned ram shepherd with a cream wool beard",
+      "medium": "extremely minimal flat geometric cut-paper shapes and polygons, clean straight facets, restrained rich muted solid colors, no outlines, no gradients, no texture, no 3D. Cute head-and-shoulder fantasy icons with tiny black eyes, simple strong silhouette",
+      "prompt": "Use case: stylized-concept. Asset type: avatar sprite atlas for a fantasy tabletop companion app. Primary request: Generate one coherent sheet of EXACTLY EIGHT brand-new, distinct character avatars in the 极简几何 style.\nCanvas: 2:1 landscape, ideally 2048x1024. Exact uniform grid: FOUR columns and TWO rows of square cells. Every cell has one centered head-and-shoulders character. Place centers exactly at x=12.5%,37.5%,62.5%,87.5% and y=25%,75%. All eight share the same visual scale. Each complete silhouette occupies at most 70% of its square cell width and 72% of its height, with broad blank paper gutters. Characters must fit safely inside circular avatar crops. Absolutely no grid lines, no labels, no frames, no circles, no text, no watermark, no scenery. Uniform pale warm ivory backdrop #f8f5eb across the whole sheet.\nSubjects in exact reading order, left to right, top row then bottom row: blue mountain spirit with branching antlers; bronze automaton with a square head and one small heart plate; orange red panda with a cream muzzle; pink lotus fairy with petal hair; aqua seahorse guardian with a curled crest; red phoenix with layered triangular feathers; black-and-gold jackal guardian with long ears; copper-horned ram shepherd with a cream wool beard.\nStyle/medium: extremely minimal flat geometric cut-paper shapes and polygons, clean straight facets, restrained rich muted solid colors, no outlines, no gradients, no texture, no 3D. Cute head-and-shoulder fantasy icons with tiny black eyes, simple strong silhouette.\nConstraints: match the charming, very simple, tiny fantasy bust icon feeling of a mini-program avatar library. Strong different silhouettes. Each character should remain recognizable at 52px display size. The eight subjects must all be present once, with no duplicates. No generic wizard/princess/hooded assassin/knight repetition. Do not draw weapons outside the cells, do not overlap neighbors, no floating decorations between cells.",
+      "atlas": "output/imagegen/geometric-expansion.png"
+    },
+    {
+      "style": "pixel",
+      "name": "像素风",
+      "roles": [
+        "青蛙药师",
+        "南瓜旅人",
+        "星巾术士",
+        "矿灯矮人",
+        "浣熊盗贼",
+        "猫咪圣骑士",
+        "雪鸮占星师",
+        "红角小恶魔"
+      ],
+      "subjects": "green frog herbalist with a tiny leaf hat; cheerful pumpkin traveler with a carved orange face and a little cloak; dark-skinned star mage in a purple turban; dwarf miner with a headlamp helmet and ginger beard; raccoon rogue with a teal scarf; armored cat paladin with gold shoulder plates; snowy owl astrologer with a blue star cape; friendly red-horned little imp with lavender hair",
+      "medium": "crisp 16-bit RPG pixel art, each character constructed on a strict 32 by 32 pixel grid then enlarged with nearest-neighbor, square hard pixel edges, restrained 5 to 8 color palette per character, no smoothing, no blurred outlines, no painterly textures. Small readable fantasy character busts with simple faces",
+      "prompt": "Use case: stylized-concept. Asset type: avatar sprite atlas for a fantasy tabletop companion app. Primary request: Generate one coherent sheet of EXACTLY EIGHT brand-new, distinct character avatars in the 像素风 style.\nCanvas: 2:1 landscape, ideally 2048x1024. Exact uniform grid: FOUR columns and TWO rows of square cells. Every cell has one centered head-and-shoulders character. Place centers exactly at x=12.5%,37.5%,62.5%,87.5% and y=25%,75%. All eight share the same visual scale. Each complete silhouette occupies at most 70% of its square cell width and 72% of its height, with broad blank paper gutters. Characters must fit safely inside circular avatar crops. Absolutely no grid lines, no labels, no frames, no circles, no text, no watermark, no scenery. Uniform pale warm ivory backdrop #f8f5eb across the whole sheet.\nSubjects in exact reading order, left to right, top row then bottom row: green frog herbalist with a tiny leaf hat; cheerful pumpkin traveler with a carved orange face and a little cloak; dark-skinned star mage in a purple turban; dwarf miner with a headlamp helmet and ginger beard; raccoon rogue with a teal scarf; armored cat paladin with gold shoulder plates; snowy owl astrologer with a blue star cape; friendly red-horned little imp with lavender hair.\nStyle/medium: crisp 16-bit RPG pixel art, each character constructed on a strict 32 by 32 pixel grid then enlarged with nearest-neighbor, square hard pixel edges, restrained 5 to 8 color palette per character, no smoothing, no blurred outlines, no painterly textures. Small readable fantasy character busts with simple faces.\nConstraints: match the charming, very simple, tiny fantasy bust icon feeling of a mini-program avatar library. Strong different silhouettes. Each character should remain recognizable at 52px display size. The eight subjects must all be present once, with no duplicates. No generic wizard/princess/hooded assassin/knight repetition. Do not draw weapons outside the cells, do not overlap neighbors, no floating decorations between cells.",
+      "atlas": "output/imagegen/pixel-expansion.png"
+    }
+  ]
+}

@@ -9,6 +9,17 @@ const { decodeAvatar } = require('../server/profile');
 const builtinAvatars = require('../miniprogram/builtin-avatars');
 const avatarBytes = readFileSync(join(__dirname,'../miniprogram/assets/tab-me.png'));
 const avatar = 'data:image/png;base64,' + avatarBytes.toString('base64');
+test('头像库包含经典28款与四种风格各20款，编号和图片内容不重复', () => {
+  const { avatarStyles } = require('../miniprogram/avatar-library');
+  assert.deepEqual(avatarStyles.map(item => [item.id, item.count]), [
+    ['classic', 28], ['crayon', 20], ['sketch', 20], ['geometric', 20], ['pixel', 20],
+  ]);
+  assert.equal(new Set(builtinAvatars.map(item => item.id)).size, 108);
+  assert.equal(new Set(builtinAvatars.map(item => item.hash)).size, 108);
+  for (const style of ['crayon', 'sketch', 'geometric', 'pixel']) {
+    for (let i = 1; i <= 20; i++) assert.ok(builtinAvatars.some(item => item.id === style + '-' + String(i).padStart(2, '0')));
+  }
+});
 test('内置头像选择跨重启保留，与上传头像互换、去重、重试及清除兼容', async () => {
   const directory = mkdtempSync(join(tmpdir(),'shadow-builtin-')), db = join(directory,'db.sqlite');
   let app = await launch(db);

@@ -475,7 +475,7 @@
       const profile = await request('/api/me/profile');
       if (sequence !== profileSequence) return;
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
-        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version }, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
+        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' }, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
       } : {}) });
     } catch (e) {
       if (sequence === profileSequence) setState({ profileError: e.message });
@@ -486,8 +486,16 @@
     setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
   }
   const builtinAvatars = window.shadowtableBuiltinAvatars || [];
+  const avatarStyles = window.shadowtableAvatarStyles || [];
   function profilePreset(url) {
     return builtinAvatars.find(item => url === item.path || url?.endsWith('/api/avatars/' + item.hash));
+  }
+  function chooseProfileAvatarStyle(el) {
+    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
+    const style = el.dataset.style;
+    if (!avatarStyles.some(item => item.id === style)) return;
+    state.profileDraft.avatarStyle = style;
+    setState({});
   }
   function chooseBuiltinProfileAvatar(el) {
     if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
@@ -496,6 +504,7 @@
     if (profilePreset(state.profile?.avatarUrl)?.id === preset.id) delete state.profileDraft.avatar;
     else state.profileDraft.avatar = 'builtin:' + preset.id;
     state.profileDraft.avatarPreview = preset.path;
+    state.profileDraft.avatarStyle = preset.style;
     state.profileError = '';
     profileDirty();
   }
@@ -604,7 +613,9 @@
     if (state.profileNicknameError) html += '<div id="profile-nickname-error" class="nickname-error" role="alert">' + esc(state.profileNicknameError) + '</div>';
     html += '</div><div class="avatar-actions"><label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '上传头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="上传头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label></div></div>';
     const selected = profilePreset(draft.avatarPreview)?.id;
-    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-grid">' + builtinAvatars.map(item => {
+    const style = draft.avatarStyle || 'classic';
+    const visibleAvatars = builtinAvatars.filter(item => item.style === style);
+    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked || state.avatarLoading ? ' disabled' : '') + '>' + esc(item.label) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
       const chosen = selected === item.id;
       return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked || state.avatarLoading ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
     }).join('') + '</div></section>';
@@ -3590,6 +3601,7 @@ function roomListItems(rooms) {
     navigate: el => navigate(el.dataset.page),
     saveProfile,
     chooseBuiltinProfileAvatar,
+    chooseProfileAvatarStyle,
     editProfileNickname,
     finishProfileNickname,
     reloadProfile: async () => { if (!state.profileDirty || await confirm('重新载入资料？', '当前未保存的修改将丢弃。')) { profilePending = null; try { await login(); await loadProfile(state.page === 'profile'); } catch (e) { setState({ profileError: e.message }); } } },

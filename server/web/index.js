@@ -2,6 +2,7 @@
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const builtinAvatars = require("../../miniprogram/builtin-avatars");
+const { avatarStyles } = require("../../miniprogram/avatar-library");
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const assets = {
@@ -23,7 +24,7 @@ function serve(req, res, path) {
   res.setHeader("Cache-Control", "no-store");
   res.writeHead(200);
   res.end(asset[0] === null
-    ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";"
+    ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0])));
   return true;
 }
