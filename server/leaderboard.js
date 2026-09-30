@@ -1,6 +1,7 @@
 "use strict";
 const { randomUUID } = require("node:crypto");
 const { RuleError } = require("./engine");
+const { readProfile } = require("./profile");
 const METRICS = { games: 1, overall: 1, good: 1, evil: 1 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
 function periodRange(period, now) {
@@ -66,7 +67,7 @@ class Leaderboard {
     if (version && version !== snapshot.version) throw new RuleError("榜单已更新，请刷新后继续查看", 409);
     const own = snapshot.aggregates.get(uid), ownStats = summary(own);
     // Profiles without games do not appear in the aggregation.
-    const visible = own ? !!own.leaderboard_visible : !!this.store.db.prepare("SELECT leaderboard_visible FROM profiles WHERE uid=?").get(uid)?.leaderboard_visible;
+    const visible = readProfile(this.store, uid).leaderboardVisible;
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     return {

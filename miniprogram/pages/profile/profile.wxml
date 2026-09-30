@@ -1,6 +1,5 @@
 <app-nav title="编辑资料" back="{{true}}" backLabel="{{backLabel || '返回我的'}}" bindback="back" />
-<view class="page personal-page">
-  <view class="page-title">编辑资料</view>
+<view class="page personal-page profile-page {{pendingSave ? 'has-pending-save' : ''}}">
   <view wx:if="{{loading && !profile}}" class="status">正在读取资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
   <form wx:if="{{profile}}" bindsubmit="save">
@@ -9,25 +8,36 @@
         <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" />
         <view wx:else class="profile-avatar large avatar-fallback">{{initial}}</view>
       </view>
+      <view class="nickname-editor">
+        <view wx:if="{{editingNickname}}" class="nickname-input-row">
+          <input id="profile-nickname" class="input nickname-input {{nicknameError ? 'is-invalid' : ''}}" name="nickname" type="text" maxlength="16" value="{{nickname}}" focus="{{editingNickname}}" bindinput="inputName" bindblur="finishNicknameEdit" bindconfirm="finishNicknameEdit" bindkeyboardheightchange="keyboardHeightChange" confirm-type="done" cursor-spacing="24" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符" />
+          <button hover-class="none" class="nickname-done" bindtap="finishNicknameEdit" disabled="{{busy || pendingSave}}">完成</button>
+        </view>
+        <button wx:else hover-class="none" class="nickname-display" bindtap="editNickname" disabled="{{busy || pendingSave}}" aria-label="{{'修改个人昵称，当前昵称：' + nickname}}">
+          <text class="nickname-text">{{nickname}}</text>
+          <image class="nickname-edit-icon" src="/assets/edit.svg" aria-hidden="{{true}}" />
+        </button>
+        <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
+      </view>
       <view class="avatar-actions">
-        <button hover-class="none" class="secondary avatar-upload" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}">{{choosing?'正在处理头像…':'上传自己的头像'}}</button>
+        <button hover-class="none" class="secondary avatar-upload" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}">{{choosing?'正在处理头像…':'上传头像'}}</button>
       </view>
     </view>
     <view class="avatar-library">
       <view class="field-title">选择内置头像</view>
-      <scroll-view scroll-y="{{true}}" class="avatar-library-scroll">
-        <view class="avatar-grid">
-          <button wx:for="{{builtinAvatars}}" wx:key="id" hover-class="none" class="avatar-option {{selectedAvatar === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="chooseBuiltinAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="{{item.label}}{{selectedAvatar === item.id ? '，已选择' : ''}}" aria-pressed="{{selectedAvatar === item.id}}">
-            <image class="avatar-option-image" src="{{item.path}}" mode="aspectFill" lazy-load="{{true}}" aria-hidden="{{true}}" />
-            <text wx:if="{{selectedAvatar === item.id}}" class="avatar-option-selected" aria-hidden="{{true}}">✓</text>
-          </button>
-        </view>
-      </scroll-view>
+      <view class="avatar-grid">
+        <button wx:for="{{builtinAvatars}}" wx:key="id" hover-class="none" class="avatar-option {{selectedAvatar === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="chooseBuiltinAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="{{item.label}}{{selectedAvatar === item.id ? '，已选择' : ''}}" aria-pressed="{{selectedAvatar === item.id}}">
+          <image class="avatar-option-image" src="{{item.path}}" mode="aspectFill" lazy-load="{{true}}" aria-hidden="{{true}}" />
+          <text wx:if="{{selectedAvatar === item.id}}" class="avatar-option-selected" aria-hidden="{{true}}">✓</text>
+        </button>
+      </view>
     </view>
-    <label for="profile-nickname" class="field-title">个人昵称</label>
-    <input id="profile-nickname" class="input" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" bindinput="inputName" bindblur="inputName" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" />
-    <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{pendingSave?'重试保存':'保存资料'}}</button>
-    <view wx:if="{{pendingSave && !busy}}" class="small muted">保存结果尚未确认，请重试同一次保存。</view>
+    <view wx:if="{{!keyboardHeight}}" class="profile-save-bar">
+      <view class="profile-save-content">
+        <view wx:if="{{pendingSave && !busy}}" class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</view>
+        <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{busy ? '正在保存…' : (pendingSave ? '重试保存' : '保存资料')}}</button>
+      </view>
+    </view>
   </form>
   <canvas type="2d" id="avatar-canvas" class="avatar-canvas" />
 </view>

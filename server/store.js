@@ -2,6 +2,7 @@
 const { DatabaseSync } = require("node:sqlite");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { dirname } = require("node:path");
+const { randomUUID } = require("node:crypto");
 const { roomSummary } = require("./engine");
 const { migrate: migrateKnights } = require("./knights");
 class Store {
@@ -26,7 +27,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
     if (!profileColumns.some(column => column.name === "leaderboard_visible"))
-      this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 0");
+      this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 1");
     if (!profileColumns.some(column => column.name === "public_id"))
       this.db.exec("ALTER TABLE profiles ADD COLUMN public_id TEXT");
     this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS profiles_public_id ON profiles(public_id) WHERE public_id IS NOT NULL;
@@ -40,6 +41,10 @@ class Store {
       "CREATE INDEX IF NOT EXISTS admin_audit_room ON admin_audit(code, id)",
     );
     this.transaction(() => {
+      // A missing public ID marks legacy profiles that never saved a visibility choice.
+      const initializePublicProfile = this.db.prepare("UPDATE profiles SET leaderboard_visible=1, public_id=? WHERE uid=?");
+      for (const row of this.db.prepare("SELECT uid FROM profiles WHERE public_id IS NULL AND (uid LIKE 'wx:%' OR uid LIKE 'dev:%')").all())
+        initializePublicProfile.run(randomUUID(), row.uid);
       this.restoreCompanionMatches();
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);

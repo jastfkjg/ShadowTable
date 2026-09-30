@@ -5,7 +5,7 @@ function presetId(url) {
   return builtinAvatars.find(item => url?.endsWith("/api/avatars/" + item.hash))?.id || "";
 }
 Page({
-  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", selectedAvatar: "", builtinAvatars, initial: "友", profile: null },
+  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", builtinAvatars, initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -26,10 +26,10 @@ Page({
       const profile = await api.request("/api/me/profile");
       if (!this.alive) return;
       // A background refresh must never replace edits started from the preview.
-      if (preserveEdits && (this.data.dirty || this.data.choosing || this.pending)) return;
+      if (preserveEdits && (this.data.dirty || this.data.editingNickname || this.data.choosing || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), initial: shown.initial, dirty: false, pendingSave: false });
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
@@ -42,7 +42,26 @@ Page({
   },
   inputName(e) {
     if (this.pending || this.data.busy) return;
-    this.setData({ nickname: e.detail.value, initial: (e.detail.value.trim() || "友").slice(0,1), error: "" }); this.markDirty();
+    this.setData({ nickname: e.detail.value, initial: (e.detail.value.trim() || "友").slice(0,1), error: "", nicknameError: "" }); this.markDirty();
+  },
+  editNickname() {
+    if (this.pending || this.data.busy || !this.data.profile) return;
+    this.setData({ editingNickname: true, nicknameError: "" });
+    wx.pageScrollTo?.({ scrollTop: 0, duration: 0 });
+  },
+  finishNicknameEdit(e) {
+    if (this.pending || this.data.busy) return;
+    if (typeof e?.detail?.value === "string") this.inputName(e);
+    const nickname = this.data.nickname.trim();
+    if (!nickname || nickname.length > 16) {
+      this.setData({ nicknameError: "请输入1–16个字符的昵称" });
+      return;
+    }
+    this.setData({ nickname, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
+    this.markDirty();
+  },
+  keyboardHeightChange(e) {
+    this.setData({ keyboardHeight: this.data.editingNickname ? Math.max(0, e.detail.height || 0) : 0 });
   },
   chooseBuiltinAvatar(e) {
     if (!this.original || this.data.busy || this.pending || this.data.choosing) return;
@@ -82,10 +101,13 @@ Page({
     if (!this.pending) {
       const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
       this.setData({ nickname });
-      if (!nickname || nickname.length > 16) return this.setData({ error: "请输入1–16个字符的昵称" });
+      if (!nickname || nickname.length > 16) {
+        this.editNickname();
+        return this.setData({ nicknameError: "请输入1–16个字符的昵称" });
+      }
       this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
     }
-    this.setData({ busy: true, error: "", pendingSave: true });
+    this.setData({ busy: true, error: "", pendingSave: true, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
     try {
       await api.login();
       await api.request("/api/me/profile", "POST", this.pending.data, this.pending.id);
@@ -95,7 +117,10 @@ Page({
       wx.showToast({ title: "资料已保存", icon: "success" }); backToMe();
     } catch (e) {
       if (e.status && e.status < 500 && ![401,429].includes(e.status)) this.pending = null;
-      if (this.alive) this.setData({ error: e.message, conflict: e.status === 409, pendingSave: !!this.pending });
+      if (this.alive) {
+        this.setData({ error: e.message, conflict: e.status === 409, pendingSave: !!this.pending });
+        wx.pageScrollTo?.({ scrollTop: 0, duration: 0 });
+      }
     } finally { if (this.alive) this.setData({ busy: false }); }
   },
   async reload() {

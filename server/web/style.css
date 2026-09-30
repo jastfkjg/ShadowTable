@@ -1800,7 +1800,7 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 .profile-form { margin-top: 4px; }
 .page-title:focus { outline: none; }
 
-.leaderboard-page { padding-bottom: calc(13rem + env(safe-area-inset-bottom)); }
+.leaderboard-page { padding-bottom: calc(11rem + env(safe-area-inset-bottom)); }
 .rank-period { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface); }
 .rank-period button { flex: 1 1 0%; width: 0; min-width: 0; color: var(--muted); }
 .rank-period button[aria-pressed="true"] { background: var(--bg); color: var(--text); }
@@ -1834,7 +1834,13 @@ button.rank-refresh { margin: 20px 0; }
 .rank-mine { position: fixed; z-index: 10; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 460px; padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
 .rank-mine-content { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .rank-mine-copy { min-width: 0; }
-.rank-mine-status { font-size: 16px; overflow-wrap: anywhere; }
+.rank-mine-label { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
+.rank-mine-place, .rank-mine-value { color: var(--accent); font-size: 28px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-mine-prefix, .rank-mine-unit, .rank-mine-value .rank-unit { color: var(--muted); font-size: 14px; font-weight: 400; }
+.rank-mine-prefix { margin-right: 4px; }
+.rank-mine-unit { margin-left: 4px; }
+.rank-mine-place.is-unranked { color: var(--muted); font-size: 18px; line-height: 35px; }
+.rank-mine-metric { min-width: 0; text-align: right; }
 .leaderboard-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .leaderboard-page button:focus-visible, .rank-visibility input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 360px) { .rank-row { gap: 8px; } .rank-metric { font-size: 13px; } }

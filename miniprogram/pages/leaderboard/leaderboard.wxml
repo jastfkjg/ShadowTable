@@ -22,7 +22,10 @@
     <view wx:else class="rank-empty muted">暂无战绩</view>
     <button hover-class="none" wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
     <view class="rank-mine" aria-label="我的排名">
-      <view class="rank-mine-content"><view class="rank-mine-copy"><view class="small muted">我的{{board.metricLabel}}</view><view wx:if="{{board.me.statusLabel}}" class="rank-mine-status">{{board.me.statusLabel}}</view><view class="small muted">{{board.me.wins}}胜 · {{board.me.total}}局</view></view><view class="rank-value accent">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view>
+      <view class="rank-mine-content">
+        <view class="rank-mine-copy"><view class="rank-mine-label">我的名次</view><view class="rank-mine-place {{board.me.rank?'':'is-unranked'}}"><block wx:if="{{board.me.rank}}"><text class="rank-mine-prefix">第</text><text>{{board.me.rank}}</text><text class="rank-mine-unit">名</text></block><text wx:else>未上榜</text></view></view>
+        <view class="rank-mine-metric"><view class="rank-mine-label">{{board.metric==='games'?'总局数':board.metricLabel}}</view><view class="rank-mine-value">{{board.me.value}}<text class="rank-mine-unit">{{board.me.unit}}</text></view></view>
+      </view>
       <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
       <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button hover-class="none" bindtap="retryVisibility" disabled="{{visibilitySaving}}">重试</button></view>
     </view>

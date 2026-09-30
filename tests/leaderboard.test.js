@@ -21,13 +21,14 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
-test('开发账号可主动公开并参与四榜，关闭后隐藏；游客和陪测账号仍不能公开', () => {
+test('开发账号默认公开并参与四榜，关闭后隐藏；游客和陪测账号仍不能公开', () => {
   const store=new Store(':memory:');
   try {
-    games(store,'dev:me',1,1);games(store,'dev:me',1,0,{faction:'evil'});
     const board=new Leaderboard(store);
-    assert.equal(query(board,'dev:me').me.status,'hidden');
-    profile(store,'dev:me',true,'开发玩家');
+    assert.equal(query(board,'dev:me').me.status,'no_games');
+    assert.equal(readProfile(store,'dev:me').leaderboardVisible,true);
+    store.transaction(()=>saveProfile(store,'dev:me',{nickname:'开发玩家',version:0}));
+    games(store,'dev:me',1,1);games(store,'dev:me',1,0,{faction:'evil'});
     for(const metric of ['games','overall','good','evil']) {
       const result=query(board,'dev:me','metric='+metric);
       assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
@@ -36,7 +37,10 @@ test('开发账号可主动公开并参与四榜，关闭后隐藏；游客和�
     profile(store,'dev:me',false);
     assert.equal(query(board,'dev:me').rows.length,0);
     assert.equal(query(board,'dev:me').me.total,2);
-    for(const uid of ['guest:me','test:me']) assert.throws(()=>profile(store,uid,true),/微信或开发账号/);
+    for(const uid of ['guest:me','test:me']) {
+      assert.equal(readProfile(store,uid).leaderboardVisible,false);
+      assert.throws(()=>profile(store,uid,true),/微信或开发账号/);
+    }
   } finally {store.close();}
 });
 test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来源和门槛一致；隐藏及游客不公开', () => {
@@ -156,16 +160,22 @@ test('缓存仅在提交后失效：回滚、重复归档、昵称头像及公�
     assert.equal(refreshed.version,hiddenVersion);assert.equal(refreshed.updatedAt,NOW+30000);
   } finally { store.close(); }
 });
-test('旧资料迁移默认不公开，公开ID跨重启稳定，旧客户端保存保留公开设置', () => {
+test('旧资料迁移默认公开，公开ID跨重启稳定，关闭后改名与重启保留设置', () => {
   const dir=mkdtempSync(join(tmpdir(),'shadow-rank-')),path=join(dir,'db.sqlite'); let store;
   try {
     const old=new DatabaseSync(path);
     old.exec("CREATE TABLE profiles(uid TEXT PRIMARY KEY,nickname TEXT NOT NULL,avatar_hash TEXT,version INTEGER NOT NULL,updated INTEGER NOT NULL); INSERT INTO profiles VALUES('wx:me','旧昵称',NULL,1,1)");old.close();
-    store=new Store(path);assert.equal(readProfile(store,'wx:me').leaderboardVisible,false);
-    profile(store,'wx:me'); games(store,'wx:me',1,1); const id=query(new Leaderboard(store),'wx:me').rows[0].publicId;
-    store.transaction(()=>saveProfile(store,'wx:me',{nickname:'旧客户端改名',version:2}));
+    store=new Store(path);assert.equal(readProfile(store,'wx:me').leaderboardVisible,true);
+    games(store,'wx:me',1,1); const id=query(new Leaderboard(store),'wx:me').rows[0].publicId;
+    store.transaction(()=>saveProfile(store,'wx:me',{nickname:'旧客户端改名',version:1}));
     assert.equal(readProfile(store,'wx:me').leaderboardVisible,true);
     store.close();store=new Store(path);assert.equal(query(new Leaderboard(store),'wx:me').rows[0].publicId,id);
+    profile(store,'wx:me',false);
+    store.transaction(()=>saveProfile(store,'wx:me',{nickname:'关闭后改名',version:3}));
+    store.close();store=new Store(path);
+    assert.equal(readProfile(store,'wx:me').leaderboardVisible,false);
+    assert.equal(query(new Leaderboard(store),'wx:me').me.status,'hidden');
+    assert.equal(store.db.prepare('SELECT public_id FROM profiles WHERE uid=?').get('wx:me').public_id,id);
   } finally {store?.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保存失败/幂等与缓存一致', async () => {

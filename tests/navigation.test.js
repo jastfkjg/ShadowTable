@@ -130,6 +130,43 @@ test('编辑资料取消离开仍保留输入；我的和战绩页可独立刷�
   let reads=0; const stats=page('stats',{...apiBase,request:async()=>{if(++reads===1)throw new Error('断线');return emptyStats;}}).p;
   await stats.load(); assert.equal(stats.data.error,'断线'); await stats.load(); assert.equal(stats.data.stats.total,0); assert.equal(stats.data.error,'');
 });
+test('昵称原位编辑保留空值提示，完成只更新草稿，头像与昵称统一保存且失败重试锁定编辑', async () => {
+  const writes=[]; let fail=true;
+  const {p}=page('profile',{...apiBase,request:async(url,method,body,id)=>{
+    if(method!=='POST') return profile;
+    writes.push({body:structuredClone(body),id});
+    if(fail) throw new Error('network lost');
+    return {...profile,...body,version:2};
+  }});
+  await p.load(); p.editNickname();
+  assert.equal(p.data.editingNickname,true);
+  p.keyboardHeightChange({detail:{height:300}}); assert.equal(p.data.keyboardHeight,300);
+  p.finishNicknameEdit({detail:{value:'   '}});
+  assert.equal(p.data.editingNickname,true); assert.match(p.data.nicknameError,/1–16/);
+  await p.save(); assert.equal(writes.length,0);
+  p.inputName({detail:{value:'  晚风  '}}); assert.equal(p.data.nicknameError,'');
+  p.finishNicknameEdit({detail:{value:'  晚风  '}});
+  assert.equal(p.data.nickname,'晚风'); assert.equal(p.data.editingNickname,false);
+  assert.equal(p.data.keyboardHeight,0); assert.equal(p.data.dirty,true); assert.equal(writes.length,0);
+  const preset=require('../miniprogram/builtin-avatars')[1];
+  p.chooseBuiltinAvatar({currentTarget:{dataset:{id:preset.id}}});
+  // The input no longer exists in the submitted form after inline editing finishes.
+  await p.save({detail:{value:{}}});
+  assert.equal(writes[0].body.nickname,'晚风'); assert.equal(writes[0].body.avatar,'builtin:'+preset.id);
+  p.editNickname(); assert.equal(p.data.editingNickname,false);
+  p.finishNicknameEdit({detail:{value:'不能替换待确认内容'}}); assert.equal(p.data.nickname,'晚风');
+  fail=false; await p.save(); assert.deepEqual(writes[1],writes[0]);
+});
+test('后台资料刷新不打断已进入但尚未输入的昵称编辑，迟到的键盘事件不隐藏保存按钮', async () => {
+  const request=deferred();
+  const {p}=page('profile',{...apiBase,request:()=>request.promise},{pages:priorMe()});
+  const loading=p.onLoad(); p.editNickname();
+  request.resolve({...profile,nickname:'远端昵称',version:2}); await loading;
+  assert.equal(p.data.editingNickname,true); assert.equal(p.data.nickname,'林间');
+  p.finishNicknameEdit({detail:{value:'林间'}});
+  assert.equal(p.data.dirty,false);
+  p.keyboardHeightChange({detail:{height:300}}); assert.equal(p.data.keyboardHeight,0);
+});
 test('战绩逐层展开，记录逐场展开成员并可继续分页', async () => {
   const detailedStats = { ...emptyStats, total: 2, wins: 1, losses: 1, winRate: 50,
     byFaction: [{ faction: 'good', label: '好人阵营', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }],
@@ -321,11 +358,15 @@ test('小程序排行榜保留空榜、错误、样本量与参与入口，移�
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const rank=page('leaderboard',apiBase).p;
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
-  const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',statusLabel:''},rows:[]};
+  const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',rank:null,statusLabel:''},rows:[]};
   const tree=render({board,error:'请求失败'});
   assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
   assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
+  const footer=template.slice(template.indexOf('<view class="rank-mine"'));
+  assert.match(footer,/我的名次/);assert.match(footer,/总局数/);assert.match(footer,/board.me.rank/);
+  assert.doesNotMatch(footer,/board.me.wins|board.me.total/);
+  assert.match(tree,/未上榜/);
 });
 
 test('资料页在网络返回前展示已有资料，后台刷新不覆盖刚输入的草稿', async () => {

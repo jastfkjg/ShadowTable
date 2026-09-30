@@ -701,6 +701,13 @@ test('网页排行榜可深链，私密资料不公开，输出转义昵称并�
   await c.applyRoute('#/leaderboard');
   assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
   const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第 1 名/);
+  for (const [metric,label] of [['games','总局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']]) {
+    c.state.rankBoard=webRanks(metric);
+    const footer=c.viewLeaderboard().split('<aside class="rank-mine"')[1];
+    assert.match(footer,/我的名次/);assert.ok(footer.includes(label));
+    assert.match(footer,/rank-mine-place/);assert.doesNotMatch(footer,/胜 ·/);
+    assert.ok(footer.includes(metric==='games'?'20<span':'50.0<span'));
+  }
   c.state.rankBoard=webRanks('games',{rows:[],me:{status:'hidden',rank:null,total:20,wins:10,winRate:50}});
   assert.match(c.viewLeaderboard(),/在排行榜公开展示/);assert.match(c.viewLeaderboard(),/暂无战绩/);
   assert.doesNotMatch(c.viewLeaderboard(),/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);

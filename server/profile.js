@@ -53,7 +53,7 @@ function readProfile(store, uid) {
   const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
-    leaderboardVisible: !!row?.leaderboard_visible };
+    leaderboardVisible: /^(wx|dev):/.test(uid) && (row ? !!row.leaderboard_visible : true) };
 }
 function saveProfile(store, uid, input) {
   fail(typeof input.nickname === "string" && input.nickname.trim().length >= 1 && input.nickname.trim().length <= 16 && !/[\u0000-\u001f\u007f]/.test(input.nickname), "昵称需要1–16个字符，不能包含换行");
