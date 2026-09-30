@@ -18,6 +18,11 @@ docker run -d --name "$container" --read-only --tmpfs /tmp --cap-drop ALL \
     -e WEB_ORIGIN=https://table.example.com "$image" >/dev/null
 check() {
     for attempt in {1..20}; do
+        if [ "$(docker inspect --format '{{.State.Running}}' "$container")" != "true" ]; then
+            echo "Container exited before becoming healthy" >&2
+            docker logs "$container"
+            return 1
+        fi
         if docker exec "$container" node -e "fetch('http://127.0.0.1:8787/health').then(async r=>{if(!r.ok || !(await r.json()).ok)process.exit(1)}).catch(()=>process.exit(1))"; then return 0; fi
         sleep 1
     done

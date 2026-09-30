@@ -3,6 +3,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=8787 DB_PATH=/data/shadowtable.sqlite
 WORKDIR /app
 COPY --chown=node:node server ./server
 COPY --chown=node:node miniprogram/builtin-avatars.js ./miniprogram/builtin-avatars.js
+COPY --chown=node:node miniprogram/avatar-library.js ./miniprogram/avatar-library.js
 COPY --chown=node:node miniprogram/assets/avatars ./miniprogram/assets/avatars
 COPY --chown=node:node package.json ./package.json
 RUN mkdir /data && chown node:node /data
