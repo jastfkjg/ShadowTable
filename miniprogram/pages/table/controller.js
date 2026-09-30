@@ -368,14 +368,20 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const nameInputRevision = this.nameInputRevision || 0;
     try {
       await api.login();
-      await this.loadRooms();
-      const profile = await api.request("/api/me/profile");
+      // Neither read should prevent the other from populating the lobby.
+      const [roomsResult, profileResult] = await Promise.allSettled([
+        this.loadRooms(), api.request("/api/me/profile"),
+      ]);
       if (!this.alive || sequence !== this.lobbyRefreshSequence) return;
+      const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
       // A changed personal nickname replaces an older table draft, while input
       // entered during this refresh and avatar-only edits retain the user's name.
-      if (this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
-          nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
-      this.lobbyProfileNickname = profile.nickname;
+      if (profile) {
+        if (this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
+            nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
+        this.lobbyProfileNickname = profile.nickname;
+        if (!this.nameEdited) this.setData({ name: profile.nickname || wx.getStorageSync("nickname") || "" });
+      }
       const held = typeof getApp === "function" && getApp().pendingTableRequest;
       if (held) this.setData({ pendingTableCode: held.code });
       else this.setData({ pendingTableCode: "" });
@@ -384,7 +390,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.setData({ code: invited, entryMode: "join", notice: "朋友邀请你加入房间 " + invited });
         wx.removeStorageSync("invitedRoom");
       }
-      if (!this.nameEdited) this.setData({ name: profile.nickname || wx.getStorageSync("nickname") || "" });
+      if (profileResult.status === "rejected") throw profileResult.reason;
+      if (roomsResult.status === "rejected") throw roomsResult.reason;
     } catch (e) { if (this.alive && sequence === this.lobbyRefreshSequence) this.handleError(e); }
   },
   async enterTable(code) {
@@ -756,7 +763,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   async refreshRooms() {
     if (this.data.busy || this.pending || this.data.loading) return;
     this.setData({ loading: true });
-    try { await this.loadRooms(); } catch (e) { this.handleError(e); }
+    try {
+      if (this.data.isLobby) await this.refreshLobby();
+      else await this.loadRooms();
+    } catch (e) { this.handleError(e); }
     finally { this.setData({ loading: false }); }
   },
   openRoomMenu(e) {
@@ -870,6 +880,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   inputName(e) {
+    // Native blur events can fire without an edit, including on an empty field.
+    if (e.detail.value === this.data.name) return;
     this.nameInputRevision = (this.nameInputRevision || 0) + 1;
     this.nameEdited = true;
     this.setData({ name: e.detail.value });
@@ -1088,6 +1100,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     try {
       this.setData({ loading: true });
       if (this.roomCode) await this.refresh();
+      else if (this.data.isLobby) await this.refreshLobby();
       else await this.loadRooms();
     } catch (e) {
       this.handleError(e);

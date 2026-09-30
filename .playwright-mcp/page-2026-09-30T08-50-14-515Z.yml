@@ -1,0 +1,37 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - button "返回我的" [ref=e5] [cursor=pointer]: ‹
+      - heading "编辑资料" [level=1] [ref=e6]
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [aria-hidden] [ref=e11]: 友
+        - button "修改个人昵称，当前昵称：新朋友" [ref=e13] [cursor=pointer]:
+          - generic [ref=e14]: 新朋友
+        - generic [ref=e18] [cursor=pointer]:
+          - text: 上传头像
+          - button "上传头像" [ref=e19]
+      - region [ref=e20]:
+        - heading "选择内置头像" [level=2] [ref=e21]
+        - group "头像风格" [ref=e22]:
+          - button "经典线稿，28款头像" [ref=e23] [cursor=pointer]: 经典线稿
+          - button "彩色蜡笔，12款头像" [active] [pressed] [ref=e24] [cursor=pointer]: 彩色蜡笔
+          - button "黑白简笔，12款头像" [ref=e25] [cursor=pointer]: 黑白简笔
+          - button "极简几何，12款头像" [ref=e26] [cursor=pointer]: 极简几何
+          - button "像素风，12款头像" [ref=e27] [cursor=pointer]: 像素风
+        - generic [ref=e28]: 12 款头像
+        - generic [ref=e29]:
+          - button "彩色蜡笔 · 星帽法师" [ref=e61] [cursor=pointer]
+          - button "彩色蜡笔 · 王冠公主" [ref=e62] [cursor=pointer]
+          - button "彩色蜡笔 · 红巾刺客" [ref=e63] [cursor=pointer]
+          - button "彩色蜡笔 · 圣光修女" [ref=e64] [cursor=pointer]
+          - button "彩色蜡笔 · 红围巾勇者" [ref=e65] [cursor=pointer]
+          - button "彩色蜡笔 · 月牙女巫" [ref=e66] [cursor=pointer]
+          - button "彩色蜡笔 · 红披风骑士" [ref=e67] [cursor=pointer]
+          - button "彩色蜡笔 · 森林游侠" [ref=e68] [cursor=pointer]
+          - button "彩色蜡笔 · 银发术士" [ref=e69] [cursor=pointer]
+          - button "彩色蜡笔 · 王冠国王" [ref=e70] [cursor=pointer]
+          - button "彩色蜡笔 · 尖帽女巫" [ref=e71] [cursor=pointer]
+          - button "彩色蜡笔 · 灰袍刺客" [ref=e72] [cursor=pointer]
+      - button "保存资料" [ref=e60] [cursor=pointer]
+  - status

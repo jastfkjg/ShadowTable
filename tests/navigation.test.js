@@ -196,6 +196,84 @@ test('大厅重叠刷新只应用最新资料响应', async () => {
   await first;
   assert.equal(lobby.data.name, '最新昵称');
 });
+test('大厅未修改昵称的失焦事件不阻止初次回填和个人昵称更新', async () => {
+  for (const initial of ['', '旧个人昵称']) {
+    const pendingProfile = deferred();
+    const api = { ...apiBase, request: async url => url === '/api/me/rooms' ? { rooms: [] } : pendingProfile.promise };
+    const lobby = page('lobby', api).p;
+    lobby.setData({ name: initial });
+    if (initial) lobby.lobbyProfileNickname = initial;
+    const refresh = lobby.refreshLobby();
+    await new Promise(resolve => setImmediate(resolve));
+    lobby.inputName({ type: 'blur', detail: { value: initial } });
+    pendingProfile.resolve({ ...profile, nickname: '最新个人昵称' });
+    await refresh;
+    assert.equal(lobby.data.name, '最新个人昵称');
+    assert.ok(!lobby.nameEdited);
+  }
+});
+test('大厅昵称读取失败后自动重连补齐默认值，创建和加入无需再次输入', async () => {
+  let reads = 0;
+  const writes = [];
+  const api = { ...apiBase, request: async (url, method, body) => {
+    if (method === 'POST') { writes.push({ url, body: structuredClone(body) }); return { code: '234567' }; }
+    if (url === '/api/boards') return { boards: BOARDS };
+    if (url === '/api/me/rooms') return { rooms: [] };
+    if (++reads === 1) throw new Error('暂时无法读取昵称');
+    return profile;
+  } };
+  const lobby = page('lobby', api).p;
+  await lobby.bootstrap();
+  assert.equal(lobby.data.reconnecting, true);
+  await lobby.recoverConnection();
+  assert.equal(lobby.data.reconnecting, false);
+  assert.equal(lobby.data.name, profile.nickname);
+  for (const mode of ['create', 'join']) {
+    lobby.switchEntry({ currentTarget: { dataset: { mode } } });
+    assert.equal(lobby.data.name, profile.nickname);
+    lobby.submitEntry({ detail: { value: { nickname: lobby.data.name, code: '123456' } } });
+    while (lobby.data.busy) await new Promise(resolve => setImmediate(resolve));
+    await lobby.refreshLobby();
+  }
+  assert.deepEqual(writes.map(w => [w.url, w.body.name]), [['/api/rooms', '林间'], ['/api/rooms/123456/join', '林间']]);
+});
+test('大厅刷新按钮同步个人昵称，房间列表失败仍能回填昵称', async () => {
+  let current = profile, failRooms = false;
+  const api = { ...apiBase, request: async url => {
+    if (url === '/api/me/profile') return current;
+    if (failRooms) throw new Error('房间列表暂不可用');
+    return { rooms: [] };
+  } };
+  const lobby = page('lobby', api).p;
+  lobby.setData({ loading: false });
+  await lobby.refreshRooms();
+  assert.equal(lobby.data.name, profile.nickname);
+  current = { ...profile, nickname: '改后昵称' };
+  failRooms = true;
+  await lobby.refreshRooms();
+  assert.equal(lobby.data.name, '改后昵称');
+  assert.equal(lobby.data.reconnecting, true);
+});
+test('实际清空本桌昵称后刷新仍保留空值，提交不得偷偷复用个人昵称', async () => {
+  const writes = [];
+  const api = { ...apiBase, request: async (url, method, body) => {
+    if (method === 'POST') writes.push(body);
+    return url === '/api/me/rooms' ? { rooms: [] } : profile;
+  } };
+  const lobby = page('lobby', api).p;
+  lobby.setData({ loading: false });
+  await lobby.refreshLobby();
+  lobby.inputName({ detail: { value: '' } });
+  await lobby.refreshLobby();
+  assert.equal(lobby.data.name, '');
+  assert.equal(lobby.nameEdited, true);
+  for (const mode of ['create', 'join']) {
+    lobby.switchEntry({ currentTarget: { dataset: { mode } } });
+    lobby.submitEntry({ detail: { value: { nickname: '', code: '123456' } } });
+    assert.match(lobby.data.error, /请填写昵称/);
+  }
+  assert.equal(writes.length, 0);
+});
 test('首页进入独立牌桌，切后台时建房成功不强行跳转；直接邀请提示加入', async () => {
   const api = { ...apiBase, request: async (url,method) => method==='POST' ? {code:'234567'} : url==='/api/boards' ? {boards:BOARDS} : url==='/api/me/rooms' ? {rooms:[]} : url==='/api/me/profile' ? profile : Promise.reject(Object.assign(new Error('你不在该房间'),{status:403})) };
   const first = page('lobby',api); first.p.data.name='林间';
