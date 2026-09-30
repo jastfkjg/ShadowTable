@@ -1,5 +1,5 @@
 .me-page {
-  --me-divider: rgba(177, 191, 198, .09);
+  --me-divider: rgba(177, 191, 198, .12);
   padding-top: 32rpx;
   padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
 }
@@ -15,7 +15,7 @@
   width: 100%;
   min-height: 136rpx;
   margin: 0;
-  padding: 24rpx 28rpx;
+  padding: 24rpx 32rpx;
   text-align: left;
   background: var(--surface);
   border-radius: 24rpx;
@@ -25,9 +25,10 @@
 .me-profile .avatar-fallback { font-size: 36rpx; font-weight: 500; }
 .me-profile .profile-identity { min-width: 0; flex: 1; }
 .me-profile .profile-name { font-size: 36rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.me-profile-action { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--muted); font-size: 24rpx; }
 .me-page .account-note { margin: 20rpx 0 0; }
 
-.me-results { display: block; margin-top: 32rpx; padding: 28rpx; background: var(--surface); border-radius: 24rpx; }
+.me-results { display: block; margin-top: 32rpx; padding: 32rpx; background: var(--surface); border-radius: 24rpx; }
 .me-results-heading {
   display: flex;
   align-items: center;
@@ -40,15 +41,13 @@
   font-size: 28rpx;
   font-weight: 600;
 }
-.me-results-detail { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--accent); font-size: 24rpx; font-weight: 400; }
-.me-results-detail .me-chevron { border-color: var(--accent); }
-.me-stats-panel { padding: 28rpx 0 4rpx; }
+.me-results-detail { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--muted); font-size: 24rpx; font-weight: 400; }
+.me-stats-panel { padding: 32rpx 0 0; }
 .me-stats-panel .personal-metrics { gap: 16rpx; padding: 0; text-align: center; }
 .me-stats-panel .metric-value { font-size: 44rpx; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
-.me-stats-panel .small { margin-top: 6rpx; font-size: 24rpx; }
+.me-stats-panel .small { margin-top: 8rpx; font-size: 24rpx; }
 
-.me-links { margin-top: 32rpx; border-top: 0; }
-.me-links-secondary { margin-top: 40rpx; }
+.me-links { margin-top: 48rpx; border-top: 0; }
 .me-links .personal-link {
   position: relative;
   display: flex;
@@ -59,7 +58,7 @@
   min-height: 112rpx;
   min-height: max(48px, 112rpx);
   margin: 0;
-  padding: 28rpx 8rpx;
+  padding: 24rpx 32rpx;
   border: 0;
   border-radius: 0;
   text-align: left;
@@ -69,15 +68,13 @@
 .me-links .personal-link::before {
   content: "";
   position: absolute;
-  left: 76rpx;
-  right: 8rpx;
+  left: 100rpx;
+  right: 32rpx;
   bottom: 0;
   height: 1rpx;
   background: var(--me-divider);
 }
 .me-links .personal-link:last-child::before { display: none; }
-.me-links-secondary .personal-link { color: var(--muted); font-size: 28rpx; }
-.me-links-secondary .me-icon { opacity: .85; }
 .me-link-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .me-chevron {
   box-sizing: border-box;
