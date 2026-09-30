@@ -6,7 +6,7 @@ function presetId(url) {
   return avatarPreset(url)?.id || "";
 }
 Page({
-  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", ...avatarLibrary(), initial: "友", profile: null },
+  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", ...avatarLibrary(), initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -27,7 +27,7 @@ Page({
       const profile = await api.request("/api/me/profile");
       if (!this.alive) return;
       // A background refresh must never replace edits started from the preview.
-      if (preserveEdits && (this.data.dirty || this.data.editingNickname || this.data.choosing || this.pending)) return;
+      if (preserveEdits && (this.data.dirty || this.data.editingNickname || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
       const style = preserveEdits && this.avatarStyleTouched ? this.data.avatarStyle : avatarPreset(profile.avatarUrl)?.style;
@@ -66,47 +66,27 @@ Page({
     this.setData({ keyboardHeight: this.data.editingNickname ? Math.max(0, e.detail.height || 0) : 0 });
   },
   chooseAvatarStyle(e) {
-    if (this.data.busy || this.pending || this.data.choosing) return;
+    if (this.data.busy || this.pending) return;
     const style = e.currentTarget.dataset.style;
     if (!avatarStyles.some(item => item.id === style) || style === this.data.avatarStyle) return;
     this.avatarStyleTouched = true;
     this.setData(avatarLibrary(style));
   },
   chooseBuiltinAvatar(e) {
-    if (!this.original || this.data.busy || this.pending || this.data.choosing) return;
+    if (!this.original || this.data.busy || this.pending) return;
     const preset = builtinAvatars.find(item => item.id === e.currentTarget.dataset.id);
     if (!preset) return;
     this.avatar = presetId(this.original.avatarUrl) === preset.id ? undefined : "builtin:" + preset.id;
     this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, ...avatarLibrary(preset.style), error: "" });
     this.markDirty();
   },
-  async chooseAvatar(e) {
-    if (this.data.busy || this.pending || this.data.choosing || !e.detail.avatarUrl) return;
-    this.setData({ choosing: true, error: "" });
-    try {
-      const url = e.detail.avatarUrl;
-      const canvas = await new Promise((resolve, reject) => wx.createSelectorQuery().in(this).select('#avatar-canvas').fields({ node: true, size: true }).exec(rows => rows[0]?.node ? resolve(rows[0].node) : reject(new Error("无法处理头像，请重试"))));
-      canvas.width = 256; canvas.height = 256;
-      const img = canvas.createImage();
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("图片无法读取，请重新选择")); img.src = url; });
-      const side = Math.min(img.width, img.height), ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,256);
-      ctx.drawImage(img, (img.width-side)/2, (img.height-side)/2, side, side, 0,0,256,256);
-      const file = await new Promise((resolve, reject) => wx.canvasToTempFilePath({ canvas, fileType: 'jpg', quality: 0.85, destWidth: 256, destHeight: 256, success: resolve, fail: reject }, this));
-      const read = await new Promise((resolve, reject) => wx.getFileSystemManager().readFile({ filePath: file.tempFilePath, encoding: 'base64', success: resolve, fail: reject }));
-      if (!this.alive) return;
-      this.avatar = 'data:image/jpeg;base64,' + read.data;
-      this.setData({ avatarPreview: file.tempFilePath, selectedAvatar: "" }); this.markDirty();
-    } catch (e) { if (this.alive) this.setData({ error: e.message || "头像处理失败，请重新选择" }); }
-    finally { if (this.alive) this.setData({ choosing: false }); }
-  },
   removeAvatar() {
-    if (this.data.busy || this.pending || this.data.choosing) return;
+    if (this.data.busy || this.pending) return;
     this.avatar = this.original?.avatarUrl ? null : undefined;
     this.setData({ avatarPreview: "", selectedAvatar: "", error: "" }); this.markDirty();
   },
   async save(e) {
-    if (this.data.busy || this.data.loading || this.data.choosing || this.data.conflict) return;
+    if (this.data.busy || this.data.loading || this.data.conflict) return;
     if (!this.pending) {
       const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
       this.setData({ nickname });
@@ -140,7 +120,7 @@ Page({
     await this.load();
   },
   async back() {
-    if (this.data.busy || this.data.choosing) return;
+    if (this.data.busy) return;
     if (this.data.dirty || this.pending) {
       const yes = await new Promise(resolve => wx.showModal({ title: "离开编辑资料？", content: this.pending ? "保存结果尚未确认，建议先重试保存。仍要离开吗？" : "未保存的修改将丢弃。", success: r => resolve(r.confirm), fail: () => resolve(false) }));
       if (!yes) return;

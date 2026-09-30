@@ -38,7 +38,7 @@ function decodeAvatar(value) {
   return { hash: createHash("sha256").update(data).digest("hex"), mime: "image/" + match[1], data };
 }
 function resolveAvatar(value) {
-  if (typeof value !== "string" || !value.startsWith("builtin:")) return decodeAvatar(value);
+  fail(typeof value === "string" && value.startsWith("builtin:"), "头像上传已关闭，请选择内置头像");
   const preset = builtinAvatars.find(item => item.id === value.slice(8));
   fail(preset, "请选择有效的内置头像");
   if (!builtinCache.has(preset.id)) {

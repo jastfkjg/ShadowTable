@@ -99,7 +99,7 @@ test('内置头像无需图片接口即可预览和保存，待确认时锁定�
   const pick = preset => p.chooseBuiltinAvatar({currentTarget:{dataset:{id:preset.id}}});
   pick(presets[0]);
   assert.equal(p.data.avatarPreview,presets[0].path); assert.equal(p.data.selectedAvatar,presets[0].id);
-  assert.equal(p.data.dirty,true); assert.equal(p.data.choosing,false);
+  assert.equal(p.data.dirty,true);
   await p.save(); assert.equal(p.data.pendingSave,true);
   p.chooseAvatarStyle({currentTarget:{dataset:{style:'pixel'}}}); assert.equal(p.data.avatarStyle,'classic');
   pick(presets[1]); assert.equal(p.data.selectedAvatar,presets[0].id);
@@ -425,7 +425,8 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   assert.match(me,/编辑资料/); assert.match(me,/对局记录/);
   assert.doesNotMatch(me,/去开一局|还没有有效战绩|逐场查看/);
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
-  assert.match(editor,/chooseAvatar/); assert.match(editor,/formType/);
+  assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
+  assert.match(editor,/选择内置头像/);
   const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
   assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
   const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
@@ -433,7 +434,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const emptyMatches=JSON.stringify(factory('pages/matches/matches.wxml')({loading:false,error:'',records:[],total:0}));
   assert.match(emptyMatches,/暂无对局记录/); assert.doesNotMatch(emptyMatches,/去开一局|逐场查看/);
 });
-test('窗口背景与自绘导航保持深色，所有页面都有顶部导航', () => {
+test('窗口、原生底栏与顶部导航保持深色，所有页面都有顶部导航', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
   const color = '#101c24';
   assert.equal(config.window.backgroundColor, color);
@@ -442,7 +443,7 @@ test('窗口背景与自绘导航保持深色，所有页面都有顶部导航',
   assert.equal(config.window.navigationBarBackgroundColor, color);
   assert.equal(config.tabBar.backgroundColor, color);
   assert.equal(config.window.navigationStyle, 'custom');
-  assert.equal(config.tabBar.custom, true);
+  assert.notEqual(config.tabBar.custom, true);
   for (const route of config.pages) {
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
@@ -607,6 +608,56 @@ test('预取对局记录不阻塞我的页面，过期预取结果和失败均�
   assert.equal(p.matchesPreview,null);
   second.reject(new Error('预取断线')); await new Promise(resolve=>setImmediate(resolve));
   assert.equal(p.data.error,''); assert.equal(p.data.profile.displayName,'林间');
+});
+
+test('切回我的页即时保留内容，相同资料刷新不重新绑定头像和战绩', async () => {
+  let delayed = false;
+  const profileRead = deferred(), statsRead = deferred();
+  const {p} = page('me', { ...apiBase, request: async url => {
+    if (url.includes('/matches')) return { records: [], total: 0, hasMore: false };
+    if (url.endsWith('/profile')) return delayed ? profileRead.promise : structuredClone(profile);
+    return delayed ? statsRead.promise : structuredClone(emptyStats);
+  } });
+  await p.onShow();
+  const previousProfile = p.data.profile, previousStats = p.data.stats;
+  const patches = [], setData = p.setData;
+  p.setData = function(patch) { patches.push(patch); setData.call(this, patch); };
+  delayed = true;
+  const refresh = p.onShow();
+  assert.equal(p.data.profile, previousProfile);
+  assert.equal(p.data.stats, previousStats);
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const rendered = JSON.stringify(factory('pages/me/me.wxml')(p.data));
+  assert.match(rendered, /林间/);
+  assert.doesNotMatch(rendered, /正在读取个人资料/);
+  profileRead.resolve(structuredClone(profile)); statsRead.resolve(structuredClone(emptyStats));
+  await refresh;
+  assert.equal(p.data.loading, false);
+  assert.equal(p.data.profile, previousProfile);
+  assert.equal(p.data.stats, previousStats);
+  assert.ok(patches.every(patch => !('profile' in patch) && !('stats' in patch)));
+});
+
+test('我的页后台刷新仍应用新资料，快速切换时迟到响应不覆盖新结果', async () => {
+  const oldProfile = deferred(), oldStats = deferred();
+  let profileReads = 0, statsReads = 0;
+  const latest = { ...profile, nickname: '晚风', avatarUrl: '/api/avatars/new', version: 2 };
+  const {p} = page('me', { ...apiBase, request: async url => {
+    if (url.includes('/matches')) return { records: [], total: 0, hasMore: false };
+    if (url.endsWith('/profile')) return ++profileReads === 1 ? oldProfile.promise : latest;
+    return ++statsReads === 1 ? oldStats.promise : { ...emptyStats, total: 2, wins: 1, losses: 1, winRate: 50 };
+  } });
+  const first = p.onShow();
+  await new Promise(resolve => setImmediate(resolve));
+  await p.onShow();
+  assert.equal(p.data.profile.displayName, '晚风');
+  assert.equal(p.data.profile.avatarUrl, 'https://test.invalid/api/avatars/new');
+  assert.equal(p.data.stats.rateLabel, '50%');
+  oldProfile.resolve(profile); oldStats.resolve(emptyStats); await first;
+  assert.equal(p.data.profile.displayName, '晚风');
+  assert.equal(p.data.stats.total, 2);
+  assert.equal(p.data.loading, false);
 });
 
 test('预取记录立即可见，首屏刷新失败后重试首屏，不误用加载更多', async () => {

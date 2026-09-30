@@ -222,7 +222,7 @@ function createApp({
         if (req.method === "GET" && !visibilityOnly) return send(200, readProfile(store, uid));
         check(req.method === "POST", "接口不存在", 404);
         limit(`profile:${uid}`, 10);
-        const b = await body(req, 360 * 1024), id = req.headers["idempotency-key"];
+        const b = await body(req), id = req.headers["idempotency-key"];
         check(typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id), "缺少合法请求编号");
         const fingerprint = hash(JSON.stringify([path, b]));
         const result = store.transaction(() => {

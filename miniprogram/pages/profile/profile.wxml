@@ -19,18 +19,15 @@
         </button>
         <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
       </view>
-      <view class="avatar-actions">
-        <button hover-class="none" class="secondary avatar-upload" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}">{{choosing?'正在处理头像…':'上传头像'}}</button>
-      </view>
     </view>
     <view class="avatar-library">
       <view class="field-title">选择内置头像</view>
       <view class="avatar-styles" role="group" aria-label="头像风格">
-        <button wx:for="{{avatarStyles}}" wx:key="id" hover-class="none" class="avatar-style {{avatarStyle === item.id ? 'is-active' : ''}}" data-style="{{item.id}}" bindtap="chooseAvatarStyle" disabled="{{busy || pendingSave || choosing}}" aria-label="{{item.label + '，' + item.count + '款头像'}}" aria-pressed="{{avatarStyle === item.id}}">{{item.label}}</button>
+        <button wx:for="{{avatarStyles}}" wx:key="id" hover-class="none" class="avatar-style {{avatarStyle === item.id ? 'is-active' : ''}}" data-style="{{item.id}}" bindtap="chooseAvatarStyle" disabled="{{busy || pendingSave}}" aria-label="{{item.label + '，' + item.count + '款头像'}}" aria-pressed="{{avatarStyle === item.id}}">{{item.label}}</button>
       </view>
       <view class="avatar-library-count muted">{{visibleAvatars.length}} 款头像</view>
       <view class="avatar-grid">
-        <button wx:for="{{visibleAvatars}}" wx:key="id" hover-class="none" class="avatar-option {{selectedAvatar === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="chooseBuiltinAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="{{item.label}}{{selectedAvatar === item.id ? '，已选择' : ''}}" aria-pressed="{{selectedAvatar === item.id}}">
+        <button wx:for="{{visibleAvatars}}" wx:key="id" hover-class="none" class="avatar-option {{selectedAvatar === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="chooseBuiltinAvatar" disabled="{{busy || pendingSave}}" aria-label="{{item.label}}{{selectedAvatar === item.id ? '，已选择' : ''}}" aria-pressed="{{selectedAvatar === item.id}}">
           <image class="avatar-option-image" src="{{item.path}}" mode="aspectFill" lazy-load="{{true}}" aria-hidden="{{true}}" />
           <text wx:if="{{selectedAvatar === item.id}}" class="avatar-option-selected" aria-hidden="{{true}}">✓</text>
         </button>
@@ -39,9 +36,8 @@
     <view wx:if="{{!keyboardHeight}}" class="profile-save-bar">
       <view class="profile-save-content">
         <view wx:if="{{pendingSave && !busy}}" class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</view>
-        <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{busy ? '正在保存…' : (pendingSave ? '重试保存' : '保存资料')}}</button>
+        <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || conflict}}">{{busy ? '正在保存…' : (pendingSave ? '重试保存' : '保存资料')}}</button>
       </view>
     </view>
   </form>
-  <canvas type="2d" id="avatar-canvas" class="avatar-canvas" />
 </view>

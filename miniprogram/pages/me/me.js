@@ -3,25 +3,32 @@ const { presentProfile, presentStats } = require("../../profile");
 Page({
   data: { loading: true, error: "", profile: null, stats: null },
   onLoad() { this.alive = true; },
-  onShow() { this.getTabBar?.()?.setData({ selected: 1 }); this.load(); },
+  onShow() { return this.load(); },
   onUnload() { this.alive = false; },
+  updateChangedData(values) {
+    const changed = {};
+    for (const key of Object.keys(values)) {
+      if (JSON.stringify(this.data[key]) !== JSON.stringify(values[key])) changed[key] = values[key];
+    }
+    if (Object.keys(changed).length) this.setData(changed);
+  },
   async load() {
     const sequence = this.sequence = (this.sequence || 0) + 1;
     this.matchesPreview = null;
-    this.setData({ loading: true, error: "" });
+    this.updateChangedData({ loading: true, error: "" });
     try {
       await api.login();
       // Warm the first records page without delaying profile/stats or surfacing
       // speculative request errors. The destination still refreshes on entry.
       this.prefetchMatches(sequence);
       const [profile, stats] = await Promise.allSettled([api.request("/api/me/profile"), api.request("/api/me/stats")]);
-      if (this.alive && sequence === this.sequence) this.setData({
+      if (this.alive && sequence === this.sequence) this.updateChangedData({
         ...(profile.status === "fulfilled" ? { profile: presentProfile(profile.value) } : {}),
         ...(stats.status === "fulfilled" ? { stats: presentStats(stats.value) } : {}),
         error: [profile, stats].filter(r => r.status === "rejected").map(r => r.reason.message).join("；"),
       });
-    } catch (e) { if (this.alive && sequence === this.sequence) this.setData({ error: e.message }); }
-    finally { if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }
+    } catch (e) { if (this.alive && sequence === this.sequence) this.updateChangedData({ error: e.message }); }
+    finally { if (this.alive && sequence === this.sequence) this.updateChangedData({ loading: false }); }
   },
   async prefetchMatches(sequence) {
     try {

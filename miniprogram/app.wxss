@@ -49,7 +49,8 @@ button.disclosure-button:not([disabled]):active {
   margin: auto;
   box-sizing: border-box;
 }
-.tab-page { padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
+/* The native tab bar occupies its own viewport area, including the safe area. */
+.tab-page { padding-bottom: 48rpx; }
 .brand {
   display: flex;
   align-items: center;
@@ -1480,4 +1481,3 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .inline-error { margin: 32rpx 0; padding: 28rpx; border: 2rpx solid var(--evil); border-radius: 24rpx; color: var(--evil); }
 .inline-error button { margin-top: 24rpx; width: 100%; }
 .empty-records { padding: 64rpx 0; }
-.avatar-canvas { position: fixed; left: -4096rpx; top: 0; width: 512rpx; height: 512rpx; pointer-events: none; }

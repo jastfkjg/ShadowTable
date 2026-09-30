@@ -1,14 +1,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { mkdtempSync, rmSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { createApp } = require('../server/app');
 const { decodeAvatar } = require('../server/profile');
 const builtinAvatars = require('../miniprogram/builtin-avatars');
-const avatarBytes = readFileSync(join(__dirname,'../miniprogram/assets/tab-me.png'));
-const avatar = 'data:image/png;base64,' + avatarBytes.toString('base64');
+const avatarBytes = readFileSync(join(__dirname,'../miniprogram',builtinAvatars[0].path));
+const avatar = 'builtin:' + builtinAvatars[0].id;
+const legacyAvatarBytes = readFileSync(join(__dirname,'../miniprogram/assets/tab-me.png'));
+const customAvatar = 'data:image/png;base64,' + legacyAvatarBytes.toString('base64');
 test('头像库包含经典28款与四种风格各20款，编号和图片内容不重复', () => {
   const { avatarStyles } = require('../miniprogram/avatar-library');
   assert.deepEqual(avatarStyles.map(item => [item.id, item.count]), [
@@ -20,7 +22,7 @@ test('头像库包含经典28款与四种风格各20款，编号和图片内容�
     for (let i = 1; i <= 20; i++) assert.ok(builtinAvatars.some(item => item.id === style + '-' + String(i).padStart(2, '0')));
   }
 });
-test('内置头像选择跨重启保留，与上传头像互换、去重、重试及清除兼容', async () => {
+test('内置头像选择跨重启保留，拒绝上传并兼容去重、重试及清除', async () => {
   const directory = mkdtempSync(join(tmpdir(),'shadow-builtin-')), db = join(directory,'db.sqlite');
   let app = await launch(db);
   try {
@@ -38,14 +40,15 @@ test('内置头像选择跨重启保留，与上传头像互换、去重、重�
     assert.deepEqual((await app.req('/api/me/profile',again)).data,saved.data);
     assert.deepEqual((await app.req(saved.data.avatarUrl)).data,bytes);
     assert.equal((await app.req('/api/me/profile',again,{nickname:'改名',version:1})).data.avatarUrl,saved.data.avatarUrl);
-    const uploaded = await app.req('/api/me/profile',again,{nickname:'改名',version:2,avatar});
-    assert.notEqual(uploaded.data.avatarUrl,saved.data.avatarUrl);
-    const picked = await app.req('/api/me/profile',again,{nickname:'改名',version:3,avatar:'builtin:'+last.id});
+    const uploaded = await app.req('/api/me/profile',again,{nickname:'改名',version:2,avatar:customAvatar});
+    assert.equal(uploaded.status,400); assert.match(uploaded.data.error,/上传已关闭/);
+    assert.equal((await app.req('/api/me/profile',again)).data.version,2);
+    const picked = await app.req('/api/me/profile',again,{nickname:'改名',version:2,avatar:'builtin:'+last.id});
     assert.equal(picked.data.avatarUrl,'/api/avatars/'+last.hash);
     const other = (await app.req('/api/login',null,{code:'other-builtin-account'})).data.token;
     await app.req('/api/me/profile',other,{nickname:'朋友',version:0,avatar:'builtin:'+last.id});
-    assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM avatars').get().n,3);
-    assert.equal((await app.req('/api/me/profile',again,{nickname:'改名',version:4,avatar:null})).data.avatarUrl,null);
+    assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM avatars').get().n,2);
+    assert.equal((await app.req('/api/me/profile',again,{nickname:'改名',version:3,avatar:null})).data.avatarUrl,null);
   } finally { await app.close(); rmSync(directory,{recursive:true,force:true}); }
 });
 test('内置头像拒绝未列出的编号及路径，资源均能通过头像校验', async () => {
@@ -56,7 +59,7 @@ test('内置头像拒绝未列出的编号及路径，资源均能通过头像�
   const app = await launch();
   try {
     const token = (await app.req('/api/login',null,{code:'invalid-builtin'})).data.token;
-    for (const value of ['builtin:','builtin:avatar-99','builtin:../../package.json','builtin:/etc/passwd']) {
+    for (const value of ['builtin:','builtin:avatar-99','builtin:../../package.json','builtin:/etc/passwd', customAvatar, 'https://example.com/avatar.png', 123, {}]) {
       const result = await app.req('/api/me/profile',token,{nickname:'甲',version:0,avatar:value});
       assert.equal(result.status,400); assert.match(result.data.error,/内置头像/);
     }
@@ -126,7 +129,7 @@ test('微信资料跨登录与重启保留，头像持久化；昵称修改不�
     assert.equal((await app.req('/api/me/profile',other)).data.nickname,'');
     const image = await app.req(first.data.avatarUrl);
     assert.equal(image.status,200); assert.deepEqual(image.data,avatarBytes);
-    assert.equal(image.headers.get('content-type'),'image/png');
+    assert.equal(image.headers.get('content-type'),'image/jpeg');
     assert.equal(image.headers.get('x-content-type-options'),'nosniff');
     await app.close(); app = await launch(db);
     const again = (await app.req('/api/login',null,{code:'same-account'})).data.token;
@@ -159,17 +162,40 @@ test('资料写入鉴权、版本冲突与幂等重试；事务失败不遗留�
     assert.equal((await app.req('/api/me/profile',token,{nickname:'甲\n乙',version:1})).status,400);
   } finally { await app.close(); }
 });
-test('头像只接受受限光栅图片，拒绝脚本、损坏文件与超大尺寸；普通接口仍限8KB', async () => {
-  assert.equal(decodeAvatar(avatar).mime,'image/png');
+test('内置资源校验拒绝损坏图片，资料接口只接受内置编号且限8KB', async () => {
+  assert.equal(decodeAvatar(customAvatar).mime,'image/png');
   for (const value of ['data:image/svg+xml;base64,PHN2Zz4=', 'https://example.com/avatar.png', 'data:image/png;base64,c2NyaXB0', 'data:image/jpeg;base64,/9j/2Q==']) assert.throws(() => decodeAvatar(value));
-  const oversized = Buffer.from(avatarBytes); oversized.writeUInt32BE(4096,16);
+  const oversized = Buffer.from(legacyAvatarBytes); oversized.writeUInt32BE(4096,16);
   assert.throws(() => decodeAvatar('data:image/png;base64,'+oversized.toString('base64')),/1024/);
   const app = await launch();
   try {
     const token = (await app.req('/api/login',null,{code:'account'})).data.token;
-    assert.equal((await app.req('/api/me/profile',token,{nickname:'甲',version:0,avatar:'a'.repeat(370*1024)})).status,413);
+    assert.equal((await app.req('/api/me/profile',token,{nickname:'甲',version:0,avatar:'a'.repeat(9000)})).status,413);
     assert.equal((await app.req('/api/rooms',token,{name:'甲',padding:'x'.repeat(9000)})).status,413);
     assert.equal((await app.req('/api/me/profile',token,{nickname:'甲',version:0,avatar:'data:image/svg+xml;base64,PHN2Zz4='})).status,400);
     assert.equal((await app.req('/api/avatars/'+'a'.repeat(64))).status,404);
   } finally { await app.close(); }
+});
+
+test('已上传的旧头像跨重启继续展示，改昵称保留旧头像并可替换为内置头像', async () => {
+  const directory = mkdtempSync(join(tmpdir(),'shadow-legacy-avatar-')), db = join(directory,'db.sqlite');
+  let app = await launch(db);
+  try {
+    const code = 'legacy-avatar-account', uid = 'wx:' + createHash('sha256').update(code).digest('hex');
+    const token = (await app.req('/api/login',null,{code})).data.token;
+    await app.req('/api/me/profile',token,{nickname:'旧头像',version:0});
+    const hash = decodeAvatar(customAvatar).hash;
+    // Seed the database layout created by the former upload implementation.
+    app.store.db.prepare('INSERT INTO avatars VALUES(?,?,?)').run(hash,'image/png',legacyAvatarBytes);
+    app.store.db.prepare('UPDATE profiles SET avatar_hash=? WHERE uid=?').run(hash,uid);
+    await app.close(); app = await launch(db);
+    const again = (await app.req('/api/login',null,{code})).data.token;
+    const oldUrl = '/api/avatars/' + hash;
+    assert.equal((await app.req('/api/me/profile',again)).data.avatarUrl,oldUrl);
+    assert.deepEqual((await app.req(oldUrl)).data,legacyAvatarBytes);
+    assert.equal((await app.req('/api/me/profile',again,{nickname:'新昵称',version:1})).data.avatarUrl,oldUrl);
+    const updated = await app.req('/api/me/profile',again,{nickname:'新昵称',version:2,avatar});
+    assert.equal(updated.status,200);
+    assert.equal(updated.data.avatarUrl,'/api/avatars/' + builtinAvatars[0].hash);
+  } finally { await app.close(); rmSync(directory,{recursive:true,force:true}); }
 });

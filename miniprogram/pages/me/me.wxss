@@ -1,7 +1,7 @@
 .me-page {
   --me-divider: rgba(177, 191, 198, .12);
   padding-top: 32rpx;
-  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+  padding-bottom: 48rpx;
 }
 
 .me-profile,

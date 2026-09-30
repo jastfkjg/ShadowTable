@@ -310,7 +310,7 @@
   var settingsSavePending = null;
 
   var state = {
-    page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, avatarLoading: false, nameEdited: false, profileEditingNickname: false, profileNicknameError: "",
+    page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, nameEdited: false, profileEditingNickname: false, profileNicknameError: "",
     loading: true,
     busy: false,
     error: "",
@@ -426,7 +426,7 @@
     return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help'].includes(name) ? name : 'lobby' };
   }
   async function mayNavigate() {
-    if (pending || state.busy || state.profileSaving || state.avatarLoading) {
+    if (pending || state.busy || state.profileSaving) {
       toast('请先完成或重试当前操作'); return false;
     }
     if (state.page === 'profile' && (state.profileDirty || profilePending))
@@ -491,14 +491,14 @@
     return builtinAvatars.find(item => url === item.path || url?.endsWith('/api/avatars/' + item.hash));
   }
   function chooseProfileAvatarStyle(el) {
-    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
+    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
     const style = el.dataset.style;
     if (!avatarStyles.some(item => item.id === style)) return;
     state.profileDraft.avatarStyle = style;
     setState({});
   }
   function chooseBuiltinProfileAvatar(el) {
-    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
+    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
     const preset = builtinAvatars.find(item => item.id === el.dataset.id);
     if (!preset) return;
     if (profilePreset(state.profile?.avatarUrl)?.id === preset.id) delete state.profileDraft.avatar;
@@ -524,26 +524,8 @@
     state.profileNicknameError = '';
     profileDirty();
   }
-  async function chooseProfileAvatar(el) {
-    const file = el.files?.[0]; el.value = '';
-    if (!file || !state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
-    if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024)
-      return setState({ profileError: '请选择10MB以内的 JPG 或 PNG 图片' });
-    setState({ avatarLoading: true, profileError: '' });
-    let bitmap;
-    try {
-      bitmap = await createImageBitmap(file);
-      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
-      const ctx = canvas.getContext('2d'), side = Math.min(bitmap.width, bitmap.height);
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,256);
-      ctx.drawImage(bitmap, (bitmap.width-side)/2, (bitmap.height-side)/2, side, side, 0,0,256,256);
-      const avatar = canvas.toDataURL('image/jpeg', .85);
-      state.profileDraft.avatar = avatar; state.profileDraft.avatarPreview = avatar; profileDirty();
-    } catch { setState({ profileError: '图片无法读取，请重新选择' }); }
-    finally { bitmap?.close(); setState({ avatarLoading: false }); }
-  }
   async function saveProfile() {
-    if (state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict || !state.profileDraft) return;
+    if (state.profileSaving || state.profileLoading || state.profileConflict || !state.profileDraft) return;
     if (!profilePending) {
       const nickname = state.profileDraft.nickname.trim();
       if (!nickname || nickname.length > 16) {
@@ -611,19 +593,19 @@
       html += '<button type="button" class="nickname-display" data-action="editProfileNickname" aria-label="修改个人昵称，当前昵称：' + esc(draft.nickname || '新朋友') + '"' + (locked ? ' disabled' : '') + '><span class="nickname-text">' + esc(draft.nickname || '新朋友') + '</span><svg class="nickname-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1L20 7.5a2.8 2.8 0 0 0-4-4L4.5 15Z"/></svg></button>';
     }
     if (state.profileNicknameError) html += '<div id="profile-nickname-error" class="nickname-error" role="alert">' + esc(state.profileNicknameError) + '</div>';
-    html += '</div><div class="avatar-actions"><label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '上传头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="上传头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label></div></div>';
+    html += '</div></div>';
     const selected = profilePreset(draft.avatarPreview)?.id;
     const style = draft.avatarStyle || 'classic';
     const visibleAvatars = builtinAvatars.filter(item => item.style === style);
-    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked || state.avatarLoading ? ' disabled' : '') + '>' + esc(item.label) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
+    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked ? ' disabled' : '') + '>' + esc(item.label) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
       const chosen = selected === item.id;
-      return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked || state.avatarLoading ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
+      return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
     }).join('') + '</div></section>';
-    html += '<div class="profile-save-bar"><div class="profile-save-content">' + (profilePending && !state.profileSaving ? '<div class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</div>' : '') + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict) + '</div></div></form>';
+    html += '<div class="profile-save-bar"><div class="profile-save-content">' + (profilePending && !state.profileSaving ? '<div class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</div>' : '') + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.profileConflict) + '</div></div></form>';
     return html;
   }
   function viewProfileHeader() {
-    return '<header class="profile-navigation"><div class="profile-navigation-content"><button type="button" class="profile-back" data-action="navigate" data-page="me" aria-label="返回我的"' + (state.profileSaving || state.avatarLoading ? ' disabled' : '') + '>‹</button><h1 class="profile-title" tabindex="-1" data-page-heading>编辑资料</h1></div></header>';
+    return '<header class="profile-navigation"><div class="profile-navigation-content"><button type="button" class="profile-back" data-action="navigate" data-page="me" aria-label="返回我的"' + (state.profileSaving ? ' disabled' : '') + '>‹</button><h1 class="profile-title" tabindex="-1" data-page-heading>编辑资料</h1></div></header>';
   }
   const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
   var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
@@ -3828,7 +3810,6 @@ function roomListItems(rooms) {
   };
   var CHANGES = {
     rankVisibility: el => changeRankVisibility(el.checked),
-    profileAvatar: chooseProfileAvatar,
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
     settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },
     entryCapacity: function (el) {

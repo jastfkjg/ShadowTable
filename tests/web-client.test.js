@@ -78,6 +78,7 @@ test('网页内置头像只改草稿，重新选原头像取消改动，保存�
   });
   await c.applyRoute('#/profile');
   assert.equal((c.viewProfileEditor().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 28);
+  assert.doesNotMatch(c.viewProfileEditor(), /type="file"|上传头像/);
   assert.match(c.viewProfileEditor(), /data-id="avatar-01" aria-label="头像 01，已选择" aria-pressed="true"/);
   const choose = id => c.ACTIONS.chooseBuiltinProfileAvatar({ dataset: { id } });
   choose(presets[1].id);

@@ -1817,15 +1817,11 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 .empty-records { padding: 32px 0; }
 .resume-section { padding-top: 18px; }
 .resume-room { width: 100%; display: flex; justify-content: space-between; text-align: left; gap: 12px; border: 1px solid var(--accent); padding: 16px; margin-top: 8px; background: var(--surface); border-radius: 12px; }
-.avatar-canvas { position: fixed; left: -2048px; top: 0; width: 256px; height: 256px; pointer-events: none; }
 
 .has-bottom-nav { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 .bottom-navigation { position: fixed; z-index: 90; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; padding: 6px 16px calc(6px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--border); }
 .nav-destination { flex: 1; max-width: 240px; min-height: 56px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; padding: 4px; }
 .nav-destination.active { color: var(--accent); }
-.avatar-upload { position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 18px; border-radius: 8px; cursor: pointer; }
-.avatar-upload input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
-.avatar-upload:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .profile-form { margin-top: 4px; }
 .page-title:focus { outline: none; }
 
@@ -1849,8 +1845,6 @@ button.nickname-display { width: auto; max-width: 100%; min-height: 48px; margin
 .input.nickname-input.is-invalid { border-color: var(--evil); }
 button.nickname-done { width: auto; flex-shrink: 0; min-height: 48px; padding: 6px 8px; color: var(--accent); font-size: .875rem; }
 .nickname-error { margin-top: 6px; color: var(--evil); font-size: .8125rem; }
-.avatar-actions { display: flex; flex-direction: column; align-items: center; }
-.profile-page .avatar-upload { width: auto; min-height: 48px; padding: 8px 16px; font-size: .875rem; }
 .avatar-library { margin: 0; }
 .avatar-library .field-title { margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: .9375rem; }
 .avatar-styles { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; padding-top: 12px; }
