@@ -129,6 +129,14 @@ const scenes = {
     availableBoards: BOARDS.filter((b) => b.available && b.counts.includes(12)),
   },
   join: { ...base, entryMode: "join" },
+  joinWithRooms: {
+    ...base, entryMode: "join", name: "zzl",
+    memberRooms: [{ code: "759429" }, { code: "471755" }],
+    visibleMemberRooms: ["759429", "471755"].map(code => ({
+      code, status: "playing", statusLabel: "进行中", available: true,
+      boardName: "阿瓦隆 · 十二骑士", peopleLabel: "12人", relationLabel: "已入座",
+    })),
+  },
   lobby: roomData(),
 };
 r.players.forEach((p) =>

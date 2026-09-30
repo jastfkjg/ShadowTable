@@ -387,11 +387,21 @@ button {
   width: 100%;
 }
 .entry-panel {
-  margin-top: 28rpx;
+  margin: 24rpx 0 32rpx;
   padding: 24rpx;
 }
+.entry-panel button,
+.entry-panel button[disabled]:not([type]) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.entry-panel .label,
+.entry-panel .field-title { font-size: 28rpx; }
 .entry-panel .input {
-  margin-bottom: 24rpx;
+  width: 100%;
+  height: 96rpx;
+  margin: 12rpx 0 20rpx;
 }
 .entry-tabs {
   display: flex;
@@ -1438,6 +1448,4 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .inline-error { margin: 32rpx 0; padding: 28rpx; border: 2rpx solid var(--evil); border-radius: 24rpx; color: var(--evil); }
 .inline-error button { margin-top: 24rpx; width: 100%; }
 .empty-records { padding: 64rpx 0; }
-.resume-section { padding-top: 36rpx; }
-.resume-room { width: 100%; display: flex; justify-content: space-between; text-align: left; gap: 24rpx; border: 2rpx solid var(--accent); padding: 32rpx; margin-top: 16rpx; background: var(--surface); border-radius: 24rpx; }
 .avatar-canvas { position: fixed; left: -4096rpx; top: 0; width: 512rpx; height: 512rpx; pointer-events: none; }

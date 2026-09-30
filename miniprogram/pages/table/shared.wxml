@@ -220,19 +220,15 @@
   </view>
   <block wx:if="{{isLobby}}">
     <view wx:if="{{pendingTableCode}}" class="inline-error"><view>房间 {{pendingTableCode}} 有一项操作尚未确认。</view><button hover-class="none" class="secondary" bindtap="resumePending">返回牌桌处理</button></view>
-    <view wx:if="{{activeRooms.length}}" class="resume-section">
-      <view class="eyebrow">正在进行</view>
-      <button hover-class="none" wx:for="{{activeRooms}}" wx:key="code" class="resume-room" bindtap="openRoom" data-code="{{item.code}}" disabled="{{busy || loading || hasPendingRequest}}"><view><view>继续对局 · {{item.code}}</view><view class="small muted">{{item.boardName}} · {{item.peopleLabel}}</view></view><text aria-hidden="true">→</text></button>
-    </view>
     <form class="panel entry-panel" bindsubmit="submitEntry">
+      <view class="entry-tabs">
+        <button hover-class="none" class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode!=='join'}}">创建房间</button>
+        <button hover-class="none" class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode==='join'}}">加入房间</button>
+      </view>
       <label class="label" for="nickname">本桌昵称</label>
       <input class="input" id="nickname" name="nickname" type="nickname" maxlength="16"
         value="{{name}}" bindinput="inputName" bindblur="inputName"
         placeholder="默认使用个人昵称，也可为本桌修改" disabled="{{busy}}" />
-      <view class="entry-tabs">
-        <button hover-class="none" class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}">创建房间</button>
-        <button hover-class="none" class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}">加入房间</button>
-      </view>
       <block wx:if="{{entryMode!=='join'}}">
         <view class="field-title">人数</view>
         <view class="capacity-grid">
