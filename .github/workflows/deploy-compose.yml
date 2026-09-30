@@ -1,0 +1,46 @@
+name: Reusable Compose deployment
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+      revision:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  deploy:
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: shadowtable-deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+      - name: Deploy immutable image to selected host
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE: ${{ inputs.image }}
+          REVISION: ${{ inputs.revision }}
+        run: bash deploy/cloud/publish.sh
+      - name: Record deployment
+        env:
+          TARGET: ${{ inputs.environment }}
+          IMAGE: ${{ inputs.image }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          printf 'Target: `%s`\n\nImage: `%s`\n\nRevision: `%s`\n' "$TARGET" "$IMAGE" "$REVISION" >> "$GITHUB_STEP_SUMMARY"

@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 release=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 image=${1:?Usage: deploy.sh IMAGE_DIGEST}
-[[ "$image" =~ ^[a-z0-9][a-z0-9.-]*\.aliyuncs\.com/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*@sha256:[a-f0-9]{64}$ ]] || { echo 'An immutable ACR image digest is required.' >&2; exit 1; }
+python3 "$release/validate_image.py" "$image"
 bash "$release/preflight.sh"
 exec 9>/opt/shadowtable/deploy.lock
 flock -w 120 9
@@ -12,6 +12,7 @@ printf 'SHADOWTABLE_IMAGE=%s\n' "$image" > "$release/image.env"
 compose() { bash "$release/compose.sh" "$@"; }
 compose config --quiet
 origin=$(compose config --format json | python3 "$release/validate_config.py")
+health_resolve=$(compose config --format json | python3 "$release/validate_config.py" --local-gateway)
 compose pull
 # Verify persistent directory permissions using the actual container user.
 compose run --rm --no-deps -T app node -e "const fs=require('node:fs');fs.accessSync('/data',fs.constants.R_OK|fs.constants.W_OK)"
@@ -56,7 +57,8 @@ mv "$backup.tmp" "$backup"
 compose up -d --wait --wait-timeout 120 app
 healthy=false
 for attempt in {1..12}; do
-    if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "$origin/health" |
+    # Keep Host/SNI and certificate verification, but always check this host's gateway.
+    if curl --noproxy '*' --resolve "$health_resolve" --fail --silent --show-error --connect-timeout 5 --max-time 10 "$origin/health" |
         python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ok") is True else 1)'; then
         healthy=true
         break

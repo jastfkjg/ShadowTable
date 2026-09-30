@@ -24,7 +24,7 @@ class DeploymentTest(unittest.TestCase):
         self.old.mkdir()
         (self.home / 'current').symlink_to(self.old)
         (self.old / 'compose.yaml').write_text('')
-        for name in ['deploy.sh', 'compose.sh', 'validate_config.py']:
+        for name in ['deploy.sh', 'compose.sh', 'validate_config.py', 'validate_image.py']:
             (self.release / name).write_text((ROOT / 'deploy/cloud' / name).read_text().replace('/opt/shadowtable', str(self.home)))
         (self.old / 'compose.sh').write_text((self.release / 'compose.sh').read_text())
         (self.release / 'preflight.sh').write_text('exit 0\n')
@@ -130,6 +130,18 @@ print(Path(sys.argv[-1]).resolve())
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(calls, [])
 
+    def test_ecr_and_nested_registry_images_are_supported(self):
+        result, _ = self.run_deploy(image='123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/apps/shadowtable@sha256:' + 'b' * 64)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_health_check_always_targets_local_gateway(self):
+        result, _ = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        curl = (self.base / 'calls.curl').read_text()
+        self.assertIn('--resolve table.example.com:443:127.0.0.1', curl)
+        self.assertIn('--noproxy *', curl)
+        self.assertNotIn('--insecure', curl)
+
     def test_first_deployment_failure_stops_candidate(self):
         (self.home / 'current').unlink()
         result, calls = self.run_deploy('startup')
@@ -175,6 +187,41 @@ class ConfigTest(unittest.TestCase):
             env[key] = bad
             with self.assertRaises(ValueError): module.validate(config)
             env[key] = saved
+
+
+class PromotionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / 'deploy/cloud'))
+        from image_metadata import resolve
+        cls.resolve = staticmethod(resolve)
+
+    def test_only_matching_build_metadata_can_be_promoted(self):
+        sha = 'c' * 40
+        metadata = {'image': IMAGE, 'revision': sha, 'run_id': '123'}
+        repository = IMAGE.split('@')[0]
+        self.assertEqual(self.resolve(metadata, sha, '123', repository), IMAGE)
+        for revision, run_id, name in [('d' * 40, '123', repository), (sha, '124', repository), (sha, '123', 'ghcr.io/example/other')]:
+            with self.assertRaises(ValueError):
+                self.resolve(metadata, revision, run_id, name)
+        with self.assertRaises(ValueError):
+            self.resolve(dict(metadata, image=repository + ':latest'), sha, '123', repository)
+
+    def test_missing_or_wrong_environment_marker_prevents_ssh(self):
+        for marker in ['', 'aws-prod']:
+            result = subprocess.run(['bash', str(ROOT / 'deploy/cloud/publish.sh')], env=dict(os.environ, TARGET_ENVIRONMENT='aliyun-prod', DEPLOY_TARGET=marker), capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('DEPLOY_TARGET', result.stderr)
+
+    def test_remote_preflight_rejects_a_different_host(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'deployment-target').write_text('aws-prod\n')
+            script = root / 'preflight.sh'
+            script.write_text((ROOT / 'deploy/cloud/preflight.sh').read_text().replace('/opt/shadowtable', str(root)))
+            result = subprocess.run(['bash', str(script), 'aliyun-prod'], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('does not match', result.stderr)
 
 
 if __name__ == '__main__':

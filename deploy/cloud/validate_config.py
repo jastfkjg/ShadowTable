@@ -12,6 +12,11 @@ def origin(value):
     return value
 
 
+def local_gateway(public):
+    url = urlsplit(public)
+    return f'{url.hostname}:{url.port or 443}:127.0.0.1'
+
+
 def validate(config):
     env = config['services']['app']['environment']
     public = origin(env['WEB_ORIGIN'])
@@ -28,6 +33,7 @@ def validate(config):
 
 if __name__ == '__main__':
     try:
-        print(validate(json.load(sys.stdin)))
+        public = validate(json.load(sys.stdin))
+        print(local_gateway(public) if '--local-gateway' in sys.argv else public)
     except (ValueError, KeyError, TypeError) as exc:
         sys.exit(str(exc))

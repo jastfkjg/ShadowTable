@@ -1,116 +1,61 @@
-name: Container CI and deploy
+name: Deploy tested image
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment environment (each target must use its own host and data)
+        required: true
+        type: choice
+        options: [aliyun-staging, aliyun-prod, aws-prod]
+      build_run_id:
+        description: Successful Container CI and build run ID (copy from its summary)
+        required: true
+        type: string
 permissions:
   contents: read
-concurrency:
-  group: shadowtable-production
-  cancel-in-progress: false
+  actions: read
 jobs:
-  test:
+  resolve:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      image: ${{ steps.metadata.outputs.image }}
+      revision: ${{ steps.run.outputs.revision }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Verify successful build from this repository's main branch
+        id: run
+        uses: actions/github-script@v7
+        env:
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
         with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm test
-      - run: python3 -m unittest discover -s tests -p 'test_deploy.py'
-      - run: for script in deploy/cloud/*.sh; do bash -n "$script"; done
-      - run: bash deploy/cloud/smoke-test.sh
+          script: |
+            if (!/^[1-9][0-9]*$/.test(process.env.BUILD_RUN_ID)) throw new Error('Invalid build run ID');
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(process.env.BUILD_RUN_ID) });
+            const { data: workflow } = await github.rest.actions.getWorkflow({ owner, repo, workflow_id: run.workflow_id });
+            if (workflow.path !== '.github/workflows/ci.yml' || run.head_branch !== 'main' ||
+                run.head_repository?.full_name !== `${owner}/${repo}` || run.status !== 'completed' ||
+                run.conclusion !== 'success' || !['push', 'workflow_dispatch'].includes(run.event) ||
+                !/^[a-f0-9]{40}$/.test(run.head_sha)) throw new Error('Select a successful main-branch Container CI and build run');
+            core.setOutput('revision', run.head_sha);
+      - uses: actions/download-artifact@v4
+        with:
+          name: shadowtable-image
+          path: image-metadata
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ github.token }}
+      - name: Resolve immutable image
+        id: metadata
+        env:
+          EXPECTED_REVISION: ${{ steps.run.outputs.revision }}
+          EXPECTED_RUN_ID: ${{ inputs.build_run_id }}
+          IMAGE_REPOSITORY: ${{ vars.IMAGE_REPOSITORY }}
+        run: python3 deploy/cloud/image_metadata.py resolve image-metadata/image.json
   deploy:
-    needs: test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    environment: production
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - name: Validate registry configuration
-        id: image
-        env:
-          ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
-          ACR_NAMESPACE: ${{ vars.ACR_NAMESPACE }}
-          ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
-        run: |
-          set -euo pipefail
-          [[ "$ACR_REGISTRY" =~ ^[a-z0-9][a-z0-9.-]*\.aliyuncs\.com$ ]] || { echo 'Set ACR_REGISTRY to the public ACR hostname, without https:// or a path.' >&2; exit 1; }
-          [[ "$ACR_NAMESPACE" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set ACR_NAMESPACE.' >&2; exit 1; }
-          [[ "$ACR_REPOSITORY" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set ACR_REPOSITORY.' >&2; exit 1; }
-          echo "name=$ACR_REGISTRY/$ACR_NAMESPACE/$ACR_REPOSITORY" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.ACR_REGISTRY }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-      - name: Check server prerequisites before building
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          SSH_PORT=${SSH_PORT:-22}
-          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
-          install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
-          chmod 600 "$HOME/.ssh/deploy_key"
-          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'bash -s' < deploy/cloud/preflight.sh
-      - name: Build and publish
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          # ACR Personal Edition rejects OCI attestation artifact manifests.
-          provenance: false
-          sbom: false
-          outputs: type=image,push=true,oci-mediatypes=false
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-      - name: Deploy over SSH
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-        run: |
-          set -euo pipefail
-          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          SSH_PORT=${SSH_PORT:-22}
-          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
-          install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
-          chmod 600 "$HOME/.ssh/deploy_key"
-          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          SSH=(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
-          target="$SSH_USER@$SSH_HOST"
-          release="/opt/shadowtable/releases/${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          "${SSH[@]}" "$target" "umask 077; mkdir -p '$release'"
-          tar -C deploy/cloud -czf - . | "${SSH[@]}" "$target" "tar -xzf - -C '$release'"
-          "${SSH[@]}" "$target" "bash '$release/deploy.sh' '$IMAGE'"
-      - name: Remove SSH key
-        if: always()
-        run: rm -f "$HOME/.ssh/deploy_key"
+    needs: resolve
+    uses: ./.github/workflows/deploy-compose.yml
+    with:
+      environment: ${{ inputs.target }}
+      image: ${{ needs.resolve.outputs.image }}
+      revision: ${{ needs.resolve.outputs.revision }}

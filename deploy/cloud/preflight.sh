@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -n "${1:-}" ]]; then
+    [[ -r /opt/shadowtable/deployment-target && "$(cat /opt/shadowtable/deployment-target)" == "$1" ]] || { echo 'This host does not match the selected deployment target.' >&2; exit 1; }
+fi
 for tool in docker python3 curl flock tar readlink; do
     command -v "$tool" >/dev/null || { echo "Missing dependency: $tool" >&2; exit 1; }
 done
