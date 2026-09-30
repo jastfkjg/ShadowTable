@@ -50,10 +50,13 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   assert.equal(image.attr.src, seat.avatarUrl);
   assert.equal(image.attr.binderror, "seatAvatarError");
   assert.equal(image.attr["data-url"], seat.avatarUrl);
-  assert.match(JSON.stringify(button), /你·房主/);
+  assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-self").children), ["你"]);
+  assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-flag").children), ["房主"]);
   assert.match(JSON.stringify(button), /已出局/);
   assert.match(JSON.stringify(button), /湖仙/);
   assert.match(JSON.stringify(button), /已选入队/);
+  assert.ok(nodes(button).find(n => n.attr?.class?.startsWith("seat-status")).children.includes("已选入队"));
+  assert.ok(nodes(button).find(n => n.attr?.class === "seat-tags"));
   const failed = byHandler(render({ ...base, room, seats: [{ ...seat, avatarFailed: true }] }), "seat");
   assert.ok(!nodes(failed).some(n => n.tag === "wx-image"));
   assert.ok(nodes(failed).some(n => n.attr?.class === "seat-avatar-fallback"));
@@ -61,10 +64,32 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   const empty = byHandler(render({ ...base, room: lobby, seats: [{ seat: 2, name: "空位", occupied: false, mine: false, avatarInitial: "+" }] }), "seat");
   assert.equal(empty.attr.disabled, false);
   assert.equal(empty.attr.ariaLabel, "2号，空位，可入座");
-  assert.match(JSON.stringify(empty), /seat-avatar-empty/);
-  assert.match(JSON.stringify(empty), /可入座/);
+  assert.match(empty.attr.class, /seat-empty/);
+  assert.match(JSON.stringify(empty), /点击入座/);
+  assert.ok(!nodes(empty).some(n => n.tag === "wx-image" || n.attr?.class === "seat-meta"));
+  const gameEmpty = byHandler(render({ ...base, room, seats: [{ seat: 2, name: "空位", occupied: false }] }), "seat");
+  assert.doesNotMatch(JSON.stringify(gameEmpty), /点击入座/);
   const occupied = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, mine: false }] }), "seat");
   assert.equal(occupied.attr.disabled, true);
+  assert.equal(nodes(occupied).find(n => n.attr?.class === "seat-self"), undefined);
+  assert.match(JSON.stringify(occupied), /未准备/);
+  const ready = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, ready: true }] }), "seat");
+  assert.match(JSON.stringify(ready), /已准备/);
+  assert.doesNotMatch(JSON.stringify(ready), /未准备/);
+});
+test("座位区保留人数和准备统计，长昵称保留在原卡片且不显示名单入口", () => {
+  const room = { phase: "lobby", capacity: 13, me: { seat: 1 }, team: [] };
+  const seats = [{ seat: 1, name: "这是一个很长的完整玩家昵称", occupied: true, mine: true, host: true, role: "秘密角色" },
+    { seat: 2, name: "乙", occupied: true, ready: true }, { seat: 3, name: "空位", occupied: false }];
+  const tree = render({ ...base, room, seats, seatOccupiedCount: 2, seatReadyCount: 1 });
+  assert.doesNotMatch(JSON.stringify(tree), /玩家名单|关闭名单|秘密角色/);
+  const count = nodes(tree).find(n => n.attr?.class === "seat-count");
+  assert.equal(count.attr.ariaLabel, "已入座2人，共13个座位");
+  const caption = nodes(tree).find(n => n.attr?.class === "seat-section-caption");
+  assert.match(JSON.stringify(caption), /已准备 1\/2/);
+  const button = byHandler(tree, "seat");
+  assert.match(button.attr.ariaLabel, /这是一个很长的完整玩家昵称/);
+  assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-name").children), ["这是一个很长的完整玩家昵称"]);
 });
 test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份入口气泡，不渲染旧秘密", () => {
   const data = { ...base, room: { phase: "tools", code: "123456", capacity: 6, team: [], me: { seat: 1 } }, dealtIdentityDialog: true };

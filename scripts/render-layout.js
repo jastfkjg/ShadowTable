@@ -101,6 +101,7 @@ const base = {
   secret: null,
   network: true,
   selected: [],
+  seatsExpanded: true,
   history: [],
 };
 function roomData(source = r) {
@@ -108,6 +109,8 @@ function roomData(source = r) {
   return {
     ...base,
     room,
+    seatOccupiedCount: room.players.length,
+    seatReadyCount: room.players.filter(p => p.ready).length,
     teamText: "尚未选择",
     seats: room.players.map((p) => ({
       ...p,
@@ -151,6 +154,10 @@ scenes.seatAvatars = { ...avatarScene, seats: Array.from({ length: 13 }, (_, i) 
 scenes.seatAvatarStates = { ...scenes.seatAvatars,
   room: { ...scenes.seatAvatars.room, phase: "proposal", flexible: false, leader: 1, fairyHolder: 1 },
   seats: scenes.seatAvatars.seats.map(p => ({ ...p, selected: p.seat === 1, alive: p.seat !== 1, avatarFailed: p.seat === 5 })) };
+const emptyLobby = roomData(newRoom("628421", "p1", "zz", "classic", 6));
+scenes.seatCardsLobby = { ...emptyLobby, seats: Array.from({ length: 6 }, (_, i) => i === 0
+  ? { ...emptyLobby.seats[0], avatarUrl: "../../miniprogram/assets/avatars/avatar-01.jpg" }
+  : { seat: i + 1, name: "空位", occupied: false, mine: false, avatarInitial: "+" }) };
 r.players.forEach((p) =>
   command(r, p.uid, { type: "ready", ready: true, stage: r.stage }),
 );

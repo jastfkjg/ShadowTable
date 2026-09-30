@@ -3,6 +3,10 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 const { createApp } = require("../server/app");
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
+const vm = require("node:vm");
+const builtinAvatars = require("../miniprogram/builtin-avatars");
 
 const origin = "https://play.example.com";
 const host = "play.example.com";
@@ -32,17 +36,19 @@ async function setup(t, opts = {}) {
           },
         },
         (response) => {
-          let text = "";
-          response.on("data", (chunk) => (text += chunk));
-          response.on("end", () =>
+          const chunks = [];
+          response.on("data", (chunk) => chunks.push(chunk));
+          response.on("end", () => {
+            const bytes = Buffer.concat(chunks), text = bytes.toString("utf8");
             resolve({
               status: response.statusCode,
               ok: response.statusCode < 400,
               headers: response.headers,
               text,
+              bytes,
               json: async () => JSON.parse(text),
-            }),
-          );
+            });
+          });
         },
       );
       request.on("error", reject);
@@ -150,4 +156,27 @@ test("回归锚点：微信登录与开发登录不受网页版影响", async (t
   ));
   assert.equal((await a.raw("/api/dev-login", {})).status, 404);
   assert.equal((await a.raw("/api/login", {})).status, 400);
+});
+
+test("网页共享小程序头像目录，所有预览可匿名加载，其他资源路径不开放", async (t) => {
+  const a = await setup(t, { webOrigin: origin });
+  const home = await a.raw('/');
+  assert.ok(home.text.indexOf('/builtin-avatars.js') < home.text.indexOf('/app.js'));
+  const catalog = await a.raw('/builtin-avatars.js'), context = { window: {} };
+  assert.equal(catalog.status, 200);
+  assert.match(catalog.headers['content-type'], /javascript/);
+  vm.runInNewContext(catalog.text, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.window.shadowtableBuiltinAvatars)), builtinAvatars);
+  for (const item of builtinAvatars) {
+    const image = await a.raw(item.path);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers['content-type'], 'image/jpeg');
+    assert.deepEqual(image.bytes, readFileSync(join(__dirname, '../miniprogram', item.path)));
+  }
+  for (const path of ['/assets/avatars/avatar-99.jpg', '/assets/edit.svg', '/miniprogram/builtin-avatars.js', '/toString'])
+    assert.equal((await a.raw(path)).status, 401);
+  assert.equal((await a.raw(builtinAvatars[0].path, {})).status, 401);
+  const disabled = await setup(t);
+  assert.equal((await disabled.raw('/builtin-avatars.js')).status, 401);
+  assert.equal((await disabled.raw(builtinAvatars[0].path)).status, 401);
 });

@@ -378,37 +378,46 @@
       </view>
     <view class="task-progress">
       <view class="section-title history-heading">
-        <text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家与座位'}}</text>
-        <text wx:if="{{room.phase==='lobby'}}" class="small muted">点自己站起，点空位坐下</text>
-        <button hover-class="none" wx:else class="disclosure-button history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
+        <view class="seat-section-title"><text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家与座位'}}</text><text wx:if="{{room.phase==='lobby'}}" class="seat-count" aria-label="{{'已入座'+seatOccupiedCount+'人，共'+room.capacity+'个座位'}}">{{seatOccupiedCount}}/{{room.capacity}}</text></view>
+        <button hover-class="none" wx:if="{{room.phase!=='lobby'}}" class="disclosure-button history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
       </view>
+      <view wx:if="{{room.phase==='lobby'}}" class="seat-section-caption"><text class="seat-ready-count">已准备 {{seatReadyCount}}/{{seatOccupiedCount}}</text><text>点自己站起，点空位坐下</text></view>
       <view wx:if="{{room.phase!=='lobby' && questTimeline.length}}" class="quest-timeline">
         <button hover-class="none" wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
       </view>
     </view>
-    <view wx:if="{{room.phase==='lobby' || seatsExpanded !== false}}" class="seats"
+    <view wx:if="{{room.phase==='lobby' || seatsExpanded !== false}}" class="{{room.capacity>=10?'seats seats-compact':'seats'}}"
       ><button hover-class="none"
         wx:for="{{seats}}"
         wx:key="seat"
-        class="seat {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
+        class="seat {{item.occupied?'':'seat-empty'}} {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
         data-seat="{{item.seat}}"
         aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.host?'，房主':'')+(item.alive===false?'，已出局':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.fairyHolder===item.seat?'，湖仙':'')+(room.phase==='lobby'?'，'+(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):'')}}"
         bindtap="seat"
         disabled="{{hasPendingRequest || busy || (room.phase==='lobby'?(item.occupied && !item.mine):!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
       >
         <view class="seat-head">
-          <text class="seat-number">{{item.seat}}</text>
-          <view class="seat-avatar {{item.occupied?'':'seat-avatar-empty'}}" aria-hidden="{{true}}">
+          <text class="seat-number">{{item.seat}}号</text>
+          <text wx:if="{{item.mine}}" class="seat-self">你</text>
+        </view>
+        <view wx:if="{{item.occupied}}" class="seat-player">
+          <view class="seat-avatar" aria-hidden="{{true}}">
             <text class="seat-avatar-fallback">{{item.avatarInitial}}</text>
             <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="seat-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="{{true}}" />
           </view>
+          <view class="seat-name">{{item.name}}</view>
         </view>
-        <view class="seat-name">{{item.name}}</view>
-        <view class="seat-meta">
-          <text wx:if="{{item.mine || item.host}}" class="seat-flag">{{item.mine?(item.host?'你·房主':'你'):'房主'}}</text>
-          <text wx:if="{{item.alive===false}}" class="seat-out">已出局</text>
-          <text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>
-          <text>{{room.phase==='lobby'?(item.occupied?(item.ready?'已准备':'未准备'):'可入座'):(item.selected?'已选入队':item.inTeam?'任务队员':'')}}</text>
+        <view wx:else class="seat-empty-body">
+          <text class="seat-empty-mark" aria-hidden="{{true}}">+</text>
+          <text class="seat-empty-label">{{room.phase==='lobby'?'点击入座':'空位'}}</text>
+        </view>
+        <view wx:if="{{item.occupied}}" class="seat-meta">
+          <text wx:if="{{room.phase==='lobby' || item.selected || item.inTeam}}" class="seat-status {{room.phase==='lobby' && item.ready?'seat-ready':''}}">{{room.phase==='lobby'?(item.ready?'已准备':'未准备'):(item.selected?'已选入队':'任务队员')}}</text>
+          <view wx:if="{{item.host || item.alive===false || room.fairyHolder===item.seat}}" class="seat-tags">
+            <text wx:if="{{item.host}}" class="seat-flag">房主</text>
+            <text wx:if="{{item.alive===false}}" class="seat-out">已出局</text>
+            <text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>
+          </view>
         </view>
       </button></view
     >

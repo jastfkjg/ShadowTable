@@ -1267,6 +1267,29 @@ test("换号以座位选择，合法组合才提交，取消确认或过期不�
   assert.equal(p.data.swapSeats.length, 0);
 });
 
+test("座位轮询跟随公开昵称并保留选人，阶段变化重置选人，离房清理统计", async () => {
+  const room = { code: "123456", stage: "s1", phase: "proposal", flexible: false, capacity: 13, leader: 1,
+    players: [{ seat: 1, name: "甲", ready: true }, { seat: 2, name: "完整的玩家昵称", ready: false }],
+    me: { seat: 1 }, history: [], team: [] };
+  let writes = 0;
+  const p = page({ request: async (path,method) => { if (method === "POST") writes++; return structuredClone(room); } });
+  p.roomCode = room.code;
+  await p.refresh();
+  p.seat({ currentTarget: { dataset: { seat: 2 } } });
+  assert.deepEqual(Array.from(p.data.selected), [2]);
+  room.players[1].name = "更新后的完整昵称";
+  room.players[1].seat = 4;
+  await p.refresh();
+  assert.equal(p.data.seats[3].name, "更新后的完整昵称");
+  assert.deepEqual(Array.from(p.data.selected), [2]);
+  assert.equal(writes, 0);
+  room.stage = "s2";
+  await p.refresh();
+  assert.deepEqual(Array.from(p.data.selected), []);
+  p.clearRoom();
+  assert.equal(p.data.seatOccupiedCount, 0);
+  assert.equal(p.data.seatReadyCount, 0);
+});
 test("房主提示随入座准备与提交进度刷新，非房主不推算秘密进度", async () => {
   let room = { stage: "s1", phase: "lobby", capacity: 6, players: [{ seat: 1, ready: true }], me: { seat: 1 }, history: [], team: [] };
   const p = page({ request: async () => structuredClone(room) });
@@ -1274,12 +1297,17 @@ test("房主提示随入座准备与提交进度刷新，非房主不推算秘�
   await p.refresh();
   assert.equal(p.data.canStart, false);
   assert.ok(p.data.startHint.includes("还差 5 人入座"));
+  assert.equal(p.data.seatOccupiedCount, 1);
+  assert.equal(p.data.seatReadyCount, 1);
   room.players = Array.from({ length: 6 }, (_, i) => ({ seat: i + 1, ready: i !== 5 }));
   await p.refresh();
   assert.equal(p.data.startHint, "还差 1 人准备");
+  assert.equal(p.data.seatOccupiedCount, 6);
+  assert.equal(p.data.seatReadyCount, 5);
   room.players[5].ready = true;
   await p.refresh();
   assert.equal(p.data.canStart, true);
+  assert.equal(p.data.seatReadyCount, 6);
   room.phase = "quest";
   room.operationProgress = { total: 2, completed: 1 };
   await p.refresh();

@@ -5,6 +5,7 @@ page {
   --muted: #b1bfc6;
   --accent: #e5c68b;
   --border: #536570;
+  --seat-empty-border: rgba(83, 101, 112, 0.65);
   --good: #a3dfbe;
   --evil: #f2b6ae;
   --third: #8ab8d9;
@@ -616,7 +617,7 @@ button.seat {
   padding: 0;
   font-size: 22rpx;
 }
-.seat.mine .seat-flag {
+.seat-self {
   background: var(--text);
   color: var(--bg);
   border-radius: 8rpx;
@@ -1160,20 +1161,36 @@ button.quest-step.failure[disabled]:not([type]) { color: var(--evil); }
 }
 .seat-meta { min-height: 40rpx; }
 
-/* Seat identity: reserve the avatar and status slots across polling updates. */
+/* Seat cards: seat context, centered player identity, then public status. */
 button.seat,
-button.seat[disabled]:not([type]) { display: flex; flex-direction: column; align-items: stretch; gap: 12rpx; min-height: 248rpx; padding: 16rpx; }
-.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 8rpx; }
-.seat-head .seat-number { display: block; flex-shrink: 0; }
-.seat-avatar { position: relative; display: block; flex: 0 0 72rpx; width: 72rpx; height: 72rpx; overflow: hidden; border-radius: 50%; background: var(--bg); color: var(--muted); }
-.seat-avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 32rpx; font-weight: 600; }
-.seat-avatar-image { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: block; width: 100%; height: 100%; }
-.seat-avatar-empty { box-sizing: border-box; background: transparent; border: 2rpx dashed var(--border); }
-button.seat .seat-name { display: -webkit-box; min-height: 40rpx; line-height: 40rpx; white-space: normal; overflow: hidden; word-break: break-all; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-button.seat .seat-meta { display: flex; align-content: flex-start; align-items: flex-start; flex-wrap: wrap; gap: 8rpx; min-height: 72rpx; margin-top: auto; line-height: 32rpx; }
-button.seat .seat-flag { display: inline-block; min-height: 0; }
-button.seat .seat-fairy { margin-right: 0; line-height: 32rpx; }
-button.seat .seat-out { margin-top: 0; white-space: nowrap; }
+button.seat[disabled]:not([type]) { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8rpx; min-height: 288rpx; padding: 16rpx; }
+.seats-compact button.seat,
+.seats-compact button.seat[disabled]:not([type]) { gap: 6rpx; min-height: 272rpx; padding: 12rpx; }
+.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 8rpx; min-height: 40rpx; }
+.seat-head .seat-number { display: block; flex-shrink: 0; font-size: 32rpx; line-height: 40rpx; }
+.seat-self { flex-shrink: 0; padding: 2rpx 8rpx; font-size: 22rpx; line-height: 36rpx; }
+.seat-player { display: flex; flex-direction: column; align-items: center; gap: 8rpx; min-width: 0; }
+.seat-avatar { position: relative; display: block; flex: 0 0 100rpx; width: 100rpx; height: 100rpx; overflow: hidden; border-radius: 50%; background: var(--bg); color: var(--muted); }
+.seat-avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 44rpx; font-weight: 600; }
+.seat-avatar-image { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+button.seat .seat-name { display: -webkit-box; width: 100%; min-height: 40rpx; font-weight: 600; line-height: 40rpx; text-align: center; white-space: normal; overflow: hidden; word-break: break-all; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+button.seat .seat-meta { display: flex; flex-direction: column; align-items: center; gap: 4rpx; min-height: 32rpx; margin-top: auto; line-height: 32rpx; }
+.seat-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 8rpx; width: 100%; }
+button.seat .seat-flag { display: inline-block; min-height: 0; padding: 0 6rpx; border: 2rpx solid var(--border); border-radius: 8rpx; font-size: 22rpx; line-height: 28rpx; white-space: nowrap; }
+button.seat .seat-fairy { margin-right: 0; padding: 0 6rpx; border-width: 2rpx; font-size: 22rpx; line-height: 28rpx; }
+button.seat .seat-out { margin-top: 0; padding: 0 6rpx; border-width: 2rpx; border-radius: 8rpx; font-size: 22rpx; line-height: 28rpx; white-space: nowrap; }
+.seat-status { display: block; max-width: 100%; white-space: nowrap; }
+.seat-ready { color: var(--good); }
+button.seat.seat-empty,
+button.seat.seat-empty[disabled]:not([type]) { background: var(--bg); border-style: dashed; border-color: var(--seat-empty-border); }
+.seat-empty .seat-number { color: var(--muted); }
+.seat-empty-body { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12rpx; padding-bottom: 48rpx; color: var(--muted); }
+.seat-empty-mark { display: flex; align-items: center; justify-content: center; width: 100rpx; height: 100rpx; font-size: 48rpx; font-weight: 400; line-height: 1; }
+.seat-empty-label { font-size: 24rpx; line-height: 40rpx; }
+.seat-section-title { display: flex; align-items: center; gap: 16rpx; }
+.seat-count { font-size: 24rpx; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.seat-section-caption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8rpx 24rpx; font-size: 24rpx; line-height: 36rpx; color: var(--muted); }
+.seat-ready-count { white-space: nowrap; }
 
 .result-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; }
 .result-team { font-size: 28rpx; font-weight: 400; color: var(--muted); margin-left: auto; }

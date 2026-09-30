@@ -5,6 +5,7 @@
   --muted: #b1bfc6;
   --accent: #e5c68b;
   --border: #536570;
+  --seat-empty-border: rgba(83, 101, 112, 0.65);
   --good: #a3dfbe;
   --evil: #f2b6ae;
   --third: #8ab8d9;
@@ -527,7 +528,7 @@ button.seat.selected {
   color: var(--muted);
   font-weight: 400;
 }
-.seat.mine .seat-flag {
+.seat-self {
   background: var(--text);
   color: var(--bg);
   border-radius: 4px;
@@ -1510,19 +1511,33 @@ button.role-quick-toggle { display: grid; grid-template-columns: 106px minmax(0,
 }
 .seat-meta { min-height: 20px; }
 
-/* Seat identity: reserve the avatar and status slots across polling updates. */
-button.seat { display: flex; gap: 6px; min-height: 124px; padding: 8px; }
-.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-.seat-head .seat-number { display: block; flex-shrink: 0; }
-.seat-avatar { position: relative; display: block; flex: 0 0 36px; width: 36px; height: 36px; overflow: hidden; border-radius: 50%; background: var(--bg); color: var(--muted); }
-.seat-avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
+/* Seat cards: seat context, centered player identity, then public status. */
+button.seat { display: flex; justify-content: flex-start; gap: 4px; min-height: 144px; padding: 8px; }
+.seats-compact button.seat { gap: 3px; min-height: 136px; padding: 6px; }
+.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 20px; }
+.seat-head .seat-number { display: block; flex-shrink: 0; font-size: 16px; line-height: 20px; }
+.seat-self { flex-shrink: 0; padding: 1px 4px; font-size: 11px; line-height: 18px; }
+.seat-player { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.seat-avatar { position: relative; display: block; flex: 0 0 50px; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: var(--bg); color: var(--muted); }
+.seat-avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; }
 .seat-avatar-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
-.seat-avatar-empty { box-sizing: border-box; background: transparent; border: 1px dashed var(--border); }
-button.seat .seat-name { display: -webkit-box; min-height: 20px; line-height: 20px; white-space: normal; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-button.seat .seat-meta { display: flex; align-content: flex-start; align-items: flex-start; flex-wrap: wrap; gap: 4px; min-height: 36px; margin-top: auto; line-height: 16px; }
-button.seat .seat-flag { display: inline-block; min-height: 0; }
-button.seat .seat-fairy { margin-right: 0; line-height: 16px; }
-button.seat .seat-out { display: inline-block; padding: 0 4px; border: 1px solid var(--evil); border-radius: 4px; color: var(--evil); white-space: nowrap; }
+button.seat .seat-name { display: -webkit-box; width: 100%; min-height: 20px; font-weight: 600; line-height: 20px; text-align: center; white-space: normal; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+button.seat .seat-meta { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 16px; margin-top: auto; line-height: 16px; }
+.seat-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; width: 100%; }
+button.seat .seat-flag { display: inline-block; min-height: 0; padding: 0 3px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; line-height: 14px; white-space: nowrap; }
+button.seat .seat-fairy { margin-right: 0; padding: 0 3px; font-size: 11px; line-height: 14px; }
+button.seat .seat-out { display: inline-block; padding: 0 3px; border: 1px solid var(--evil); border-radius: 4px; color: var(--evil); font-size: 11px; line-height: 14px; white-space: nowrap; }
+.seat-status { display: block; max-width: 100%; white-space: nowrap; }
+.seat-ready { color: var(--good); }
+button.seat.seat-empty { background: var(--bg); border-style: dashed; border-color: var(--seat-empty-border); }
+.seat-empty .seat-number { color: var(--muted); }
+.seat-empty-body { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding-bottom: 24px; color: var(--muted); }
+.seat-empty-mark { display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; font-size: 24px; font-weight: 400; line-height: 1; }
+.seat-empty-label { font-size: 12px; line-height: 20px; }
+.seat-section-title { display: flex; align-items: center; gap: 8px; }
+.seat-count { font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.seat-section-caption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 12px; line-height: 18px; color: var(--muted); }
+.seat-ready-count { white-space: nowrap; }
 .fairy-setting .settings-caption { display: block; }
 .fairy-setting input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--accent); }
 .fairy-setting input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
@@ -1813,6 +1828,45 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 .avatar-upload:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .profile-form { margin-top: 4px; }
 .page-title:focus { outline: none; }
+
+/* Profile editing follows the mini program's layout and avatar catalog. */
+.profile-navigation { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); }
+.profile-navigation-content { position: relative; display: flex; align-items: center; justify-content: center; min-height: 56px; max-width: 460px; margin: 0 auto; }
+.profile-title { max-width: 52%; margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3; }
+.profile-title:focus { outline: none; }
+button.profile-back { position: absolute; left: 12px; width: 44px; min-height: 48px; padding: 0; justify-content: flex-start; font-size: 30px; line-height: 1; }
+.page.profile-page { padding-top: 12px; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+.page.profile-page.has-pending-save { padding-bottom: calc(132px + env(safe-area-inset-bottom)); }
+.profile-page .profile-form { margin: 0; }
+.profile-page .avatar-editor { gap: 8px; padding: 8px 0 20px; }
+.profile-page .avatar-preview .profile-avatar.large { width: 92px; height: 92px; }
+.nickname-editor { width: 100%; max-width: 300px; text-align: center; }
+button.nickname-display { width: auto; max-width: 100%; min-height: 48px; margin: 0 auto; padding: 6px 10px; gap: 8px; }
+.nickname-text { min-width: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.nickname-edit-icon { flex-shrink: 0; width: 18px; height: 18px; color: var(--accent); }
+.nickname-input-row { display: flex; align-items: center; gap: 6px; min-height: 48px; }
+.input.nickname-input { flex: 1; min-width: 0; width: 0; height: 48px; margin: 0; border-color: var(--accent); text-align: center; font-size: 1.125rem; }
+.input.nickname-input.is-invalid { border-color: var(--evil); }
+button.nickname-done { width: auto; flex-shrink: 0; min-height: 48px; padding: 6px 8px; color: var(--accent); font-size: .875rem; }
+.nickname-error { margin-top: 6px; color: var(--evil); font-size: .8125rem; }
+.avatar-actions { display: flex; flex-direction: column; align-items: center; }
+.profile-page .avatar-upload { width: auto; min-height: 48px; padding: 8px 16px; font-size: .875rem; }
+.avatar-library { margin: 0; }
+.avatar-library .field-title { margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: .9375rem; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 10px 0 0; }
+.avatar-grid button.avatar-option { position: relative; width: 100%; min-width: 0; min-height: 68px; padding: 6px 2px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); scroll-margin-block: 72px 110px; }
+.avatar-option-image { display: block; width: 52px; height: 52px; max-width: 100%; object-fit: cover; border-radius: 50%; }
+.avatar-option-selected { position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 12px; line-height: 16px; text-align: center; }
+.avatar-grid button.avatar-option.is-selected { border-color: var(--accent); background: var(--surface); color: var(--accent); }
+.avatar-grid button.avatar-option:not(:disabled):hover, .avatar-grid button.avatar-option:not(:disabled):active { background: var(--surface); }
+.profile-save-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; border-top: 1px solid var(--border); background: var(--bg); padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+.profile-save-content { max-width: 428px; margin: 0 auto; }
+.profile-save-bar .profile-save { width: 100%; min-height: 48px; margin: 0; }
+.profile-save-hint { margin-bottom: 8px; text-align: center; }
+.profile-page button:focus-visible, .profile-navigation button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: none) and (pointer: coarse) {
+  .profile-page:has(.nickname-input:focus) .profile-save-bar { display: none; }
+}
 
 .leaderboard-page { padding-bottom: calc(11rem + env(safe-area-inset-bottom)); }
 .rank-period { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface); }

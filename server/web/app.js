@@ -310,7 +310,7 @@
   var settingsSavePending = null;
 
   var state = {
-    page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, avatarLoading: false, nameEdited: false,
+    page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, avatarLoading: false, nameEdited: false, profileEditingNickname: false, profileNicknameError: "",
     loading: true,
     busy: false,
     error: "",
@@ -382,6 +382,8 @@
     history: [],
     latestResult: null,
     seatsExpanded: true,
+    seatOccupiedCount: 0,
+    seatReadyCount: 0,
     operationProgressExpanded: false,
     historyExpanded: false,
     focusedHistoryKey: null,
@@ -444,7 +446,7 @@
     roomCode = null; profilePending = null;
     setState({ page: route.page, room: null, error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
-      profileDirty: false, profileDraft: null, profileError: '', profileConflict: false, statsOpen: route.page === 'stats' });
+      profileDirty: false, profileDraft: null, profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats' });
     window.scrollTo(0, 0);
     try {
       await login();
@@ -473,7 +475,7 @@
       const profile = await request('/api/me/profile');
       if (sequence !== profileSequence) return;
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
-        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version }, profileDirty: false,
+        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version }, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
       } : {}) });
     } catch (e) {
       if (sequence === profileSequence) setState({ profileError: e.message });
@@ -483,9 +485,39 @@
   function profileDirty() {
     setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
   }
+  const builtinAvatars = window.shadowtableBuiltinAvatars || [];
+  function profilePreset(url) {
+    return builtinAvatars.find(item => url === item.path || url?.endsWith('/api/avatars/' + item.hash));
+  }
+  function chooseBuiltinProfileAvatar(el) {
+    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
+    const preset = builtinAvatars.find(item => item.id === el.dataset.id);
+    if (!preset) return;
+    if (profilePreset(state.profile?.avatarUrl)?.id === preset.id) delete state.profileDraft.avatar;
+    else state.profileDraft.avatar = 'builtin:' + preset.id;
+    state.profileDraft.avatarPreview = preset.path;
+    state.profileError = '';
+    profileDirty();
+  }
+  function editProfileNickname() {
+    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
+    setState({ profileEditingNickname: true, profileNicknameError: '' });
+    app.querySelector('#profile-nickname')?.focus();
+  }
+  function finishProfileNickname() {
+    // Removing the focused input also fires focusout during DOM reconciliation.
+    if (!state.profileEditingNickname || !state.profileDraft || state.profileSaving || profilePending) return;
+    const nickname = state.profileDraft.nickname.trim();
+    if (!nickname || nickname.length > 16)
+      return setState({ profileNicknameError: '请输入1–16个字符的昵称' });
+    state.profileDraft.nickname = nickname;
+    state.profileEditingNickname = false;
+    state.profileNicknameError = '';
+    profileDirty();
+  }
   async function chooseProfileAvatar(el) {
     const file = el.files?.[0]; el.value = '';
-    if (!file || state.profileSaving || profilePending) return;
+    if (!file || !state.profileDraft || state.profileLoading || state.profileSaving || profilePending || state.avatarLoading) return;
     if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024)
       return setState({ profileError: '请选择10MB以内的 JPG 或 PNG 图片' });
     setState({ avatarLoading: true, profileError: '' });
@@ -505,11 +537,16 @@
     if (state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict || !state.profileDraft) return;
     if (!profilePending) {
       const nickname = state.profileDraft.nickname.trim();
-      if (!nickname || nickname.length > 16) return setState({ profileError: '请输入1–16个字符的昵称' });
+      if (!nickname || nickname.length > 16) {
+        editProfileNickname();
+        setState({ profileNicknameError: '请输入1–16个字符的昵称' });
+        app.querySelector('#profile-nickname')?.focus();
+        return;
+      }
       profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version,
         ...(state.profileDraft.avatar !== undefined ? { avatar: state.profileDraft.avatar } : {}) } };
     }
-    setState({ profileSaving: true, profileError: '' });
+    setState({ profileSaving: true, profileError: '', profileEditingNickname: false, profileNicknameError: '' });
     try {
       await login();
       const profile = await request('/api/me/profile', 'POST', profilePending.data, profilePending.id);
@@ -555,14 +592,27 @@
     return html;
   }
   function viewProfileEditor() {
-    const draft = state.profileDraft, locked = state.profileSaving || !!profilePending;
-    let html = personalTitle('编辑资料','') + '<div class="muted">让朋友认出你。</div>' + viewProfileError();
+    const draft = state.profileDraft, locked = state.profileLoading || state.profileSaving || !!profilePending;
+    let html = viewProfileError();
     if (!draft) return html + (state.profileLoading ? '<div class="status">正在读取资料…</div>' : '');
-    html += '<form class="profile-form" data-form="profile"><div class="avatar-editor">' + avatarView(draft.avatarPreview,draft.nickname,true) + '<label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '更换头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="选择新头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label>';
-    if (draft.avatarPreview) html += btn('text-button','removeProfileAvatar','恢复默认头像',null,locked || state.avatarLoading);
-    html += '</div><label for="profile-nickname" class="field-title">个人昵称</label><input id="profile-nickname" name="nickname" class="input" maxlength="16" autocomplete="nickname" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符"' + (locked ? ' disabled' : '') + ' /><div class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</div>';
-    html += btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict) + (profilePending && !state.profileSaving ? '<div class="small muted">保存结果尚未确认，请重试同一次保存。</div>' : '') + '</form>';
+    html += '<form class="profile-form" data-form="profile"><div class="avatar-editor"><div class="avatar-preview">' + avatarView(draft.avatarPreview,draft.nickname.trim(),true) + '</div><div class="nickname-editor">';
+    if (state.profileEditingNickname) {
+      html += '<div class="nickname-input-row"><input id="profile-nickname" name="nickname" class="input nickname-input' + (state.profileNicknameError ? ' is-invalid' : '') + '" maxlength="16" autocomplete="nickname" enterkeyhint="done" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符"' + (state.profileNicknameError ? ' aria-invalid="true" aria-describedby="profile-nickname-error"' : '') + (locked ? ' disabled' : '') + ' />' + btn('nickname-done','finishProfileNickname','完成',null,locked) + '</div>';
+    } else {
+      html += '<button type="button" class="nickname-display" data-action="editProfileNickname" aria-label="修改个人昵称，当前昵称：' + esc(draft.nickname || '新朋友') + '"' + (locked ? ' disabled' : '') + '><span class="nickname-text">' + esc(draft.nickname || '新朋友') + '</span><svg class="nickname-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1L20 7.5a2.8 2.8 0 0 0-4-4L4.5 15Z"/></svg></button>';
+    }
+    if (state.profileNicknameError) html += '<div id="profile-nickname-error" class="nickname-error" role="alert">' + esc(state.profileNicknameError) + '</div>';
+    html += '</div><div class="avatar-actions"><label class="avatar-upload secondary">' + (state.avatarLoading ? '正在处理头像…' : '上传头像') + '<input type="file" accept="image/png,image/jpeg" data-change="profileAvatar" aria-label="上传头像"' + (locked || state.avatarLoading ? ' disabled' : '') + ' /></label></div></div>';
+    const selected = profilePreset(draft.avatarPreview)?.id;
+    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-grid">' + builtinAvatars.map(item => {
+      const chosen = selected === item.id;
+      return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked || state.avatarLoading ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
+    }).join('') + '</div></section>';
+    html += '<div class="profile-save-bar"><div class="profile-save-content">' + (profilePending && !state.profileSaving ? '<div class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</div>' : '') + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.avatarLoading || state.profileConflict) + '</div></div></form>';
     return html;
+  }
+  function viewProfileHeader() {
+    return '<header class="profile-navigation"><div class="profile-navigation-content"><button type="button" class="profile-back" data-action="navigate" data-page="me" aria-label="返回我的"' + (state.profileSaving || state.avatarLoading ? ' disabled' : '') + '>‹</button><h1 class="profile-title" tabindex="-1" data-page-heading>编辑资料</h1></div></header>';
   }
   const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
   var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
@@ -782,6 +832,8 @@
       toolSeats: [],
       toolPlayers: [],
       seats: [],
+      seatOccupiedCount: 0,
+      seatReadyCount: 0,
       history: [],
       latestResult: null,
       selected: [],
@@ -989,6 +1041,8 @@ function roomListItems(rooms) {
       };
     });
     patch.seats = seats;
+    patch.seatOccupiedCount = seats.filter(s => s.occupied).length;
+    patch.seatReadyCount = seats.filter(s => s.occupied && s.ready).length;
     var history = room.history.map(function (h, i) {
       return (
         toolHistory(h, i) || {
@@ -2971,18 +3025,21 @@ function roomListItems(rooms) {
       html += "</div>";
     }
     var quests = r.phase === "lobby" ? [] : state.history.filter(function (h) { return h.questResult; });
-    html += '<div class="task-progress"><div class="section-title history-heading"><span>' + (quests.length ? '任务进度' : '玩家与座位') + '</span>' +
-      (r.phase === "lobby" ? '<span class="small muted">点自己站起，点空位坐下</span>' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
+    html += '<div class="task-progress"><div class="section-title history-heading"><span class="seat-section-title"><span>' + (quests.length ? '任务进度' : '玩家与座位') + '</span>' +
+      (r.phase === 'lobby' ? '<span class="seat-count" aria-label="已入座' + state.seatOccupiedCount + '人，共' + r.capacity + '个座位">' + state.seatOccupiedCount + '/' + r.capacity + '</span>' : '') + '</span>' +
+      (r.phase === "lobby" ? '' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
+    if (r.phase === 'lobby') html += '<div class="seat-section-caption"><span class="seat-ready-count">已准备 ' + state.seatReadyCount + '/' + state.seatOccupiedCount + '</span><span>点自己站起，点空位坐下</span></div>';
     if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
       return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
     }).join("") + '</div>';
     html += '</div>';
     if (r.phase === "lobby" || state.seatsExpanded) {
-    html += '<div class="seats">';
+    html += '<div class="seats' + (r.capacity >= 10 ? ' seats-compact' : '') + '">';
     for (var i = 0; i < state.seats.length; i++) {
       var s = state.seats[i];
       html +=
         '<button type="button" class="seat' +
+        (s.occupied ? "" : " seat-empty") +
         (s.mine ? " mine" : "") +
         (s.inTeam ? " team" : "") +
         (s.selected ? " selected" : "") +
@@ -2993,16 +3050,21 @@ function roomListItems(rooms) {
         (seatDisabled(s) ? " disabled" : "") +
         '><span class="seat-head"><span class="seat-number">' +
         s.seat +
-        '</span><span class="seat-avatar' + (s.occupied ? '' : ' seat-avatar-empty') + '" aria-hidden="true"><span class="seat-avatar-fallback">' + esc(s.avatarInitial) + '</span>' +
+        '号</span>' + (s.mine ? '<span class="seat-self">你</span>' : '') + '</span>';
+      if (s.occupied) {
+        html += '<span class="seat-player"><span class="seat-avatar" aria-hidden="true"><span class="seat-avatar-fallback">' + esc(s.avatarInitial) + '</span>' +
         (s.avatarUrl && !s.avatarFailed ? '<img class="seat-avatar-image" src="' + esc(s.avatarUrl) + '" alt="" data-seat="' + s.seat + '" data-seat-avatar-url="' + esc(s.avatarUrl) + '" />' : '') +
-        '</span></span><span class="seat-name">' +
-        esc(s.name) +
-        '</span><span class="seat-meta">' +
-        (s.mine || s.host ? '<span class="seat-flag">' + (s.mine ? (s.host ? '你·房主' : '你') : '房主') + '</span>' : '') +
-        (s.alive === false ? '<span class="seat-out">已出局</span>' : '') +
-        (r.fairyHolder === s.seat ? '<span class="seat-fairy">湖仙</span> ' : '') +
-        '<span>' + esc(seatMeta(s)) + '</span>' +
-        "</span></button>";
+        '</span><span class="seat-name">' + esc(s.name) + '</span></span><span class="seat-meta">' +
+        (seatMeta(s) ? '<span class="seat-status' + (r.phase === 'lobby' && s.ready ? ' seat-ready' : '') + '">' + esc(seatMeta(s)) + '</span>' : '') +
+        (s.host || s.alive === false || r.fairyHolder === s.seat ? '<span class="seat-tags">' +
+          (s.host ? '<span class="seat-flag">房主</span>' : '') +
+          (s.alive === false ? '<span class="seat-out">已出局</span>' : '') +
+          (r.fairyHolder === s.seat ? '<span class="seat-fairy">湖仙</span>' : '') + '</span>' : '') +
+        '</span>';
+      } else {
+        html += '<span class="seat-empty-body"><span class="seat-empty-mark" aria-hidden="true">+</span><span class="seat-empty-label">' + (r.phase === 'lobby' ? '点击入座' : '空位') + '</span></span>';
+      }
+      html += '</button>';
     }
     html += "</div>";
     }
@@ -3497,10 +3559,10 @@ function roomListItems(rooms) {
       viewFairyResult() +
       viewIdentityChange() +
       viewDealtIdentity() +
-      '<div class="page' +
+      (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
-      '">' +
-      viewBrand() +
+      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '">' +
+      (state.page === 'profile' ? '' : viewBrand()) +
       (state.loading ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
       viewActionDialog() +
@@ -3527,6 +3589,9 @@ function roomListItems(rooms) {
     rankRefresh: () => loadLeaderboard(),
     navigate: el => navigate(el.dataset.page),
     saveProfile,
+    chooseBuiltinProfileAvatar,
+    editProfileNickname,
+    finishProfileNickname,
     reloadProfile: async () => { if (!state.profileDirty || await confirm('重新载入资料？', '当前未保存的修改将丢弃。')) { profilePending = null; try { await login(); await loadProfile(state.page === 'profile'); } catch (e) { setState({ profileError: e.message }); } } },
     removeProfileAvatar: () => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.avatar = null; state.profileDraft.avatarPreview = null; profileDirty(); } },
     about: () => confirm('关于桌边助手', 'ShadowTable · 为面对面的阿瓦隆聚会而做。身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', false),
@@ -3793,7 +3858,7 @@ function roomListItems(rooms) {
     },
   };
   var INPUTS = {
-    profileName: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.nickname = el.value; profileDirty(); } },
+    profileName: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.nickname = el.value; state.profileNicknameError = ''; state.profileError = ''; profileDirty(); } },
     roomNote: function (el) { state.roomNoteDraft = el.value; },
     name: function (el) {
       state.nameEdited = true;
@@ -3836,6 +3901,16 @@ function roomListItems(rooms) {
   app.addEventListener("submit", function (e) {
     e.preventDefault();
     if (e.target.dataset.form === "profile") saveProfile();
+  });
+  app.addEventListener('focusout', function (e) {
+    if (e.target?.dataset?.input === 'profileName' && e.relatedTarget?.dataset?.action !== 'finishProfileNickname') finishProfileNickname();
+  });
+  app.addEventListener('keydown', function (e) {
+    if (e.target?.dataset?.input === 'profileName' && e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      finishProfileNickname();
+      if (!state.profileEditingNickname) app.querySelector('[data-action="editProfileNickname"]')?.focus({ preventScroll: true });
+    }
   });
 
   // ===== lifecycle =====

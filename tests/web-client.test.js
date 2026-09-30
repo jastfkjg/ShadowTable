@@ -14,7 +14,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
-    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {} },
+    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {}, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars') },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
@@ -36,6 +36,82 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页内置头像只改草稿，重新选原头像取消改动，保存与断网重试保持同一选择', async () => {
+  const presets = require('../miniprogram/builtin-avatars'), posts = [];
+  let saved = { nickname: '林间', version: 2, identityType: 'guest', avatarUrl: '/api/avatars/' + presets[0].hash };
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') {
+      posts.push(options);
+      if (posts.length === 1) throw new Error('网络未确认');
+      saved = { ...saved, version: 3, avatarUrl: '/api/avatars/' + presets.at(-1).hash };
+    }
+    return response(url.endsWith('/profile') ? saved : url.endsWith('/rooms') ? {rooms:[]} : {total:0,wins:0,winRate:null});
+  });
+  await c.applyRoute('#/profile');
+  assert.equal((c.viewProfileEditor().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 28);
+  assert.match(c.viewProfileEditor(), /data-id="avatar-01" aria-label="头像 01，已选择" aria-pressed="true"/);
+  const choose = id => c.ACTIONS.chooseBuiltinProfileAvatar({ dataset: { id } });
+  choose(presets[1].id);
+  assert.equal(c.state.profileDraft.avatar, 'builtin:' + presets[1].id);
+  assert.equal(c.state.profileDirty, true);
+  assert.equal(posts.length, 0);
+  choose(presets[0].id);
+  assert.equal(c.state.profileDraft.avatar, undefined);
+  assert.equal(c.state.profileDirty, false);
+  choose('avatar-99');
+  assert.equal(c.state.profileDirty, false);
+  choose(presets.at(-1).id);
+  await c.saveProfile();
+  choose(presets[1].id);
+  assert.equal(c.state.profileDraft.avatar, 'builtin:' + presets.at(-1).id);
+  await c.saveProfile();
+  assert.equal(posts[0].body, posts[1].body);
+  assert.equal(posts[0].headers['Idempotency-Key'], posts[1].headers['Idempotency-Key']);
+  assert.equal(JSON.parse(posts[1].body).avatar, 'builtin:' + presets.at(-1).id);
+  await c.navigate('profile');
+  assert.match(c.viewProfileEditor(), /data-id="avatar-28" aria-label="头像 28，已选择" aria-pressed="true"/);
+});
+test('网页昵称在头像下编辑，空值保留错误，完成后仅更新草稿', async () => {
+  let writes = 0;
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') writes++;
+    return response({ nickname:'林间', version:1, avatarUrl:null });
+  });
+  await c.applyRoute('#/profile');
+  c.ACTIONS.editProfileNickname();
+  c.INPUTS.profileName({value:' '});
+  c.ACTIONS.finishProfileNickname();
+  assert.equal(c.state.profileEditingNickname, true);
+  assert.match(c.viewProfileEditor(), /aria-invalid="true"/);
+  c.INPUTS.profileName({value:' 晚风 '});
+  c.ACTIONS.finishProfileNickname();
+  assert.equal(c.state.profileEditingNickname, false);
+  assert.equal(c.state.profileDraft.nickname, '晚风');
+  assert.equal(c.state.profileDirty, true);
+  assert.equal(writes, 0);
+  assert.match(c.viewProfileEditor(), /nickname-text">晚风/);
+  assert.match(c.viewProfileEditor(), /profile-save-bar/);
+});
+test("网页座位昵称转义且轮询更新人数和准备统计", async () => {
+  const room = dealtWebRoom({ phase: "lobby", capacity: 13, stage: "s1", code: "123456",
+    players: [{ seat: 1, name: "完整昵称<甲>", ready: false, isHost: true, role: "秘密角色" }, { seat: 2, name: "乙", ready: true }] });
+  let writes = 0;
+  const c = client(async (path,options) => { if (options?.method === "POST") writes++; return response(structuredClone(room)); });
+  await c.refresh();
+  assert.equal(c.state.seatOccupiedCount, 2);
+  assert.equal(c.state.seatReadyCount, 1);
+  assert.match(c.viewRoom(), /class="seat-name">完整昵称&lt;甲&gt;/);
+  assert.doesNotMatch(c.viewRoom(), /秘密角色|玩家名单|关闭名单/);
+  assert.match(c.viewRoom(), /已准备 1\/2/);
+  room.players[0].ready = true;
+  room.players[1].seat = 4;
+  room.players[1].name = "更新后的完整昵称";
+  await c.refresh();
+  assert.equal(c.state.seatReadyCount, 2);
+  assert.match(c.viewRoom(), /aria-label="4号，更新后的完整昵称/);
+  assert.match(c.viewRoom(), /已准备 2\/2/);
+  assert.equal(writes, 0);
+});
 test("网页房主进度可展开收起，刷新保留状态，新操作默认收起", async () => {
   const room = dealtWebRoom({ phase: "skillPrepare", canUseTools: true, knights: { round: 3, remainingCards: 6 }, operationProgress: { total: 2, completed: 1, players: [{ seat: 1, name: "甲", required: true, completed: true }, { seat: 2, name: "乙", required: true, completed: false }] } });
   const c = client(async () => response(structuredClone(room)));
@@ -85,9 +161,11 @@ test("网页座位头像失败回退且轮询不重试，换座跟随玩家，�
   const c = client(async () => response(structuredClone(room)));
   await c.refresh();
   assert.match(c.viewRoom(), /class="seat-avatar-image" src="\/api\/avatars\/a"/);
-  assert.match(c.viewRoom(), /你·房主/);
+  assert.match(c.viewRoom(), /class="seat-self">你<\/span>/);
+  assert.match(c.viewRoom(), /class="seat-flag">房主<\/span>/);
   assert.match(c.viewRoom(), /aria-label="1号，甲，你的座位，房主"/);
-  assert.match(c.viewRoom(), /seat-avatar-empty/);
+  assert.match(c.viewRoom(), /seat-empty/);
+  assert.doesNotMatch(c.viewRoom(), /点击入座/);
   c.ACTIONS.seat({ dataset: { seat: "2" } });
   c.ACTIONS.toggleSeats();
   c.seatAvatarError({ dataset: { seat: "1", seatAvatarUrl: "/api/avatars/a" } });
@@ -111,6 +189,11 @@ test("网页座位头像失败回退且轮询不重试，换座跟随玩家，�
   room.players[0].avatarUrl = "/api/avatars/a";
   await c.refresh();
   assert.equal(c.state.seats[3].avatarFailed, false);
+  room.phase = "lobby";
+  room.players[0].ready = true;
+  await c.refresh();
+  assert.match(c.viewRoom(), /class="seat-status seat-ready">已准备<\/span>/);
+  assert.match(c.viewRoom(), /class="seat-empty-label">点击入座<\/span>/);
 });
 test("网页首次提醒无需秘密请求，主动揭示后关闭并清空，刷新不重弹且重开再提醒", async () => {
   let room = dealtWebRoom(), reads = 0;
