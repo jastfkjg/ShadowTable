@@ -50,7 +50,9 @@ jobs:
         env:
           EXPECTED_REVISION: ${{ steps.run.outputs.revision }}
           EXPECTED_RUN_ID: ${{ inputs.build_run_id }}
-          IMAGE_REPOSITORY: ${{ vars.IMAGE_REPOSITORY }}
+          ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ vars.ACR_NAMESPACE }}
+          ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
         run: python3 deploy/cloud/image_metadata.py resolve image-metadata/image.json
   deploy:
     needs: resolve

@@ -54,11 +54,13 @@ WECHAT_APP_SECRET=
 
 | 类型 | 名称 | 内容 |
 | --- | --- | --- |
-| Variable | `IMAGE_REPOSITORY` | 完整仓库路径，不带协议、tag 或 digest，例如 `registry.cn-hangzhou.aliyuncs.com/your-namespace/shadowtable` |
-| Secret | `REGISTRY_USERNAME` | 镜像推送账号 |
-| Secret | `REGISTRY_PASSWORD` | 镜像推送密码 |
+| Variable | `ACR_REGISTRY` | 现有 ACR 仓库域名，不带协议或路径 |
+| Variable | `ACR_NAMESPACE` | 现有命名空间，例如 `zzl-project` |
+| Variable | `ACR_REPOSITORY` | 镜像仓库名称，例如 `shadowtable`，不带 tag 或 digest |
+| Secret | `ACR_USERNAME` | 镜像推送账号 |
+| Secret | `ACR_PASSWORD` | 镜像推送密码 |
 
-从旧配置迁移时，`IMAGE_REPOSITORY` 由原 `ACR_REGISTRY/ACR_NAMESPACE/ACR_REPOSITORY` 拼接；推送凭据由原 `ACR_USERNAME/ACR_PASSWORD` 迁入新名称。若凭据只配置在旧 `production` Environment，需要迁到仓库级别，因为 CI 构建不访问部署环境。
+继续使用现有 ACR 配置，workflow 自动将三个变量拼接为完整镜像路径，无需新增变量或改名。若凭据只配置在旧 `production` Environment，需要将同名凭据配置到仓库级别，因为 CI 构建不访问部署环境。
 
 继续使用当前 ACR 即可同时服务 EC2/ECS。构建登录流程适用于支持 Docker 用户名/密码的 registry；以后切到 ECR 时另加 OIDC 登录适配，服务器发布脚本已接受 ECR、ACR、GHCR 等不可变镜像地址。
 

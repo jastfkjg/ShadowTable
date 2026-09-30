@@ -7,6 +7,16 @@ import sys
 from validate_image import image_reference, repository
 
 
+def configured_repository():
+    parts = []
+    for key in ('ACR_REGISTRY', 'ACR_NAMESPACE', 'ACR_REPOSITORY'):
+        value = os.environ.get(key, '')
+        if not value:
+            raise ValueError(f'Missing repository variable: {key}')
+        parts.append(value)
+    return repository('/'.join(parts))
+
+
 def resolve(metadata, revision, run_id, image_repository):
     image = image_reference(metadata['image'])
     if not re.fullmatch(r'[a-f0-9]{40}', revision):
@@ -26,9 +36,10 @@ def output(key, value):
 if __name__ == '__main__':
     try:
         command = sys.argv[1]
-        name = repository(os.environ['IMAGE_REPOSITORY'])
+        name = configured_repository()
         if command == 'repository':
             output('registry', name.split('/', 1)[0])
+            output('repository', name)
         elif command == 'create':
             image = image_reference(name + '@' + os.environ['IMAGE_DIGEST'])
             metadata = {'image': image, 'revision': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID']}

@@ -196,6 +196,31 @@ class PromotionTest(unittest.TestCase):
         from image_metadata import resolve
         cls.resolve = staticmethod(resolve)
 
+    def test_existing_acr_variables_support_build_and_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            env = dict(os.environ, ACR_REGISTRY='registry.cn-hangzhou.aliyuncs.com',
+                       ACR_NAMESPACE='example', ACR_REPOSITORY='shadowtable',
+                       GITHUB_OUTPUT=str(root / 'output'), GITHUB_STEP_SUMMARY=str(root / 'summary'),
+                       IMAGE_DIGEST='sha256:' + 'a' * 64, GITHUB_SHA='c' * 40,
+                       GITHUB_RUN_ID='123', EXPECTED_REVISION='c' * 40, EXPECTED_RUN_ID='123')
+            env.pop('IMAGE_REPOSITORY', None)
+            metadata = str(root / 'image.json')
+            for args in [('repository',), ('create', metadata), ('resolve', metadata)]:
+                result = subprocess.run([sys.executable, str(ROOT / 'deploy/cloud/image_metadata.py'), *args],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(Path(metadata).read_text())['image'], IMAGE)
+            self.assertEqual((root / 'output').read_text().splitlines(), [
+                'registry=registry.cn-hangzhou.aliyuncs.com',
+                'repository=' + IMAGE.split('@')[0], 'image=' + IMAGE])
+            for key in ('ACR_REGISTRY', 'ACR_NAMESPACE', 'ACR_REPOSITORY'):
+                with self.subTest(missing=key):
+                    result = subprocess.run([sys.executable, str(ROOT / 'deploy/cloud/image_metadata.py'), 'repository'],
+                                            env=dict(env, **{key: ''}), capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('Missing repository variable: ' + key, result.stderr)
+
     def test_only_matching_build_metadata_can_be_promoted(self):
         sha = 'c' * 40
         metadata = {'image': IMAGE, 'revision': sha, 'run_id': '123'}
