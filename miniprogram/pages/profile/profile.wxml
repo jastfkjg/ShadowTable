@@ -1,19 +1,31 @@
 <app-nav title="编辑资料" back="{{true}}" backLabel="{{backLabel || '返回我的'}}" bindback="back" />
 <view class="page personal-page">
-  <view class="page-title">编辑资料</view><view class="muted">让朋友认出你。</view>
+  <view class="page-title">编辑资料</view>
   <view wx:if="{{loading && !profile}}" class="status">正在读取资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
   <form wx:if="{{profile}}" bindsubmit="save">
     <view class="avatar-editor">
-      <button hover-class="none" class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="选择新头像">
+      <view class="avatar-preview">
         <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" />
         <view wx:else class="profile-avatar large avatar-fallback">{{initial}}</view>
-      </button><view class="small muted">{{choosing?'正在处理头像…':'点击头像更换'}}</view>
-      <button hover-class="none" wx:if="{{avatarPreview}}" class="text-button" bindtap="removeAvatar" disabled="{{busy || pendingSave || choosing}}">恢复默认头像</button>
+      </view>
+      <view class="avatar-actions">
+        <button hover-class="none" class="secondary avatar-upload" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy || pendingSave || choosing}}">{{choosing?'正在处理头像…':'上传自己的头像'}}</button>
+      </view>
+    </view>
+    <view class="avatar-library">
+      <view class="field-title">选择内置头像</view>
+      <scroll-view scroll-y="{{true}}" class="avatar-library-scroll">
+        <view class="avatar-grid">
+          <button wx:for="{{builtinAvatars}}" wx:key="id" hover-class="none" class="avatar-option {{selectedAvatar === item.id ? 'is-selected' : ''}}" data-id="{{item.id}}" bindtap="chooseBuiltinAvatar" disabled="{{busy || pendingSave || choosing}}" aria-label="{{item.label}}{{selectedAvatar === item.id ? '，已选择' : ''}}" aria-pressed="{{selectedAvatar === item.id}}">
+            <image class="avatar-option-image" src="{{item.path}}" mode="aspectFill" lazy-load="{{true}}" aria-hidden="{{true}}" />
+            <text wx:if="{{selectedAvatar === item.id}}" class="avatar-option-selected" aria-hidden="{{true}}">✓</text>
+          </button>
+        </view>
+      </scroll-view>
     </view>
     <label for="profile-nickname" class="field-title">个人昵称</label>
     <input id="profile-nickname" class="input" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" bindinput="inputName" bindblur="inputName" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" />
-    <view class="small muted">用于新建或加入牌桌时的默认昵称。修改不会影响当前桌上的昵称和历史记录。</view>
     <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || choosing || conflict}}">{{pendingSave?'重试保存':'保存资料'}}</button>
     <view wx:if="{{pendingSave && !busy}}" class="small muted">保存结果尚未确认，请重试同一次保存。</view>
   </form>

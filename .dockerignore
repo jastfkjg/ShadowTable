@@ -3,3 +3,8 @@
 !package.json
 !server/
 !server/**
+!miniprogram/
+!miniprogram/builtin-avatars.js
+!miniprogram/assets/
+!miniprogram/assets/avatars/
+!miniprogram/assets/avatars/**

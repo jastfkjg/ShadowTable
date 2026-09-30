@@ -1,7 +1,11 @@
 const api = require("../../api");
 const { presentProfile, backToMe, personalPreview } = require("../../profile");
+const builtinAvatars = require("../../builtin-avatars");
+function presetId(url) {
+  return builtinAvatars.find(item => url?.endsWith("/api/avatars/" + item.hash))?.id || "";
+}
 Page({
-  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", initial: "友", profile: null },
+  data: { loading: true, busy: false, choosing: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", avatarPreview: "", selectedAvatar: "", builtinAvatars, initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -9,7 +13,7 @@ Page({
     const preview = personalPreview("profile");
     if (preview) {
       this.original = preview;
-      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, initial: preview.initial });
+      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), initial: preview.initial });
     }
     return this.load({ preserveEdits: true });
   },
@@ -25,7 +29,7 @@ Page({
       if (preserveEdits && (this.data.dirty || this.data.choosing || this.pending)) return;
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, initial: shown.initial, dirty: false, pendingSave: false });
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), initial: shown.initial, dirty: false, pendingSave: false });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
@@ -39,6 +43,14 @@ Page({
   inputName(e) {
     if (this.pending || this.data.busy) return;
     this.setData({ nickname: e.detail.value, initial: (e.detail.value.trim() || "友").slice(0,1), error: "" }); this.markDirty();
+  },
+  chooseBuiltinAvatar(e) {
+    if (!this.original || this.data.busy || this.pending || this.data.choosing) return;
+    const preset = builtinAvatars.find(item => item.id === e.currentTarget.dataset.id);
+    if (!preset) return;
+    this.avatar = presetId(this.original.avatarUrl) === preset.id ? undefined : "builtin:" + preset.id;
+    this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, error: "" });
+    this.markDirty();
   },
   async chooseAvatar(e) {
     if (this.data.busy || this.pending || this.data.choosing || !e.detail.avatarUrl) return;
@@ -56,13 +68,14 @@ Page({
       const read = await new Promise((resolve, reject) => wx.getFileSystemManager().readFile({ filePath: file.tempFilePath, encoding: 'base64', success: resolve, fail: reject }));
       if (!this.alive) return;
       this.avatar = 'data:image/jpeg;base64,' + read.data;
-      this.setData({ avatarPreview: file.tempFilePath }); this.markDirty();
+      this.setData({ avatarPreview: file.tempFilePath, selectedAvatar: "" }); this.markDirty();
     } catch (e) { if (this.alive) this.setData({ error: e.message || "头像处理失败，请重新选择" }); }
     finally { if (this.alive) this.setData({ choosing: false }); }
   },
   removeAvatar() {
     if (this.data.busy || this.pending || this.data.choosing) return;
-    this.avatar = null; this.setData({ avatarPreview: "" }); this.markDirty();
+    this.avatar = this.original?.avatarUrl ? null : undefined;
+    this.setData({ avatarPreview: "", selectedAvatar: "", error: "" }); this.markDirty();
   },
   async save(e) {
     if (this.data.busy || this.data.loading || this.data.choosing || this.data.conflict) return;

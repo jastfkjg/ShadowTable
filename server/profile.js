@@ -1,6 +1,10 @@
 "use strict";
 const { createHash, randomUUID } = require("node:crypto");
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
 const { RuleError } = require("./engine");
+const builtinAvatars = require("../miniprogram/builtin-avatars");
+const builtinCache = new Map();
 const MAX_AVATAR_BYTES = 256 * 1024;
 function fail(ok, message) { if (!ok) throw new RuleError(message, 400); }
 function decodeAvatar(value) {
@@ -33,6 +37,18 @@ function decodeAvatar(value) {
   fail(width > 0 && height > 0 && width <= 1024 && height <= 1024, "请使用长宽不超过1024像素的头像");
   return { hash: createHash("sha256").update(data).digest("hex"), mime: "image/" + match[1], data };
 }
+function resolveAvatar(value) {
+  if (typeof value !== "string" || !value.startsWith("builtin:")) return decodeAvatar(value);
+  const preset = builtinAvatars.find(item => item.id === value.slice(8));
+  fail(preset, "请选择有效的内置头像");
+  if (!builtinCache.has(preset.id)) {
+    const data = readFileSync(join(__dirname, "../miniprogram", preset.path));
+    const avatar = decodeAvatar("data:image/jpeg;base64," + data.toString("base64"));
+    if (avatar.hash !== preset.hash) throw new Error("内置头像资源与目录不一致");
+    builtinCache.set(preset.id, avatar);
+  }
+  return builtinCache.get(preset.id);
+}
 function readProfile(store, uid) {
   const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
@@ -50,7 +66,7 @@ function saveProfile(store, uid, input) {
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
   if (input.avatar === null) avatarHash = null;
   else if (input.avatar !== undefined) {
-    const avatar = decodeAvatar(input.avatar);
+    const avatar = resolveAvatar(input.avatar);
     store.db.prepare("INSERT OR IGNORE INTO avatars VALUES(?,?,?)").run(avatar.hash, avatar.mime, avatar.data);
     avatarHash = avatar.hash;
   }

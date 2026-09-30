@@ -6,8 +6,53 @@ const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { createApp } = require('../server/app');
 const { decodeAvatar } = require('../server/profile');
+const builtinAvatars = require('../miniprogram/builtin-avatars');
 const avatarBytes = readFileSync(join(__dirname,'../miniprogram/assets/tab-me.png'));
 const avatar = 'data:image/png;base64,' + avatarBytes.toString('base64');
+test('内置头像选择跨重启保留，与上传头像互换、去重、重试及清除兼容', async () => {
+  const directory = mkdtempSync(join(tmpdir(),'shadow-builtin-')), db = join(directory,'db.sqlite');
+  let app = await launch(db);
+  try {
+    const preset = builtinAvatars[0], last = builtinAvatars.at(-1);
+    const token = (await app.req('/api/login',null,{code:'builtin-account'})).data.token;
+    const body = { nickname:'林间',version:0,avatar:'builtin:'+preset.id }, id = randomUUID();
+    const saved = await app.req('/api/me/profile',token,body,id);
+    assert.equal(saved.status,200);
+    assert.equal(saved.data.avatarUrl,'/api/avatars/'+preset.hash);
+    assert.deepEqual((await app.req('/api/me/profile',token,body,id)).data,saved.data);
+    const bytes = readFileSync(join(__dirname,'../miniprogram',preset.path));
+    assert.deepEqual((await app.req(saved.data.avatarUrl)).data,bytes);
+    await app.close(); app = await launch(db);
+    const again = (await app.req('/api/login',null,{code:'builtin-account'})).data.token;
+    assert.deepEqual((await app.req('/api/me/profile',again)).data,saved.data);
+    assert.deepEqual((await app.req(saved.data.avatarUrl)).data,bytes);
+    assert.equal((await app.req('/api/me/profile',again,{nickname:'改名',version:1})).data.avatarUrl,saved.data.avatarUrl);
+    const uploaded = await app.req('/api/me/profile',again,{nickname:'改名',version:2,avatar});
+    assert.notEqual(uploaded.data.avatarUrl,saved.data.avatarUrl);
+    const picked = await app.req('/api/me/profile',again,{nickname:'改名',version:3,avatar:'builtin:'+last.id});
+    assert.equal(picked.data.avatarUrl,'/api/avatars/'+last.hash);
+    const other = (await app.req('/api/login',null,{code:'other-builtin-account'})).data.token;
+    await app.req('/api/me/profile',other,{nickname:'朋友',version:0,avatar:'builtin:'+last.id});
+    assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM avatars').get().n,3);
+    assert.equal((await app.req('/api/me/profile',again,{nickname:'改名',version:4,avatar:null})).data.avatarUrl,null);
+  } finally { await app.close(); rmSync(directory,{recursive:true,force:true}); }
+});
+test('内置头像拒绝未列出的编号及路径，资源均能通过头像校验', async () => {
+  for (const preset of builtinAvatars) {
+    const bytes = readFileSync(join(__dirname,'../miniprogram',preset.path));
+    assert.equal(decodeAvatar('data:image/jpeg;base64,'+bytes.toString('base64')).hash,preset.hash);
+  }
+  const app = await launch();
+  try {
+    const token = (await app.req('/api/login',null,{code:'invalid-builtin'})).data.token;
+    for (const value of ['builtin:','builtin:avatar-99','builtin:../../package.json','builtin:/etc/passwd']) {
+      const result = await app.req('/api/me/profile',token,{nickname:'甲',version:0,avatar:value});
+      assert.equal(result.status,400); assert.match(result.data.error,/内置头像/);
+    }
+    assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM avatars').get().n,0);
+    assert.equal((await app.req('/api/me/profile',token)).data.version,0);
+  } finally { await app.close(); }
+});
 async function launch(database = ':memory:') {
   const app = createApp({ database, exchangeCode: async code => code });
   await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve));

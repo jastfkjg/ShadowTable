@@ -34,6 +34,37 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+test('内置头像无需图片接口即可预览和保存，待确认时锁定选择并保留重试内容', async () => {
+  const presets = require('../miniprogram/builtin-avatars');
+  const writes=[]; let fail=true;
+  const {p} = page('profile',{...apiBase,request:async(url,method,body,id)=>{
+    if(method!=='POST') return profile;
+    writes.push({body:structuredClone(body),id});
+    if(fail) throw new Error('network lost');
+    return {...profile,avatarUrl:'/api/avatars/'+presets[0].hash,version:2};
+  }});
+  await p.load();
+  const pick = preset => p.chooseBuiltinAvatar({currentTarget:{dataset:{id:preset.id}}});
+  pick(presets[0]);
+  assert.equal(p.data.avatarPreview,presets[0].path); assert.equal(p.data.selectedAvatar,presets[0].id);
+  assert.equal(p.data.dirty,true); assert.equal(p.data.choosing,false);
+  await p.save(); assert.equal(p.data.pendingSave,true);
+  pick(presets[1]); assert.equal(p.data.selectedAvatar,presets[0].id);
+  p.removeAvatar(); assert.equal(p.data.selectedAvatar,presets[0].id);
+  fail=false; await p.save();
+  assert.equal(writes[0].body.avatar,'builtin:'+presets[0].id);
+  assert.deepEqual(writes[1],writes[0]);
+});
+test('已保存内置头像载入后显示选中，切换后选回原头像不产生改动', async () => {
+  const presets = require('../miniprogram/builtin-avatars');
+  const saved = {...profile,avatarUrl:'/api/avatars/'+presets[0].hash};
+  const {p} = page('profile',{...apiBase,request:async()=>saved});
+  await p.load(); assert.equal(p.data.selectedAvatar,presets[0].id);
+  p.chooseBuiltinAvatar({currentTarget:{dataset:{id:presets[1].id}}}); assert.equal(p.data.dirty,true);
+  p.chooseBuiltinAvatar({currentTarget:{dataset:{id:presets[0].id}}}); assert.equal(p.data.dirty,false);
+  p.removeAvatar(); assert.equal(p.data.selectedAvatar,''); assert.equal(p.avatar,null); assert.equal(p.data.dirty,true);
+  p.chooseBuiltinAvatar({currentTarget:{dataset:{id:presets[0].id}}}); assert.equal(p.data.dirty,false);
+});
 test('小程序一级导航为对局与我的，独立牌桌仍支持原邀请地址', async () => {
   const config = JSON.parse(fs.readFileSync(path.join(root,'app.json')));
   assert.equal(config.pages[0],'pages/lobby/lobby');

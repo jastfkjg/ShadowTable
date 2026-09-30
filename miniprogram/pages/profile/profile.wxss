@@ -1,0 +1,11 @@
+.avatar-editor { padding: 40rpx 0 32rpx; }
+.avatar-actions { display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.avatar-upload { min-height: 96rpx; }
+.avatar-library { margin-bottom: 40rpx; }
+.avatar-library-scroll { height: 480rpx; margin-top: 24rpx; border-block: 2rpx solid var(--border); }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16rpx; padding: 16rpx 4rpx; }
+.avatar-grid button.avatar-option { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; margin: 0; padding: 12rpx 4rpx; border: 2rpx solid transparent; border-radius: 20rpx; background: transparent; color: var(--muted); }
+.avatar-option-image { display: block; width: 104rpx; height: 104rpx; border-radius: 50%; }
+.avatar-option-selected { position: absolute; right: 4rpx; top: 4rpx; width: 32rpx; height: 32rpx; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 24rpx; line-height: 32rpx; text-align: center; }
+.avatar-grid button.avatar-option.is-selected { border-color: var(--accent); background: var(--surface); color: var(--accent); }
+.avatar-grid button.avatar-option:not([disabled]):active { background: var(--surface); opacity: 0.8; }
