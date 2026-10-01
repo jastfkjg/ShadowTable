@@ -18,15 +18,22 @@ Page({
     this.updateChangedData({ loading: true, error: "" });
     try {
       await api.login();
+      if (!this.alive || sequence !== this.sequence) return;
       // Warm the first records page without delaying profile/stats or surfacing
       // speculative request errors. The destination still refreshes on entry.
       this.prefetchMatches(sequence);
-      const [profile, stats] = await Promise.allSettled([api.request("/api/me/profile"), api.request("/api/me/stats")]);
-      if (this.alive && sequence === this.sequence) this.updateChangedData({
-        ...(profile.status === "fulfilled" ? { profile: presentProfile(profile.value) } : {}),
-        ...(stats.status === "fulfilled" ? { stats: presentStats(stats.value) } : {}),
-        error: [profile, stats].filter(r => r.status === "rejected").map(r => r.reason.message).join("；"),
-      });
+      const errors = {};
+      const read = async (key, present) => {
+        try {
+          const result = await api.request("/api/me/" + key);
+          if (this.alive && sequence === this.sequence) this.updateChangedData({ [key]: present(result) });
+        } catch (e) {
+          errors[key] = e.message;
+          if (this.alive && sequence === this.sequence) this.updateChangedData({ error: [errors.profile, errors.stats].filter(Boolean).join("；") });
+        }
+      };
+      // Each section becomes usable as soon as its own request finishes.
+      await Promise.all([read("profile", presentProfile), read("stats", presentStats)]);
     } catch (e) { if (this.alive && sequence === this.sequence) this.updateChangedData({ error: e.message }); }
     finally { if (this.alive && sequence === this.sequence) this.updateChangedData({ loading: false }); }
   },

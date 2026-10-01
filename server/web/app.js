@@ -312,6 +312,7 @@
   var state = {
     page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, nameEdited: false, profileEditingNickname: false, profileNicknameError: "",
     loading: true,
+    roomsRefreshing: false,
     busy: false,
     error: "",
     recoverableError: false,
@@ -418,6 +419,7 @@
 
   // Personal destinations use hash URLs so refresh, browser back and shared room links remain meaningful.
   var routeSequence = 0, currentRoute = '#/lobby', profileSequence = 0, profilePending = null;
+  var statsSequence = 0, statsRequestRoute = -1;
   var seatAvatarFailures = new Set();
   function routeInfo(hash) {
     var table = /^#\/table\/(\d{6})$/.exec(hash || '');
@@ -444,10 +446,14 @@
     currentRoute = '#/' + route.page + (route.code ? '/' + route.code : '');
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
-    setState({ page: route.page, room: null, error: '', notice: '', showRoomSettings: false, showRoomRules: false,
+    setState({ page: route.page, room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+      ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
-      profileDirty: false, profileDraft: null, profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats' });
+      profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
+      profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats' });
     window.scrollTo(0, 0);
+    const heading = app.querySelector('[data-page-heading]');
+    if (heading) heading.focus({ preventScroll: true });
     try {
       await login();
       if (sequence !== routeSequence) return;
@@ -463,24 +469,30 @@
       else if (route.page === 'stats') await loadStats();
       else if (route.page === 'leaderboard') await loadLeaderboard();
     } catch (e) { if (sequence === routeSequence) handleError(e); }
-    if (sequence === routeSequence) {
-      const heading = app.querySelector('[data-page-heading]');
-      if (heading) heading.focus({ preventScroll: true });
-    }
+  }
+  function profileDraft(profile) {
+    return { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
   }
   async function loadProfile(edit = false) {
-    const sequence = ++profileSequence;
+    const sequence = ++profileSequence, route = routeSequence;
+    const initialAvatarStyle = state.profileDraft?.avatarStyle;
     setState({ profileLoading: true, profileError: '', profileConflict: false });
     try {
       const profile = await request('/api/me/profile');
-      if (sequence !== profileSequence) return;
+      if (sequence !== profileSequence || route !== routeSequence) return;
+      // Refreshing a preview must not replace edits or their original version.
+      if (edit && (state.profileDirty || state.profileEditingNickname || profilePending)) return;
+      const draft = profileDraft(profile);
+      if (edit && initialAvatarStyle && state.profileDraft?.avatarStyle !== initialAvatarStyle)
+        draft.avatarStyle = state.profileDraft.avatarStyle;
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
-        profileDraft: { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' }, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
+        profileDraft: draft, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
       } : {}) });
     } catch (e) {
-      if (sequence === profileSequence) setState({ profileError: e.message });
+      if (sequence !== profileSequence || route !== routeSequence) return;
+      setState({ profileError: e.message });
       if (e.status === 401) handleError(e);
-    } finally { if (sequence === profileSequence) setState({ profileLoading: false }); }
+    } finally { if (sequence === profileSequence && route === routeSequence) setState({ profileLoading: false }); }
   }
   function profileDirty() {
     setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
@@ -491,14 +503,14 @@
     return builtinAvatars.find(item => url === item.path || url?.endsWith('/api/avatars/' + item.hash));
   }
   function chooseProfileAvatarStyle(el) {
-    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
+    if (!state.profileDraft || state.profileSaving || profilePending) return;
     const style = el.dataset.style;
     if (!avatarStyles.some(item => item.id === style)) return;
     state.profileDraft.avatarStyle = style;
     setState({});
   }
   function chooseBuiltinProfileAvatar(el) {
-    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
+    if (!state.profileDraft || state.profileSaving || profilePending) return;
     const preset = builtinAvatars.find(item => item.id === el.dataset.id);
     if (!preset) return;
     if (profilePreset(state.profile?.avatarUrl)?.id === preset.id) delete state.profileDraft.avatar;
@@ -509,7 +521,7 @@
     profileDirty();
   }
   function editProfileNickname() {
-    if (!state.profileDraft || state.profileLoading || state.profileSaving || profilePending) return;
+    if (!state.profileDraft || state.profileSaving || profilePending) return;
     setState({ profileEditingNickname: true, profileNicknameError: '' });
     app.querySelector('#profile-nickname')?.focus();
   }
@@ -567,7 +579,7 @@
     return (back ? btn('text-button page-back','navigate','‹ 返回我的',{page:'me'},state.profileSaving) : '') + '<div class="personal-heading">' + (eyebrow ? '<span class="eyebrow">' + eyebrow + '</span>' : '') + '<h1 class="page-title" tabindex="-1" data-page-heading>' + title + '</h1></div>';
   }
   function viewProfileError() {
-    return state.profileError ? '<div class="inline-error" role="alert">' + esc(state.profileError) + (state.profileConflict || !state.profile ? btn('secondary','reloadProfile','重新载入资料',null,state.profileLoading) : '') + '</div>' : '';
+    return state.profileError ? '<div class="inline-error" role="alert">' + esc(state.profileError) + (state.page === 'profile' || state.profileConflict || !state.profile ? btn('secondary','reloadProfile','重新载入资料',null,state.profileLoading) : '') + '</div>' : '';
   }
   function viewMe() {
     const profile = state.profile, stats = state.stats;
@@ -577,16 +589,16 @@
     if (profile.identityType === 'guest') html += '<div class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</div>';
     html += '<section class="personal-section" aria-label="我的战绩"><div class="section-title history-heading"><span>我的战绩</span>' + btn('history-toggle','navigate','查看全部 ›',{page:'stats'}) + '</div>';
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
-    else if (stats) html += '<div class="personal-metrics"><div><div class="metric-value">' + stats.total + '</div><span class="small muted">有效对局</span></div><div><div class="metric-value">' + stats.wins + '</div><span class="small muted">获胜场次</span></div><div><div class="metric-value accent">' + (stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">总胜率</span></div></div>' + (!stats.total ? '<div class="small muted">第一局故事，等你开场。结束后请房主登记胜方。</div>' : '');
-    else html += '<div class="status">正在读取战绩…</div>';
+    if (stats) html += '<div class="personal-metrics"><div><div class="metric-value">' + stats.total + '</div><span class="small muted">有效对局</span></div><div><div class="metric-value">' + stats.wins + '</div><span class="small muted">获胜场次</span></div><div><div class="metric-value accent">' + (stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">总胜率</span></div></div>' + (!stats.total ? '<div class="small muted">第一局故事，等你开场。结束后请房主登记胜方。</div>' : '');
+    else if (state.statsLoading) html += '<div class="status">正在读取战绩…</div>';
     html += '</section><div class="personal-links">' + btn('personal-link','navigate','排行榜 ›',{page:'leaderboard'}) + '<button class="personal-link" type="button" data-action="navigate" data-page="stats"><span><span>对局记录</span><span class="small muted link-note">按阵营、板子查看表现</span></span><span aria-hidden="true">›</span></button>' + btn('personal-link','navigate','帮助与规则 ›',{page:'help'}) + btn('personal-link','about','关于桌边助手 ›') + '</div><div class="personal-footer">同桌相聚，每局都有故事。</div>';
     return html;
   }
   function viewProfileEditor() {
-    const draft = state.profileDraft, locked = state.profileLoading || state.profileSaving || !!profilePending;
+    const draft = state.profileDraft, locked = state.profileSaving || !!profilePending;
     let html = viewProfileError();
     if (!draft) return html + (state.profileLoading ? '<div class="status">正在读取资料…</div>' : '');
-    html += '<form class="profile-form" data-form="profile"><div class="avatar-editor"><div class="avatar-preview">' + avatarView(draft.avatarPreview,draft.nickname.trim(),true) + '</div><div class="nickname-editor">';
+    html += '<form class="profile-form" data-form="profile" aria-busy="' + state.profileLoading + '"><div class="avatar-editor"><div class="avatar-preview">' + avatarView(draft.avatarPreview,draft.nickname.trim(),true) + '</div><div class="nickname-editor">';
     if (state.profileEditingNickname) {
       html += '<div class="nickname-input-row"><input id="profile-nickname" name="nickname" class="input nickname-input' + (state.profileNicknameError ? ' is-invalid' : '') + '" maxlength="16" autocomplete="nickname" enterkeyhint="done" data-input="profileName" value="' + esc(draft.nickname) + '" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符"' + (state.profileNicknameError ? ' aria-invalid="true" aria-describedby="profile-nickname-error"' : '') + (locked ? ' disabled' : '') + ' />' + btn('nickname-done','finishProfileNickname','完成',null,locked) + '</div>';
     } else {
@@ -601,7 +613,7 @@
       const chosen = selected === item.id;
       return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
     }).join('') + '</div></section>';
-    html += '<div class="profile-save-bar"><div class="profile-save-content">' + (profilePending && !state.profileSaving ? '<div class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</div>' : '') + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : '保存资料',null,state.profileSaving || state.profileLoading || state.profileConflict) + '</div></div></form>';
+    html += '<div class="profile-save-bar"><div class="profile-save-content">' + (profilePending && !state.profileSaving ? '<div class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</div>' : '') + btn('primary profile-save','saveProfile',state.profileSaving ? '正在保存…' : profilePending ? '重试保存' : state.profileLoading ? '正在同步…' : '保存资料',null,state.profileSaving || state.profileLoading || state.profileConflict) + '</div></div></form>';
     return html;
   }
   function viewProfileHeader() {
@@ -1293,13 +1305,18 @@ function roomListItems(rooms) {
       "finishTools", { replace: true, winner: choice === "none" ? null : choice });
   }
   async function loadStats() {
-    if (state.statsLoading) return;
-    setState({ statsLoading: true, statsError: "", stats: null });
-    try { setState({ stats: await request("/api/me/stats"), serverConnected: true }); }
+    if (state.statsLoading && statsRequestRoute === routeSequence) return;
+    const sequence = ++statsSequence, route = statsRequestRoute = routeSequence;
+    setState({ statsLoading: true, statsError: "" });
+    try {
+      const stats = await request("/api/me/stats");
+      if (sequence === statsSequence && route === routeSequence) setState({ stats, serverConnected: true });
+    }
     catch (e) {
+      if (sequence !== statsSequence || route !== routeSequence) return;
       setState({ statsError: e.message });
       if (e.status === 401) handleError(e);
-    } finally { setState({ statsLoading: false }); }
+    } finally { if (sequence === statsSequence && route === routeSequence) setState({ statsLoading: false }); }
   }
   function viewResultDialog() {
     var room = state.room;
@@ -1311,11 +1328,11 @@ function roomListItems(rooms) {
       '</div><div class="dialog-actions">' + btn('secondary','closeResult','取消') + btn('primary','saveResult','确认胜负并结束',null,!state.resultChoice || state.busy || !!pending) + '</div></div></div>';
   }
   function viewStats() {
-    var html = '<section class="stats-content" aria-label="我的战绩">';
+    var html = '<section class="stats-content" aria-label="我的战绩" aria-busy="' + state.statsLoading + '">';
     var stats = state.stats, rate = row => row.winRate === null ? '—' : row.winRate + '%';
-    if (state.statsLoading) html += '<div class="muted" role="status">正在读取战绩…</div>';
-    else if (state.statsError) html += '<div role="alert">' + esc(state.statsError) + '</div>' + btn('secondary','loadStats','重试');
-    else if (stats) {
+    if (state.statsError) html += '<div role="alert">' + esc(state.statsError) + '</div>' + btn('secondary','loadStats','重试',null,state.statsLoading);
+    if (state.statsLoading && !stats) html += '<div class="muted" role="status">正在读取战绩…</div>';
+    if (stats) {
       html += '<div class="stats-summary"><div><div class="stats-rate">' + rate(stats) + '</div><span class="small muted">总胜率</span></div><div><div>' + stats.wins + ' 胜 · ' + stats.losses + ' 负</div><span class="small muted">' + stats.total + ' 局有效对局</span></div></div>';
       html += '<div class="small muted">胜率 = 胜场 ÷ 有效对局。另有 ' + stats.excluded + ' 局不计入；旁观不计入。</div>';
       if (stats.identityType === 'guest') html += '<div class="stats-note small">当前为游客战绩，仅随本浏览器登录凭证保留；清缓存或登录过期后无法自动找回。</div>';
@@ -1328,7 +1345,7 @@ function roomListItems(rooms) {
       stats.recent.forEach(function (r) {
         html += '<div class="stats-match"><div class="stats-row"><span>' + esc(r.boardName) + ' · ' + r.capacity + '人</span><span class="stats-outcome ' + esc(r.outcome) + '">' + ({win:'胜',loss:'负',excluded:'不计入'})[r.outcome] + '</span></div><div class="small muted">' + esc(r.role) + ' · 最终' + ({good:'好人',evil:'坏人',third:'盗贼',unknown:'未知'})[r.faction] + '阵营 · ' + (r.source === 'manual' ? '房主登记' : r.source === 'system' ? '系统判定' : '未判定') + (r.excludedReason ? ' · ' + esc(r.excludedReason) : '') + '</div><div class="small muted">' + esc(new Date(r.endedAt).toLocaleString('zh-CN', { hour12: false })) + '</div></div>';
       });
-      html += btn('text-button','loadStats','刷新战绩');
+      html += btn('text-button','loadStats',state.statsLoading ? '刷新中…' : '刷新战绩',null,state.statsLoading);
     }
     return html + '</section>';
   }
@@ -1392,10 +1409,10 @@ function roomListItems(rooms) {
   }
   var undoRoomTimer;
   async function refreshRooms() {
-    if (state.busy || pending || state.loading) return;
-    setState({ loading: true });
+    if (state.busy || pending || state.loading || state.roomsRefreshing) return;
+    setState({ roomsRefreshing: true });
     try { await loadRooms(); } catch (e) { handleError(e); }
-    finally { setState({ loading: false }); }
+    finally { setState({ roomsRefreshing: false }); }
   }
   async function roomMenuAction(kind) {
     var room = state.roomMenu;
@@ -2112,7 +2129,7 @@ function roomListItems(rooms) {
   function connectionInfo() {
     var content = !state.network || state.needsLogin || !state.serverConnected
       ? "连接尚未确认，请检查网络或重试。"
-      : state.busy || state.loading || pending
+      : state.busy || state.loading || state.roomsRefreshing || pending
         ? "正在确认操作，请稍候。"
         : "最近一次服务器请求成功。";
     confirm("连接状态", content, false);
@@ -2483,7 +2500,7 @@ function roomListItems(rooms) {
     var dot =
       !state.network || state.needsLogin
         ? "offline"
-        : state.loading || state.busy || state.hasPendingRequest
+        : state.loading || state.roomsRefreshing || state.busy || state.hasPendingRequest
           ? "pending"
           : state.serverConnected
             ? "online"
@@ -2491,7 +2508,7 @@ function roomListItems(rooms) {
     var label =
       !state.network || state.needsLogin
         ? "连接异常"
-        : state.loading || state.busy || state.hasPendingRequest
+        : state.loading || state.roomsRefreshing || state.busy || state.hasPendingRequest
           ? "正在同步"
           : state.serverConnected
             ? "连接正常"
@@ -2503,7 +2520,7 @@ function roomListItems(rooms) {
       '"><span class="connection-dot ' + (state.reconnecting ? "pending" : dot) + '"></span>' +
       (state.reconnecting || !state.network || state.needsLogin ? '<span class="connection-label">' + (state.reconnecting ? '重连中' : '连接断开') + '</span>' : '') +
       '</button></div>' +
-      (state.room ? '<button type="button" class="switch-table home-entry" data-action="returnHome" aria-label="返回对局，保留当前座位"' + (state.busy ? ' disabled' : '') + '><span class="home-icon" aria-hidden="true"></span><span>对局</span></button>' : '') +
+      (state.room || state.page === 'table' ? '<button type="button" class="switch-table home-entry" data-action="returnHome" aria-label="返回对局，保留当前座位"' + (state.busy ? ' disabled' : '') + '><span class="home-icon" aria-hidden="true"></span><span>对局</span></button>' : '') +
       '</div>'
 
     );
@@ -2824,7 +2841,7 @@ function roomListItems(rooms) {
     }
     html += "</form>";
 
-    html += '<div class="section-title history-heading"><span>我的牌桌' + (state.memberRooms.length ? '<span class="room-count">' + state.memberRooms.length + '</span>' : '') + '</span>' + btn("history-toggle", "refreshRooms", "刷新", null, state.busy || state.loading || !!pending) + '</div>';
+    html += '<div class="section-title history-heading"><span>我的牌桌' + (state.memberRooms.length ? '<span class="room-count">' + state.memberRooms.length + '</span>' : '') + '</span>' + btn("history-toggle room-refresh", "refreshRooms", state.roomsRefreshing ? "刷新中…" : "刷新", null, state.busy || state.loading || state.roomsRefreshing || !!pending) + '</div>';
     if (state.memberRooms.length >= 6 || state.roomListFilter !== "all") {
       html += '<div class="room-filters">' + [["all","全部"],["playing","进行中"],["lobby","待开局"],["ended","已结束"],["unavailable","已失效"]].map(function (f) {
         return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';
@@ -3541,6 +3558,9 @@ function roomListItems(rooms) {
       parent.removeChild(removed);
     }
   }
+  function viewTableLoading() {
+    return '<section class="table-loading" aria-busy="' + !state.error + '"><div class="section-title">房间 ' + esc(roomCode || state.code) + '</div><div class="status" role="status">' + (state.error ? '牌桌暂未载入，请重试' : '正在读取牌桌…') + '</div></section>';
+  }
   function render() {
     var hasHostBar =
       state.room &&
@@ -3556,13 +3576,13 @@ function roomListItems(rooms) {
       (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
       (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '">' +
       (state.page === 'profile' ? '' : viewBrand()) +
-      (state.loading ? '<div class="status">正在连接牌桌…</div>' : "") +
+      (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
       viewActionDialog() +
       viewToolDialog() +
       viewResultDialog() +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.room ? viewRoom() : viewEntry()) +
+      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
       viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
@@ -3995,6 +4015,9 @@ function roomListItems(rooms) {
   if (codeMatch) inviteCode = codeMatch[1];
   state.name = storage.get("nickname") || "";
   state.code = inviteCode || storage.get("roomCode") || "";
+  var initialRoute = routeInfo(location.hash || (inviteCode ? '#/table/' + inviteCode : '#/lobby'));
+  state.page = initialRoute.page;
+  if (initialRoute.code) state.code = initialRoute.code;
   render();
   bootstrap();
 })();

@@ -2,21 +2,21 @@
 <view class="page settings-page">
   <view wx:if="{{loading}}" class="muted">正在加载房间设置…</view>
   <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
-  <button hover-class="none" wx:if="{{error && authorized && (dirty || pendingSave)}}" class="secondary" bindtap="save" disabled="{{busy || pendingTransfer || pendingKick}}">重试保存</button>
+  <button hover-class="none" wx:if="{{error && authorized && (dirty || pendingSave)}}" class="secondary" bindtap="save" disabled="{{busy || refreshing || pendingTransfer || pendingKick}}">重试保存</button>
   <block wx:if="{{!loading && authorized}}">
     <view class="settings-header">
       <view class="settings-eyebrow">房间 {{room.code}} · 管理员</view>
       <view class="settings-title">{{room.boardName}}</view>
       <view class="muted">{{room.capacity}}人 · {{room.phase==='lobby'?'准备中':room.phase==='ended'?'本局已结束':room.phase==='terminated'?'本局已终止':'对局进行中'}}</view>
     </view>
-    <view class="settings-caption" role="status">{{pendingSave?(busy?'正在保存…':'保存未确认'):dirty?'尚未保存':'更改自动保存'}}</view>
+    <view class="settings-caption" role="status">{{pendingSave?(busy?'正在保存…':'保存未确认'):refreshing?'正在同步…':dirty?'尚未保存':'更改自动保存'}}</view>
     <view class="settings-section-title">房间配置</view>
     <view class="settings-section">
-      <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || pendingSave || pendingTransfer || pendingKick}}">
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick}}">
         <view class="settings-row"><text>人数</text><text class="settings-value">{{capacity}} 人 ›</text></view>
       </picker>
       <view wx:else class="settings-row"><text>人数</text><text class="muted">{{room.capacity}} 人</text></view>
-      <picker wx:if="{{room.phase==='lobby'}}" range="{{choices}}" range-key="name" value="{{boardIndex}}" bindchange="pickBoard" disabled="{{busy || pendingSave || pendingTransfer || pendingKick}}">
+      <picker wx:if="{{room.phase==='lobby'}}" range="{{choices}}" range-key="name" value="{{boardIndex}}" bindchange="pickBoard" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick}}">
         <view class="settings-row"><text>板子</text><text class="settings-value">{{choices[boardIndex].name}} ›</text></view>
       </picker>
       <view wx:else class="settings-row"><text>板子</text><text class="muted settings-value">{{room.boardName}}</text></view>
@@ -25,7 +25,7 @@
     <view class="settings-section">
       <view class="settings-row">
         <view><view>启用湖中仙女</view><view class="settings-caption">{{7 > capacity?'5、6人局不支持':fairyEnabled?'持有者对所有玩家公开':'本房间不使用仙女查验'}}</view></view>
-        <switch checked="{{fairyEnabled}}" bindchange="toggleFairy" color="#c3a361" disabled="{{busy || pendingSave || pendingTransfer || pendingKick || 7 > capacity || room.phase==='fairy'}}" aria-label="启用湖中仙女"/>
+        <switch checked="{{fairyEnabled}}" bindchange="toggleFairy" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || 7 > capacity || room.phase==='fairy'}}" aria-label="启用湖中仙女"/>
       </view>
     </view>
     <view wx:if="{{room.phase==='fairy'}}" class="settings-help">请先完成或作废当前查验。</view>
@@ -34,16 +34,16 @@
       <view class="settings-section">
         <view class="settings-row">
           <view><view>公开技能过程</view><view class="settings-caption">{{visible?'所有玩家可见':'仅公示最终结果'}}</view></view>
-          <switch checked="{{visible}}" bindchange="toggleVisibility" color="#c3a361" disabled="{{busy || pendingSave || pendingTransfer || pendingKick}}" aria-label="公开技能过程"/>
+          <switch checked="{{visible}}" bindchange="toggleVisibility" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick}}" aria-label="公开技能过程"/>
         </view>
       </view>
     </block>
     <view class="transfer-entry">
-      <button hover-class="none" class="secondary" bindtap="openTransfer" disabled="{{busy || pendingSave || pendingTransfer || pendingKick || !transferPlayers.length}}">移交房主</button>
+      <button hover-class="none" class="secondary" bindtap="openTransfer" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !transferPlayers.length}}">移交房主</button>
       <view wx:if="{{!transferPlayers.length}}" class="settings-help">暂无可移交的玩家</view>
     </view>
     <view class="transfer-entry">
-      <button hover-class="none" class="secondary kick-entry" bindtap="openKick" disabled="{{busy || pendingSave || pendingTransfer || pendingKick || !room.canKick || !transferPlayers.length}}">移出玩家</button>
+      <button hover-class="none" class="secondary kick-entry" bindtap="openKick" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.canKick || !transferPlayers.length}}">移出玩家</button>
       <view wx:if="{{!room.canKick || !transferPlayers.length}}" class="settings-help">{{room.canKick === undefined?'暂不支持移出玩家':!room.canKick?'对局进行中不能移出玩家':'暂无可移出的玩家'}}</view>
     </view>
     <button hover-class="none" wx:if="{{pendingKick}}" class="secondary" bindtap="sendKick" disabled="{{busy}}">重试确认移出结果</button>

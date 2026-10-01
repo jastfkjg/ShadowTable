@@ -147,6 +147,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   data: {
     isLobby: lobby,
     loading: true,
+    roomsRefreshing: false,
     busy: false,
     error: "",
     reconnecting: false,
@@ -760,13 +761,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({ roomListFilter: filter, visibleMemberRooms: this.data.memberRooms.filter(r => filter === "all" || r.status === filter) });
   },
   async refreshRooms() {
-    if (this.data.busy || this.pending || this.data.loading) return;
-    this.setData({ loading: true });
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
+    this.setData({ roomsRefreshing: true });
     try {
       if (this.data.isLobby) await this.refreshLobby();
       else await this.loadRooms();
     } catch (e) { this.handleError(e); }
-    finally { this.setData({ loading: false }); }
+    finally { this.setData({ roomsRefreshing: false }); }
   },
   openRoomMenu(e) {
     if (this.data.busy || this.pending) return;
@@ -1419,7 +1420,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const content =
       !this.data.network || this.data.needsLogin || !this.data.serverConnected
         ? "连接尚未确认，请检查网络或重试。"
-        : this.data.busy || this.data.loading || this.pending
+        : this.data.busy || this.data.loading || this.data.roomsRefreshing || this.pending
           ? "正在确认操作，请稍候。"
           : "最近一次服务器请求成功。";
     wx.showModal({ title: "连接状态", content, showCancel: false });

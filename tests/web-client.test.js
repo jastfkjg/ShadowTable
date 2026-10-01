@@ -27,7 +27,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError,
-      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
@@ -124,6 +124,80 @@ test('网页昵称在头像下编辑，空值保留错误，完成后仅更新�
   assert.equal(writes, 0);
   assert.match(c.viewProfileEditor(), /nickname-text">晚风/);
   assert.match(c.viewProfileEditor(), /profile-save-bar/);
+});
+
+test('网页已有资料立即可编辑，迟到的刷新不覆盖昵称头像或保存版本', async () => {
+  let finish;
+  const original = { nickname: '林间', version: 1, avatarUrl: null, identityType: 'wx' };
+  const c = client(() => new Promise(resolve => { finish = resolve; }));
+  c.state.profile = original;
+  const entering = c.applyRoute('#/profile');
+  await new Promise(setImmediate);
+  assert.match(c.viewProfileEditor(), /林间/);
+  assert.match(c.viewProfileEditor(), /aria-busy="true"/);
+  c.ACTIONS.editProfileNickname();
+  c.INPUTS.profileName({ value: '正在编辑' });
+  c.ACTIONS.chooseBuiltinProfileAvatar({ dataset: { id: 'avatar-02' } });
+  finish(response({ ...original, nickname: '远端昵称', version: 2 }));
+  await entering;
+  assert.equal(c.state.profileDraft.nickname, '正在编辑');
+  assert.equal(c.state.profileDraft.avatar, 'builtin:avatar-02');
+  assert.equal(c.state.profileDraft.version, 1);
+  assert.equal(c.state.profile.nickname, '林间');
+  assert.equal(c.state.profileLoading, false);
+  assert.equal(c.state.profileEditingNickname, true);
+});
+
+test('网页资料预览浏览头像分类时保持分类，未编辑的昵称应用最新资料', async () => {
+  let finish;
+  const original = { nickname: '林间', version: 1, avatarUrl: null, identityType: 'wx' };
+  const c = client(() => new Promise(resolve => { finish = resolve; }));
+  c.state.profile = original;
+  const entering = c.applyRoute('#/profile'); await new Promise(setImmediate);
+  c.ACTIONS.chooseProfileAvatarStyle({ dataset: { style: 'pixel' } });
+  finish(response({ ...original, nickname: '最新昵称', version: 2 })); await entering;
+  assert.equal(c.state.profileDraft.avatarStyle, 'pixel');
+  assert.equal(c.state.profileDraft.nickname, '最新昵称');
+  assert.equal(c.state.profileDraft.version, 2);
+  assert.equal(c.state.profileDirty, false);
+});
+
+test('网页战绩刷新保留统计与记录，失败可重试且重复点击不重复请求', async () => {
+  let reject, calls = 0;
+  const stats = { total: 1, wins: 1, losses: 0, excluded: 0, winRate: 100, byFaction: [], byBoard: [], recent: [] };
+  const c = client(() => { calls++; return new Promise((resolve, no) => { reject = no; }); });
+  c.state.stats = stats;
+  const refreshing = c.ACTIONS.loadStats();
+  assert.equal(c.state.stats, stats);
+  assert.match(c.viewStats(), /1 局有效对局/);
+  assert.match(c.viewStats(), /刷新中/);
+  assert.doesNotMatch(c.viewStats(), /正在读取战绩/);
+  await c.ACTIONS.loadStats(); assert.equal(calls, 1);
+  reject(new Error('网络异常')); await refreshing;
+  assert.equal(c.state.stats, stats);
+  assert.match(c.viewStats(), /网络未确认/);
+  assert.match(c.viewStats(), /1 局有效对局/);
+  assert.match(c.viewStats(), /重试/);
+  c.state.profile = { nickname: '玩家', identityType: 'wx', avatarUrl: null };
+  c.state.stats = null;
+  assert.match(c.viewMe(), /重试/);
+  assert.doesNotMatch(c.viewMe(), /正在读取战绩/);
+});
+
+test('网页快速切换后旧战绩响应不覆盖新页面的数据', async () => {
+  let finishOld, count = 0;
+  const stats = { total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50, byFaction: [], byBoard: [], recent: [] };
+  const c = client(url => {
+    if (url.endsWith('/profile')) return Promise.resolve(response({ nickname: '林间', version: 1 }));
+    if (++count === 1) return new Promise(resolve => { finishOld = resolve; });
+    return Promise.resolve(response(stats));
+  });
+  const old = c.ACTIONS.loadStats();
+  await c.applyRoute('#/me');
+  assert.equal(c.state.stats.total, 2);
+  finishOld(response({ ...stats, total: 99 })); await old;
+  assert.equal(c.state.stats.total, 2);
+  assert.equal(c.state.statsLoading, false);
 });
 test("网页座位昵称转义且轮询更新人数和准备统计", async () => {
   const room = dealtWebRoom({ phase: "lobby", capacity: 13, stage: "s1", code: "123456",

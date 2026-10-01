@@ -54,6 +54,40 @@ test("设置页仅管理员可进入，不读取他人的设置表单", async ()
   assert.ok(p.data.error.includes("仅房主管理员"));
   assert.equal(p.data.room, null);
 });
+
+test("设置后台刷新保留内容并锁定操作，断网保留快照，权限失效关闭管理入口", async () => {
+  let finish, failure, delayed = false;
+  const p = page({ login: async () => {}, request: async url => {
+    if (url === '/api/boards') return { boards: BOARDS };
+    if (delayed) return new Promise((resolve, reject) => { finish = resolve; failure = reject; });
+    return kickRoom();
+  } });
+  await p.load();
+  const previous = p.data.room;
+  delayed = true;
+  const refreshing = p.load();
+  await new Promise(setImmediate);
+  assert.equal(p.data.room, previous);
+  assert.equal(p.data.authorized, true);
+  assert.equal(p.data.loading, false);
+  assert.equal(p.settingsLocked(), true);
+  p.openTransfer(); p.openKick();
+  assert.equal(p.data.showTransferPicker, false);
+  assert.equal(p.data.showKickPicker, false);
+  p.toggleFairy({ detail: { value: true } });
+  assert.equal(p.data.dirty, false);
+  finish({ ...kickRoom(), stage: 's2' }); await refreshing;
+  assert.equal(p.original.stage, 's2');
+  assert.equal(p.data.refreshing, false);
+  const offline = p.load(); await new Promise(setImmediate);
+  failure(new Error('网络异常')); await offline;
+  assert.equal(p.data.authorized, true);
+  assert.equal(p.data.room.stage, 's2');
+  const revoked = p.load(); await new Promise(setImmediate);
+  finish({ ...kickRoom(), me: { isHost: false } }); await revoked;
+  assert.equal(p.data.authorized, false);
+  assert.equal(p.settingsLocked(), true);
+});
 test("开关调整后自动提交并显示服务端状态，无需手动保存", async () => {
   let r = room();
   const writes = [];
@@ -266,6 +300,7 @@ test("移交阶段冲突刷新，权限撤销后禁止继续移交", async () =>
 test("移交选择弹窗按需打开，取消不提交，空房或保存中不可打开", () => {
   const p = page({});
   p.data.authorized = true;
+  p.data.loading = false;
   p.openTransfer();
   assert.equal(p.data.showTransferPicker, false);
   p.data.transferPlayers = [{ seat: 2, name: "乙" }];

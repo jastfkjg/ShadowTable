@@ -660,6 +660,51 @@ test('我的页后台刷新仍应用新资料，快速切换时迟到响应不�
   assert.equal(p.data.loading, false);
 });
 
+test('我的页资料先返回即可使用，战绩占位保留入口布局且失败不清空资料', async () => {
+  const statsRead = deferred();
+  const { p } = page('me', { ...apiBase, request: async url => {
+    if (url.includes('/matches')) return { records: [], total: 0, hasMore: false };
+    return url.endsWith('/profile') ? profile : statsRead.promise;
+  } });
+  const loading = p.load();
+  await new Promise(setImmediate);
+  assert.equal(p.data.profile.displayName, '林间');
+  assert.equal(p.data.stats, null);
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const rendered = JSON.stringify(factory('pages/me/me.wxml')(p.data));
+  assert.match(rendered, /me-stats-panel/);
+  assert.match(rendered, /对局记录/);
+  assert.doesNotMatch(rendered, /正在读取个人资料/);
+  statsRead.reject(new Error('战绩暂不可用'));
+  await loading;
+  assert.equal(p.data.profile.displayName, '林间');
+  assert.equal(p.data.error, '战绩暂不可用');
+  assert.equal(p.data.loading, false);
+});
+
+test('大厅刷新保留空状态与表单，不插入页面加载文字，重复刷新只发送一次', async () => {
+  const roomsRead = deferred(); let reads = 0;
+  const { p } = page('lobby', { ...apiBase, request: async url => {
+    if (url.endsWith('/profile')) return profile;
+    reads++; return roomsRead.promise;
+  } });
+  p.data.loading = false;
+  const refreshing = p.refreshRooms();
+  await new Promise(setImmediate);
+  await p.refreshRooms();
+  assert.equal(reads, 1);
+  assert.equal(p.data.loading, false);
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const rendered = JSON.stringify(factory('pages/lobby/lobby.wxml')(p.data));
+  assert.match(rendered, /还没有牌桌/);
+  assert.match(rendered, /刷新中/);
+  assert.doesNotMatch(rendered, /正在连接牌桌/);
+  roomsRead.resolve({ rooms: [] }); await refreshing;
+  assert.equal(p.data.roomsRefreshing, false);
+});
+
 test('预取记录立即可见，首屏刷新失败后重试首屏，不误用加载更多', async () => {
   const record={id:'one',endedAt:1000,seat:1,role:'梅林',faction:'good',outcome:'win',members:[{seat:1,name:'林间'}]};
   const result={records:[record],total:1,hasMore:false};

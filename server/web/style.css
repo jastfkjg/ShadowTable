@@ -1662,6 +1662,7 @@ button.room-list-open { display: block; width: 100%; margin: 0; padding: 14px 48
 .room-list-time { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
 button.room-more { position: absolute; right: 2px; top: 4px; width: 44px; min-height: 44px; padding: 0; margin: 0; font-size: 24px; color: var(--muted); background: transparent; }
 .is-unavailable button.room-list-open:disabled { opacity: 0.7; }
+button.room-refresh { width: 72px; }
 .room-filters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
 button.room-filter { width: auto; min-height: 44px; margin: 0; padding: 8px 10px; font-size: 12px; color: var(--muted); background: transparent; }
 button.room-filter.active { color: var(--accent); background: var(--surface); }

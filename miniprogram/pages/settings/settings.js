@@ -2,6 +2,7 @@ const api = require("../../api");
 Page({
   data: {
     loading: true,
+    refreshing: false,
     busy: false,
     authorized: false,
     error: "",
@@ -44,8 +45,10 @@ Page({
     this.alive = false;
   },
   async load({ quiet = false } = {}) {
-    if (this.data.busy && !quiet) return;
-    this.setData(quiet ? { error: "" } : { loading: true, error: "", authorized: false });
+    if (this.fetching || (this.data.busy && !quiet)) return;
+    this.fetching = true;
+    const retain = this.data.authorized && !!this.data.room;
+    this.setData({ error: "", refreshing: true, ...(!retain ? { loading: true, authorized: false } : {}) });
     try {
       if (!/^\d{6}$/.test(this.code || "")) throw new Error("房间号无效");
       await api.login();
@@ -73,9 +76,10 @@ Page({
       });
       this.updateChoices(room.capacity, room.board);
     } catch (e) {
-      if (this.alive) this.setData({ error: e.message, authorized: e.status === 403 ? false : this.data.authorized });
+      if (this.alive) this.setData({ error: e.message, authorized: [401, 403, 404].includes(e.status) ? false : this.data.authorized });
     } finally {
-      if (this.alive) this.setData({ loading: false });
+      this.fetching = false;
+      if (this.alive) this.setData({ loading: false, refreshing: false });
     }
   },
   updateChoices(capacity, boardId) {
@@ -124,7 +128,7 @@ Page({
     return this.save();
   },
   settingsLocked() {
-    return this.data.busy || this.data.loading || !this.data.authorized ||
+    return this.data.busy || this.data.loading || this.data.refreshing || !this.data.authorized ||
       this.pending || this.transferPending || this.kickPending;
   },
   toggleFairy(e) {
@@ -142,6 +146,7 @@ Page({
   async save() {
     if (
       this.data.busy ||
+      this.data.refreshing ||
       this.transferPending ||
       this.kickPending ||
       !this.data.authorized
@@ -200,11 +205,7 @@ Page({
   },
   openTransfer() {
     if (
-      this.data.busy ||
-      this.pending ||
-      this.transferPending ||
-      this.kickPending ||
-      !this.data.authorized ||
+      this.settingsLocked() ||
       !this.data.transferPlayers.length
     )
       return;
@@ -215,14 +216,7 @@ Page({
   },
   stopPropagation() {},
   async transfer(e) {
-    if (
-      this.data.busy ||
-      this.pending ||
-      this.transferPending ||
-      this.kickPending ||
-      !this.data.authorized
-    )
-      return;
+    if (this.settingsLocked()) return;
     const seat = Number(e.currentTarget.dataset.seat);
     const target = this.data.transferPlayers.find((p) => p.seat === seat);
     if (!target) return;
@@ -287,11 +281,7 @@ Page({
   },
   openKick() {
     if (
-      this.data.busy ||
-      this.pending ||
-      this.transferPending ||
-      this.kickPending ||
-      !this.data.authorized ||
+      this.settingsLocked() ||
       !this.data.room?.canKick ||
       !this.data.transferPlayers.length
     )
@@ -303,11 +293,7 @@ Page({
   },
   async kick(e) {
     if (
-      this.data.busy ||
-      this.pending ||
-      this.transferPending ||
-      this.kickPending ||
-      !this.data.authorized ||
+      this.settingsLocked() ||
       !this.data.room?.canKick
     )
       return;

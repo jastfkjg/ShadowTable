@@ -1316,6 +1316,8 @@ button.room-more,
 button.room-more[disabled]:not([type]) { position: absolute; right: 4rpx; top: 8rpx; width: 88rpx; min-height: 88rpx; padding: 0; margin: 0; font-size: 48rpx; color: var(--muted); background: transparent; }
 button.room-list-open[disabled] { color: var(--text); background: transparent; }
 .is-unavailable button.room-list-open[disabled] { opacity: 0.7; }
+button.room-refresh,
+button.room-refresh[disabled]:not([type]) { width: 144rpx; }
 .room-filters { display: flex; flex-wrap: wrap; gap: 8rpx; margin-bottom: 24rpx; }
 button.room-filter,
 button.room-filter[disabled]:not([type]) { width: auto; min-height: 88rpx; margin: 0; padding: 16rpx 20rpx; font-size: 24rpx; color: var(--muted); background: transparent; }
