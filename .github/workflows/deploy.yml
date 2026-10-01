@@ -57,6 +57,7 @@ jobs:
   deploy:
     needs: resolve
     uses: ./.github/workflows/deploy-compose.yml
+    secrets: inherit
     with:
       environment: ${{ inputs.target }}
       image: ${{ needs.resolve.outputs.image }}
