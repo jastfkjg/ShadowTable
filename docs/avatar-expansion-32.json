@@ -1,0 +1,245 @@
+{
+  "tool": "Built-in image_gen",
+  "date": "2026-10-01",
+  "targetPerStyle": 32,
+  "added": 13,
+  "processing": "Crop complete subject with a small margin; resize to 128px JPEG with circular-crop-safe padding. Pixel images use nearest-neighbor sampling and 4:4:4 chroma.",
+  "avatars": [
+    {
+      "id": "avatar-29",
+      "style": "classic",
+      "label": "蘑菇药师",
+      "source": "output/imagegen/32-per-style/avatar-29.png",
+      "path": "miniprogram/assets/avatars/avatar-29.jpg",
+      "reference": "classic-current.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: a cheerful chibi young herbalist wearing one wide rounded mushroom cap, short straight hair, holding a small plain medicine jar near the chest. The mushroom hat is the dominant silhouette.\nStyle/medium: Expressive black-and-white manga chibi ink line art. Match the existing classic circular portraits: confident crisp hand-drawn black contours, playful face with large expressive eyes, a few bold black fills and very sparse hatching. Pure white paper. A single thin imperfect hand-drawn black circular border surrounds the bust, with white space between the subject and circle. Not realistic, no grayscale painting.\nBackdrop: pure white #ffffff, flat and clean across the entire square.\nComposition: centered single isolated head-and-shoulders bust inside a circular border, with balanced empty margins. The circular border occupies 88% of canvas width; keep all ears, hats, horns, hands and shoulders fully within the border.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 26,
+        "top": 25,
+        "width": 1197,
+        "height": 1176
+      },
+      "padding": 4,
+      "kernel": "lanczos3",
+      "hash": "1046e32f5c1f988a6709f9e6f789cebd8a969989bf5ef97593ada31e0b325d95"
+    },
+    {
+      "id": "avatar-30",
+      "style": "classic",
+      "label": "兔耳信使",
+      "source": "output/imagegen/32-per-style/avatar-30.png",
+      "path": "miniprogram/assets/avatars/avatar-30.jpg",
+      "reference": "classic-current.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: a cheerful chibi rabbit-eared courier, two very long upright rabbit ears rising from a simple soft cap, a small envelope held at the chest, a short scarf, one playful wink. The long ears are the dominant silhouette.\nStyle/medium: Expressive black-and-white manga chibi ink line art. Match the existing classic circular portraits: confident crisp hand-drawn black contours, playful face with large expressive eyes, a few bold black fills and very sparse hatching. Pure white paper. A single thin imperfect hand-drawn black circular border surrounds the bust, with white space between the subject and circle. Not realistic, no grayscale painting.\nBackdrop: pure white #ffffff, flat and clean across the entire square.\nComposition: centered single isolated head-and-shoulders bust inside a circular border, with balanced empty margins. The circular border occupies 88% of canvas width; keep all ears, hats, horns, hands and shoulders fully within the border.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "revisionPrompt": "Edit target: the rabbit courier portrait. Preserve its black-and-white chibi manga ink style, face, envelope, cap, scarf, pose, pure white paper and single circular ink border. Make only one geometry adjustment: shorten both rabbit ears by about 20%, lowering their tips so every part of the ears stays fully INSIDE the circular border with visible blank paper between ear tips and the border. Preserve the long-rabbit-ear recognizable silhouette. No other changes, no extra elements, no text.",
+      "crop": {
+        "left": 12,
+        "top": 22,
+        "width": 1228,
+        "height": 1205
+      },
+      "padding": 4,
+      "kernel": "lanczos3",
+      "hash": "0ca84297fd8e13531b49487ed001b8c01a7794d3a07fb731c50264524c2dec76"
+    },
+    {
+      "id": "avatar-31",
+      "style": "classic",
+      "label": "龙角守卫",
+      "source": "output/imagegen/32-per-style/avatar-31.png",
+      "path": "miniprogram/assets/avatars/avatar-31.jpg",
+      "reference": "classic-current.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: a friendly chibi dragon-horned young guard with two broad curved outward horns, short swept-back hair, simple shoulder armor and an open smile. Horns, not a crown or pointed hat, dominate the silhouette.\nStyle/medium: Expressive black-and-white manga chibi ink line art. Match the existing classic circular portraits: confident crisp hand-drawn black contours, playful face with large expressive eyes, a few bold black fills and very sparse hatching. Pure white paper. A single thin imperfect hand-drawn black circular border surrounds the bust, with white space between the subject and circle. Not realistic, no grayscale painting.\nBackdrop: pure white #ffffff, flat and clean across the entire square.\nComposition: centered single isolated head-and-shoulders bust inside a circular border, with balanced empty margins. The circular border occupies 88% of canvas width; keep all ears, hats, horns, hands and shoulders fully within the border.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 22,
+        "top": 23,
+        "width": 1208,
+        "height": 1185
+      },
+      "padding": 4,
+      "kernel": "lanczos3",
+      "hash": "47628a5dcd53d32fea5bc0bbccce94475d3670407b0161360a5dd9de50165096"
+    },
+    {
+      "id": "avatar-32",
+      "style": "classic",
+      "label": "熊猫武僧",
+      "source": "output/imagegen/32-per-style/avatar-32.png",
+      "path": "miniprogram/assets/avatars/avatar-32.jpg",
+      "reference": "classic-current.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: a cute anthropomorphic panda monk, round panda ears, dark eye patches, a plain folded robe and a short necklace of four large round beads. Calm cheerful expression, no hat, no weapon.\nStyle/medium: Expressive black-and-white manga chibi ink line art. Match the existing classic circular portraits: confident crisp hand-drawn black contours, playful face with large expressive eyes, a few bold black fills and very sparse hatching. Pure white paper. A single thin imperfect hand-drawn black circular border surrounds the bust, with white space between the subject and circle. Not realistic, no grayscale painting.\nBackdrop: pure white #ffffff, flat and clean across the entire square.\nComposition: centered single isolated head-and-shoulders bust inside a circular border, with balanced empty margins. The circular border occupies 88% of canvas width; keep all ears, hats, horns, hands and shoulders fully within the border.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 20,
+        "top": 24,
+        "width": 1209,
+        "height": 1200
+      },
+      "padding": 4,
+      "kernel": "lanczos3",
+      "hash": "cdab94513950f29552fd3fec0e01e5ccc1dad39f0cf60d8faba1af07b0191527"
+    },
+    {
+      "id": "crayon-32",
+      "style": "crayon",
+      "label": "魔法钥匙",
+      "source": "output/imagegen/32-per-style/crayon-32.png",
+      "path": "miniprogram/assets/avatars/crayon-32.jpg",
+      "reference": "crayon-new.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one chunky golden magical key, large rounded oval bow with a small red gem, straight shaft and two large teeth, positioned on a gentle diagonal. No character, no hands, no lettering.\nStyle/medium: Colored wax-crayon doodle with broad uneven strokes and visible coarse wax grain, warm cheerful muted gold and red. Soft irregular edges without hard ink outlines. Use the attached sheet only as a STYLE reference: match its simple chunky shapes and charming handmade quality.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "revisionPrompt": "Edit target: image 1, the golden key. Image 2 is the desired wax-crayon STYLE reference. Preserve the same recognizable gold key and red gem and the centered composition on warm ivory paper. Change only the rendering style: match the reference's VERY coarse childlike dry wax crayon scribbles, conspicuous broken fills with large ivory paper gaps and thick diagonal handmade strokes, rough frayed uneven edges. Wax gaps and strokes should be broad enough to remain clearly visible when the complete key is displayed at only 52px. Flatten all 3D bevels, metallic reflections and ring shadows into just warm yellow plus small orange wax strokes. Do not add a hard dark outline. Do not add any objects, symbols, text or border. One single avatar, not a grid.",
+      "crop": {
+        "left": 155,
+        "top": 117,
+        "width": 979,
+        "height": 995
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "77f9aa89d6953f8806ee49a2cbf224ebeb014d6cf2d3fb93ebb8d8cecc3e81b8"
+    },
+    {
+      "id": "sketch-30",
+      "style": "sketch",
+      "label": "沙漏",
+      "source": "output/imagegen/32-per-style/sketch-30.png",
+      "path": "miniprogram/assets/avatars/sketch-30.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one simple squat hourglass, two curved glass triangles between a top and bottom wooden bar, one small black sand pile. Outline only with minimal solid black accents.\nStyle/medium: Extremely simple black-and-white hand-drawn doodle. Match the earliest and object icons in the reference: thick slightly wobbly black marker/pencil outline, maximum 8 to 14 meaningful strokes, at most one or two small roughly scribbled black fill areas. Mostly blank warm paper. No gray shading, no fine engraving, no decorative details, no realistic rendering, no dense hatching. Readable instantly at 52px.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 357,
+        "top": 247,
+        "width": 540,
+        "height": 757
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "beff3234f9d39da17b5cde91978946c0c2614f2d3242e7a80c6dac9714a9ccb8"
+    },
+    {
+      "id": "sketch-31",
+      "style": "sketch",
+      "label": "宝箱",
+      "source": "output/imagegen/32-per-style/sketch-31.png",
+      "path": "miniprogram/assets/avatars/sketch-31.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one small closed treasure chest with a rounded lid, a single big lock and two plain corner bands. Slight three-quarter view, very few interior lines.\nStyle/medium: Extremely simple black-and-white hand-drawn doodle. Match the earliest and object icons in the reference: thick slightly wobbly black marker/pencil outline, maximum 8 to 14 meaningful strokes, at most one or two small roughly scribbled black fill areas. Mostly blank warm paper. No gray shading, no fine engraving, no decorative details, no realistic rendering, no dense hatching. Readable instantly at 52px.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 213,
+        "top": 281,
+        "width": 830,
+        "height": 680
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "fdf136224c7bfb94143a354e57baf46ab8699b830f39243155c8039432833c51"
+    },
+    {
+      "id": "sketch-32",
+      "style": "sketch",
+      "label": "小蘑菇",
+      "source": "output/imagegen/32-per-style/sketch-32.png",
+      "path": "miniprogram/assets/avatars/sketch-32.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one cute simple mushroom, a wide round cap with three large blank spots, short stem with two small vertical dot eyes. No feet or arms, no grass.\nStyle/medium: Extremely simple black-and-white hand-drawn doodle. Match the earliest and object icons in the reference: thick slightly wobbly black marker/pencil outline, maximum 8 to 14 meaningful strokes, at most one or two small roughly scribbled black fill areas. Mostly blank warm paper. No gray shading, no fine engraving, no decorative details, no realistic rendering, no dense hatching. Readable instantly at 52px.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 173,
+        "top": 212,
+        "width": 905,
+        "height": 848
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "4c3924d2f078088b8bafdbb4bd332e4758bebfd7b173ec37cec4cd05131dc27a"
+    },
+    {
+      "id": "geometric-31",
+      "style": "geometric",
+      "label": "翡翠宝石",
+      "source": "output/imagegen/32-per-style/geometric-31.png",
+      "path": "miniprogram/assets/avatars/geometric-31.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one large upright emerald gemstone with a broad flat hexagonal top and pointed bottom, made of only 7 to 9 simple flat polygon facets in muted jade green and teal. No setting, no sparkles.\nStyle/medium: Extremely minimal flat cut-paper polygon icon, broad straight-edged facets, restrained muted solid colors, about 6 to 10 large polygons total, no outline, no texture, no soft gradient, no 3D highlights or shadows.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 216,
+        "top": 202,
+        "width": 823,
+        "height": 849
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "7f8140d1ae9af4d3635b6befe8eb963f89bd48bad15c6df80efd681e5e223b67"
+    },
+    {
+      "id": "geometric-32",
+      "style": "geometric",
+      "label": "古卷",
+      "source": "output/imagegen/32-per-style/geometric-32.png",
+      "path": "miniprogram/assets/avatars/geometric-32.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one unfurled parchment scroll in a gentle diagonal, short rolled ends, simple flat cream paper and muted brown polygon shadows, no writing, no ribbon or seal.\nStyle/medium: Extremely minimal flat cut-paper polygon icon, broad straight-edged facets, restrained muted solid colors, about 6 to 10 large polygons total, no outline, no texture, no soft gradient, no 3D highlights or shadows.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 240,
+        "top": 184,
+        "width": 782,
+        "height": 871
+      },
+      "padding": 16,
+      "kernel": "lanczos3",
+      "hash": "29349eee255fecb82b644c39bb6a7102d67a5618f55866771ba23a0d04ec2849"
+    },
+    {
+      "id": "pixel-30",
+      "style": "pixel",
+      "label": "蓝色水晶",
+      "source": "output/imagegen/32-per-style/pixel-30.png",
+      "path": "miniprogram/assets/avatars/pixel-30.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one upright chunky blue crystal with a wide hexagonal upper section and pointed bottom, only three solid blue tones. Symmetric strong silhouette, no sparkles, no base.\nStyle/medium: Very simple old 8-bit pixel icon on a strict 16 by 16 logical pixel grid, enlarged with nearest-neighbor. Each edge is made of LARGE square blocks; keep individual blocks about 1/16 of the subject width. At most 4 flat subject colors plus the ivory background. No anti-aliased edges, no dithering, no texture, no tiny details, no gradient, no realistic lighting. Match the simple big-pixel objects in the reference rather than detailed RPG portraits.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 346,
+        "top": 239,
+        "width": 562,
+        "height": 809
+      },
+      "padding": 16,
+      "kernel": "nearest",
+      "hash": "53d93e74a51cf99acacc2c6502dcadbe5b88c4a1207da42dc85a7b8b7b169e1b"
+    },
+    {
+      "id": "pixel-31",
+      "style": "pixel",
+      "label": "铜钥匙",
+      "source": "output/imagegen/32-per-style/pixel-31.png",
+      "path": "miniprogram/assets/avatars/pixel-31.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one simple chunky copper key, a large square ring bow, straight vertical shaft and two large rectangular teeth. Only three solid copper/gold tones, no jewel, no engraving.\nStyle/medium: Very simple old 8-bit pixel icon on a strict 16 by 16 logical pixel grid, enlarged with nearest-neighbor. Each edge is made of LARGE square blocks; keep individual blocks about 1/16 of the subject width. At most 4 flat subject colors plus the ivory background. No anti-aliased edges, no dithering, no texture, no tiny details, no gradient, no realistic lighting. Match the simple big-pixel objects in the reference rather than detailed RPG portraits.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 372,
+        "top": 171,
+        "width": 510,
+        "height": 919
+      },
+      "padding": 16,
+      "kernel": "nearest",
+      "hash": "04ee186c1da816fbac04c774b7f3466f09987676c53c52359bf69e45f43972d4"
+    },
+    {
+      "id": "pixel-32",
+      "style": "pixel",
+      "label": "宝箱",
+      "source": "output/imagegen/32-per-style/pixel-32.png",
+      "path": "miniprogram/assets/avatars/pixel-32.jpg",
+      "reference": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: ONE single square built-in avatar for a fantasy tabletop companion app.\nInput image 1 is a STYLE REFERENCE ONLY, not an edit target. Create one NEW subject; do not recreate any existing avatar or produce a grid.\nSubject: one closed treasure chest in a simple front view, wide rectangular body, slightly stepped rounded lid, two gold vertical straps and one big square black lock. Only four solid brown/gold tones, no coins or scenery.\nStyle/medium: Very simple old 8-bit pixel icon on a strict 16 by 16 logical pixel grid, enlarged with nearest-neighbor. Each edge is made of LARGE square blocks; keep individual blocks about 1/16 of the subject width. At most 4 flat subject colors plus the ivory background. No anti-aliased edges, no dithering, no texture, no tiny details, no gradient, no realistic lighting. Match the simple big-pixel objects in the reference rather than detailed RPG portraits.\nBackdrop: uniform warm ivory #f8f5eb, flat and clean across the entire square.\nComposition: centered single isolated icon, with balanced empty margins. The complete silhouette occupies roughly 65% of the square width and 65% height; all parts must fit safely inside a circular crop.\nConstraints: preserve the reference style, simple shapes, compact proportions and readability at 52px. Exactly ONE avatar; no contact sheet, no labels, no letters, no watermark, no background scene, no additional floating symbols, no duplicated subjects. Make the new subject visibly distinct from the reference subjects.",
+      "crop": {
+        "left": 133,
+        "top": 294,
+        "width": 988,
+        "height": 659
+      },
+      "padding": 16,
+      "kernel": "nearest",
+      "hash": "f5a0e2d46f701b2698cc26df5f75632c3390945e2a744087c44ced2029253628"
+    }
+  ]
+}

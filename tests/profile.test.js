@@ -11,16 +11,17 @@ const avatarBytes = readFileSync(join(__dirname,'../miniprogram',builtinAvatars[
 const avatar = 'builtin:' + builtinAvatars[0].id;
 const legacyAvatarBytes = readFileSync(join(__dirname,'../miniprogram/assets/tab-me.png'));
 const customAvatar = 'data:image/png;base64,' + legacyAvatarBytes.toString('base64');
-test('头像库包含147款分类头像，编号和图片内容不重复', () => {
+test('头像库五种风格各32款，编号和图片内容不重复', () => {
   const { avatarStyles } = require('../miniprogram/avatar-library');
   assert.deepEqual(avatarStyles.map(item => [item.id, item.count]), [
-    ['classic', 28], ['crayon', 31], ['sketch', 29], ['geometric', 30], ['pixel', 29],
+    ['classic', 32], ['crayon', 32], ['sketch', 32], ['geometric', 32], ['pixel', 32],
   ]);
-  assert.equal(builtinAvatars.length, 147);
-  assert.equal(new Set(builtinAvatars.map(item => item.id)).size, 147);
-  assert.equal(new Set(builtinAvatars.map(item => item.hash)).size, 147);
-  for (const { id: style, count } of avatarStyles.filter(item => item.id !== 'classic')) {
-    for (let i = 1; i <= count; i++) assert.ok(builtinAvatars.some(item => item.id === style + '-' + String(i).padStart(2, '0')));
+  assert.equal(builtinAvatars.length, 160);
+  assert.equal(new Set(builtinAvatars.map(item => item.id)).size, 160);
+  assert.equal(new Set(builtinAvatars.map(item => item.hash)).size, 160);
+  for (const { id: style, count } of avatarStyles) {
+    const prefix = style === 'classic' ? 'avatar' : style;
+    for (let i = 1; i <= count; i++) assert.ok(builtinAvatars.some(item => item.style === style && item.id === prefix + '-' + String(i).padStart(2, '0')));
   }
 });
 test('内置头像选择跨重启保留，拒绝上传并兼容去重、重试及清除', async () => {

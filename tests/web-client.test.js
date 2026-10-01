@@ -38,7 +38,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
 const response = (body) => ({ status: 200, json: async () => body });
 test('网页按风格筛选头像，切换分类保留草稿和预览并且不触发保存', async () => {
   const presets = require('../miniprogram/builtin-avatars');
-  const geometric = presets.find(item => item.id === 'geometric-30'), crayon = presets.find(item => item.id === 'crayon-31');
+  const geometric = presets.find(item => item.id === 'geometric-32'), crayon = presets.find(item => item.id === 'crayon-32');
   let posts = 0;
   const c = client(async (url, options) => {
     if (options.method === 'POST') posts++;
@@ -47,8 +47,8 @@ test('网页按风格筛选头像，切换分类保留草稿和预览并且不�
   await c.applyRoute('#/profile');
   const rendered = () => c.viewProfileEditor();
   assert.equal(c.state.profileDraft.avatarStyle, 'geometric');
-  assert.equal((rendered().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 30);
-  assert.match(rendered(), /data-id="geometric-30"/);
+  assert.equal((rendered().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 32);
+  assert.match(rendered(), /data-id="geometric-32"/);
   assert.doesNotMatch(rendered(), /data-id="avatar-01"|data-id="crayon-01"/);
   const switchStyle = style => c.ACTIONS.chooseProfileAvatarStyle({ dataset: { style } });
   switchStyle('crayon');
@@ -77,7 +77,7 @@ test('网页内置头像只改草稿，重新选原头像取消改动，保存�
     return response(url.endsWith('/profile') ? saved : url.endsWith('/rooms') ? {rooms:[]} : {total:0,wins:0,winRate:null});
   });
   await c.applyRoute('#/profile');
-  assert.equal((c.viewProfileEditor().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 28);
+  assert.equal((c.viewProfileEditor().match(/class="avatar-option(?: is-selected)?"/g) || []).length, 32);
   assert.doesNotMatch(c.viewProfileEditor(), /type="file"|上传头像/);
   assert.match(c.viewProfileEditor(), /data-id="avatar-01" aria-label="头像 01，已选择" aria-pressed="true"/);
   const choose = id => c.ACTIONS.chooseBuiltinProfileAvatar({ dataset: { id } });
@@ -102,7 +102,7 @@ test('网页内置头像只改草稿，重新选原头像取消改动，保存�
   assert.equal(JSON.parse(posts[1].body).avatar, 'builtin:' + presets.at(-1).id);
   await c.navigate('profile');
   assert.equal(c.state.profileDraft.avatarStyle, 'pixel');
-  assert.match(c.viewProfileEditor(), /data-id="pixel-29" aria-label="像素风 · 圣光盾牌，已选择" aria-pressed="true"/);
+  assert.match(c.viewProfileEditor(), /data-id="pixel-32" aria-label="像素风 · 宝箱，已选择" aria-pressed="true"/);
 });
 test('网页昵称在头像下编辑，空值保留错误，完成后仅更新草稿', async () => {
   let writes = 0;

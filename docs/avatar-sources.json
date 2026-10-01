@@ -1561,5 +1561,161 @@
     },
     "review": "docs/avatar-imports-2026-10-01.json",
     "sourceTile": 16
+  },
+  {
+    "id": "avatar-29",
+    "source": "output/imagegen/32-per-style/avatar-29.png",
+    "style": "classic",
+    "crop": {
+      "left": 26,
+      "top": 25,
+      "width": 1197,
+      "height": 1176
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "avatar-30",
+    "source": "output/imagegen/32-per-style/avatar-30.png",
+    "style": "classic",
+    "crop": {
+      "left": 12,
+      "top": 22,
+      "width": 1228,
+      "height": 1205
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "avatar-31",
+    "source": "output/imagegen/32-per-style/avatar-31.png",
+    "style": "classic",
+    "crop": {
+      "left": 22,
+      "top": 23,
+      "width": 1208,
+      "height": 1185
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "avatar-32",
+    "source": "output/imagegen/32-per-style/avatar-32.png",
+    "style": "classic",
+    "crop": {
+      "left": 20,
+      "top": 24,
+      "width": 1209,
+      "height": 1200
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "crayon-32",
+    "source": "output/imagegen/32-per-style/crayon-32.png",
+    "style": "crayon",
+    "crop": {
+      "left": 155,
+      "top": 117,
+      "width": 979,
+      "height": 995
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "sketch-30",
+    "source": "output/imagegen/32-per-style/sketch-30.png",
+    "style": "sketch",
+    "crop": {
+      "left": 357,
+      "top": 247,
+      "width": 540,
+      "height": 757
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "sketch-31",
+    "source": "output/imagegen/32-per-style/sketch-31.png",
+    "style": "sketch",
+    "crop": {
+      "left": 213,
+      "top": 281,
+      "width": 830,
+      "height": 680
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "sketch-32",
+    "source": "output/imagegen/32-per-style/sketch-32.png",
+    "style": "sketch",
+    "crop": {
+      "left": 173,
+      "top": 212,
+      "width": 905,
+      "height": 848
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "geometric-31",
+    "source": "output/imagegen/32-per-style/geometric-31.png",
+    "style": "geometric",
+    "crop": {
+      "left": 216,
+      "top": 202,
+      "width": 823,
+      "height": 849
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "geometric-32",
+    "source": "output/imagegen/32-per-style/geometric-32.png",
+    "style": "geometric",
+    "crop": {
+      "left": 240,
+      "top": 184,
+      "width": 782,
+      "height": 871
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "pixel-30",
+    "source": "output/imagegen/32-per-style/pixel-30.png",
+    "style": "pixel",
+    "crop": {
+      "left": 346,
+      "top": 239,
+      "width": 562,
+      "height": 809
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "pixel-31",
+    "source": "output/imagegen/32-per-style/pixel-31.png",
+    "style": "pixel",
+    "crop": {
+      "left": 372,
+      "top": 171,
+      "width": 510,
+      "height": 919
+    },
+    "generation": "docs/avatar-expansion-32.json"
+  },
+  {
+    "id": "pixel-32",
+    "source": "output/imagegen/32-per-style/pixel-32.png",
+    "style": "pixel",
+    "crop": {
+      "left": 133,
+      "top": 294,
+      "width": 988,
+      "height": 659
+    },
+    "generation": "docs/avatar-expansion-32.json"
   }
 ]
