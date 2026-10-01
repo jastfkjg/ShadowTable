@@ -1,7 +1,6 @@
 .me-page {
   --me-divider: rgba(177, 191, 198, .12);
   padding-top: 32rpx;
-  padding-bottom: 48rpx;
 }
 
 .me-profile,
@@ -99,3 +98,8 @@
 .me-icon-info {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7h.01'/%3E%3C/svg%3E");
 }
+
+.me-points { margin-top: 32rpx; padding: 28rpx 32rpx; border-radius: 24rpx; background: var(--surface); }
+.me-points .me-results-detail { min-height: 48px; }
+.score-overview { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding-top: 16rpx; }
+.score-overview .metric-value { font-size: 44rpx; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

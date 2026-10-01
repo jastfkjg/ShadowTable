@@ -1,9 +1,10 @@
 const api = require("../../api");
 const { presentProfile, presentStats } = require("../../profile");
+const { selectTab } = require("../../tab-navigation");
 Page({
   data: { loading: true, error: "", profile: null, stats: null },
   onLoad() { this.alive = true; },
-  onShow() { return this.load(); },
+  onShow() { selectTab(this, 1); return this.load(); },
   onUnload() { this.alive = false; },
   updateChangedData(values) {
     const changed = {};

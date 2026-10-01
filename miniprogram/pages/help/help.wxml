@@ -12,6 +12,14 @@
     <view class="help-step"><text class="help-number">03</text><view><view class="help-step-title">私下查看身份</view><view class="help-copy">记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。</view></view></view>
     <view class="help-step"><text class="help-number">04</text><view><view class="help-step-title">线下讨论，按提示操作</view><view class="help-copy">需要你投票、出任务牌或使用技能时，页面会提示；提交后等待结算。</view></view></view>
   </view>
+  <view class="help-section" id="scoring-rules">
+    <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleScoring" aria-expanded="{{scoringExpanded}}"><view class="help-toggle-copy"><view class="help-heading">积分规则</view><view class="help-caption">查看当前计分范围与加分项目</view></view><text aria-hidden="true">{{scoringExpanded?'−':'+'}}</text></button>
+    <view wx:if="{{scoringExpanded}}" class="help-answers">
+      <view wx:if="{{scoringLoading && !scoringRules}}" class="help-copy" role="status">正在读取积分规则…</view>
+      <view wx:if="{{scoringError}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
+      <block wx:if="{{scoringRules}}"><view class="help-copy">{{scoringRules.scopeLabel}}</view><view wx:for="{{scoringRules.items}}" wx:key="id" class="help-answer"><view class="help-step-title">{{item.label}}</view><view class="help-copy">{{item.text}}</view></view><view wx:for="{{scoringRules.notes}}" wx:key="*this" class="help-copy">{{item}}</view></block>
+    </view>
+  </view>
   <block wx:for="{{sections}}" wx:key="id">
     <view wx:if="{{item.id !== 'faq'}}" class="help-section">
       <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>

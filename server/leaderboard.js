@@ -2,7 +2,7 @@
 const { randomUUID } = require("node:crypto");
 const { RuleError } = require("./engine");
 const { readProfile } = require("./profile");
-const METRICS = { games: 1, overall: 1, good: 1, evil: 1 };
+const METRICS = { points: 1, games: 1, overall: 1, good: 1, evil: 1 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
 function periodRange(period, now) {
   if (period === "all") return { start: 0, end: null };
@@ -26,10 +26,12 @@ function parseQuery(params) {
 }
 const summary = row => {
   const total = row?.total || 0, wins = row?.wins || 0;
-  return { total, wins, losses: total - wins, winRate: total ? Math.round(wins / total * 1000) / 10 : null };
+  return { total, wins, losses: total - wins, winRate: total ? Math.round(wins / total * 1000) / 10 : null,
+    ...(row?.points !== undefined ? { points: row.points } : {}) };
 };
 // Compare the original integer ratios, never their one-decimal display values.
 function compare(a, b, metric) {
+  if (metric === "points") return b.points - a.points;
   if (metric === "games") return b.total - a.total;
   const delta = BigInt(b.wins) * BigInt(a.total) - BigInt(a.wins) * BigInt(b.total);
   return delta > 0n ? 1 : delta < 0n ? -1 : b.total - a.total;
@@ -42,8 +44,10 @@ class Leaderboard {
     if (old && old.revision === this.store.leaderboardRevision && old.start === range.start && now >= old.updatedAt && now - old.updatedAt < CACHE_MS) return old;
     const faction = ["good", "evil"].includes(metric) ? metric : null;
     const aggregates = this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
+      ${metric === "points" ? "sum(s.points) AS points," : ""}
       f.nickname, f.avatar_hash, f.public_id, f.leaderboard_visible
       FROM match_players p LEFT JOIN profiles f ON f.uid=p.uid
+      ${metric === "points" ? "JOIN match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'" : ""}
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
       .all(range.start, ...(range.end === null ? [] : [range.end]), ...(faction ? [faction] : []));
@@ -66,12 +70,13 @@ class Leaderboard {
     const snapshot = this.snapshot(metric, period, now);
     if (version && version !== snapshot.version) throw new RuleError("榜单已更新，请刷新后继续查看", 409);
     const own = snapshot.aggregates.get(uid), ownStats = summary(own);
+    if (metric === "points") ownStats.points = own?.points || 0;
     // Profiles without games do not appear in the aggregation.
     const visible = readProfile(this.store, uid).leaderboardVisible;
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     return {
-      metric, period, periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",
+      metric, period, availableMetrics: Object.keys(METRICS), periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",
       threshold: METRICS[metric], eligibleCount: snapshot.eligible.length, maxRows: MAX_ROWS,
       updatedAt: snapshot.updatedAt, version: snapshot.version,
       rows: snapshot.eligible.slice(offset, Math.min(nextOffset, end)).map(row => ({

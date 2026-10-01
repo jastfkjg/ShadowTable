@@ -434,7 +434,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const emptyMatches=JSON.stringify(factory('pages/matches/matches.wxml')({loading:false,error:'',records:[],total:0}));
   assert.match(emptyMatches,/暂无对局记录/); assert.doesNotMatch(emptyMatches,/去开一局|逐场查看/);
 });
-test('窗口、原生底栏与顶部导航保持深色，所有页面都有顶部导航', () => {
+test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面都有顶部导航', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
   const color = '#101c24';
   assert.equal(config.window.backgroundColor, color);
@@ -443,7 +443,7 @@ test('窗口、原生底栏与顶部导航保持深色，所有页面都有顶�
   assert.equal(config.window.navigationBarBackgroundColor, color);
   assert.equal(config.tabBar.backgroundColor, color);
   assert.equal(config.window.navigationStyle, 'custom');
-  assert.notEqual(config.tabBar.custom, true);
+  assert.equal(config.tabBar.custom, true);
   for (const route of config.pages) {
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
@@ -454,13 +454,37 @@ test('窗口、原生底栏与顶部导航保持深色，所有页面都有顶�
   }
 });
 
+test('一级页面在慢网读取前同步底栏选中态，重复显示不重绘；牌桌不操作底栏', async () => {
+  const selections = [];
+  const bar = { data: { selected: 0 }, setData(patch) { selections.push(patch.selected); Object.assign(this.data, patch); } };
+  const login = deferred();
+  const { p: me } = page('me', { ...apiBase, login: () => login.promise, request: async url =>
+    url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { records: [] } });
+  me.getTabBar = () => bar;
+  const refresh = me.onShow();
+  assert.deepEqual(selections, [1]);
+  assert.equal(me.data.profile, null);
+  login.resolve(); await refresh;
+  await me.onShow();
+  assert.deepEqual(selections, [1]);
+  const { p: lobby } = page('lobby', apiBase);
+  lobby.getTabBar = () => bar;
+  lobby.alive = false;
+  lobby.onShow();
+  const { p: table } = page('table', apiBase);
+  table.getTabBar = () => { throw new Error('牌桌不应访问底栏'); };
+  table.alive = false;
+  table.onShow();
+  assert.deepEqual(selections, [1, 0]);
+});
+
 test('个人入口使用原生导航与即时轻按态，不触发默认白色按钮背景', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
   const factory = vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['profile','stats','matches','leaderboard','help'].map(name => `/pages/${name}/${name}`));
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/help/help?section=scoring','/pages/matches/matches?scored=1',...['stats','matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
     assert.equal(node.attr.hoverStartTime,0);
@@ -479,6 +503,52 @@ function rankResult(metric='games', extra={}) {
     rows:[{publicId:'player',nickname:'甲',avatarUrl:null,rank:1,total:20,wins:12,losses:8,winRate:60,isSelf:true}],
     me:{rank:1,status:'ranked',total:20,wins:12,losses:8,winRate:60,remaining:0},...extra};
 }
+test('新小程序连接旧服务时自动显示局数榜，周期和胜率可用，升级后恢复积分入口', async () => {
+  const urls=[];let upgraded=false;
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{
+    urls.push(url);
+    const params=new URL('https://test.invalid'+url).searchParams,metric=params.get('metric');
+    if(metric==='points' && !upgraded)throw Object.assign(new Error('排行榜参数无效，请刷新后重试'),{status:400});
+    return rankResult(metric,{period:params.get('period'),...(upgraded?{availableMetrics:['points','games','overall','good','evil']}:{})});
+  }});
+  await p.onShow();
+  assert.deepEqual(urls,['/api/leaderboard?metric=points&period=all','/api/leaderboard?metric=games&period=all']);
+  assert.equal(p.data.metric,'games');assert.equal(p.data.board.metric,'games');assert.equal(p.data.error,'');
+  assert.equal(p.data.pointsAvailable,false);assert.match(p.data.notice,/尚未开放积分榜/);
+  await p.chooseMetric({currentTarget:{dataset:{id:'points'}}});assert.equal(urls.length,2);
+  await p.choosePeriod({currentTarget:{dataset:{id:'month'}}});
+  assert.equal(urls.at(-1),'/api/leaderboard?metric=games&period=month');
+  await p.chooseGroup({currentTarget:{dataset:{id:'overall'}}});assert.equal(p.data.board.metric,'overall');
+  upgraded=true;await p.onShow();assert.equal(p.data.pointsAvailable,true);assert.equal(p.data.notice,'');
+  await p.chooseMetric({currentTarget:{dataset:{id:'points'}}});assert.equal(p.data.board.metric,'points');
+  assert.equal(urls.at(-1),'/api/leaderboard?metric=points&period=month');
+});
+test('过期积分请求的参数错误不会覆盖新选择，权限和普通请求错误不降级',async()=>{
+  const pending=deferred(),urls=[];
+  const {p}=page('leaderboard',{...apiBase,request:url=>{
+    urls.push(url);return urls.length===1?pending.promise:Promise.resolve(rankResult('good'));
+  }});
+  const initial=p.onShow();await new Promise(resolve=>setImmediate(resolve));
+  await p.chooseMetric({currentTarget:{dataset:{id:'good'}}});
+  pending.reject(Object.assign(new Error('排行榜参数无效，请刷新后重试'),{status:400}));await initial;
+  assert.equal(urls.length,2);assert.equal(p.data.board.metric,'good');assert.equal(p.data.pointsAvailable,true);
+  for(const [status,message] of [[401,'请重新登录'],[403,'禁止访问'],[500,'暂时无法处理'],[400,'其他输入错误']]) {
+    let reads=0;
+    const failed=page('leaderboard',{...apiBase,request:async()=>{reads++;throw Object.assign(new Error(message),{status});}}).p;
+    await failed.onShow();assert.equal(reads,1);assert.equal(failed.data.error,message);assert.equal(failed.data.pointsAvailable,true);
+  }
+});
+test('积分榜分页遇到旧服务后从局数榜第一页重新加载，不混合两种榜单记录',async()=>{
+  const urls=[];
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{
+    urls.push(url);
+    if(url.includes('offset='))throw Object.assign(new Error('排行榜参数无效，请刷新后重试'),{status:400});
+    return rankResult(url.includes('metric=points')?'points':'games',{hasMore:urls.length===1,nextOffset:20,version:'old'});
+  }});
+  await p.onShow();await p.loadMore();
+  assert.equal(urls.at(-1),'/api/leaderboard?metric=games&period=all');
+  assert.equal(p.data.board.metric,'games');assert.equal(p.data.board.rows.length,1);assert.equal(p.data.error,'');
+});
 test('小程序切换周期保留榜单和底栏，完成后一次更新，失败可重试目标周期', async () => {
   const requests=[];
   const {p}=page('leaderboard',{...apiBase,request:url=>{
@@ -717,4 +787,26 @@ test('预取记录立即可见，首屏刷新失败后重试首屏，不误用�
   await p.retry();
   assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=0']);
   assert.equal(p.data.error,'');assert.equal(p.data.records[0].expanded,true);
+});
+
+test('计分表单接受服务端结束原因，提交实际目标；分值与加分标签由服务端明细展示', async () => {
+  const {p}=page('table',apiBase);
+  p.data.room={canUseTools:true,stage:'score-stage',players:[{seat:1,name:'甲'},{seat:2,name:'乙'}],winnerOptions:[{value:'good',label:'好人胜'}],scoreSettlement:[{id:'remote-reason',label:'服务端新结算选项',requiresTarget:true}]};
+  let submission;
+  p.confirmCommand=async(title,message,type,body)=>submission={message,type,body};
+  p.finishTools();p.pickScoreReason({currentTarget:{dataset:{id:'remote-reason'}}});
+  await p.saveResult();assert.equal(submission,undefined);
+  p.pickScoreTarget({currentTarget:{dataset:{seat:2}}});await p.saveResult();
+  assert.equal(submission.type,'finishTools');assert.equal(submission.body.scoreReason,'remote-reason');assert.equal(submission.body.scoreTarget,2);assert.ok(!Object.hasOwn(submission.body,'winner'));
+  const presented=require('../miniprogram/profile').presentMatches([{id:'x',endedAt:1,members:[],score:{status:'scored',total:9,breakdown:[{id:'future-award',label:'服务端新增奖励',points:9}]}}]);
+  const context={window:{},global:{}};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  const rendered=JSON.stringify(factory('pages/matches/matches.wxml')({records:presented.map(row=>({...row,expanded:true})),total:1}));
+  assert.match(rendered,/服务端新增奖励/);assert.match(rendered,/9 分/);
+});
+test('积分明细入口不复用全部对局预取，过滤与后续分页持续使用计分局口径',async()=>{
+  const urls=[];
+  const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[],score:{status:'scored',total:0,breakdown:[]}}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unscored',endedAt:1,members:[]}],total:1}},{}]});
+  await p.onLoad({scored:'1'});assert.equal(p.data.records[0].scoreLabel,'+0 分');
+  await p.loadMore();assert.deepEqual(urls,['/api/me/matches?offset=0&scored=1','/api/me/matches?offset=1&scored=1']);
 });

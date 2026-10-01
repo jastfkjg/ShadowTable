@@ -62,6 +62,20 @@
           </div>
         </section>
         <section>
+          <h2>更正已归档结果</h2>
+          <p>按本局开局时的规则重算积分，并同步战绩和连胜。每次更正会保留原因和前后记录。</p>
+          <label for="correction-code">房间号</label><input id="correction-code" inputmode="numeric" maxlength="6" placeholder="6位房间号" />
+          <button id="correction-load" type="button">查找最近50场对局</button>
+          <form id="correction-form">
+            <label for="correction-match">选择对局</label><select id="correction-match" required disabled><option value="">请先查找对局</option></select>
+            <label for="correction-result">实际结束原因</label><select id="correction-result" required disabled></select>
+            <div id="correction-target-row" hidden><label for="correction-target">实际刺杀目标</label><select id="correction-target"></select></div>
+            <label for="correction-reason">更正原因</label><input id="correction-reason" required minlength="2" maxlength="200" />
+            <p id="correction-status" role="status" aria-live="polite"></p>
+            <button id="correction-submit" class="danger" disabled>确认更正整局结果</button>
+          </form>
+        </section>
+        <section>
           <div class="section-heading">
             <h2>操作记录</h2>
             <span id="audit-count"></span>

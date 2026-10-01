@@ -33,9 +33,11 @@ Page({
       ] },
     ],
   },
-  onLoad() {
+  onLoad(options = {}) {
     this.alive = true;
     this.loadBoards();
+    this.setData({ scoringExpanded: options.section === "scoring" });
+    this.loadScoreRules();
   },
   onUnload() { this.alive = false; },
   back() {
@@ -78,6 +80,15 @@ Page({
       if (this.alive) this.setData({ loadingBoards: false });
     }
   },
+  async loadScoreRules() {
+    this.setData({ scoringLoading: true, scoringError: "" });
+    try {
+      const rules = await api.request("/api/scoring/rules");
+      if (this.alive) this.setData({ scoringRules: rules });
+    } catch (e) { if (this.alive) this.setData({ scoringError: "积分规则暂未加载，请重试。" }); }
+    finally { if (this.alive) this.setData({ scoringLoading: false }); }
+  },
+  toggleScoring() { this.setData({ scoringExpanded: !this.data.scoringExpanded }); },
   toggleBoards() {
     this.setData({ boardsExpanded: !this.data.boardsExpanded });
   },

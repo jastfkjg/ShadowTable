@@ -35,11 +35,11 @@ button.nickname-done[disabled]:not([type]) { width: auto; flex-shrink: 0; min-he
 .nickname-error { margin-top: 12rpx; color: var(--evil); font-size: 26rpx; }
 .avatar-library { margin: 0; }
 .avatar-library .field-title { margin: 0; padding-bottom: 20rpx; border-bottom: 2rpx solid var(--border); font-size: 30rpx; }
-.avatar-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; padding-top: 24rpx; }
+.avatar-styles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16rpx; padding-top: 16rpx; }
 button.avatar-style,
-button.avatar-style[disabled]:not([type]) { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 16rpx 20rpx; border: 2rpx solid var(--border); border-radius: 16rpx; color: var(--muted); background: transparent; font-size: 26rpx; line-height: 1.5; }
+button.avatar-style[disabled]:not([type]) { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 4rpx; border: 0; border-bottom: 4rpx solid transparent; border-radius: 0; color: var(--muted); background: transparent; font-size: 28rpx; line-height: 1.5; white-space: nowrap; }
 button.avatar-style.is-active,
-button.avatar-style.is-active[disabled]:not([type]) { color: var(--bg); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+button.avatar-style.is-active[disabled]:not([type]) { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .avatar-library-count { margin-top: 20rpx; font-size: 24rpx; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16rpx; padding: 20rpx 0 0; }
 .avatar-grid button.avatar-option,

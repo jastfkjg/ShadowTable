@@ -49,8 +49,8 @@ button.disclosure-button:not([disabled]):active {
   margin: auto;
   box-sizing: border-box;
 }
-/* The native tab bar occupies its own viewport area, including the safe area. */
-.tab-page { padding-bottom: 48rpx; }
+/* Custom tabs share the page viewport; reserve the bar and iPhone safe area. */
+.tab-page { padding-bottom: calc(48rpx + 50px + env(safe-area-inset-bottom)); }
 .brand {
   display: flex;
   align-items: center;
@@ -1483,3 +1483,14 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .inline-error { margin: 32rpx 0; padding: 28rpx; border: 2rpx solid var(--evil); border-radius: 24rpx; color: var(--evil); }
 .inline-error button { margin-top: 24rpx; width: 100%; }
 .empty-records { padding: 64rpx 0; }
+
+.score-reasons { display: flex; flex-direction: column; gap: 16rpx; margin: 24rpx 0; }
+.score-reasons button { width: 100%; min-height: 48px; margin: 0; white-space: normal; }
+.score-targets { margin: 24rpx 0; }
+.score-result { margin: 24rpx 0; padding: 24rpx; background: var(--surface); border-radius: 16rpx; }
+.score-result .metric-value { font-size: 36rpx; }
+.score-award { display: flex; justify-content: space-between; gap: 24rpx; margin-top: 12rpx; font-size: 26rpx; }
+.score-reasons button.is-selected, .score-targets button.is-selected { border-color: var(--accent); color: var(--accent); outline: 4rpx solid var(--accent); outline-offset: -4rpx; }
+.error-dialog.score-dialog { height: 85vh; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; gap: 24rpx; }
+.score-dialog .dialog-title, .score-dialog .dialog-actions { flex-shrink: 0; }
+.score-body { height: 0; min-height: 0; flex: 1; }

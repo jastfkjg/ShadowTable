@@ -8,6 +8,7 @@ const labels = {
   rematch: "同房重开",
   delete: "删除房间",
   login: "管理员登录",
+  "correct-result": "更正对局结果",
   companion: "陪测玩家",
   player: "玩家",
 };
@@ -27,7 +28,7 @@ async function api(path, data) {
   });
   const result = await response.json();
   if (response.status === 401) showSession(false);
-  if (!response.ok) throw new Error(result.error || "请求失败");
+  if (!response.ok) throw Object.assign(new Error(result.error || "请求失败"), { status: response.status });
   return result;
 }
 function showSession(on) {
@@ -508,3 +509,61 @@ api("session")
     showSession(false);
   })
   .catch(feedback);
+
+let correctionMatches = [], correctionPending = null, correctionBusy = false;
+const correctionControls = ['correction-code','correction-load','correction-match','correction-result','correction-target','correction-reason'];
+function selectOptions(id, options) {
+  $(id).replaceChildren(...options.map(item => {const option=el('option',item.label);option.value=item.value;return option;}));
+}
+function correctionMatch() { return correctionMatches.find(match=>match.id===$('correction-match').value); }
+function updateCorrectionTarget() {
+  const match=correctionMatch(), selected=match?.options.find(option=>option.id===$('correction-result').value);
+  $('correction-target-row').hidden=!selected?.requiresTarget;
+  $('correction-target').required=!!selected?.requiresTarget;
+}
+function updateCorrectionMatch() {
+  const match=correctionMatch();
+  selectOptions('correction-result',[{value:'',label:'请选择结束原因'},...(match?.options || []).map(option=>({value:option.id,label:option.label}))]);
+  selectOptions('correction-target',[{value:'',label:'请选择实际目标'},...(match?.players || []).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name})),{value:'0',label:'空刀'}]);
+  $('correction-result').disabled=!match?.options.length;
+  $('correction-submit').disabled=!match?.options.length;
+  $('correction-status').textContent=match && !match.options.length ? '本局未启用计分或不在计分范围，无法更正积分。' : '';
+  updateCorrectionTarget();
+}
+async function loadCorrectionMatches() {
+  if(correctionBusy || correctionPending) return;
+  const code=$('correction-code').value.trim();
+  if(!/^\d{6}$/.test(code)) {$('correction-status').textContent='请输入6位房间号';return;}
+  $('correction-load').disabled=true;
+  try {
+    const result=await api('matches?code='+encodeURIComponent(code));correctionMatches=result.matches;
+    selectOptions('correction-match',[{value:'',label:correctionMatches.length?'请选择对局':'暂无已归档对局'},...correctionMatches.map(match=>({value:match.id,label:new Date(match.endedAt).toLocaleString('zh-CN')+' · '+match.boardName+' · '+({good:'好人胜',evil:'坏人胜',third:'第三方胜'})[match.winner]}))]);
+    $('correction-match').disabled=!correctionMatches.length;updateCorrectionMatch();
+  } catch(error) {$('correction-status').textContent=error.message;}
+  finally {$('correction-load').disabled=false;}
+}
+$('correction-load').addEventListener('click',loadCorrectionMatches);
+$('correction-match').addEventListener('change',updateCorrectionMatch);
+$('correction-result').addEventListener('change',updateCorrectionTarget);
+$('correction-form').addEventListener('submit',async event=>{
+  event.preventDefault();if(correctionBusy) return;
+  const match=correctionMatch();if(!match || !match.options.length) return;
+  if(!correctionPending) {
+    if(!window.confirm('确认更正这场对局？战绩、积分和受影响的连胜奖励会同步重算，并保留更正记录。')) return;
+    const option=match.options.find(reason=>reason.id===$('correction-result').value);
+    correctionPending={id:match.id,data:{requestId:crypto.randomUUID(),revision:match.revision,scoreReason:option.id,
+      ...(option.requiresTarget?{scoreTarget:Number($('correction-target').value)}:{}),reason:$('correction-reason').value.trim()}};
+  }
+  correctionBusy=true;correctionControls.forEach(id=>$(id).disabled=true);$('correction-submit').disabled=true;
+  try {
+    await api('matches/'+correctionPending.id+'/correct',correctionPending.data);
+    correctionPending=null;$('correction-status').textContent='已更正，战绩、积分和连胜已同步。';$('correction-reason').value='';
+  }catch(error){
+    if(error.status && error.status < 500 && ![401,429].includes(error.status)) correctionPending=null;
+    $('correction-status').textContent=error.message;
+  }finally{
+    correctionBusy=false;correctionControls.forEach(id=>$(id).disabled=!!correctionPending);$('correction-submit').disabled=false;
+    $('correction-submit').textContent=correctionPending?'重试同一更正':'确认更正整局结果';
+    if(!correctionPending) {const status=$('correction-status').textContent;await loadCorrectionMatches();$('correction-status').textContent=status;}
+  }
+});

@@ -44,3 +44,8 @@ button.rank-more { width: 100%; min-height: 48px; margin-top: 24rpx; color: var(
 .rank-visibility-error { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; font-size: 24rpx; color: var(--evil); }
 .rank-visibility-error button { flex-shrink: 0; width: auto; margin: 0; min-height: 44px; color: var(--accent); }
 @media (max-height: 500px) { .rank-mine { position: static; margin-top: 24rpx; } .leaderboard-page { padding-bottom: 32rpx; } }
+
+button.rank-metric { max-width: 33.333%; }
+.rank-rates { display: flex; gap: 12rpx; margin: -12rpx 0 24rpx; }
+.rank-rates button { flex: 1; width: 0; min-width: 0; min-height: 48px; margin: 0; font-size: 26rpx; color: var(--muted); }
+.rank-rates button.selected { color: var(--accent); background: var(--surface); }

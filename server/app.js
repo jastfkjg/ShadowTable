@@ -5,6 +5,7 @@ const { Store } = require("./store");
 const { actionDetails } = require("./audit");
 const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
 const { Leaderboard } = require("./leaderboard");
+const { publicRules: scoreRules } = require("./scoring");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -157,6 +158,8 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account and login/create limits below remain unchanged.
       limit(`ip:${req.socket.remoteAddress}`, 6000);
+      if (req.method === "GET" && path === "/api/scoring/rules")
+        return send(200, scoreRules());
       const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
       if (req.method === "GET" && avatar) {
         const stored = store.db.prepare("SELECT mime,data FROM avatars WHERE hash=?").get(avatar[1]);
@@ -245,7 +248,9 @@ function createApp({
       if (req.method === "GET" && path === "/api/me/matches") {
         const rawOffset = requestUrl.searchParams.get("offset") || "0";
         check(/^(0|[1-9]\d{0,6})$/.test(rawOffset), "对局记录页码无效");
-        return send(200, store.matchesFor(uid, Number(rawOffset)));
+        const scored = requestUrl.searchParams.get("scored") || "0";
+        check(["0", "1"].includes(scored), "对局记录筛选无效");
+        return send(200, store.matchesFor(uid, Number(rawOffset), 20, scored === "1"));
       }
       if (req.method === "GET" && path === "/api/me/rooms") {
         const rooms = store.personalRooms(uid);

@@ -23,3 +23,9 @@ button.match-toggle { display: block; width: 100%; min-height: 168rpx; margin: 0
 .match-member.is-self text:last-child { color: var(--accent); }
 button.matches-more { width: auto; min-height: 88rpx; margin: 24rpx 0; padding: 8rpx 0; color: var(--accent); font-size: 27rpx; }
 .matches-empty { padding: 34rpx 0; text-align: center; font-size: 26rpx; }
+
+.matches-filters { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
+.matches-filters button { flex: 1; width: 0; min-height: 48px; margin: 0; background: var(--surface); color: var(--muted); }
+.matches-filters button.selected { color: var(--accent); }
+.match-score { margin-top: 8rpx; font-size: 26rpx; font-weight: 500; }
+.score-breakdown { margin-top: 16rpx; padding-top: 12rpx; border-top: 1rpx solid var(--border); }

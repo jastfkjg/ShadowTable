@@ -3,6 +3,7 @@ const { randomInt, randomUUID, createHash } = require("node:crypto");
 const variants = require("./variants");
 const knights = require("./knights");
 const fairy = require("./fairy");
+const scoring = require("./scoring");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
@@ -237,8 +238,9 @@ function stage(room, phase) {
   room.stage = randomUUID();
   room.submissions = {};
 }
-function end(room, winner, reason, source = "system") {
+function end(room, winner, reason, source = "system", facts = null) {
   room.result = { winner, reason, source };
+  room.scoringFacts = facts;
   stage(room, "ended");
 }
 function winnerOptions(room) {
@@ -254,15 +256,21 @@ function manualResult(room, input) {
 function archiveResult(room) {
   const excludedReason = room.phase === "terminated" ? "对局终止" : !room.result?.winner ? "未登记胜负"
       : room.players.some(p => !ROLES[room.roles[p.uid]]) ? "身份记录不完整" : null;
+  const scoreExcludedReason = scoring.exclusion(room) || excludedReason || (!room.scoringFacts ? "未登记计分依据" : null);
   room.matchRecord = {
     id: room.matchId || randomUUID(), code: room.code, game: room.game,
     board: room.board, boardName: boardName(room), capacity: room.capacity,
     startedAt: room.startedAt || null, endedAt: Date.now(),
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
+    scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
+    scoreEligibilityReason: scoring.exclusion(room),
+    scoreExcludedReason,
     players: room.players.map(p => ({
-      uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色",
+      uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
       faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
       outcome: excludedReason ? "excluded" : faction(room, p.uid) === room.result.winner ? "win" : "loss",
+      score: scoring.scorePlayer({ seat: p.seat, roleId: room.roles[p.uid], faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
+        outcome: ROLES[room.roles[p.uid]] && faction(room, p.uid) === room.result?.winner ? "win" : "loss" }, room.scoringFacts, room.scorePolicy, scoreExcludedReason),
     })),
   };
 }
@@ -391,6 +399,8 @@ function start(room, flexible = false) {
   room.game++;
   room.matchId = randomUUID();
   room.startedAt = Date.now();
+  room.scorePolicy = scoring.policy();
+  room.scoringFacts = null;
   delete room.matchRecord;
   room.leader = randomInt(1, room.capacity + 1);
   room.round = 1;
@@ -1158,6 +1168,9 @@ function publicView(room, uid) {
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
+    scoreSettlement: scoring.settlementOptions(room),
+    scoreNotice: scoring.exclusion(room),
+    myScore: room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),
@@ -1422,7 +1435,18 @@ function applyCommand(room, uid, input) {
   }
   if (type === "finishTools") {
     requireRule(canUseTools(room), "当前没有已发牌的对局");
-    const winner = manualResult(room, input);
+    let winner, facts = null;
+    if (input.scoreReason !== undefined) {
+      const option = scoring.settlementOptions(room).find(item => item.id === input.scoreReason);
+      requireRule(option, "计分结束原因无效，请重新选择");
+      if (option.requiresTarget) {
+        requireRule(Number.isInteger(input.scoreTarget) && (input.scoreTarget === 0 || room.players.some(player => player.seat === input.scoreTarget)), "请选择实际刺杀目标或空刀");
+        const target = room.players.find(player => player.seat === input.scoreTarget);
+        // Resolve hidden identity only as part of ending the game; no preview oracle.
+        winner = target && room.roles[target.uid] === "merlin" ? "evil" : "good";
+      } else winner = option.winner;
+      facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
+    } else winner = manualResult(room, input);
     requireRule(
       !hasActiveOperation(room) || input.replace === true,
       "请先结算或确认作废当前操作",
@@ -1431,7 +1455,7 @@ function applyCommand(room, uid, input) {
     if (hasActiveOperation(room)) room.history.push({ kind: "toolCanceled" });
     room.flexible = true;
     room.activity = null;
-    end(room, winner, winner ? "房主已登记线下胜负，战绩已归档。" : "房主已结束本局，以线下确认的胜负为准。本局不计战绩。", "manual");
+    end(room, winner, winner ? "房主已登记线下结果，战绩已归档。" : "房主已结束本局，以线下确认的胜负为准。本局不计战绩。", "manual", facts);
     return;
   }
   if (type === "kick") {
@@ -1692,7 +1716,7 @@ function applyCommand(room, uid, input) {
       else room.rejects = 0;
       if (room.rejects === 5) {
         if (room.board === "shadow-assist") stage(room, "offlineFinal");
-        else end(room, "evil", "连续五次组队被否决，坏人获胜");
+        else end(room, "evil", "连续五次组队被否决，坏人获胜", "system", { reason: "five_rejections" });
       } else stage(room, "teamResult");
       break;
     }
@@ -1721,7 +1745,7 @@ function applyCommand(room, uid, input) {
       room.history.push({ kind: "quest", ...result });
       if (room.quests.filter((q) => !q.success).length === 3) {
         if (room.board === "shadow-assist") stage(room, "offlineFinal");
-        else end(room, "evil", "三次任务失败，坏人获胜");
+        else end(room, "evil", "三次任务失败，坏人获胜", "system", { reason: "quest_fail" });
       } else stage(room, "questResult");
       break;
     }
@@ -1769,6 +1793,7 @@ function applyCommand(room, uid, input) {
         room,
         hit ? "evil" : "good",
         hit ? "刺杀命中梅林，坏人获胜" : "刺杀未命中梅林，好人获胜",
+        "system", { reason: "assassination", target: target.seat },
       );
       break;
     }

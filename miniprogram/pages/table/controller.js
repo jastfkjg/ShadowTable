@@ -1,4 +1,5 @@
 const api = require("../../api");
+const { selectTab } = require("../../tab-navigation");
 function roomListItems(rooms) {
   return rooms.map(r => {
     const time = r.updatedAt ? new Date(r.updatedAt) : null;
@@ -243,6 +244,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.bootstrap();
   },
   onShow() {
+    if (this.data.isLobby) selectTab(this, 0);
     this.foreground = true;
     if (this.alive) {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
@@ -1327,25 +1329,37 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   finishTools() {
     if (!this.data.room?.canUseTools || this.data.busy || this.pending) return;
     this.resultStage = this.data.room.stage;
-    this.setData({ resultDialog: true, resultChoice: "" });
+    this.setData({ resultDialog: true, resultChoice: "", resultReason: "", resultTarget: null, resultRequiresTarget: false });
   },
   closeResult() { if (!this.data.busy) this.setData({ resultDialog: false }); },
-  pickResult(e) { this.setData({ resultChoice: e.currentTarget.dataset.value }); },
+  pickResult(e) { this.setData({ resultChoice: e.currentTarget.dataset.value, resultReason: "", resultRequiresTarget: false, resultTarget: null }); },
+  pickScoreReason(e) {
+    const reason = this.data.room?.scoreSettlement?.find(item => item.id === e.currentTarget.dataset.id);
+    if (reason) this.setData({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null });
+  },
+  pickScoreTarget(e) { this.setData({ resultTarget: Number(e.currentTarget.dataset.seat) }); },
+  viewScoreRecord() { wx.navigateTo({ url: "/pages/matches/matches?scored=1" }); },
   async saveResult() {
     const room = this.data.room, choice = this.data.resultChoice;
-    if (!this.data.resultDialog || !choice || this.data.busy || this.pending) return;
+    const reason = room?.scoreSettlement?.find(item => item.id === this.data.resultReason);
+    if (!this.data.resultDialog || (!choice && !reason) || this.data.busy || this.pending) return;
+    if (reason?.requiresTarget && !Number.isInteger(this.data.resultTarget)) return;
     if (!room || room.stage !== this.resultStage) {
       this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" });
       return;
     }
     const option = (room.winnerOptions || []).find(o => o.value === choice);
-    if (choice !== "none" && !option) return;
+    if (!reason && choice !== "none" && !option) return;
+    const target = this.data.resultTarget;
+    const details = reason ? { scoreReason: reason.id, ...(reason.requiresTarget ? { scoreTarget: target } : {}) }
+      : { winner: choice === "none" ? null : choice };
     this.setData({ resultDialog: false });
     return this.confirmCommand("确认结束本局？",
-      (option ? "登记为「" + option.label + "」。" : "本局不计战绩。") +
+      (reason ? "登记「" + reason.label + "」" + (reason.requiresTarget ? "，" + (target === 0 ? "空刀" : "刺杀" + target + "号") : "") + "。结束后结算本人积分。"
+        : option ? "登记为「" + option.label + "」，未填写计分依据，不计积分。" : "本局不计战绩及积分。") +
       "胜负确认后将归档，不能直接修改。" +
       (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
-      "finishTools", { replace: true, winner: choice === "none" ? null : choice });
+      "finishTools", { replace: true, ...details });
   },
   async start() {
     return this.confirmCommand(

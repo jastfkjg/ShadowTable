@@ -419,3 +419,24 @@ test("陪测开启与清理无需确认；终止、重开、删除和关闭陪�
   await a.action(code, "delete", { confirm: true });
   assert.equal(a.app.store.get(code), null);
 });
+
+test('管理员更正计分结果鉴权、幂等和版本校验，并保留整局更正记录',async t=>{
+  const a=await setup(t),{newRoom,enter,command}=require('../server/engine');
+  const room=newRoom('123456','wx:score-1','房主','classic',6);
+  for(let i=2;i<=6;i++)enter(room,'wx:score-'+i,'玩家'+i);
+  room.players.forEach(p=>p.ready=true);
+  command(room,room.host,{type:'start',stage:room.stage,flexible:true});
+  room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
+  command(room,room.host,{type:'finishTools',stage:room.stage,scoreReason:'assassination',scoreTarget:3});
+  a.app.store.transaction(()=>a.app.store.save(room));
+  assert.equal((await a.raw('/api/admin/matches?code=123456')).status,401);
+  await a.login();
+  const records=await a.api('/api/admin/matches?code=123456');assert.equal(records.matches.length,1);assert.doesNotMatch(JSON.stringify(records),/"uid"|roleId/);
+  const path='/api/admin/matches/'+room.matchId+'/correct',body={requestId:randomUUID(),revision:0,scoreReason:'quest_fail',reason:'现场登记错误'};
+  const first=await a.api(path,body);assert.equal(first.winner,'evil');
+  assert.deepEqual(await a.api(path,body),first);
+  assert.equal(a.app.store.statsFor('wx:score-3').score.total,0);assert.equal(a.app.store.statsFor('wx:score-3').wins,0);
+  assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='correct-result'").get().n,1);
+  assert.equal((await a.raw(path,{...body,requestId:randomUUID()})).status,409);
+  assert.equal((await a.raw(path,{...body,requestId:randomUUID(),revision:1,reason:' '})).status,400);
+});

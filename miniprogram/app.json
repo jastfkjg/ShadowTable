@@ -25,6 +25,7 @@
   "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json",
   "tabBar": {
+    "custom": true,
     "color": "#b1bfc6",
     "selectedColor": "#e5c68b",
     "backgroundColor": "#101c24",

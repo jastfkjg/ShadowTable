@@ -200,6 +200,7 @@ test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保
     app.store.addReceipt=add;
     const saved=await request('/api/me/profile',token,body,id);assert.equal(saved.status,200);
     const before=(await request('/api/leaderboard',token)).data;
+    assert.deepEqual(before.availableMetrics,['points','games','overall','good','evil']);
     assert.deepEqual((await request('/api/me/profile',token,body,id)).data,saved.data);
     assert.equal((await request('/api/leaderboard',token)).data.version,before.version);
     const guestToken='a'.repeat(64);app.store.addSession(createHash('sha256').update(guestToken).digest('hex'),'guest:guest');

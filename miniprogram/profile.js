@@ -13,10 +13,11 @@ function presentProfile(profile) {
     identityLabel: ({ wx: "微信账号", guest: "游客账号", dev: "开发账号", test: "陪测账号" })[profile.identityType] || "玩家账号" };
 }
 function presentStats(stats) {
-  const rate = row => ({ ...row, rateLabel: row.winRate === null ? "—" : row.winRate + "%" });
+  const rate = row => ({ ...row, rateLabel: row.winRate === null ? "—" : row.winRate + "%",
+    scoreAverageLabel: row.score?.average == null ? "—" : row.score.average.toFixed(2) });
   const byRole = (stats.byRole || []).map(rate);
   const factionOrder = { good: 0, evil: 1, third: 2, unknown: 3 };
-  return { ...rate(stats), byFaction: stats.byFaction.filter(row => row.total > 0)
+  return { ...rate(stats), score: stats.score || { total: 0, month: 0, games: 0, average: null, current: 0, best: 0 }, byFaction: stats.byFaction.filter(row => row.total > 0)
     .sort((a, b) => (factionOrder[a.faction] ?? 9) - (factionOrder[b.faction] ?? 9))
     .map(row => ({ ...rate(row), roles: byRole.filter(role => role.faction === row.faction), expanded: false })),
     byRole, byBoard: stats.byBoard.map(rate),
@@ -30,6 +31,7 @@ function presentStats(stats) {
 function presentMatches(records) {
   return records.map(record => ({
     ...record,
+    scoreLabel: record.score?.status === "scored" ? (record.score.total >= 0 ? "+" : "") + record.score.total + " 分" : record.score?.status === "excluded" ? "不计积分" : "积分未启用",
     dateLabel: new Date(record.endedAt).toLocaleString("zh-CN", { hour12: false }),
     outcomeLabel: record.outcome === "win" ? "胜利" : record.outcome === "loss" ? "失利" : "不计入战绩",
     factionLabel: ({ good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" })[record.faction] || "未知",

@@ -937,6 +937,37 @@ test('网页排行榜可深链，私密资料不公开，输出转义昵称并�
   c.state.rankBoard.me.status='unsupported';
   assert.doesNotMatch(c.viewLeaderboard(),/仅微信账号|参与排行/);
 });
+test('网页积分榜兼容旧服务，升级后自动恢复入口，不把积分参数错误显示在局数榜',async()=>{
+  const urls=[];let upgraded=false;
+  const c=client(async url=>{
+    urls.push(url);const params=new URL('https://test.invalid'+url).searchParams,metric=params.get('metric');
+    if(metric==='points' && !upgraded)return {status:400,json:async()=>({error:'排行榜参数无效，请刷新后重试'})};
+    return response(webRanks(metric,{period:params.get('period'),...(upgraded?{availableMetrics:['points','games','overall','good','evil']}:{})}));
+  });
+  await c.applyRoute('#/leaderboard');
+  assert.equal(c.state.rankMetric,'games');assert.equal(c.state.rankError,'');assert.equal(c.state.rankPointsAvailable,false);
+  assert.match(c.state.rankNotice,/尚未开放积分榜/);assert.match(c.viewLeaderboard(),/data-value="points"[^>]+ disabled/);
+  assert.equal(urls.length,2);await c.ACTIONS.rankMetric({dataset:{value:'points'}});assert.equal(urls.length,2);
+  await c.ACTIONS.rankPeriod({dataset:{value:'month'}});assert.equal(urls.at(-1),'/api/leaderboard?metric=games&period=month');
+  await c.ACTIONS.rankMetric({dataset:{value:'good'}});assert.equal(c.state.rankBoard.metric,'good');
+  upgraded=true;await c.ACTIONS.rankRefresh();assert.equal(c.state.rankPointsAvailable,true);assert.equal(c.state.rankNotice,'');
+  await c.ACTIONS.rankMetric({dataset:{value:'points'}});assert.equal(c.state.rankBoard.metric,'points');
+});
+test('网页旧积分错误不触发过期降级，其他服务错误继续保留真实错误',async()=>{
+  let rejectOld;const urls=[];
+  const c=client(async url=>{
+    urls.push(url);if(urls.length===1)return new Promise((resolve,reject)=>{rejectOld=reject;});
+    return response(webRanks('good'));
+  });
+  const first=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
+  await c.ACTIONS.rankMetric({dataset:{value:'good'}});
+  rejectOld(Object.assign(new Error('排行榜参数无效，请刷新后重试'),{status:400}));await first;
+  assert.equal(urls.length,2);assert.equal(c.state.rankBoard.metric,'good');assert.equal(c.state.rankPointsAvailable,true);
+  for(const [status,message] of [[403,'禁止访问'],[500,'暂时无法处理'],[400,'其他输入错误']]) {
+    let reads=0;const failed=client(async()=>{reads++;return {status,json:async()=>({error:message})};});
+    await failed.applyRoute('#/leaderboard');assert.equal(reads,1);assert.equal(failed.state.rankError,message);assert.equal(failed.state.rankPointsAvailable,true);
+  }
+});
 test('网页榜单切换和离开页面不接收旧响应，过期分页重新加载，错误可重试', async () => {
   let resolveOld;let reads=0;
   const c=client(async url=>{
@@ -957,7 +988,7 @@ test('网页榜单切换和离开页面不接收旧响应，过期分页重新�
   assert.match(urls[1],/offset=20&version=old/);assert.equal(paged.state.rankBoard.rows.length,1);assert.equal(paged.state.rankBoard.version,'new');assert.match(paged.state.rankNotice,/重新加载/);
   await paged.ACTIONS.rankRefresh();assert.match(paged.state.rankError,/网络未确认/);assert.equal(paged.state.rankBoard.rows.length,1);
   await paged.ACTIONS.rankRetry();assert.equal(paged.state.rankError,'');
-  let finish;const leaving=client(async()=>new Promise(resolve=>finish=resolve));
+  let finish;const leaving=client(async url=>url.endsWith('/api/scoring/rules')?response({scopeLabel:'经典板',items:[],notes:[]}):new Promise(resolve=>finish=resolve));
   leaving.state.page='leaderboard';const pending=leaving.loadLeaderboard();await Promise.resolve();await Promise.resolve();
   await leaving.applyRoute('#/help');finish(response(webRanks()));await pending;assert.equal(leaving.state.rankBoard,null);
 });

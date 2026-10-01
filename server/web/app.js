@@ -354,8 +354,9 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
-    rankMetric: 'games', rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
-    resultDialog: false, resultChoice: "",
+    rankMetric: 'points', rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultRequiresTarget: false,
+    matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
     roomMenu: null,
@@ -424,6 +425,8 @@
   function routeInfo(hash) {
     var table = /^#\/table\/(\d{6})$/.exec(hash || '');
     if (table) return { page: 'table', code: table[1] };
+    var matchRoute = /^#\/matches(?:\?scored=(0|1))?$/.exec(hash || '');
+    if (matchRoute) return { page: 'matches', scored: matchRoute[1] === '1' };
     var name = (hash || '').replace(/^#\//, '');
     return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help'].includes(name) ? name : 'lobby' };
   }
@@ -450,7 +453,7 @@
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
-      profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats' });
+      profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'matches' ? { matchScored: !!route.scored, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
     const heading = app.querySelector('[data-page-heading]');
     if (heading) heading.focus({ preventScroll: true });
@@ -468,6 +471,8 @@
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
       else if (route.page === 'leaderboard') await loadLeaderboard();
+      else if (route.page === 'matches') await loadMatches();
+      else if (route.page === 'help') await loadScoreRules();
     } catch (e) { if (sequence === routeSequence) handleError(e); }
   }
   function profileDraft(profile) {
@@ -587,11 +592,12 @@
     if (!profile) return html + (state.profileLoading ? '<div class="status" role="status">正在读取个人资料…</div>' : '');
     html += '<div class="profile-hero">' + avatarView(profile.avatarUrl,profile.nickname) + '<div class="profile-identity"><div class="profile-name">' + esc(profile.nickname || '新朋友') + '</div><div class="small muted">' + ({wx:'微信账号',guest:'游客账号',dev:'开发账号',test:'陪测账号'})[profile.identityType] + '</div></div>' + btn('profile-edit','navigate','编辑资料 ›',{page:'profile'}) + '</div>';
     if (profile.identityType === 'guest') html += '<div class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</div>';
+    html += viewScoreOverview(stats?.score);
     html += '<section class="personal-section" aria-label="我的战绩"><div class="section-title history-heading"><span>我的战绩</span>' + btn('history-toggle','navigate','查看全部 ›',{page:'stats'}) + '</div>';
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     if (stats) html += '<div class="personal-metrics"><div><div class="metric-value">' + stats.total + '</div><span class="small muted">有效对局</span></div><div><div class="metric-value">' + stats.wins + '</div><span class="small muted">获胜场次</span></div><div><div class="metric-value accent">' + (stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">总胜率</span></div></div>' + (!stats.total ? '<div class="small muted">第一局故事，等你开场。结束后请房主登记胜方。</div>' : '');
     else if (state.statsLoading) html += '<div class="status">正在读取战绩…</div>';
-    html += '</section><div class="personal-links">' + btn('personal-link','navigate','排行榜 ›',{page:'leaderboard'}) + '<button class="personal-link" type="button" data-action="navigate" data-page="stats"><span><span>对局记录</span><span class="small muted link-note">按阵营、板子查看表现</span></span><span aria-hidden="true">›</span></button>' + btn('personal-link','navigate','帮助与规则 ›',{page:'help'}) + btn('personal-link','about','关于桌边助手 ›') + '</div><div class="personal-footer">同桌相聚，每局都有故事。</div>';
+    html += '</section><div class="personal-links">' + btn('personal-link','navigate','排行榜 ›',{page:'leaderboard'}) + '<button class="personal-link" type="button" data-action="navigate" data-page="matches"><span><span>对局记录</span><span class="small muted link-note">查看每局结果与积分明细</span></span><span aria-hidden="true">›</span></button>' + btn('personal-link','navigate','帮助与规则 ›',{page:'help'}) + btn('personal-link','about','关于桌边助手 ›') + '</div><div class="personal-footer">同桌相聚，每局都有故事。</div>';
     return html;
   }
   function viewProfileEditor() {
@@ -609,7 +615,7 @@
     const selected = profilePreset(draft.avatarPreview)?.id;
     const style = draft.avatarStyle || 'classic';
     const visibleAvatars = builtinAvatars.filter(item => item.style === style);
-    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked ? ' disabled' : '') + '>' + esc(item.label) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
+    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked ? ' disabled' : '') + '>' + esc(item.shortLabel) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
       const chosen = selected === item.id;
       return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
     }).join('') + '</div></section>';
@@ -619,29 +625,43 @@
   function viewProfileHeader() {
     return '<header class="profile-navigation"><div class="profile-navigation-content"><button type="button" class="profile-back" data-action="navigate" data-page="me" aria-label="返回我的"' + (state.profileSaving ? ' disabled' : '') + '>‹</button><h1 class="profile-title" tabindex="-1" data-page-heading>编辑资料</h1></div></header>';
   }
-  const rankMetrics = [['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
+  const rankGroups = [['points','积分'],['games','局数'],['overall','胜率']];
+  const rankMetrics = [['points','积分'],['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
   var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
     const sequence = ++rankSequence, route = routeSequence;
-    const metric = selection.rankMetric || state.rankMetric, period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
+    let metric = selection.rankMetric || state.rankMetric;
+    const period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
+    let append = more, pointsUnavailable = false;
     rankFailedSelection = null;
     setState({ ...selection, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
     try {
       await login();
-      const result = await request('/api/leaderboard?metric=' + metric + '&period=' + period + (more ? '&offset=' + board.nextOffset + '&version=' + board.version : ''));
+      let result;
+      try { result = await request('/api/leaderboard?metric=' + metric + '&period=' + period + (more ? '&offset=' + board.nextOffset + '&version=' + board.version : '')); }
+      catch (e) {
+        if (metric !== 'points' || e.status !== 400 || !/^排行榜参数无效/.test(e.message)) throw e;
+        if (sequence !== rankSequence || route !== routeSequence) return;
+        metric = 'games'; append = false; pointsUnavailable = true;
+        result = await request('/api/leaderboard?metric=games&period=' + period);
+      }
       if (sequence !== rankSequence || route !== routeSequence) return;
-      if (more) result.rows = board.rows.concat(result.rows);
-      setState({ rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false, ...(!rankVisibilityPending ? { rankVisible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
+      if (append) result.rows = board.rows.concat(result.rows);
+      const rankPointsAvailable = Array.isArray(result.availableMetrics) ? result.availableMetrics.includes('points') : !pointsUnavailable && state.rankPointsAvailable;
+      setState({ rankMetric: result.metric, rankPointsAvailable, rankPeriod: result.period, rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false,
+        rankNotice: rankPointsAvailable ? '' : pointsUnavailable ? '当前服务尚未开放积分榜，已显示局数榜。' : '当前服务尚未开放积分榜。',
+        ...(!rankVisibilityPending ? { rankVisible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
     } catch (e) {
       if (sequence !== rankSequence || route !== routeSequence) return;
-      if (more && e.status === 409) {
+      if (append && e.status === 409) {
         await loadLeaderboard();
         if (sequence + 1 === rankSequence && route === routeSequence && !state.rankError)
           setState({ rankNotice: '榜单已更新，已重新加载。' });
       } else {
         rankFailedSelection = { rankMetric: metric, rankPeriod: period };
-        setState({ rankError: e.message, rankLoading: false, rankMoreLoading: false,
+        setState({ rankError: e.message, rankLoading: false, rankMoreLoading: false, rankMoreError: append,
+          ...(pointsUnavailable ? { rankPointsAvailable: false, rankNotice: '当前服务尚未开放积分榜。' } : {}),
           ...(!more && board ? { rankMetric: board.metric, rankPeriod: board.period } : {}) });
       }
     }
@@ -667,17 +687,18 @@
     const metricLabel = rankMetrics.find(item => item[0] === displayMetric)[1];
     let html = personalTitle('排行榜', '') + '<section class="leaderboard-page" aria-label="排行榜">';
     html += '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
-    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankMetrics.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '"><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>').join('') + '</div>';
+    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0] || item[0] === 'overall' && ['overall','good','evil'].includes(metric)) + '"' + (item[0] === 'points' && !state.rankPointsAvailable ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>').join('') + '</div>';
+    if (['overall','good','evil'].includes(metric)) html += '<div class="rank-rates" role="group" aria-label="胜率阵营">' + rankMetrics.filter(item => ['overall','good','evil'].includes(item[0])).map(item => '<button type="button" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
     if (state.rankLoading && !board) html += '<div class="status" role="status">正在读取榜单…</div>';
     if (state.rankNotice) html += '<div role="status" class="small muted">' + esc(state.rankNotice) + '</div>';
     if (state.rankError) html += '<div class="inline-error" role="alert">' + esc(state.rankError) + btn('secondary','rankRetry','重试',null,state.rankLoading || state.rankMoreLoading) + '</div>';
     if (!board) return html + '</section>';
-    const value = row => (displayMetric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (displayMetric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
+    const value = row => (displayMetric === 'points' ? (row.points || 0) : displayMetric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (displayMetric === 'points' ? '分' : displayMetric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
     html += '<div aria-live="polite" aria-atomic="true" class="sr-only">' + metricLabel + '，' + board.eligibleCount + '人上榜</div>';
     if (board.rows.length) {
       html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (displayMetric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
       board.rows.forEach(row => {
-        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + row.wins + '胜 · ' + row.total + '局</div></div><div class="rank-value">' + value(row) + '</div></li>';
+        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + (displayMetric === 'points' ? row.total + '场计分局' : row.wins + '胜 · ' + row.total + '局') + '</div></div><div class="rank-value">' + value(row) + '</div></li>';
       });
       html += '</ol>';
     } else html += '<div class="rank-empty muted">暂无战绩</div>';
@@ -689,7 +710,7 @@
     return html;
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p></div>';
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1290,19 +1311,22 @@ function roomListItems(rooms) {
   }
   async function saveResult() {
     var room = state.room, choice = state.resultChoice;
-    if (!state.resultDialog || !choice || state.busy || pending) return;
+    const reason = room?.scoreSettlement?.find(item => item.id === state.resultReason);
+    if (!state.resultDialog || (!choice && !reason) || state.busy || pending) return;
+    if (reason?.requiresTarget && !Number.isInteger(state.resultTarget)) return;
     if (!room || room.stage !== resultStage) {
-      setState({ resultDialog: false, error: "阶段已变化，请重新登记胜负" });
-      return;
+      setState({ resultDialog: false, error: "阶段已变化，请重新登记胜负" }); return;
     }
     var option = (room.winnerOptions || []).find(o => o.value === choice);
-    if (choice !== "none" && !option) return;
+    if (!reason && choice !== "none" && !option) return;
+    const target = state.resultTarget;
+    const details = reason ? { scoreReason: reason.id, ...(reason.requiresTarget ? { scoreTarget: target } : {}) } : { winner: choice === "none" ? null : choice };
     closeResult();
     return confirmCommand("确认结束本局？",
-      (option ? "登记为「" + option.label + "」。" : "本局不计战绩。") +
-      "胜负确认后将归档，不能直接修改。" +
-      (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
-      "finishTools", { replace: true, winner: choice === "none" ? null : choice });
+      (reason ? "登记「" + reason.label + "」" + (reason.requiresTarget ? "，" + (target === 0 ? "空刀" : "刺杀" + target + "号") : "") + "。结束后结算本人积分。"
+        : option ? "登记为「" + option.label + "」，未填写计分依据，不计积分。" : "本局不计战绩及积分。") +
+      "胜负确认后将归档，不能直接修改。" + (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
+      "finishTools", { replace: true, ...details });
   }
   async function loadStats() {
     if (state.statsLoading && statsRequestRoute === routeSequence) return;
@@ -1321,11 +1345,52 @@ function roomListItems(rooms) {
   function viewResultDialog() {
     var room = state.room;
     if (!state.resultDialog || !room?.canUseTools || state.error) return "";
+    const reasons = room.scoreSettlement || [];
     var options = (room.winnerOptions || []).concat([{ value: "none", label: "不计战绩" }]);
-    return '<div class="dialog-backdrop"><div class="error-dialog result-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="dialog-title" id="result-dialog-title">登记本局胜负</div>' +
-      '<div class="small muted">请与同桌玩家确认胜方。不确定胜负时，请选择不计战绩。</div><div class="result-options">' +
-      options.map(function (o) { return '<button type="button" class="secondary ' + (state.resultChoice === o.value ? 'is-selected' : '') + '" data-action="pickResult" data-value="' + esc(o.value) + '" aria-pressed="' + (state.resultChoice === o.value) + '">' + esc(o.label) + '</button>'; }).join('') +
-      '</div><div class="dialog-actions">' + btn('secondary','closeResult','取消') + btn('primary','saveResult','确认胜负并结束',null,!state.resultChoice || state.busy || !!pending) + '</div></div></div>';
+    let html = '<div class="dialog-backdrop"><div class="error-dialog result-dialog score-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="dialog-title" id="result-dialog-title">登记本局结果</div><div class="small muted">请与同桌玩家确认结果。</div>';
+    if (reasons.length) html += '<div class="score-reasons">' + reasons.map(reason => '<button type="button" class="secondary ' + (state.resultReason === reason.id ? 'is-selected' : '') + '" data-action="pickScoreReason" data-id="' + esc(reason.id) + '" aria-pressed="' + (state.resultReason === reason.id) + '">' + esc(reason.label) + '</button>').join('') + '</div>';
+    if (state.resultRequiresTarget) html += '<div class="label">实际刺杀目标</div><div class="score-targets">' + room.players.map(player => '<button type="button" class="secondary ' + (state.resultTarget === player.seat ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="' + player.seat + '" aria-pressed="' + (state.resultTarget === player.seat) + '">' + player.seat + '号 · ' + esc(player.name) + '</button>').join('') + '<button type="button" class="secondary ' + (state.resultTarget === 0 ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="0" aria-pressed="' + (state.resultTarget === 0) + '">空刀</button></div>';
+    html += '<div class="small muted">' + esc(reasons.length ? '信息不完整时可仅登记胜方，以下选项不计积分。' : room.scoreNotice || '本局不计积分') + '</div><div class="result-options">' + options.map(o => '<button type="button" class="secondary ' + (state.resultChoice === o.value ? 'is-selected' : '') + '" data-action="pickResult" data-value="' + esc(o.value) + '" aria-pressed="' + (state.resultChoice === o.value) + '">' + esc(o.label) + '</button>').join('') + '</div><div class="dialog-actions">' + btn('secondary','closeResult','取消') + btn('primary','saveResult','确认结果并结束',null,(!state.resultChoice && !state.resultReason) || (state.resultRequiresTarget && state.resultTarget === null) || state.busy || !!pending) + '</div></div></div>';
+    return html;
+  }
+  function viewScoreOverview(score) {
+    return '<section class="personal-section score-overview" aria-label="我的积分"><div class="section-title history-heading"><span>积分</span>' + btn('text-button','navigate','积分规则 ›',{page:'help'}) + '</div><div class="personal-metrics"><div><div class="metric-value accent">' + (score?.total ?? '—') + '</div><span class="small muted">总积分</span></div><div><div class="metric-value">' + (score?.month ?? '—') + '</div><span class="small muted">本月积分</span></div><div>' + btn('text-button','scoreRecords','积分明细 ›') + '</div></div></section>';
+  }
+  function viewScoreBreakdown(score) {
+    if (!score || score.status !== 'scored') return '<div class="small muted">' + esc(score?.reason || '积分功能启用前的记录') + '</div>';
+    return '<details class="score-breakdown"><summary class="accent">本局 ' + (score.total >= 0 ? '+' : '') + score.total + ' 分 · 查看明细</summary>' + score.breakdown.map(award => '<div class="score-award"><span>' + esc(award.label) + '</span><span>' + (award.points >= 0 ? '+' : '') + award.points + '分</span></div>').join('') + '</details>';
+  }
+  var matchSequence = 0;
+  async function loadMatches(more = false) {
+    if (more && (state.matchesLoading || !state.matchesMore)) return;
+    const sequence = ++matchSequence, route = routeSequence;
+    setState({ matchesLoading: true, matchesError: '' });
+    try {
+      const result = await request('/api/me/matches?offset=' + (more ? state.matches.length : 0) + (state.matchScored ? '&scored=1' : ''));
+      if (sequence === matchSequence && route === routeSequence) setState({ matches: more ? state.matches.concat(result.records) : result.records, matchesTotal: result.total, matchesMore: result.hasMore });
+    } catch (e) { if (sequence === matchSequence && route === routeSequence) setState({ matchesError: e.message }); }
+    finally { if (sequence === matchSequence && route === routeSequence) setState({ matchesLoading: false }); }
+  }
+  function viewMatches() {
+    let html = personalTitle('对局记录','') + '<div class="matches-filters" role="group" aria-label="对局筛选">' + [['0','全部对局'],['1','计分局']].map(item => '<button type="button" data-action="filterMatches" data-scored="' + item[0] + '" aria-pressed="' + (state.matchScored === (item[0] === '1')) + '">' + item[1] + '</button>').join('') + '</div>';
+    if (state.matchesError) html += '<div class="inline-error" role="alert">' + esc(state.matchesError) + btn('secondary','loadMatches','重试') + '</div>';
+    if (!state.matches.length) html += '<div class="muted" role="status">' + (state.matchesLoading ? '正在读取对局…' : '暂无对局记录') + '</div>';
+    else html += '<div class="small muted">共 ' + state.matchesTotal + ' 场对局</div>';
+    state.matches.forEach(record => {
+      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div></summary>' + viewScoreBreakdown(record.score) + '<div class="small muted">同桌成员：' + record.members.map(member => esc(member.seat + '号 ' + member.name)).join('、') + '</div></details>';
+    });
+    if (state.matchesMore) html += btn('secondary','moreMatches',state.matchesLoading ? '正在加载…' : '加载更多',null,state.matchesLoading);
+    return html;
+  }
+  async function loadScoreRules() {
+    const route = routeSequence;
+    setState({ scoringError: '' });
+    try { const rules = await request('/api/scoring/rules'); if (route === routeSequence) setState({ scoringRules: rules }); }
+    catch (e) { if (route === routeSequence) setState({ scoringError: '积分规则暂未加载，请重试。' }); }
+  }
+  function viewScoreRules() {
+    const rules = state.scoringRules;
+    return '<section class="personal-section"><h2 class="page-subtitle">积分规则</h2>' + (state.scoringError ? '<div role="alert">' + esc(state.scoringError) + btn('secondary','loadScoreRules','重试') : '') + (!rules ? '<div class="muted">正在读取积分规则…</div>' : '<p class="muted">' + esc(rules.scopeLabel) + '</p>' + rules.items.map(item => '<p><strong>' + esc(item.label) + '</strong><br><span class="muted">' + esc(item.text) + '</span></p>').join('') + rules.notes.map(note => '<p class="small muted">' + esc(note) + '</p>').join('')) + '</section>';
   }
   function viewStats() {
     var html = '<section class="stats-content" aria-label="我的战绩" aria-busy="' + state.statsLoading + '">';
@@ -1334,16 +1399,17 @@ function roomListItems(rooms) {
     if (state.statsLoading && !stats) html += '<div class="muted" role="status">正在读取战绩…</div>';
     if (stats) {
       html += '<div class="stats-summary"><div><div class="stats-rate">' + rate(stats) + '</div><span class="small muted">总胜率</span></div><div><div>' + stats.wins + ' 胜 · ' + stats.losses + ' 负</div><span class="small muted">' + stats.total + ' 局有效对局</span></div></div>';
+      if (stats.score) html += '<div class="score-stats muted">积分 ' + stats.score.total + ' · ' + stats.score.games + '场计分局 · 场均 ' + (stats.score.average == null ? '—' : stats.score.average.toFixed(2)) + '<br>当前 ' + stats.score.current + ' 连胜 · 最高 ' + stats.score.best + ' 连胜</div>';
       html += '<div class="small muted">胜率 = 胜场 ÷ 有效对局。另有 ' + stats.excluded + ' 局不计入；旁观不计入。</div>';
       if (stats.identityType === 'guest') html += '<div class="stats-note small">当前为游客战绩，仅随本浏览器登录凭证保留；清缓存或登录过期后无法自动找回。</div>';
       if (!stats.total) html += '<div class="stats-note">还没有有效战绩。对局结束后，请房主登记胜方。</div>';
       [['按阵营',stats.byFaction],['按板子',stats.byBoard]].forEach(function (group) {
         if (group[1].length) html += '<div class="field-title">' + group[0] + '</div>';
-        group[1].forEach(function (row) { html += '<div class="stats-row"><span>' + esc(row.label) + '</span><span>' + row.wins + '胜 ' + row.losses + '负 · ' + rate(row) + '</span></div>'; });
+        group[1].forEach(function (row) { html += '<div class="stats-row"><span>' + esc(row.label) + '</span><span>' + row.wins + '胜 ' + row.losses + '负 · ' + rate(row) + (row.score ? ' · ' + row.score.total + '分' : '') + '</span></div>'; });
       });
       if (stats.recent.length) html += '<div class="field-title">最近对局 · 最多20局</div>';
       stats.recent.forEach(function (r) {
-        html += '<div class="stats-match"><div class="stats-row"><span>' + esc(r.boardName) + ' · ' + r.capacity + '人</span><span class="stats-outcome ' + esc(r.outcome) + '">' + ({win:'胜',loss:'负',excluded:'不计入'})[r.outcome] + '</span></div><div class="small muted">' + esc(r.role) + ' · 最终' + ({good:'好人',evil:'坏人',third:'盗贼',unknown:'未知'})[r.faction] + '阵营 · ' + (r.source === 'manual' ? '房主登记' : r.source === 'system' ? '系统判定' : '未判定') + (r.excludedReason ? ' · ' + esc(r.excludedReason) : '') + '</div><div class="small muted">' + esc(new Date(r.endedAt).toLocaleString('zh-CN', { hour12: false })) + '</div></div>';
+        html += '<div class="stats-match"><div class="stats-row"><span>' + esc(r.boardName) + ' · ' + r.capacity + '人</span><span class="stats-outcome ' + esc(r.outcome) + '">' + ({win:'胜',loss:'负',excluded:'不计入'})[r.outcome] + '</span></div><div class="small muted">' + esc(r.role) + ' · 最终' + ({good:'好人',evil:'坏人',third:'盗贼',unknown:'未知'})[r.faction] + '阵营 · ' + (r.source === 'manual' ? '房主登记' : r.source === 'system' ? '系统判定' : '未判定') + (r.excludedReason ? ' · ' + esc(r.excludedReason) : '') + '</div><div class="small muted">' + esc(new Date(r.endedAt).toLocaleString('zh-CN', { hour12: false })) + '</div>' + viewScoreBreakdown(r.score) + '</div>';
       });
       html += btn('text-button','loadStats',state.statsLoading ? '刷新中…' : '刷新战绩',null,state.statsLoading);
     }
@@ -3133,6 +3199,7 @@ function roomListItems(rooms) {
           esc(r.result.reason || "") +
           "</span>" +
           '<div class="small muted">' + (r.result.source === "manual" ? "房主登记" : r.result.source === "system" ? "系统判定" : "") + "</div>" +
+          (r.myScore ? viewScoreBreakdown(r.myScore) + btn("text-button", "scoreRecords", "查看积分明细 ›") : "") +
           (r.me.isHost
             ? btn("primary", "rematch", "同房再开一局", null, state.busy)
             : '<span class="muted">等待房主开启下一局</span>') +
@@ -3582,7 +3649,7 @@ function roomListItems(rooms) {
       viewToolDialog() +
       viewResultDialog() +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
+      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
       viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
@@ -3594,7 +3661,7 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
-    rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
+    rankMetric: el => { if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
     rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
     rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
@@ -3784,12 +3851,22 @@ function roomListItems(rooms) {
     finishTools: function () {
       if (!state.room?.canUseTools || state.busy || pending) return;
       resultStage = state.room.stage;
-      setState({ resultDialog: true, resultChoice: "" });
+      setState({ resultDialog: true, resultChoice: "", resultReason: "", resultTarget: null, resultRequiresTarget: false });
       var first = app.querySelector('.result-dialog button');
       if (first) first.focus();
     },
     closeResult: closeResult,
-    pickResult: function (el) { setState({ resultChoice: el.dataset.value }); },
+    pickResult: function (el) { setState({ resultChoice: el.dataset.value, resultReason: "", resultRequiresTarget: false, resultTarget: null }); },
+    pickScoreReason: function (el) {
+      const reason = state.room?.scoreSettlement?.find(item => item.id === el.dataset.id);
+      if (reason) setState({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null });
+    },
+    pickScoreTarget: function (el) { setState({ resultTarget: Number(el.dataset.seat) }); },
+    scoreRecords: function () { return navigate('matches?scored=1'); },
+    filterMatches: function (el) { return navigate('matches?scored=' + (el.dataset.scored === '1' ? '1' : '0')); },
+    loadMatches: function () { return loadMatches(); },
+    moreMatches: function () { return loadMatches(true); },
+    loadScoreRules: loadScoreRules,
     saveResult: saveResult,
     toggleStats: async function () {
       setState({ statsOpen: !state.statsOpen });

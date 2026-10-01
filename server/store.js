@@ -3,7 +3,8 @@ const { DatabaseSync } = require("node:sqlite");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { dirname } = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { roomSummary } = require("./engine");
+const { roomSummary, RuleError } = require("./engine");
+const scoring = require("./scoring");
 const { migrate: migrateKnights } = require("./knights");
 class Store {
   constructor(path) {
@@ -24,6 +25,9 @@ class Store {
       CREATE TABLE IF NOT EXISTS matches(id TEXT PRIMARY KEY, snapshot TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS match_players(match_id TEXT NOT NULL, uid TEXT NOT NULL, board TEXT NOT NULL, faction TEXT NOT NULL, outcome TEXT NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
       CREATE INDEX IF NOT EXISTS match_players_user ON match_players(uid,ended DESC);
+      CREATE TABLE IF NOT EXISTS match_scores(match_id TEXT NOT NULL, uid TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('scored','excluded')), points INTEGER NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
+      CREATE INDEX IF NOT EXISTS match_scores_user ON match_scores(uid,ended);
+      CREATE INDEX IF NOT EXISTS match_scores_rank ON match_scores(ended,uid,points) WHERE status='scored';
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
     if (!profileColumns.some(column => column.name === "leaderboard_visible"))
@@ -152,8 +156,21 @@ class Store {
     this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
     const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
     for (const { uid, ...player } of players) {
+      if (player.score?.status === "scored" && !this.db.prepare("SELECT 1 FROM match_players WHERE match_id=? AND uid=?").get(match.id, uid)) {
+        const streak = player.outcome === "win" ? this.streakFor(uid).current + 1 : 0;
+        const bonus = record.scorePolicy?.streakBonus;
+        player.score = { ...player.score, breakdown: [...player.score.breakdown], streak };
+        if (bonus?.enabled && streak === bonus.threshold) {
+          player.score.breakdown.push({ id: "streak", label: bonus.label, points: bonus.points });
+          player.score.total += bonus.points;
+        }
+        players.find(p => p.uid === uid).score = player.score;
+      }
       const result = insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
-      if (result.changes) this.invalidateLeaderboard();
+      if (result.changes) {
+        if (player.score) this.db.prepare("INSERT INTO match_scores VALUES(?,?,?,?,?,?)").run(match.id, uid, player.score.status, player.score.total, match.endedAt, JSON.stringify(player.score));
+        this.invalidateLeaderboard();
+      }
     }
   }
   statsFor(uid) {
@@ -176,14 +193,88 @@ class Store {
       .map(row => ({ board: row.board, capacity: row.capacity, key: row.board + ":" + row.capacity,
         label: row.name + " · " + row.capacity + "人", ...summary(row) }));
     const recent = this.db.prepare("SELECT m.snapshot AS game, p.snapshot AS player FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
-      .map(row => ({ ...JSON.parse(row.game), ...JSON.parse(row.player) }));
-    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent };
+      .map(row => {
+        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, ...game } = JSON.parse(row.game);
+        const { roleId, ...player } = JSON.parse(row.player);
+        return { ...game, ...player };
+      });
+    const scoreRows = this.db.prepare(`SELECT p.faction,json_extract(p.snapshot,'$.role') AS role,s.points,s.ended
+      FROM match_scores s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored'`).all(uid);
+    const aggregate = rows => ({ total: rows.reduce((sum,row) => sum + row.points,0), games: rows.length,
+      average: rows.length ? Math.round(rows.reduce((sum,row) => sum + row.points,0) / rows.length * 100) / 100 : null });
+    const now = new Date(Date.now() + 8 * 3600000);
+    const monthStart = Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1) - 8 * 3600000;
+    const monthEnd = Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1) - 8 * 3600000;
+    for (const row of byFaction) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction));
+    for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
+    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent,
+      score: { ...aggregate(scoreRows), month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total, ...this.streakFor(uid) } };
   }
-  matchesFor(uid, offset = 0, limit = 20) {
-    const total = this.db.prepare("SELECT count(*) AS total FROM match_players WHERE uid=?").get(uid).total;
+  streakFor(uid) {
+    const rows = this.db.prepare(`SELECT p.outcome FROM match_scores s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid
+      WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
+    let current = 0, best = 0;
+    for (const row of rows) { current = row.outcome === "win" ? current + 1 : 0; best = Math.max(best,current); }
+    return { current, best };
+  }
+  correctMatch(id, input) {
+    if (!this.inTransaction) throw Error("对局更正必须在事务中执行");
+    const row = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
+    if (!row) throw new RuleError("对局不存在",404);
+    const match = JSON.parse(row.snapshot);
+    if (!Number.isSafeInteger(input.revision) || input.revision !== (match.scoreRevision || 0)) throw new RuleError("对局已更新，请重新加载",409);
+    if (!match.scorePolicy || match.scoreEligibilityReason) throw new RuleError("本局不在计分范围，不能补算积分");
+    const option = match.scorePolicy.endReasons.find(reason => reason.id === input.scoreReason);
+    if (!option) throw new RuleError("计分结束原因无效");
+    const players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(id).map(player => ({uid:player.uid,...JSON.parse(player.snapshot)}));
+    if (!players.length || players.some(player => !player.roleId || player.faction === "unknown")) throw new RuleError("身份信息不完整，不能更正计分");
+    if (option.requiresTarget && (!Number.isInteger(input.scoreTarget) || input.scoreTarget !== 0 && !players.some(player => player.seat === input.scoreTarget))) throw new RuleError("请选择实际刺杀目标或空刀");
+    const before = {winner:match.winner, facts:match.scoringFacts, revision:match.scoreRevision || 0};
+    match.winner = option.requiresTarget ? players.find(player => player.seat === input.scoreTarget)?.roleId === "merlin" ? "evil" : "good" : option.winner;
+    match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
+    match.source = "manual"; match.excludedReason = null; match.scoreExcludedReason = null;
+    match.scoreRevision = (match.scoreRevision || 0) + 1;
+    this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
+    for (const {uid,...player} of players) {
+      player.outcome = player.faction === match.winner ? "win" : "loss";
+      this.db.prepare("UPDATE match_players SET outcome=?,snapshot=? WHERE match_id=? AND uid=?").run(player.outcome,JSON.stringify(player),id,uid);
+      this.db.prepare("UPDATE match_scores SET status='scored' WHERE match_id=? AND uid=?").run(id,uid);
+      this.rebuildScores(uid);
+    }
+    // Synchronize any still-visible completed table, including later streak awards.
+    for (const roomRow of this.db.prepare("SELECT code,state FROM rooms WHERE json_extract(state,'$.matchRecord.id') IS NOT NULL").all()) {
+      const room = JSON.parse(roomRow.state), archived = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(room.matchRecord.id);
+      if (!archived) continue;
+      const saved = JSON.parse(archived.snapshot);
+      room.matchRecord = {...saved,players:this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(saved.id).map(p=>({uid:p.uid,...JSON.parse(p.snapshot)}))};
+      if (saved.id === id) {room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;}
+      this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room),room.code);
+    }
+    this.invalidateLeaderboard();
+    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision}};
+  }
+  rebuildScores(uid) {
+    const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM match_scores s
+      JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN matches m ON m.id=s.match_id
+      WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
+    let streak = 0;
+    for (const row of rows) {
+      const player=JSON.parse(row.player), game=JSON.parse(row.game);
+      streak = player.outcome === "win" ? streak + 1 : 0;
+      const score = {...scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null),streak};
+      const bonus = game.scorePolicy.streakBonus;
+      if (bonus.enabled && streak === bonus.threshold) {score.breakdown.push({id:"streak",label:bonus.label,points:bonus.points});score.total+=bonus.points;}
+      player.score=score;
+      this.db.prepare("UPDATE match_scores SET points=?,snapshot=? WHERE match_id=? AND uid=?").run(score.total,JSON.stringify(score),row.match_id,uid);
+      this.db.prepare("UPDATE match_players SET snapshot=? WHERE match_id=? AND uid=?").run(JSON.stringify(player),row.match_id,uid);
+    }
+  }
+  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false) {
+    const filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
+    const total = this.db.prepare("SELECT count(*) AS total FROM match_players p WHERE uid=?" + filter).get(uid).total;
     const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
       FROM match_players p JOIN matches m ON m.id=p.match_id
-      WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(uid, limit, offset);
+      WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(uid, limit, offset);
     const members = this.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')");
     const records = rows.map(row => {
       const game = JSON.parse(row.game), player = JSON.parse(row.player);
@@ -193,6 +284,8 @@ class Store {
         source: game.source, excludedReason: game.excludedReason,
         name: player.name, seat: player.seat, role: player.role,
         faction: player.faction, outcome: player.outcome,
+        score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
+        scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
         members: members.all(row.match_id).map(member => {
           const { seat, name } = JSON.parse(member.snapshot);
           return { seat, name };

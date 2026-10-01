@@ -23,7 +23,7 @@
     <view class="avatar-library">
       <view class="field-title">选择内置头像</view>
       <view class="avatar-styles" role="group" aria-label="头像风格">
-        <button wx:for="{{avatarStyles}}" wx:key="id" hover-class="none" class="avatar-style {{avatarStyle === item.id ? 'is-active' : ''}}" data-style="{{item.id}}" bindtap="chooseAvatarStyle" disabled="{{busy || pendingSave}}" aria-label="{{item.label + '，' + item.count + '款头像'}}" aria-pressed="{{avatarStyle === item.id}}">{{item.label}}</button>
+        <button wx:for="{{avatarStyles}}" wx:key="id" hover-class="none" class="avatar-style {{avatarStyle === item.id ? 'is-active' : ''}}" data-style="{{item.id}}" bindtap="chooseAvatarStyle" disabled="{{busy || pendingSave}}" aria-label="{{item.label + '，' + item.count + '款头像'}}" aria-pressed="{{avatarStyle === item.id}}">{{item.shortLabel}}</button>
       </view>
       <view class="avatar-library-count muted">{{visibleAvatars.length}} 款头像</view>
       <view class="avatar-grid">

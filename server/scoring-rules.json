@@ -1,0 +1,20 @@
+{
+  "version": "classic-2026-10-v1",
+  "title": "经典板积分规则",
+  "scopeLabel": "经典基础 5–8、10、12 人；逆仆及扩展板暂不计积分",
+  "boards": { "classic": [5, 6, 7, 8], "classic-court": [10, 12] },
+  "excludedIdentityPrefixes": ["dev:", "test:"],
+  "endReasons": [
+    { "id": "assassination", "label": "三绿，已完成最终刺杀", "requiresTarget": true },
+    { "id": "quest_fail", "label": "三次任务失败", "winner": "evil" },
+    { "id": "five_rejections", "label": "连续五次组队被否决", "winner": "evil" }
+  ],
+  "awards": [
+    { "id": "good_win", "label": "好人获胜", "points": 2, "when": { "faction": "good", "outcome": "win" } },
+    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": "assassination" } },
+    { "id": "evil_win", "label": "坏人获胜", "points": 3, "when": { "faction": "evil", "outcome": "win" } },
+    { "id": "role", "label": "梅林／派西角色奖励", "points": 1, "when": { "faction": "good", "outcome": "win", "roleId": ["merlin", "percival"] } },
+    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": "assassination", "isTarget": true } }
+  ],
+  "streakBonus": { "enabled": false, "threshold": 3, "points": 1, "label": "三连胜奖励" }
+}

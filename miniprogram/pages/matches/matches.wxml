@@ -1,5 +1,6 @@
 <app-nav title="对局记录" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page matches-page">
+  <view class="matches-filters" aria-label="对局筛选"><button hover-class="none" class="{{scoredOnly?'':'selected'}}" bindtap="filterScores" data-scored="0" aria-pressed="{{!scoredOnly}}">全部对局</button><button hover-class="none" class="{{scoredOnly?'selected':''}}" bindtap="filterScores" data-scored="1" aria-pressed="{{scoredOnly}}">计分局</button></view>
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted">暂无对局记录</view>
@@ -7,7 +8,7 @@
     <view class="matches-count">共 {{total}} 场对局</view>
     <view wx:for="{{records}}" wx:key="id" class="match-entry">
       <button hover-class="none" class="disclosure-button match-toggle" bindtap="toggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.dateLabel}}，{{item.boardName}}，{{item.role}}，{{item.outcomeLabel}}，{{item.expanded?'收起成员':'展开成员'}}">
-        <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
+        <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view><view class="match-score {{item.score.status==='scored'?'accent':'muted'}}">{{item.scoreLabel}}</view>
         <view class="match-board">{{item.boardName}} · {{item.capacity}}人</view>
         <view class="match-secondary"><text>我的身份：{{item.role}} · {{item.factionLabel}}</text><text class="match-arrow" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text></view>
       </button>
@@ -15,6 +16,12 @@
         <view class="match-detail-row"><text>胜方</text><text>{{item.winnerLabel}}</text></view>
         <view class="match-detail-row"><text>结果来源</text><text>{{item.sourceLabel}}</text></view>
         <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
+        <view wx:if="{{item.scoreEndReason}}" class="match-detail-row"><text>结束原因</text><text>{{item.scoreEndReason}}</text></view>
+        <view wx:if="{{item.score.status==='scored'}}" class="score-breakdown">
+          <view wx:for="{{item.score.breakdown}}" wx:for-item="award" wx:key="id" class="match-detail-row"><text>{{award.label}}</text><text>{{award.points>=0?'+':''}}{{award.points}}分</text></view>
+          <view class="match-detail-row"><text>本局积分</text><text class="accent">{{item.score.total>=0?'+':''}}{{item.score.total}}分</text></view>
+        </view>
+        <view wx:elif="{{item.score.reason}}" class="match-detail-row"><text>积分说明</text><text>{{item.score.reason}}</text></view>
         <view class="match-members-label">同桌成员</view>
         <view class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text>{{member.seat}}号</text><text>{{member.name}}{{member.isSelf?'（我）':''}}</text></view></view>
       </view>

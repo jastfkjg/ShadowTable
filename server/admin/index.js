@@ -239,6 +239,33 @@ function createAdmin({ store, origin, key, body, limit }) {
       send(200, { token });
       return true;
     }
+    if (path === "/api/admin/matches" && req.method === "GET") {
+      const code = new URL(req.url,origin).searchParams.get("code");
+      fail(/^\d{6}$/.test(code || ""),"请输入6位房间号");
+      const matches = store.db.prepare("SELECT id,snapshot FROM matches WHERE json_extract(snapshot,'$.code')=? ORDER BY json_extract(snapshot,'$.endedAt') DESC LIMIT 50").all(code).map(row=>{
+        const saved=JSON.parse(row.snapshot);
+        return {id:row.id,boardName:saved.boardName,endedAt:saved.endedAt,winner:saved.winner,revision:saved.scoreRevision || 0,
+          options:saved.scorePolicy && !saved.scoreEligibilityReason ? saved.scorePolicy.endReasons : [],
+          players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name};})};
+      });
+      send(200,{matches});return true;
+    }
+    const correction = path.match(/^\/api\/admin\/matches\/([a-f0-9-]{36})\/correct$/);
+    if (correction && req.method === "POST") {
+      const b = await body(req);
+      fail(typeof b.reason === "string" && b.reason.trim().length >= 2 && b.reason.length <= 200,"请填写2–200字的更正原因");
+      fail(typeof b.requestId === "string" && /^[a-f0-9-]{36}$/.test(b.requestId),"缺少合法请求编号");
+      const actor = "admin:" + session.hash, fingerprint = digest(JSON.stringify([path,b])).toString("hex");
+      const result=store.transaction(()=>{
+        const cached=store.receipt(actor,b.requestId);
+        if(cached) {fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
+        const changed=store.correctMatch(correction[1],b);
+        const code=JSON.parse(store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(correction[1]).snapshot).code;
+        store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)").run("correct-result",code,b.reason.trim(),Date.now(),JSON.stringify(changed));
+        const response={id:changed.id,winner:changed.winner,revision:changed.revision};store.addReceipt(actor,b.requestId,fingerprint,response);return response;
+      });
+      send(200,result);return true;
+    }
     const match = path.match(/^\/api\/admin\/rooms\/(\d{6})$/);
     if (match && req.method === "POST") {
       const b = await body(req);
