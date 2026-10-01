@@ -10,17 +10,16 @@ ShadowTable 使用单个 Node 24 容器提供网页和 API，SQLite 持久化到
 
 | 业务 Environment | infra 主机目标 | 用途 |
 | --- | --- | --- |
-| `aliyun-staging` | `aliyun-staging-shadowtable-01` | 独立测试服务器、域名与数据库 |
-| `aliyun-prod` | `aliyun-prod-shadowtable-01` | 阿里云正式服务器 |
-| `aws-prod` | `aws-prod-shared-01` | AWS 正式服务器，保留手动发布能力 |
+| `aliyun-prod` | `aliyun-beijing-01` | 北京 ECS |
+| `aws-prod` | `aws-singapore-01` | 新加坡 EC2，保留手动发布能力 |
 
-每个目标必须指向自己的服务器。当前部署目录、Compose 项目名和代理网络按单实例设计，不能把 staging/prod 配成同一台机器。跨云迁移时只有一边承担正式流量与写入。
+每个目标必须指向自己的服务器。当前仅有新加坡 EC2 和北京 ECS 两台服务器，没有独立 staging 部署目标。部署目录、Compose 项目名和代理网络按单实例设计。跨云迁移时只有一边承担正式流量与写入。
 
 需要 Linux、Docker Engine、Compose >=2.24、Python3、curl、tar、flock 和 SSH。infra 的 Ubuntu 初始化脚本会创建账号、目录与目标标记。现有 EC2 无需重装 Docker；可由部署账号补充目标标记：
 
 ```bash
 printf '%s\n' aws-prod > /opt/shadowtable/deployment-target
-printf '%s\n' aws-prod-shared-01 > /opt/gateway/deployment-target
+printf '%s\n' aws-singapore-01 > /opt/gateway/deployment-target
 ```
 
 首次应用部署必须先在目标主机部署网关，创建 `shadowtable_proxy`。只有 Caddy 对外映射 80/443，应用不映射 8787。服务器部署账号需要 Docker 权限。
@@ -68,7 +67,7 @@ WECHAT_APP_SECRET=
 
 ### 2.2 配置部署 Environment
 
-在 Settings → Environments 建立需要的 `aliyun-staging`、`aliyun-prod`、`aws-prod`，将部署分支限制为 main。每个 Environment 配置：
+在 Settings → Environments 建立需要的 `aliyun-prod`、`aws-prod`，将部署分支限制为 main。每个 Environment 配置：
 
 | 类型 | 名称 | 内容 |
 | --- | --- | --- |
@@ -88,7 +87,7 @@ GitHub runner 必须能访问目标 SSH 与镜像仓库；安全组填写实际�
 1. 推送或合并代码到 main。**Container CI and build** 运行语法检查、单元测试、部署故障测试及容器冒烟测试，再构建 amd64/arm64 镜像。PR 只测试。
 2. CI 成功后在 Summary 复制 **Build run ID**。对应 artifact `shadowtable-image` 保存 `image@sha256`、源码 SHA 和构建编号，保留90天。
 3. Actions → **Deploy tested image** → Run workflow，分支选择 main，填写目标与 Build run ID。流程核验本仓库 main 的 CI 已成功，读取 artifact，通过共用 workflow 发布同一 digest；不重新构建。
-4. 先发布到 `aliyun-staging` 做业务验收，再使用相同 Build run ID 发布 `aliyun-prod`。各目标独立限制部署并发。
+4. 选择实际目标：`aliyun-prod` 对应北京 ECS，`aws-prod` 对应新加坡 EC2。迁移演练在尚未接正式流量的目标上使用临时域名和测试数据；两台主机独立限制部署并发。
 5. 回退应用时选一个仍保留 artifact 和镜像的旧成功 Build run ID，再手动发布到同一目标。artifact 过期不能直接用此入口，需重新构建并重新验收，或维护窗口内按服务器手动回退流程处理。
 
 发布使用该镜像对应源码版本的业务部署脚本，只上传部署文件，不上传数据库、真实 env、私钥或小程序。CI 不依赖任何生产服务器。

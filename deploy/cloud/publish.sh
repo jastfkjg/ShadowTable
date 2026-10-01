@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs only after a manual target selection; target credentials come from its Environment.
 set -euo pipefail
-[[ "${TARGET_ENVIRONMENT:-}" =~ ^(aws-prod|aliyun-prod|aliyun-staging)$ && "${DEPLOY_TARGET:-}" == "$TARGET_ENVIRONMENT" ]] || { echo 'Set DEPLOY_TARGET to the selected Environment name in that Environment.' >&2; exit 1; }
+[[ "${TARGET_ENVIRONMENT:-}" =~ ^(aws-prod|aliyun-prod)$ && "${DEPLOY_TARGET:-}" == "$TARGET_ENVIRONMENT" ]] || { echo 'Set DEPLOY_TARGET to the selected Environment name in that Environment.' >&2; exit 1; }
 [[ "${SSH_HOST:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Set SSH_HOST in the selected Environment.' >&2; exit 1; }
 [[ "${SSH_USER:-}" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Set SSH_USER in the selected Environment.' >&2; exit 1; }
 SSH_PORT=${SSH_PORT:-22}

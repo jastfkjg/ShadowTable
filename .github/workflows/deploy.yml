@@ -6,7 +6,7 @@ on:
         description: Deployment environment (each target must use its own host and data)
         required: true
         type: choice
-        options: [aliyun-staging, aliyun-prod, aws-prod]
+        options: [aliyun-prod, aws-prod]
       build_run_id:
         description: Successful Container CI and build run ID (copy from its summary)
         required: true
