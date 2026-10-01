@@ -1054,5 +1054,512 @@
       "width": 326,
       "height": 356
     }
+  },
+  {
+    "id": "crayon-21",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 58,
+      "top": 64,
+      "width": 235,
+      "height": 246
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 1
+  },
+  {
+    "id": "crayon-22",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 381,
+      "top": 60,
+      "width": 183,
+      "height": 257
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 2
+  },
+  {
+    "id": "crayon-23",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 656,
+      "top": 107,
+      "width": 259,
+      "height": 183
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 3
+  },
+  {
+    "id": "crayon-24",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 986,
+      "top": 69,
+      "width": 214,
+      "height": 243
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 4
+  },
+  {
+    "id": "crayon-25",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 68,
+      "top": 357,
+      "width": 215,
+      "height": 250
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 5
+  },
+  {
+    "id": "crayon-26",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 330,
+      "top": 354,
+      "width": 273,
+      "height": 239
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 6
+  },
+  {
+    "id": "crayon-27",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 651,
+      "top": 394,
+      "width": 252,
+      "height": 198
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 7
+  },
+  {
+    "id": "crayon-28",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 959,
+      "top": 358,
+      "width": 260,
+      "height": 245
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 8
+  },
+  {
+    "id": "crayon-29",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 34,
+      "top": 650,
+      "width": 275,
+      "height": 234
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 9
+  },
+  {
+    "id": "crayon-30",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 353,
+      "top": 654,
+      "width": 245,
+      "height": 224
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 10
+  },
+  {
+    "id": "crayon-31",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+    "style": "crayon",
+    "crop": {
+      "left": 974,
+      "top": 636,
+      "width": 223,
+      "height": 257
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 12
+  },
+  {
+    "id": "sketch-21",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 684,
+      "top": 405,
+      "width": 217,
+      "height": 199
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 7
+  },
+  {
+    "id": "sketch-22",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 955,
+      "top": 406,
+      "width": 202,
+      "height": 210
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 8
+  },
+  {
+    "id": "sketch-23",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 59,
+      "top": 675,
+      "width": 234,
+      "height": 215
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 9
+  },
+  {
+    "id": "sketch-24",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 378,
+      "top": 675,
+      "width": 184,
+      "height": 210
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 10
+  },
+  {
+    "id": "sketch-25",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 662,
+      "top": 674,
+      "width": 209,
+      "height": 184
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 11
+  },
+  {
+    "id": "sketch-26",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 973,
+      "top": 673,
+      "width": 198,
+      "height": 211
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 12
+  },
+  {
+    "id": "sketch-27",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 81,
+      "top": 942,
+      "width": 190,
+      "height": 231
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 13
+  },
+  {
+    "id": "sketch-28",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 370,
+      "top": 947,
+      "width": 220,
+      "height": 232
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 14
+  },
+  {
+    "id": "sketch-29",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+    "style": "sketch",
+    "crop": {
+      "left": 658,
+      "top": 935,
+      "width": 219,
+      "height": 238
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 15
+  },
+  {
+    "id": "geometric-21",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 672,
+      "top": 404,
+      "width": 196,
+      "height": 209
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 7
+  },
+  {
+    "id": "geometric-22",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 962,
+      "top": 401,
+      "width": 206,
+      "height": 216
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 8
+  },
+  {
+    "id": "geometric-23",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 97,
+      "top": 664,
+      "width": 174,
+      "height": 230
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 9
+  },
+  {
+    "id": "geometric-24",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 378,
+      "top": 664,
+      "width": 196,
+      "height": 234
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 10
+  },
+  {
+    "id": "geometric-25",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 659,
+      "top": 697,
+      "width": 219,
+      "height": 154
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 11
+  },
+  {
+    "id": "geometric-26",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 961,
+      "top": 665,
+      "width": 209,
+      "height": 229
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 12
+  },
+  {
+    "id": "geometric-27",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 70,
+      "top": 944,
+      "width": 225,
+      "height": 205
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 13
+  },
+  {
+    "id": "geometric-28",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 377,
+      "top": 934,
+      "width": 196,
+      "height": 243
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 14
+  },
+  {
+    "id": "geometric-29",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 651,
+      "top": 924,
+      "width": 230,
+      "height": 254
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 15
+  },
+  {
+    "id": "geometric-30",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+    "style": "geometric",
+    "crop": {
+      "left": 922,
+      "top": 944,
+      "width": 268,
+      "height": 227
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 16
+  },
+  {
+    "id": "pixel-21",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 972,
+      "top": 394,
+      "width": 186,
+      "height": 220
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 8
+  },
+  {
+    "id": "pixel-22",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 78,
+      "top": 700,
+      "width": 213,
+      "height": 203
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 9
+  },
+  {
+    "id": "pixel-23",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 390,
+      "top": 680,
+      "width": 178,
+      "height": 219
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 10
+  },
+  {
+    "id": "pixel-24",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 657,
+      "top": 710,
+      "width": 227,
+      "height": 184
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 11
+  },
+  {
+    "id": "pixel-25",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 958,
+      "top": 680,
+      "width": 223,
+      "height": 231
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 12
+  },
+  {
+    "id": "pixel-26",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 72,
+      "top": 995,
+      "width": 227,
+      "height": 158
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 13
+  },
+  {
+    "id": "pixel-27",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 382,
+      "top": 966,
+      "width": 188,
+      "height": 197
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 14
+  },
+  {
+    "id": "pixel-28",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 649,
+      "top": 964,
+      "width": 251,
+      "height": 216
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 15
+  },
+  {
+    "id": "pixel-29",
+    "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+    "style": "pixel",
+    "crop": {
+      "left": 971,
+      "top": 962,
+      "width": 208,
+      "height": 218
+    },
+    "review": "docs/avatar-imports-2026-10-01.json",
+    "sourceTile": 16
   }
 ]

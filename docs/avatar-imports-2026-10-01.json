@@ -1,0 +1,823 @@
+{
+  "date": "2026-10-01",
+  "policy": "人工按同风格的整体轮廓、主体和构图对照；已有角色仅换色、配饰或细节时排除。独立道具、动物、幽灵与已有角色肖像具有明显区别时保留。",
+  "sources": [
+    {
+      "style": "crayon",
+      "source": "ChatGPT 图像 2026年10月1日 12_29_43-1.png",
+      "included": 11,
+      "excluded": 5,
+      "entries": [
+        {
+          "tile": 1,
+          "row": 1,
+          "column": 1,
+          "decision": "include",
+          "id": "crayon-21",
+          "label": "星月精灵",
+          "crop": {
+            "left": 58,
+            "top": 64,
+            "width": 235,
+            "height": 246
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 2,
+          "row": 1,
+          "column": 2,
+          "decision": "include",
+          "id": "crayon-22",
+          "label": "发芽土豆",
+          "crop": {
+            "left": 381,
+            "top": 60,
+            "width": 183,
+            "height": 257
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 3,
+          "row": 1,
+          "column": 3,
+          "decision": "include",
+          "id": "crayon-23",
+          "label": "红宝石王冠",
+          "crop": {
+            "left": 656,
+            "top": 107,
+            "width": 259,
+            "height": 183
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 4,
+          "row": 1,
+          "column": 4,
+          "decision": "include",
+          "id": "crayon-24",
+          "label": "星光宝剑",
+          "crop": {
+            "left": 986,
+            "top": 69,
+            "width": 214,
+            "height": 243
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 5,
+          "row": 2,
+          "column": 1,
+          "decision": "include",
+          "id": "crayon-25",
+          "label": "爱心药水",
+          "crop": {
+            "left": 68,
+            "top": 357,
+            "width": 215,
+            "height": 250
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 6,
+          "row": 2,
+          "column": 2,
+          "decision": "include",
+          "id": "crayon-26",
+          "label": "星月法师帽",
+          "crop": {
+            "left": 330,
+            "top": 354,
+            "width": 273,
+            "height": 239
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 7,
+          "row": 2,
+          "column": 3,
+          "decision": "include",
+          "id": "crayon-27",
+          "label": "橘猫",
+          "crop": {
+            "left": 651,
+            "top": 394,
+            "width": 252,
+            "height": 198
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 8,
+          "row": 2,
+          "column": 4,
+          "decision": "include",
+          "id": "crayon-28",
+          "label": "夜鸦",
+          "crop": {
+            "left": 959,
+            "top": 358,
+            "width": 260,
+            "height": 245
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 9,
+          "row": 3,
+          "column": 1,
+          "decision": "include",
+          "id": "crayon-29",
+          "label": "蓝焰幽灵",
+          "crop": {
+            "left": 34,
+            "top": 650,
+            "width": 275,
+            "height": 234
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 10,
+          "row": 3,
+          "column": 2,
+          "decision": "include",
+          "id": "crayon-30",
+          "label": "小星星",
+          "crop": {
+            "left": 353,
+            "top": 654,
+            "width": 245,
+            "height": 224
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 11,
+          "row": 3,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "crayon-03",
+          "reason": "与已有彩色蜡笔 · 红巾刺客的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 12,
+          "row": 3,
+          "column": 4,
+          "decision": "include",
+          "id": "crayon-31",
+          "label": "鸢尾盾牌",
+          "crop": {
+            "left": 974,
+            "top": 636,
+            "width": 223,
+            "height": 257
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 13,
+          "row": 4,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "crayon-02",
+          "reason": "与已有彩色蜡笔 · 王冠公主的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 14,
+          "row": 4,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "crayon-07",
+          "reason": "与已有彩色蜡笔 · 红披风骑士的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 15,
+          "row": 4,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "crayon-11",
+          "reason": "与已有彩色蜡笔 · 尖帽女巫的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 16,
+          "row": 4,
+          "column": 4,
+          "decision": "exclude",
+          "similarTo": "crayon-08",
+          "reason": "与已有彩色蜡笔 · 森林游侠的角色主体、轮廓和构图高度相似"
+        }
+      ]
+    },
+    {
+      "style": "sketch",
+      "source": "ChatGPT 图像 2026年10月1日 12_29_47-3.png",
+      "included": 9,
+      "excluded": 7,
+      "entries": [
+        {
+          "tile": 1,
+          "row": 1,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "sketch-01",
+          "reason": "与已有黑白简笔 · 星帽法师的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 2,
+          "row": 1,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "sketch-04",
+          "reason": "与已有黑白简笔 · 圣光修女的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 3,
+          "row": 1,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "sketch-03",
+          "reason": "与已有黑白简笔 · 蒙面刺客的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 4,
+          "row": 1,
+          "column": 4,
+          "decision": "exclude",
+          "similarTo": "sketch-09",
+          "reason": "与已有黑白简笔 · 长发公主的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 5,
+          "row": 2,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "sketch-08",
+          "reason": "与已有黑白简笔 · 羽冠骑士的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 6,
+          "row": 2,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "sketch-07",
+          "reason": "与已有黑白简笔 · 尖帽女巫的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 7,
+          "row": 2,
+          "column": 3,
+          "decision": "include",
+          "id": "sketch-21",
+          "label": "星月",
+          "crop": {
+            "left": 684,
+            "top": 405,
+            "width": 217,
+            "height": 199
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 8,
+          "row": 2,
+          "column": 4,
+          "decision": "include",
+          "id": "sketch-22",
+          "label": "小土豆",
+          "crop": {
+            "left": 955,
+            "top": 406,
+            "width": 202,
+            "height": 210
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 9,
+          "row": 3,
+          "column": 1,
+          "decision": "include",
+          "id": "sketch-23",
+          "label": "夜鸦",
+          "crop": {
+            "left": 59,
+            "top": 675,
+            "width": 234,
+            "height": 215
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 10,
+          "row": 3,
+          "column": 2,
+          "decision": "include",
+          "id": "sketch-24",
+          "label": "格纹盾牌",
+          "crop": {
+            "left": 378,
+            "top": 675,
+            "width": 184,
+            "height": 210
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 11,
+          "row": 3,
+          "column": 3,
+          "decision": "include",
+          "id": "sketch-25",
+          "label": "宝石王冠",
+          "crop": {
+            "left": 662,
+            "top": 674,
+            "width": 209,
+            "height": 184
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 12,
+          "row": 3,
+          "column": 4,
+          "decision": "include",
+          "id": "sketch-26",
+          "label": "闪光宝剑",
+          "crop": {
+            "left": 973,
+            "top": 673,
+            "width": 198,
+            "height": 211
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 13,
+          "row": 4,
+          "column": 1,
+          "decision": "include",
+          "id": "sketch-27",
+          "label": "魔法药水",
+          "crop": {
+            "left": 81,
+            "top": 942,
+            "width": 190,
+            "height": 231
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 14,
+          "row": 4,
+          "column": 2,
+          "decision": "include",
+          "id": "sketch-28",
+          "label": "坐姿小猫",
+          "crop": {
+            "left": 370,
+            "top": 947,
+            "width": 220,
+            "height": 232
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 15,
+          "row": 4,
+          "column": 3,
+          "decision": "include",
+          "id": "sketch-29",
+          "label": "小幽灵",
+          "crop": {
+            "left": 658,
+            "top": 935,
+            "width": 219,
+            "height": 238
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 16,
+          "row": 4,
+          "column": 4,
+          "decision": "exclude",
+          "similarTo": "sketch-11",
+          "reason": "与已有黑白简笔 · 兜帽刺客的角色主体、轮廓和构图高度相似"
+        }
+      ]
+    },
+    {
+      "style": "geometric",
+      "source": "ChatGPT 图像 2026年10月1日 12_29_50-4.png",
+      "included": 10,
+      "excluded": 6,
+      "entries": [
+        {
+          "tile": 1,
+          "row": 1,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "geometric-01",
+          "reason": "与已有极简几何 · 星帽法师的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 2,
+          "row": 1,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "geometric-09",
+          "reason": "与已有极简几何 · 王冠公主的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 3,
+          "row": 1,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "geometric-03",
+          "reason": "与已有极简几何 · 红巾刺客的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 4,
+          "row": 1,
+          "column": 4,
+          "decision": "exclude",
+          "similarTo": "geometric-08",
+          "reason": "与已有极简几何 · 红披风骑士的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 5,
+          "row": 2,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "geometric-06",
+          "reason": "与已有极简几何 · 森林游侠的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 6,
+          "row": 2,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "geometric-07",
+          "reason": "与已有极简几何 · 尖帽女巫的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 7,
+          "row": 2,
+          "column": 3,
+          "decision": "include",
+          "id": "geometric-21",
+          "label": "星月",
+          "crop": {
+            "left": 672,
+            "top": 404,
+            "width": 196,
+            "height": 209
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 8,
+          "row": 2,
+          "column": 4,
+          "decision": "include",
+          "id": "geometric-22",
+          "label": "小土豆",
+          "crop": {
+            "left": 962,
+            "top": 401,
+            "width": 206,
+            "height": 216
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 9,
+          "row": 3,
+          "column": 1,
+          "decision": "include",
+          "id": "geometric-23",
+          "label": "红色药水",
+          "crop": {
+            "left": 97,
+            "top": 664,
+            "width": 174,
+            "height": 230
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 10,
+          "row": 3,
+          "column": 2,
+          "decision": "include",
+          "id": "geometric-24",
+          "label": "宝石盾牌",
+          "crop": {
+            "left": 378,
+            "top": 664,
+            "width": 196,
+            "height": 234
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 11,
+          "row": 3,
+          "column": 3,
+          "decision": "include",
+          "id": "geometric-25",
+          "label": "红宝石王冠",
+          "crop": {
+            "left": 659,
+            "top": 697,
+            "width": 219,
+            "height": 154
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 12,
+          "row": 3,
+          "column": 4,
+          "decision": "include",
+          "id": "geometric-26",
+          "label": "长剑",
+          "crop": {
+            "left": 961,
+            "top": 665,
+            "width": 209,
+            "height": 229
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 13,
+          "row": 4,
+          "column": 1,
+          "decision": "include",
+          "id": "geometric-27",
+          "label": "黑猫",
+          "crop": {
+            "left": 70,
+            "top": 944,
+            "width": 225,
+            "height": 205
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 14,
+          "row": 4,
+          "column": 2,
+          "decision": "include",
+          "id": "geometric-28",
+          "label": "小幽灵",
+          "crop": {
+            "left": 377,
+            "top": 934,
+            "width": 196,
+            "height": 243
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 15,
+          "row": 4,
+          "column": 3,
+          "decision": "include",
+          "id": "geometric-29",
+          "label": "晨星",
+          "crop": {
+            "left": 651,
+            "top": 924,
+            "width": 230,
+            "height": 254
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 16,
+          "row": 4,
+          "column": 4,
+          "decision": "include",
+          "id": "geometric-30",
+          "label": "夜鸦",
+          "crop": {
+            "left": 922,
+            "top": 944,
+            "width": 268,
+            "height": 227
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        }
+      ]
+    },
+    {
+      "style": "pixel",
+      "source": "ChatGPT 图像 2026年10月1日 12_29_45-2.png",
+      "included": 9,
+      "excluded": 7,
+      "entries": [
+        {
+          "tile": 1,
+          "row": 1,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "pixel-01",
+          "reason": "与已有像素风 · 星帽法师的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 2,
+          "row": 1,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "pixel-02",
+          "reason": "与已有像素风 · 王冠公主的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 3,
+          "row": 1,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "pixel-03",
+          "reason": "与已有像素风 · 暗影刺客的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 4,
+          "row": 1,
+          "column": 4,
+          "decision": "exclude",
+          "similarTo": "pixel-07",
+          "reason": "与已有像素风 · 红披风骑士的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 5,
+          "row": 2,
+          "column": 1,
+          "decision": "exclude",
+          "similarTo": "pixel-08",
+          "reason": "与已有像素风 · 森林游侠的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 6,
+          "row": 2,
+          "column": 2,
+          "decision": "exclude",
+          "similarTo": "pixel-11",
+          "reason": "与已有像素风 · 尖帽女巫的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 7,
+          "row": 2,
+          "column": 3,
+          "decision": "exclude",
+          "similarTo": "pixel-12",
+          "reason": "与已有像素风 · 灰袍刺客的角色主体、轮廓和构图高度相似"
+        },
+        {
+          "tile": 8,
+          "row": 2,
+          "column": 4,
+          "decision": "include",
+          "id": "pixel-21",
+          "label": "星月",
+          "crop": {
+            "left": 972,
+            "top": 394,
+            "width": 186,
+            "height": 220
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 9,
+          "row": 3,
+          "column": 1,
+          "decision": "include",
+          "id": "pixel-22",
+          "label": "小土豆",
+          "crop": {
+            "left": 78,
+            "top": 700,
+            "width": 213,
+            "height": 203
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 10,
+          "row": 3,
+          "column": 2,
+          "decision": "include",
+          "id": "pixel-23",
+          "label": "红色药水",
+          "crop": {
+            "left": 390,
+            "top": 680,
+            "width": 178,
+            "height": 219
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 11,
+          "row": 3,
+          "column": 3,
+          "decision": "include",
+          "id": "pixel-24",
+          "label": "黑猫",
+          "crop": {
+            "left": 657,
+            "top": 710,
+            "width": 227,
+            "height": 184
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 12,
+          "row": 3,
+          "column": 4,
+          "decision": "include",
+          "id": "pixel-25",
+          "label": "小幽灵",
+          "crop": {
+            "left": 958,
+            "top": 680,
+            "width": 223,
+            "height": 231
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 13,
+          "row": 4,
+          "column": 1,
+          "decision": "include",
+          "id": "pixel-26",
+          "label": "红宝石王冠",
+          "crop": {
+            "left": 72,
+            "top": 995,
+            "width": 227,
+            "height": 158
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 14,
+          "row": 4,
+          "column": 2,
+          "decision": "include",
+          "id": "pixel-27",
+          "label": "长剑",
+          "crop": {
+            "left": 382,
+            "top": 966,
+            "width": 188,
+            "height": 197
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 15,
+          "row": 4,
+          "column": 3,
+          "decision": "include",
+          "id": "pixel-28",
+          "label": "夜鸦",
+          "crop": {
+            "left": 649,
+            "top": 964,
+            "width": 251,
+            "height": 216
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        },
+        {
+          "tile": 16,
+          "row": 4,
+          "column": 4,
+          "decision": "include",
+          "id": "pixel-29",
+          "label": "圣光盾牌",
+          "crop": {
+            "left": 971,
+            "top": 962,
+            "width": 208,
+            "height": 218
+          },
+          "reason": "独立主体、轮廓或姿态与已有同风格头像明显不同"
+        }
+      ]
+    }
+  ]
+}

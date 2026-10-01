@@ -337,6 +337,83 @@ module.exports = [
     "style": "crayon"
   },
   {
+    "id": "crayon-21",
+    "label": "彩色蜡笔 · 星月精灵",
+    "path": "/assets/avatars/crayon-21.jpg",
+    "hash": "331e2072488228be28c9356211d4dc3fdc58b980ac5cb8cb1bee5641da96d7ab",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-22",
+    "label": "彩色蜡笔 · 发芽土豆",
+    "path": "/assets/avatars/crayon-22.jpg",
+    "hash": "7eeadec30deecab95192ee79bb1f56bf7e13810743583afa4b9cf6e16c6cd48e",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-23",
+    "label": "彩色蜡笔 · 红宝石王冠",
+    "path": "/assets/avatars/crayon-23.jpg",
+    "hash": "0f8272fa6254b8a393c2ababd229abddc351ee542aaf0fcf0d0f65ab554f4135",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-24",
+    "label": "彩色蜡笔 · 星光宝剑",
+    "path": "/assets/avatars/crayon-24.jpg",
+    "hash": "5640ed9a4f57aabc53ca0a2fa09960b268d3e1e72679e17b32e95c1c457ae31b",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-25",
+    "label": "彩色蜡笔 · 爱心药水",
+    "path": "/assets/avatars/crayon-25.jpg",
+    "hash": "79f8e3b8109a21a0a87d0463d0ed9f46c7565d176d57277e5e155ce05f9e477b",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-26",
+    "label": "彩色蜡笔 · 星月法师帽",
+    "path": "/assets/avatars/crayon-26.jpg",
+    "hash": "1fc50eca2d62ce39d5141865f8943f62c9c78bb9ca680741efdcf0e3e8699e6e",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-27",
+    "label": "彩色蜡笔 · 橘猫",
+    "path": "/assets/avatars/crayon-27.jpg",
+    "hash": "314553af685edde3a28a76a5cdbc46b8a773234d51419b0c2358b6c6dd9246f5",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-28",
+    "label": "彩色蜡笔 · 夜鸦",
+    "path": "/assets/avatars/crayon-28.jpg",
+    "hash": "260f8268e1a5f41b08ea9349a4a8536ad2cf83c7f919f1b8940420b205287cc4",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-29",
+    "label": "彩色蜡笔 · 蓝焰幽灵",
+    "path": "/assets/avatars/crayon-29.jpg",
+    "hash": "c8991c9bf27f5f9cd2c7d3e95f9f51174c2de6ec11162efdc640c2643144449e",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-30",
+    "label": "彩色蜡笔 · 小星星",
+    "path": "/assets/avatars/crayon-30.jpg",
+    "hash": "4be58f056b245d71e40daaaf53bc38105df83144c325b95733e538f3c11f1982",
+    "style": "crayon"
+  },
+  {
+    "id": "crayon-31",
+    "label": "彩色蜡笔 · 鸢尾盾牌",
+    "path": "/assets/avatars/crayon-31.jpg",
+    "hash": "9e2298c539b92b17ae02cbce881b39499e51742f7c87091ed73ceaf6807faf7c",
+    "style": "crayon"
+  },
+  {
     "id": "sketch-01",
     "label": "黑白简笔 · 星帽法师",
     "path": "/assets/avatars/sketch-01.jpg",
@@ -474,6 +551,69 @@ module.exports = [
     "label": "黑白简笔 · 星项圈黑猫",
     "path": "/assets/avatars/sketch-20.jpg",
     "hash": "150de648e3db33b4ea0f49c5214ee9a5b9514fe612704f24af62797fb507ad05",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-21",
+    "label": "黑白简笔 · 星月",
+    "path": "/assets/avatars/sketch-21.jpg",
+    "hash": "879226ec189a424f00e51bae24f21e7146cb48bf651e67f66f7aca808d071d0c",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-22",
+    "label": "黑白简笔 · 小土豆",
+    "path": "/assets/avatars/sketch-22.jpg",
+    "hash": "665b59109aed24ee55504588e1342d2549c034c069d2d8bbc72ec31b07e9646b",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-23",
+    "label": "黑白简笔 · 夜鸦",
+    "path": "/assets/avatars/sketch-23.jpg",
+    "hash": "4ffc8bbdb89167bce4dfa78511ddf1ce9a36d04b518cbefa3d63e88212c4dd07",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-24",
+    "label": "黑白简笔 · 格纹盾牌",
+    "path": "/assets/avatars/sketch-24.jpg",
+    "hash": "3094b8dc7aef8b1e8e649321f194f4a68a07841ed84b47517936d4ca4973ecb4",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-25",
+    "label": "黑白简笔 · 宝石王冠",
+    "path": "/assets/avatars/sketch-25.jpg",
+    "hash": "927d0bc6a0f83dc771c9e3d1b899f85c3c8980e8de2cdde32a948dbecacaed6f",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-26",
+    "label": "黑白简笔 · 闪光宝剑",
+    "path": "/assets/avatars/sketch-26.jpg",
+    "hash": "c421b4ad1444071beabfa5215b53140a12bbdd7e3fcc30f9941faa0ea0a11831",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-27",
+    "label": "黑白简笔 · 魔法药水",
+    "path": "/assets/avatars/sketch-27.jpg",
+    "hash": "d54dc8dbc7ccdd1c94f99158f2b56056f636df32497b5ca548356d50461cf01d",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-28",
+    "label": "黑白简笔 · 坐姿小猫",
+    "path": "/assets/avatars/sketch-28.jpg",
+    "hash": "929cdc89ebf58d1901764d53523be6f4af61b4ec33ab0ab26369136d04906e29",
+    "style": "sketch"
+  },
+  {
+    "id": "sketch-29",
+    "label": "黑白简笔 · 小幽灵",
+    "path": "/assets/avatars/sketch-29.jpg",
+    "hash": "32f42506db89508afced859227248913ee88d2baf17912b7d3febf042128860e",
     "style": "sketch"
   },
   {
@@ -617,6 +757,76 @@ module.exports = [
     "style": "geometric"
   },
   {
+    "id": "geometric-21",
+    "label": "极简几何 · 星月",
+    "path": "/assets/avatars/geometric-21.jpg",
+    "hash": "6c15e54cdd2fdc782278362876a221c932c148f7fc482d088aa32167d608e98f",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-22",
+    "label": "极简几何 · 小土豆",
+    "path": "/assets/avatars/geometric-22.jpg",
+    "hash": "2833477d8d9a5653b7bb45ba64de22236008839897b91a31f2467cabaf8782b7",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-23",
+    "label": "极简几何 · 红色药水",
+    "path": "/assets/avatars/geometric-23.jpg",
+    "hash": "78d6ca1975898046b909978fff87ac25a7929c2b70bbf92eb64a260b9c53afc9",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-24",
+    "label": "极简几何 · 宝石盾牌",
+    "path": "/assets/avatars/geometric-24.jpg",
+    "hash": "26158f3813d55fdb57df771db187e4c27817e3c1bbddba7ffbed65d8a6e5bff1",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-25",
+    "label": "极简几何 · 红宝石王冠",
+    "path": "/assets/avatars/geometric-25.jpg",
+    "hash": "34b79804b5d26a09ef13aee12b808538091377705b712127dbadf55d11a2f00e",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-26",
+    "label": "极简几何 · 长剑",
+    "path": "/assets/avatars/geometric-26.jpg",
+    "hash": "dd6cdf86df2d647e7cffddf079c51b09f63e5ad59fdbc119a0970e6ff4108336",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-27",
+    "label": "极简几何 · 黑猫",
+    "path": "/assets/avatars/geometric-27.jpg",
+    "hash": "a2a50b623f8f25cb97c3ac6688bcab31d6dbdf0cc0ae5b392d98b052359176c5",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-28",
+    "label": "极简几何 · 小幽灵",
+    "path": "/assets/avatars/geometric-28.jpg",
+    "hash": "a8c338dc9b6fe1e9c949a011b47cb80480ab685079ea8b0591db667ea129abea",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-29",
+    "label": "极简几何 · 晨星",
+    "path": "/assets/avatars/geometric-29.jpg",
+    "hash": "3a6fcc58251806f52181bea294f76584134e25ca511ee6f49bd002508f083ef9",
+    "style": "geometric"
+  },
+  {
+    "id": "geometric-30",
+    "label": "极简几何 · 夜鸦",
+    "path": "/assets/avatars/geometric-30.jpg",
+    "hash": "79c3469ca2189d35237f963bbc2fc1d2a26dba754bc9c0f2798e240f3418fef6",
+    "style": "geometric"
+  },
+  {
     "id": "pixel-01",
     "label": "像素风 · 星帽法师",
     "path": "/assets/avatars/pixel-01.jpg",
@@ -754,6 +964,69 @@ module.exports = [
     "label": "像素风 · 红角小恶魔",
     "path": "/assets/avatars/pixel-20.jpg",
     "hash": "0a17f286f64751d5b1d05e4cd3cda869353634101c3a27e247db117d863544fd",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-21",
+    "label": "像素风 · 星月",
+    "path": "/assets/avatars/pixel-21.jpg",
+    "hash": "77facb81ad7d16767aba7a10b743818a291e157a99238fd665a327e4f5f95e67",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-22",
+    "label": "像素风 · 小土豆",
+    "path": "/assets/avatars/pixel-22.jpg",
+    "hash": "be190baf507cf8493bcfe4ad688ecdfa76960282aaf697d08909f43bf316af49",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-23",
+    "label": "像素风 · 红色药水",
+    "path": "/assets/avatars/pixel-23.jpg",
+    "hash": "4262e2c06e9df87eea9e269ef61d6ddb13dbef4e94816cf1c83a4507b5c1b053",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-24",
+    "label": "像素风 · 黑猫",
+    "path": "/assets/avatars/pixel-24.jpg",
+    "hash": "ed578c7cc0c9601a8cc8e42a68f1b841027d725d10041e88890e80053fa797a4",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-25",
+    "label": "像素风 · 小幽灵",
+    "path": "/assets/avatars/pixel-25.jpg",
+    "hash": "3c3dcf050c6752a453ba0387325377783239f29c368c162686f3da2ed830b77a",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-26",
+    "label": "像素风 · 红宝石王冠",
+    "path": "/assets/avatars/pixel-26.jpg",
+    "hash": "882384969113e7d2ebf306db3320c7cb7c20a7e92983b75c3f9bdc389467dd89",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-27",
+    "label": "像素风 · 长剑",
+    "path": "/assets/avatars/pixel-27.jpg",
+    "hash": "e4d4da1b81cd081b6535f43003655363af1e335fc1a9e7157c8624e9816c160b",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-28",
+    "label": "像素风 · 夜鸦",
+    "path": "/assets/avatars/pixel-28.jpg",
+    "hash": "1f87d977824237444dee6c9a49ce160ab1f60cf86f7c6a1f00f6a56b2aab46b5",
+    "style": "pixel"
+  },
+  {
+    "id": "pixel-29",
+    "label": "像素风 · 圣光盾牌",
+    "path": "/assets/avatars/pixel-29.jpg",
+    "hash": "5265953995abb303d19958042fd7f5ffef001425136fe4bfc6eec3fba13665e7",
     "style": "pixel"
   }
 ];

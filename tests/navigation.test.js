@@ -36,7 +36,7 @@ const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' }
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
 test('头像按风格筛选，浏览分类保留选择和昵称；新风格可保存并恢复选中', async () => {
   const presets = require('../miniprogram/builtin-avatars');
-  const pixel = presets.find(item => item.id === 'pixel-20'), crayon = presets.find(item => item.id === 'crayon-13');
+  const pixel = presets.find(item => item.id === 'pixel-29'), crayon = presets.find(item => item.id === 'crayon-31');
   const saved = { ...profile, avatarUrl: '/api/avatars/' + pixel.hash };
   const writes = [];
   const { p } = page('profile', { ...apiBase, request: async (url, method, body) => {
@@ -46,7 +46,7 @@ test('头像按风格筛选，浏览分类保留选择和昵称；新风格可�
   await p.load();
   assert.equal(p.data.avatarStyle, 'pixel');
   assert.equal(p.data.selectedAvatar, pixel.id);
-  assert.equal(p.data.visibleAvatars.length, 20);
+  assert.equal(p.data.visibleAvatars.length, 29);
   p.chooseAvatarStyle({ currentTarget: { dataset: { style: 'crayon' } } });
   assert.equal(p.data.avatarStyle, 'crayon');
   assert.equal(p.data.selectedAvatar, pixel.id);
@@ -64,7 +64,7 @@ test('头像按风格筛选，浏览分类保留选择和昵称；新风格可�
   assert.match(rendered, /sketch-01.jpg/);
   assert.doesNotMatch(rendered, /pixel-01.jpg/);
   // The currently selected crayon remains in the preview while browsing another style.
-  assert.match(rendered, /crayon-13.jpg/);
+  assert.match(rendered, /crayon-31.jpg/);
   await p.save();
   assert.equal(writes[0].avatar, 'builtin:' + crayon.id);
   assert.equal(writes[0].nickname, '晚风');
