@@ -80,7 +80,7 @@ class Leaderboard {
       threshold: METRICS[metric], eligibleCount: snapshot.eligible.length, maxRows: MAX_ROWS,
       updatedAt: snapshot.updatedAt, version: snapshot.version,
       rows: snapshot.eligible.slice(offset, Math.min(nextOffset, end)).map(row => ({
-        publicId: row.public_id, nickname: row.nickname, avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
+        publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
         rank: row.rank, isSelf: row.uid === uid, ...summary(row),
       })),
       nextOffset: nextOffset < end ? nextOffset : null, hasMore: nextOffset < end,

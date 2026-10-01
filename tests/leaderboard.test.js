@@ -21,6 +21,80 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
+test('未保存资料的微信和开发账号首局自动公开，五榜无需切换开关且不公开牌桌昵称', () => {
+  const store=new Store(':memory:');
+  try {
+    const board=new Leaderboard(store), uids=['wx:new','dev:new','guest:new','test:new'];
+    const original=readProfile(store,'wx:new');
+    const empty=query(board,'guest:viewer');
+    assert.equal(empty.rows.length,0);
+    for(const faction of ['good','evil']) store.transaction(()=>store.archiveMatch({
+      id:randomUUID(),board:'classic',endedAt:NOW-1000,players:uids.map(uid=>({
+        uid,name:'不应公开的牌桌昵称',faction,outcome:'win',score:{status:'scored',total:3,breakdown:[]},
+      })),
+    }));
+    assert.deepEqual(readProfile(store,'wx:new'),original);
+    const ids=new Map();
+    for(const metric of ['points','games','overall','good','evil']) for(const uid of uids.slice(0,2)) {
+      const result=query(board,uid,'metric='+metric);
+      assert.equal(result.eligibleCount,2);
+      assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
+      const own=result.rows.find(row=>row.isSelf);
+      assert.ok(own);assert.equal(own.nickname,'新朋友');assert.match(own.publicId,/^[\da-f-]{36}$/);
+      if(ids.has(uid)) assert.equal(own.publicId,ids.get(uid));
+      else ids.set(uid,own.publicId);
+      assert.doesNotMatch(JSON.stringify(result),/wx:|dev:|guest:|test:|牌桌昵称/);
+    }
+    assert.notEqual(query(board,'wx:new').version,empty.version);
+    assert.equal(query(board,'guest:new').me.status,'unsupported');
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,2);
+    profile(store,'wx:new',false);
+    games(store,'wx:new',1,1);
+    assert.equal(query(board,'wx:new').me.status,'hidden');
+    assert.equal(query(board,'dev:new').eligibleCount,1);
+  } finally {store.close();}
+});
+test('默认公开资料与战绩同事务回滚，重复归档不改变公开ID或榜单缓存', () => {
+  const store=new Store(':memory:');
+  try {
+    const board=new Leaderboard(store), first=query(board,'wx:new');
+    const record={id:randomUUID(),board:'classic',endedAt:NOW,players:[{uid:'wx:new',faction:'good',outcome:'win'}]};
+    assert.throws(()=>store.transaction(()=>{store.archiveMatch(record);throw Error('rollback');}));
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,0);
+    assert.deepEqual(query(board,'wx:new'),first);
+    store.transaction(()=>store.archiveMatch(record));
+    const ranked=query(board,'wx:new');
+    assert.equal(ranked.me.rank,1);
+    store.transaction(()=>store.archiveMatch(record));
+    assert.deepEqual(query(board,'wx:new'),ranked);
+    store.transaction(()=>saveProfile(store,'wx:new',{nickname:'新昵称',version:0}));
+    const renamed=query(board,'wx:new');
+    assert.equal(renamed.rows[0].publicId,ranked.rows[0].publicId);
+    assert.equal(renamed.rows[0].nickname,'新昵称');
+  } finally {store.close();}
+});
+test('重启补齐已有战绩但无资料的账号，保留主动隐藏设置且公开ID跨重启稳定', () => {
+  const dir=mkdtempSync(join(tmpdir(),'shadow-rank-missing-')),path=join(dir,'db.sqlite');
+  let store=new Store(path);
+  try {
+    profile(store,'wx:hidden',false);
+    for(const uid of ['wx:missing','dev:missing','guest:missing','test:missing','wx:hidden']) games(store,uid,1,1);
+    // Reproduce databases written before archives initialized public profiles.
+    store.db.prepare("DELETE FROM profiles WHERE uid IN ('wx:missing','dev:missing')").run();
+    const hidden=store.db.prepare("SELECT * FROM profiles WHERE uid='wx:hidden'").get();
+    store.close();store=new Store(path);
+    const first=query(new Leaderboard(store),'wx:missing');
+    assert.equal(first.me.rank,1);assert.equal(first.rows.length,2);
+    assert.equal(first.rows[0].nickname,'新朋友');
+    assert.equal(readProfile(store,'wx:missing').version,0);
+    assert.equal(readProfile(store,'wx:hidden').leaderboardVisible,false);
+    assert.deepEqual(store.db.prepare("SELECT * FROM profiles WHERE uid='wx:hidden'").get(),hidden);
+    const ids=first.rows.map(row=>row.publicId);
+    store.close();store=new Store(path);
+    assert.deepEqual(query(new Leaderboard(store),'wx:missing').rows.map(row=>row.publicId),ids);
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,3);
+  } finally {store?.close();rmSync(dir,{recursive:true,force:true});}
+});
 test('开发账号默认公开并参与四榜，关闭后隐藏；游客和陪测账号仍不能公开', () => {
   const store=new Store(':memory:');
   try {
@@ -190,16 +264,20 @@ test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保
     assert.equal((await request('/api/leaderboard')).status,401);
     const token=(await request('/api/login',null,{code:'owner'})).data.token;
     const uid='wx:'+createHash('sha256').update('owner').digest('hex');games(app.store,uid,20,10);
+    const initial=(await request('/api/leaderboard',token)).data;
+    assert.equal(initial.me.status,'ranked');assert.equal(initial.me.rank,1);
+    assert.equal(initial.rows[0].nickname,'新朋友');assert.equal(initial.rows[0].isSelf,true);
     for (const q of ['metric=unknown','metric=__proto__','period=week','offset=-1','offset=20','offset=100','metric=good&metric=evil','uid=other','version=bad','limit=100000'])
       assert.equal((await request('/api/leaderboard?'+q,token)).status,400,q);
     assert.equal((await request('/api/me/profile',token,{nickname:'我',version:0,leaderboardVisible:'true'})).status,400);
     const body={nickname:'我',version:0,leaderboardVisible:true},id=randomUUID();
     const add=app.store.addReceipt; app.store.addReceipt=()=>{throw Error('write failed');};
     assert.equal((await request('/api/me/profile',token,body,id)).status,500);
-    assert.equal((await request('/api/leaderboard',token)).data.rows.length,0);
+    assert.deepEqual((await request('/api/leaderboard',token)).data,initial);
     app.store.addReceipt=add;
     const saved=await request('/api/me/profile',token,body,id);assert.equal(saved.status,200);
     const before=(await request('/api/leaderboard',token)).data;
+    assert.equal(before.rows[0].nickname,'我');assert.equal(before.rows[0].publicId,initial.rows[0].publicId);
     assert.deepEqual(before.availableMetrics,['points','games','overall','good','evil']);
     assert.deepEqual((await request('/api/me/profile',token,body,id)).data,saved.data);
     assert.equal((await request('/api/leaderboard',token)).data.version,before.version);

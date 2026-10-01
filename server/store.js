@@ -49,6 +49,10 @@ class Store {
       const initializePublicProfile = this.db.prepare("UPDATE profiles SET leaderboard_visible=1, public_id=? WHERE uid=?");
       for (const row of this.db.prepare("SELECT uid FROM profiles WHERE public_id IS NULL AND (uid LIKE 'wx:%' OR uid LIKE 'dev:%')").all())
         initializePublicProfile.run(randomUUID(), row.uid);
+      // Older archives may contain players who never saved personal details.
+      for (const row of this.db.prepare(`SELECT DISTINCT p.uid FROM match_players p LEFT JOIN profiles f ON f.uid=p.uid
+        WHERE f.uid IS NULL AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%')`).all())
+        this.initializeLeaderboardProfile(row.uid);
       this.restoreCompanionMatches();
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);
@@ -95,6 +99,14 @@ class Store {
   invalidateLeaderboard() {
     if (this.inTransaction) this.leaderboardDirty = true;
     else this.leaderboardRevision++;
+  }
+  initializeLeaderboardProfile(uid) {
+    if (!/^(wx|dev):/.test(uid)) return;
+    // Persist the default visibility and public ID without changing unsaved details
+    // or overwriting an existing visibility choice, nickname, avatar or version.
+    const result = this.db.prepare(`INSERT OR IGNORE INTO profiles(uid,nickname,version,updated,leaderboard_visible,public_id)
+      VALUES(?,'',0,0,1,?)`).run(uid, randomUUID());
+    if (result.changes) this.invalidateLeaderboard();
   }
   get(code) {
     const row = this.db
@@ -156,6 +168,7 @@ class Store {
     this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
     const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
     for (const { uid, ...player } of players) {
+      this.initializeLeaderboardProfile(uid);
       if (player.score?.status === "scored" && !this.db.prepare("SELECT 1 FROM match_players WHERE match_id=? AND uid=?").get(match.id, uid)) {
         const streak = player.outcome === "win" ? this.streakFor(uid).current + 1 : 0;
         const bonus = record.scorePolicy?.streakBonus;

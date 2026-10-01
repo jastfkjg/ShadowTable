@@ -121,7 +121,7 @@ test('终止、不计战绩及身份不完整仍排除，陪测房间和陪测�
     const leaderboard=new Leaderboard(store);
     for (const metric of ['games','overall','good']) {
       const board=leaderboard.read('wx:1',new URLSearchParams({metric}));
-      assert.equal(board.me.total,3);assert.equal(board.rows[0].winRate,33.3);
+      assert.equal(board.me.total,3);assert.equal(board.rows.find(row=>row.isSelf).winRate,33.3);
     }
     assert.equal(store.matchesFor('wx:1').records.filter(record=>record.outcome!=='excluded').length,3);
   } finally { store.close(); }
@@ -150,7 +150,7 @@ test('旧陪测归档启动时补算，保留未判胜负和身份不完整局�
       assert.equal(records.filter(record=>record.excludedReason===null&&record.outcome!=='excluded').length,2);
       for(const metric of ['games','overall','good']) {
         const board=new Leaderboard(store).read('wx:1',new URLSearchParams({metric,period:'month'}));
-        assert.equal(board.rows[0].total,2);assert.equal(board.me.winRate,50);
+        assert.equal(board.rows.find(row=>row.isSelf).total,2);assert.equal(board.me.winRate,50);
       }
     };
     verify();legacy.forEach(room=>store.save(room));verify();
