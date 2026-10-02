@@ -1,5 +1,4 @@
 .share-page { max-width: 580px; padding-top: 24rpx; }
-.share-intro { color: var(--muted); font-size: 28rpx; margin-bottom: 24rpx; }
 .share-modes { display: flex; padding: 6rpx; gap: 8rpx; margin-bottom: 24rpx; border-radius: 20rpx; background: var(--surface); }
 .share-modes button { flex: 1; width: 0; min-width: 0; min-height: 48px; margin: 0; padding: 12rpx; color: var(--muted); }
 .share-modes button.selected { color: var(--text); background: var(--bg); }
@@ -11,14 +10,12 @@ button.share-preview { display: block; width: 100%; padding: 0; margin: 0; line-
 .share-actions button { flex: 1; width: 0; min-width: 0; min-height: 48px; margin: 0; }
 .share-actions .share-send, .share-actions .share-save-primary { background: var(--accent); color: var(--bg); font-weight: 600; }
 .share-actions .share-save { border: 1px solid var(--border); }
-.share-footnote { margin-top: 24rpx; font-size: 26rpx; color: var(--muted); }
 .share-action-error { color: var(--evil); margin-top: 20rpx; font-size: 28rpx; }
 .share-action-error button { color: var(--accent); min-height: 48px; }
 /* Keep the native canvas mounted for drawing without adding page scroll width. */
 .share-canvas { position: fixed; left: -1100px; top: 0; width: 1080px; height: 1080px; pointer-events: none; }
 @media (orientation: landscape) {
   .share-page { max-width: 520px; }
-  .share-intro, .share-notice, .share-action-error { font-size: 14px; }
+  .share-notice, .share-action-error { font-size: 14px; }
   .share-actions button, .share-modes button { font-size: 16px; }
-  .share-footnote { font-size: 13px; }
 }

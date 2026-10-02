@@ -40,7 +40,6 @@ button.avatar-style,
 button.avatar-style[disabled]:not([type]) { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 12rpx 4rpx; border: 0; border-bottom: 4rpx solid transparent; border-radius: 0; color: var(--muted); background: transparent; font-size: 28rpx; line-height: 1.5; white-space: nowrap; }
 button.avatar-style.is-active,
 button.avatar-style.is-active[disabled]:not([type]) { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-.avatar-library-count { margin-top: 20rpx; font-size: 24rpx; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16rpx; padding: 20rpx 0 0; }
 .avatar-grid button.avatar-option,
 .avatar-grid button.avatar-option[disabled]:not([type]) { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; min-height: 136rpx; margin: 0; padding: 12rpx 4rpx; border: 2rpx solid transparent; border-radius: 20rpx; background: transparent; color: var(--muted); }

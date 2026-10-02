@@ -622,10 +622,9 @@
     html += '<div class="me-overview"><section class="personal-section me-results" aria-label="我的战绩"><div class="section-title history-heading"><span>战绩概览</span>' + btn('history-toggle','navigate','战绩详情 ›',{page:'stats'}) + '</div>';
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     html += '<div class="personal-metrics"><div><div class="metric-value">' + (stats ? stats.total : '—') + '</div><span class="small muted">总局数</span></div><div><div class="metric-value">' + (stats ? stats.wins : '—') + '</div><span class="small muted">胜场</span></div><div><div class="metric-value accent">' + (!stats || stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">胜率</span></div></div>';
-    if (stats && !stats.total) html += '<div class="small muted">对局结束并登记胜方后，这里会留下战绩。</div>';
     html += '</section>' + viewScoreOverview(stats?.score) + '</div>';
     const link = (page, title, note, icon) => '<button class="personal-link" type="button" data-action="navigate" data-page="'+page+'"><span class="me-icon me-icon-'+icon+'" aria-hidden="true"></span><span class="me-link-copy"><span>'+title+'</span>'+(note?'<span class="small muted link-note">'+esc(note)+'</span>':'')+'</span><span aria-hidden="true">›</span></button>';
-    html += '<div class="personal-links me-links-primary">' + link('stats?tab=fun','趣味记录',stats?.fun?.teaser || '每局都有故事','spark') + link('matches','对局记录','逐局结果与积分明细','history') + link('leaderboard','排行榜','','rank') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
+    html += '<div class="personal-links me-links-primary">' + link('stats?tab=fun','趣味记录',stats?.fun?.teaser || '','spark') + link('matches','对局记录','','history') + link('leaderboard','排行榜','','rank') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
     return html;
   }
   function viewProfileEditor() {
@@ -643,7 +642,7 @@
     const selected = profilePreset(draft.avatarPreview)?.id;
     const style = draft.avatarStyle || 'classic';
     const visibleAvatars = builtinAvatars.filter(item => item.style === style);
-    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择内置头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked ? ' disabled' : '') + '>' + esc(item.shortLabel) + '</button>').join('') + '</div><div class="avatar-library-count muted" aria-live="polite">' + visibleAvatars.length + ' 款头像</div><div class="avatar-grid">' + visibleAvatars.map(item => {
+    html += '<section class="avatar-library" aria-labelledby="avatar-library-title"><h2 id="avatar-library-title" class="field-title">选择头像</h2><div class="avatar-styles" role="group" aria-label="头像风格">' + avatarStyles.map(item => '<button type="button" class="avatar-style' + (style === item.id ? ' is-active' : '') + '" data-action="chooseProfileAvatarStyle" data-style="' + esc(item.id) + '" aria-label="' + esc(item.label + '，' + item.count + '款头像') + '" aria-pressed="' + (style === item.id) + '"' + (locked ? ' disabled' : '') + '>' + esc(item.shortLabel) + '</button>').join('') + '</div><div class="avatar-grid">' + visibleAvatars.map(item => {
       const chosen = selected === item.id;
       return '<button type="button" class="avatar-option' + (chosen ? ' is-selected' : '') + '" data-action="chooseBuiltinProfileAvatar" data-id="' + esc(item.id) + '" aria-label="' + esc(item.label + (chosen ? '，已选择' : '')) + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '><img class="avatar-option-image" src="' + esc(item.path) + '" width="52" height="52" loading="lazy" alt="" />' + (chosen ? '<span class="avatar-option-selected" aria-hidden="true">✓</span>' : '') + '</button>';
     }).join('') + '</div></section>';
@@ -1459,7 +1458,7 @@ function roomListItems(rooms) {
     } else if (step === 'actor' || step === 'target') {
       html += '<p class="small muted">' + (step === 'actor' ? '选择线下实际执行最终刺杀的玩家。' : '选择线下实际刺杀的目标；未指定目标请选择空刀。') + '</p><div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && room.knights && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
     } else {
-      html += '<div class="result-review">' + flow.resultSummary.map(row => '<div class="result-review-row"><span class="small muted">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('') + '</div><p class="result-review-note">'+esc(flow.resultNotice)+'</p>' + (room.hasActiveOperation ? '<p class="result-warning">当前未结算的操作将作废。</p>' : '') + '<p class="small muted">确认后归档；如有填写错误，可返回上一步修改。</p>';
+      html += '<div class="result-review">' + flow.resultSummary.map(row => '<div class="result-review-row"><span class="small muted">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('') + '</div><p class="result-review-note">'+esc(flow.resultNotice)+'</p>' + (room.hasActiveOperation ? '<p class="result-warning">当前未结算的操作将作废。</p>' : '');
     }
     return html + '</div><div class="dialog-actions">' + btn('secondary','backResult',step==='reason'?'取消':'上一步',null,state.busy || !!pending) + (step==='review' ? btn('primary','saveResult','确认并结束',null,!flow.resultReady || state.busy || !!pending) : btn('primary','nextResult','下一步',null,!flow.resultNextEnabled || state.busy || !!pending)) + '</div></div></div>';
   }
@@ -1498,7 +1497,7 @@ function roomListItems(rooms) {
   function viewFunStats(data) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
     let html = data.legacyGames ? '<p class="small muted">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>' : '';
-    if (!data.cards.length) return html + '<p class="fun-empty muted">还没有趣味记录。结束对局时登记实际结束原因，或完成十二骑士技能后，记录会出现在这里。</p>';
+    if (!data.cards.length) return html + '<p class="fun-empty muted">暂无趣味记录</p>';
     for (const card of (state.funExpanded ? data.cards : data.cards.slice(0,3))) {
       const rows = card.metrics.filter(row => !row.id.endsWith('aim_enemy')), primary = rows.find(row => row.ranked) || rows[0];
       const combat = [':knife',':gun',':duel'].some(suffix => card.id.endsWith(suffix));
@@ -1534,7 +1533,7 @@ function roomListItems(rooms) {
   function viewFunRankFilters(board) {
     const metric = state.rankMetric, list = state.rankFunMetrics;
     const select = (key,label,items,value) => '<label class="fun-select"><span class="sr-only">'+label+'</span><select class="fun-picker" data-change="'+key+'">'+items.map(item=>'<option value="'+esc(item.id)+'"'+(item.id===value ? ' selected' : '')+'>'+esc(item.label)+'</option>').join('')+'</select></label>';
-    let html = '<div class="fun-rank-filters"><div class="rank-filter-heading"><span class="small muted">左右滑动选择指标</span><button class="rank-disclosure" data-action="rankToggleMetrics" aria-expanded="'+!!state.rankMetricsExpanded+'">'+(state.rankMetricsExpanded?'收起指标 ⌃':'全部指标 ⌄')+'</button></div><div class="fun-rank-tabs'+(state.rankMetricsExpanded?' is-expanded':'')+'" role="group" aria-label="趣味指标，可左右滑动">'+list.map(item=>'<button type="button" class="fun-rank-tab" data-action="funRankMetric" data-value="'+esc(item.key)+'" aria-pressed="'+(metric===item.key)+'">'+esc(item.title+' · '+item.label)+'</button>').join('')+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button type="button" data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : '成功率')+'</button>').join('')+'</div>';
+    let html = '<div class="fun-rank-filters"><div class="rank-filter-heading"><button class="rank-disclosure" data-action="rankToggleMetrics" aria-expanded="'+!!state.rankMetricsExpanded+'">'+(state.rankMetricsExpanded?'收起指标 ⌃':'全部指标 ⌄')+'</button></div><div class="fun-rank-tabs'+(state.rankMetricsExpanded?' is-expanded':'')+'" role="group" aria-label="趣味指标，可左右滑动">'+list.map(item=>'<button type="button" class="fun-rank-tab" data-action="funRankMetric" data-value="'+esc(item.key)+'" aria-pressed="'+(metric===item.key)+'">'+esc(item.title+' · '+item.label)+'</button>').join('')+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button type="button" data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : '成功率')+'</button>').join('')+'</div>';
     if (board?.roleOptions?.length) html += select('funRankRole','出刀角色',[{id:'',label:'全部角色'},...board.roleOptions],state.rankFunRole);
     html += '</div><div class="rank-rule-heading"><span class="small muted">'+(state.rankFunSort==='rate'?'至少 '+(list.find(item=>item.key===metric)?.rateThreshold || 5)+' 次机会':'累计次数 · 同次数并列')+'</span><button class="rank-disclosure" data-action="rankToggleRules" aria-expanded="'+!!state.rankRulesExpanded+'">如何计算 '+(state.rankRulesExpanded?'⌃':'⌄')+'</button></div>';
     if (state.rankRulesExpanded) html += '<div class="small muted rank-rule-detail">'+(state.rankFunSort==='rate'?'按未舍入比例排名。':'按累计次数排名，同次数并列。')+(metric==='fun_good_shield'?'挡刀率 = 挡刀次数 / 作为非梅林好人面对最终非空刀的局数。':'')+'空刀单列，缺失记录不参与。</div>';
@@ -1590,9 +1589,9 @@ function roomListItems(rooms) {
       html += '<div class="stats-tabs" role="group" aria-label="战绩分类">' + [['records','胜负积分'],['fun','趣味记录']].map(item=>'<button type="button" data-action="statsTab" data-value="'+item[0]+'" aria-pressed="'+(state.statsTab===item[0])+'">'+item[1]+'</button>').join('') + '</div>';
       if (state.statsTab === 'fun') return html + viewFunStats(stats.fun) + '</section>';
       if (stats.score) html += '<div class="score-stats muted">积分 ' + stats.score.total + ' · ' + stats.score.games + '场计分局 · 场均 ' + (stats.score.average == null ? '—' : stats.score.average.toFixed(2)) + '<br>当前 ' + stats.score.current + ' 连胜 · 最高 ' + stats.score.best + ' 连胜</div>';
-      html += '<div class="small muted">胜率 = 胜场 ÷ 有效对局。另有 ' + stats.excluded + ' 局不计入；旁观不计入。</div>';
+      if (stats.excluded) html += '<div class="small muted">' + stats.excluded + ' 局不计入战绩</div>';
       if (stats.identityType === 'guest') html += '<div class="stats-note small">当前为游客战绩，仅随本浏览器登录凭证保留；清缓存或登录过期后无法自动找回。</div>';
-      if (!stats.total) html += '<div class="stats-note">还没有有效战绩。对局结束后，请房主登记胜方。</div>';
+      if (!stats.total) html += '<div class="stats-note">还没有有效战绩</div>';
       [['阵营战绩',(stats.byFaction || []).map(row=>({...row,roles:(stats.byRole || []).filter(role=>role.faction===row.faction)}))],['板子战绩',stats.byBoard]].forEach(function (group) {
         if (!group[1]?.length) return;
         html += '<section class="stats-breakdown"><h2 class="page-subtitle">'+group[0]+'</h2>';
@@ -1603,7 +1602,7 @@ function roomListItems(rooms) {
         });
         html += '</section>';
       });
-      html += btn('stats-record-link','navigate','查看逐局结果与积分明细 ›',{page:'matches'});
+      html += btn('stats-record-link','navigate','对局记录 ›',{page:'matches'});
       html += btn('text-button','loadStats',state.statsLoading ? '刷新中…' : '刷新战绩',null,state.statsLoading);
     }
     return html + '</section>';
@@ -3038,7 +3037,7 @@ function roomListItems(rooms) {
   function viewEntry() {
     var active = state.memberRooms.filter(r => r.status === 'playing' && r.available !== false);
     var html = (active.length ? '<div class="resume-section"><span class="eyebrow">正在进行</span>' + active.map(r => '<button type="button" class="resume-room" data-action="openRoom" data-code="' + esc(r.code) + '"><span><span>继续对局 · ' + esc(r.code) + '</span><span class="small muted link-note">' + esc(r.boardName) + ' · ' + r.capacity + '人</span></span><span aria-hidden="true">→</span></button>').join('') + '</div>' : '') +
-      '<div class="lobby-heading"><h1 class="page-title" tabindex="-1" data-page-heading>今晚，开一桌。</h1><div class="muted">和朋友面对面，把秘密交给牌桌。</div></div>';
+      '<div class="lobby-heading"><h1 class="page-title" tabindex="-1" data-page-heading>今晚，开一桌。</h1></div>';
     html +=
       '<form class="panel entry-panel"><label class="label" for="nickname">' + (needsNicknameSetup() ? '玩家昵称' : '本桌昵称') + '</label>' +
       '<input class="input" id="nickname" name="nickname" maxlength="16" data-input="name" value="' +
@@ -3119,7 +3118,7 @@ function roomListItems(rooms) {
         (m.note ? '<span class="small muted">房间 ' + esc(m.code) + '</span>' : '') + '<span class="room-list-board">' + esc(m.boardName) + ' · ' + esc(m.peopleLabel) + '</span><span class="room-list-meta"><span class="room-host-name">房主：' + esc(m.hostName || '未知') + '</span><span>' + esc(m.relationLabel) + '</span></span><span class="room-list-time">最近活动 ' + esc(m.activityLabel) + '</span></button>' +
         '<button type="button" class="room-more" data-action="openRoomMenu" data-code="' + esc(m.code) + '" aria-label="管理房间' + esc(m.code) + '的个人记录"' + (state.busy || state.loading || pending ? ' disabled' : '') + '>⋯</button></div>';
     });
-    if (!state.memberRooms.length && !state.loading) html += '<div class="room-empty"><div>还没有牌桌</div><span class="small muted">加入朋友的房间，或创建一桌开始游戏</span><div class="room-empty-actions">' + btn("secondary","switchEntry","加入房间",{mode:"join",scroll:"true"},state.busy || !!pending) + btn("secondary","switchEntry","创建房间",{mode:"create",scroll:"true"},state.busy || !!pending) + '</div></div>';
+    if (!state.memberRooms.length && !state.loading) html += '<div class="room-empty"><div>还没有牌桌</div><div class="room-empty-actions">' + btn("secondary","switchEntry","加入房间",{mode:"join",scroll:"true"},state.busy || !!pending) + btn("secondary","switchEntry","创建房间",{mode:"create",scroll:"true"},state.busy || !!pending) + '</div></div>';
     else if (!visible.length) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
     if (state.roomMenu && !state.error) {
       var m = state.roomMenu, locked = state.busy || !!pending;

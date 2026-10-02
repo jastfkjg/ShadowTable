@@ -485,7 +485,7 @@ function aggregate(rows, legacyGames = 0) {
     legacyGames,
     teaser: highlights.length
       ? `${highlights[0].title} · ${highlights[0].label} ${highlights[0].count} ${highlights[0].unit}`
-      : "每局都有故事，查看趣味记录",
+      : "",
   };
 }
 function publicMetrics() {

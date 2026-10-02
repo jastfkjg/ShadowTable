@@ -69,7 +69,6 @@
   <view class="transfer-dialog" catchtap="stopPropagation" role="dialog" aria-modal="true" aria-label="选择新房主">
     <view class="transfer-header">
       <view class="transfer-heading"><view class="dialog-title">选择新房主</view><text class="transfer-count">{{transferPlayers.length}} 位玩家</text></view>
-      <view class="transfer-description">选择一位玩家接管房间，下一步确认移交。</view>
     </view>
     <scroll-view class="transfer-list" style="height: {{transferPlayers.length * 104}}rpx" scroll-y enhanced show-scrollbar="{{true}}" catchtouchmove="stopPropagation">
       <button wx:for="{{transferPlayers}}" wx:key="seat" class="transfer-option" hover-class="transfer-option-hover" bindtap="transfer" data-seat="{{item.seat}}" disabled="{{busy}}">
@@ -84,7 +83,6 @@
   <view class="transfer-dialog" catchtap="stopPropagation" role="dialog" aria-modal="true" aria-label="选择要移出的玩家">
     <view class="transfer-header">
       <view class="transfer-heading"><view class="dialog-title">移出玩家</view><text class="transfer-count">{{transferPlayers.length}} 位玩家</text></view>
-      <view class="transfer-description">请选择座位和昵称，下一步确认移出。</view>
     </view>
     <scroll-view class="transfer-list" style="height: {{transferPlayers.length * 104}}rpx" scroll-y enhanced show-scrollbar="{{true}}" catchtouchmove="stopPropagation">
       <button wx:for="{{transferPlayers}}" wx:key="seat" class="transfer-option" hover-class="transfer-option-hover" bindtap="kick" data-seat="{{item.seat}}" disabled="{{busy}}" aria-label="{{'移出 '+item.seat+'号 '+item.name}}">

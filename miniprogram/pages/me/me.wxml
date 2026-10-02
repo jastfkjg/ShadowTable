@@ -27,8 +27,8 @@
     </view>
     </view>
     <view class="personal-links me-links me-links-primary">
-      <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-spark" aria-hidden="true"></view><view class="me-link-copy"><view>趣味记录</view><view class="small muted">{{stats.fun.teaser || '每局都有故事'}}</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy"><view>对局记录</view><view class="small muted">逐局结果与积分明细</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-spark" aria-hidden="true"></view><view class="me-link-copy"><view>趣味记录</view><view wx:if="{{stats.fun.teaser}}" class="small muted">{{stats.fun.teaser}}</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy">对局记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-rank" aria-hidden="true"></view><view class="me-link-copy">排行榜</view><view class="me-chevron" aria-hidden="true"></view></navigator>
     </view>
     <view class="personal-links me-links me-links-secondary">

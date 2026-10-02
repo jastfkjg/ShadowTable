@@ -235,7 +235,6 @@
           <view class="result-review"><view wx:for="{{resultSummary}}" wx:key="label" class="result-review-row"><text class="small muted">{{item.label}}</text><text>{{item.value}}</text></view></view>
           <view class="result-review-note">{{resultNotice}}</view>
           <view wx:if="{{room.hasActiveOperation}}" class="result-warning">当前未结算的操作将作废。</view>
-          <view class="small muted">确认后归档；如有填写错误，可返回上一步修改。</view>
         </block>
       </scroll-view>
       <view class="dialog-actions"><button class="secondary" bindtap="backResult" disabled="{{busy || hasPendingRequest}}" hover-class="none">{{resultStep==='reason'?'取消':'上一步'}}</button><button wx:if="{{resultStep!=='review'}}" class="primary" bindtap="nextResult" disabled="{{!resultNextEnabled || busy || hasPendingRequest}}" hover-class="none">下一步</button><button wx:else class="primary" bindtap="saveResult" disabled="{{!resultReady || busy || hasPendingRequest}}" hover-class="none">确认并结束</button></view>
@@ -272,7 +271,7 @@
         <view class="rules-detail">
           <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
-        <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
+        <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 ›</button>
         <button hover-class="none" class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">{{nicknameSetup?'确认昵称并创建':'创建'}} {{capacity}} 人房间</button>
       </block>
       <block wx:else>
@@ -297,7 +296,7 @@
       </button>
       <button hover-class="none" class="room-more" data-code="{{item.code}}" bindtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
     </view>
-    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><text class="small muted">加入朋友的房间，或创建一桌开始游戏</text><view class="room-empty-actions"><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
+    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><view class="room-empty-actions"><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
     <view wx:elif="{{memberRooms.length && !visibleMemberRooms.length}}" class="room-empty"><text>没有符合条件的牌桌</text><button hover-class="none" class="history-toggle" bindtap="filterRooms" data-filter="all">查看全部</button></view>
     <view wx:if="{{roomMenu && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog room-menu-dialog" role="dialog" aria-modal="true" aria-label="{{'房间管理，房间'+roomMenu.code}}">
       <view class="room-menu-header"><view class="room-menu-heading">房间管理</view><view class="room-menu-code">房间 {{roomMenu.code}}</view></view>

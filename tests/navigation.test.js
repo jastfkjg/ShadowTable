@@ -454,7 +454,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   assert.doesNotMatch(me,/去开一局|还没有有效战绩|逐场查看/);
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
-  assert.match(editor,/选择内置头像/);
+  assert.match(editor,/选择头像/);
   const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
   assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
   const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));

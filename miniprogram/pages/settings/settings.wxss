@@ -99,12 +99,6 @@ switch {
   font-size: 24rpx;
   flex-shrink: 0;
 }
-.transfer-description {
-  margin-top: 12rpx;
-  font-size: 26rpx;
-  line-height: 1.6;
-  color: var(--muted);
-}
 .transfer-list {
   width: 100%;
   min-height: 0;

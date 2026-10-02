@@ -29,7 +29,7 @@ function presentStats(stats) {
     })) };
 }
 function presentFun(value) {
-  if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "趣味记录将在服务更新后开放" };
+  if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "" };
   const cards = value.cards.map(card => {
     const metrics = card.metrics.filter(row => !row.id.endsWith("aim_enemy")).map(row => ({ ...row,
       valueLabel: row.value === null ? "—" : String(row.count), rateLabel: row.rate === null ? "暂无机会" : row.rate.toFixed(1) + "%",

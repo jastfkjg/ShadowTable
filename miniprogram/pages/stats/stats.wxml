@@ -26,11 +26,11 @@
       </view>
       </block>
     </view>
-    <navigator class="stats-record-link" url="/pages/matches/matches" hover-class="fun-pressed">查看逐局结果与积分明细 ›</navigator>
+    <navigator class="stats-record-link" url="/pages/matches/matches" hover-class="fun-pressed">对局记录 ›</navigator>
     </block>
     <view wx:if="{{tab==='fun'}}" class="fun-content">
       <view wx:if="{{!stats.fun.available}}" class="muted">趣味记录将在服务更新后开放</view>
-      <view wx:elif="{{!stats.fun.cards.length}}" class="fun-empty muted">还没有趣味记录。结束对局时登记实际结束原因，或完成十二骑士技能后，记录会出现在这里。</view>
+      <view wx:elif="{{!stats.fun.cards.length}}" class="fun-empty muted">暂无趣味记录</view>
       <view wx:if="{{stats.fun.legacyGames}}" class="fun-note small muted">{{stats.fun.legacyGames}} 局旧对局未记录完整过程，缺失数据不按零次计算。</view>
       <view wx:for="{{stats.fun.cards}}" wx:for-item="card" wx:key="id" wx:if="{{funExpanded || 3 > index}}" class="fun-card">
         <view class="fun-heading"><text>{{card.title}}</text><view class="fun-heading-actions"><text class="small muted">{{card.modeLabel}}</text><button wx:if="{{card.shareMetric}}" class="share-entry-button" bindtap="shareFun" data-card="{{card.id}}" disabled="{{loading || error}}" hover-class="none" aria-label="分享{{card.title}}的{{card.shareLabel}}图片"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view></view>

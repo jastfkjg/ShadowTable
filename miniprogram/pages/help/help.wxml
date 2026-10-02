@@ -1,10 +1,5 @@
 <app-nav title="使用帮助" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page help-page">
-  <view class="help-intro">
-    <view class="help-eyebrow">桌边助手 · 使用帮助</view>
-    <view class="help-title">一起坐下，轻松开局</view>
-    <view class="help-copy">线下讨论，线上发牌、投票和结算。房主根据现场进度发起操作，大家按提示参与。</view>
-  </view>
   <view class="help-quick">
     <view class="help-heading">第一次使用</view>
     <view class="help-step"><text class="help-number">01</text><view><view class="help-step-title">加入牌桌</view><view class="help-copy">打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。</view></view></view>
@@ -29,7 +24,6 @@
   <view class="help-section help-boards">
     <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleBoards" aria-expanded="{{boardsExpanded}}"><view class="help-toggle-copy"><view class="help-heading">板子与角色</view><view class="help-caption">按玩法与人数，查看角色和规则</view></view><text aria-hidden="true">{{boardsExpanded?'−':'+'}}</text></button>
     <view wx:if="{{boardsExpanded}}" class="help-board-content">
-    <view class="help-copy">先了解玩法特色，再按人数查看角色与完整规则。各板子的线上操作与线下结算分工，以详情说明为准。</view>
     <view wx:if="{{loadingBoards}}" class="help-caption" role="status">正在加载板子介绍…</view>
     <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
     <view wx:elif="{{!boards.length}}" class="help-copy">暂无可用板子。</view>

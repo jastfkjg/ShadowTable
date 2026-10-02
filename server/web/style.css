@@ -1852,7 +1852,6 @@ button.nickname-done { width: auto; flex-shrink: 0; min-height: 48px; padding: 6
 button.avatar-style { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 6px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); background: transparent; font-size: .875rem; line-height: 1.5; white-space: nowrap; }
 button.avatar-style.is-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 button.avatar-style:not(:disabled):hover { color: var(--accent); }
-.avatar-library-count { margin-top: 10px; font-size: .75rem; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 10px 0 0; }
 .avatar-grid button.avatar-option { position: relative; width: 100%; min-width: 0; min-height: 68px; padding: 6px 2px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); scroll-margin-block: 72px 110px; }
 .avatar-option-image { display: block; width: 52px; height: 52px; max-width: 100%; object-fit: cover; border-radius: 50%; }
@@ -2026,6 +2025,7 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 .rank-row { min-height: 64px; padding-top: 12px; padding-bottom: 12px; }
 .rank-name { white-space: normal; overflow-wrap: anywhere; }
 .rank-filter-heading, .rank-rule-heading, .rank-details-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rank-filter-heading { justify-content: flex-end; }
 .rank-disclosure { flex-shrink: 0; width: auto; min-height: 44px; margin: 0; padding: 8px 0 8px 8px; color: var(--accent); font-size: 13px; }
 .rank-rule-detail { padding: 10px 12px; background: var(--surface); border-radius: 8px; }
 .fun-rank-filters { margin-bottom: 12px; }
