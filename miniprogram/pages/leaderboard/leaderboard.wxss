@@ -1,5 +1,5 @@
+@import "../../share-entry.wxss";
 .leaderboard-page { padding-top: 16rpx; padding-bottom: calc(180rpx + env(safe-area-inset-bottom)); }
-button.rank-share { width: 100%; min-height: 48px; margin: 0 0 12rpx; padding: 12rpx; color: var(--accent); font-size: 28rpx; }
 .rank-period { display: flex; gap: 8rpx; padding: 6rpx; background: var(--surface); border-radius: 20rpx; }
 .rank-period button { flex: 1 1 0%; width: 0; min-width: 0; margin: 0; min-height: 48px; padding: 12rpx; color: var(--muted); }
 .rank-period button.selected { color: var(--text); background: var(--bg); }
@@ -13,7 +13,9 @@ button.rank-metric.selected { color: var(--accent); }
 button.rank-metric.good.selected { color: var(--good); }
 button.rank-metric.evil.selected { color: var(--evil); }
 .rank-metric.selected .rank-metric-indicator { background: currentColor; }
-.rank-list-heading { display: flex; justify-content: space-between; gap: 20rpx; padding-bottom: 8rpx; }
+.rank-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding-bottom: 8rpx; }
+.rank-heading-label { display: flex; align-items: center; flex-shrink: 0; min-height: 28px; }
+.rank-heading-label button.share-entry-button, .rank-heading-label button.share-entry-button[disabled]:not([type]) { margin: -8px 0; }
 .rank-row { display: flex; align-items: center; gap: 20rpx; box-sizing: border-box; min-height: 128rpx; padding: 20rpx 16rpx; border-bottom: 1rpx solid rgba(177,191,198,.18); }
 .rank-row.is-self { background: var(--surface); border-radius: 16rpx; border-bottom-color: transparent; box-shadow: inset 3rpx 0 var(--accent); }
 .rank-number { flex-shrink: 0; width: 48rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2rpx; color: var(--muted); font-variant-numeric: tabular-nums; }

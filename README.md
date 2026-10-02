@@ -143,7 +143,7 @@ docs/             规则、架构、部署说明与 README 图片
 
 ## 部署与发布
 
-服务端采用单实例 Node.js + SQLite，使用 Docker Compose 部署；独立 Caddy 网关提供 HTTPS。仓库已提供 GitHub Actions 流程：推送 `main` 后执行验证、构建镜像并通过 SSH 部署，健康检查失败时回退应用镜像。
+服务端采用单实例 Node.js + SQLite，使用 Docker Compose 部署；独立 Caddy 网关提供 HTTPS。仓库已提供 GitHub Actions 流程：推送 `main` 后执行验证并构建镜像，再手动选择已验证的镜像通过 SSH 发布，健康检查失败时回退应用镜像。
 
 完整的服务器初始化、镜像仓库、Secrets、网关和备份配置见 [部署文档](docs/deployment.md)。环境变量示例见 [.env.example](.env.example) 和 [容器部署配置](deploy/cloud/app.env.example)。**Node 不会自动加载 `.env`，需由运行环境或 Compose 注入。**
 
@@ -168,6 +168,8 @@ NODE_ENV=production DEV_AUTH=0 DEV_PANEL=0 PORT=8787 npm start
 
 SQLite 仅由一个服务实例写入；备份使用 SQLite 在线备份或停服备份完整数据目录，不要在运行时仅复制主文件而遗漏 WAL。发布失败时的自动回退只恢复应用镜像，不恢复数据库。main 只运行 CI 并构建镜像；通过 GitHub Actions 的 Deploy tested image 手动选择目标和构建编号发布。
 
+服务已内置每日本机在线备份及日／周／月保留。准备牌桌默认 7 天无活动后进入 3 天宽限，结束牌桌保留 30 天，失效列表条目和操作回执保留 90 天；历史战绩、积分和进行中牌局保留。自动清理要求最近 48 小时内存在已校验备份。双端支持公共详情条件请求和空闲降频，网页补齐自动重连、未确认操作核对及恢复提示。配置、恢复与版本兼容要求见 [维护说明](docs/operations.md)。
+
 ## 个人页面
 
 底部“对局 / 我的”分别管理牌桌和个人资料；进入牌桌后隐藏底部导航，返回大厅保留座位。“我的”支持头像、昵称、胜负积分及趣味记录。点趣味次数可回查本人对应对局；排行榜提供积分、局数、胜率与趣味四类，趣味榜支持玩法、角色、次数／成功率及全部／本月筛选。资料沿用当前登录账号保存，不需要新增微信绑定；游客清除登录信息后无法自动找回。
@@ -189,6 +191,7 @@ SQLite 仅由一个服务实例写入；备份使用 SQLite 在线备份或停�
 | [规则原文快照](docs/sources/custom-boards.txt) | 自定义板子的参考原文                     |
 | [架构与接口](docs/architecture.md)             | 服务结构、数据模型与 API                 |
 | [部署指南](docs/deployment.md)                 | 容器、CI/CD、网关、备份及运维            |
+| [维护说明](docs/operations.md)                | 数据保留、本机备份、恢复与连接稳定性     |
 | [验证记录](docs/verification.md)               | 测试记录与真机验收                       |
 | [趣味记录](docs/fun-records.md)                | 指标口径、个人展示与荣誉榜               |
 

@@ -17,9 +17,8 @@
   <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
   <block wx:if="{{board}}">
-    <button wx:if="{{board.rows.length}}" class="rank-share" bindtap="shareLeaderboard" disabled="{{loading || loadingMore || error || visibilitySaving}}" hover-class="none">分享排名图片</button>
     <view wx:if="{{board.rows.length}}" class="rank-list">
-      <view class="rank-list-heading small muted"><text>排名 / 玩家</text><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
+      <view class="rank-list-heading small muted"><view class="rank-heading-label"><text>排名 / 玩家</text><button class="share-entry-button" bindtap="shareLeaderboard" disabled="{{loading || loadingMore || error || visibilitySaving}}" hover-class="none" aria-label="分享当前榜单图片"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
       <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
         <view class="rank-number rank-place-{{item.rank}}" aria-label="第{{item.rank}}名"><image wx:if="{{3 >= item.rank}}" class="rank-crown" src="/assets/rank-{{item.rank}}.svg" aria-hidden="true" /><text>{{item.rank}}</text></view>
         <image wx:if="{{item.avatarUrl}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true" />

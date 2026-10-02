@@ -48,8 +48,8 @@ compose stop app
 stopped=true
 mkdir -p /opt/shadowtable/backups
 backup="/opt/shadowtable/backups/$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$release").tgz"
-# The writer is stopped: archive the entire directory, including any WAL files.
-if ! compose run --rm --no-deps -T app tar -C /data -czf - . > "$backup.tmp"; then
+# The writer is stopped: include WAL, but not copies of the automatic snapshots.
+if ! compose run --rm --no-deps -T app tar -C /data --exclude=./backups -czf - . > "$backup.tmp"; then
     rm -f "$backup.tmp"
     exit 1
 fi

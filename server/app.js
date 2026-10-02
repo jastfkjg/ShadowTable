@@ -50,6 +50,8 @@ function createApp({
   adminKey = "",
   webOrigin = "",
   exchangeCode,
+  trustedProxies = "",
+  logger = console,
   clock = () => Date.now(),
 } = {}) {
   // Defense in depth: callers cannot enable development features in production.
@@ -76,7 +78,9 @@ function createApp({
       throw new Error("网页版必须使用 HTTPS");
     webHost = url.host;
   }
-  const store = new Store(database),
+  const clientAddress = require("./network").clientAddressResolver(trustedProxies);
+  const metrics = require("./network").createMetrics({ clock, logger });
+  const store = new Store(database, { clock }),
     limits = new Map();
   const leaderboard = new Leaderboard(store);
   function limit(key, max) {
@@ -133,6 +137,8 @@ function createApp({
         })
       : null;
   const server = http.createServer(async (req, res) => {
+    const began = clock();
+    res.once("finish", () => metrics.observe(res.statusCode, Math.max(0, clock() - began)));
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -157,8 +163,8 @@ function createApp({
       }
       if (web && web(req, res, path)) return;
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
-      // Per-account and login/create limits below remain unchanged.
-      limit(`ip:${req.socket.remoteAddress}`, 6000);
+      // Per-account read/write and login/create limits below apply independently.
+      limit(`ip:${clientAddress(req)}`, 6000);
       if (req.method === "GET" && path === "/api/scoring/rules")
         return send(200, scoreRules());
       const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
@@ -179,7 +185,7 @@ function createApp({
         req.method === "POST" &&
         ["/api/login", "/api/dev-login", "/api/guest-login"].includes(path)
       ) {
-        limit(`login:${req.socket.remoteAddress}`, 30);
+        limit(`login:${clientAddress(req)}`, 60);
         const b = await body(req);
         let uid;
         if (path === "/api/dev-login") {
@@ -218,7 +224,7 @@ function createApp({
         );
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
-      limit(`uid:${uid}`, 180);
+      limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
       if (path === "/api/me/profile" || path === "/api/me/leaderboard-visibility") {
@@ -287,7 +293,12 @@ function createApp({
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
         view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat) }));
-        return send(200, view);
+        store.touchRoom(room.code);
+        const encoded = JSON.stringify(view), etag = '"' + hash(uid + "\n" + encoded) + '"';
+        res.setHeader("ETag", etag);
+        // Authorization and the viewer-specific projection always precede conditional responses.
+        if (req.headers["if-none-match"] === etag) { res.writeHead(304); res.end(); return; }
+        return send(200, encoded, true);
       }
       check(
         req.method === "POST" &&
@@ -401,6 +412,8 @@ function createApp({
       });
     }
   });
+  const metricsTimer = setInterval(() => metrics.flush(), 60000); metricsTimer.unref();
+  server.on("close", () => clearInterval(metricsTimer));
   server.requestTimeout = 15000;
   return { server, store };
 }

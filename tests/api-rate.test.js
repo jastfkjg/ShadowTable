@@ -2,6 +2,30 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const fs = require("node:fs");
+test("小程序条件读取只复用同会话公开视图，304返回副本且私密/写请求不复用", async () => {
+  let token="one", calls=0; const headers=[], module={exports:{}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/api'),'utf8'),{module,require:()=>({baseUrl:'http://test'}),wx:{
+    getStorageSync:()=>token,removeStorageSync(){token='';},request(o){
+      headers.push(o.header);calls++;
+      o.success(calls===2?{statusCode:304}:{statusCode:200,data:{players:[{name:'甲'}]},header:{ETag:'"one"'}});
+    }
+  }});
+  const api=module.exports, original=await api.request('/api/rooms/123456');original.players[0].name='changed';
+  assert.equal((await api.request('/api/rooms/123456')).players[0].name,'甲');assert.equal(headers[1]['If-None-Match'],'"one"');
+  await api.request('/api/rooms/123456/private');assert.equal(headers[2]['If-None-Match'],undefined);
+  token='two';await api.request('/api/rooms/123456');assert.equal(headers[3]['If-None-Match'],undefined);
+  await api.request('/api/rooms/123456/commands','POST',{},api.requestId());
+  assert.match(headers[4]['Idempotency-Key'],/^v1_/);
+  await api.request('/api/rooms/123456');assert.equal(headers[5]['If-None-Match'],undefined);
+});
+test("小程序遵守超过60秒的Retry-After，旧401响应不能清掉新登录", async () => {
+  const module={exports:{}};let token='old',pending;
+  vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/api'),'utf8'),{module,require:()=>({baseUrl:'http://test'}),wx:{getStorageSync:()=>token,removeStorageSync(){token='';},request:o=>{pending=o;}}});
+  const request=module.exports.request('/api/me/rooms');token='new';pending.success({statusCode:401,data:{error:'过期'}});
+  await assert.rejects(request,e=>e.status===401);assert.equal(token,'new');
+  const limited=module.exports.request('/api/me/rooms');pending.success({statusCode:429,data:{error:'限流'},header:{'Retry-After':'120'}});
+  await assert.rejects(limited,e=>e.retryAfterMs===120000);
+});
 test("429冷却期间不再发请求，到期允许显式重试且保留幂等编号", async () => {
   let now = 0,
     calls = 0;

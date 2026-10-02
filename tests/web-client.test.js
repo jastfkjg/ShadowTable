@@ -4,8 +4,8 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const { newRoom, enter, command, publicView, BOARDS } = require("../server/engine");
 
-function client(fetch, storage = new Map([["session", "session"]]), layout) {
-  let scheduled;
+function client(fetch, storage = new Map([["session", "session"]]), layout, runtime = {}) {
+  let scheduled, scheduledDelay;
   const events = {};
   const scrolls = [], lookups = [];
   const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
@@ -14,18 +14,19 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
-    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener() {}, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
+    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
-    setTimeout(fn) { scheduled = fn; return 1; },
+    setTimeout(fn, delay) { scheduled = fn; scheduledDelay = delay; return 1; },
     clearTimeout() { scheduled = undefined; },
     URL, URLSearchParams, console,
+    ...runtime,
   };
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+    window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       setConfirm(fn) { confirm = fn; },
@@ -33,9 +34,99 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
       stop() { foreground = false; }
     };
   })();`, context);
-  return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled };
+  return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页慢请求十秒后中止，成功与失败均释放超时计时器', async () => {
+  const timers = new Map(); let next = 0, slow = true, signal;
+  const c = client(async (_url, options) => {
+    signal = options.signal;
+    if (!slow) return response({ ok: true });
+    return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(Object.assign(Error('aborted'), { name: 'AbortError' }))));
+  }, undefined, undefined, {
+    AbortController,
+    setTimeout(fn, delay) { const id = ++next; timers.set(id, { fn, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  });
+  const failed = assert.rejects(c.request('/api/rooms/123456'), /请求超时/);
+  const timer = [...timers.values()][0]; assert.equal(timer.delay, 10000);
+  timer.fn(); await failed; assert.equal(signal.aborted, true); assert.equal(timers.size, 0);
+  slow = false; assert.equal((await c.request('/api/rooms/123456')).ok, true);
+  assert.equal(signal.aborted, false); assert.equal(timers.size, 0);
+});
+test('网页并发登录复用一次请求，失败后仍可重新登录', async () => {
+  const storage = new Map(); let calls = 0, finish;
+  const c = client(() => { calls++; return new Promise(resolve => { finish = resolve; }); }, storage);
+  const first = c.login(), second = c.login();
+  assert.equal(calls, 1); finish({ status: 503, json: async () => ({ error: '暂时不可用' }) });
+  const results = await Promise.allSettled([first, second]);
+  assert.ok(results.every(result => result.status === 'rejected')); assert.equal(storage.has('session'), false);
+  const retry = c.login(); assert.equal(calls, 2);
+  finish(response({ token: 'new-session' })); await retry; assert.equal(storage.get('session'), 'new-session');
+});
+test('网页网络失败自动退避恢复，后台停止，恢复联网后立即同步', async () => {
+  const room = publicView(newRoom('123456','host','房主'),'host'); let reads=0;
+  const c=client(async()=>{ if (++reads===1) throw Error('offline'); return response(structuredClone(room)); });
+  Object.assign(c.state,{loading:false,boards:BOARDS});
+  await c.refresh().catch(c.handleError);
+  assert.equal(c.state.reconnecting,true); assert.equal(c.state.error,'');
+  assert.ok(c.scheduledDelay()>=800 && c.scheduledDelay()<=1000);
+  await c.scheduled()(); assert.equal(c.state.reconnecting,false); assert.equal(reads,2);
+  c.events['window:offline'](); await c.scheduled()(); assert.equal(reads,2);
+  c.events['window:online'](); await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reads,3); assert.equal(c.state.serverConnected,true);
+  c.document.hidden=true; c.events.visibilitychange(); assert.equal(c.scheduled(),undefined);
+});
+test('网页响应丢失后自动重试同一编号，重复点击不新增写入，最终只执行一次', async () => {
+  const room = publicView(newRoom('123456','host','房主'),'host'), writes=[], accepted=new Set();
+  const c=client(async(url,options)=>{
+    if(options.method==='POST') {
+      const id=options.headers['Idempotency-Key']; writes.push(id);
+      if(!accepted.has(id)) {accepted.add(id);throw Error('response lost');}
+      return response({accepted:true,code:'123456'});
+    }
+    return response(structuredClone(room));
+  });
+  Object.assign(c.state,{loading:false,boards:BOARDS,room});
+  await c.mutate('/api/rooms/123456/commands',{type:'ready',stage:room.stage,ready:true});
+  assert.equal(c.state.reconnecting,true); assert.equal(c.state.hasPendingRequest,true);
+  await c.mutate('/api/rooms/123456/commands',{type:'ready',stage:room.stage,ready:false});
+  assert.equal(writes.length,1);
+  await c.scheduled()();
+  assert.equal(writes.length,2); assert.equal(writes[0],writes[1]); assert.equal(accepted.size,1);
+  assert.equal(c.state.hasPendingRequest,false); assert.equal(c.state.reconnecting,false);
+});
+test('网页429遵守冷却，401停止自动恢复且不会悄悄创建游客身份', async () => {
+  let calls=0; const c=client(async()=>{calls++;return {status:401,json:async()=>({error:'登录失效'})};});
+  Object.assign(c.state,{loading:false,boards:BOARDS});
+  c.handleError(Object.assign(Error('限流'),{status:429,retryAfterMs:120000}));
+  assert.ok(c.scheduledDelay()>119000);
+  await c.recoverConnection(); assert.equal(calls,0);
+  c.handleError(Object.assign(Error('登录失效'),{status:401}));
+  assert.equal(c.state.needsLogin,true);assert.equal(c.state.reconnecting,false);
+  c.events['window:online'](); await c.recoverConnection(); assert.equal(calls,0);
+});
+test('网页闲置牌桌逐步降频，进行中牌桌保持2500ms', async () => {
+  const room = newRoom('123456','host','房主');
+  const c=client(async()=>response(publicView(room,'host')));
+  for(let n=0;n<14;n++)await c.refresh(); c.schedule(); assert.equal(c.scheduledDelay(),10000);
+  room.phase='tools'; await c.refresh(); c.schedule(); assert.equal(c.scheduledDelay(),2500);
+});
+test('网页仅缓存本人公开房间视图，304复用独立副本，写入和登录变化失效', async () => {
+  const storage=new Map([['session','one']]), headers=[];let calls=0;
+  const c=client(async(url,options)=>{
+    headers.push(options.headers);calls++;
+    if(calls===2)return {status:304};
+    return {...response({players:[{name:'甲'}]}),headers:{get:()=> '"view-one"'}};
+  },storage);
+  const first=await c.request('/api/rooms/123456');first.players[0].name='mutated';
+  assert.equal((await c.request('/api/rooms/123456')).players[0].name,'甲');
+  assert.equal(headers[1]['If-None-Match'],'"view-one"');
+  await c.request('/api/rooms/123456/private');assert.equal(headers[2]['If-None-Match'],undefined);
+  storage.set('session','two');await c.request('/api/rooms/123456');assert.equal(headers[3]['If-None-Match'],undefined);
+  await c.request('/api/rooms/123456/commands','POST',{},'same-request-number');
+  await c.request('/api/rooms/123456');assert.equal(headers[5]['If-None-Match'],undefined);
+});
 test('网页显示本人积分调整和原因，分页重试不重复，切换页面后不接收旧调整响应',async()=>{
   const row={id:'adjustment',created:1,delta:-2,beforePoints:4,afterPoints:2,reason:'<img src=x onerror=evil()>修正'};
   let requests=0,finish;

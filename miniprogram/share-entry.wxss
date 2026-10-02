@@ -1,0 +1,10 @@
+button.share-entry-button, button.share-entry-button[disabled]:not([type]) {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 44px; min-width: 44px; height: 44px; min-height: 44px;
+  margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: transparent; color: #b1bfc6; line-height: 1;
+}
+button.share-entry-button::after { border: 0; }
+button.share-entry-button[disabled] { opacity: .5; }
+button.share-entry-button:not([disabled]):active { opacity: .7; }
+.share-entry-icon { display: block; width: 20px; height: 20px; }

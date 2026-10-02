@@ -500,7 +500,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.foreground || !this.alive || (!this.roomCode && !this.data.reconnecting)) return;
     const delay = this.data.reconnecting
       ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, (this.reconnectAttempts || 1) - 1))) * (0.8 + Math.random() * 0.2)
-      : 2500;
+      : ["lobby", "ended", "terminated"].includes(this.data.room?.phase) ? Math.min(10000, 2500 * (1 + Math.floor((this.unchangedPolls || 0) / 4))) : 2500;
     this.timer = setTimeout(async () => {
       if (this.data.reconnecting) {
         if (this.data.network) await this.recoverConnection();
@@ -542,6 +542,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     )
       return;
     this.connectionRecovered();
+    const snapshot = JSON.stringify(room);
+    this.unchangedPolls = snapshot === this.lastRoomSnapshot ? (this.unchangedPolls || 0) + 1 : 0;
+    this.lastRoomSnapshot = snapshot;
     const stageChanged = this.data.room?.stage !== room.stage;
     const privacyChanged = stageChanged || this.data.room?.me.identityRevision !== room.me.identityRevision;
     // Haptic nudge on game-stage transitions; stronger when it is now our turn.

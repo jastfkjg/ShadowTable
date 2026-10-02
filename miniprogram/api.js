@@ -1,5 +1,7 @@
 const config = require("./config");
-let retryAt = 0;
+let retryAt = 0, cacheEpoch = 0;
+const roomCache = new Map();
+const copy = value => JSON.parse(JSON.stringify(value));
 function request(path, method = "GET", data, requestId) {
   if (Date.now() < retryAt)
     return Promise.reject(
@@ -8,6 +10,10 @@ function request(path, method = "GET", data, requestId) {
         retryAfterMs: retryAt - Date.now(),
       }),
     );
+  const token = wx.getStorageSync("session") || "";
+  const cacheKey = token + path, cacheable = method === "GET" && /^\/api\/rooms\/\d{6}$/.test(path);
+  if (method !== "GET") { roomCache.clear(); cacheEpoch++; }
+  const cached = cacheable && roomCache.get(cacheKey), epoch = cacheEpoch;
   return new Promise((resolve, reject) =>
     wx.request({
       url: config.baseUrl + path,
@@ -16,26 +22,34 @@ function request(path, method = "GET", data, requestId) {
       timeout: 10000,
       header: {
         "content-type": "application/json",
-        Authorization: "Bearer " + (wx.getStorageSync("session") || ""),
+        Authorization: "Bearer " + token,
+        ...(cached ? { "If-None-Match": cached.etag } : {}),
         ...(requestId ? { "Idempotency-Key": requestId } : {}),
       },
       success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) resolve(res.data);
+        if (res.statusCode === 304 && cached) { resolve(copy(cached.data)); return; }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const headers = res.header || {}, key = Object.keys(headers).find(k => k.toLowerCase() === "etag");
+          if (cacheable && headers[key] && epoch === cacheEpoch && token === (wx.getStorageSync("session") || "")) {
+            roomCache.set(cacheKey, { etag: headers[key], data: copy(res.data) });
+            if (roomCache.size > 4) roomCache.delete(roomCache.keys().next().value);
+          }
+          resolve(res.data);
+        }
         else {
-          const e = new Error(res.data.error || "请求失败");
+          const e = new Error(res.data?.error || "请求失败");
           e.status = res.statusCode;
           if (e.status === 429) {
             const headers = res.header || {};
             const key = Object.keys(headers).find(
               (k) => k.toLowerCase() === "retry-after",
             );
-            e.retryAfterMs = Math.min(
-              60000,
-              Math.max(1000, (Number(headers[key]) || 60) * 1000),
-            );
+            const value = headers[key], seconds = value == null ? NaN : Number(value);
+            const wait = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+            e.retryAfterMs = Math.max(1000, Number.isFinite(wait) ? wait : 60000);
             retryAt = Date.now() + e.retryAfterMs;
           }
-          if (e.status === 401) wx.removeStorageSync("session");
+          if (e.status === 401 && token === (wx.getStorageSync("session") || "")) { wx.removeStorageSync("session"); roomCache.clear(); cacheEpoch++; }
           reject(e);
         }
       },
@@ -59,7 +73,13 @@ function request(path, method = "GET", data, requestId) {
     }),
   );
 }
+let loginPromise;
 async function login() {
+  if (loginPromise) return loginPromise;
+  loginPromise = loginOnce();
+  try { return await loginPromise; } finally { loginPromise = null; }
+}
+async function loginOnce() {
   if (wx.getStorageSync("session")) return;
   const data = config.devAuth
     ? await request("/api/dev-login", "POST", {})
@@ -74,7 +94,7 @@ async function login() {
 }
 function requestId() {
   return (
-    Date.now().toString(36) +
+    "v1_" + Date.now().toString(36) +
     "_" +
     Math.random().toString(36).slice(2) +
     Math.random().toString(36).slice(2)

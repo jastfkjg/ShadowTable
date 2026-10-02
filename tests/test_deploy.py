@@ -37,6 +37,8 @@ args = sys.argv[1:]
 with open(os.environ['CALLS'], 'a') as f: f.write(json.dumps(args) + '\\n')
 mode = os.environ.get('FAIL_MODE', '')
 new = any('/new/' in x for x in args)
+if args[:2] == ['network', 'inspect']:
+    print(json.dumps([{'IPAM': {'Config': [{'Subnet': '172.28.0.0/16'}]}}]))
 if 'config' in args and 'json' in args:
     print(json.dumps({'services': {'app': {'environment': {'WEB_ORIGIN': os.environ.get('TEST_ORIGIN', 'https://table.example.com')}}}}))
 if 'pull' in args and mode == 'pull': sys.exit(1)

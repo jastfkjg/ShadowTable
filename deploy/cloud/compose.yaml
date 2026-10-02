@@ -12,6 +12,8 @@ services:
       DB_PATH: /data/shadowtable.sqlite
       DEV_AUTH: '0'
       DEV_PANEL: '0'
+      TRUSTED_PROXY_CIDRS: ${SHADOWTABLE_PROXY_CIDRS:?Use compose.sh to resolve the dedicated proxy network}
+      BACKUP_DIR: /data/backups
     volumes:
       - /opt/shadowtable/data:/data
     networks:

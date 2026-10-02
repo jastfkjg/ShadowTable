@@ -231,7 +231,9 @@
   }
 
   // ===== API =====
-  var retryAt = 0;
+  var retryAt = 0, cacheEpoch = 0;
+  const roomCache = new Map();
+  const copyResponse = value => JSON.parse(JSON.stringify(value));
   function request(path, method, data, id) {
     if (Date.now() < retryAt)
       return Promise.reject(
@@ -240,19 +242,31 @@
           retryAfterMs: retryAt - Date.now(),
         }),
       );
-    var headers = {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + (storage.get("session") || ""),
-    };
+    const token = storage.get("session") || "", cacheKey = token + path;
+    const cacheable = (!method || method === "GET") && /^\/api\/rooms\/\d{6}$/.test(path);
+    if (method && method !== "GET") { roomCache.clear(); cacheEpoch++; }
+    const cached = cacheable && roomCache.get(cacheKey), epoch = cacheEpoch;
+    var headers = { "Content-Type": "application/json", Authorization: "Bearer " + token };
+    if (cached) headers["If-None-Match"] = cached.etag;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 10000) : null;
     if (id) headers["Idempotency-Key"] = id;
     return fetch(path, {
       method: method || "GET",
+      ...(controller ? { signal: controller.signal } : {}),
       headers: headers,
       body: data !== undefined ? JSON.stringify(data) : undefined,
     })
       .then(function (response) {
-        if (response.status >= 200 && response.status < 300)
-          return response.json();
+        if (response.status === 304 && cached) return copyResponse(cached.data);
+        if (response.status >= 200 && response.status < 300) return response.json().then(payload => {
+          const etag = response.headers?.get("ETag");
+          if (cacheable && etag && epoch === cacheEpoch && token === (storage.get("session") || "")) {
+            roomCache.set(cacheKey, { etag, data: copyResponse(payload) });
+            if (roomCache.size > 4) roomCache.delete(roomCache.keys().next().value);
+          }
+          return payload;
+        });
         return response
           .json()
           .catch(function () {
@@ -262,28 +276,32 @@
             var err = new Error(payload.error || "请求失败");
             err.status = response.status;
             if (err.status === 429) {
-              var ra = Number(response.headers.get("Retry-After")) || 60;
-              err.retryAfterMs = Math.min(60000, Math.max(1000, ra * 1000));
+              const value = response.headers.get("Retry-After"), seconds = value == null ? NaN : Number(value);
+              const wait = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+              err.retryAfterMs = Math.max(1000, Number.isFinite(wait) ? wait : 60000);
               retryAt = Date.now() + err.retryAfterMs;
             }
-            if (err.status === 401) storage.remove("session");
+            if (err.status === 401 && token === (storage.get("session") || "")) { storage.remove("session"); roomCache.clear(); cacheEpoch++; }
             throw err;
           });
       })
       .catch(function (e) {
         if (e && e.status) throw e;
-        throw new Error("网络未确认，请检查连接后重试原请求");
-      });
+        throw new Error(e?.name === "AbortError" ? "请求超时，结果尚未确认，正在重试原请求" : "网络未确认，请检查连接后重试原请求");
+      }).finally(() => { if (timeout !== null) clearTimeout(timeout); });
   }
+  var loginPromise;
   function login() {
     if (storage.get("session")) return Promise.resolve();
-    return request("/api/guest-login", "POST", {}).then(function (data) {
+    if (loginPromise) return loginPromise;
+    loginPromise = request("/api/guest-login", "POST", {}).then(function (data) {
       storage.set("session", data.token);
-    });
+    }).finally(() => { loginPromise = null; });
+    return loginPromise;
   }
   function requestId() {
     return (
-      Date.now().toString(36) +
+      "v1_" + Date.now().toString(36) +
       "_" +
       Math.random().toString(36).slice(2) +
       Math.random().toString(36).slice(2)
@@ -300,7 +318,7 @@
   var pending = null;
   var timer = 0;
   var refreshSequence = 0;
-  var rateLimitUntil = 0;
+  var rateLimitUntil = 0, reconnectAttempts = 0, recovering = false, unchangedPolls = 0, lastRoomSnapshot = "";
   var promptedActionStage = null;
   var actionDraftStage = null;
   var toolStage = null;
@@ -316,6 +334,7 @@
     busy: false,
     error: "",
     recoverableError: false,
+    reconnecting: false,
     hasPendingRequest: false,
     notice: "",
     room: null,
@@ -837,18 +856,14 @@
       loadRooms().catch(handleError);
       return;
     }
-    if (e.status === 429) {
-      rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
-      if (!pending && roomCode) {
-        setState({
-          error: "",
-          notice: "请求较多，冷却后会自动刷新",
-          serverConnected: true,
-        });
-        schedule();
-        return;
-      }
+    if ((!e.status || e.status >= 500 || e.status === 429) && e.retryable !== false) {
+      reconnectAttempts++;
+      if (e.status === 429) rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
+      setState({ reconnecting: true, error: "", recoverableError: false, serverConnected: false, hasPendingRequest: !!pending,
+        notice: e.status === 429 && !pending ? "请求较多，冷却后会自动刷新" : "" });
+      schedule(); return;
     }
+    setState({ reconnecting: false });
     setState({
       error: e.message,
       serverConnected: !!e.status && e.status < 500 && e.status !== 401,
@@ -858,18 +873,31 @@
       hasPendingRequest: !!pending,
     });
   }
+  function connectionRecovered() {
+    reconnectAttempts = 0;
+    if (state.reconnecting || !state.serverConnected || !state.network || state.needsLogin)
+      setState({ reconnecting: false, serverConnected: true, network: true, needsLogin: false });
+  }
+  async function recoverConnection() {
+    if (!alive || !foreground || recovering || state.busy || state.loading || state.needsLogin || !state.network) return;
+    if (Date.now() < rateLimitUntil) { schedule(); return; }
+    recovering = true;
+    try { await retry(); } finally { recovering = false; schedule(); }
+  }
   function schedule() {
     clearTimeout(timer);
-    if (foreground && alive && roomCode)
-      timer = setTimeout(async function () {
-        try {
-          if (roomCode && !state.busy && !pending && !state.error) await refresh();
-        } catch (e) {
-          handleError(e);
-        } finally {
-          schedule();
-        }
-      }, Math.max(2500, (rateLimitUntil || 0) - Date.now()));
+    if (!foreground || !alive || (!roomCode && !state.reconnecting)) return;
+    const idle = ["lobby", "ended", "terminated"].includes(state.room?.phase);
+    const delay = state.reconnecting
+      ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, reconnectAttempts - 1))) * (.8 + Math.random() * .2)
+      : idle ? Math.min(10000, 2500 * (1 + Math.floor(unchangedPolls / 4))) : 2500;
+    timer = setTimeout(async function () {
+      try {
+        if (state.reconnecting) await recoverConnection();
+        else if (roomCode && !state.busy && !pending && !state.error && !recovering && state.network) await refresh();
+      } catch (e) { handleError(e); }
+      finally { schedule(); }
+    }, Math.max(delay, rateLimitUntil - Date.now()));
   }
   function clearRoom() {
     clearTimeout(timer);
@@ -952,7 +980,7 @@ function roomListItems(rooms) {
 }
   async function loadRooms() {
     var data = await request("/api/me/rooms");
-    if (alive) setState({ memberRooms: roomListItems(data.rooms), serverConnected: true });
+    if (alive) { connectionRecovered(); setState({ memberRooms: roomListItems(data.rooms), serverConnected: true }); }
   }
   function nicknameValue() {
     var el = document.getElementById("nickname");
@@ -1023,6 +1051,10 @@ function roomListItems(rooms) {
       throw e;
     }
     if (!alive || code !== roomCode || sequence !== refreshSequence) return;
+    connectionRecovered();
+    const snapshot = JSON.stringify(room);
+    unchangedPolls = snapshot === lastRoomSnapshot ? unchangedPolls + 1 : 0;
+    lastRoomSnapshot = snapshot;
     var stageChanged = state.room && state.room.stage !== room.stage;
     var privacyChanged = stageChanged || (state.room && state.room.me.identityRevision !== room.me.identityRevision);
     if (stageChanged)
@@ -1273,6 +1305,7 @@ function roomListItems(rooms) {
       await login();
       var result = await request(p.path, "POST", p.data, p.id);
       pending = null;
+      connectionRecovered();
       setState({
         serverConnected: true,
         hasPendingRequest: false,
@@ -3820,6 +3853,7 @@ function roomListItems(rooms) {
       viewActionDialog() +
       viewToolDialog() +
       viewResultDialog() +
+      (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
@@ -3834,6 +3868,7 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    recoverConnection: recoverConnection,
     toggleFunCards: () => setState({funExpanded:!state.funExpanded}),
     toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
@@ -4247,7 +4282,8 @@ function roomListItems(rooms) {
     } else {
       foreground = true;
       if (alive) {
-        if (roomCode) refresh().catch(handleError);
+        if (state.reconnecting || pending) recoverConnection();
+        else if (roomCode && !state.needsLogin) refresh().catch(handleError);
         schedule();
       }
     }
@@ -4259,6 +4295,8 @@ function roomListItems(rooms) {
   });
   window.addEventListener("online", function () {
     state.network = true;
+    if (state.reconnecting || pending) recoverConnection();
+    else if (roomCode && foreground && !state.needsLogin) refresh().catch(handleError);
     render();
   });
 
