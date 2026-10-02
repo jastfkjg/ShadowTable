@@ -1,8 +1,8 @@
 .stats-page { padding-top: 26rpx; }
 .stats-overview { border-radius: 24rpx; background: var(--surface); padding: 8rpx 28rpx 12rpx; }
 .stats-overview .personal-metrics { padding: 20rpx 0; gap: 12rpx; }
-.stats-overview .metric-value { font-size: 48rpx; line-height: 1.35; }
-.stats-breakdown { margin-top: 52rpx; }
+.stats-overview .metric-value { font-size: 44rpx; line-height: 1.35; }
+.stats-breakdown { margin-top: 32rpx; }
 button.stats-breakdown-toggle { width: 100%; min-height: 96rpx; margin: 0; padding: 0; justify-content: space-between; font-size: 33rpx; font-weight: 600; }
 .faction-group { border-bottom: 1rpx solid rgba(177,191,198,.22); }
 button.faction-toggle { width: 100%; min-height: 116rpx; margin: 0; padding: 22rpx 0; justify-content: space-between; gap: 18rpx; text-align: left; border-radius: 0; }
@@ -29,7 +29,7 @@ button.faction-toggle { width: 100%; min-height: 116rpx; margin: 0; padding: 22r
 .fun-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16rpx; margin: 24rpx 0; }
 .fun-metrics.three { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8rpx; }
 .fun-metric { display: block; padding: 12rpx 0; min-height: 48px; }
-.fun-number { font-size: 48rpx; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.4; }
+.fun-number { font-size: 44rpx; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.4; }
 .fun-number.good { color: var(--good); } .fun-number.evil { color: var(--evil); }
 .fun-bar { height: 12rpx; display: flex; overflow: hidden; border-radius: 8rpx; margin-bottom: 20rpx; background: var(--border); }
 .fun-bar-good { background: var(--good); } .fun-bar-evil { background: var(--evil); } .fun-bar-muted { background: var(--muted); }
@@ -39,3 +39,14 @@ button.fun-role-toggle { justify-content: space-between; min-height: 48px; paddi
 .fun-role { display: block; padding: 18rpx 20rpx; margin: 8rpx 0; background: var(--surface); border-radius: 12rpx; }
 
 .fun-pressed { background: var(--surface); }
+
+.stats-record-link { display: flex; align-items: center; min-height: 48px; margin-top: 24rpx; color: var(--accent); font-size: 28rpx; }
+.fun-card { padding: 28rpx; margin: 20rpx 0; border: 0; border-radius: 20rpx; background: var(--surface); }
+.fun-heading { align-items: flex-start; }
+.fun-heading > text:first-child { min-width: 0; overflow-wrap: anywhere; }
+.fun-heading > text:last-child { flex-shrink: 0; }
+.fun-metrics { margin: 16rpx 0; }
+.fun-number { overflow-wrap: anywhere; font-size: 40rpx; }
+.fun-caption { margin-bottom: 0; }
+button.fun-more { width: 100%; min-height: 48px; }
+.stats-tabs { margin: 20rpx 0; }

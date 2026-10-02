@@ -1,7 +1,7 @@
 const api = require("../../api");
 const { presentStats, backToMe, personalPreview } = require("../../profile");
 Page({
-  data: { loading: true, error: "", stats: null, overviewExpanded: false, tab: "records", funRoles: {} },
+  data: { loading: true, error: "", stats: null, overviewExpanded: true, funExpanded: false, funRulesExpanded: false, tab: "records", funRoles: {} },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
@@ -25,6 +25,8 @@ Page({
     catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
+  toggleFunCards() { this.setData({ funExpanded: !this.data.funExpanded }); },
+  toggleFunRules() { this.setData({ funRulesExpanded: !this.data.funRulesExpanded }); },
   toggleOverview() { this.setData({ overviewExpanded: !this.data.overviewExpanded }); },
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
   toggleFunRoles(e) { const id = e.currentTarget.dataset.id; this.setData({ funRoles: { ...this.data.funRoles, [id]: !this.data.funRoles[id] } }); },

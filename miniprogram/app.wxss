@@ -1491,6 +1491,37 @@ button.room-menu-action.danger[disabled]:not([type]) { margin-top: 24rpx; border
 .score-result .metric-value { font-size: 36rpx; }
 .score-award { display: flex; justify-content: space-between; gap: 24rpx; margin-top: 12rpx; font-size: 26rpx; }
 .score-reasons button.is-selected, .score-targets button.is-selected { border-color: var(--accent); color: var(--accent); outline: 4rpx solid var(--accent); outline-offset: -4rpx; }
-.error-dialog.score-dialog { height: 85vh; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; gap: 24rpx; }
+.error-dialog.score-dialog { height: 80vh; max-height: 1100rpx; overflow: hidden; display: flex; flex-direction: column; gap: 0; padding: 0; }
 .score-dialog .dialog-title, .score-dialog .dialog-actions { flex-shrink: 0; }
 .score-body { height: 0; min-height: 0; flex: 1; }
+
+/* Shared hierarchy for result selection, review and fixed actions. */
+.score-header { flex-shrink: 0; padding: 32rpx; border-bottom: 1rpx solid var(--border); }
+.score-step-label { margin-top: 8rpx; color: var(--accent); font-size: 26rpx; }
+.score-body { padding: 28rpx 32rpx; box-sizing: border-box; }
+.score-dialog .dialog-actions { padding: 24rpx 32rpx; border-top: 1rpx solid var(--border); }
+.score-dialog button { min-height: 48px; }
+.score-reasons button { width: 100%; justify-content: space-between; text-align: left; }
+button.score-other-toggle { width: 100%; padding: 12rpx 0; margin-top: 20rpx; justify-content: space-between; color: var(--muted); font-size: 28rpx; }
+.score-dialog .score-targets { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16rpx; margin-top: 24rpx; }
+.score-targets button.secondary { margin: 0; padding: 18rpx 8rpx; flex-direction: column; gap: 6rpx; min-height: 128rpx; }
+.score-player-name { font-size: 24rpx; overflow-wrap: anywhere; max-width: 100%; }
+.result-options button.is-selected { border-color: var(--accent); color: var(--accent); outline: 4rpx solid var(--accent); outline-offset: -4rpx; }
+.result-review-row { padding: 20rpx 0; border-bottom: 1rpx solid var(--border); display: flex; flex-direction: column; gap: 8rpx; overflow-wrap: anywhere; }
+.result-review-note { margin: 24rpx 0 16rpx; color: var(--accent); font-size: 28rpx; }
+.result-warning { color: var(--evil); margin-bottom: 16rpx; }
+.seat-number, .metric-value, .match-score { font-variant-numeric: tabular-nums; }
+@media (max-height: 500px) {
+  .error-dialog.score-dialog { max-width: 440px; font-size: 16px; }
+  .score-header { padding: 10px 16px; }
+  .score-header .dialog-title { font-size: 18px; }
+  .score-step-label { margin-top: 4px; font-size: 14px; }
+  .score-body { padding: 12px 16px; }
+  .score-dialog .small, .score-player-name { font-size: 13px; }
+  .score-dialog button { font-size: 16px; padding: 10px 12px; }
+  .score-dialog .dialog-actions { padding: 10px 16px; gap: 8px; }
+  .score-dialog .score-targets { gap: 8px; margin-top: 12px; }
+  .score-targets button.secondary { min-height: 64px; padding: 10px 4px; gap: 4px; }
+  .result-review-row { padding: 10px 0; gap: 4px; }
+  .result-review-note { margin: 12px 0 8px; font-size: 14px; }
+}

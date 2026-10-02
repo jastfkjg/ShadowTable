@@ -2,7 +2,7 @@ const api = require("../../api");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
 const { backToMe } = require("../../profile");
 Page({
-  data: { groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funActiveId: "", funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { mineExpanded: false, rulesExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funActiveId: "", funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, visible: false, visibilitySaving: false, visibilityError: "" },
   onLoad() { this.alive = true; },
   onShow() { return this.load(); },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; },
@@ -76,6 +76,10 @@ Page({
     if (!["all", "month"].includes(period) || period === this.data.period) return;
     return this.load(false, { period });
   },
+  toggleMine() { this.setData({ mineExpanded: !this.data.mineExpanded }); },
+  toggleRules() { this.setData({ rulesExpanded: !this.data.rulesExpanded }); },
+  toggleMetrics() { this.setData({ metricsExpanded: !this.data.metricsExpanded }); },
+  blockScroll() {},
   loadMore() { return this.load(true); },
   retry() { return this.load(this.data.moreError, this.failedSelection || {}); },
   async changeVisibility(e) {
@@ -91,7 +95,7 @@ Page({
       if (this.alive) await this.load();
     } catch (e) {
       if (e.status && e.status < 500 && ![401,429].includes(e.status)) this.visibilityPending = null;
-      if (this.alive) this.setData({ visible: !['hidden','unsupported'].includes(this.data.board.me.status), visibilityError: e.message });
+      if (this.alive) this.setData({ visible: !['hidden','unsupported'].includes(this.data.board.me.status), visibilityError: e.message, mineExpanded: true });
     } finally {
       if (this.alive) this.setData({ visibilitySaving: false });
     }

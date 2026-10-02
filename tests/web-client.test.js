@@ -880,16 +880,17 @@ test("网页战绩空态、错误重试与第三阵营结算选择", async () =>
   c.state.room = { stage: "s1", canUseTools: true, winnerOptions: [{value: "third", label: "盗贼阵营胜"}] };
   c.ACTIONS.finishTools();
   assert.match(c.viewResultDialog(), /盗贼阵营胜/);
-  assert.match(c.viewResultDialog(), /data-action="saveResult" disabled/);
+  assert.match(c.viewResultDialog(), /data-action="nextResult" disabled/);
   c.ACTIONS.pickResult({ dataset: { value: "third" } });
   assert.match(c.viewResultDialog(), /aria-pressed="true"/);
+  c.ACTIONS.nextResult();
   c.state.room.stage = "s2";
   await c.ACTIONS.saveResult();
   assert.match(c.state.error, /阶段已变化/);
   assert.equal(calls, 2);
   c.state.room = { stage: 'knight-stage', canUseTools: true, knights: {}, winnerOptions: [], scoreSettlement: [{ id: 'early_assassination', label: '三绿前提前盘刀', requiresTarget: true }], players: [{ seat: 1, name: '已出局', alive: false }, { seat: 2, name: '在场', alive: true }] };
   c.state.error = '';c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({ dataset: { id: 'early_assassination' } });
-  const knifeHtml = c.viewResultDialog();assert.match(knifeHtml, /三绿前提前盘刀/);
+  assert.match(c.viewResultDialog(), /三绿前提前盘刀/);c.ACTIONS.nextResult();const knifeHtml = c.viewResultDialog();
   assert.doesNotMatch(knifeHtml, /data-seat="1"/);assert.match(knifeHtml, /data-seat="2"/);assert.match(knifeHtml, /data-seat="0"/);
 });
 
@@ -958,9 +959,9 @@ test('网页排行榜可深链，私密资料不公开，输出转义昵称并�
   const c=client(async()=>response(webRanks()));
   await c.applyRoute('#/leaderboard');
   assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
-  const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第 1 名/);
+  const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第<\/span>1<span/);
   for (const [metric,label] of [['games','总局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']]) {
-    c.state.rankBoard=webRanks(metric);
+    c.state.rankBoard=webRanks(metric);c.state.rankMineExpanded=true;
     const footer=c.viewLeaderboard().split('<aside class="rank-mine"')[1];
     assert.match(footer,/我的名次/);assert.ok(footer.includes(label));
     assert.match(footer,/rank-mine-place/);assert.doesNotMatch(footer,/胜 ·/);
@@ -1066,14 +1067,53 @@ test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应�
   const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})});});
   const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
   await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
+  c.ACTIONS.rankToggleMine();
   assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
   const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人（非梅林） · 成功挡刀/);assert.match(html,/轮内刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
-  assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
+  c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
 });
 test('网页不计积分的骑士终局必须选实际带刀人，切换带刀人排除自刀目标',async()=>{
   const c=client(async()=>response({}));c.state.room={canUseTools:true,stage:'fun-stage',knights:{},scoreSettlement:[],funSettlement:[{id:'early_assassination',label:'提前盘刀',requiresTarget:true}],players:[{seat:1,name:'<甲>'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}]};
-  c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'early_assassination'}});c.ACTIONS.pickScoreTarget({dataset:{seat:2}});
-  assert.match(c.viewResultDialog(),/实际带刀人/);assert.match(c.viewResultDialog(),/data-action="saveResult" disabled/);assert.doesNotMatch(c.viewResultDialog(),/data-seat="3"/);
-  c.ACTIONS.pickFunActor({dataset:{seat:2}});assert.equal(c.state.resultTarget,null);assert.match(c.viewResultDialog(),/pickScoreTarget" disabled data-seat="2"/);assert.match(c.viewResultDialog(),/1号 · &lt;甲&gt;/);assert.doesNotMatch(c.viewResultDialog(),/&amp;lt;/);
+  c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'early_assassination'}});c.ACTIONS.pickScoreTarget({dataset:{seat:2}});c.ACTIONS.nextResult();
+  assert.match(c.viewResultDialog(),/实际带刀人/);assert.match(c.viewResultDialog(),/data-action="nextResult" disabled/);assert.doesNotMatch(c.viewResultDialog(),/data-seat="3"/);
+  c.ACTIONS.pickFunActor({dataset:{seat:2}});assert.equal(c.state.resultTarget,null);c.ACTIONS.nextResult();assert.match(c.viewResultDialog(),/pickScoreTarget" disabled data-seat="2"/);assert.match(c.viewResultDialog(),/1号<\/span><span class="score-player-name">&lt;甲&gt;/);assert.doesNotMatch(c.viewResultDialog(),/&amp;lt;/);
+});
+
+test('个人趣味入口正常渲染且仍转义动态文字，排名详情按需打开', async () => {
+  const c = client(async () => response(webRanks()));
+  c.state.profile = {nickname:'林间',identityType:'wx'};
+  c.state.stats = {total:1,wins:1,winRate:100,fun:{teaser:'<img src=x onerror=attack()>战报'}};
+  const html = c.viewMe();
+  assert.match(html, /data-page="stats\?tab=fun"/);
+  assert.doesNotMatch(html, /&lt;span|<img src=x/);
+  assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;战报/);
+  await c.applyRoute('#/leaderboard');
+  assert.doesNotMatch(c.viewLeaderboard(), /role="switch"/);
+  c.ACTIONS.rankToggleMine();
+  assert.match(c.viewLeaderboard(), /role="dialog"[^>]*aria-label="我的排名与公开设置"/);
+  assert.match(c.viewLeaderboard(), /role="switch"/);
+  c.ACTIONS.rankToggleMine();
+  assert.doesNotMatch(c.viewLeaderboard(), /rank-details-dialog/);
+});
+
+test('网页分步结算保留返回草稿，取消终确认不提交，重复确认只写一次', async () => {
+  const writes = [];
+  const c = client(async (url,options) => { if(options.method==='POST') writes.push(JSON.parse(options.body)); return response({}); });
+  c.setRefresh(async()=>{});
+  c.state.room={code:'123456',stage:'flow',canUseTools:true,knights:{},scoreSettlement:[{id:'early',label:'提前盘刀',requiresTarget:true}],funSettlement:[],players:[{seat:1,name:'甲'},{seat:2,name:'乙'}],winnerOptions:[{value:'good',label:'好人胜'}]};
+  c.ACTIONS.finishTools();
+  c.ACTIONS.nextResult();assert.equal(c.state.resultStep,'reason');
+  c.ACTIONS.pickScoreReason({dataset:{id:'early'}});c.ACTIONS.nextResult();assert.equal(c.state.resultStep,'actor');
+  c.ACTIONS.nextResult();assert.equal(c.state.resultStep,'actor');
+  c.ACTIONS.pickFunActor({dataset:{seat:1}});c.ACTIONS.nextResult();
+  c.ACTIONS.pickScoreTarget({dataset:{seat:1}});assert.equal(c.state.resultTarget,null);
+  c.ACTIONS.pickScoreTarget({dataset:{seat:2}});c.ACTIONS.nextResult();assert.equal(c.state.resultStep,'review');
+  assert.match(c.viewResultDialog(),/实际带刀人/);assert.match(c.viewResultDialog(),/1号 · 甲/);
+  c.ACTIONS.backResult();assert.equal(c.state.resultTarget,2);c.ACTIONS.nextResult();
+  c.setConfirm(async()=>false);await c.ACTIONS.saveResult();assert.equal(writes.length,0);assert.equal(c.state.resultDialog,true);assert.equal(c.state.resultStep,'review');
+  let release; c.setConfirm(()=>new Promise(resolve=>{release=resolve;}));
+  const first=c.ACTIONS.saveResult();await c.ACTIONS.saveResult();release(true);await first;
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes.length,1);assert.equal(writes[0].scoreReason,'early');assert.equal(writes[0].funActor,1);assert.equal(writes[0].scoreTarget,2);
 });

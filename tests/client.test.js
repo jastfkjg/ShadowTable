@@ -887,6 +887,7 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     await host.finishTools();
     assert.equal(host.data.resultDialog, true);
     host.pickResult({ currentTarget: { dataset: { value: "evil" } } });
+    host.nextResult();
     await host.saveResult();
     await settle(host);
     assert.equal(host.data.room.phase, "ended");
@@ -1841,11 +1842,13 @@ test("小程序胜负登记取消及阶段过期不提交", async () => {
   await p.saveResult();
   assert.equal(writes, 0);
   p.pickResult({ currentTarget: { dataset: { value: "good" } } });
+  p.nextResult();
   p.confirm = async () => false;
   await p.saveResult();
   assert.equal(writes, 0);
   p.finishTools();
   p.pickResult({ currentTarget: { dataset: { value: "good" } } });
+  p.nextResult();
   p.data.room.stage = "s2";
   p.confirm = async () => true;
   await p.saveResult();

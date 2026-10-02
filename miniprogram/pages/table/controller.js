@@ -1,5 +1,31 @@
 const api = require("../../api");
 const { selectTab } = require("../../tab-navigation");
+function resultFlow(data) {
+  const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
+  const reason = reasons.find(item => item.id === data.resultReason);
+  const option = (room.winnerOptions || []).find(item => item.value === data.resultChoice);
+  const players = (room.players || []).filter(player => player.alive !== false);
+  const actor = players.find(player => player.seat === data.resultActor);
+  const target = players.find(player => player.seat === data.resultTarget);
+  const needsActor = !!(reason?.requiresTarget && room.knights && room.funSettlement);
+  const steps = [{ id: "reason", label: "结束原因" }];
+  if (needsActor) steps.push({ id: "actor", label: "实际带刀人" });
+  if (reason?.requiresTarget) steps.push({ id: "target", label: "实际刺杀目标" });
+  steps.push({ id: "review", label: "核对结果" });
+  const step = steps.findIndex(item => item.id === data.resultStep);
+  const index = Math.max(0, step), current = steps[index];
+  const selected = !!reason || !!option || data.resultChoice === "none";
+  const actorValid = !needsActor || !!actor;
+  const targetValid = !reason?.requiresTarget || data.resultTarget === 0 || !!target && (!needsActor || target.seat !== actor?.seat);
+  const ready = selected && actorValid && targetValid;
+  const summary = [{ label: reason ? "结束原因" : "登记方式", value: reason?.label || (option ? "仅登记胜方 · " + option.label : "不计战绩") }];
+  if (needsActor) summary.push({ label: "实际带刀人", value: actor ? actor.seat + "号 · " + actor.name : "尚未选择" });
+  if (reason?.requiresTarget) summary.push({ label: "实际刺杀目标", value: data.resultTarget === 0 ? "空刀" : target ? target.seat + "号 · " + target.name : "尚未选择" });
+  const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。" : "仅保存胜负，不计积分；缺失的趣味结果保留未知。";
+  return { resultSteps: steps, resultStep: current.id, resultStepIndex: index, resultStepTitle: current.label,
+    resultNextEnabled: current.id === "reason" ? selected : current.id === "actor" ? actorValid : current.id === "target" ? targetValid : ready,
+    resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
+}
 function roomListItems(rooms) {
   return rooms.map(r => {
     const time = r.updatedAt ? new Date(r.updatedAt) : null;
@@ -1342,24 +1368,51 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   finishTools() {
     if (!this.data.room?.canUseTools || this.data.busy || this.pending) return;
     this.resultStage = this.data.room.stage;
-    this.setData({ resultDialog: true, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false });
+    this.setResultDraft({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false });
   },
   closeResult() { if (!this.data.busy) this.setData({ resultDialog: false }); },
-  pickResult(e) { this.setData({ resultChoice: e.currentTarget.dataset.value, resultReason: "", resultRequiresTarget: false, resultTarget: null }); },
+  setResultDraft(patch = {}) { this.setData({ ...patch, ...resultFlow({ ...this.data, ...patch }) }); },
+  toggleResultOther() { this.setData({ resultOther: !this.data.resultOther }); },
+  nextResult() {
+    if (this.data.busy || this.pending || !this.data.resultDialog) return;
+    if (this.data.room?.stage !== this.resultStage) { this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" }); return; }
+    const flow = resultFlow(this.data);
+    if (flow.resultNextEnabled && flow.resultStep !== "review") this.setResultDraft({ resultStep: flow.resultSteps[flow.resultStepIndex + 1].id });
+  },
+  backResult() {
+    if (this.data.busy || this.pending) return;
+    const flow = resultFlow(this.data);
+    if (flow.resultStepIndex) this.setResultDraft({ resultStep: flow.resultSteps[flow.resultStepIndex - 1].id });
+    else this.closeResult();
+  },
+  pickResult(e) {
+    const value = e.currentTarget.dataset.value;
+    if (value !== "none" && !this.data.room?.winnerOptions?.some(item => item.value === value)) return;
+    this.setResultDraft({ resultChoice: value, resultReason: "", resultRequiresTarget: false, resultTarget: null, resultActor: null });
+  },
   pickScoreReason(e) {
     const room = this.data.room;
     const reason = (room?.scoreSettlement?.length ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === e.currentTarget.dataset.id);
-    if (reason) this.setData({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
+    if (reason) this.setResultDraft({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
   },
-  pickScoreTarget(e) { this.setData({ resultTarget: Number(e.currentTarget.dataset.seat) }); },
-  pickFunActor(e) { this.setData({ resultActor: Number(e.currentTarget.dataset.seat), ...(Number(e.currentTarget.dataset.seat) === this.data.resultTarget ? { resultTarget: null } : {}) }); },
+  pickScoreTarget(e) {
+    const seat = Number(e.currentTarget.dataset.seat), room = this.data.room;
+    if (seat !== 0 && !room?.players?.some(player => player.seat === seat && player.alive !== false)) return;
+    if (room?.knights && this.data.resultActor === seat) return;
+    this.setResultDraft({ resultTarget: seat });
+  },
+  pickFunActor(e) {
+    const seat = Number(e.currentTarget.dataset.seat);
+    if (!this.data.room?.players?.some(player => player.seat === seat && player.alive !== false)) return;
+    this.setResultDraft({ resultActor: seat, ...(seat === this.data.resultTarget ? { resultTarget: null } : {}) });
+  },
   viewScoreRecord() { wx.navigateTo({ url: "/pages/matches/matches?scored=1" }); },
   viewFunRecord() { wx.navigateTo({ url: "/pages/stats/stats?tab=fun" }); },
   async saveResult() {
     const room = this.data.room, choice = this.data.resultChoice;
     const scoring = !!room?.scoreSettlement?.length;
     const reason = (scoring ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === this.data.resultReason);
-    if (!this.data.resultDialog || (!choice && !reason) || this.data.busy || this.pending) return;
+    if (!this.data.resultDialog || this.data.resultStep !== "review" || !resultFlow(this.data).resultReady || (!choice && !reason) || this.data.busy || this.pending || this.resultConfirming) return;
     if (reason?.requiresTarget && !Number.isInteger(this.data.resultTarget)) return;
     if (reason?.requiresTarget && room.knights && room.funSettlement && !Number.isInteger(this.data.resultActor)) return;
     if (!room || room.stage !== this.resultStage) {
@@ -1371,14 +1424,17 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const target = this.data.resultTarget;
     const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(room.knights && room.funSettlement ? { funActor: this.data.resultActor } : {}) } : {}) }
       : { winner: choice === "none" ? null : choice };
-    this.setData({ resultDialog: false });
-    return this.confirmCommand("确认结束本局？",
-      (reason ? "登记「" + reason.label + "」" + (reason.requiresTarget ? "，" + (target === 0 ? "空刀" : "刺杀" + target + "号") : "") + (scoring ? "。结束后结算本人积分与趣味记录。" : "。结束后归档胜负与趣味记录，本局不计积分。")
-        : option ? "登记为「" + option.label + "」，未填写计分依据，不计积分。" : "本局不计战绩及积分。") +
-      "胜负确认后将归档，不能直接修改。" +
-      (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),
-      "finishTools", { replace: true, ...details });
+    const flow = resultFlow(this.data), stage = room.stage;
+    this.resultConfirming = true;
+    try {
+      const confirmed = await this.confirm("确认结束本局？", flow.resultSummary.map(row => row.label + "：" + row.value).join("\n") + "\n" + flow.resultNotice + "\n胜负确认后将归档，不能直接修改。" + (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""));
+      if (!confirmed) return;
+      if (!this.foreground || this.data.room?.stage !== stage || this.data.busy || this.pending) { this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" }); return; }
+      this.setData({ resultDialog: false });
+      return this.cmd("finishTools", { replace: true, ...details });
+    } finally { this.resultConfirming = false; }
   },
+
   async start() {
     return this.confirmCommand(
       "开始这一局？",

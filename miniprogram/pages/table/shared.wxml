@@ -208,23 +208,37 @@
   <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button hover-class="none" class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
   <view wx:if="{{notice}}" class="notice">{{notice}}</view>
   <view wx:if="{{resultDialog && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-    <view class="error-dialog score-dialog" role="dialog" aria-modal="true" aria-label="登记本局胜负">
-      <view class="dialog-title">登记本局胜负</view>
-      <scroll-view scroll-y class="score-body">
-      <view class="small muted">请与同桌玩家确认胜方。不确定胜负时，请选择不计战绩。</view>
-      <view wx:if="{{room.scoreSettlement.length}}" class="score-reasons">
-        <button wx:for="{{room.scoreSettlement}}" wx:key="id" hover-class="none" class="secondary {{resultReason===item.id?'is-selected':''}}" data-id="{{item.id}}" bindtap="pickScoreReason" aria-pressed="{{resultReason===item.id}}">{{item.label}}</button>
-      </view>
-      <view wx:elif="{{room.funSettlement.length}}" class="score-reasons"><button wx:for="{{room.funSettlement}}" wx:key="id" hover-class="none" class="secondary {{resultReason===item.id?'is-selected':''}}" data-id="{{item.id}}" bindtap="pickScoreReason" aria-pressed="{{resultReason===item.id}}">{{item.label}}</button></view>
-      <view wx:if="{{resultRequiresTarget && room.knights && room.funSettlement}}" class="score-targets"><view class="label">实际带刀人</view><view class="capacity-grid"><button wx:for="{{room.players}}" wx:if="{{item.alive !== false}}" wx:key="seat" hover-class="none" class="secondary {{resultActor===item.seat?'is-selected':''}}" bindtap="pickFunActor" data-seat="{{item.seat}}" aria-pressed="{{resultActor===item.seat}}">{{item.seat}}号 · {{item.name}}</button></view></view>
-      <view wx:if="{{resultRequiresTarget}}" class="score-targets"><view class="label">实际刺杀目标</view><view class="capacity-grid"><button wx:for="{{room.players}}" wx:if="{{item.alive !== false}}" wx:key="seat" hover-class="none" class="secondary {{resultTarget===item.seat?'is-selected':''}}" bindtap="pickScoreTarget" disabled="{{room.knights && resultActor===item.seat}}" data-seat="{{item.seat}}" aria-pressed="{{resultTarget===item.seat}}">{{item.seat}}号 · {{item.name}}</button><button hover-class="none" class="secondary {{resultTarget===0?'is-selected':''}}" bindtap="pickScoreTarget" data-seat="0" aria-pressed="{{resultTarget===0}}">空刀</button></view></view>
-      <view class="small muted">{{(room.scoreSettlement.length || room.funSettlement.length)?'信息不完整时可仅登记胜方，缺失的趣味结果保留未知；以下选项不计积分。':room.scoreNotice}}</view>
-      <view class="result-options">
-        <button hover-class="none" wx:for="{{room.winnerOptions}}" wx:key="value" class="secondary {{resultChoice===item.value?'is-selected':''}}" data-value="{{item.value}}" bindtap="pickResult" aria-pressed="{{resultChoice===item.value}}">{{item.label}}</button>
-        <button hover-class="none" class="secondary {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}">不计战绩</button>
-      </view>
+    <view class="error-dialog score-dialog" role="dialog" aria-modal="true" aria-label="登记本局结果">
+      <view class="score-header"><view class="dialog-title">登记本局结果</view><view class="score-step-label" role="status">{{resultStepIndex+1}} / {{resultSteps.length}} · {{resultStepTitle}}</view></view>
+      <scroll-view scroll-y class="score-body" scroll-top="{{resultStepIndex % 2}}">
+        <block wx:if="{{resultStep==='reason'}}">
+          <view class="small muted">按实际发生的情况登记，请先与同桌玩家确认。</view>
+          <view class="score-reasons">
+            <button wx:for="{{room.scoreSettlement.length ? room.scoreSettlement : room.funSettlement}}" wx:key="id" hover-class="none" class="secondary {{resultReason===item.id?'is-selected':''}}" data-id="{{item.id}}" bindtap="pickScoreReason" aria-pressed="{{resultReason===item.id}}">{{item.label}}<text wx:if="{{resultReason===item.id}}" aria-hidden="true"> ✓</text></button>
+          </view>
+          <button wx:if="{{room.scoreSettlement.length || room.funSettlement.length}}" class="disclosure-button score-other-toggle" bindtap="toggleResultOther" aria-expanded="{{resultOther}}" hover-class="none">其他登记方式 <text>{{resultOther?'收起':'展开'}}</text></button>
+          <view wx:if="{{resultOther || (!room.scoreSettlement.length && !room.funSettlement.length)}}" class="result-options">
+            <view class="small muted">信息不完整时可仅登记胜方；不确定胜负时选“不计战绩”。以下选项不计积分。</view>
+            <button wx:for="{{room.winnerOptions}}" wx:key="value" class="secondary {{resultChoice===item.value?'is-selected':''}}" data-value="{{item.value}}" bindtap="pickResult" aria-pressed="{{resultChoice===item.value}}" hover-class="none">仅登记胜方 · {{item.label}}</button>
+            <button class="secondary {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}" hover-class="none">不计战绩</button>
+          </view>
+        </block>
+        <block wx:if="{{resultStep==='actor' || resultStep==='target'}}">
+          <view class="small muted">{{resultStep==='actor'?'选择线下实际执行最终刺杀的玩家。':'选择线下实际刺杀的目标；未指定目标请选择空刀。'}}</view>
+          <view class="score-targets capacity-grid">
+            <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='actor'}}" class="secondary {{resultActor===item.seat?'is-selected':''}}" bindtap="pickFunActor" data-seat="{{item.seat}}" aria-pressed="{{resultActor===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
+            <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===item.seat?'is-selected':''}}" bindtap="pickScoreTarget" disabled="{{room.knights && resultActor===item.seat}}" data-seat="{{item.seat}}" aria-pressed="{{resultTarget===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
+            <button wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===0?'is-selected':''}}" bindtap="pickScoreTarget" data-seat="0" aria-pressed="{{resultTarget===0}}" hover-class="none">空刀</button>
+          </view>
+        </block>
+        <block wx:if="{{resultStep==='review'}}">
+          <view class="result-review"><view wx:for="{{resultSummary}}" wx:key="label" class="result-review-row"><text class="small muted">{{item.label}}</text><text>{{item.value}}</text></view></view>
+          <view class="result-review-note">{{resultNotice}}</view>
+          <view wx:if="{{room.hasActiveOperation}}" class="result-warning">当前未结算的操作将作废。</view>
+          <view class="small muted">确认后归档；如有填写错误，可返回上一步修改。</view>
+        </block>
       </scroll-view>
-      <view class="dialog-actions"><button hover-class="none" class="secondary" bindtap="closeResult">取消</button><button hover-class="none" class="primary" bindtap="saveResult" disabled="{{(!resultChoice && !resultReason) || (resultRequiresTarget && resultTarget===null) || (resultRequiresTarget && room.knights && room.funSettlement && resultActor===null) || busy || hasPendingRequest}}">确认胜负并结束</button></view>
+      <view class="dialog-actions"><button class="secondary" bindtap="backResult" disabled="{{busy || hasPendingRequest}}" hover-class="none">{{resultStep==='reason'?'取消':'上一步'}}</button><button wx:if="{{resultStep!=='review'}}" class="primary" bindtap="nextResult" disabled="{{!resultNextEnabled || busy || hasPendingRequest}}" hover-class="none">下一步</button><button wx:else class="primary" bindtap="saveResult" disabled="{{!resultReady || busy || hasPendingRequest}}" hover-class="none">确认并结束</button></view>
     </view>
   </view>
   <block wx:if="{{isLobby}}">

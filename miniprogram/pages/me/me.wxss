@@ -46,7 +46,7 @@
 .me-stats-panel .metric-value { font-size: 44rpx; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
 .me-stats-panel .small { margin-top: 8rpx; font-size: 24rpx; }
 
-.me-links { margin-top: 48rpx; border-top: 0; }
+.me-links { margin-top: 24rpx; border-top: 0; }
 .me-links .personal-link {
   position: relative;
   display: flex;
@@ -103,3 +103,16 @@
 .me-points .me-results-detail { min-height: 48px; }
 .score-overview { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding-top: 16rpx; }
 .score-overview .metric-value { font-size: 44rpx; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* A single overview keeps totals together; deeper records have their own destinations. */
+.me-overview { margin-top: 24rpx; padding: 0 28rpx; background: var(--surface); border-radius: 24rpx; }
+.me-overview .me-results, .me-overview .me-points { margin: 0; padding: 20rpx 0 24rpx; border-radius: 0; background: transparent; }
+.me-overview .me-points { border-top: 1rpx solid var(--me-divider); padding-top: 8rpx; }
+.me-overview .me-stats-panel { padding-top: 16rpx; }
+.me-overview .score-overview { padding-top: 0; gap: 16rpx; }
+.me-results-heading .me-results-detail { min-height: 48px; }
+.me-overview .metric-value { font-size: 44rpx; font-variant-numeric: tabular-nums; }
+.me-links-secondary { margin-top: 16rpx; border-top: 1rpx solid var(--me-divider); }
+.me-links .personal-link { padding-left: 16rpx; padding-right: 16rpx; }
+.me-link-copy .small { font-size: 24rpx; margin-top: 4rpx; }
+.me-icon-spark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z'/%3E%3C/svg%3E"); }

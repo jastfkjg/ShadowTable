@@ -834,14 +834,14 @@ test("技能网格独立选择，底部确认默认禁用并显示明确目标",
 
 test("结算需要主动选择胜方，支持第三阵营；零有效局不显示0%", () => {
   const room = { code: "123456", phase: "tools", capacity: 12, canUseTools: true, me: { isHost: true }, team: [], winnerOptions: [{ value: "good", label: "好人胜" }, { value: "evil", label: "坏人胜" }, { value: "third", label: "盗贼阵营胜" }] };
-  const dialog = render({ ...base, room, resultDialog: true, resultChoice: "" });
-  assert.equal(byHandler(dialog, "saveResult").attr.disabled, true);
+  const dialog = render({ ...base, room, resultDialog: true, resultStep: "reason", resultChoice: "" });
+  assert.equal(byHandler(dialog, "nextResult").attr.disabled, true);
   assert.match(JSON.stringify(dialog), /盗贼阵营胜|不计战绩/);
-  assert.equal(byHandler(render({ ...base, room, hasPendingRequest: false, resultDialog: true, resultChoice: "third" }), "saveResult").attr.disabled, false);
+  assert.equal(byHandler(render({ ...base, room, hasPendingRequest: false, resultDialog: true, resultStep: "review", resultReady: true, resultChoice: "third" }), "saveResult").attr.disabled, false);
   const knightRoom = { ...room, knights: {}, scoreSettlement: [{ id: 'early_assassination', label: '三绿前提前盘刀', requiresTarget: true }], players: [{ seat: 1, name: '已出局', alive: false }, { seat: 2, name: '在场', alive: true }] };
-  const knifeDialog = render({ ...base, room: knightRoom, resultDialog: true, resultReason: 'early_assassination', resultRequiresTarget: true, resultTarget: null });
+  const knifeDialog = render({ ...base, room: knightRoom, resultDialog: true, resultStep:'target',resultStepTitle:'实际刺杀目标',resultPlayers:knightRoom.players.filter(p=>p.alive!==false), resultReason: 'early_assassination', resultRequiresTarget: true, resultTarget: null });
   assert.deepEqual(nodes(knifeDialog).filter(n => n.attr?.bindtap === 'pickScoreTarget').map(n => Number(n.attr['data-seat'])), [2, 0]);
-  assert.match(JSON.stringify(knifeDialog), /三绿前提前盘刀/);
+  assert.match(JSON.stringify(knifeDialog), /实际刺杀目标/);
   const stats = factory("pages/stats/stats.wxml")({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
   assert.doesNotMatch(JSON.stringify(stats), /还没有有效战绩|去开一局|按阵营与角色查看/);
   assert.doesNotMatch(JSON.stringify(stats), /0%/);

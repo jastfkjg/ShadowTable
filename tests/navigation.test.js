@@ -379,8 +379,9 @@ test('战绩逐层展开，记录逐场展开成员并可继续分页', async ()
     byRole: [{ faction: 'good', role: '梅林', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }] };
   const stats = page('stats',{...apiBase,request:async()=>detailedStats}).p;
   await stats.load();
-  assert.equal(stats.data.overviewExpanded,false);
-  stats.toggleOverview(); assert.equal(stats.data.overviewExpanded,true);
+  assert.equal(stats.data.overviewExpanded,true);
+  stats.toggleOverview(); assert.equal(stats.data.overviewExpanded,false);
+  stats.toggleOverview();
   stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
   assert.equal(stats.data.stats.byFaction[0].expanded,true);
   assert.equal(stats.data.stats.byFaction[0].roles[0].rateLabel,'50%');
@@ -496,7 +497,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/help/help?section=scoring','/pages/matches/matches?scored=1','/pages/stats/stats','/pages/stats/stats?tab=fun',...['matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/help/help?section=scoring','/pages/matches/matches?scored=1','/pages/stats/stats?tab=fun',...['matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
     assert.equal(node.attr.hoverStartTime,0);
@@ -636,7 +637,7 @@ test('小程序排行榜保留空榜、错误、样本量与参与入口，移�
   const rank=page('leaderboard',apiBase).p;
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
   const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',rank:null,statusLabel:''},rows:[]};
-  const tree=render({board,error:'请求失败'});
+  const tree=render({board,error:'请求失败',mineExpanded:true});
   assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
   assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
@@ -805,10 +806,10 @@ test('计分表单接受服务端结束原因，提交实际目标；分值与�
   const {p}=page('table',apiBase);
   p.data.room={canUseTools:true,stage:'score-stage',players:[{seat:1,name:'甲'},{seat:2,name:'乙'}],winnerOptions:[{value:'good',label:'好人胜'}],scoreSettlement:[{id:'remote-reason',label:'服务端新结算选项',requiresTarget:true}]};
   let submission;
-  p.confirmCommand=async(title,message,type,body)=>submission={message,type,body};
+  p.cmd=(type,body)=>submission={type,body};
   p.finishTools();p.pickScoreReason({currentTarget:{dataset:{id:'remote-reason'}}});
   await p.saveResult();assert.equal(submission,undefined);
-  p.pickScoreTarget({currentTarget:{dataset:{seat:2}}});await p.saveResult();
+  p.nextResult();p.pickScoreTarget({currentTarget:{dataset:{seat:2}}});p.nextResult();await p.saveResult();
   assert.equal(submission.type,'finishTools');assert.equal(submission.body.scoreReason,'remote-reason');assert.equal(submission.body.scoreTarget,2);assert.ok(!Object.hasOwn(submission.body,'winner'));
   const presented=require('../miniprogram/profile').presentMatches([{id:'x',endedAt:1,members:[],score:{status:'scored',total:9,breakdown:[{id:'future-award',label:'服务端新增奖励',points:9}]}}]);
   const context={window:{},global:{}};vm.createContext(context);
@@ -819,11 +820,11 @@ test('计分表单接受服务端结束原因，提交实际目标；分值与�
 test('不计积分的骑士登记要求实际带刀人和目标，自选目标会清空，提交独立趣味事实',async()=>{
   const {p}=page('table',apiBase);let submission;
   p.data.room={canUseTools:true,stage:'fun-stage',knights:{},players:[{seat:1,name:'甲'},{seat:2,name:'乙'}],winnerOptions:[],scoreSettlement:[],funSettlement:[{id:'early_assassination',requiresTarget:true},{id:'quest_fail',winner:'evil'}]};
-  p.confirmCommand=async(title,message,type,body)=>submission={type,body};
+  p.cmd=(type,body)=>submission={type,body};
   const choose=(handler,dataset)=>p[handler]({currentTarget:{dataset}});
   p.finishTools();choose('pickScoreReason',{id:'early_assassination'});choose('pickScoreTarget',{seat:2});await p.saveResult();assert.equal(submission,undefined);
   choose('pickFunActor',{seat:2});assert.equal(p.data.resultTarget,null);await p.saveResult();assert.equal(submission,undefined);
-  choose('pickScoreTarget',{seat:1});await p.saveResult();assert.equal(submission.body.funReason,'early_assassination');assert.equal(submission.body.funTarget,1);assert.equal(submission.body.funActor,2);assert.ok(!Object.hasOwn(submission.body,'scoreReason'));
+  choose('pickScoreTarget',{seat:1});p.nextResult();p.nextResult();p.nextResult();await p.saveResult();assert.equal(submission.body.funReason,'early_assassination');assert.equal(submission.body.funTarget,1);assert.equal(submission.body.funActor,2);assert.ok(!Object.hasOwn(submission.body,'scoreReason'));
 });
 test('小程序趣味战绩保留未知而非零，指标回查与分页持续保留玩法和出刀角色',async()=>{
   const aggregate=require('../server/fun').aggregate;
@@ -853,4 +854,22 @@ test('积分明细入口不复用全部对局预取，过滤与后续分页持�
   const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[],score:{status:'scored',total:0,breakdown:[]}}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unscored',endedAt:1,members:[]}],total:1}},{}]});
   await p.onLoad({scored:'1'});assert.equal(p.data.records[0].scoreLabel,'+0 分');
   await p.loadMore();assert.deepEqual(urls,['/api/me/matches?offset=0&scored=1','/api/me/matches?offset=1&scored=1']);
+});
+
+test('小程序分步结算取消终确认保留摘要，改原因清除旧目标，阶段变化阻止提交', async () => {
+  const {p}=page('table',apiBase); const writes=[];
+  p.cmd=(type,body)=>writes.push({type,body});
+  p.data.room={code:'123456',stage:'flow',canUseTools:true,knights:{},scoreSettlement:[{id:'knife',label:'提前盘刀',requiresTarget:true},{id:'fail',label:'三次任务失败'}],funSettlement:[],players:[{seat:1,name:'甲'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}],winnerOptions:[{value:'good',label:'好人胜'}]};
+  const choose=(handler,dataset)=>p[handler]({currentTarget:{dataset}});
+  p.finishTools();p.nextResult();assert.equal(p.data.resultStep,'reason');
+  choose('pickScoreReason',{id:'knife'});p.nextResult();assert.equal(p.data.resultStep,'actor');
+  choose('pickFunActor',{seat:3});p.nextResult();assert.equal(p.data.resultActor,null);assert.equal(p.data.resultStep,'actor');
+  choose('pickFunActor',{seat:1});p.nextResult();choose('pickScoreTarget',{seat:1});assert.equal(p.data.resultTarget,null);
+  choose('pickScoreTarget',{seat:2});p.nextResult();assert.equal(p.data.resultStep,'review');
+  p.confirm=async()=>false;await p.saveResult();assert.equal(writes.length,0);assert.equal(p.data.resultDialog,true);assert.match(p.data.resultSummary[1].value,/1号/);
+  p.backResult();p.backResult();p.backResult();choose('pickScoreReason',{id:'fail'});assert.equal(p.data.resultTarget,null);assert.equal(p.data.resultActor,null);
+  p.nextResult();assert.equal(p.data.resultStep,'review');p.data.room.stage='later';p.confirm=async()=>true;await p.saveResult();assert.equal(writes.length,0);assert.match(p.data.error,/阶段已变化/);
+  p.data.error='';p.finishTools();choose('pickResult',{value:'none'});p.nextResult();
+  assert.match(p.data.resultNotice,/不计战绩及积分/);
+  await p.saveResult();assert.equal(writes.length,1);assert.equal(writes[0].body.winner,null);
 });
