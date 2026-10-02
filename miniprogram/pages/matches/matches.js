@@ -16,7 +16,10 @@ Page({
     try {
       await api.login();
       const result = await api.request(this.query(0));
-      if (this.alive) this.setData({ records: presentMatches(result.records).map(row => ({ ...row, expanded: this.data.records.some(old => old.id === row.id && old.expanded) })), total: result.total, hasMore: result.hasMore, loaded: true, adjustments: presentAdjustments(result.adjustments?.records || []), adjustmentsTotal: result.adjustments?.total || 0, adjustmentsMore: !!result.adjustments?.hasMore, adjustmentsError: "" });
+      if (this.alive) this.setData({ records: presentMatches(result.records).map(row => {
+        const previous = this.data.records.find(old => old.id === row.id);
+        return { ...row, expanded: !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
+      }), total: result.total, hasMore: result.hasMore, loaded: true, adjustments: presentAdjustments(result.adjustments?.records || []), adjustmentsTotal: result.adjustments?.total || 0, adjustmentsMore: !!result.adjustments?.hasMore, adjustmentsError: "" });
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
@@ -50,6 +53,10 @@ Page({
   toggleRecord(e) {
     const id = e.currentTarget.dataset.id;
     this.setData({ records: this.data.records.map(record => record.id === id ? { ...record, expanded: !record.expanded } : record) });
+  },
+  toggleMembers(e) {
+    const id = e.currentTarget.dataset.id;
+    this.setData({ records: this.data.records.map(record => record.id === id && record.expanded ? { ...record, membersExpanded: !record.membersExpanded } : record) });
   },
   back: backToMe,
 });

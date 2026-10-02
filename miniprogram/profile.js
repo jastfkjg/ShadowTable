@@ -50,17 +50,32 @@ function presentFun(value) {
   return { ...value, available: true, cards };
 }
 function presentMatches(records) {
-  return records.map(record => ({
-    ...record,
-    funLabel: record.fun?.highlights?.map(item => item.label + (item.count > 1 ? " ×" + item.count : "")).slice(0,2).join(" · ") || "",
-    scoreLabel: record.score?.status === "scored" ? (record.score.total >= 0 ? "+" : "") + record.score.total + " 分" : record.score?.status === "excluded" ? "不计积分" : "积分未启用",
-    dateLabel: new Date(record.endedAt).toLocaleString("zh-CN", { hour12: false }),
-    outcomeLabel: record.outcome === "win" ? "胜利" : record.outcome === "loss" ? "失利" : "不计入战绩",
-    factionLabel: ({ good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" })[record.faction] || "未知",
-    winnerLabel: ({ good: "好人", evil: "坏人", third: "盗贼" })[record.winner] || "未登记",
-    sourceLabel: record.source === "manual" ? "房主登记" : record.source === "system" ? "系统判定" : "未判定",
-    members: record.members.map(member => ({ ...member, isSelf: member.seat === record.seat })),
-  }));
+  return records.map(record => {
+    const date = new Date(record.endedAt);
+    const validDate = !Number.isNaN(date.getTime());
+    const pad = value => String(value).padStart(2, "0");
+    const hasFunEvents = !!record.fun?.events?.length;
+    const funNote = record.fun?.status === "legacy" && !hasFunEvents ? "本局暂无过程记录" : record.fun?.reason || "";
+    return {
+      ...record,
+      expanded: false,
+      membersExpanded: false,
+      dayKey: validDate ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` : "unknown",
+      dayLabel: validDate ? `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日` : "日期未知",
+      timeLabel: validDate ? `${pad(date.getHours())}:${pad(date.getMinutes())}` : "—",
+      hasFunEvents,
+      showInitialRole: !!record.fun?.initialRole && record.fun.initialRole !== record.role,
+      funNote: funNote === record.excludedReason || funNote === record.score?.reason ? "" : funNote,
+      funLabel: record.fun?.highlights?.map(item => item.label + (item.count > 1 ? " ×" + item.count : "")).slice(0,2).join(" · ") || "",
+      scoreLabel: record.score?.status === "scored" ? (record.score.total >= 0 ? "+" : "") + record.score.total + " 分" : "未计分",
+      dateLabel: validDate ? date.toLocaleString("zh-CN", { hour12: false }) : "日期未知",
+      outcomeLabel: record.outcome === "win" ? "胜利" : record.outcome === "loss" ? "失利" : "不计入战绩",
+      factionLabel: ({ good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" })[record.faction] || "未知",
+      winnerLabel: ({ good: "好人", evil: "坏人", third: "盗贼" })[record.winner] || "未登记",
+      sourceLabel: record.source === "manual" ? "房主登记" : record.source === "system" ? "系统判定" : "未判定",
+      members: record.members.map(member => ({ ...member, isSelf: member.seat === record.seat })),
+    };
+  });
 }
 function backToMe() {
   if (getCurrentPages().length > 1) wx.navigateBack();

@@ -390,7 +390,7 @@ test('后台资料刷新不打断已进入但尚未输入的昵称编辑，迟�
   assert.equal(p.data.dirty,false);
   p.keyboardHeightChange({detail:{height:300}}); assert.equal(p.data.keyboardHeight,0);
 });
-test('战绩按阵营展开角色，记录逐场展开成员并可继续分页', async () => {
+test('战绩按阵营展开角色，对局详情与成员独立展开并在分页后保留', async () => {
   const detailedStats = { ...emptyStats, total: 2, wins: 1, losses: 1, winRate: 50,
     byFaction: [{ faction: 'good', label: '好人阵营', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }],
     byRole: [{ faction: 'good', role: '梅林', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }] };
@@ -412,9 +412,14 @@ test('战绩按阵营展开角色，记录逐场展开成员并可继续分页',
     return url.endsWith('offset=0') ? {records:[record('one',1000)],total:2,hasMore:true} : {records:[record('two',500)],total:2,hasMore:false};
   }}).p;
   await matches.load();
+  assert.equal(matches.data.records[0].expanded,false);
+  assert.equal(matches.data.records[0].membersExpanded,false);
   matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
   assert.equal(matches.data.records[0].expanded,true);
+  assert.equal(matches.data.records[0].membersExpanded,false);
   assert.equal(matches.data.records[0].members[0].isSelf,true);
+  matches.toggleMembers({currentTarget:{dataset:{id:'one'}}});
+  assert.equal(matches.data.records[0].membersExpanded,true);
   matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
   assert.equal(matches.data.records[0].expanded,false);
   assert.equal(matches.data.records.length,1);
@@ -423,6 +428,12 @@ test('战绩按阵营展开角色，记录逐场展开成员并可继续分页',
   assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=1']);
   assert.equal(matches.data.records.length,2);
   assert.equal(matches.data.hasMore,false);
+  assert.equal(matches.data.records[0].membersExpanded,true);
+  assert.equal(matches.data.records[1].membersExpanded,false);
+  matches.toggleRecord({currentTarget:{dataset:{id:'one'}}});
+  assert.equal(matches.data.records[0].membersExpanded,true);
+  matches.toggleMembers({currentTarget:{dataset:{id:'one'}}});
+  assert.equal(matches.data.records[0].membersExpanded,false);
 });
 test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅色背景与整行淡出', () => {
   const templates=fs.readdirSync(root,{recursive:true}).filter(file=>file.endsWith('.wxml'));
@@ -455,7 +466,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   assert.match(editor,/选择头像/);
   const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]}}));
   assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
-  const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
+  const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,membersExpanded:true,winner:'good',winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
   assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
   const emptyMatches=JSON.stringify(factory('pages/matches/matches.wxml')({loading:false,error:'',records:[],total:0}));
   assert.match(emptyMatches,/暂无对局记录/); assert.doesNotMatch(emptyMatches,/去开一局|逐场查看/);
@@ -808,11 +819,13 @@ test('预取记录立即可见，首屏刷新失败后重试首屏，不误用�
   const {p}=page('matches',{...apiBase,request:url=>{reads.push(url);return reads.length===1?request.promise:Promise.resolve(result);}},{pages:priorMe({matchesPreview:result})});
   const loading=p.onLoad();assert.equal(p.data.loaded,true);assert.equal(p.data.records[0].id,'one');
   p.toggleRecord({currentTarget:{dataset:{id:'one'}}});
+  p.toggleMembers({currentTarget:{dataset:{id:'one'}}});
   request.reject(new Error('刷新失败'));await loading;
   assert.equal(p.data.records[0].expanded,true);
   await p.retry();
   assert.deepEqual(reads,['/api/me/matches?offset=0','/api/me/matches?offset=0']);
   assert.equal(p.data.error,'');assert.equal(p.data.records[0].expanded,true);
+  assert.equal(p.data.records[0].membersExpanded,true);
 });
 
 test('计分表单接受服务端结束原因，提交实际目标；分值与加分标签由服务端明细展示', async () => {
