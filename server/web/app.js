@@ -1349,7 +1349,7 @@ function roomListItems(rooms) {
     var options = (room.winnerOptions || []).concat([{ value: "none", label: "不计战绩" }]);
     let html = '<div class="dialog-backdrop"><div class="error-dialog result-dialog score-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="dialog-title" id="result-dialog-title">登记本局结果</div><div class="small muted">请与同桌玩家确认结果。</div>';
     if (reasons.length) html += '<div class="score-reasons">' + reasons.map(reason => '<button type="button" class="secondary ' + (state.resultReason === reason.id ? 'is-selected' : '') + '" data-action="pickScoreReason" data-id="' + esc(reason.id) + '" aria-pressed="' + (state.resultReason === reason.id) + '">' + esc(reason.label) + '</button>').join('') + '</div>';
-    if (state.resultRequiresTarget) html += '<div class="label">实际刺杀目标</div><div class="score-targets">' + room.players.map(player => '<button type="button" class="secondary ' + (state.resultTarget === player.seat ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="' + player.seat + '" aria-pressed="' + (state.resultTarget === player.seat) + '">' + player.seat + '号 · ' + esc(player.name) + '</button>').join('') + '<button type="button" class="secondary ' + (state.resultTarget === 0 ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="0" aria-pressed="' + (state.resultTarget === 0) + '">空刀</button></div>';
+    if (state.resultRequiresTarget) html += '<div class="label">实际刺杀目标</div><div class="score-targets">' + room.players.filter(player => player.alive !== false).map(player => '<button type="button" class="secondary ' + (state.resultTarget === player.seat ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="' + player.seat + '" aria-pressed="' + (state.resultTarget === player.seat) + '">' + player.seat + '号 · ' + esc(player.name) + '</button>').join('') + '<button type="button" class="secondary ' + (state.resultTarget === 0 ? 'is-selected' : '') + '" data-action="pickScoreTarget" data-seat="0" aria-pressed="' + (state.resultTarget === 0) + '">空刀</button></div>';
     html += '<div class="small muted">' + esc(reasons.length ? '信息不完整时可仅登记胜方，以下选项不计积分。' : room.scoreNotice || '本局不计积分') + '</div><div class="result-options">' + options.map(o => '<button type="button" class="secondary ' + (state.resultChoice === o.value ? 'is-selected' : '') + '" data-action="pickResult" data-value="' + esc(o.value) + '" aria-pressed="' + (state.resultChoice === o.value) + '">' + esc(o.label) + '</button>').join('') + '</div><div class="dialog-actions">' + btn('secondary','closeResult','取消') + btn('primary','saveResult','确认结果并结束',null,(!state.resultChoice && !state.resultReason) || (state.resultRequiresTarget && state.resultTarget === null) || state.busy || !!pending) + '</div></div></div>';
     return html;
   }
@@ -3327,7 +3327,7 @@ function roomListItems(rooms) {
         "人 · " +
         (room.phase === "lobby" ? "准备中" : room.phase === "ended" ? "本局已结束" : room.phase === "terminated" ? "本局已终止" : "对局进行中") +
         "</div></div>";
-      html += '<div class="settings-caption" role="status">' + (s.pendingSave ? (s.busy ? '正在保存…' : '保存未确认') : s.dirty ? '尚未保存' : '更改自动保存') + '</div>';
+      if (s.pendingSave || s.dirty) html += '<div class="settings-caption" role="status">' + (s.pendingSave ? (s.busy ? '正在保存…' : '保存未确认') : '尚未保存') + '</div>';
       if (s.pendingSave && !s.busy) html += btn("secondary", "settingsSave", "重试保存");
       html += '<div class="settings-section-title">房间配置</div><div class="settings-section">';
       if (room.phase === "lobby") {
@@ -3369,11 +3369,9 @@ function roomListItems(rooms) {
       }
       html += "</div>";
       if (room.scoreSettings) html += '<div class="settings-section-title">积分</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>本局计分</span><span class="settings-caption">' +
-        (s.scoreEnabled ? '已开启' : '已关闭') + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
+        esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
         '</span></span><input type="checkbox" aria-label="本局计分" data-change="settingsScoring"' + (s.scoreEnabled ? ' checked' : '') +
-        (settingsLocked() || !room.scoreSettings.editable ? ' disabled' : '') + ' /></label></div><div class="settings-help">' +
-        room.scoreSettings.defaultEnabledMinPlayers + '人及以上默认开启，其他默认关闭。更换人数会重设默认值。</div>' +
-        (room.scoreSettings.unavailableReason ? '<div class="settings-help">' + esc(room.scoreSettings.unavailableReason) + '，开启开关也不计积分。</div>' : '');
+        (settingsLocked() || !room.scoreSettings.editable ? ' disabled' : '') + ' /></label></div>';
       html += '<div class="settings-section-title">湖中仙女</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>启用湖中仙女</span><span class="settings-caption">' +
         (s.capacity < 7 ? "5、6人局不支持" : s.fairyEnabled ? "持有者对所有玩家公开" : "本房间不使用仙女查验") +
         '</span></span><input type="checkbox" aria-label="启用湖中仙女" data-change="settingsFairy"' +

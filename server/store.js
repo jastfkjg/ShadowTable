@@ -237,13 +237,13 @@ class Store {
     const match = JSON.parse(row.snapshot);
     if (!Number.isSafeInteger(input.revision) || input.revision !== (match.scoreRevision || 0)) throw new RuleError("对局已更新，请重新加载",409);
     if (!match.scorePolicy || match.scoreEligibilityReason) throw new RuleError("本局不在计分范围，不能补算积分");
-    const option = match.scorePolicy.endReasons.find(reason => reason.id === input.scoreReason);
+    const option = scoring.optionsFor(match.board, match.scorePolicy).find(reason => reason.id === input.scoreReason);
     if (!option) throw new RuleError("计分结束原因无效");
     const players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(id).map(player => ({uid:player.uid,...JSON.parse(player.snapshot)}));
     if (!players.length || players.some(player => !player.roleId || player.faction === "unknown")) throw new RuleError("身份信息不完整，不能更正计分");
-    if (option.requiresTarget && (!Number.isInteger(input.scoreTarget) || input.scoreTarget !== 0 && !players.some(player => player.seat === input.scoreTarget))) throw new RuleError("请选择实际刺杀目标或空刀");
+    if (option.requiresTarget && !scoring.validTarget(input.scoreTarget, players, match.board, match.scorePolicy)) throw new RuleError("请选择实际在场刺杀目标或空刀");
     const before = {winner:match.winner, facts:match.scoringFacts, revision:match.scoreRevision || 0};
-    match.winner = option.requiresTarget ? players.find(player => player.seat === input.scoreTarget)?.roleId === "merlin" ? "evil" : "good" : option.winner;
+    match.winner = scoring.resolveWinner(option, input.scoreTarget, players, match.board, match.scorePolicy);
     match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
     match.source = "manual"; match.excludedReason = null; match.scoreExcludedReason = null;
     match.scoreRevision = (match.scoreRevision || 0) + 1;

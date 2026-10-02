@@ -7,6 +7,8 @@ function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
     || !Array.isArray(rules.endReasons) || !Array.isArray(rules.excludedIdentityPrefixes)) throw Error("积分规则配置不完整");
   if (!Number.isSafeInteger(rules.defaultEnabledMinPlayers) || rules.defaultEnabledMinPlayers < 0) throw Error("积分默认人数配置无效");
+  if (rules.targetModes && Object.values(rules.targetModes).some(mode => mode !== "living_merlin")) throw Error("积分刺杀判定配置无效");
+  if (rules.notes && (!Array.isArray(rules.notes) || rules.notes.some(note => typeof note !== "string"))) throw Error("积分说明配置无效");
   const ids = new Set();
   for (const award of rules.awards) {
     if (!award.id || ids.has(award.id) || !award.label || !Number.isSafeInteger(award.points) || award.points < -100 || award.points > 100
@@ -16,6 +18,7 @@ function validateRules(rules) {
   ids.clear();
   for (const reason of rules.endReasons) {
     if (!reason.id || ids.has(reason.id) || !reason.label || (reason.requiresTarget !== true && !["good", "evil"].includes(reason.winner))) throw Error("积分结束原因无效");
+    if (reason.boards && (!Array.isArray(reason.boards) || !reason.boards.length || reason.boards.some(board => !rules.boards[board]))) throw Error("积分结束原因板子配置无效");
     ids.add(reason.id);
   }
   const bonus = rules.streakBonus;
@@ -52,11 +55,25 @@ function settings(room) {
     unavailableReason: scopeExclusion(room, rules) };
 }
 function settlementOptions(room) {
-  return exclusion(room) ? [] : clone(room.scorePolicy.endReasons);
+  return exclusion(room) ? [] : optionsFor(room.board, room.scorePolicy);
+}
+function optionsFor(board, rules) {
+  return clone(rules.endReasons.filter(reason => !reason.boards || reason.boards.includes(board)));
+}
+function validTarget(target, players, board, rules) {
+  return Number.isInteger(target) && (target === 0 || players.some(player => player.seat === target
+    && (rules.targetModes?.[board] !== "living_merlin" || player.alive !== false)));
+}
+function resolveWinner(option, target, players, board, rules) {
+  if (!option.requiresTarget) return option.winner;
+  const livingMode = rules.targetModes?.[board] === "living_merlin";
+  const hit = target === 0 && livingMode ? !players.some(player => player.alive !== false && player.roleId === "merlin")
+    : players.some(player => player.seat === target && player.roleId === "merlin" && (!livingMode || player.alive !== false));
+  return hit ? "evil" : "good";
 }
 function scorePlayer(player, facts, rules, excludedReason) {
   if (excludedReason) return { status: "excluded", total: 0, breakdown: [], reason: excludedReason, ruleVersion: rules?.version || null };
-  const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target };
+  const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target && player.alive !== false };
   const breakdown = rules.awards.filter(award => Object.entries(award.when).every(([key, value]) =>
     Array.isArray(value) ? value.includes(context[key]) : context[key] === value))
     .filter(award => award.points !== 0).map(({ id, label, points }) => ({ id, label, points }));
@@ -77,6 +94,6 @@ function publicRules(rules = policy()) {
     }),
     notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，历史积分保留。",
       "测试、开发、终止及缺少计分依据的对局不计积分。", "连胜仅统计计分局；失利归零，不计分局不推进或打断。",
-      rules.streakBonus.enabled ? `每段连胜首次达到${rules.streakBonus.threshold}连胜额外+${rules.streakBonus.points}分。` : "连胜先做荣誉展示，不额外加分。"] };
+      rules.streakBonus.enabled ? `每段连胜首次达到${rules.streakBonus.threshold}连胜额外+${rules.streakBonus.points}分。` : "连胜先做荣誉展示，不额外加分。", ...(rules.notes || [])] };
 }
-module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, scorePlayer, publicRules, validateRules };
+module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

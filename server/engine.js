@@ -268,9 +268,10 @@ function archiveResult(room) {
     scoreExcludedReason,
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
+      alive: room.knights?.players[p.uid].alive ?? true,
       faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
       outcome: excludedReason ? "excluded" : faction(room, p.uid) === room.result.winner ? "win" : "loss",
-      score: scoring.scorePlayer({ seat: p.seat, roleId: room.roles[p.uid], faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
+      score: scoring.scorePlayer({ seat: p.seat, roleId: room.roles[p.uid], alive: room.knights?.players[p.uid].alive ?? true, faction: ROLES[room.roles[p.uid]] ? faction(room, p.uid) : "unknown",
         outcome: ROLES[room.roles[p.uid]] && faction(room, p.uid) === room.result?.winner ? "win" : "loss" }, room.scoringFacts, room.scorePolicy, scoreExcludedReason),
     })),
   };
@@ -1447,27 +1448,28 @@ function applyCommand(room, uid, input) {
   }
   if (type === "finishTools") {
     requireRule(canUseTools(room), "当前没有已发牌的对局");
+    const active = hasActiveOperation(room);
+    requireRule(!active || input.replace === true, "请先结算或确认作废当前操作", 409);
+    const next = structuredClone(room);
+    // Discard an unfinished skill cycle before resolving final identity and side.
+    if (active) knights.cancel(next);
     let winner, facts = null;
     if (input.scoreReason !== undefined) {
-      const option = scoring.settlementOptions(room).find(item => item.id === input.scoreReason);
+      const option = scoring.settlementOptions(next).find(item => item.id === input.scoreReason);
       requireRule(option, "计分结束原因无效，请重新选择");
+      const players = next.players.map(player => ({ seat: player.seat, roleId: next.roles[player.uid], alive: next.knights?.players[player.uid].alive ?? true }));
       if (option.requiresTarget) {
-        requireRule(Number.isInteger(input.scoreTarget) && (input.scoreTarget === 0 || room.players.some(player => player.seat === input.scoreTarget)), "请选择实际刺杀目标或空刀");
-        const target = room.players.find(player => player.seat === input.scoreTarget);
-        // Resolve hidden identity only as part of ending the game; no preview oracle.
-        winner = target && room.roles[target.uid] === "merlin" ? "evil" : "good";
-      } else winner = option.winner;
+        requireRule(scoring.validTarget(input.scoreTarget, players, next.board, next.scorePolicy), "请选择实际在场刺杀目标或空刀");
+      }
+      // Resolve hidden identity only as part of ending the game; no preview oracle.
+      winner = scoring.resolveWinner(option, input.scoreTarget, players, next.board, next.scorePolicy);
       facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
-    } else winner = manualResult(room, input);
-    requireRule(
-      !hasActiveOperation(room) || input.replace === true,
-      "请先结算或确认作废当前操作",
-      409,
-    );
-    if (hasActiveOperation(room)) room.history.push({ kind: "toolCanceled" });
-    room.flexible = true;
-    room.activity = null;
-    end(room, winner, winner ? "房主已登记线下结果，战绩已归档。" : "房主已结束本局，以线下确认的胜负为准。本局不计战绩。", "manual", facts);
+    } else winner = manualResult(next, input);
+    if (active) next.history.push({ kind: "toolCanceled" });
+    next.flexible = true;
+    next.activity = null;
+    end(next, winner, winner ? "房主已登记线下结果，战绩已归档。" : "房主已结束本局，以线下确认的胜负为准。本局不计战绩。", "manual", facts);
+    Object.assign(room, next);
     return;
   }
   if (type === "kick") {

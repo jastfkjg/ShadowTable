@@ -524,7 +524,7 @@ function updateCorrectionTarget() {
 function updateCorrectionMatch() {
   const match=correctionMatch();
   selectOptions('correction-result',[{value:'',label:'请选择结束原因'},...(match?.options || []).map(option=>({value:option.id,label:option.label}))]);
-  selectOptions('correction-target',[{value:'',label:'请选择实际目标'},...(match?.players || []).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name})),{value:'0',label:'空刀'}]);
+  selectOptions('correction-target',[{value:'',label:'请选择实际目标'},...(match?.players || []).filter(player=>player.alive !== false).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name})),{value:'0',label:'空刀'}]);
   $('correction-result').disabled=!match?.options.length;
   $('correction-submit').disabled=!match?.options.length;
   $('correction-status').textContent=match && !match.options.length ? '本局未启用计分或不在计分范围，无法更正积分。' : '';

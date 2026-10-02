@@ -819,6 +819,10 @@ test("结算需要主动选择胜方，支持第三阵营；零有效局不显�
   assert.equal(byHandler(dialog, "saveResult").attr.disabled, true);
   assert.match(JSON.stringify(dialog), /盗贼阵营胜|不计战绩/);
   assert.equal(byHandler(render({ ...base, room, hasPendingRequest: false, resultDialog: true, resultChoice: "third" }), "saveResult").attr.disabled, false);
+  const knightRoom = { ...room, knights: {}, scoreSettlement: [{ id: 'early_assassination', label: '三绿前提前盘刀', requiresTarget: true }], players: [{ seat: 1, name: '已出局', alive: false }, { seat: 2, name: '在场', alive: true }] };
+  const knifeDialog = render({ ...base, room: knightRoom, resultDialog: true, resultReason: 'early_assassination', resultRequiresTarget: true, resultTarget: null });
+  assert.deepEqual(nodes(knifeDialog).filter(n => n.attr?.bindtap === 'pickScoreTarget').map(n => Number(n.attr['data-seat'])), [2, 0]);
+  assert.match(JSON.stringify(knifeDialog), /三绿前提前盘刀/);
   const stats = factory("pages/stats/stats.wxml")({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
   assert.doesNotMatch(JSON.stringify(stats), /还没有有效战绩|去开一局|按阵营与角色查看/);
   assert.doesNotMatch(JSON.stringify(stats), /0%/);

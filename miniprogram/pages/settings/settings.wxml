@@ -9,7 +9,7 @@
       <view class="settings-title">{{room.boardName}}</view>
       <view class="muted">{{room.capacity}}人 · {{room.phase==='lobby'?'准备中':room.phase==='ended'?'本局已结束':room.phase==='terminated'?'本局已终止':'对局进行中'}}</view>
     </view>
-    <view class="settings-caption" role="status">{{pendingSave?(busy?'正在保存…':'保存未确认'):refreshing?'正在同步…':dirty?'尚未保存':'更改自动保存'}}</view>
+    <view wx:if="{{pendingSave || dirty}}" class="settings-caption" role="status">{{pendingSave?(busy?'正在保存…':'保存未确认'):'尚未保存'}}</view>
     <view class="settings-section-title">房间配置</view>
     <view class="settings-section">
       <picker wx:if="{{room.phase==='lobby'}}" range="{{capacities}}" value="{{capacityIndex}}" bindchange="pickCapacity" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick}}">
@@ -24,11 +24,9 @@
     <block wx:if="{{room.scoreSettings}}">
       <view class="settings-section-title">积分</view>
       <view class="settings-section"><view class="settings-row">
-        <view><view>本局计分</view><view class="settings-caption">{{scoreEnabled?'已开启':'已关闭'}} · {{room.scoreSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
+        <view><view>本局计分</view><view class="settings-caption">{{room.scoreSettings.unavailableReason || (scoreEnabled?'已开启':'已关闭')}} · {{room.scoreSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
         <switch checked="{{scoreEnabled}}" bindchange="toggleScoring" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.scoreSettings.editable}}" aria-label="本局计分" />
       </view></view>
-      <view class="settings-help">{{room.scoreSettings.defaultEnabledMinPlayers}}人及以上默认开启，其他默认关闭。更换人数会重设默认值。</view>
-      <view wx:if="{{room.scoreSettings.unavailableReason}}" class="settings-help">{{room.scoreSettings.unavailableReason}}，开启开关也不计积分。</view>
     </block>
     <view class="settings-section-title">湖中仙女</view>
     <view class="settings-section">

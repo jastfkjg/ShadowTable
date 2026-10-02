@@ -1,21 +1,24 @@
 {
-  "version": "classic-2026-10-v2",
+  "version": "avalon-2026-10-v4",
   "defaultEnabledMinPlayers": 10,
-  "title": "经典板积分规则",
-  "scopeLabel": "经典基础 5–8、10、12 人；逆仆及扩展板暂不计积分",
-  "boards": { "classic": [5, 6, 7, 8], "classic-court": [10, 12] },
+  "title": "阿瓦隆积分规则",
+  "scopeLabel": "经典基础 5–8、10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
+  "boards": { "classic": [5, 6, 7, 8], "classic-court": [10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
+  "targetModes": { "knights-10": "living_merlin", "knights-11": "living_merlin", "knights": "living_merlin", "knights-13": "living_merlin" },
+  "notes": ["十二骑士按结束时的角色与阵营计分；出局玩家保留最后阵营。", "十二骑士空刀：场上无存活梅林则坏人胜，仍有存活梅林则好人胜。提前盘刀与三绿盘刀使用相同计分规则。"],
   "excludedIdentityPrefixes": ["dev:", "test:"],
   "endReasons": [
     { "id": "assassination", "label": "三绿，已完成最终刺杀", "requiresTarget": true },
+    { "id": "early_assassination", "label": "提前盘刀（按三绿计分）", "requiresTarget": true, "boards": ["knights-10", "knights-11", "knights", "knights-13"] },
     { "id": "quest_fail", "label": "三次任务失败", "winner": "evil" },
     { "id": "five_rejections", "label": "连续五次组队被否决", "winner": "evil" }
   ],
   "awards": [
     { "id": "good_win", "label": "好人获胜", "points": 2, "when": { "faction": "good", "outcome": "win" } },
-    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": "assassination" } },
+    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"] } },
     { "id": "evil_win", "label": "坏人获胜", "points": 3, "when": { "faction": "evil", "outcome": "win" } },
     { "id": "role", "label": "梅林／派西角色奖励", "points": 1, "when": { "faction": "good", "outcome": "win", "roleId": ["merlin", "percival"] } },
-    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": "assassination", "isTarget": true } }
+    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true } }
   ],
   "streakBonus": { "enabled": false, "threshold": 3, "points": 1, "label": "三连胜奖励" }
 }

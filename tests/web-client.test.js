@@ -874,6 +874,10 @@ test("网页战绩空态、错误重试与第三阵营结算选择", async () =>
   await c.ACTIONS.saveResult();
   assert.match(c.state.error, /阶段已变化/);
   assert.equal(calls, 2);
+  c.state.room = { stage: 'knight-stage', canUseTools: true, knights: {}, winnerOptions: [], scoreSettlement: [{ id: 'early_assassination', label: '三绿前提前盘刀', requiresTarget: true }], players: [{ seat: 1, name: '已出局', alive: false }, { seat: 2, name: '在场', alive: true }] };
+  c.state.error = '';c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({ dataset: { id: 'early_assassination' } });
+  const knifeHtml = c.viewResultDialog();assert.match(knifeHtml, /三绿前提前盘刀/);
+  assert.doesNotMatch(knifeHtml, /data-seat="1"/);assert.match(knifeHtml, /data-seat="2"/);assert.match(knifeHtml, /data-seat="0"/);
 });
 
 

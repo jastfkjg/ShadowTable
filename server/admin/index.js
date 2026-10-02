@@ -8,6 +8,7 @@ const {
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { auditGroups } = require("../audit");
+const scoring = require("../scoring");
 const { RuleError, command, roomSummary } = require("../engine");
 const digest = (s) => createHash("sha256").update(s).digest();
 const fail = (ok, message, status = 400) => {
@@ -245,8 +246,8 @@ function createAdmin({ store, origin, key, body, limit }) {
       const matches = store.db.prepare("SELECT id,snapshot FROM matches WHERE json_extract(snapshot,'$.code')=? ORDER BY json_extract(snapshot,'$.endedAt') DESC LIMIT 50").all(code).map(row=>{
         const saved=JSON.parse(row.snapshot);
         return {id:row.id,boardName:saved.boardName,endedAt:saved.endedAt,winner:saved.winner,revision:saved.scoreRevision || 0,
-          options:saved.scorePolicy && !saved.scoreEligibilityReason ? saved.scorePolicy.endReasons : [],
-          players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name};})};
+          options:saved.scorePolicy && !saved.scoreEligibilityReason ? scoring.optionsFor(saved.board, saved.scorePolicy) : [],
+          players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name,alive:player.alive ?? true};})};
       });
       send(200,{matches});return true;
     }
