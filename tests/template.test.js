@@ -166,7 +166,7 @@ test('趣味榜显示当前指标，展开后可选全部指标，排序独立�
   assert.equal(tabs.length,defs.length);assert.ok(tabs.every(n=>n.tag==='wx-button'));
   assert.equal(byHandler(tree,'toggleMetrics').attr.ariaExpanded,true);
   assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
-  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'轮内刀法 · 命中敌方');
+  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'刀客刀法 · 命中敌方');
   assert.ok(!all.some(n=>n.attr?.bindchange==='chooseFunMode' || n.attr?.bindchange==='chooseFunMetric'));
 });
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{

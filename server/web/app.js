@@ -1682,7 +1682,7 @@ function roomListItems(rooms) {
     for (const card of (state.funExpanded ? data.cards : data.cards.slice(0,3))) {
       const rows = card.metrics.filter(row => !row.id.endsWith('aim_enemy')), primary = rows.find(row => row.ranked) || rows[0];
       const combat = [':knife',':gun',':duel'].some(suffix => card.id.endsWith(suffix));
-      html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2><span class="small muted">' + esc(card.modeLabel) + '</span></div><div class="fun-metrics' + (combat ? ' three' : '') + '">';
+      html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2></div><div class="fun-metrics' + (combat ? ' three' : '') + '">';
       for (const row of rows) {
         const color = row.ranked ? 'good' : /_(ally|hit|bust|miss)$/.test(row.id) ? 'evil' : 'muted';
         html += '<button type="button" class="fun-metric" data-action="funRecords" data-metric="'+esc(row.id)+'" data-mode="'+esc(row.mode)+'"><span class="fun-number '+color+'">'+(row.value===null ? '—' : row.count)+'<span class="small muted"> '+esc(row.unit)+'</span></span><span class="small">'+esc(row.label)+' ›</span></button>';

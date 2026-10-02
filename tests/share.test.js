@@ -60,14 +60,15 @@ test("趣味图片仅输出所选正向指标，区分未知、真实零和无�
   Object.assign(metric, { value: 1, knownGames: 1, ranked: false });
   assert.throws(create, /没有完整记录/);
 });
-test("排名图片只投影附近五位公开摘要，突出本人并保留同周期计分样本", () => {
+test("排名图片保留附近玩家并隐藏分区标题", () => {
   const mine = cards.leaderboardCard(fixtures.profile, fixtures.board);
-  assert.equal(mine.context, "2026 年 10 月 · 积分榜");
+  assert.equal(mine.title, "积分榜");
+  assert.equal(mine.context, "2026 年 10 月");
   assert.equal(mine.hero + mine.unit, "286分");
   assert.equal(mine.rank, 8);
+  assert.doesNotMatch(cards.describe(mine), /我的附近/);
   assert.deepEqual(mine.nearby.map(row=>row.rank),[6,7,8,9,10]);
-  assert.equal(mine.nearby[2].isSelf,true);assert.equal(mine.gap,"距上一位 16 分");
-  assert.match(cards.describe(mine),/我的附近.*晚风.*小林（我）.*距上一位 16 分/);
+  assert.match(cards.describe(mine), /晚风.*小林（我）.*北川/);
   assert.deepEqual(mine.metrics.map(item=>[item.value,item.label]), [["24","计分局数"],["15","计分局胜场"],["62.5%","计分局胜率"]]);
   assert.doesNotMatch(JSON.stringify(mine), /private-version|not-needed|should-not-appear|publicId|rows/);
   assert.equal(cards.leaderboardCard(fixtures.profile, {...fixtures.board, me:{...fixtures.board.me,rank:1}}).rank,1);
@@ -92,14 +93,14 @@ test("缺少完整本人邻近数据时保留个人卡，并列或百分比榜�
   delete board.nearby;assert.deepEqual(build().nearby,[]);assert.equal(build().hero,"62.5");
 });
 test("趣味榜图片完整带上指标、排序、角色、玩法和周期，百分比不混用胜率", () => {
-  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "轮内刀法", metricLabel: "命中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
+  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "刀客刀法", metricLabel: "命中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
     me: { status: "ranked", rank: 2, rate: 62.5, count: 10, opportunities: 16, knownGames: 12, unknownGames: 2, winRate: 50 } };
   const selection = cards.boardSelection(board);
   assert.deepEqual(cards.parseSelection(selection), selection);
   assert.deepEqual(selection, { kind: "leaderboard", metric: "fun_knife_enemy", period: "month", mode: "knights", sort: "rate", role: "gareth" });
   const card = cards.leaderboardCard(fixtures.profile, board);
-  assert.match(card.context, /命中敌方率榜/);
-  assert.equal(card.scope, "轮内刀法 · 十二骑士 · 加雷斯");
+  assert.match(card.title, /命中敌方率榜/);
+  assert.equal(card.scope, "刀客刀法 · 十二骑士 · 加雷斯");
   assert.equal(card.hero + card.unit, "62.5%");
   assert.deepEqual(card.metrics.map(item=>item.value), ["10","16","12"]);
   assert.match(card.notes.join(), /至少 10 次有效机会/);
@@ -156,7 +157,8 @@ test("榜单预览直接生成本人成绩，生成期间禁用发送；隐藏�
   assert.equal(p.data.imagePath,"wxfile://mine");
   p.send(); assert.equal(sent[0].path, "wxfile://mine");
   assert.equal(p.chooseMode, undefined);
-  assert.match(p.data.description, /我的附近.*晚风.*北川/);
+  assert.doesNotMatch(p.data.description, /我的附近/);
+  assert.match(p.data.description, /晚风.*北川/);
   assert.doesNotMatch(p.data.description, /前三位|should-not-appear/);
   assert.equal(requests.find(url => url.includes("leaderboard")), "/api/leaderboard?metric=points&period=month&nearby=1");
   const hidden = page({ api: { login: async () => {}, request: async url => url.includes("profile") ? fixtures.profile : { ...fixtures.board, rows:[], me: { ...fixtures.board.me, status: "hidden", rank: null } } } });
@@ -225,4 +227,36 @@ test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退",
   assert.equal(canvas.width, 1080); assert.equal(canvas.height, 1424);
   assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,1424);
   assert.equal(exported.height,canvas.height);assert.equal(exported.fileType, "png"); assert.ok(drawing.includes("小"));
+});
+
+
+test("趣味分享接收小程序编码和未编码的卡片参数，并完成挡刀及刀客图片生成", async () => {
+  const aggregate = require("../server/fun").aggregate;
+  const stats = { fun: aggregate([
+    { match_id: 'm1', mode: 'knights', metric: 'good_shield', role: 'servant', role_label: '忠臣', status: 'known', count: 1, opportunities: 1 },
+    { match_id: 'm1', mode: 'knights', metric: 'knife_enemy', role: 'gareth', role_label: '加雷斯', status: 'known', count: 0, opportunities: 1 },
+  ]) };
+  for (const card of stats.fun.cards) for (const encoded of [true, false]) {
+    const { p, renderCount } = page({ api: { login: async () => {}, request: async url => url.includes('profile') ? fixtures.profile : stats } });
+    await p.onLoad({ kind: 'fun', card: encoded ? encodeURIComponent(card.id) : card.id, metric: card.metrics[0].id });
+    await p.onReady();
+    assert.equal(p.data.error, '');
+    assert.ok(p.data.imagePath);assert.equal(renderCount(), 1);
+    assert.match(p.data.description, /成功挡刀|刀客刀法/);
+    assert.doesNotMatch(p.data.description, /好人/);
+    assert.doesNotMatch(p.data.description, /十二骑士/);
+  }
+  for (const card of ['knights%3', 'knights%253Ashield', '../shield', 'knights:shield?uid=other']) {
+    assert.throws(() => cards.parseSelection({kind: 'fun',card,metric:'good_shield'}), /分享内容无效/);
+  }
+});
+
+test("分享榜单突出标题，全部时间及全部玩法不输出，未知局数不输出", () => {
+  const card = cards.leaderboardCard(fixtures.profile, { ...fixtures.board, period: 'all', fun: true, metric: 'fun_good_shield', title: '好人', metricLabel: '成功挡刀次数', mode: 'all', sort: 'count', unit: '次',
+    me: { status: 'ranked', rank: 1, count: 1, rate: 100, opportunities: 1, knownGames: 1, unknownGames: 2 },
+    nearby: [{rank:1,isSelf:true,nickname:'小林',count:1}] });
+  assert.equal(card.title, '成功挡刀次数榜');assert.equal(card.context, '');assert.equal(card.scope, '');
+  assert.deepEqual(card.notes, []);
+  assert.doesNotMatch(cards.describe(card), /全部时间|全部玩法|好人|非梅林|我的附近|另有.*未记录/);
+  assert.equal(card.metrics[2].value, '1');
 });

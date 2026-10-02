@@ -1251,7 +1251,7 @@ test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应�
   await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
   c.ACTIONS.rankToggleMine();
   assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
-  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人（非梅林） · 成功挡刀/);assert.match(html,/轮内刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
+  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
   c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
 });

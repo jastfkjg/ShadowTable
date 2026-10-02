@@ -26,6 +26,7 @@ function html(node) {
   return `<${tag} ${attrs}>${(node.children || []).map(html).join("")}${tag === "img" ? "" : `</${tag}>`}`;
 }
 const scenes = {
+  shield: cards.leaderboardCard({nickname:"子龙xxx"}, { ...board, period:"all", fun:true, metric:"fun_good_shield", title:"好人", metricLabel:"成功挡刀次数", mode:"all", sort:"count", unit:"次", me:{status:"ranked",rank:1,count:1,rate:100,opportunities:1,knownGames:1,unknownGames:2}, nearby:[{rank:1,isSelf:true,nickname:"子龙xxx",count:1}] }),
   stats: cards.statsCard(profile, stats, now),
   fun: cards.funCard(profile, stats, "classic:merlin", "merlin_evade", now),
   rank: cards.leaderboardCard(profile, board),
@@ -36,7 +37,7 @@ const scenes = {
   short: cards.statsCard({ nickname: "新朋友" }, { total: 2, wins: 1, losses: 1, winRate: 50,
     byFaction:[{faction:"good",total:1,wins:1},{faction:"evil",total:1,wins:0}],byRole:[{role:"梅林",total:1,wins:1},{role:"刺客",total:1,wins:0}] }, now),
   pending: cards.leaderboardCard(profile, { ...board, metric:"fun_merlin_evade",fun: true, title: "梅林", metricLabel: "成功躲刀率", mode: "classic", sort: "rate", unit: "%", threshold: 5, me: { status: "not_enough", rank: null, knownGames: 4, opportunities: 4, count: 3, rate: 75, remaining: 1 } }),
-  long: cards.leaderboardCard({ ...profile, nickname: "很长的玩家昵称😀😀😀测试边界与截断" }, { ...board, metric:"fun_good_shield",fun: true, title: "好人（非梅林）", metricLabel: "成功挡刀率", mode: "knights", sort: "rate", unit: "%", threshold: 5,
+  long: cards.leaderboardCard({ ...profile, nickname: "很长的玩家昵称😀😀😀测试边界与截断" }, { ...board, metric:"fun_good_shield",fun: true, title: "好人", metricLabel: "成功挡刀率", mode: "knights", sort: "rate", unit: "%", threshold: 5,
     nearby:board.nearby.map((row,i)=>({...row,rank:12343+i,nickname:i===1?"昵称很长很长的附近玩家":row.nickname,rate:[70,68,66.7,63,61][i]})),
     me: { ...board.me, rank: 12345, rate: 66.7, count: 2000, opportunities: 3000, knownGames: 3200, unknownGames: 20 } }),
   hidden: cards.leaderboardCard(profile,{...board,me:{...board.me,status:"hidden",rank:null}}),
@@ -54,6 +55,6 @@ for (const [name, card] of Object.entries(scenes)) {
   fs.writeFileSync(path.join(output, `share-${name}.html`), base + `<style>body{margin:0}button{font:inherit;border:0}nav{height:64px;display:flex;align-items:center;gap:16px;padding:0 20px;background:#101c24}nav button{width:44px;font-size:32px}img{height:auto} ${css("app.wxss")} ${css("pages/share/share.wxss")}</style>` + html(tree) + script(card) + "</html>");
   fs.writeFileSync(path.join(output, `share-card-${name}.html`), base + '<style>body{margin:0;background:#101c24}canvas{display:block;width:1080px;height:auto}</style><canvas class="card"></canvas>' + script(card) + "</html>");
 }
-const labels = { stats: "战绩 · 阵营与常玩角色", fun: "趣味成绩", rank: "积分 · 我的附近", third: "第三阵营", games: "局数 · 我的附近", short: "仅两局战绩", pending: "暂未上榜", long: "长昵称与大数字", hidden:"未公开排名",unknown:"未知样本与长角色名称" };
+const labels = { shield:"挡刀次数榜", stats: "战绩 · 阵营与常玩角色", fun: "趣味成绩", rank: "积分 · 本人成绩", third: "第三阵营", games: "局数 · 本人成绩", short: "仅两局战绩", pending: "暂未上榜", long: "长昵称与大数字", hidden:"未公开排名",unknown:"未知样本与长角色名称" };
 fs.writeFileSync(path.join(output, "share-gallery.html"), base + '<style>body{margin:32px;background:#e9e5dd;font:16px sans-serif;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}section{width:280px}canvas{width:280px;height:auto;display:block;margin-top:10px}a{color:#101c24;text-decoration:none}</style>' + Object.entries(scenes).map(([name, card]) => `<section><a href="share-${name}.html">${labels[name]}</a><canvas id="${name}"></canvas><script>{const module={exports:{}};${source}\nconst card=${JSON.stringify(card)};const canvas=document.getElementById('${name}');Object.assign(canvas,module.exports.dimensions(card));module.exports.drawCard(canvas.getContext('2d'),card);}</script></section>`).join("") + "</html>");
 console.log("Share previews: output/playwright/share-gallery.html");

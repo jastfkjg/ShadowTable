@@ -43,6 +43,8 @@ test('分享入口只传内容选择，拦截旧预览和读取失败，不传�
   assert.equal(navigations[0],'/pages/share/share?kind=stats');
   const query=new URL('https://example.test'+navigations[1]).searchParams;
   assert.equal(query.get('card'),'classic:merlin');assert.equal(query.get('metric'),'merlin_evade');
+  const rawOptions=Object.fromEntries(navigations[1].split('?')[1].split('&').map(item=>item.split('=')));
+  assert.equal(require('../miniprogram/share-card').parseSelection(rawOptions).card,'classic:merlin');
   const ranking=page('leaderboard',apiBase);
   ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_knife_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
   ranking.p.shareLeaderboard();
