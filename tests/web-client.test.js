@@ -1060,13 +1060,16 @@ test('网页趣味回查深链与分页保留过滤，清除回到全部，不�
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);assert.doesNotMatch(c.viewMatches(),/管理员积分调整/);
   await c.applyRoute('#/matches');assert.equal(urls.at(-1),'/api/me/matches?offset=0');assert.match(c.viewMatches(),/管理员积分调整/);
 });
-test('网页趣味榜模式角色筛选与迟到响应隔离，未达门槛展示本人分母',async()=>{
+test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应隔离，未达门槛展示本人分母',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=metric=>webRanks(metric,{fun:true,mode:'knights',sort:'rate',role:'gareth',metricLabel:'命中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
-  const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);return response(result('fun_knife_enemy'));});
+  const result=metric=>webRanks(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',metricLabel:'命中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
+  const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})});});
   const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
-  await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunMode:'knights',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
-  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=knights&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
+  await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
+  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
+  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人（非梅林） · 成功挡刀/);assert.match(html,/轮内刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
+  await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
+  assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
 });
 test('网页不计积分的骑士终局必须选实际带刀人，切换带刀人排除自刀目标',async()=>{
   const c=client(async()=>response({}));c.state.room={canUseTools:true,stage:'fun-stage',knights:{},scoreSettlement:[],funSettlement:[{id:'early_assassination',label:'提前盘刀',requiresTarget:true}],players:[{seat:1,name:'<甲>'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}]};

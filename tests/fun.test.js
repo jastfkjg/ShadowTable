@@ -95,6 +95,209 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
+test("非梅林好人挡刀按实际最终目标计数，每位在场非梅林好人形成一次非空刀机会", () => {
+  for (const target of [1, 2, 3, 5]) {
+    const r = deal();
+    finish(r, { funReason: "assassination", funTarget: target });
+    assert.equal(row(r, "wx:2", "good_shield").count, target === 2 ? 1 : 0);
+    assert.equal(row(r, "wx:3", "good_shield").count, target === 3 ? 1 : 0);
+    assert.equal(row(r, "wx:2", "good_shield").opportunities, 1);
+    assert.equal(row(r, "wx:3", "good_shield").opportunities, 1);
+    assert.equal(row(r, "wx:1", "good_shield"), undefined);
+    assert.equal(row(r, "wx:5", "good_shield"), undefined);
+    if (target === 3) {
+      const story = r.matchRecord.players[2].fun;
+      assert.ok(story.events.some((e) => e.label === "成功挡刀"));
+      assert.ok(story.highlights.some((e) => e.id === "good_shield"));
+    }
+  }
+  for (const reason of ["quest_fail", "five_rejections"]) {
+    const r = deal();
+    finish(r, { funReason: reason });
+    assert.equal(row(r, "wx:3", "good_shield").count, 0);
+    assert.equal(row(r, "wx:3", "good_shield").opportunities, 0);
+    assert.equal(row(r, "wx:3", "good_shield").status, "known");
+  }
+  const unknown = deal();
+  finish(unknown, { winner: "good" });
+  assert.equal(row(unknown, "wx:3", "good_shield").status, "unknown");
+});
+test("骑士挡刀使用终局当前阵营与存活状态，排除空刀、梅林和已出局玩家", () => {
+  const r = deal(true);
+  configure(r, {
+    "wx:1": "merlin",
+    "wx:2": "blueLancelot",
+    "wx:3": "redLancelot",
+    "wx:6": "assassin",
+  });
+  r.knights.players["wx:2"].faction = "evil";
+  r.knights.players["wx:3"].faction = "good";
+  r.knights.players["wx:4"].alive = false;
+  finish(r, { funReason: "early_assassination", funTarget: 3, funActor: 6 });
+  assert.equal(row(r, "wx:2", "good_shield"), undefined);
+  assert.equal(row(r, "wx:3", "good_shield").count, 1);
+  assert.equal(row(r, "wx:4", "good_shield").opportunities, 0);
+  assert.equal(row(r, "wx:1", "good_shield"), undefined);
+  const empty = deal(true);
+  configure(empty, { "wx:1": "merlin", "wx:6": "assassin" });
+  finish(empty, {
+    funReason: "early_assassination",
+    funTarget: 0,
+    funActor: 6,
+  });
+  assert.equal(row(empty, "wx:3", "good_shield").count, 0);
+  assert.equal(row(empty, "wx:3", "good_shield").opportunities, 0);
+});
+test("挡刀榜跨板子合并次数和原始分母，成功率门槛跨板子累积且旧玩法参数兼容", () => {
+  const store = new Store(":memory:");
+  try {
+    for (let i = 0; i < 5; i++) {
+      const knight = i >= 3,
+        r = deal(knight, "wx:shield");
+      r.roles["wx:shield"] = "servant";
+      r.roles["wx:3"] = "merlin";
+      r.roles["wx:6"] = "assassin";
+      r.fun.initialRoles = { ...r.roles };
+      finish(r, {
+        funReason: knight ? "early_assassination" : "assassination",
+        funTarget: i === 2 ? 3 : 1,
+        ...(knight ? { funActor: 6 } : {}),
+      });
+      store.transaction(() => store.save(r));
+    }
+    const board = new Leaderboard(store),
+      read = (query) => board.read("wx:shield", new URLSearchParams(query));
+    const all = read("metric=fun_good_shield&sort=rate");
+    assert.equal(all.mode, "all");
+    assert.equal(all.me.count, 4);
+    assert.equal(all.me.opportunities, 5);
+    assert.equal(all.me.rate, 80);
+    assert.equal(all.me.status, "ranked");
+    assert.equal(all.threshold, 5);
+    assert.equal(read("metric=fun_good_shield&mode=all").me.count, 4);
+    assert.equal(read("metric=fun_good_shield&mode=classic").me.count, 2);
+    assert.equal(read("metric=fun_good_shield&mode=knights").me.count, 2);
+    assert.equal(
+      read("metric=fun_good_shield&mode=classic&sort=rate").me.remaining,
+      2,
+    );
+    assert.ok(all.availableFunMetrics.some((m) => m.key === "fun_good_shield"));
+    assert.doesNotMatch(JSON.stringify(all), /wx:|"uid"|target|events/);
+    assert.throws(
+      () => read("metric=fun_good_shield&role=servant"),
+      /参数无效/,
+    );
+  } finally {
+    store.close();
+  }
+});
+test("管理员更正刀口同步挡刀记录与对局回查，重复归档不累计", () => {
+  const store = new Store(":memory:");
+  try {
+    const r = deal();
+    r.scoreEnabled = false;
+    finish(r);
+    store.transaction(() => store.save(r));
+    assert.equal(
+      store.funFor("wx:3").metrics.find((m) => m.id === "good_shield").count,
+      1,
+    );
+    assert.equal(
+      store.matchesFor("wx:3", 0, 20, false, {
+        metric: "good_shield",
+        mode: "classic",
+      }).records.length,
+      1,
+    );
+    store.transaction(() =>
+      store.correctFunMatch(r.matchRecord.id, {
+        revision: 0,
+        funReason: "assassination",
+        funTarget: 1,
+      }),
+    );
+    assert.equal(
+      store.funFor("wx:3").metrics.find((m) => m.id === "good_shield").count,
+      0,
+    );
+    assert.equal(
+      store.matchesFor("wx:3", 0, 20, false, {
+        metric: "good_shield",
+        mode: "classic",
+      }).records.length,
+      0,
+    );
+    store.transaction(() =>
+      store.correctFunMatch(r.matchRecord.id, {
+        revision: 1,
+        funReason: "assassination",
+        funTarget: 2,
+      }),
+    );
+    assert.equal(
+      store.funFor("wx:2").metrics.find((m) => m.id === "good_shield").count,
+      1,
+    );
+    store.transaction(() => store.archiveMatch(r.matchRecord));
+    assert.equal(
+      store.funFor("wx:2").metrics.find((m) => m.id === "good_shield").count,
+      1,
+    );
+    assert.equal(
+      store.funFor("wx:2").metrics.find((m) => m.id === "good_shield")
+        .opportunities,
+      1,
+    );
+  } finally {
+    store.close();
+  }
+});
+test("v1对局启动时从已保存终局事实补算挡刀，未知不补零，结束牌桌同步且重启幂等", () => {
+  const dir = mkdtempSync(join(tmpdir(), "shadow-shield-migrate-")),
+    path = join(dir, "data.sqlite");
+  let store = new Store(path);
+  try {
+    const known = deal();
+    finish(known);
+    store.transaction(() => store.save(known));
+    const unknown = deal();
+    unknown.code = "123457";
+    finish(unknown, { winner: "good" });
+    store.transaction(() => store.save(unknown));
+    store.db.exec(
+      "DELETE FROM match_fun_stats WHERE metric='good_shield'; UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.version','fun-2026-10-v1')",
+    );
+    store.close();
+    store = new Store(path);
+    const shield = store
+      .funFor("wx:3")
+      .metrics.find((m) => m.id === "good_shield");
+    assert.equal(shield.count, 1);
+    assert.equal(shield.opportunities, 1);
+    assert.equal(shield.knownGames, 1);
+    assert.equal(shield.unknownGames, 1);
+    assert.ok(
+      publicView(store.get(known.code), "wx:3").myFun.highlights.some(
+        (m) => m.id === "good_shield",
+      ),
+    );
+    const before = JSON.stringify(store.funFor("wx:3"));
+    store.close();
+    store = new Store(path);
+    assert.equal(JSON.stringify(store.funFor("wx:3")), before);
+    assert.equal(
+      store.db
+        .prepare(
+          "SELECT count(*) AS n FROM match_fun_stats WHERE metric='good_shield' AND uid='wx:3'",
+        )
+        .get().n,
+      2,
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test("关闭积分仍记录三绿和终局机会，三炸、否决与提前盘刀互不混淆", () => {
   for (const reason of ["assassination", "quest_fail", "five_rejections"]) {
     const r = deal();

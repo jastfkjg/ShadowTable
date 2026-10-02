@@ -1964,6 +1964,10 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 .fun-event { padding: 12px 0; }
 .fun-filter { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--accent); }
 .fun-rank-filters { margin-bottom: 24px; }
+.fun-rank-tabs { position: relative; display: flex; gap: 8px; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 4px 4px 12px; margin-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.fun-rank-tab { flex: none; width: auto; min-height: 48px; margin: 0; padding: 10px 14px; font-size: 13px; white-space: nowrap; color: var(--muted); background: var(--surface); border: 1px solid transparent; }
+.fun-rank-tab[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+.fun-rank-tab:active { opacity: .75; }
 .fun-rank-selects { display: flex; gap: 8px; margin-bottom: 12px; }
 .fun-select { flex: 1; min-width: 0; }
 .fun-picker, .fun-picker.option-trigger { min-width: 0; width: 100%; min-height: 48px; margin: 0; font-size: 13px; padding: 10px 8px; overflow-wrap: anywhere; }

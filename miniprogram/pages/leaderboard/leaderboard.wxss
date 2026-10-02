@@ -48,6 +48,11 @@ button.rank-more { width: 100%; min-height: 48px; margin-top: 24rpx; color: var(
 button.rank-metric { max-width: 33.333%; }
 button.rank-metric { max-width: 25%; }
 .fun-rank-filters { margin: -8rpx 0 28rpx; }
+.fun-rank-tabs { width: 100%; margin-bottom: 16rpx; white-space: nowrap; }
+.fun-rank-tabs-inner { display: inline-flex; gap: 16rpx; padding: 4rpx 0; }
+button.fun-rank-tab { flex: none; width: auto; min-height: 48px; margin: 0; padding: 16rpx 24rpx; font-size: 25rpx; color: var(--muted); background: var(--surface); white-space: nowrap; border: 1rpx solid transparent; }
+button.fun-rank-tab.selected { color: var(--accent); border-color: var(--accent); }
+button.fun-rank-tab:not([disabled]):active { opacity: .75; }
 .fun-rank-selects { display: flex; gap: 16rpx; align-items: stretch; margin-bottom: 16rpx; }
 .fun-rank-selects picker { min-width: 0; flex: 1; }
 .fun-picker { min-height: 48px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 16rpx; background: var(--surface); border-radius: 12rpx; font-size: 25rpx; overflow-wrap: anywhere; }

@@ -835,13 +835,16 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
   await p.clearFunFilter();assert.equal(urls.at(-1),'/api/me/matches?offset=0');
 });
-test('小程序趣味榜保留筛选与样本门槛，迟到响应不能覆盖新选择，旧服务回退独立于积分',async()=>{
+test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到响应隔离，旧服务回退独立于积分',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'knights',sort:'rate',role:'gareth',unit:'%',metricLabel:'命中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
-  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);return result();}});
+  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'命中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return {...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})};}});
   const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
-  await p.load(false,{metric:'fun_knife_enemy',funMode:'knights',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
-  assert.match(urls[1],/mode=knights&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_knife_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
+  await p.load(false,{metric:'fun_knife_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
+  assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_knife_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
+  assert.equal(p.data.funOptions.length,defs.length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_good_shield'));
+  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
+  assert.equal(p.data.funActiveId,'rank-fun_good_shield');assert.equal(p.data.funRole,'');
   const fallback=page('leaderboard',{...apiBase,request:async url=>{if(url.includes('metric=fun_'))throw Object.assign(Error('排行榜参数无效'),{status:400});return rankResult('games',{availableMetrics:['points','games']});}}).p;
   await fallback.load(false,{metric:'fun_merlin_evade'});assert.equal(fallback.data.metric,'games');assert.equal(fallback.data.pointsAvailable,true);assert.equal(fallback.data.funAvailable,false);assert.match(fallback.data.notice,/趣味榜/);
 });

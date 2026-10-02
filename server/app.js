@@ -238,7 +238,8 @@ function createApp({
           if (visibilityOnly) check(typeof b.leaderboardVisible === "boolean" && Object.keys(b).length === 1, "排行榜展示设置无效");
           const old = visibilityOnly ? readProfile(store, uid) : null;
           const profile = saveProfile(store, uid, visibilityOnly
-            ? { nickname: old.nickname || "新朋友", version: old.version, leaderboardVisible: b.leaderboardVisible } : b);
+            ? { nickname: old.nickname || "新朋友", version: old.version, leaderboardVisible: b.leaderboardVisible } : b,
+            { confirmNickname: !visibilityOnly });
           store.addReceipt(uid, id, fingerprint, profile);
           return profile;
         });
@@ -365,7 +366,15 @@ function createApp({
         if (match?.[2] === "delete") store.remove(room.code);
         else {
           store.save(room);
-          if (path === "/api/rooms" || match?.[2] === "join") store.visitRoom(uid, room.code);
+          if (path === "/api/rooms" || match?.[2] === "join") {
+            store.visitRoom(uid, room.code);
+            if (b.confirmNickname !== undefined) {
+              check(b.confirmNickname === true && Number.isSafeInteger(b.profileVersion) && b.profileVersion >= 0, "请刷新资料后确认玩家昵称");
+              const old = readProfile(store, uid);
+              // Another device may already have confirmed a personal nickname.
+              response.profile = old.nicknameConfirmed ? old : saveProfile(store, uid, { nickname: b.name, version: b.profileVersion });
+            }
+          }
         }
         store.addReceipt(uid, id, fingerprint, response);
         store.db

@@ -234,10 +234,11 @@
         <button hover-class="none" class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode!=='join'}}">创建房间</button>
         <button hover-class="none" class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode==='join'}}">加入房间</button>
       </view>
-      <label class="label" for="nickname">本桌昵称</label>
+      <label class="label" for="nickname">{{nicknameSetup?'玩家昵称':'本桌昵称'}}</label>
       <input class="input" id="nickname" name="nickname" type="nickname" maxlength="16"
         value="{{name}}" bindinput="inputName" bindblur="inputName"
-        placeholder="默认使用个人昵称，也可为本桌修改" disabled="{{busy}}" />
+        placeholder="{{nicknameSetup?'填写或选择微信昵称':'默认使用个人昵称，也可为本桌修改'}}" disabled="{{busy}}" />
+      <view wx:if="{{nicknameSetup}}" class="small muted">用于牌桌和排行榜，可在“我的”中修改。</view>
       <block wx:if="{{entryMode!=='join'}}">
         <view class="field-title">人数</view>
         <view class="capacity-grid">
@@ -258,13 +259,13 @@
           <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
         </view>
         <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 · 查看玩法与技能 ›</button>
-        <button hover-class="none" class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">创建 {{capacity}} 人房间</button>
+        <button hover-class="none" class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">{{nicknameSetup?'确认昵称并创建':'创建'}} {{capacity}} 人房间</button>
       </block>
       <block wx:else>
         <label class="field-title" for="room-code">房间码</label>
         <input class="input room-input" id="room-code" name="code" type="number" maxlength="6"
           value="{{code}}" bindinput="inputCode" placeholder="输入6位房间码" disabled="{{busy}}" />
-        <button hover-class="none" class="primary" form-type="submit" data-action="join" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">加入房间</button>
+        <button hover-class="none" class="primary" form-type="submit" data-action="join" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">{{nicknameSetup?'确认昵称并加入房间':'加入房间'}}</button>
       </block>
     </form>
     <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button hover-class="none" class="history-toggle room-refresh" bindtap="refreshRooms" disabled="{{busy || loading || roomsRefreshing || hasPendingRequest}}">{{roomsRefreshing?'刷新中…':'刷新'}}</button></view>

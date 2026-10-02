@@ -209,6 +209,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     boardName: "阿瓦隆 · 经典基础",
     boardRoleConfiguration: [],
     name: "",
+    nicknameSetup: true,
+    nicknameVersion: 0,
     code: "",
     capacity: 6,
     capacities: [5, 6, 7, 8, 9, 10, 11, 12, 13],
@@ -365,7 +367,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.schedule();
     }
   },
-  async refreshLobby() {
+  async refreshLobby({ preserveName = false } = {}) {
     const sequence = this.lobbyRefreshSequence = (this.lobbyRefreshSequence || 0) + 1;
     const nameInputRevision = this.nameInputRevision || 0;
     try {
@@ -379,10 +381,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       // A changed personal nickname replaces an older table draft, while input
       // entered during this refresh and avatar-only edits retain the user's name.
       if (profile) {
-        if (this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
+        const confirmed = profile.nicknameConfirmed ?? !!(profile.nickname && profile.nickname !== "新朋友");
+        this.setData({ nicknameSetup: !confirmed, nicknameVersion: profile.version });
+        if (!preserveName && this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
             nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
         this.lobbyProfileNickname = profile.nickname;
-        if (!this.nameEdited) this.setData({ name: profile.nickname || wx.getStorageSync("nickname") || "" });
+        if (!this.nameEdited) this.setData({ name: (confirmed ? profile.nickname : "") || wx.getStorageSync("nickname") || "" });
       }
       const held = typeof getApp === "function" && getApp().pendingTableRequest;
       if (held) this.setData({ pendingTableCode: held.code });
@@ -1051,9 +1055,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (pending.after === "enter") wx.removeStorageSync("pendingEntry");
       this.mask();
       if (pending.after === "enter" || pending.after === "entryVisit") {
+        if (result.profile) {
+          this.lobbyRefreshSequence = (this.lobbyRefreshSequence || 0) + 1;
+          this.lobbyProfileNickname = result.profile.nickname;
+          this.setData({ nicknameSetup: !result.profile.nicknameConfirmed, nicknameVersion: result.profile.version });
+        }
         this.roomCode = result.code;
         wx.setStorageSync("roomCode", result.code);
-        wx.setStorageSync("nickname", this.data.name);
+        wx.setStorageSync("nickname", pending.data.name || this.data.name);
         if (this.data.isLobby) {
           this.nameEdited = false;
           await this.enterTable(result.code);
@@ -1089,6 +1098,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       this.setData({ notice: "" });
       this.handleError(e);
+      if (e.status === 409 && pending.after === "enter" && this.data.isLobby) await this.refreshLobby({ preserveName: true });
     } finally {
       this.setData({ busy: false, busyAction: "" });
       this.schedule();
@@ -1113,6 +1123,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   submitEntry(e) {
     if (this.data.busy || this.data.loading) return;
     // Read the native form value: nickname autofill/security checks may skip input events.
+    this.nameEdited = true;
+    this.nameInputRevision = (this.nameInputRevision || 0) + 1;
     this.setData({ name: (e.detail.value.nickname || "").trim() });
     if (this.data.entryMode === "join") {
       this.setData({ code: (e.detail.value.code || "").trim() });
@@ -1128,6 +1140,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         name: this.data.name,
         board: this.data.boardId,
         capacity: this.data.capacity,
+        ...(this.data.nicknameSetup ? { confirmNickname: true, profileVersion: this.data.nicknameVersion } : {}),
       },
       "enter",
     );
@@ -1137,7 +1150,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       return this.setData({ error: "请填写昵称和6位房间码" });
     this.mutate(
       "/api/rooms/" + this.data.code + "/join",
-      { name: this.data.name },
+      { name: this.data.name, ...(this.data.nicknameSetup ? { confirmNickname: true, profileVersion: this.data.nicknameVersion } : {}) },
       "enter",
     );
   },

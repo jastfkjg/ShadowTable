@@ -354,7 +354,7 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsTab: "records", statsLoading: false, statsError: "",
-    rankMetric: 'points', rankFunMode: 'classic', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
@@ -468,7 +468,7 @@
         await refresh(); schedule();
       } else if (route.page === 'lobby') {
         await Promise.all([loadRooms(), loadProfile()]);
-        if (!state.nameEdited) setState({ name: state.profile?.nickname || storage.get('nickname') || '' });
+        if (!state.nameEdited) setState({ name: (!needsNicknameSetup() ? state.profile?.nickname : '') || storage.get('nickname') || '' });
       } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats()]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
@@ -479,6 +479,12 @@
   }
   function profileDraft(profile) {
     return { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
+  }
+  function needsNicknameSetup() {
+    return !(state.profile?.nicknameConfirmed ?? !!(state.profile?.nickname && state.profile.nickname !== '新朋友'));
+  }
+  function entryNicknameData() {
+    return needsNicknameSetup() ? { confirmNickname: true, profileVersion: state.profile?.version || 0 } : {};
   }
   async function loadProfile(edit = false) {
     const sequence = ++profileSequence, route = routeSequence;
@@ -630,7 +636,24 @@
   }
   const rankGroups = [['points','积分'],['games','局数'],['overall','胜率'],['fun','趣味']];
   const rankMetrics = [['points','积分'],['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
-  var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
+  var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false, lastFunRankMetric = null;
+  var observedFunTabs = null, observedFunTab = null;
+  const funRankResizeObserver = window.ResizeObserver ? new window.ResizeObserver(() => keepFunRankVisible(true)) : null;
+  function keepFunRankVisible(force = false) {
+    const tabs = app.querySelector('.fun-rank-tabs'), active = tabs?.querySelector('[aria-pressed="true"]');
+    if (active && (force || lastFunRankMetric !== state.rankMetric)) {
+      const bounds = tabs.getBoundingClientRect(), selected = active.getBoundingClientRect();
+      if (selected.left < bounds.left + 4) tabs.scrollLeft += selected.left - bounds.left - 4;
+      else if (selected.right > bounds.right - 4) tabs.scrollLeft += selected.right - bounds.right + 4;
+    }
+    if (funRankResizeObserver && (observedFunTabs !== tabs || observedFunTab !== active)) {
+      funRankResizeObserver.disconnect();
+      if (active) { funRankResizeObserver.observe(tabs); funRankResizeObserver.observe(active); }
+      observedFunTabs = tabs; observedFunTab = active;
+    }
+    lastFunRankMetric = active ? state.rankMetric : null;
+  }
+  window.addEventListener('resize', () => keepFunRankVisible(true));
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
     const sequence = ++rankSequence, route = routeSequence;
@@ -716,7 +739,7 @@
     return html;
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，十二骑士还需登记实际带刀人。缺失过程保留未知。趣味榜按玩法隔离，只公开正向指标；成功率需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，十二骑士还需登记实际带刀人。非梅林好人挡刀会记录次数及成功率，分母是作为在场非梅林好人面对最终非空刀的局数。缺失过程保留未知。趣味排行跨板子汇总，横栏可左右滑动切换指标，只公开正向指标；成功率需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1256,9 +1279,10 @@ function roomListItems(rooms) {
       if (p.after === "enter") storage.remove("pendingEntry");
       mask();
       if (p.after === "enter" || p.after === "entryVisit") {
+        if (result.profile) { profileSequence++; state.profile = result.profile; state.profileLoading = false; }
         roomCode = result.code;
         storage.set("roomCode", result.code);
-        storage.set("nickname", state.name);
+        storage.set("nickname", p.data.name || state.name);
         state.nameEdited = false;
         state.page = 'table'; currentRoute = '#/table/' + result.code;
         window.history.pushState({}, '', currentRoute);
@@ -1289,6 +1313,7 @@ function roomListItems(rooms) {
       }
       setState({ notice: "" });
       handleError(e);
+      if (e.status === 409 && p.after === 'enter') await loadProfile();
     } finally {
       setState({ busy: false });
       schedule();
@@ -1414,6 +1439,7 @@ function roomListItems(rooms) {
         }).join('') + '</svg>';
       }
       html += '<p class="fun-caption small muted">' + (combat ? '有效敌方命中率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
+      if (card.id.endsWith(':shield')) html += '<p class="small muted">挡刀率以终局时作为在场非梅林好人、面对最终非空刀的局数为分母。</p>';
       const aim = card.metrics.find(row=>row.id.endsWith('aim_enemy'));
       if (aim?.rate!==null && aim) html += '<p class="small muted">选敌率 '+aim.rate.toFixed(1)+'%；选中敌方但被挡下仍计未生效。</p>';
       if (combat && primary.byRole.length) {
@@ -1426,12 +1452,11 @@ function roomListItems(rooms) {
     return html + '<p class="small muted fun-note">派西按初始身份记三绿／三炸；梅林只统计最终刺杀机会。刀、枪、决斗与最终刀分别记录，空刀单列；未使用和作废不计失败。</p>';
   }
   function viewFunRankFilters(board) {
-    const mode = state.rankFunMode, metric = state.rankMetric;
-    const list = state.rankFunMetrics.filter(item=>mode==='knights' || !['knife','gun','duel','final'].includes(item.group));
+    const metric = state.rankMetric, list = state.rankFunMetrics;
     const select = (key,label,items,value) => '<label class="fun-select"><span class="sr-only">'+label+'</span><select class="fun-picker" data-change="'+key+'">'+items.map(item=>'<option value="'+esc(item.id)+'"'+(item.id===value ? ' selected' : '')+'>'+esc(item.label)+'</option>').join('')+'</select></label>';
-    let html = '<div class="fun-rank-filters"><div class="fun-rank-selects">'+select('funRankMode','玩法',[{id:'classic',label:'经典'},{id:'knights',label:'十二骑士'},{id:'other',label:'扩展玩法'}],mode)+select('funRankMetric','趣味指标',list.map(item=>({id:item.key,label:item.title+' · '+item.label})),metric)+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : '成功率')+'</button>').join('')+'</div>';
+    let html = '<div class="fun-rank-filters"><div class="fun-rank-tabs" role="group" aria-label="趣味指标，可左右滑动">'+list.map(item=>'<button type="button" class="fun-rank-tab" data-action="funRankMetric" data-value="'+esc(item.key)+'" aria-pressed="'+(metric===item.key)+'">'+esc(item.title+' · '+item.label)+'</button>').join('')+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button type="button" data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : '成功率')+'</button>').join('')+'</div>';
     if (board?.roleOptions?.length) html += select('funRankRole','出刀角色',[{id:'',label:'全部角色'},...board.roleOptions],state.rankFunRole);
-    html += '</div><div class="small muted">'+(state.rankFunSort==='rate' ? '至少 '+(list.find(item=>item.key===metric)?.rateThreshold || 5)+' 次机会，按未舍入比例排名。' : '按累计次数排名，同次数并列。')+'空刀单列，缺失记录不参与。</div></div>';
+    html += '</div><div class="small muted">'+(state.rankFunSort==='rate' ? '至少 '+(list.find(item=>item.key===metric)?.rateThreshold || 5)+' 次机会，按未舍入比例排名。' : '按累计次数排名，同次数并列。')+(metric==='fun_good_shield' ? '挡刀率 = 挡刀次数 / 作为非梅林好人面对最终非空刀的局数。' : '')+'空刀单列，缺失记录不参与。</div></div>';
     return html;
   }
   function viewMatches() {
@@ -1524,7 +1549,7 @@ function roomListItems(rooms) {
     state.name = name;
     mutate(
       "/api/rooms",
-      { name: name, board: state.boardId, capacity: state.capacity },
+      { name: name, board: state.boardId, capacity: state.capacity, ...entryNicknameData() },
       "enter",
     );
   }
@@ -1535,7 +1560,7 @@ function roomListItems(rooms) {
       return setState({ error: "请填写昵称和6位房间码" });
     state.name = name;
     state.code = code;
-    mutate("/api/rooms/" + code + "/join", { name: name }, "enter");
+    mutate("/api/rooms/" + code + "/join", { name: name, ...entryNicknameData() }, "enter");
   }
   async function openRoom(code) {
     if (state.busy || pending) return;
@@ -2930,10 +2955,11 @@ function roomListItems(rooms) {
     var html = (active.length ? '<div class="resume-section"><span class="eyebrow">正在进行</span>' + active.map(r => '<button type="button" class="resume-room" data-action="openRoom" data-code="' + esc(r.code) + '"><span><span>继续对局 · ' + esc(r.code) + '</span><span class="small muted link-note">' + esc(r.boardName) + ' · ' + r.capacity + '人</span></span><span aria-hidden="true">→</span></button>').join('') + '</div>' : '') +
       '<div class="lobby-heading"><h1 class="page-title" tabindex="-1" data-page-heading>今晚，开一桌。</h1><div class="muted">和朋友面对面，把秘密交给牌桌。</div></div>';
     html +=
-      '<form class="panel entry-panel"><label class="label" for="nickname">本桌昵称</label>' +
+      '<form class="panel entry-panel"><label class="label" for="nickname">' + (needsNicknameSetup() ? '玩家昵称' : '本桌昵称') + '</label>' +
       '<input class="input" id="nickname" name="nickname" maxlength="16" data-input="name" value="' +
       esc(state.name) +
-      '" placeholder="使用个人昵称，也可为本桌修改" />' +
+      '" placeholder="' + (needsNicknameSetup() ? '填写玩家昵称' : '使用个人昵称，也可为本桌修改') + '"' + (state.busy ? ' disabled' : '') + ' />' +
+      (needsNicknameSetup() ? '<div class="small muted">用于牌桌和排行榜，可在“我的”中修改。</div>' : '') +
       '<div class="entry-tabs">' +
       btn("entry-tab" + (state.entryMode !== "join" ? " active" : ""), "switchEntry", "创建房间", { mode: "create" }, state.busy) +
       btn("entry-tab" + (state.entryMode === "join" ? " active" : ""), "switchEntry", "加入房间", { mode: "join" }, state.busy) +
@@ -2984,14 +3010,14 @@ function roomListItems(rooms) {
               .join("") +
             "</div>"
           : "") +
-        btn("primary", "create", "创建 " + state.capacity + " 人房间", null, state.loading || state.busy);
+        btn("primary", "create", (needsNicknameSetup() ? "确认昵称并创建 " : "创建 ") + state.capacity + " 人房间", null, state.loading || state.busy);
     } else {
       html +=
         '<label class="field-title" for="code">房间码</label>' +
         '<input class="input room-input" id="code" name="code" inputmode="numeric" maxlength="6" data-input="code" value="' +
         esc(state.code) +
         '" placeholder="输入6位房间码" />' +
-        btn("primary", "join", "加入房间", null, state.loading || state.busy);
+        btn("primary", "join", needsNicknameSetup() ? "确认昵称并加入房间" : "加入房间", null, state.loading || state.busy);
     }
     html += "</form>";
 
@@ -3749,6 +3775,7 @@ function roomListItems(rooms) {
       viewBoardDetails() + viewNavigation();
     enhanceSelects(next);
     patchDOM(app, next);
+    keepFunRankVisible();
     validateOptionDialog();
     showIdentityHintWhenVisible();
   }
@@ -3757,8 +3784,9 @@ function roomListItems(rooms) {
   var ACTIONS = {
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
     funRecords: el => navigate('matches?fun='+encodeURIComponent(el.dataset.metric)+'&mode='+encodeURIComponent(el.dataset.mode)+(el.dataset.role ? '&role='+encodeURIComponent(el.dataset.role) : '')),
+    funRankMetric: el => { if(el.dataset.value!==state.rankMetric && state.rankFunMetrics.some(item=>item.key===el.dataset.value)) return loadLeaderboard(false,{rankMetric:el.dataset.value,rankFunMode:'all',rankFunRole:''}); },
     funRankSort: el => { if(['count','rate'].includes(el.dataset.value)) return loadLeaderboard(false,{rankFunSort:el.dataset.value}); },
-    rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:'fun_merlin_evade',rankFunMode:'classic',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
+    rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:'fun_merlin_evade',rankFunMode:'all',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
     rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
     rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
@@ -4006,8 +4034,6 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
-    funRankMode: el => loadLeaderboard(false,{rankFunMode:el.value,rankFunRole:'',rankMetric:el.value==='knights' || !['fun_knife_enemy','fun_gun_enemy','fun_duel_enemy','fun_final_hit'].includes(state.rankMetric) ? state.rankMetric : 'fun_merlin_evade'}),
-    funRankMetric: el => loadLeaderboard(false,{rankMetric:el.value,rankFunRole:''}),
     funRankRole: el => loadLeaderboard(false,{rankFunRole:el.value}),
     rankVisibility: el => changeRankVisibility(el.checked),
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
@@ -4080,7 +4106,7 @@ function roomListItems(rooms) {
     if (picker && !picker.disabled) {
       var key = picker.dataset.optionTrigger;
       var select = app.querySelector('select[data-change="' + key + '"]');
-      if (select) openOptions(select, key.startsWith('funRank') ? ({funRankMode:'玩法',funRankMetric:'趣味指标',funRankRole:'出刀角色'})[key] : key === "settingsKick" ? "要移出的玩家" : key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子");
+      if (select) openOptions(select, key === 'funRankRole' ? '出刀角色' : key === "settingsKick" ? "要移出的玩家" : key === "settingsTransfer" ? "新房主" : /Capacity$/.test(key) ? "人数" : "板子");
       return;
     }
     var t = e.target.closest("[data-action]");

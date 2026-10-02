@@ -50,10 +50,10 @@ function resolveAvatar(value) {
   return builtinCache.get(preset.id);
 }
 function readProfile(store, uid) {
-  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible FROM profiles WHERE uid=?").get(uid);
+  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
-    leaderboardVisible: /^(wx|dev):/.test(uid) && (row ? !!row.leaderboard_visible : true) };
+    leaderboardVisible: /^(wx|dev):/.test(uid) && (row ? !!row.leaderboard_visible : true), nicknameConfirmed: !!row?.nickname_confirmed };
 }
 // Room presentation uses current avatars without copying profile data into game state.
 function readAvatarUrls(store, uids) {
@@ -61,7 +61,7 @@ function readAvatarUrls(store, uids) {
   const rows = store.db.prepare(`SELECT uid, avatar_hash FROM profiles WHERE uid IN (${uids.map(() => "?").join(",")})`).all(...uids);
   return new Map(rows.map(row => [row.uid, row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null]));
 }
-function saveProfile(store, uid, input) {
+function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
   fail(typeof input.nickname === "string" && input.nickname.trim().length >= 1 && input.nickname.trim().length <= 16 && !/[\u0000-\u001f\u007f]/.test(input.nickname), "昵称需要1–16个字符，不能包含换行");
   fail(Number.isSafeInteger(input.version) && input.version >= 0, "请刷新个人资料后重试");
   const old = readProfile(store, uid);
@@ -76,10 +76,10 @@ function saveProfile(store, uid, input) {
     store.db.prepare("INSERT OR IGNORE INTO avatars VALUES(?,?,?)").run(avatar.hash, avatar.mime, avatar.data);
     avatarHash = avatar.hash;
   }
-  store.db.prepare(`INSERT INTO profiles(uid,nickname,avatar_hash,version,updated,leaderboard_visible,public_id) VALUES(?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
+  store.db.prepare(`INSERT INTO profiles(uid,nickname,avatar_hash,version,updated,leaderboard_visible,public_id,nickname_confirmed) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
     nickname=excluded.nickname, avatar_hash=excluded.avatar_hash, version=excluded.version, updated=excluded.updated,
-    leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id)`)
-    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID());
+    leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id), nickname_confirmed=excluded.nickname_confirmed`)
+    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID(), confirmNickname || old.nicknameConfirmed ? 1 : 0);
   store.invalidateLeaderboard();
   return readProfile(store, uid);
 }

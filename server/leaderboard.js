@@ -22,11 +22,11 @@ function parseQuery(params) {
   const metric = params.get("metric") ?? "games", period = params.get("period") ?? "all";
   const offset = params.get("offset") ?? "0", version = params.get("version");
   const funMetric = metric.startsWith("fun_") ? fun.metrics[metric.slice(4)] : null;
-  const mode = params.get("mode") || "classic", role = params.get("role") || null, sort = params.get("sort") || "count";
+  const mode = params.get("mode") || "all", role = params.get("role") || null, sort = params.get("sort") || "count";
   if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !["all", "month"].includes(period) || !/^(0|20|40|60|80)$/.test(offset)
     || (version !== null && !/^[a-f0-9-]{36}$/.test(version)) || (Number(offset) > 0 && !version))
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
-  if (funMetric ? !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && (fun.combatType(role) !== funMetric.group && funMetric.group !== "final") || role && !roleName(role)
+  if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && (fun.combatType(role) !== funMetric.group && funMetric.group !== "final") || role && !roleName(role)
     : ["mode", "role", "sort"].some(key => params.has(key))) throw new RuleError("排行榜参数无效",400);
   return { metric, period, offset: Number(offset), version, funMetric, mode, role, sort };
 }
@@ -126,8 +126,8 @@ class Leaderboard {
         count(DISTINCT CASE WHEN s.status='unknown' THEN s.match_id END) AS unknownGames,
         f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
         FROM match_fun_stats s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
-        WHERE p.outcome IN ('win','loss') AND s.metric=? AND s.mode=? AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
-        GROUP BY s.uid`).all(def.id, mode, range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
+        WHERE p.outcome IN ('win','loss') AND s.metric=? ${mode === "all" ? "" : "AND s.mode=?"} AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
+        GROUP BY s.uid`).all(def.id, ...(mode === "all" ? [] : [mode]), range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
       const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);
       eligible.sort((a,b) => comparator(a,b) || a.public_id.localeCompare(b.public_id));
       let rank = 0;

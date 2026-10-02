@@ -1,6 +1,6 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
-const VERSION = "fun-2026-10-v1";
+const VERSION = "fun-2026-10-v2";
 const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
 const modeFor = (board) =>
   /^knights(?:-|$)/.test(board)
@@ -13,6 +13,7 @@ const definitions = [
   ["percival_bust", "三炸收场", "percival", "派西维尔", "局", false],
   ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 5],
   ["merlin_hit", "被最终刺中", "merlin", "梅林", "次", false],
+  ["good_shield", "成功挡刀", "shield", "好人（非梅林）", "次", true, 5],
   ["assassin_hit", "刺中梅林", "assassin", "刺客", "次", true, 5],
   ["assassin_miss", "歪刀", "assassin", "刺客", "次", false],
   ["final_hit", "最终刺中梅林", "final", "最终带刀", "次", true, 5],
@@ -228,6 +229,27 @@ function project(record, players, roles) {
         known,
       );
     }
+    // Use the final identity and faction, including knights' faction changes.
+    const shieldEligible =
+      player.roleId !== "merlin" && player.faction === "good";
+    const shieldOpportunity =
+      shieldEligible &&
+      player.alive !== false &&
+      Number.isInteger(t?.target) &&
+      t.target > 0
+        ? 1
+        : 0;
+    const shieldHit = shieldOpportunity && t.target === player.seat ? 1 : 0;
+    if (shieldEligible) {
+      add("good_shield", player.roleId, shieldHit, shieldOpportunity, !!t);
+      if (shieldHit)
+        events.push({
+          id: "final-shield",
+          role: labelRole(player.roleId),
+          label: "成功挡刀",
+          detail: `最终刀落到本人（${player.seat}号非梅林好人） · ${t.source === "system" ? "系统结算" : "房主登记"}`,
+        });
+    }
     if (
       player.roleId === "assassin" ||
       (t?.actor?.uid === player.uid && t.actor.role === "assassin")
@@ -343,7 +365,7 @@ function project(record, players, roles) {
     return {
       uid: player.uid,
       fun: {
-        version: state?.version || VERSION,
+        version: VERSION,
         mode,
         initialRole: initial ? labelRole(initial) : null,
         status: excluded

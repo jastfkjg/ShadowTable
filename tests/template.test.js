@@ -43,6 +43,19 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test('趣味指标全部以横向滚动按钮呈现，不再弹出玩法或指标选择器', () => {
+  const defs=require('../server/fun').publicMetrics();
+  const tree=factory('pages/leaderboard/leaderboard.wxml')({
+    groups:require('../miniprogram/leaderboard').groups,metric:'fun_good_shield',funSelected:true,funAvailable:true,
+    funOptions:defs.map(m=>({...m,tabLabel:m.title+' · '+m.label})),funActiveId:'rank-fun_good_shield',funSort:'count',funRoleOptions:[],
+  });
+  const all=nodes(tree), tabs=all.filter(n=>n.attr?.bindtap==='chooseFunMetric');
+  assert.equal(tabs.length,defs.length);assert.ok(tabs.every(n=>n.tag==='wx-button'));
+  assert.ok(all.some(n=>n.tag==='wx-scroll-view'));
+  assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
+  assert.match(JSON.stringify(tree),/好人（非梅林） · 成功挡刀/);assert.match(JSON.stringify(tree),/轮内刀法 · 命中敌方/);
+  assert.ok(!all.some(n=>n.attr?.bindchange==='chooseFunMode' || n.attr?.bindchange==='chooseFunMetric'));
+});
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{
   const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
   const ended=render({...base,room});assert.match(JSON.stringify(ended),/本局 \+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);

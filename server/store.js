@@ -2,7 +2,7 @@
 const { DatabaseSync } = require("node:sqlite");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { dirname } = require("node:path");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
 const fun = require("./fun");
@@ -37,6 +37,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS match_fun_stats(match_id TEXT NOT NULL,uid TEXT NOT NULL,mode TEXT NOT NULL,metric TEXT NOT NULL,role TEXT NOT NULL,role_label TEXT NOT NULL,count INTEGER NOT NULL,opportunities INTEGER NOT NULL,status TEXT NOT NULL,ended INTEGER NOT NULL,PRIMARY KEY(match_id,uid,metric,role));
       CREATE INDEX IF NOT EXISTS match_fun_user ON match_fun_stats(uid,mode,metric,ended);
       CREATE INDEX IF NOT EXISTS match_fun_rank ON match_fun_stats(mode,metric,ended,uid) WHERE status='known';
+      CREATE INDEX IF NOT EXISTS match_fun_metric ON match_fun_stats(metric,ended,uid);
       CREATE TABLE IF NOT EXISTS score_versions(uid TEXT PRIMARY KEY, revision INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
@@ -46,6 +47,18 @@ class Store {
       this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 1");
     if (!profileColumns.some(column => column.name === "public_id"))
       this.db.exec("ALTER TABLE profiles ADD COLUMN public_id TEXT");
+    if (!profileColumns.some(column => column.name === "nickname_confirmed")) this.transaction(() => {
+      this.db.exec("ALTER TABLE profiles ADD COLUMN nickname_confirmed INTEGER NOT NULL DEFAULT 0");
+      // Visibility-only saves used to persist the placeholder as a real nickname.
+      // Explicit profile-save receipts distinguish intentional uses of that name;
+      // ambiguous legacy placeholders remain unchanged until their owner confirms.
+      const visibilityFingerprints = [false, true].map(leaderboardVisible => createHash("sha256")
+        .update(JSON.stringify(["/api/me/leaderboard-visibility", { leaderboardVisible }])).digest("hex"));
+      this.db.prepare(`UPDATE profiles SET nickname_confirmed=1 WHERE trim(nickname)<>'' AND
+        (nickname<>'新朋友' OR EXISTS (SELECT 1 FROM receipts r WHERE r.uid=profiles.uid
+          AND json_extract(r.result,'$.nickname')=profiles.nickname AND json_extract(r.result,'$.version') IS NOT NULL
+          AND r.fingerprint NOT IN (?,?)))`).run(...visibilityFingerprints);
+    });
     this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS profiles_public_id ON profiles(public_id) WHERE public_id IS NOT NULL;
       CREATE INDEX IF NOT EXISTS match_players_rank_time ON match_players(ended, faction, uid, outcome) WHERE outcome IN ('win','loss');`);
     const columns = this.db.prepare("PRAGMA table_info(admin_audit)").all();
@@ -74,7 +87,7 @@ class Store {
     });
   }
   restoreFunRecords() {
-    const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all();
+    const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
     for (const row of rows) {
       const match = JSON.parse(row.snapshot), players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(row.id).map(p => ({ uid: p.uid, ...JSON.parse(p.snapshot) }));
       // Only classical frozen identities and explicit terminal facts can be recovered.
@@ -86,6 +99,7 @@ class Store {
       }
       this.rebuildFun(match, players);
     }
+    if (rows.length) this.syncScoreRooms();
   }
   writeFun(match, uid, projection) {
     this.db.prepare("DELETE FROM match_fun_stats WHERE match_id=? AND uid=?").run(match.id, uid);

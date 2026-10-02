@@ -10,7 +10,7 @@
       </view>
       <view class="nickname-editor">
         <view wx:if="{{editingNickname}}" class="nickname-input-row">
-          <input id="profile-nickname" class="input nickname-input {{nicknameError ? 'is-invalid' : ''}}" name="nickname" type="text" maxlength="16" value="{{nickname}}" focus="{{editingNickname}}" bindinput="inputName" bindblur="finishNicknameEdit" bindconfirm="finishNicknameEdit" bindkeyboardheightchange="keyboardHeightChange" confirm-type="done" cursor-spacing="24" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符" />
+          <input id="profile-nickname" class="input nickname-input {{nicknameError ? 'is-invalid' : ''}}" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" focus="{{editingNickname}}" bindinput="inputName" bindblur="finishNicknameEdit" bindconfirm="finishNicknameEdit" bindkeyboardheightchange="keyboardHeightChange" confirm-type="done" cursor-spacing="24" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符" />
           <button hover-class="none" class="nickname-done" bindtap="finishNicknameEdit" disabled="{{busy || pendingSave}}">完成</button>
         </view>
         <button wx:else hover-class="none" class="nickname-display" bindtap="editNickname" disabled="{{busy || pendingSave}}" aria-label="{{'修改个人昵称，当前昵称：' + nickname}}">
