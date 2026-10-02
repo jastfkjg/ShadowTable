@@ -335,9 +335,9 @@ test("直接执行失败时展示错误并允许重试", async () => {
 function scoringClient(api) {
   const elements = new Map(), inputs = [], confirmations = [];
   const node = (tag = 'div', textContent = '') => ({
-    tag, textContent, value: '', dataset: {}, children: [], disabled: false,
+    tag, textContent, value: '', dataset: {}, children: [], disabled: false, listeners: {}, attributes: {},
     append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; },
-    addEventListener() {}, setAttribute() {}, querySelector() { return this.children.find(n => n.tag === 'small'); },
+    addEventListener(type, fn) { this.listeners[type]=fn; }, setAttribute(key,value) { this.attributes[key]=value; }, focus() { this.focused=true; }, querySelector() { return this.children.find(n => n.tag === 'small'); },
     querySelectorAll() { return inputs; },
   });
   const $ = id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
@@ -349,7 +349,7 @@ function scoringClient(api) {
     correctionMatch: () => context.match, selectOptions() {},
   };
   vm.runInNewContext(source.slice(source.indexOf('let scorePlayers=[]')) + `
-    this.test = { submitScoreWrite, loadMatchScores,
+    this.test = { submitScoreWrite, loadMatchScores, searchScorePlayers, updatePlayerScorePreview,
       player(p) { scorePlayers=[p]; selectedScorePlayer=p; $('score-player').value=p.uid; },
       match(m) { matchScoreDetail=m; },
       pending() { return scoreWritePending; }, detail() { return matchScoreDetail; }
@@ -363,27 +363,48 @@ test('积分提交断网后锁住原请求，重试复用编号和数据，成�
     return { points:9,matchPoints:4,manualPoints:5,revision:2,adjustments:{records:[],hasMore:false} };
   });
   c.player({uid:'wx:1',name:'林间',points:4,revision:1});
-  c.$('player-score-points').value='5';c.$('player-score-mode').value='delta';c.$('player-score-reason').value='奖励调整';
+  c.$('player-score-points').value='5';c.$('player-score-mode').value='delta';
   await c.submitScoreWrite('player');assert.ok(c.pending());assert.equal(c.$('player-score-points').disabled,true);
   assert.equal(c.$('match-score-submit').disabled,true);assert.match(c.$('player-score-status').textContent,/重试/);
   c.$('player-score-points').value='100';await c.submitScoreWrite('player');
   assert.deepEqual(writes[0],writes[1]);assert.equal(c.confirmations.length,1);assert.equal(c.pending(),null);
-  assert.match(c.$('score-player-summary').textContent,/总积分 9/);assert.equal(c.$('player-score-points').value,'');
+  assert.equal(c.$('score-total').textContent,9);assert.equal(c.$('player-score-points').value,'');
+  assert.ok(!Object.hasOwn(writes[0],'reason'));
   c.context.api=async()=>{throw Object.assign(Error('玩家积分已变化'),{status:409});};
-  c.$('player-score-points').value='1';c.$('player-score-reason').value='再次调整';await c.submitScoreWrite('player');
+  c.$('player-score-points').value='1';await c.submitScoreWrite('player');
   assert.equal(c.pending(),null);assert.equal(c.$('score-player-query').disabled,false);
 });
 test('单局改分只提交有变化的玩家与自动恢复选项，迟到的对局明细不覆盖当前选择', async () => {
   const players=[{uid:'a',seat:1,name:'甲',editable:true,score:{total:4}},{uid:'b',seat:2,name:'乙',editable:true,score:{total:3}}];
   const writes=[],c=scoringClient(async(path,body)=>{if(body)writes.push(structuredClone(body));return {id:'m',revision:1,players};});
-  c.context.match={id:'m',options:[]};c.match({id:'m',revision:0,players});c.$('match-score-reason').value='本局修正';
+  c.context.match={id:'m',options:[]};c.match({id:'m',revision:0,players});
   c.inputs.push({dataset:{scoreUid:'a'},value:'8'},{dataset:{scoreUid:'b',reset:'true'},value:''});
   await c.submitScoreWrite('match');assert.deepEqual(writes[0].scores,[{uid:'a',points:8},{uid:'b',points:null}]);
+  assert.ok(!Object.hasOwn(writes[0],'reason'));
   let resolveOld,resolveNew;
   c.context.api=path=>new Promise(resolve=>{if(path.includes('/old/'))resolveOld=resolve;else resolveNew=resolve;});
   c.context.match={id:'old',options:[]};const old=c.loadMatchScores();c.context.match={id:'new',options:[]};const latest=c.loadMatchScores();
   resolveNew({id:'new',revision:3,players:[]});await latest;resolveOld({id:'old',revision:2,players:[]});await old;
   assert.equal(c.detail().id,'new');
+});
+test('积分标签支持键盘切换且保留草稿，增减和设置显示各自结果预览', () => {
+  const c=scoringClient(async()=>{});
+  c.player({uid:'wx:1',name:'林间',points:12,revision:0});
+  c.$('player-score-points').value='-5';c.$('player-score-mode').value='delta';c.updatePlayerScorePreview();
+  assert.equal(c.$('player-score-preview').textContent,'总积分 12 → 7 分');
+  c.$('score-tab-player').listeners.keydown({key:'ArrowRight',preventDefault(){}});
+  assert.equal(c.$('score-tab-match').attributes['aria-selected'],'true');
+  assert.equal(c.$('player-score-section').hidden,true);assert.equal(c.$('score-tab-match').focused,true);
+  c.$('score-tab-match').listeners.keydown({key:'Home',preventDefault(){}});
+  assert.equal(c.$('player-score-section').hidden,false);assert.equal(c.$('player-score-points').value,'-5');
+  c.$('player-score-mode').value='set';c.updatePlayerScorePreview();
+  assert.equal(c.$('player-score-preview').textContent,'总积分 12 → -5 分');
+});
+test('玩家查询失败后清除旧编辑目标，不把改分提交给上一次玩家',async()=>{
+  let writes=0;const c=scoringClient(async(path,body)=>{if(body)writes++;throw Error('读取失败');});
+  c.player({uid:'wx:old',name:'旧玩家',points:9,revision:0});c.$('score-player-query').value='新玩家';
+  await c.searchScorePlayers();assert.equal(c.$('player-score-editor').hidden,true);assert.equal(c.$('player-score-submit').disabled,true);
+  await c.submitScoreWrite('player');assert.equal(writes,0);assert.match(c.$('player-score-status').textContent,/读取失败/);
 });
 test('管理员不计分对局更正提交趣味目标与带刀人，失败重试保持原数据，筛掉已出局玩家',async()=>{
   const source=fs.readFileSync(require.resolve('../server/admin/app.js'),'utf8'),elements=new Map(),writes=[];
@@ -391,12 +412,13 @@ test('管理员不计分对局更正提交趣味目标与带刀人，失败重�
   const $=id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id);};
   const match={id:'m',revision:0,correctionKind:'fun',needsActor:true,options:[{id:'early_assassination',requiresTarget:true}],players:[{seat:1,name:'甲'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}]};
   let attempts=0;
-  const context={$,el:node,crypto:require('node:crypto'),window:{confirm:()=>true},scoreBusy:false,scoreWritePending:null,matchScoreLoading:false,selectedScorePlayer:null,lockScoreControls(){},loadMatchScores(){},loadPlayerScore(){},api:async(path,body)=>{if(body){writes.push(structuredClone(body));if(++attempts===1)throw Error('网络中断');return {revision:1,winner:'good'};}return {matches:[{...match,revision:1}]};}};
+  const context={$,el:node,crypto:require('node:crypto'),window:{confirm:()=>true},scoreBusy:false,scoreWritePending:null,matchScoreLoading:false,matchScoreSequence:0,selectedScorePlayer:null,lockScoreControls(){},loadMatchScores(){},loadPlayerScore(){},api:async(path,body)=>{if(body){writes.push(structuredClone(body));if(++attempts===1)throw Error('网络中断');return {revision:1,winner:'good'};}return {matches:[{...match,revision:1}]};}};
   vm.runInNewContext(source.slice(source.indexOf('let correctionMatches ='),source.indexOf('let scorePlayers=[]'))+';this.setMatch=m=>{correctionMatches=[m];};this.target=updateCorrectionTarget;this.refreshMatch=updateCorrectionMatch;',context);
   context.setMatch(match);$('correction-match').value='m';context.refreshMatch();
   assert.ok(!$('correction-target').children.some(row=>row.value==='3'));assert.ok(!$('correction-actor').children.some(row=>row.value==='3'));
   $('correction-result').value='early_assassination';context.target();assert.equal($('correction-actor-row').hidden,false);
-  $('correction-target').value='1';$('correction-actor').value='2';$('correction-reason').value='刺杀登记更正';$('correction-code').value='123456';
+  $('correction-target').value='1';$('correction-actor').value='2';$('correction-code').value='123456';
   const submit=$('correction-form').listeners.submit;await submit({preventDefault(){}});assert.match($('correction-submit').textContent,/重试/);
   $('correction-target').value='0';await submit({preventDefault(){}});assert.deepEqual(writes[0],writes[1]);assert.equal(writes[0].funTarget,1);assert.equal(writes[0].funActor,2);assert.ok(!Object.hasOwn(writes[0],'scoreTarget'));assert.match($('correction-status').textContent,/趣味记录/);
+  assert.ok(!Object.hasOwn(writes[0],'reason'));
 });

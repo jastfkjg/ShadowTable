@@ -61,45 +61,75 @@
             ><button id="next">下一页</button>
           </div>
         </section>
-        <section id="player-score-section">
-          <h2>玩家积分管理</h2>
-          <form id="score-player-search"><label for="score-player-query">玩家昵称或账号标识</label><input id="score-player-query" required maxlength="200" /><button id="score-player-find" type="submit">查找玩家</button></form>
-          <div class="pager"><button id="score-player-prev" disabled>上一页</button><span id="score-player-page"></span><button id="score-player-next" disabled>下一页</button></div>
-          <label for="score-player">选择玩家</label><select id="score-player" disabled><option value="">请先查找玩家</option></select>
-          <p id="score-player-summary"></p>
-          <form id="player-score-form">
-            <label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta">加减积分</option><option value="set">设置总积分</option></select>
-            <label for="player-score-points">积分数值</label><input id="player-score-points" type="number" step="1" min="-1000000" max="1000000" required aria-describedby="player-score-help" />
-            <p id="player-score-help">加减积分时，正数加分、负数扣分。总分调整不改变胜负、连胜或场均积分。</p>
-            <label for="player-score-reason">调整原因</label><input id="player-score-reason" required minlength="2" maxlength="200" />
-            <p id="player-score-status" role="status" aria-live="polite"></p>
-            <button id="player-score-submit" class="danger" disabled>确认调整玩家积分</button>
-          </form>
-          <div id="player-score-history"></div>
-          <button id="player-score-history-more" hidden>加载更多调整记录</button>
-        </section>
-        <section>
-          <h2>对局积分与结果管理</h2>
-          <p>按本局开局时的规则重算积分，并同步战绩和连胜。每次更正会保留原因和前后记录。</p>
-          <label for="correction-code">房间号</label><input id="correction-code" inputmode="numeric" maxlength="6" placeholder="6位房间号" />
-          <button id="correction-load" type="button">查找最近50场对局</button>
-          <form id="correction-form">
-            <label for="correction-match">选择对局</label><select id="correction-match" required disabled><option value="">请先查找对局</option></select>
-            <label for="correction-result">实际结束原因</label><select id="correction-result" required disabled></select>
-            <div id="correction-target-row" hidden><label for="correction-target">实际刺杀目标</label><select id="correction-target"></select></div>
-            <div id="correction-actor-row" hidden><label for="correction-actor">实际带刀人（可保持未记录）</label><select id="correction-actor"></select></div>
-            <label for="correction-reason">更正原因</label><input id="correction-reason" required minlength="2" maxlength="200" />
-            <p id="correction-status" role="status" aria-live="polite"></p>
-            <button id="correction-submit" class="danger" disabled>确认更正整局结果</button>
-          </form>
-          <form id="match-score-form">
-            <h3>本局玩家积分</h3>
-            <p>修改得分保留原胜负和连胜。恢复自动计分后，按本局规则重新计算。</p>
-            <div id="match-score-players"></div>
-            <label for="match-score-reason">积分调整原因</label><input id="match-score-reason" required minlength="2" maxlength="200" />
-            <p id="match-score-status" role="status" aria-live="polite"></p>
-            <button id="match-score-submit" class="danger" disabled>保存本局积分调整</button>
-          </form>
+        <section id="score-management" aria-labelledby="score-title">
+          <div class="score-heading">
+            <div><h2 id="score-title">积分管理</h2><p>调整玩家总分，或按对局管理积分与结果。</p></div>
+            <div class="score-tabs" role="tablist" aria-label="积分管理范围">
+              <button id="score-tab-player" type="button" role="tab" aria-selected="true" aria-controls="player-score-section">玩家</button>
+              <button id="score-tab-match" type="button" role="tab" aria-selected="false" aria-controls="match-score-section" tabindex="-1">对局</button>
+            </div>
+          </div>
+          <div id="player-score-section" role="tabpanel" aria-labelledby="score-tab-player" tabindex="0">
+            <form id="score-player-search" class="score-search">
+              <div class="score-field"><label for="score-player-query">查找玩家</label><input id="score-player-query" type="search" required maxlength="200" placeholder="输入玩家昵称或账号标识" /></div>
+              <button id="score-player-find" type="submit" class="primary">查找玩家</button>
+            </form>
+            <div id="score-player-results" class="score-selection" hidden>
+              <div class="score-field"><label for="score-player">搜索结果</label><select id="score-player" disabled><option value="">请先查找玩家</option></select></div>
+              <div id="score-player-pager" class="score-pager" hidden><button id="score-player-prev" disabled>上一页</button><span id="score-player-page"></span><button id="score-player-next" disabled>下一页</button></div>
+            </div>
+            <p id="score-player-empty" class="score-empty">查找并选择玩家后，可查看积分和调整记录。</p>
+            <div id="player-score-editor" class="score-editor" hidden>
+              <p id="score-player-summary" class="score-selected-name"></p>
+              <dl class="score-metrics">
+                <div><dt>当前总积分</dt><dd id="score-total">—</dd></div>
+                <div><dt>对局积分</dt><dd id="score-match-total">—</dd></div>
+                <div><dt>管理调整</dt><dd id="score-manual-total">—</dd></div>
+              </dl>
+              <form id="player-score-form">
+                <div class="score-fields">
+                  <div class="score-field"><label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta">加减积分</option><option value="set">设置总积分</option></select></div>
+                  <div class="score-field"><label id="player-score-points-label" for="player-score-points">调整分值</label><input id="player-score-points" type="number" step="1" min="-1000000" max="1000000" required placeholder="如 5 或 -5" aria-describedby="player-score-help player-score-preview" /></div>
+                </div>
+                <p id="player-score-help" class="score-hint">正数加分，负数扣分；不改变胜负、连胜或场均积分。</p>
+                <div class="score-form-footer"><p id="player-score-preview" class="score-preview" aria-live="polite">输入分值，预览调整后的总积分。</p><button id="player-score-submit" class="primary" disabled>确认调整玩家积分</button></div>
+              </form>
+              <details class="score-history"><summary>调整记录</summary><div id="player-score-history"></div><button id="player-score-history-more" hidden>加载更多调整记录</button></details>
+            </div>
+            <p id="player-score-status" class="score-status" role="status" aria-live="polite"></p>
+          </div>
+          <div id="match-score-section" role="tabpanel" aria-labelledby="score-tab-match" tabindex="0" hidden>
+            <form id="correction-search" class="score-search">
+              <div class="score-field"><label for="correction-code">查找对局</label><input id="correction-code" inputmode="numeric" required pattern="[0-9]{6}" maxlength="6" placeholder="输入6位房间号" /></div>
+              <button id="correction-load" type="submit" class="primary">查找对局</button>
+            </form>
+            <div id="correction-results" class="score-selection" hidden>
+              <div class="score-field"><label for="correction-match">最近的对局</label><select id="correction-match" disabled><option value="">请先查找对局</option></select></div>
+              <p id="correction-count" class="score-hint"></p>
+            </div>
+            <p id="match-score-empty" class="score-empty">输入房间号，查找最近 50 场已归档对局。</p>
+            <div id="match-score-editor" class="score-editor" hidden>
+              <form id="match-score-form">
+                <h3>本局玩家积分</h3>
+                <p class="score-hint">直接修改得分，或恢复自动计分。胜负与连胜保持原结果。</p>
+                <div id="match-score-players"></div>
+                <div class="score-form-footer"><p id="match-score-preview" class="score-preview" aria-live="polite"></p><button id="match-score-submit" class="primary" disabled>保存本局积分调整</button></div>
+              </form>
+              <details id="correction-editor" class="score-correction">
+                <summary>更正对局结果<span>同步重算战绩、连胜及适用的积分</span></summary>
+                <form id="correction-form">
+                  <div class="score-fields">
+                    <div class="score-field"><label for="correction-result">实际结束方式</label><select id="correction-result" required disabled></select></div>
+                    <div id="correction-target-row" class="score-field" hidden><label for="correction-target">实际刺杀目标</label><select id="correction-target"></select></div>
+                    <div id="correction-actor-row" class="score-field" hidden><label for="correction-actor">实际带刀人</label><select id="correction-actor"></select></div>
+                  </div>
+                  <div class="score-form-footer"><p class="score-hint">使用本局开局时的规则，保留更正前后的记录。</p><button id="correction-submit" class="danger" disabled>确认更正整局结果</button></div>
+                </form>
+              </details>
+            </div>
+            <p id="match-score-status" class="score-status" role="status" aria-live="polite"></p>
+            <p id="correction-status" class="score-status" role="status" aria-live="polite"></p>
+          </div>
         </section>
         <section>
           <div class="section-heading">
@@ -107,7 +137,7 @@
             <span id="audit-count"></span>
           </div>
           <p>
-            玩家操作按阶段汇总，显示行动当时的身份与时间；管理员改分保留原因和前后数据。仅管理员可见。
+            玩家操作按阶段汇总，显示行动当时的身份与时间；管理员改分保留前后数据。仅管理员可见。
           </p>
           <label for="audit-room">选择房间</label>
           <button

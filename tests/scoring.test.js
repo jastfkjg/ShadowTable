@@ -86,7 +86,7 @@ test('结束十二骑士并作废未完成技能时还原身份与阵营，再�
   assert.equal(room.matchRecord.players[3].roleId,'blueLancelot');assert.equal(room.matchRecord.players[3].score.total,2);
   assert.equal(room.knights.snapshot,undefined);
 });
-test('十二骑士积分进入明细榜单和跨板连胜，关闭与测试仍排除，旧规则局不补算',()=>{
+test('十二骑士积分进入明细榜单和跨板连胜，关闭仍排除，旧规则局不补算',()=>{
   const store=new Store(':memory:');try {
     const first=knightDeal();finish(first);store.transaction(()=>store.save(first));
     const second=deal();finish(second);store.transaction(()=>store.save(second));
@@ -96,9 +96,8 @@ test('十二骑士积分进入明细榜单和跨板连胜，关闭与测试仍�
     assert.equal(ranking.me.points,8);assert.equal(ranking.me.total,2);assert.equal(ranking.me.status,'ranked');
     const loss=knightDeal();finish(loss,{scoreReason:'early_assassination',scoreTarget:1});store.transaction(()=>store.save(loss));
     assert.equal(store.streakFor('wx:3').current,0);assert.equal(store.statsFor('wx:3').score.games,3);assert.equal(store.statsFor('wx:3').score.total,9);
-    for(const options of [{scoreEnabled:false},{prefix:'test:'}]) {
-      const room=knightDeal(options);run(room,'finishTools',{winner:'good'});assert.ok(room.matchRecord.players.every(player=>player.score.status==='excluded'));
-    }
+    const off=knightDeal({scoreEnabled:false});run(off,'finishTools',{winner:'good'});
+    assert.ok(off.matchRecord.players.every(player=>player.score.status==='excluded'));
     const old=knightDeal();delete old.scorePolicy.boards.knights;run(old,'finishTools',{winner:'good'});
     store.transaction(()=>store.save(old));assert.equal(old.matchRecord.players[0].score.status,'excluded');
     assert.throws(()=>store.transaction(()=>store.correctMatch(old.matchId,{revision:0,scoreReason:'assassination',scoreTarget:1})),/不在计分范围/);
@@ -137,7 +136,7 @@ test('开关默认阈值可仅改服务端；发牌后锁定，旧进行中牌�
   assert.equal(publicView(room,room.host).scoreSettings.enabled,false);
   const enabledRoom=deal();finish(enabledRoom);run(enabledRoom,'rematch');assert.equal(enabledRoom.scoreEnabled,true);
 });
-test('房主关闭只排除积分，胜负仍归档，不影响连胜；开启不能绕过板子和测试排除',()=>{
+test('房主关闭只排除积分，胜负仍归档，不影响连胜；开启不能绕过板子范围',()=>{
   const store=new Store(':memory:');
   try {
     const first=deal();finish(first);store.transaction(()=>store.save(first));
@@ -149,9 +148,8 @@ test('房主关闭只排除积分，胜负仍归档，不影响连胜；开启�
     assert.equal(store.statsFor('wx:3').losses,1);assert.equal(store.statsFor('wx:3').score.games,1);
     assert.equal(store.streakFor('wx:3').current,1);
     assert.throws(()=>store.transaction(()=>store.correctMatch(off.matchId,{revision:0,scoreReason:'quest_fail'})),/不在计分范围/);
-    for(const room of [deal({capacity:9}),deal({prefix:'test:'})]) {
-      run(room,'finishTools',{winner:'good'});assert.ok(room.matchRecord.players.every(p=>p.score.status==='excluded'));
-    }
+    const reverse=deal({capacity:9});run(reverse,'finishTools',{winner:'good'});
+    assert.ok(reverse.matchRecord.players.every(p=>p.score.status==='excluded'));
   } finally {store.close();}
 });
 test("三绿刺中、未中、派西挡刀、刺到坏人和空刀正确分解积分",()=>{
@@ -160,6 +158,57 @@ test("三绿刺中、未中、派西挡刀、刺到坏人和空刀正确分解�
   assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[3,5,2,2,0,0]);
   for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[3,3,2,2,0,0]);
   for(const reason of ["quest_fail","five_rejections"]) assert.deepEqual(finish(deal(),{scoreReason:reason}),[0,0,0,0,3,3]);
+});
+test('测试房间、开发与陪测账号可设置、结算、归档及更正积分，已有开局也可计分',()=>{
+  for(const prefix of ['wx:','dev:','test:']) {
+    const lobby=newRoom('123456',prefix+'1','房主','knights',12);lobby.testRoom=true;
+    assert.equal(publicView(lobby,lobby.host).scoreSettings.unavailableReason,null);
+    assert.equal(publicView(lobby,lobby.host).scoreNotice,null);
+    run(lobby,'updateSettings',{board:lobby.board,capacity:lobby.capacity,visible:false,scoreEnabled:false});
+    assert.equal(publicView(lobby,lobby.host).scoreNotice,'本局未开启计分');
+    run(lobby,'updateSettings',{board:lobby.board,capacity:lobby.capacity,visible:false,scoreEnabled:true});
+    assert.equal(publicView(lobby,lobby.host).scoreNotice,null);
+    for(const testRoom of [false,true]) {
+      const store=new Store(':memory:');try {
+        const room=deal({prefix});room.testRoom=testRoom;
+        // Persisted policies from before this change must not block an active test game.
+        room.scorePolicy.excludedIdentityPrefixes=['dev:','test:'];
+        assert.equal(publicView(room,room.host).scoreNotice,null);
+        assert.ok(publicView(room,room.host).scoreSettlement.length>0);
+        assert.deepEqual(finish(room),[3,3,4,2,0,0]);
+        store.transaction(()=>store.save(room));store.transaction(()=>store.save(room));
+        const uid=prefix+'3';
+        assert.equal(store.statsFor(uid).score.total,4);
+        assert.equal(store.statsFor(uid).score.games,1);
+        assert.equal(store.streakFor(uid).current,1);
+        assert.equal(store.matchesFor(uid,0,20,true).total,1);
+        assert.equal(publicView(room,uid).myScore.total,4);
+        assert.ok(store.matchScoreData(room.matchId).players.every(player=>player.editable));
+        store.transaction(()=>store.correctMatch(room.matchId,{revision:0,scoreReason:'quest_fail'}));
+        assert.equal(store.statsFor(uid).score.total,0);
+        assert.equal(store.streakFor(uid).current,0);
+        assert.equal(store.statsFor(prefix+'5').score.total,3);
+      } finally {store.close();}
+    }
+  }
+  assert.match(publicRules().notes.join(''),/测试房间、陪测和开发账号参与的对局正常计分/);
+});
+test('正式玩家与陪测账号同桌的十二骑士正常结算并计入积分榜',()=>{
+  const store=new Store(':memory:');try {
+    const room=knightDeal();room.testRoom=true;
+    const player=room.players[11],previousUid=player.uid;player.uid='test:companion';
+    room.roles[player.uid]=room.roles[previousUid];delete room.roles[previousUid];
+    room.knights.players[player.uid]=room.knights.players[previousUid];delete room.knights.players[previousUid];
+    assert.ok(publicView(room,room.host).scoreSettlement.some(option=>option.id==='early_assassination'));
+    finish(room,{scoreReason:'early_assassination',scoreTarget:1});
+    store.transaction(()=>store.save(room));
+    assert.ok(room.matchRecord.players.every(player=>player.score.status==='scored'));
+    assert.equal(store.statsFor(player.uid).score.games,1);
+    assert.equal(store.statsFor(player.uid).score.total,1);
+    saveProfile(store,'wx:1',{nickname:'房主',version:0,leaderboardVisible:true});
+    const ranking=new Leaderboard(store).read('wx:1',new URLSearchParams('metric=points'));
+    assert.equal(ranking.me.points,1);assert.equal(ranking.me.total,1);assert.equal(ranking.me.status,'ranked');
+  }finally{store.close();}
 });
 test("规则与表单在开局固定，修改服务端规则只影响新局，说明随配置生成",()=>{
   const old=deal(), original=configured.awards[0].points;
@@ -185,11 +234,10 @@ test("结算无身份预览，非法目标不泄露身份，只有房主能提�
   assert.equal(publicView(room,"wx:observer").myScore,null);
   assert.doesNotMatch(JSON.stringify(publicView(room,"wx:3")),/wx:1|wx:2|scorePolicy|scoringFacts|"uid"/);
 });
-test("积分资格独立于战绩；旧开局、开发局、逆仆板和缺少依据不会计分",()=>{
-  for(const variant of ["legacy","dev","testRoom","unknown","reverse","terminated"]) {
-    const room=variant==="reverse"?deal({capacity:9}):deal({prefix:variant==="dev"?"dev:":"wx:"});
+test("积分资格独立于战绩；旧开局、逆仆板和缺少依据不会计分",()=>{
+  for(const variant of ["legacy","unknown","reverse","terminated"]) {
+    const room=variant==="reverse"?deal({capacity:9}):deal();
     if(variant==="legacy") delete room.scorePolicy;
-    if(variant==="testRoom") room.testRoom=true;
     if(variant==="terminated") run(room,"terminate");
     else run(room,"finishTools",{winner:"good",replace:true});
     assert.ok(room.matchRecord.players.every(p=>p.score.status==="excluded"));

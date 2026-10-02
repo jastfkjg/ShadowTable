@@ -2,6 +2,15 @@ const api = require("../../api");
 const cards = require("../../share-card");
 const { renderImage } = require("../../share-image");
 const { backToMe } = require("../../profile");
+async function readLeaderboard(query) {
+  const url = "/api/leaderboard?" + cards.queryString(query);
+  try { return await api.request(url + "&nearby=1"); }
+  catch (error) {
+    // Keep personal sharing available while the mini-program and server roll out separately.
+    if (error.status !== 400 || !/^排行榜参数无效/.test(error.message)) throw error;
+    return api.request(url);
+  }
+}
 Page({
   data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true },
   onLoad(options = {}) {
@@ -22,7 +31,7 @@ Page({
     try {
       await api.login();
       const { kind, ...query } = this.selection;
-      const [profile, result] = await Promise.all([api.request("/api/me/profile"), api.request(kind === "leaderboard" ? "/api/leaderboard?" + cards.queryString(query) : "/api/me/stats")]);
+      const [profile, result] = await Promise.all([api.request("/api/me/profile"), kind === "leaderboard" ? readLeaderboard(query) : api.request("/api/me/stats")]);
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
       this.card = kind === "leaderboard" ? cards.leaderboardCard(profile, result)

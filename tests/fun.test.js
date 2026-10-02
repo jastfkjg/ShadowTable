@@ -597,6 +597,11 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
     const board = new Leaderboard(store),
       read = (query) => board.read("wx:c", new URLSearchParams(query));
     const count = read("metric=fun_merlin_evade");
+    const nearby = read("metric=fun_merlin_evade&nearby=1");
+    assert.deepEqual(nearby.nearby,count.rows);
+    assert.equal(nearby.nearby.filter(row=>row.isSelf).length,1);
+    assert.deepEqual(read("metric=fun_merlin_evade&sort=rate&nearby=1").nearby,[]);
+    assert.deepEqual(read("metric=fun_merlin_evade&mode=knights&nearby=1").nearby,[]);
     assert.deepEqual(
       count.rows.map((r) => r.rank),
       [1, 2, 2, 4],
@@ -617,6 +622,8 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
       }),
     );
     assert.equal(read("metric=fun_merlin_evade&sort=rate").rows.length, 2);
+    assert.equal(read("metric=fun_merlin_evade&nearby=1").nearby.length,3);
+    assert.deepEqual(board.read("wx:b",new URLSearchParams("metric=fun_merlin_evade&nearby=1")).nearby,[]);
     assert.doesNotMatch(JSON.stringify(rate), /wx:|"uid"|target|events/);
     for (const q of [
       "metric=fun_knife_ally",

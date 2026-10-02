@@ -7,8 +7,8 @@ const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
 const fun = require("./fun");
 const { migrate: migrateKnights } = require("./knights");
-const adjustmentReason = reason => {
-  if (typeof reason!=="string" || reason.trim().length<2 || reason.length>200) throw new RuleError("请填写2–200字的调整原因");
+const adjustmentReason = (reason = "") => {
+  if (typeof reason!=="string" || reason.length>200) throw new RuleError("操作备注最多200字");
   return reason.trim();
 };
 class Store {

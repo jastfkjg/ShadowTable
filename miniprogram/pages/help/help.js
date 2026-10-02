@@ -2,6 +2,8 @@ const api = require("../../api");
 
 Page({
   data: {
+    scoringOnly: false,
+    scoringExpanded: false,
     boards: [],
     boardsExpanded: false,
     loadingBoards: true,
@@ -36,8 +38,9 @@ Page({
   },
   onLoad(options = {}) {
     this.alive = true;
-    this.loadBoards();
-    this.setData({ scoringExpanded: options.section === "scoring" });
+    const scoringOnly = options.section === "scoring";
+    this.setData({ scoringOnly, scoringExpanded: scoringOnly });
+    if (!scoringOnly) this.loadBoards();
     this.loadScoreRules();
   },
   onUnload() { this.alive = false; },

@@ -1,6 +1,6 @@
-// Explicit display projections: never pass whole profiles, matches or events to the renderer.
+// Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
 const SIZE = 1080;
-const COLORS = { background: "#101c24", surface: "#192c36", text: "#f2eee5", muted: "#b1bfc6", accent: "#e5c68b", border: "#3d515d" };
+const COLORS = { background: "#101c24", surface: "#192c36", text: "#f2eee5", muted: "#b1bfc6", accent: "#e5c68b", border: "#3d515d", good: "#80b4d7", evil: "#d88f91", self: "#30352f" };
 const metricNames = { points: "积分榜", games: "局数榜", overall: "总胜率榜", good: "好人胜率榜", evil: "坏人胜率榜" };
 const modeNames = { all: "全部玩法", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
@@ -20,31 +20,44 @@ function identity(profile) {
 function describe(card) {
   return [card.name, card.context, card.scope, card.label, card.hero + card.unit, card.rank ? "第 " + card.rank + " 名" : card.rankLabel,
     ...(card.chart ? [card.chart.label + " " + card.chart.value] : []), ...card.metrics.map(item => item.label + " " + item.value), ...(card.notes || []),
-    ...(card.highlight ? [card.highlight.label, card.highlight.value, ...card.highlight.details] : []),
+    ...(card.factions || []).map(row => row.label + " " + recordDescription(row)),
+    ...(card.roles || []).map(row => row.label + " " + recordDescription(row)),
+    ...(card.otherRoles ? ["其他角色 " + recordDescription(card.otherRoles)] : []),
+    ...(card.nearby?.length ? ["我的附近", ...card.nearby.map(row => "第 " + row.rank + " 名 " + row.name + (row.isSelf ? "（我）" : "") + " " + row.value + card.unit)] : []), card.gap,
     "截至 " + shanghaiTime(card.asOf)].filter(Boolean).join("，");
 }
-function personalHighlight(stats) {
-  // A role can appear in multiple final factions: combine its real samples before comparing.
-  const roles = new Map();
+const recordDescription = row => row.total + " 局，" + row.wins + " 胜 " + row.losses + " 负，胜率 " + row.rate;
+function record(row) {
+  if (!Number.isInteger(row.total) || !Number.isInteger(row.wins) || row.total < 1 || row.wins < 0 || row.wins > row.total) return null;
+  return { total: row.total, wins: row.wins, losses: row.total - row.wins, ratio: row.wins / row.total, rate: percent(row.wins / row.total * 100) };
+}
+function breakdown(stats) {
+  const labels = { good: "好人", evil: "坏人", third: "第三阵营", unknown: "未知阵营" };
+  const factions = Object.keys(labels).flatMap(id => {
+    const summary = record(stats.byFaction?.find(row => row.faction === id) || {});
+    return summary ? [{ id, label: labels[id], ...summary }] : [];
+  });
+  const grouped = new Map(); let unknown = 0;
+  // The same role may have different final factions. Merge its samples before sorting by games.
   for (const row of stats.byRole || []) {
-    const role = clean(row.role);
-    if (!role || role === "未知角色" || !Number.isFinite(row.total) || !Number.isFinite(row.wins) || row.total < 1 || row.wins < 0 || row.wins > row.total) continue;
-    const aggregate = roles.get(role) || { role, total: 0, wins: 0 };
-    aggregate.total += row.total; aggregate.wins += row.wins; roles.set(role, aggregate);
+    const summary = record(row), label = clean(row.role);
+    if (!summary) continue;
+    if (!label || label === "未知角色") { unknown += summary.total; continue; }
+    const existing = grouped.get(label) || { label, total: 0, wins: 0 };
+    existing.total += summary.total; existing.wins += summary.wins; grouped.set(label, existing);
   }
-  const best = [...roles.values()].filter(row => row.total >= 10 && row.wins / row.total >= .5)
-    .sort((a, b) => b.wins * a.total - a.wins * b.total || b.total - a.total || a.role.localeCompare(b.role))[0];
-  if (best) return { label: "角色亮点", value: best.role, details: [percent(best.wins / best.total * 100) + " 胜率", best.wins + " 胜 / " + best.total + " 局"] };
-  if (stats.score?.games && stats.score.best >= 2) return { label: "连胜纪录", value: number(stats.score.best) + " 连胜", details: ["计分局口径", "全部时间"] };
-  return null;
+  const all = [...grouped.values()].sort((a, b) => b.total - a.total || b.wins - a.wins || a.label.localeCompare(b.label));
+  const roles = all.slice(0, 4).map(row => ({ label: row.label, ...record(row) }));
+  const remaining = all.slice(4).reduce((sum, row) => ({ total: sum.total + row.total, wins: sum.wins + row.wins }), { total: 0, wins: 0 });
+  return { factions, roles, otherRoles: record(remaining), notes: unknown ? ["另有 " + unknown + " 局未记录角色"] : [] };
 }
 function statsCard(profile, stats, now) {
   if (!stats.total) throw new Error("还没有有效战绩，完成对局后再来分享。");
   return { kind: "stats", ...identity(profile), context: "阿瓦隆战绩 · 全部时间", scope: "",
     hero: decimal(stats.winRate), unit: "%", label: "总胜率",
-    chart: { ratio: stats.wins / stats.total, value: number(stats.wins), label: "胜场" },
+    summary: { total: stats.total, wins: stats.wins, losses: stats.losses ?? stats.total - stats.wins },
     metrics: [stat(stats.total, "有效局数"), stat(stats.wins, "胜场"), stat(stats.losses ?? stats.total - stats.wins, "负场")],
-    highlight: personalHighlight(stats), notes: [], asOf: now };
+    ...breakdown(stats), asOf: now };
 }
 function recordNotes(row) {
   return row.unknownGames ? ["另有 " + number(row.unknownGames) + " 局未记录，不计入本项"] : [];
@@ -86,6 +99,19 @@ function canShareLeaderboard(board) {
   return board.fun ? me.knownGames > 0 && (board.sort !== "rate" || me.opportunities > 0 && Number.isFinite(me.rate))
     : me.total > 0 || board.metric === "points" && Number.isFinite(me.points) && me.points !== 0;
 }
+function nearbyProjection(profile, board, rank) {
+  const rows = board.nearby;
+  const value = row => board.fun ? board.sort === "rate" ? row.rate : row.count : board.metric === "points" ? row.points : board.metric === "games" ? row.total : row.winRate;
+  if (!rank || !Array.isArray(rows) || !rows.length || rows.length > 5 || rows.filter(row => row.isSelf === true).length !== 1 ||
+    rows.some(row => !Number.isInteger(row.rank) || row.rank < 1 || !Number.isFinite(value(row)))) return { nearby: [], gap: "" };
+  const index = rows.findIndex(row => row.isSelf === true), own = rows[index];
+  if (own.rank !== rank || value(own) !== value(board.me)) return { nearby: [], gap: "" };
+  const previous = rows[index - 1], count = board.fun ? board.sort === "count" : board.metric === "points" || board.metric === "games";
+  const distance = previous && previous.rank < rank && count ? value(previous) - value(own) : 0;
+  const unit = board.fun ? clean(board.unit) : board.metric === "points" ? "分" : "局";
+  return { nearby: rows.map(row => ({ rank: row.rank, name: row.isSelf ? identity(profile).name : clean(row.nickname) || "新朋友", value: decimal(value(row)), isSelf: row.isSelf === true })),
+    gap: distance > 0 ? "距上一位 " + decimal(distance) + " " + unit : "" };
+}
 function leaderboardCard(profile, board) {
   if (!canShareLeaderboard(board)) throw new Error("当前范围还没有可分享的本人成绩，完成相关对局后再来。");
   const me = board.me, points = board.metric === "points", games = board.metric === "games";
@@ -105,7 +131,8 @@ function leaderboardCard(profile, board) {
     hero: board.fun ? board.sort === "rate" ? decimal(me.rate) : number(me.count) : points ? number(me.points) : games ? number(me.total) : decimal(me.winRate),
     unit: board.fun ? clean(board.unit) : points ? "分" : games ? "局" : "%",
     label: board.fun ? clean(board.metricLabel) : points ? "我的积分" : games ? "有效局数" : title.replace(/榜$/, ""),
-    rank, rankLabel,
+    rank, rankLabel, ...nearbyProjection(profile, board, rank),
+    nearbyLabel: board.fun ? board.sort === "rate" ? "成功率" : "次数" : points ? "积分" : games ? "局数" : "胜率",
     metrics: board.fun ? [board.sort === "rate" ? stat(me.count, "成功次数") : { value: percent(me.rate), label: "成功率" }, stat(me.opportunities, "有效机会"), stat(me.knownGames, "有记录局数")]
       : points ? [stat(me.total, "计分局数"), stat(me.wins, "计分局胜场"), { value: percent(me.winRate), label: "计分局胜率" }]
       : games ? [stat(me.wins, "胜场"), stat(me.losses ?? me.total - me.wins, "负场"), { value: percent(me.winRate), label: "总胜率" }]
@@ -113,16 +140,33 @@ function leaderboardCard(profile, board) {
     notes, asOf: board.updatedAt };
 }
 function layout(card) {
-  const heroTop = card.scope ? 302 : 250, metricsTop = heroTop + 234;
-  const notesTop = metricsTop + 180, highlightTop = notesTop + (card.notes?.length || 0) * 42;
-  const footerTop = highlightTop + (card.highlight ? 156 : 0) + 24;
-  return { heroTop, metricsTop, notesTop, highlightTop, footerTop, height: footerTop + 100 };
+  const heroTop = card.scope ? 284 : 232;
+  if (card.kind === "stats") {
+    let cursor = 458;
+    const factionColumns = card.factions.length === 3 ? 3 : Math.min(2, card.factions.length);
+    const factionsTop = cursor;
+    if (factionColumns) cursor += 290 + 228 * (Math.ceil(card.factions.length / factionColumns) - 1);
+    const rolesTop = cursor;
+    if (card.roles.length) cursor += 160 + card.roles.length * 84 + (card.otherRoles ? 56 : 0);
+    const notesTop = cursor + 20;
+    const footerTop = cursor + card.notes.length * 42 + 24;
+    return { heroTop, factionColumns, factionsTop, rolesTop, notesTop, footerTop, height: footerTop + 100 };
+  }
+  if (card.kind === "rank") {
+    const nearbyTop = heroTop + 214 + (card.gap ? 56 : 0);
+    const metricsTop = nearbyTop + (card.nearby.length ? 156 + card.nearby.length * 96 : 0);
+    const notesTop = metricsTop + 178, footerTop = notesTop + card.notes.length * 42 + 24;
+    return { heroTop, nearbyTop, metricsTop, notesTop, footerTop, height: footerTop + 100 };
+  }
+  const metricsTop = heroTop + 234, notesTop = metricsTop + 180;
+  const footerTop = notesTop + card.notes.length * 42 + 24;
+  return { heroTop, metricsTop, notesTop, footerTop, height: footerTop + 100 };
 }
 const dimensions = card => ({ width: SIZE, height: layout(card).height });
 
 // Same renderer runs on a native Canvas 2D node and in visual verification.
 function drawCard(ctx, card, avatar) {
-  const { heroTop, metricsTop, notesTop, highlightTop, footerTop, height } = layout(card);
+  const box = layout(card), { heroTop, footerTop, height } = box;
   const font = (size, weight = 400) => { ctx.font = weight + " " + size + "px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif"; };
   const text = (value, x, y, size, color = COLORS.text, width = 936, align = "left", weight = 400) => {
     const original = Array.from(clean(value)), chars = original.slice();
@@ -138,13 +182,58 @@ function drawCard(ctx, card, avatar) {
   const line = (x1, y1, x2, y2, color = COLORS.border, width = 1) => {
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   };
-  ctx.fillStyle = COLORS.background; ctx.fillRect(0, 0, SIZE, height);
+  const rect = (x, y, width, height, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, width, height); };
+  const bar = (x, y, width, ratio, color) => {
+    rect(x, y, width, 12, COLORS.surface);
+    if (Number.isFinite(ratio) && ratio > 0) rect(x, y, width * Math.min(1, ratio), 12, color);
+  };
+  const largeValue = (value, unit, x, y, width, size = 176, unitSize = 54, color = COLORS.accent) => {
+    font(unitSize); const unitWidth = ctx.measureText(unit).width;
+    const maximum = width - unitWidth - 12, fitted = fit(value, size, maximum, 48);
+    font(fitted, 600); const mainWidth = Math.min(maximum, ctx.measureText(clean(value)).width);
+    text(value, x, y, fitted, color, maximum, "left", 600);
+    text(unit, x + mainWidth + 12, y - 4, unitSize, color, unitWidth + 2, "left", 500);
+  };
+  const emblem = (x, y, type, color, size = 42) => {
+    const r = size / 2;
+    ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.beginPath();
+    if (type === "shield") {
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y - r * .55); ctx.lineTo(x + r * .8, y + r * .4);
+      ctx.lineTo(x, y + r); ctx.lineTo(x - r * .8, y + r * .4); ctx.lineTo(x - r, y - r * .55); ctx.closePath();
+    } else if (type === "blade") {
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r * .25, y - r * .6); ctx.lineTo(x + r * .25, y + r * .35);
+      ctx.lineTo(x - r * .25, y + r * .35); ctx.lineTo(x - r * .25, y - r * .6); ctx.closePath();
+      ctx.moveTo(x - r * .6, y + r * .35); ctx.lineTo(x + r * .6, y + r * .35); ctx.moveTo(x, y + r * .35); ctx.lineTo(x, y + r);
+    } else if (type === "mask") {
+      ctx.moveTo(x - r, y - r); ctx.lineTo(x - r * .65, y - r * .15); ctx.lineTo(x, y + r);
+      ctx.lineTo(x + r * .65, y - r * .15); ctx.lineTo(x + r, y - r);
+      ctx.moveTo(x - r * .65, y - r * .15); ctx.lineTo(x + r * .65, y - r * .15);
+    } else {
+      for (let i = 0; i < 8; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI / 4, length = i % 2 ? r * .36 : r;
+        const px = x + Math.cos(angle) * length, py = y + Math.sin(angle) * length;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+    }
+    ctx.stroke();
+  };
+  const strip = top => {
+    line(72, top, 1008, top);
+    const column = 936 / card.metrics.length;
+    card.metrics.forEach((item, index) => {
+      const x = 72 + column * (index + .5);
+      text(item.value, x, top + 68, fit(item.value, 56, column - 40), COLORS.text, column - 36, "center", 600);
+      text(item.label, x, top + 116, 34, COLORS.muted, column - 36, "center");
+      if (index) line(72 + column * index, top + 32, 72 + column * index, top + 120);
+    });
+  };
+  rect(0, 0, SIZE, height, COLORS.background);
   ctx.strokeStyle = COLORS.border; ctx.lineWidth = 1; ctx.strokeRect(24, 24, SIZE - 48, height - 48);
   line(24, 24, 116, 24, COLORS.accent, 3); line(24, 24, 24, 90, COLORS.accent, 3);
   line(SIZE - 116, height - 24, SIZE - 24, height - 24, COLORS.accent, 3);
-  // Player identity leads the composition.
   ctx.save(); ctx.beginPath(); ctx.arc(124, 112, 52, 0, Math.PI * 2); ctx.clip();
-  ctx.fillStyle = COLORS.surface; ctx.fillRect(72, 60, 104, 104);
+  rect(72, 60, 104, 104, COLORS.surface);
   if (avatar) {
     const side = Math.min(avatar.width, avatar.height);
     ctx.drawImage(avatar, (avatar.width - side) / 2, (avatar.height - side) / 2, side, side, 72, 60, 104, 104);
@@ -154,25 +243,87 @@ function drawCard(ctx, card, avatar) {
   text(card.context, 202, 159, 32, COLORS.muted, 806);
   line(72, 196, 1008, 196);
   if (card.scope) text(card.scope, 72, 250, fit(card.scope, 34, 936), COLORS.muted);
-  text(card.label, 72, heroTop + 20, 44, COLORS.text, 624, "left", 500);
-  let heroSize = 192;
-  font(60); const unitWidth = ctx.measureText(card.unit).width;
-  while (heroSize > 76) { font(heroSize, 600); if (ctx.measureText(card.hero).width + unitWidth + 14 <= 636) break; heroSize -= 4; }
-  font(heroSize, 600); const heroWidth = ctx.measureText(card.hero).width;
-  text(card.hero, 66, heroTop + 195, heroSize, COLORS.accent, 636, "left", 600);
-  text(card.unit, 80 + heroWidth, heroTop + 190, 60, COLORS.accent, unitWidth + 4, "left", 500);
-  const cx = 856, cy = heroTop + 96;
-  if (card.kind === "rank") {
-    ctx.beginPath(); ctx.moveTo(cx, cy - 122); ctx.lineTo(cx + 112, cy - 80); ctx.lineTo(cx + 98, cy + 57);
-    ctx.quadraticCurveTo(cx + 80, cy + 102, cx, cy + 132); ctx.quadraticCurveTo(cx - 80, cy + 102, cx - 98, cy + 57);
-    ctx.lineTo(cx - 112, cy - 80); ctx.closePath(); ctx.fillStyle = COLORS.surface; ctx.fill();
-    ctx.strokeStyle = card.rank ? COLORS.accent : COLORS.border; ctx.lineWidth = 2; ctx.stroke();
-    if (card.rank) {
-      text("榜单名次", cx, cy - 46, 30, COLORS.muted, 196, "center");
-      text(card.rank, cx, cy + 40, fit(card.rank, 94, 184), COLORS.accent, 196, "center", 600);
-      text("名", cx, cy + 88, 28, COLORS.muted, 190, "center");
-    } else text(card.rankLabel, cx, cy + 16, 42, COLORS.muted, 196, "center", 500);
+
+  if (card.kind === "stats") {
+    text("总胜率", 72, heroTop + 32, 42, COLORS.text, 580, "left", 500);
+    largeValue(card.hero, card.unit, 66, heroTop + 184, 590);
+    line(680, heroTop + 44, 680, heroTop + 190);
+    largeValue(number(card.summary.total), "局", 732, heroTop + 110, 276, 84, 40, COLORS.text);
+    const result = card.summary.wins + " 胜 · " + card.summary.losses + " 负";
+    text(result, 732, heroTop + 178, fit(result, 38, 276), COLORS.muted, 276);
+    if (card.factions.length) {
+      const top = box.factionsTop, column = 936 / box.factionColumns;
+      line(72, top, 1008, top);
+      text("阵营表现", 72, top + 56, 42, COLORS.text, 440, "left", 600);
+      card.factions.forEach((row, index) => {
+        const col = index % box.factionColumns, y = top + Math.floor(index / box.factionColumns) * 228, x = 72 + column * col;
+        const color = COLORS[row.id] || COLORS.accent;
+        emblem(x + 26, y + 102, row.id === "good" ? "shield" : row.id === "evil" ? "mask" : "star", color, 44);
+        text(row.label, x + 64, y + 116, 38, COLORS.text, column - 90, "left", 500);
+        text(row.rate, x, y + 188, fit(row.rate, 78, column - 52), color, column - 52, "left", 600);
+        const record = row.wins + " 胜 · " + row.losses + " 负";
+        text(record, x, y + 234, fit(record, 34, column - 52), COLORS.muted, column - 52);
+        bar(x, y + 254, column - 52, row.ratio, color);
+        if (col) line(x - 26, y + 90, x - 26, y + 266);
+      });
+    }
+    if (card.roles.length) {
+      const top = box.rolesTop;
+      line(72, top, 1008, top);
+      text("常玩角色", 72, top + 56, 42, COLORS.text, 440, "left", 600);
+      text(card.otherRoles ? "按局数 · 前 4 位" : "按局数", 1008, top + 54, 30, COLORS.muted, 350, "right");
+      text("角色", 72, top + 112, 30, COLORS.muted, 250);
+      text("战绩", 512, top + 112, 30, COLORS.muted, 240, "center");
+      text("胜率", 690, top + 112, 30, COLORS.muted, 250);
+      line(72, top + 132, 1008, top + 132);
+      card.roles.forEach((row, index) => {
+        const y = top + 132 + index * 84;
+        const type = ({ "梅林": "star", "派西维尔": "shield", "刺客": "blade", "莫甘娜": "mask" })[row.label] || "star";
+        emblem(98, y + 42, type, COLORS.accent, 36);
+        text(row.label, 136, y + 54, fit(row.label, 38, 250), COLORS.text, 250, "left", 500);
+        const record = row.wins + " 胜 · " + row.losses + " 负";
+        text(record, 512, y + 54, fit(record, 34, 234), COLORS.muted, 234, "center");
+        bar(690, y + 36, 184, row.ratio, COLORS.accent);
+        text(row.rate, 1008, y + 54, fit(row.rate, 36, 118), COLORS.text, 118, "right", 500);
+        line(72, y + 84, 1008, y + 84);
+      });
+      if (card.otherRoles) text("其他角色：" + card.otherRoles.total + " 局 · " + card.otherRoles.wins + " 胜 · " + card.otherRoles.losses + " 负", 72, top + 132 + card.roles.length * 84 + 54, 32, COLORS.muted);
+    }
+  } else if (card.kind === "rank") {
+    text(card.rank ? "我的排名" : "排名状态", 72, heroTop + 32, 42, COLORS.text, 506, "left", 500);
+    const rank = card.rank ? "第 " + card.rank + " 名" : card.rankLabel;
+    text(rank, 66, heroTop + 180, fit(rank, 138, 522, 48), card.rank ? COLORS.accent : COLORS.muted, 522, "left", 600);
+    line(620, heroTop + 38, 620, heroTop + 182);
+    text(card.label, 670, heroTop + 32, fit(card.label, 40, 338), COLORS.text, 338, "left", 500);
+    largeValue(card.hero, card.unit, 668, heroTop + 175, 340, 128, 44);
+    if (card.gap) text(card.gap, 72, heroTop + 238, 36, COLORS.accent);
+    if (card.nearby.length) {
+      const top = box.nearbyTop;
+      line(72, top, 1008, top);
+      text("我的附近", 72, top + 56, 42, COLORS.text, 440, "left", 600);
+      text("名次 / 玩家", 72, top + 112, 30, COLORS.muted, 500);
+      text(card.nearbyLabel, 1008, top + 112, 30, COLORS.muted, 300, "right");
+      card.nearby.forEach((row, index) => {
+        const y = top + 132 + index * 96, color = row.isSelf ? COLORS.accent : COLORS.text;
+        if (row.isSelf) { rect(72, y, 936, 96, COLORS.self); rect(72, y, 5, 96, COLORS.accent); }
+        else line(72, y, 1008, y);
+        text(row.rank, 126, y + 63, fit(row.rank, 44, 96), color, 96, "center", 600);
+        ctx.beginPath(); ctx.arc(234, y + 48, 32, 0, Math.PI * 2); ctx.strokeStyle = row.isSelf ? COLORS.accent : COLORS.border; ctx.lineWidth = 2; ctx.stroke();
+        text(Array.from(row.name)[0], 234, y + 61, 34, color, 56, "center");
+        text(row.name, 292, y + 63, 40, color, row.isSelf ? 354 : 438, "left", row.isSelf ? 600 : 400);
+        if (row.isSelf) {
+          font(40, 600); const nameWidth = Math.min(354, ctx.measureText(clean(row.name)).width);
+          text("我", 292 + nameWidth + 44, y + 62, 30, COLORS.accent, 48, "center", 500);
+        }
+        const value = row.value + (card.unit === "%" ? "%" : "");
+        text(value, 982, y + 63, fit(value, 44, 230), color, 230, "right", row.isSelf ? 600 : 500);
+      });
+    }
+    strip(box.metricsTop);
   } else {
+    text(card.label, 72, heroTop + 32, 44, COLORS.text, 624, "left", 500);
+    largeValue(card.hero, card.unit, 66, heroTop + 195, 636, 192, 60);
+    const cx = 856, cy = heroTop + 104;
     ctx.lineWidth = 9; ctx.strokeStyle = COLORS.border; ctx.beginPath(); ctx.arc(cx, cy, 106, 0, Math.PI * 2); ctx.stroke();
     if (Number.isFinite(card.chart.ratio) && card.chart.ratio > 0) {
       ctx.strokeStyle = COLORS.accent; ctx.lineCap = "round"; ctx.beginPath();
@@ -180,24 +331,9 @@ function drawCard(ctx, card, avatar) {
     }
     text(card.chart.value, cx, cy + 8, fit(card.chart.value, 64, 172), COLORS.text, 184, "center", 600);
     text(card.chart.label, cx, cy + 57, 30, COLORS.muted, 184, "center");
+    strip(box.metricsTop);
   }
-  // One shared statistics strip; avoid a stack of nested cards.
-  line(72, metricsTop, 1008, metricsTop);
-  const column = 936 / card.metrics.length;
-  card.metrics.forEach((item, index) => {
-    const x = 72 + column * (index + .5);
-    text(item.value, x, metricsTop + 78, fit(item.value, 58, column - 40), COLORS.text, column - 36, "center", 600);
-    text(item.label, x, metricsTop + 128, 34, COLORS.muted, column - 36, "center");
-    if (index) line(72 + column * index, metricsTop + 38, 72 + column * index, metricsTop + 134);
-  });
-  (card.notes || []).forEach((note, index) => text(note, 72, notesTop + index * 42, 30, COLORS.muted));
-  if (card.highlight) {
-    ctx.fillStyle = COLORS.surface; ctx.fillRect(72, highlightTop, 936, 132);
-    ctx.fillStyle = COLORS.accent; ctx.fillRect(72, highlightTop, 4, 132);
-    text(card.highlight.label, 104, highlightTop + 44, 30, COLORS.muted, 420);
-    text(card.highlight.value, 104, highlightTop + 102, fit(card.highlight.value, 52, 440), COLORS.accent, 450, "left", 600);
-    card.highlight.details.forEach((detail, index) => text(detail, 976, highlightTop + 46 + index * 51, 32, COLORS.text, 414, "right"));
-  }
+  card.notes.forEach((note, index) => text(note, 72, box.notesTop + index * 42, 30, COLORS.muted));
   line(72, footerTop, 1008, footerTop);
   text("桌边助手", 72, footerTop + 57, 30, COLORS.muted, 220, "left", 500);
   text("截至 " + shanghaiTime(card.asOf), 1008, footerTop + 57, 28, COLORS.muted, 680, "right");

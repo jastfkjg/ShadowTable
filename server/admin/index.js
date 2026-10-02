@@ -167,7 +167,7 @@ function createAdmin({ store, origin, key, body, limit }) {
     const session = authenticate(req);
     limit("admin:" + session.hash, 600);
     const scoringMutation = (path,input,action,operation) => {
-      fail(typeof input.reason === "string" && input.reason.trim().length>=2 && input.reason.length<=200,"请填写2–200字的调整原因");
+      fail(input.reason === undefined || typeof input.reason === "string" && input.reason.length<=200,"操作备注最多200字");
       fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId),"缺少合法请求编号");
       const actor="admin:scoring", fingerprint=digest(JSON.stringify([path,input])).toString("hex");
       return store.transaction(()=>{
@@ -175,7 +175,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         if (cached) {fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
         const changed=operation();
         store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
-          .run(action,changed.code || "",input.reason.trim(),Date.now(),JSON.stringify({...changed,administrator:session.hash}));
+          .run(action,changed.code || "",(input.reason || "").trim(),Date.now(),JSON.stringify({...changed,administrator:session.hash}));
         const response={id:changed.id,revision:changed.revision,...(changed.delta===undefined?{}:{before:changed.before,after:changed.after,delta:changed.delta})};
         store.addReceipt(actor,input.requestId,fingerprint,response);return response;
       });
@@ -291,7 +291,7 @@ function createAdmin({ store, origin, key, body, limit }) {
     const correction = path.match(/^\/api\/admin\/matches\/([a-f0-9-]{36})\/correct$/);
     if (correction && req.method === "POST") {
       const b = await body(req);
-      fail(typeof b.reason === "string" && b.reason.trim().length >= 2 && b.reason.length <= 200,"请填写2–200字的更正原因");
+      fail(b.reason === undefined || typeof b.reason === "string" && b.reason.length <= 200,"操作备注最多200字");
       fail(typeof b.requestId === "string" && /^[a-f0-9-]{36}$/.test(b.requestId),"缺少合法请求编号");
       const actor = "administrator:correct-result", fingerprint = digest(JSON.stringify([path,b])).toString("hex");
       const result=store.transaction(()=>{
@@ -299,7 +299,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         if(cached) {fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
         const changed=b.funReason !== undefined ? store.correctFunMatch(correction[1],b) : store.correctMatch(correction[1],b);
         const code=JSON.parse(store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(correction[1]).snapshot).code;
-        store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)").run("correct-result",code,b.reason.trim(),Date.now(),JSON.stringify(changed));
+        store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)").run("correct-result",code,(b.reason || "").trim(),Date.now(),JSON.stringify(changed));
         const response={id:changed.id,winner:changed.winner,revision:changed.revision};store.addReceipt(actor,b.requestId,fingerprint,response);return response;
       });
       send(200,result);return true;

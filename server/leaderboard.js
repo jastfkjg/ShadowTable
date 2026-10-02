@@ -16,11 +16,13 @@ function periodRange(period, now) {
   };
 }
 function parseQuery(params) {
-  const allowed = new Set(["metric", "period", "offset", "version", "mode", "role", "sort"]);
+  const allowed = new Set(["metric", "period", "offset", "version", "mode", "role", "sort", "nearby"]);
   for (const key of params.keys())
     if (!allowed.has(key) || params.getAll(key).length !== 1) throw new RuleError("排行榜参数无效", 400);
   const metric = params.get("metric") ?? "games", period = params.get("period") ?? "all";
   const offset = params.get("offset") ?? "0", version = params.get("version");
+  const nearby = params.has("nearby");
+  if (nearby && (params.get("nearby") !== "1" || offset !== "0")) throw new RuleError("排行榜参数无效", 400);
   const funMetric = metric.startsWith("fun_") ? fun.metrics[metric.slice(4)] : null;
   const mode = params.get("mode") || "all", role = params.get("role") || null, sort = params.get("sort") || "count";
   if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !["all", "month"].includes(period) || !/^(0|20|40|60|80)$/.test(offset)
@@ -28,7 +30,7 @@ function parseQuery(params) {
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
   if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && (fun.combatType(role) !== funMetric.group && funMetric.group !== "final") || role && !roleName(role)
     : ["mode", "role", "sort"].some(key => params.has(key))) throw new RuleError("排行榜参数无效",400);
-  return { metric, period, offset: Number(offset), version, funMetric, mode, role, sort };
+  return { metric, period, offset: Number(offset), version, funMetric, mode, role, sort, nearby };
 }
 const summary = row => {
   const total = row?.total || 0, wins = row?.wins || 0;
@@ -41,6 +43,14 @@ function compare(a, b, metric) {
   if (metric === "games") return b.total - a.total;
   const delta = BigInt(b.wins) * BigInt(a.total) - BigInt(a.wins) * BigInt(b.total);
   return delta > 0n ? 1 : delta < 0n ? -1 : b.total - a.total;
+}
+// Center on the authenticated player in the complete public snapshot, including positions beyond the first 100 rows.
+// Slice by row position, not displayed rank: tied ranks must remain intact and retain stable ordering.
+function neighbors(eligible, uid, present) {
+  const index = eligible.findIndex(row => row.uid === uid);
+  if (index < 0) return [];
+  const start = Math.max(0, Math.min(index - 2, eligible.length - 5));
+  return eligible.slice(start, start + 5).map(present);
 }
 class Leaderboard {
   constructor(store) { this.store = store; this.cache = new Map(); }
@@ -86,7 +96,7 @@ class Leaderboard {
   read(uid, params, now = Date.now()) {
     const selection = parseQuery(params);
     if (selection.funMetric) return this.readFun(uid, selection, now);
-    const { metric, period, offset, version } = selection;
+    const { metric, period, offset, version, nearby } = selection;
     const snapshot = this.snapshot(metric, period, now);
     if (version && version !== snapshot.version) throw new RuleError("榜单已更新，请刷新后继续查看", 409);
     const own = snapshot.aggregates.get(uid), ownStats = summary(own);
@@ -95,21 +105,23 @@ class Leaderboard {
     const visible = readProfile(this.store, uid).leaderboardVisible;
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
+    const present = row => ({
+      publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
+      rank: row.rank, isSelf: row.uid === uid, ...summary(row),
+    });
     return {
       metric, period, availableMetrics: Object.keys(METRICS), periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",
       availableFunMetrics: fun.publicMetrics(),
       threshold: METRICS[metric], eligibleCount: snapshot.eligible.length, maxRows: MAX_ROWS,
       updatedAt: snapshot.updatedAt, version: snapshot.version,
-      rows: snapshot.eligible.slice(offset, Math.min(nextOffset, end)).map(row => ({
-        publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
-        rank: row.rank, isSelf: row.uid === uid, ...summary(row),
-      })),
+      rows: snapshot.eligible.slice(offset, Math.min(nextOffset, end)).map(present),
+      ...(nearby ? { nearby: neighbors(snapshot.eligible, uid, present) } : {}),
       nextOffset: nextOffset < end ? nextOffset : null, hasMore: nextOffset < end,
       me: { ...ownStats, rank: own?.rank || null, status, remaining: Math.max(0, METRICS[metric] - ownStats.total) },
     };
   }
   readFun(uid, selection, now) {
-    const { metric, period, offset, version, funMetric: def, mode, role, sort } = selection;
+    const { metric, period, offset, version, funMetric: def, mode, role, sort, nearby } = selection;
     const range = periodRange(period, now), key = [metric,period,mode,role,sort].join(":"), old = this.cache.get(key);
     let snapshot = old;
     const comparator = (a,b) => {
@@ -147,11 +159,13 @@ class Leaderboard {
     const remaining = Math.max(0,threshold - (sort === "rate" ? stats.opportunities : stats.count));
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
+    const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,isSelf:row.uid===uid,...present(row)});
     return { metric, period, mode, role, sort, fun: true, metricLabel: def.label + (sort === "rate" ? "率" : "次数"), title: def.title,
       unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && (def.group === "final" || fun.combatType(role)===def.group)).map(role=>({id:role,label:roleName(role)})),
       periodStart: range.start,periodEnd:range.end,timezone:"Asia/Shanghai",eligibleCount:snapshot.eligible.length,maxRows:MAX_ROWS,updatedAt:snapshot.updatedAt,version:snapshot.version,
-      rows:snapshot.eligible.slice(offset,Math.min(nextOffset,end)).map(row=>({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,isSelf:row.uid===uid,...present(row)})),
+      rows:snapshot.eligible.slice(offset,Math.min(nextOffset,end)).map(publicRow),
+      ...(nearby ? { nearby: neighbors(snapshot.eligible, uid, publicRow) } : {}),
       nextOffset:nextOffset<end ? nextOffset : null,hasMore:nextOffset<end,me:{...stats,rank:own?.rank || null,status,remaining} };
   }
 }

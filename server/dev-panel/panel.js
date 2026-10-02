@@ -45,6 +45,11 @@ class Companion {
     if (this.actors.some((a) => a.pending))
       throw new Error("请先重试未确认的操作");
     this.code = code;
+    const actor = await this.createActor(code);
+    await this.refresh();
+    return actor;
+  }
+  async createActor(code) {
     const { token } = await this.request("/api/dev-login", null, { code });
     const id = crypto.randomUUID();
     const actor = {
@@ -58,10 +63,9 @@ class Companion {
     await this.send(
       actor,
       "/api/rooms/" + code + "/join",
-      { name: actor.name },
+      { name: actor.name, requireSeat: true },
       "join",
     );
-    await this.refresh();
     return actor;
   }
   async send(actor, path, data, after) {
@@ -150,16 +154,27 @@ class Companion {
       type === "leave" ? "leave" : undefined,
     );
   }
-  async fill() {
-    await this.refresh();
-    let room = this.actors.find((a) => a.room)?.room;
+  async fill(progress = () => {}) {
+    if (this.actors.some((a) => a.pending))
+      throw new Error("请先重试未确认的操作");
+    const viewer = this.actors.find((a) => a.joined && !a.unavailable);
+    if (viewer) await this.refresh([viewer]);
+    const room = viewer?.room;
     if (!room) throw new Error("请先添加一位测试玩家并成功入座");
     if (room.phase !== "lobby") throw new Error("仅准备阶段可以补齐空位");
-    while (room.players.length < room.capacity) {
-      const actor = await this.add(this.code);
-      room = actor.room;
-      if (!room) throw new Error("未能确认入座，请刷新后继续");
+    const vacancies = Math.max(0, room.capacity - room.players.length);
+    let completed = 0;
+    try {
+      await pooled(Array.from({ length: vacancies }), async () => {
+        await this.createActor(this.code);
+        progress(++completed, vacancies);
+      });
+    } finally {
+      // Settle every write before reading, including partially successful fills.
+      await this.refresh();
     }
+    if (!this.actors.some((a) => a.room?.players.length >= a.room?.capacity))
+      throw new Error("未能确认空位已补齐，请刷新后继续");
   }
   forgetUnavailable() {
     const unavailable = this.actors.filter((a) => a.unavailable);
@@ -203,7 +218,7 @@ class Companion {
       }
     }
   }
-  async batch(value) {
+  async batch(value, progress = () => {}) {
     let count = 0;
     if (value === "ready") {
       const actors = this.actors.filter(
@@ -211,7 +226,7 @@ class Companion {
       );
       await pooled(actors, async (actor) => {
         await this.command(actor, "ready", { ready: true });
-        count++;
+        progress(++count, actors.length);
       });
       return count;
     }
@@ -596,7 +611,7 @@ if (typeof document !== "undefined") {
   $("connect").addEventListener("submit", (e) => {
     e.preventDefault();
     const code = $("code").value.trim();
-    run(() => companion.add(code), "测试玩家已加入");
+    run(() => companion.add(code), "测试玩家已加入", { refresh: false });
   });
   $("switch-room").onclick = () =>
     run(
@@ -629,15 +644,23 @@ if (typeof document !== "undefined") {
       refresh: false,
     });
   };
+  const progress = (verb) => (completed, total) => {
+    render();
+    $("feedback").textContent = `${verb} ${completed} / ${total} 位测试玩家…`;
+  };
   $("fill").onclick = () =>
-    run(() => companion.fill(), "测试玩家已补齐；请全员准备后由房主开局");
+    run(() => companion.fill(progress("已加入")), "测试玩家已补齐；请全员准备后由房主开局", { refresh: false });
   $("refresh").onclick = () =>
     run(() => companion.refresh(), "状态已刷新", { refresh: false });
   $("reveal").onchange = render;
   document
     .querySelectorAll("[data-batch]")
     .forEach(
-      (b) => (b.onclick = () => run(() => companion.batch(b.dataset.batch))),
+      (b) => (b.onclick = () => run(
+        () => companion.batch(b.dataset.batch, progress("已确认")),
+        "操作已确认",
+        { refresh: b.dataset.batch !== "ready" },
+      )),
     );
   $("players").addEventListener("change", (e) => {
     const actor = companion.actors.find(

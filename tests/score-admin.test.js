@@ -96,20 +96,20 @@ async function launch(t) {
  const login=async()=>{const response=await request('/api/admin/login',{key});cookie=response.headers['set-cookie'][0].split(';')[0];};
  return {...app,request,login};
 }
-test('管理积分接口要求鉴权来源和原因，跨登录重试不重复加分，审计与明细可查询且个人数据隔离',async t=>{
+test('管理积分无需填写原因，仍检查鉴权来源，跨登录重试不重复加分并保留审计和数据隔离',async t=>{
  const a=await launch(t),room=game(a.store);
  const lookup='/api/admin/score-players?q='+encodeURIComponent('林间');
  assert.equal((await a.request(lookup)).status,401);await a.login();
  const found=await a.request(lookup);assert.equal(found.data.players[0].uid,'wx:1');
- const player=a.store.playerScore('wx:1'),body={uid:'wx:1',points:8,mode:'delta',revision:player.revision,reason:'额外奖励',requestId:randomUUID()};
+ const player=a.store.playerScore('wx:1'),body={uid:'wx:1',points:8,mode:'delta',revision:player.revision,requestId:randomUUID()};
  assert.equal((await a.request('/api/admin/score-adjustments',body,{Origin:'https://evil.test'})).status,403);
- assert.equal((await a.request('/api/admin/score-adjustments',{...body,reason:''})).status,400);
+ assert.equal((await a.request('/api/admin/score-adjustments',{...body,reason:{}})).status,400);
  const first=await a.request('/api/admin/score-adjustments',body);assert.equal(first.status,200);assert.equal(first.data.after,11);
  await a.login();assert.deepEqual((await a.request('/api/admin/score-adjustments',body)).data,first.data);
  assert.equal((await a.request('/api/admin/score-adjustments',{...body,points:9})).status,409);
  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='adjust-player-score'").get().n,1);
  const details=await a.request('/api/admin/matches/'+room.matchId+'/scores');assert.equal(details.data.players.length,6);
- const change={revision:details.data.revision,scores:[{uid:'wx:1',points:12}],reason:'本局调整',requestId:randomUUID()};
+ const change={revision:details.data.revision,scores:[{uid:'wx:1',points:12}],requestId:randomUUID()};
  const changed=await a.request('/api/admin/matches/'+room.matchId+'/scores',change);assert.equal(changed.status,200);
  assert.deepEqual((await a.request('/api/admin/matches/'+room.matchId+'/scores',change)).data,changed.data);
  assert.equal(a.store.statsFor('wx:1').score.total,20);

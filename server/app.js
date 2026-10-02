@@ -379,8 +379,13 @@ function createApp({
               409,
             );
             room.players = [];
-          } else if (match[2] === "join") enter(room, uid, b.name);
-          else command(room, uid, b);
+          } else if (match[2] === "join") {
+            // A concurrent human join must not turn a fill operation into spectators.
+            if (b.requireSeat === true)
+              check(room.players.some(p => p.uid === uid) || room.players.length < room.capacity,
+                "房间已满，请刷新后重试", 409);
+            enter(room, uid, b.name);
+          } else command(room, uid, b);
           if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };
         }

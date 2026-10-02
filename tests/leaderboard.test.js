@@ -215,6 +215,55 @@ test('排名先覆盖所有合格玩家，前100位分页稳定，榜外本人�
     assert.equal(query(board,'wx:last').eligibleCount,105);
   } finally { store.close(); }
 });
+test('附近排名基于完整同周期快照，覆盖百名之后、首尾、并列、隐藏和过期版本', () => {
+  const store = new Store(':memory:');
+  try {
+    const board = new Leaderboard(store);
+    store.transaction(() => store.archiveMatch({id:randomUUID(),board:'classic',endedAt:NOW-1000,
+      players:Array.from({length:121},(_,i)=>({uid:'wx:near-'+i,name:'私人牌桌昵称',role:'私人角色',faction:'good',outcome:'win',
+        score:{status:'scored',total:i===51?950:1000-i,breakdown:[]}}))}));
+    profile(store,'wx:near-105',true,'附近本人');
+    const selection='metric=points&period=month&nearby=1';
+    const middle=query(board,'wx:near-105',selection);
+    assert.equal(middle.rows.some(row=>row.isSelf),false);
+    assert.equal(middle.me.rank,106);
+    assert.deepEqual(middle.nearby.map(row=>row.rank),[104,105,106,107,108]);
+    assert.equal(middle.nearby[2].isSelf,true);assert.equal(middle.nearby[2].nickname,'附近本人');
+    assert.deepEqual(query(board,'wx:near-0',selection).nearby.map(row=>row.rank),[1,2,3,4,5]);
+    assert.deepEqual(query(board,'wx:near-120',selection).nearby.map(row=>row.rank),[117,118,119,120,121]);
+    const tied=query(board,'wx:near-51',selection);
+    assert.equal(tied.nearby.filter(row=>row.rank===51).length,2);
+    assert.equal(tied.nearby.find(row=>row.isSelf).rank,51);
+    assert.deepEqual(query(board,'wx:near-51',selection).nearby,tied.nearby);
+    assert.equal(query(board,'wx:near-105','metric=points').nearby,undefined);
+    assert.doesNotMatch(JSON.stringify(middle),/私人|wx:|"uid"|role|breakdown|match_id/);
+    assert.deepEqual(Object.keys(middle.nearby[0]).sort(),['avatarUrl','isSelf','losses','nickname','points','publicId','rank','total','winRate','wins'].sort());
+    const hiddenId=query(board,'wx:near-104',selection).nearby.find(row=>row.isSelf).publicId;
+    profile(store,'wx:near-104',false);
+    assert.ok(query(board,'wx:near-105',selection).nearby.every(row=>row.publicId!==hiddenId));
+    assert.throws(()=>query(board,'wx:near-105',selection+'&version='+middle.version),e=>e.status===409);
+    profile(store,'wx:near-105',false);
+    assert.deepEqual(query(board,'wx:near-105',selection).nearby,[]);
+    assert.deepEqual(query(board,'guest:viewer',selection).nearby,[]);
+    assert.deepEqual(query(board,'wx:no-games',selection).nearby,[]);
+    const nextMonth=periodRange('month',NOW).end;
+    assert.deepEqual(board.read('wx:near-0',new URLSearchParams(selection),nextMonth).nearby,[]);
+  } finally {store.close();}
+});
+test('附近排名人数不足五人时只返回实际公开参榜者，阵营筛选继续生效', () => {
+  const store=new Store(':memory:');
+  try {
+    const board=new Leaderboard(store);
+    games(store,'wx:good',2,1);games(store,'wx:evil',1,1,{faction:'evil'});
+    const all=query(board,'wx:good','metric=games&nearby=1');
+    assert.equal(all.nearby.length,2);assert.equal(all.nearby[0].isSelf,true);
+    const good=query(board,'wx:good','metric=good&nearby=1');
+    assert.equal(good.nearby.length,1);assert.equal(good.nearby[0].winRate,50);
+    assert.deepEqual(query(board,'wx:good','metric=evil&nearby=1').nearby,[]);
+    for(const q of ['nearby=0','nearby=true','nearby=1&nearby=1','nearby=1&uid=wx:evil','nearby=1&offset=20&version='+all.version])
+      assert.throws(()=>query(board,'wx:good',q),e=>e.status===400);
+  } finally {store.close();}
+});
 test('缓存仅在提交后失效：回滚、重复归档、昵称头像及公开设置更新', () => {
   const store = new Store(':memory:');
   try {
@@ -267,6 +316,8 @@ test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保
     const initial=(await request('/api/leaderboard',token)).data;
     assert.equal(initial.me.status,'ranked');assert.equal(initial.me.rank,1);
     assert.equal(initial.rows[0].nickname,'新朋友');assert.equal(initial.rows[0].isSelf,true);
+    assert.equal((await request('/api/leaderboard?nearby=1',token)).data.nearby[0].isSelf,true);
+    assert.equal((await request('/api/leaderboard?nearby=1')).status,401);
     for (const q of ['metric=unknown','metric=__proto__','period=week','offset=-1','offset=20','offset=100','metric=good&metric=evil','uid=other','version=bad','limit=100000'])
       assert.equal((await request('/api/leaderboard?'+q,token)).status,400,q);
     assert.equal((await request('/api/me/profile',token,{nickname:'我',version:0,leaderboardVisible:'true'})).status,400);

@@ -5,7 +5,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const conditionKeys = new Set(["faction", "outcome", "roleId", "reason", "isTarget"]);
 function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
-    || !Array.isArray(rules.endReasons) || !Array.isArray(rules.excludedIdentityPrefixes)) throw Error("积分规则配置不完整");
+    || !Array.isArray(rules.endReasons)) throw Error("积分规则配置不完整");
   if (!Number.isSafeInteger(rules.defaultEnabledMinPlayers) || rules.defaultEnabledMinPlayers < 0) throw Error("积分默认人数配置无效");
   if (rules.targetModes && Object.values(rules.targetModes).some(mode => mode !== "living_merlin")) throw Error("积分刺杀判定配置无效");
   if (rules.notes && (!Array.isArray(rules.notes) || rules.notes.some(note => typeof note !== "string"))) throw Error("积分说明配置无效");
@@ -42,7 +42,6 @@ function enabled(room) {
 function scopeExclusion(room, rules) {
   if (!rules) return "积分功能启用前开局";
   if (!rules.boards[room.board]?.includes(room.capacity)) return "本板子暂未参与计分";
-  if (room.testRoom || room.players.some(p => rules.excludedIdentityPrefixes.some(prefix => p.uid.startsWith(prefix)))) return "测试或开发对局不计积分";
   return null;
 }
 function exclusion(room, rules = room.scorePolicy) {
@@ -93,7 +92,7 @@ function publicRules(rules = policy()) {
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
     notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，历史积分保留。",
-      "测试、开发、终止及缺少计分依据的对局不计积分。", "连胜仅统计计分局；失利归零，不计分局不推进或打断。",
+      "测试房间、陪测和开发账号参与的对局正常计分；终止及缺少计分依据的对局不计积分。", "连胜仅统计计分局；失利归零，不计分局不推进或打断。",
       rules.streakBonus.enabled ? `每段连胜首次达到${rules.streakBonus.threshold}连胜额外+${rules.streakBonus.points}分。` : "连胜先做荣誉展示，不额外加分。", ...(rules.notes || [])] };
 }
 module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

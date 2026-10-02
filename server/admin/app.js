@@ -534,45 +534,58 @@ function updateCorrectionTarget() {
 }
 function updateCorrectionMatch() {
   const match=correctionMatch();
-  selectOptions('correction-result',[{value:'',label:'请选择结束原因'},...(match?.options || []).map(option=>({value:option.id,label:option.label}))]);
+  $('match-score-editor').hidden=!match;
+  $('match-score-empty').hidden=!!match;
+  $('correction-editor').open=false;
+  selectOptions('correction-result',[{value:'',label:'请选择实际结束方式'},...(match?.options || []).map(option=>({value:option.id,label:option.label}))]);
   selectOptions('correction-target',[{value:'',label:'请选择实际目标'},...(match?.players || []).filter(player=>player.alive !== false).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name})),{value:'0',label:'空刀'}]);
   selectOptions('correction-actor',[{value:'',label:'保留原带刀记录（未登记则未知）'},...(match?.players || []).filter(player=>player.alive!==false).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name}))]);
   $('correction-result').disabled=!match?.options.length;
   $('correction-submit').disabled=!match?.options.length;
   $('correction-status').textContent=match && !match.options.length ? '本局没有可更正的结果依据。' : '';
   updateCorrectionTarget();
-  loadMatchScores();
+  return loadMatchScores();
 }
 async function loadCorrectionMatches() {
   if(correctionBusy || correctionPending || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading) return;
   const code=$('correction-code').value.trim();
   if(!/^\d{6}$/.test(code)) {$('correction-status').textContent='请输入6位房间号';return;}
-  const selected=$('correction-match').value;correctionLoading=true;lockScoreControls();
+  const selected=$('correction-match').value;correctionLoading=true;
+  correctionMatches=[];matchScoreDetail=null;matchScoreSequence++;
+  $('correction-results').hidden=true;$('match-score-editor').hidden=true;
+  $('match-score-empty').hidden=true;$('match-score-status').textContent='';
+  lockScoreControls();
+  $('correction-status').textContent='正在查找对局…';
   try {
     const result=await api('matches?code='+encodeURIComponent(code));correctionMatches=result.matches;
     selectOptions('correction-match',[{value:'',label:correctionMatches.length?'请选择对局':'暂无已归档对局'},...correctionMatches.map(match=>({value:match.id,label:new Date(match.endedAt).toLocaleString('zh-CN')+' · '+match.boardName+' · '+({good:'好人胜',evil:'坏人胜',third:'第三方胜'})[match.winner]}))]);
     if(correctionMatches.some(match=>match.id===selected))$('correction-match').value=selected;
-    $('correction-match').disabled=!correctionMatches.length;updateCorrectionMatch();
+    else if(correctionMatches.length)$('correction-match').value=correctionMatches[0].id;
+    $('correction-results').hidden=!correctionMatches.length;
+    $('correction-count').textContent=`${correctionMatches.length} 场对局 · 最近在前`;
+    $('match-score-empty').textContent=correctionMatches.length?'选择对局后管理积分与结果。':'这个房间暂无已归档对局，可检查房间号后重新查找。';
+    $('correction-match').disabled=!correctionMatches.length;await updateCorrectionMatch();
   } catch(error) {$('correction-status').textContent=error.message;}
   finally {correctionLoading=false;lockScoreControls();}
 }
-$('correction-load').addEventListener('click',loadCorrectionMatches);
+$('correction-search').addEventListener('submit',event=>{event.preventDefault();loadCorrectionMatches();});
 $('correction-match').addEventListener('change',updateCorrectionMatch);
 $('correction-result').addEventListener('change',updateCorrectionTarget);
 $('correction-form').addEventListener('submit',async event=>{
   event.preventDefault();if(correctionBusy || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading) return;
   const match=correctionMatch();if(!match || !match.options.length) return;
   if(!correctionPending) {
-    if(!window.confirm('确认更正这场对局？战绩、趣味记录及适用的积分和连胜奖励会同步重算，并保留更正记录。')) return;
     const option=match.options.find(reason=>reason.id===$('correction-result').value);
+    if(!option){$('correction-status').textContent='请选择实际结束方式';return;}
+    if(!window.confirm(`确认将这场对局更正为「${option.label}」？战绩、趣味记录及适用的积分和连胜奖励会同步重算，并保留更正记录。`)) return;
     correctionPending={id:match.id,data:{requestId:crypto.randomUUID(),revision:match.revision,[match.correctionKind === "fun" ? "funReason" : "scoreReason"]:option.id,
-      ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {}),reason:$('correction-reason').value.trim()}};
+      ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {})}};
   }
-  correctionBusy=true;lockScoreControls();
+  correctionBusy=true;lockScoreControls();$('correction-status').textContent='正在更正对局结果…';
   try {
     const result=await api('matches/'+correctionPending.id+'/correct',correctionPending.data);
     match.revision=result.revision;match.winner=result.winner;
-    correctionPending=null;$('correction-status').textContent='已更正，战绩、趣味记录及适用的积分已同步。';$('correction-reason').value='';
+    correctionPending=null;$('correction-status').textContent='已更正，战绩、趣味记录及适用的积分已同步。';
   }catch(error){
     if(error.status && error.status < 500 && ![401,429].includes(error.status)) correctionPending=null;
     $('correction-status').textContent=error.message;
@@ -587,7 +600,7 @@ $('correction-form').addEventListener('submit',async event=>{
 let scorePlayers=[], scorePlayerQuery='', scorePlayerOffset=0, scorePlayerHasMore=false;
 let selectedScorePlayer=null, scorePlayerHistoryOffset=0, scorePlayerHistoryMore=false, matchScoreDetail=null;
 let scoreBusy=false, scoreWritePending=null, matchScoreSequence=0, matchScoreLoading=false;
-const scoreControls=['score-player-query','score-player-find','score-player','score-player-prev','score-player-next','player-score-mode','player-score-points','player-score-reason','player-score-history-more','correction-load','correction-code','correction-match','correction-result','correction-target','correction-actor','correction-reason','match-score-reason'];
+const scoreControls=['score-player-query','score-player-find','score-player','score-player-prev','score-player-next','player-score-mode','player-score-points','player-score-history-more','correction-load','correction-code','correction-match','correction-result','correction-target','correction-actor','score-tab-player','score-tab-match'];
 function lockScoreControls() {
   const locked=scoreBusy || !!scoreWritePending || correctionBusy || !!correctionPending || correctionLoading || matchScoreLoading;
   for(const id of scoreControls) $(id).disabled=locked;
@@ -595,7 +608,7 @@ function lockScoreControls() {
   $('score-player-prev').disabled=locked || !scorePlayerOffset;
   $('score-player-next').disabled=locked || !scorePlayerHasMore;
   $('player-score-submit').disabled=locked || !selectedScorePlayer;
-  $('match-score-submit').disabled=locked || !matchScoreDetail?.players.some(player=>player.editable);
+  $('match-score-submit').disabled=locked || !matchScoreChanges().length;
   $('correction-match').disabled=locked || !correctionMatches.length;
   $('correction-result').disabled=locked || !correctionMatch()?.options.length;
   $('correction-submit').disabled=locked || !correctionMatch()?.options.length;
@@ -607,41 +620,67 @@ function lockScoreControls() {
     $('match-score-submit').disabled=scoreBusy || scoreWritePending.kind!=='match';
   }
   if(correctionPending)$('correction-submit').disabled=correctionBusy;
+  $('score-player-find').textContent=scoreBusy && !selectedScorePlayer && !scoreWritePending?'查找中…':'查找玩家';
+  $('correction-load').textContent=correctionLoading?'查找中…':'查找对局';
+  $('score-management').setAttribute('aria-busy',String(scoreBusy || correctionBusy || correctionLoading || matchScoreLoading));
 }
 function renderPlayerScoreSummary() {
-  $('score-player-summary').textContent=selectedScorePlayer ? `${selectedScorePlayer.name} · 总积分 ${selectedScorePlayer.points} · 对局积分 ${selectedScorePlayer.matchPoints} · 管理调整 ${selectedScorePlayer.manualPoints}` : '';
+  $('player-score-editor').hidden=!selectedScorePlayer;
+  $('score-player-empty').hidden=!!selectedScorePlayer;
+  $('score-player-summary').textContent=selectedScorePlayer?.name || '';
+  $('score-total').textContent=selectedScorePlayer?.points ?? '—';
+  $('score-match-total').textContent=selectedScorePlayer?.matchPoints ?? '—';
+  $('score-manual-total').textContent=selectedScorePlayer?.manualPoints ?? '—';
+  updatePlayerScorePreview();
+}
+function updatePlayerScorePreview() {
+  const set=$('player-score-mode').value==='set',raw=$('player-score-points').value,points=Number(raw);
+  $('player-score-points-label').textContent=set?'目标总积分':'调整分值';
+  $('player-score-points').placeholder=set?'输入新的总积分':'如 5 或 -5';
+  $('player-score-help').textContent=(set?'将总积分调整到指定数值；':'正数加分，负数扣分；')+'不改变胜负、连胜或场均积分。';
+  $('player-score-preview').textContent=selectedScorePlayer && raw && Number.isSafeInteger(points) && Math.abs(points)<=1000000
+    ? `总积分 ${selectedScorePlayer.points} → ${set?points:selectedScorePlayer.points+points} 分`
+    : '输入分值，预览调整后的总积分。';
 }
 async function searchScorePlayers(start=0) {
   if(scoreBusy || scoreWritePending || correctionBusy || correctionPending || correctionLoading || matchScoreLoading) return;
   const query=start===0?$('score-player-query').value.trim():scorePlayerQuery;if(!query)return;
-  scoreBusy=true;lockScoreControls();
+  selectedScorePlayer=null;scorePlayers=[];renderPlayerScoreSummary();$('score-player-results').hidden=true;
+  scoreBusy=true;lockScoreControls();$('player-score-status').textContent='正在查找玩家…';
   try {
     const result=await api('score-players?q='+encodeURIComponent(query)+'&offset='+start);
     scorePlayerQuery=query;scorePlayerOffset=start;scorePlayerHasMore=result.hasMore;scorePlayers=result.players;selectedScorePlayer=null;
     selectOptions('score-player',[{value:'',label:scorePlayers.length?'请选择玩家':'没有匹配的玩家'},...scorePlayers.map(player=>({value:player.uid,label:`${player.name} · ${(player.publicId || player.uid).slice(-8)} · ${player.points}分`}))]);
-    $('score-player-page').textContent=`第 ${start/50+1} 页`;$('player-score-history').replaceChildren();$('player-score-history-more').hidden=true;
+    $('score-player-results').hidden=!scorePlayers.length;
+    $('score-player-pager').hidden=!start && !result.hasMore;
+    $('score-player-empty').textContent=scorePlayers.length?'选择一位玩家，查看积分并进行调整。':'没有找到匹配的玩家，试试其他昵称或账号标识。';
+    $('score-player-page').textContent=`第 ${start/50+1} 页 · ${scorePlayers.length} 人`;$('player-score-history').replaceChildren();$('player-score-history-more').hidden=true;
+    $('player-score-points').value='';
     $('player-score-status').textContent='';renderPlayerScoreSummary();
-  }catch(error){$('player-score-status').textContent=error.message;}
+  }catch(error){$('player-score-status').textContent=error.message;return;}
   finally{scoreBusy=false;lockScoreControls();}
+  if(scorePlayers.length===1 && !selectedScorePlayer){$('score-player').value=scorePlayers[0].uid;await loadPlayerScore();}
 }
 function renderPlayerScoreHistory(records,append=false) {
-  if(!append)$('player-score-history').replaceChildren(el('h3','玩家积分调整记录'));
+  if(!append)$('player-score-history').replaceChildren();
   if(!records.length && !append)$('player-score-history').append(el('p','暂无调整记录'));
   for(const record of records) {
-    const row=el('div','','score-history-row');row.append(el('strong',`${record.delta>=0?'+':''}${record.delta} 分 · ${record.beforePoints} → ${record.afterPoints}`),el('p',record.reason),el('p',new Date(record.created).toLocaleString()));$('player-score-history').append(row);
+    const row=el('div','','score-history-row');row.append(el('strong',`${record.delta>=0?'+':''}${record.delta} 分 · ${record.beforePoints} → ${record.afterPoints}`));if(record.reason)row.append(el('p',record.reason));row.append(el('p',new Date(record.created).toLocaleString()));$('player-score-history').append(row);
   }
 }
 async function loadPlayerScore(append=false) {
   if(scoreBusy || scoreWritePending || correctionBusy || correctionPending || correctionLoading)return;
   const player=append?selectedScorePlayer:scorePlayers.find(player=>player.uid===$('score-player').value);
   if(!player){selectedScorePlayer=null;renderPlayerScoreSummary();lockScoreControls();return;}
+  if(selectedScorePlayer?.uid!==player.uid){$('player-score-points').value='';selectedScorePlayer=null;renderPlayerScoreSummary();}
   scoreBusy=true;lockScoreControls();
+  $('player-score-status').textContent='正在读取玩家积分…';
   try {
     const start=append?scorePlayerHistoryOffset:0,result=await api('score-adjustments?uid='+encodeURIComponent(player.uid)+'&offset='+start);
     selectedScorePlayer={...player,...result};scorePlayerHistoryOffset=start+result.adjustments.records.length;scorePlayerHistoryMore=result.adjustments.hasMore;
     const option=Array.from($('score-player').options || []).find(option=>option.value===player.uid);
     if(option)option.textContent=`${player.name} · ${(player.publicId || player.uid).slice(-8)} · ${result.points}分`;
-    renderPlayerScoreSummary();renderPlayerScoreHistory(result.adjustments.records,append);$('player-score-history-more').hidden=!scorePlayerHistoryMore;return true;
+    renderPlayerScoreSummary();renderPlayerScoreHistory(result.adjustments.records,append);$('player-score-history-more').hidden=!scorePlayerHistoryMore;$('player-score-status').textContent='';return true;
   }catch(error){selectedScorePlayer=null;renderPlayerScoreSummary();$('player-score-status').textContent=error.message;return false;}
   finally{scoreBusy=false;lockScoreControls();}
 }
@@ -650,15 +689,28 @@ function renderMatchScorePlayers() {
   for(const player of matchScoreDetail?.players || []) {
     const row=el('div','','score-editor-row'),label=el('label',`${player.seat}号 ${player.name}`),input=el('input'),reset=el('button','恢复自动计分');
     input.id='match-points-'+player.seat;label.htmlFor=input.id;
-    label.append(el('small',player.editable?`当前 ${player.score.total} 分${player.score.manualOverride?' · 已手动设置':''}`:player.score?.reason || '本局未计分'));
+    const caption=player.editable?`当前 ${player.score.total} 分${player.score.manualOverride?' · 已手动设置':''}`:player.score?.reason || '本局未计分';
+    label.append(el('small',caption));
     input.type='number';input.min='-1000000';input.max='1000000';input.step='1';input.value=player.editable?String(player.score.total):'';
     input.dataset.scoreUid=player.uid;input.dataset.editable=String(player.editable);input.setAttribute('aria-label',`${player.seat}号 ${player.name}的本局积分`);
-    input.addEventListener('input',()=>{delete input.dataset.reset;});
+    input.addEventListener('input',()=>{delete input.dataset.reset;label.querySelector('small').textContent=caption;$('match-score-status').textContent='';updateMatchScorePreview();lockScoreControls();});
     reset.type='button';reset.dataset.scoreUid=player.uid;reset.dataset.editable=String(player.editable);
-    reset.addEventListener('click',()=>{input.dataset.reset='true';input.value='';label.querySelector('small').textContent='待恢复自动计分';});
+    reset.addEventListener('click',()=>{input.dataset.reset='true';input.value='';label.querySelector('small').textContent='待恢复自动计分';$('match-score-status').textContent='';updateMatchScorePreview();lockScoreControls();});
     row.append(label,input,reset);$('match-score-players').append(row);
   }
   lockScoreControls();
+  updateMatchScorePreview();
+}
+function matchScoreChanges() {
+  const inputs=Array.from($('match-score-players').querySelectorAll('input[data-score-uid]'));
+  return inputs.filter(input=>{
+    const player=matchScoreDetail?.players.find(player=>player.uid===input.dataset.scoreUid);
+    return player?.editable && (input.dataset.reset==='true' || input.value!==String(player.score.total));
+  });
+}
+function updateMatchScorePreview() {
+  const changed=matchScoreChanges();
+  $('match-score-preview').textContent=changed.length?`${changed.length} 位玩家的积分待保存`:'尚未修改积分';
 }
 async function loadMatchScores() {
   if(scoreWritePending)return;
@@ -675,12 +727,10 @@ async function submitScoreWrite(kind) {
   if(scoreBusy || correctionBusy || correctionPending || correctionLoading || matchScoreLoading || scoreWritePending && scoreWritePending.kind!==kind)return;
   const status=$(kind==='player'?'player-score-status':'match-score-status');
   if(!scoreWritePending) {
-    const reason=$(kind==='player'?'player-score-reason':'match-score-reason').value.trim();
-    if(reason.length<2){status.textContent='请填写至少2字的调整原因';return;}
     let path,data;
     if(kind==='player') {
       if(!selectedScorePlayer)return;
-      const raw=$('player-score-points').value,points=Number(raw);if(!raw || !Number.isSafeInteger(points)){status.textContent='请输入整数积分';return;}
+      const raw=$('player-score-points').value,points=Number(raw);if(!raw || !Number.isSafeInteger(points) || Math.abs(points)>1000000){status.textContent='请输入 -1000000 至 1000000 之间的整数积分';return;}
       const mode=$('player-score-mode').value,after=mode==='set'?points:selectedScorePlayer.points+points;
       if(!window.confirm(`调整 ${selectedScorePlayer.name} 的总积分：${selectedScorePlayer.points} → ${after} 分？`))return;
       path='score-adjustments';data={uid:selectedScorePlayer.uid,revision:selectedScorePlayer.revision,mode,points};
@@ -691,19 +741,18 @@ async function submitScoreWrite(kind) {
         const player=matchScoreDetail.players.find(player=>player.uid===input.dataset.scoreUid);if(!player.editable)continue;
         if(input.dataset.reset==='true')scores.push({uid:player.uid,points:null});
         else if(input.value!==String(player.score.total)) {
-          const points=Number(input.value);if(!input.value || !Number.isSafeInteger(points)){status.textContent='请填写整数得分，或选择恢复自动计分';return;}scores.push({uid:player.uid,points});
+          const points=Number(input.value);if(!input.value || !Number.isSafeInteger(points) || Math.abs(points)>1000000){status.textContent='请填写 -1000000 至 1000000 之间的整数得分，或选择恢复自动计分';return;}scores.push({uid:player.uid,points});
         }
       }
       if(!scores.length){status.textContent='没有需要保存的积分变化';return;}
       if(!window.confirm(`确认修改本局 ${scores.length} 名玩家的积分？胜负与连胜保持原结果。`))return;
       path='matches/'+matchScoreDetail.id+'/scores';data={revision:matchScoreDetail.revision,scores};
     }
-    scoreWritePending={kind,path,data:{...data,reason,requestId:crypto.randomUUID()}};
+    scoreWritePending={kind,path,data:{...data,requestId:crypto.randomUUID()}};
   }
   scoreBusy=true;lockScoreControls();status.textContent='正在保存…';
   try {
     await api(scoreWritePending.path,scoreWritePending.data);scoreWritePending=null;
-    $(kind==='player'?'player-score-reason':'match-score-reason').value='';
     if(kind==='player')$('player-score-points').value='';
     scoreBusy=false;const loaded=kind==='player'?await loadPlayerScore():await loadMatchScores();
     status.textContent=loaded?'已保存，积分及排行榜已更新。':'已保存；读取最新积分失败，请重新查询。';
@@ -720,3 +769,23 @@ $('score-player').addEventListener('change',()=>loadPlayerScore());
 $('player-score-history-more').addEventListener('click',()=>loadPlayerScore(true));
 $('player-score-form').addEventListener('submit',event=>{event.preventDefault();submitScoreWrite('player');});
 $('match-score-form').addEventListener('submit',event=>{event.preventDefault();submitScoreWrite('match');});
+$('player-score-mode').addEventListener('change',()=>{$('player-score-status').textContent='';updatePlayerScorePreview();});
+$('player-score-points').addEventListener('input',()=>{$('player-score-status').textContent='';updatePlayerScorePreview();});
+const scoreTabs=['player','match'];
+function selectScoreTab(value) {
+  for(const tab of scoreTabs){
+    const active=tab===value,button=$('score-tab-'+tab);
+    button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;
+    $(tab==='player'?'player-score-section':'match-score-section').hidden=!active;
+  }
+}
+scoreTabs.forEach((value,index)=>{
+  const button=$('score-tab-'+value);
+  button.addEventListener('click',()=>selectScoreTab(value));
+  button.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    const next=event.key==='Home'?0:event.key==='End'?1:1-index,target=$('score-tab-'+scoreTabs[next]);
+    if(target.disabled)return;
+    event.preventDefault();selectScoreTab(scoreTabs[next]);target.focus();
+  });
+});

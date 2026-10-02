@@ -7,30 +7,39 @@ const cards = require("../miniprogram/share-card");
 const fixtures = require("./helpers/share-fixtures");
 const copy = value => structuredClone(value);
 
-test("战绩图片只投影本人摘要，保留有效局数与计分连胜口径，不导出私人明细", () => {
+test("战绩图片展示阵营及按局数选择的四个角色，剩余角色汇总，不导出私人明细", () => {
   const stats = copy(fixtures.stats), profile = copy(fixtures.profile);
   const card = cards.statsCard(profile, stats, fixtures.now);
   assert.equal(card.hero + card.unit, "62.5%");
   assert.deepEqual(card.metrics.map(item => item.value), ["48", "30", "18"]);
-  assert.deepEqual(card.highlight, { label: "连胜纪录", value: "5 连胜", details: ["计分局口径", "全部时间"] });
+  assert.deepEqual(card.factions.map(row=>[row.label,row.total,row.rate]),[["好人",30,"70%"],["坏人",18,"50%"]]);
+  assert.equal(card.roles.length,4);assert.deepEqual(card.roles.map(row=>row.total),[12,10,10,8]);
+  assert.equal(card.roles[0].label,"梅林");assert.equal(card.roles[0].rate,"75%");
+  assert.deepEqual([card.otherRoles.total,card.otherRoles.wins,card.otherRoles.losses],[8,5,3]);
+  assert.match(cards.describe(card),/好人 30 局，21 胜 9 负，胜率 70%/);
+  assert.match(cards.describe(card),/其他角色 8 局/);
   assert.doesNotMatch(JSON.stringify(card), /must-not-export|recent|members|uid|manualAdjustment|leaderboardVisible/);
   const original = JSON.stringify(card);
-  stats.total = 100; profile.nickname = "改名";
+  stats.total = 100; stats.byRole[0].wins=0; profile.nickname = "改名";
   assert.equal(JSON.stringify(card), original);
   assert.throws(() => cards.statsCard(profile, { total: 0 }, fixtures.now), /没有有效战绩/);
-  const plain = cards.statsCard(profile, { ...stats, score: null }, fixtures.now);
-  assert.equal(plain.highlight, null);
+  const plain = cards.statsCard(profile, { ...stats, byFaction:[],byRole:[] }, fixtures.now);
+  assert.deepEqual(plain.roles,[]);
   assert.ok(cards.dimensions(plain).height < cards.dimensions(card).height);
 });
-test("角色亮点合并同名角色的阵营样本，至少十局且胜率至少五成；不足时不虚构称号", () => {
+test("角色合并不同最终阵营，小样本和零胜率照实呈现，未知样本不冒充已知角色", () => {
   const stats = copy(fixtures.stats);
   stats.byRole = [{role:"梅林",total:8,wins:7,faction:"good"},{role:"梅林",total:2,wins:1,faction:"evil"},
-    {role:"刺客",total:2,wins:2},{role:"未知角色",total:100,wins:100}];
+    {role:"刺客",total:2,wins:0},{role:"未知角色",total:3,wins:1},{role:"无效",total:1,wins:2}];
+  stats.byFaction.push({faction:"third",total:1,wins:1},{faction:"unknown",total:0,wins:0});
   const card = cards.statsCard(fixtures.profile, stats, fixtures.now);
-  assert.deepEqual(card.highlight, {label:"角色亮点",value:"梅林",details:["80% 胜率","8 胜 / 10 局"]});
-  assert.match(cards.describe(card), /角色亮点，梅林，80% 胜率/);
-  stats.byRole = [{role:"梅林",total:10,wins:4}]; stats.score.best=1;
-  assert.equal(cards.statsCard(fixtures.profile, stats, fixtures.now).highlight, null);
+  assert.deepEqual(card.roles.map(row=>[row.label,row.total,row.wins,row.rate]),[["梅林",10,8,"80%"],["刺客",2,0,"0%"]]);
+  assert.equal(card.otherRoles,null);assert.match(card.notes.join(),/3 局未记录角色/);
+  assert.equal(card.factions[2].label,"第三阵营");assert.equal(card.factions[2].rate,"100%");
+  assert.equal(card.factions.length,3);assert.equal(card.highlight,undefined);
+  const small=cards.statsCard(fixtures.profile,{total:2,wins:1,losses:1,winRate:50,byRole:[{role:"梅林",total:1,wins:1},{role:"刺客",total:1,wins:0}]},fixtures.now);
+  assert.deepEqual(small.roles.map(row=>row.total),[1,1]);
+  assert.ok(cards.dimensions(small).height<cards.dimensions(card).height);
 });
 test("趣味图片仅输出所选正向指标，区分未知、真实零和无机会，附已知与未知样本", () => {
   const stats = copy(fixtures.stats), metric = stats.fun.cards[0].metrics[0];
@@ -51,22 +60,36 @@ test("趣味图片仅输出所选正向指标，区分未知、真实零和无�
   Object.assign(metric, { value: 1, knownGames: 1, ranked: false });
   assert.throws(create, /没有完整记录/);
 });
-test("排名图片突出本人成绩、真实名次及同周期样本，不导出其他玩家和标识", () => {
+test("排名图片只投影附近五位公开摘要，突出本人并保留同周期计分样本", () => {
   const mine = cards.leaderboardCard(fixtures.profile, fixtures.board);
   assert.equal(mine.context, "2026 年 10 月 · 积分榜");
   assert.equal(mine.hero + mine.unit, "286分");
-  assert.equal(mine.rank, 3);
+  assert.equal(mine.rank, 8);
+  assert.deepEqual(mine.nearby.map(row=>row.rank),[6,7,8,9,10]);
+  assert.equal(mine.nearby[2].isSelf,true);assert.equal(mine.gap,"距上一位 16 分");
+  assert.match(cards.describe(mine),/我的附近.*晚风.*小林（我）.*距上一位 16 分/);
   assert.deepEqual(mine.metrics.map(item=>[item.value,item.label]), [["24","计分局数"],["15","计分局胜场"],["62.5%","计分局胜率"]]);
-  assert.doesNotMatch(JSON.stringify(mine), /private-version|not-needed|should-not-appear|晚风|北川|publicId|rows/);
+  assert.doesNotMatch(JSON.stringify(mine), /private-version|not-needed|should-not-appear|publicId|rows/);
   assert.equal(cards.leaderboardCard(fixtures.profile, {...fixtures.board, me:{...fixtures.board.me,rank:1}}).rank,1);
   const hidden = cards.leaderboardCard(fixtures.profile, { ...fixtures.board, rows: [], me: { ...fixtures.board.me, status: "hidden" } });
   assert.equal(hidden.rank, null); assert.equal(hidden.rankLabel, "未公开"); assert.equal(hidden.hero,"286");
+  assert.deepEqual(hidden.nearby,[]);assert.equal(hidden.gap,"");
   assert.ok(cards.canShareLeaderboard({...fixtures.board,rows:[]}));
   assert.equal(cards.canShareLeaderboard({...fixtures.board,me:{total:0,points:0}}),false);
   assert.throws(() => cards.leaderboardCard(fixtures.profile, { ...fixtures.board, me:{total:0,points:0} }), /本人成绩/);
   const adjusted = cards.leaderboardCard(fixtures.profile, {...fixtures.board,me:{status:"no_games",rank:null,total:0,wins:0,points:-5,winRate:null,remaining:1}});
   assert.equal(adjusted.hero,"-5");assert.equal(adjusted.rankLabel,"未上榜");assert.equal(adjusted.metrics[2].value,"—");
   assert.equal(cards.shanghaiTime(Date.UTC(2026, 8, 30, 16)), "2026.10.01 00:00");
+});
+test("缺少完整本人邻近数据时保留个人卡，并列或百分比榜不制造分差", () => {
+  const board=copy(fixtures.board), build=()=>cards.leaderboardCard(fixtures.profile,board);
+  board.nearby[1].points=286;board.nearby[1].rank=8;
+  assert.equal(build().gap,"");assert.equal(build().nearby[1].rank,8);
+  board.metric='overall';board.me.winRate=62.5;
+  board.nearby.forEach(row=>row.winRate=row.isSelf?62.5:75);
+  assert.equal(build().gap,"");assert.equal(build().nearby[2].value,"62.5");
+  board.nearby[2].rank=99;assert.deepEqual(build().nearby,[]);
+  delete board.nearby;assert.deepEqual(build().nearby,[]);assert.equal(build().hero,"62.5");
 });
 test("趣味榜图片完整带上指标、排序、角色、玩法和周期，百分比不混用胜率", () => {
   const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "轮内刀法", metricLabel: "命中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
@@ -133,11 +156,26 @@ test("榜单预览直接生成本人成绩，生成期间禁用发送；隐藏�
   assert.equal(p.data.imagePath,"wxfile://mine");
   p.send(); assert.equal(sent[0].path, "wxfile://mine");
   assert.equal(p.chooseMode, undefined);
-  assert.doesNotMatch(p.data.description, /晚风|北川|前三位/);
-  assert.equal(requests.find(url => url.includes("leaderboard")), "/api/leaderboard?metric=points&period=month");
+  assert.match(p.data.description, /我的附近.*晚风.*北川/);
+  assert.doesNotMatch(p.data.description, /前三位|should-not-appear/);
+  assert.equal(requests.find(url => url.includes("leaderboard")), "/api/leaderboard?metric=points&period=month&nearby=1");
   const hidden = page({ api: { login: async () => {}, request: async url => url.includes("profile") ? fixtures.profile : { ...fixtures.board, rows:[], me: { ...fixtures.board.me, status: "hidden", rank: null } } } });
   await hidden.p.onLoad(cards.boardSelection(fixtures.board)); await hidden.p.onReady();
-  assert.ok(hidden.p.data.imagePath); assert.match(hidden.p.data.description, /未公开/); assert.doesNotMatch(hidden.p.data.description,/第 3 名/);
+  assert.ok(hidden.p.data.imagePath); assert.match(hidden.p.data.description, /未公开/); assert.doesNotMatch(hidden.p.data.description,/第 8 名|晚风/);
+});
+test("旧服务拒绝附近参数时退回个人卡；普通网络故障不会掩盖为成功", async () => {
+  let calls=[];
+  const {p}=page({api:{login:async()=>{},request:async url=>{
+    calls.push(url);if(url.includes('profile'))return fixtures.profile;
+    if(url.includes('nearby'))throw Object.assign(Error('排行榜参数无效，请刷新后重试'),{status:400});
+    const board=copy(fixtures.board);delete board.nearby;return board;
+  }}});
+  await p.onLoad(cards.boardSelection(fixtures.board));await p.onReady();
+  assert.ok(p.data.imagePath);assert.equal(calls.length,3);assert.doesNotMatch(p.data.description,/我的附近/);
+  calls=[];
+  const broken=page({api:{login:async()=>{},request:async url=>{calls.push(url);if(url.includes('profile'))return fixtures.profile;throw Object.assign(Error('网络中断'),{status:500});}}});
+  await broken.p.onLoad(cards.boardSelection(fixtures.board));await broken.p.onReady();
+  assert.equal(calls.length,2);assert.equal(broken.p.data.error,'网络中断');assert.equal(broken.p.data.imagePath,'');
 });
 test("网络失败可重试，卸载后的响应不生成图片或改变页面", async () => {
   let fail = true, release;
@@ -174,7 +212,7 @@ test("不支持图片分享时提供保存；相册拒绝可恢复，发送失�
   assert.match(other.p.data.actionError, /暂时无法发送/); assert.equal(other.notices.length, 0);
 });
 test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退", async () => {
-  const drawing = [], context = { fillRect() {}, strokeRect() {}, save() {}, restore() {}, beginPath() {}, arc() {}, clip() {}, moveTo() {}, lineTo() {}, stroke() {}, measureText: text => ({ width: text.length * 20 }), fillText: text => drawing.push(text), drawImage() { throw Error("failed avatar must not be drawn"); } };
+  const drawing = [], context = { fillRect() {}, strokeRect() {}, save() {}, restore() {}, beginPath() {}, closePath() {}, arc() {}, clip() {}, moveTo() {}, lineTo() {}, stroke() {}, measureText: text => ({ width: text.length * 20 }), fillText: text => drawing.push(text), drawImage() { throw Error("failed avatar must not be drawn"); } };
   const canvas = { getContext: () => context, createImage: () => ({ set src(value) { this.onerror(); } }) };
   let exported;
   const wx = { createSelectorQuery() { const query = { in() { return query; }, select() { return query; }, fields() { return query; }, exec(callback) { callback([{ node: canvas }]); } }; return query; },
@@ -184,7 +222,7 @@ test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退",
     require: name => name === "./api" ? { assetUrl: value => "https://example.test" + value } : cards });
   const card = cards.statsCard({ ...fixtures.profile, avatarUrl: "/api/avatars/" + "a".repeat(64) }, fixtures.stats, fixtures.now);
   assert.equal(await mod.exports.renderImage({ alive: true }, card), "wxfile://native");
-  assert.equal(canvas.width, 1080); assert.equal(canvas.height, 944);
-  assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,944);
+  assert.equal(canvas.width, 1080); assert.equal(canvas.height, 1424);
+  assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,1424);
   assert.equal(exported.height,canvas.height);assert.equal(exported.fileType, "png"); assert.ok(drawing.includes("小"));
 });

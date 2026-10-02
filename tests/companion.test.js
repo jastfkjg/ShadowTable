@@ -425,6 +425,59 @@ function simulatedPanel(count, request) {
   });
 }
 
+test("12人桌补位最多并发4人，仅读取起始状态和最终状态", async () => {
+  const a = await launch();
+  try {
+    const { token } = await a.request('/api/dev-login', null, {});
+    const { code } = await a.request('/api/rooms', token, { name: '真人', board: 'knights', capacity: 12 });
+    const calls = []; let active = 0, peak = 0;
+    const panel = new Companion({ request: async (...args) => {
+      active++; peak = Math.max(peak, active); calls.push(args);
+      try { return await a.request(...args); } finally { active--; }
+    } });
+    await panel.add(code); calls.length = 0; peak = 0;
+    const progress = [];
+    await panel.fill((done, total) => progress.push([done, total]));
+    assert.equal(calls.length, 32);
+    assert.equal(calls.filter(args => !args[2]).length, 12);
+    assert.equal(peak, 4);
+    assert.equal(panel.actors.length, 11);
+    assert.equal(new Set(panel.actors.map(actor => actor.name)).size, 11);
+    assert.ok(panel.actors.every(actor => actor.room.players.length === 12 && actor.room.me.seat !== null));
+    assert.deepEqual(progress.at(-1), [10, 10]);
+    const outsider = (await a.request('/api/dev-login', null, {})).token;
+    await assert.rejects(a.request('/api/rooms/'+code+'/join', outsider, {name:'同时入座',requireSeat:true}), error => error.status === 409);
+    const room = a.app.store.get(code);
+    assert.equal(room.players.length, 12); assert.equal((room.spectators || []).length, 0);
+  } finally { await a.close(); }
+});
+
+test("并发补位失败等待在途入座，保留未确认编号并刷新已加入玩家", async () => {
+  const gates = Array.from({length:4}, deferred);
+  let created = 0, joined = 2, settled = false;
+  const calls = [];
+  const panel = simulatedPanel(1, async (path, token, data, id) => {
+    calls.push({path, token, id});
+    if (!data) return {phase:'lobby',stage:'s1',capacity:12,players:Array(joined).fill({}),me:{ready:false}};
+    if (path === '/api/dev-login') return {token:String(++created)};
+    await gates[Number(token)-1].promise; joined++; return {};
+  });
+  const fill = panel.fill();
+  const rejected = assert.rejects(fill, /连接中断/).then(() => { settled = true; });
+  await new Promise(setImmediate);
+  assert.equal(created, 4);
+  const actor = panel.actors.find(actor => actor.token === '1'), id = actor.pending.id;
+  gates[0].reject(Error('连接中断'));
+  await new Promise(setImmediate); assert.equal(settled, false);
+  gates.slice(1).forEach(gate => gate.resolve({})); await rejected;
+  assert.equal(created, 4); assert.equal(actor.pending.id, id);
+  assert.ok(panel.actors.filter(actor => actor.joined).every(actor => actor.room.players.length === 5));
+  await assert.rejects(panel.fill(), /未确认/);
+  gates[0] = {promise:Promise.resolve({})}; await panel.retry(actor);
+  assert.equal(calls.filter(call => call.token === '1' && call.path.endsWith('/join')).at(-1).id, id);
+  assert.equal(actor.pending, null);
+});
+
 test("准备回执立即更新本人状态，迟到的轮询与错误不能覆盖操作", async () => {
   for (const fail of [false, true]) {
     const old = deferred();

@@ -26,6 +26,7 @@ function panel({ overrides = {}, search = "", saved } = {}) {
     return elements.get(id);
   };
   let stored;
+  element('batch-ready').dataset.batch = 'ready';
   let poll,
     hold = false;
   const pending = [],
@@ -60,8 +61,8 @@ function panel({ overrides = {}, search = "", saved } = {}) {
         addEventListener() {},
         querySelectorAll: (selector) =>
           selector === "button"
-            ? [element("fill"), element("refresh"), element("leave")]
-            : [],
+            ? [element("fill"), element("refresh"), element("leave"), element('batch-ready')]
+            : selector === '[data-batch]' ? [element('batch-ready')] : [],
       },
       URLSearchParams,
       confirm: () => true,
@@ -118,6 +119,17 @@ function panel({ overrides = {}, search = "", saved } = {}) {
       }),
   };
 }
+
+test("全部准备确认后直接解锁并显示结果，不追加11次状态读取", async () => {
+  const p = panel(); await flush();
+  const reads = p.calls.filter(call => call.method === 'GET').length;
+  await p.element('batch-ready').onclick();
+  assert.equal(p.calls.filter(call => call.method === 'POST').length, 11);
+  assert.equal(p.calls.filter(call => call.method === 'GET').length, reads);
+  assert.equal((p.element('players').innerHTML.match(/取消准备/g) || []).length, 11);
+  assert.equal(p.element('refresh').disabled, false);
+  assert.match(p.element('feedback').textContent, /已完成 11/);
+});
 
 test("轮询期间准备不丢点击：仅锁本人，回执立即显示且不额外全员查询", async () => {
   const p = panel();

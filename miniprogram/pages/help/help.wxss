@@ -19,3 +19,8 @@ button.help-board-link,
 button.help-board-link[disabled]:not([type]) { width: 100%; margin: 0; min-width: 0; min-height: 96rpx; padding: 16rpx 24rpx; background: var(--surface); color: var(--accent); font-size: 28rpx; }
 .help-board-error { margin-top: 24rpx; }
 .help-board-error button { margin-top: 16rpx; }
+
+.help-scoring-page .help-section { border-top: 0; }
+.help-scoring-page .help-score-scope { padding: 28rpx; background: var(--surface); border-radius: 24rpx; }
+.help-scoring-page .help-score-scope .help-heading { margin-bottom: 12rpx; }
+.help-score-heading { margin: 32rpx 0 24rpx; }
