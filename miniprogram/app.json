@@ -10,7 +10,8 @@
     "pages/table/table",
     "pages/settings/settings",
     "pages/board-details/board-details",
-    "pages/help/help"
+    "pages/help/help",
+    "pages/web-login/web-login"
   ],
   "window": {
     "navigationBarTitleText": "桌边助手 · ShadowTable",

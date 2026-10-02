@@ -44,10 +44,12 @@ test('分享入口只传内容选择，拦截旧预览和读取失败，不传�
   const query=new URL('https://example.test'+navigations[1]).searchParams;
   assert.equal(query.get('card'),'classic:merlin');assert.equal(query.get('metric'),'merlin_evade');
   const ranking=page('leaderboard',apiBase);
-  ranking.p.setData({loading:false,board:{rows:[{}],metric:'fun_knife_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
+  ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_knife_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
   ranking.p.shareLeaderboard();
   assert.equal(ranking.navigations[0],'/pages/share/share?kind=leaderboard&metric=fun_knife_enemy&period=month&mode=knights&sort=rate&role=gareth');
   ranking.p.setData({visibilitySaving:true});ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
+  ranking.p.setData({visibilitySaving:false,board:{rows:[{rank:1}],metric:'points',me:{total:0,points:0}}});
+  ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
 });
 test('小程序本人积分调整独立分页，失败保留记录可重试，读取期间不混合筛选，卸载丢弃旧响应',async()=>{
   const ledger={id:'a',created:1,delta:-3,beforePoints:5,afterPoints:2,reason:'现场修正'};
@@ -598,7 +600,7 @@ test('小程序切换周期保留榜单和底栏，完成后一次更新，失�
   await p.choosePeriod({currentTarget:{dataset:{id:'month'}}});assert.equal(requests.length,2);
   requests[1].resolve(rankResult('games',{period:'month',rows:[]}));await change;
   assert.equal(frames.length,2);assert.ok(frames.every(frame=>frame.board));
-  assert.equal(p.data.board.period,'month');assert.equal(p.data.loading,false);assert.match(render(),/暂无战绩/);
+  assert.equal(p.data.board.period,'month');assert.equal(p.data.loading,false);assert.match(render(),/暂无公开排名/);
   const failed=p.choosePeriod({currentTarget:{dataset:{id:'all'}}});await tick();
   requests[2].reject(new Error('网络中断'));await failed;
   assert.equal(p.data.period,'month');assert.equal(p.data.board.period,'month');
@@ -653,7 +655,7 @@ test('小程序排行榜保留空榜、错误、样本量与参与入口，移�
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
   const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',rank:null,statusLabel:''},rows:[]};
   const tree=render({board,error:'请求失败',mineExpanded:true});
-  assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无战绩/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
+  assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无公开排名/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
   assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
   const footer=template.slice(template.indexOf('<view class="rank-mine"'));

@@ -1,5 +1,5 @@
 const api = require("./api");
-const { SIZE, drawCard } = require("./share-card");
+const { dimensions, drawCard } = require("./share-card");
 
 function canvasFor(page) {
   return new Promise((resolve, reject) => {
@@ -25,13 +25,14 @@ function avatarFor(canvas, path) {
 }
 async function renderImage(page, card) {
   const canvas = await canvasFor(page);
-  canvas.width = SIZE; canvas.height = SIZE;
+  const { width, height } = dimensions(card);
+  canvas.width = width; canvas.height = height;
   const avatar = await avatarFor(canvas, card.avatar);
   if (!page.alive) return null;
   drawCard(canvas.getContext("2d"), card, avatar);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("图片生成超时，请重试。")), 10000);
-    wx.canvasToTempFilePath({ canvas, x: 0, y: 0, width: SIZE, height: SIZE, destWidth: SIZE, destHeight: SIZE, fileType: "png",
+    wx.canvasToTempFilePath({ canvas, x: 0, y: 0, width, height, destWidth: width, destHeight: height, fileType: "png",
       success: result => { clearTimeout(timer); resolve(result.tempFilePath); },
       fail: () => { clearTimeout(timer); reject(new Error("图片生成失败，请重试。")); },
     }, page);

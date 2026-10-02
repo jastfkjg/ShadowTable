@@ -12,6 +12,19 @@ const factory = vm.runInContext(
 );
 const renderTable = factory("pages/table/table.wxml"), renderLobby = factory("pages/lobby/lobby.wxml");
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('小程序网页登录确认页显示真实网站与账号，加载、过期后不可确认，成功后有返回入口', () => {
+  const renderLogin = factory('pages/web-login/web-login.wxml');
+  const ready = { loading: false, busy: false, terminal: false, status: 'scanned', profile: { displayName: '小程序玩家', initial: '小' }, request: { website: 'https://play.example.com', device: 'Mac' } };
+  const tree = renderLogin(ready);
+  assert.match(JSON.stringify(tree), /https:\/\/play.example.com/);
+  assert.match(JSON.stringify(tree), /小程序玩家/);
+  assert.equal(byHandler(tree, 'confirm').attr.disabled, false);
+  assert.equal(byHandler(renderLogin({ ...ready, busy: true }), 'confirm').attr.disabled, true);
+  assert.ok(!byHandler(renderLogin({ ...ready, terminal: true, error: '小程序码已过期' }), 'confirm'));
+  assert.ok(!byHandler(renderLogin({ ...ready, loading: true }), 'confirm'));
+  const done = renderLogin({ ...ready, status: 'confirmed' });
+  assert.ok(!byHandler(done, 'confirm')); assert.ok(byHandler(done, 'back'));
+});
 test('积分调整记录与单局手动原因在个人记录中可见，恢复自动后不显示手动原因',()=>{
   const renderMatches=factory('pages/matches/matches.wxml'),record={id:'m',members:[],expanded:true,score:{status:'scored',total:8,breakdown:[{id:'admin',label:'管理员调整',points:4}],manualOverride:{reason:'挡刀核对'} }};
   const data={records:[record],adjustments:[{id:'a',dateLabel:'今天',pointsLabel:'+2 分',beforePoints:8,afterPoints:10,reason:'额外奖励'}],adjustmentsTotal:1};
@@ -54,8 +67,16 @@ test('图片预览准备完成后才能发送或保存；不支持发送与相�
   assert.ok(!nodes(ready).some(node=>node.attr?.openType==='share'));
   const fallback=renderShare({imagePath:'wxfile://preview',imageMenu:false,actionError:'需要相册权限',albumDenied:true});
   assert.equal(byHandler(fallback,'send'),undefined);assert.ok(byHandler(fallback,'save'));assert.ok(byHandler(fallback,'openAlbumSettings'));
-  const unknown=renderShare({leaderboard:true,canShareMine:false,canShareTop:true,mode:'top',imagePath:'wxfile://preview',imageMenu:true});
-  assert.equal(nodes(unknown).find(node=>node.attr?.['data-mode']==='mine').attr.disabled,true);
+  assert.ok(!nodes(ready).some(node=>node.attr?.bindtap==='chooseMode'));
+  assert.doesNotMatch(JSON.stringify(ready),/榜单前三位/);
+});
+test('没有公开榜单时本人仍可分享成绩；只有他人成绩时禁止生成个人图片', () => {
+  const renderRank=factory('pages/leaderboard/leaderboard.wxml');
+  const own=renderRank({board:{rows:[],metric:'games'},shareable:true});
+  assert.equal(byHandler(own,'shareLeaderboard').attr.disabled,false);
+  assert.match(JSON.stringify(own),/暂无公开排名/);
+  const empty=renderRank({board:{rows:[{rank:1,nickname:'其他玩家'}],metric:'games'},shareable:false});
+  assert.equal(byHandler(empty,'shareLeaderboard').attr.disabled,true);
 });
 test('趣味指标全部以横向滚动按钮呈现，不再弹出玩法或指标选择器', () => {
   const defs=require('../server/fun').publicMetrics();

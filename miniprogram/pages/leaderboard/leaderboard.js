@@ -1,13 +1,13 @@
 const api = require("../../api");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
 const { backToMe } = require("../../profile");
-const { boardSelection, queryString } = require("../../share-card");
+const { boardSelection, queryString, canShareLeaderboard } = require("../../share-card");
 Page({
-  data: { mineExpanded: false, rulesExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funActiveId: "", funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { mineExpanded: false, rulesExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funActiveId: "", funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareable: false, visible: false, visibilitySaving: false, visibilityError: "" },
   onLoad() { this.alive = true; },
   onShow() { return this.load(); },
   shareLeaderboard() {
-    if (!this.data.board || this.data.loading || this.data.loadingMore || this.data.error || this.data.visibilitySaving || !this.data.board.rows.length) return;
+    if (this.data.loading || this.data.loadingMore || this.data.error || this.data.visibilitySaving || !canShareLeaderboard(this.data.board)) return;
     wx.navigateTo({ url: "/pages/share/share?" + queryString(boardSelection(this.data.board)) });
   },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; },
@@ -42,7 +42,7 @@ Page({
       const resolvedMode = result.mode || funMode;
       const funOptions = funMetrics.map(item => ({ ...item, tabLabel: item.title + " · " + item.label }));
       const funRoleOptions = [{ id:"", label:"全部角色" }, ...(result.roleOptions || [])];
-      this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, loading: false, loadingMore: false,
+      this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, shareable: canShareLeaderboard(result), loading: false, loadingMore: false,
         funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funActiveId: "rank-" + result.metric, funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
         notice: funUnavailable ? "当前服务尚未开放趣味榜，已显示局数榜。" : pointsAvailable ? "" : pointsUnavailable ? "当前服务尚未开放积分榜，已显示局数榜。" : "当前服务尚未开放积分榜。",
         ...(!this.visibilityPending ? { visible: !['hidden','unsupported'].includes(result.me.status) } : {}) });

@@ -230,7 +230,165 @@
     }
   }
 
+  // ===== mini-program confirmation for this browser =====
+  var webLoginTimer = 0, webLoginSequence = 0, webLoginPolling = false;
+  async function accountRequest(path, method = 'GET', guest = false) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (webSessionTag) headers['X-Web-Session'] = webSessionTag;
+    if (guest && !webAccountExpired && storage.get('session')) headers.Authorization = 'Bearer ' + storage.get('session');
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 25000) : null;
+    try {
+      const response = await fetch('/api/web-auth/' + path, {
+        method, headers, credentials: 'same-origin', ...(controller ? { signal: controller.signal } : {}),
+        ...(method === 'POST' ? { body: '{}' } : {}),
+      });
+      const data = await response.json();
+      if (!response.ok && response.status >= 400) throw Object.assign(new Error(data.error || '登录请求失败'), { status: response.status });
+      return data;
+    } catch (e) {
+      if (e.status) throw e;
+      throw new Error('登录请求未确认，请检查网络后重试');
+    } finally { if (timeout !== null) clearTimeout(timeout); }
+  }
+  async function initializeWebAccount() {
+    const result = await accountRequest('session');
+    state.serverConnected = true;
+    webAuthEnabled = result.enabled;
+    webSessionTag = result.authenticated ? result.sessionTag : '';
+    webAccountExpired = !result.authenticated && !!storage.get('webAccount');
+    if (result.authenticated) {
+      // A claim response may have been lost after the browser accepted its
+      // cookie. Never resume an old guest command under that cookie identity.
+      if (storage.get('webAccount') !== 'wechat' || storage.get('session')) forgetAccountDrafts();
+      if (storage.get('session')) storage.set('guestSession', storage.get('session'));
+      storage.remove('session'); storage.set('webAccount', 'wechat');
+    }
+  }
+  function forgetAccountDrafts() {
+    for (const key of ['pendingEntry', 'roomCode', 'nickname']) storage.remove(key);
+  }
+  function reloadAccount() {
+    // A full reload discards all private views, pending actions, drafts and old
+    // async callbacks together. Other tabs receive only a change notification.
+    forgetAccountDrafts();
+    storage.set('accountRevision', requestId());
+    window.location.replace('/#/me');
+    window.location.reload();
+  }
+  async function startWebLogin() {
+    if (state.webLoginBusy) return;
+    clearTimeout(webLoginTimer);
+    const sequence = ++webLoginSequence;
+    setState({ webLogin: null, webLoginBusy: true, webLoginError: '', webLoginStatus: 'creating' });
+    try {
+      const result = await accountRequest('requests', 'POST', true);
+      if (sequence !== webLoginSequence || state.page !== 'login') return;
+      setState({ webLogin: result, webLoginStatus: 'pending' });
+    } catch (e) {
+      if (sequence !== webLoginSequence) return;
+      if (e.status === 409) {
+        const session = await accountRequest('session').catch(() => null);
+        if (session?.authenticated && sequence === webLoginSequence) { reloadAccount(); return; }
+      }
+      if (e.status === 401 && !webAccountExpired) storage.remove('session');
+      setState({ webLoginError: e.message, webLoginStatus: 'error' });
+    } finally {
+      if (sequence === webLoginSequence) {
+        setState({ webLoginBusy: false });
+        if (state.webLogin) pollWebLogin();
+      }
+    }
+  }
+  async function pollWebLogin() {
+    clearTimeout(webLoginTimer);
+    if (webLoginPolling || !foreground || state.page !== 'login' || !state.webLogin || state.webLoginBusy || ['expired', 'cancelled', 'error'].includes(state.webLoginStatus)) return;
+    const sequence = webLoginSequence, item = state.webLogin;
+    if (Date.now() >= item.expiresAt) { setState({ webLoginStatus: 'expired', webLoginError: '' }); return; }
+    webLoginPolling = true;
+    let delay = 2000;
+    try {
+      const result = await accountRequest('requests/' + item.id);
+      if (sequence !== webLoginSequence || state.page !== 'login') return;
+      setState({ webLoginStatus: result.status, webLoginError: '' });
+      if (['confirmed', 'consumed'].includes(result.status)) {
+        setState({ webLoginBusy: true });
+        const claimed = await accountRequest('requests/' + item.id + '/claim', 'POST');
+        if (sequence !== webLoginSequence) return;
+        if (storage.get('session')) storage.set('guestSession', storage.get('session'));
+        storage.remove('session'); storage.set('webAccount', 'wechat');
+        webSessionTag = claimed.sessionTag; webAccountExpired = false;
+        reloadAccount(); return;
+      }
+    } catch (e) {
+      if (sequence !== webLoginSequence) return;
+      delay = e.status === 429 ? 60000 : 4000;
+      setState({ webLoginError: e.message, ...(e.status === 410 ? { webLoginStatus: 'expired' } : e.status && e.status < 500 && e.status !== 429 ? { webLoginStatus: 'error' } : {}) });
+    } finally {
+      webLoginPolling = false;
+      if (sequence === webLoginSequence) {
+        setState({ webLoginBusy: false });
+        if (foreground && state.page === 'login' && !['expired', 'cancelled', 'error'].includes(state.webLoginStatus))
+          webLoginTimer = setTimeout(pollWebLogin, delay);
+      } else if (foreground && state.page === 'login' && state.webLogin && !state.webLoginBusy)
+        webLoginTimer = setTimeout(pollWebLogin, 0);
+    }
+  }
+  async function cancelWebLogin() {
+    if (state.webLoginBusy) return false;
+    const item = state.webLogin;
+    ++webLoginSequence; clearTimeout(webLoginTimer);
+    if (item && !['expired', 'cancelled'].includes(state.webLoginStatus)) {
+      try { await accountRequest('requests/' + item.id + '/cancel', 'POST'); }
+      catch (e) {
+        if (e.status !== 410) {
+          // A claim can win the race with cancel; reflect the actual cookie state.
+          const session = await accountRequest('session').catch(() => null);
+          if (session?.authenticated) { reloadAccount(); return false; }
+          setState({ webLoginError: e.message }); return false;
+        }
+      }
+    }
+    setState({ webLogin: null, webLoginStatus: '', webLoginError: '' }); return true;
+  }
+  async function continueAsGuest() {
+    if (state.webLoginBusy || !(await mayNavigate())) return;
+    if (webSessionTag && !await confirm('退出当前网页登录？', '只退出此浏览器，小程序保持登录。将返回原游客身份；游客记录不会合并。')) return;
+    ++webLoginSequence; clearTimeout(webLoginTimer);
+    setState({ webLoginBusy: true, webLoginError: '' });
+    try {
+      await accountRequest('logout', 'POST');
+      webSessionTag = ''; webAccountExpired = false; storage.remove('webAccount');
+      const guest = storage.get('guestSession');
+      if (guest) { storage.set('session', guest); storage.remove('guestSession'); }
+      // Only a still-valid guest credential can recover its previous records.
+      if (storage.get('session')) {
+        try { await request('/api/me/profile'); }
+        catch (e) { /* Expired guest tokens are removed by request; network errors retry after reload. */ }
+      }
+      reloadAccount();
+    } catch (e) { setState({ webLoginError: e.message }); }
+    finally { setState({ webLoginBusy: false }); }
+  }
+  function viewWebLogin() {
+    const item = state.webLogin, status = state.webLoginStatus;
+    let html = '<section class="web-login-page">' + personalTitle('使用小程序账号登录', '', false);
+    html += '<p class="muted">' + (webAccountExpired ? '网页登录已过期。重新扫码即可恢复账号、资料与战绩。' : '用微信扫一扫，在桌边助手小程序中确认。') + '</p>';
+    if (!webAuthEnabled) html += '<p class="notice">小程序扫码登录暂未开放，你仍可使用游客身份。</p>';
+    else {
+      const message = { creating: '正在生成小程序码…', pending: '等待微信扫码', scanned: '已扫码，请在小程序中确认', confirmed: '已确认，正在登录…', consumed: '正在恢复登录…', cancelled: '登录已取消', expired: '小程序码已过期', error: '暂时无法登录' }[status] || '点击下方按钮生成小程序码';
+      html += '<div class="web-login-code">' + (item && ['pending', 'scanned'].includes(status) ? '<img src="' + esc(item.qrCode) + '" width="256" height="256" alt="使用微信扫描，进入小程序确认网页登录" />' : '<div class="web-login-placeholder">' + esc(message) + '</div>') + '</div>';
+      html += '<p class="web-login-status" role="status" aria-live="polite">' + esc(message) + '</p><p class="small muted">小程序码两分钟内有效。请仅确认你自己发起的登录。</p>';
+      html += btn('primary', 'startWebLogin', item ? '刷新小程序码' : '生成小程序码', null, state.webLoginBusy);
+    }
+    if (state.webLoginError) html += '<div class="inline-error" role="alert">' + esc(state.webLoginError) + '</div>';
+    html += '<p class="small muted web-login-note">登录后显示小程序账号的数据。原游客记录暂不合并；退出网页登录可返回原游客身份，原凭证失效后无法恢复。</p>';
+    html += btn('secondary', 'continueAsGuest', webAccountExpired ? '继续以游客身份访问' : '返回游客访问', null, state.webLoginBusy) + '</section>';
+    return html;
+  }
+
   // ===== API =====
+  var webSessionTag = '', webAuthEnabled = false, webAccountExpired = false;
   var retryAt = 0, cacheEpoch = 0;
   const roomCache = new Map();
   const copyResponse = value => JSON.parse(JSON.stringify(value));
@@ -242,11 +400,12 @@
           retryAfterMs: retryAt - Date.now(),
         }),
       );
-    const token = storage.get("session") || "", cacheKey = token + path;
+    const tag = webSessionTag, token = tag ? '' : storage.get("session") || "", cacheKey = (tag || token) + path;
     const cacheable = (!method || method === "GET") && /^\/api\/rooms\/\d{6}$/.test(path);
     if (method && method !== "GET") { roomCache.clear(); cacheEpoch++; }
     const cached = cacheable && roomCache.get(cacheKey), epoch = cacheEpoch;
     var headers = { "Content-Type": "application/json", Authorization: "Bearer " + token };
+    if (tag) headers['X-Web-Session'] = tag;
     if (cached) headers["If-None-Match"] = cached.etag;
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), 10000) : null;
@@ -258,10 +417,11 @@
       body: data !== undefined ? JSON.stringify(data) : undefined,
     })
       .then(function (response) {
+        if (tag !== webSessionTag) throw Object.assign(new Error('浏览器账号已变化，请刷新页面'), { status: 409 });
         if (response.status === 304 && cached) return copyResponse(cached.data);
         if (response.status >= 200 && response.status < 300) return response.json().then(payload => {
           const etag = response.headers?.get("ETag");
-          if (cacheable && etag && epoch === cacheEpoch && token === (storage.get("session") || "")) {
+          if (cacheable && etag && epoch === cacheEpoch && (tag || token) === (webSessionTag || storage.get("session") || "")) {
             roomCache.set(cacheKey, { etag, data: copyResponse(payload) });
             if (roomCache.size > 4) roomCache.delete(roomCache.keys().next().value);
           }
@@ -281,7 +441,10 @@
               err.retryAfterMs = Math.max(1000, Number.isFinite(wait) ? wait : 60000);
               retryAt = Date.now() + err.retryAfterMs;
             }
-            if (err.status === 401 && token === (storage.get("session") || "")) { storage.remove("session"); roomCache.clear(); cacheEpoch++; }
+            if (err.status === 401 && tag) {
+              webAccountExpired = true; webSessionTag = ''; storage.set('webAccount', 'expired');
+              roomCache.clear(); cacheEpoch++;
+            } else if (err.status === 401 && token === (storage.get("session") || "")) { storage.remove("session"); roomCache.clear(); cacheEpoch++; }
             throw err;
           });
       })
@@ -292,6 +455,8 @@
   }
   var loginPromise;
   function login() {
+    if (webSessionTag) return Promise.resolve();
+    if (webAccountExpired) return Promise.reject(Object.assign(new Error('网页登录已过期，请重新扫码，或选择游客访问'), { status: 401 }));
     if (storage.get("session")) return Promise.resolve();
     if (loginPromise) return loginPromise;
     loginPromise = request("/api/guest-login", "POST", {}).then(function (data) {
@@ -328,6 +493,7 @@
   var settingsSavePending = null;
 
   var state = {
+    webLogin: null, webLoginBusy: false, webLoginError: '', webLoginStatus: '',
     page: "lobby", profile: null, profileDraft: null, profileLoading: false, profileSaving: false, profileError: "", profileDirty: false, profileConflict: false, nameEdited: false, profileEditingNickname: false, profileNicknameError: "",
     loading: true,
     roomsRefreshing: false,
@@ -448,10 +614,10 @@
     if (parts[0] === '#/matches') return { page: 'matches', scored: query.get('scored') === '1', fun: query.get('fun') ? { metric: query.get('fun'), mode: query.get('mode') || 'classic', role: query.get('role') || '' } : null };
     if (parts[0] === '#/stats') return { page: 'stats', tab: query.get('tab') === 'fun' ? 'fun' : 'records' };
     var name = (hash || '').replace(/^#\//, '');
-    return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help'].includes(name) ? name : 'lobby' };
+    return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help', 'login'].includes(name) ? name : 'lobby' };
   }
   async function mayNavigate() {
-    if (pending || state.busy || state.profileSaving) {
+    if (pending || state.busy || state.profileSaving || state.webLoginBusy) {
       toast('请先完成或重试当前操作'); return false;
     }
     if (state.page === 'profile' && (state.profileDirty || profilePending))
@@ -465,6 +631,7 @@
     await applyRoute(hash);
   }
   async function applyRoute(hash) {
+    if (state.page === 'login' && routeInfo(hash).page !== 'login' && !await cancelWebLogin()) return;
     const sequence = ++routeSequence, route = routeInfo(hash);
     currentRoute = '#/' + route.page + (route.code ? '/' + route.code : '');
     clearTimeout(timer); refreshSequence++; mask();
@@ -479,6 +646,11 @@
     const heading = app.querySelector('[data-page-heading]');
     if (heading) heading.focus({ preventScroll: true });
     try {
+      if (route.page === 'login') {
+        if (webSessionTag) { await navigate('me', null, true); return; }
+        if (webAuthEnabled && !state.webLogin) await startWebLogin();
+        return;
+      }
       await login();
       if (sequence !== routeSequence) return;
       if (route.page === 'table') {
@@ -619,6 +791,8 @@
     if (!profile) return html + (state.profileLoading ? '<div class="status" role="status">正在读取个人资料…</div>' : '') + '</div>';
     html += '<div class="profile-hero">' + avatarView(profile.avatarUrl,profile.nickname) + '<div class="profile-identity"><div class="profile-name">' + esc(profile.nickname || '新朋友') + '</div></div>' + btn('profile-edit','navigate','编辑 ›',{page:'profile'}) + '</div>';
     if (profile.identityType === 'guest') html += '<div class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</div>';
+    html += '<div class="web-account-row"><span class="small muted">' + (profile.identityType === 'wx' ? '小程序账号 · 资料与战绩共用' : '游客账号') + '</span>' + (webSessionTag ? btn('text-button', 'continueAsGuest', storage.get('guestSession') ? '退出并返回原游客' : '退出网页登录', null, state.webLoginBusy) : webAuthEnabled ? btn('text-button', 'navigate', '使用小程序账号登录', { page: 'login' }) : '') + '</div>';
+    if (state.webLoginError) html += '<div class="inline-error" role="alert">' + esc(state.webLoginError) + '</div>';
     html += '<div class="me-overview"><section class="personal-section me-results" aria-label="我的战绩"><div class="section-title history-heading"><span>战绩概览</span>' + btn('history-toggle','navigate','战绩详情 ›',{page:'stats'}) + '</div>';
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     html += '<div class="personal-metrics"><div><div class="metric-value">' + (stats ? stats.total : '—') + '</div><span class="small muted">总局数</span></div><div><div class="metric-value">' + (stats ? stats.wins : '—') + '</div><span class="small muted">胜场</span></div><div><div class="metric-value accent">' + (!stats || stats.winRate === null ? '—' : stats.winRate + '%') + '</div><span class="small muted">胜率</span></div></div>';
@@ -848,6 +1022,12 @@
   }
   function handleError(e) {
     mask();
+    if (e.status === 401 && webAccountExpired) {
+      pending = null; storage.remove('pendingEntry');
+      setState({ profile: null, stats: null, matches: [], memberRooms: [], error: '', hasPendingRequest: false, needsLogin: true, reconnecting: false });
+      window.history.replaceState({}, '', '#/login');
+      applyRoute('#/login'); return;
+    }
     if (e.status === 403 && e.message === "你已被房主移出房间") {
       pending = null;
       clearRoom();
@@ -993,7 +1173,8 @@ function roomListItems(rooms) {
   async function bootstrap() {
     setState({ loading: true, error: "" });
     try {
-      await login();
+      await initializeWebAccount();
+      if (!webAccountExpired) await login();
       var boards = (await request("/api/boards")).boards;
       var capacities = [
         ...new Set(
@@ -1010,13 +1191,13 @@ function roomListItems(rooms) {
       });
       setState({ boards: boards, capacities: capacities, needsLogin: false });
       selectCapacity(state.capacity);
-      var entry = safeParse(storage.get("pendingEntry"));
+      var entry = !webAccountExpired && safeParse(storage.get("pendingEntry"));
       if (entry) {
         pending = entry;
         await executePending();
         return;
       }
-      var hash = location.hash || (inviteCode ? '#/table/' + inviteCode : '#/lobby');
+      var hash = webAccountExpired ? '#/login' : location.hash || (inviteCode ? '#/table/' + inviteCode : '#/lobby');
       window.history.replaceState({}, '', hash);
       await applyRoute(hash);
     } catch (e) {
@@ -3854,7 +4035,7 @@ function roomListItems(rooms) {
       viewResultDialog() +
       (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
+      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
       viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
@@ -3867,6 +4048,7 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    startWebLogin, continueAsGuest,
     recoverConnection: recoverConnection,
     toggleFunCards: () => setState({funExpanded:!state.funExpanded}),
     toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
@@ -4276,10 +4458,12 @@ function roomListItems(rooms) {
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       foreground = false;
+      clearTimeout(webLoginTimer);
       clearTimeout(timer);
       mask();
     } else {
       foreground = true;
+      if (state.page === 'login') pollWebLogin();
       if (alive) {
         if (state.reconnecting || pending) recoverConnection();
         else if (roomCode && !state.needsLogin) refresh().catch(handleError);
@@ -4294,6 +4478,7 @@ function roomListItems(rooms) {
   });
   window.addEventListener("online", function () {
     state.network = true;
+    if (state.page === 'login') pollWebLogin();
     if (state.reconnecting || pending) recoverConnection();
     else if (roomCode && foreground && !state.needsLogin) refresh().catch(handleError);
     render();
@@ -4353,6 +4538,12 @@ function roomListItems(rooms) {
   });
   window.addEventListener('beforeunload', function (event) {
     if (pending || state.profileDirty || profilePending || state.profileSaving) { event.preventDefault(); event.returnValue = ''; }
+  });
+  window.addEventListener('storage', function (event) {
+    if (event.key === 'accountRevision') {
+      mask();
+      window.location.reload();
+    }
   });
   // ===== boot =====
   var codeMatch = /(?:\?|&)code=(\d{6})/.exec(location.search || "");

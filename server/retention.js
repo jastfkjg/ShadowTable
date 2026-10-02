@@ -37,6 +37,10 @@ function cleanup(store, options = {}) {
     const result = { sessions: 0, receipts: 0, rooms: 0, candidates: 0, entries: 0 };
     const limit = policy.batchSize;
     result.sessions = db.prepare("DELETE FROM sessions WHERE hash IN (SELECT hash FROM sessions WHERE expires<=? ORDER BY expires LIMIT ?)").run(now, limit).changes;
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='web_sessions'").get()) {
+      result.sessions += db.prepare("DELETE FROM web_sessions WHERE hash IN (SELECT hash FROM web_sessions WHERE expires<=? ORDER BY expires LIMIT ?)").run(now, limit).changes;
+      db.prepare("DELETE FROM web_login_requests WHERE id IN (SELECT id FROM web_login_requests WHERE expires<=? ORDER BY expires LIMIT ?)").run(now, limit);
+    }
     const receipts = db.prepare("SELECT uid,request FROM receipts WHERE created<? ORDER BY created LIMIT ?").all(now - policy.receiptDays * DAY, limit);
     for (const row of receipts) {
       db.prepare("INSERT OR IGNORE INTO receipt_tombstones VALUES(?,?)").run(row.uid, row.request);

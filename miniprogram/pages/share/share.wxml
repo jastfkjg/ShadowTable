@@ -1,10 +1,5 @@
 <app-nav title="分享成绩" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page share-page">
-  <view wx:if="{{leaderboard}}" class="share-modes" aria-label="分享内容">
-    <button bindtap="chooseMode" data-mode="mine" class="{{mode==='mine'?'selected':''}}" aria-pressed="{{mode==='mine'}}" disabled="{{!canShareMine || loading || rendering || acting}}" hover-class="none">我的名次</button>
-    <button bindtap="chooseMode" data-mode="top" class="{{mode==='top'?'selected':''}}" aria-pressed="{{mode==='top'}}" disabled="{{!canShareTop || loading || rendering || acting}}" hover-class="none">榜单前三位</button>
-  </view>
-  <view wx:if="{{notice}}" class="share-notice" role="status">{{notice}}</view>
   <view wx:if="{{loading || rendering || (!imagePath && !error)}}" class="share-placeholder" role="status">{{loading?'正在读取成绩…':'正在生成图片…'}}</view>
   <button wx:if="{{imagePath}}" class="share-preview" bindtap="preview" aria-label="{{description+'，点击放大图片'}}" hover-class="none"><image src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" class="share-image" binderror="imageError" aria-hidden="true" /></button>
   <view wx:if="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || rendering || acting}}">重新生成</button></view>

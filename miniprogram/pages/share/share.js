@@ -3,8 +3,7 @@ const cards = require("../../share-card");
 const { renderImage } = require("../../share-image");
 const { backToMe } = require("../../profile");
 Page({
-  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", leaderboard: false,
-    mode: "mine", canShareMine: false, canShareTop: false, notice: "", albumDenied: false, imageMenu: true },
+  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ imageMenu: typeof wx.showShareImageMenu === "function" && (!wx.canIUse || wx.canIUse("showShareImageMenu")) });
@@ -13,26 +12,21 @@ Page({
     return this.load();
   },
   onReady() { this.canvasReady = true; if (this.card) return this.render(); },
-  onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.card = this.source = null; },
+  onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.card = null; },
   async load() {
     if (!this.selection || this.fetching || this.data.rendering || this.data.acting) return;
     this.fetching = true;
     const sequence = this.sequence = (this.sequence || 0) + 1;
-    this.card = this.source = null;
-    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "", notice: "" });
+    this.card = null;
+    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "" });
     try {
       await api.login();
       const { kind, ...query } = this.selection;
       const [profile, result] = await Promise.all([api.request("/api/me/profile"), api.request(kind === "leaderboard" ? "/api/leaderboard?" + cards.queryString(query) : "/api/me/stats")]);
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
-      if (kind === "leaderboard") {
-        this.source = { profile, board: result };
-        const canShareMine = result.me.status === "ranked" && !!result.me.rank, canShareTop = !!result.rows.length;
-        const mode = canShareMine ? this.data.mode : "top";
-        this.setData({ leaderboard: true, mode, canShareMine, canShareTop, notice: canShareMine ? "" : "当前未上榜，可分享榜单前三位。" });
-        this.card = cards.leaderboardCard(profile, result, mode);
-      } else this.card = kind === "stats" ? cards.statsCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
+      this.card = kind === "leaderboard" ? cards.leaderboardCard(profile, result)
+        : kind === "stats" ? cards.statsCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
       this.setData({ description: cards.describe(this.card) });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { this.fetching = false; if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }
@@ -47,14 +41,6 @@ Page({
       if (this.alive && sequence === this.sequence && card === this.card) this.setData({ imagePath: path });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { if (this.alive) this.setData({ rendering: false }); }
-  },
-  chooseMode(event) {
-    const mode = event.currentTarget.dataset.mode;
-    if (!this.source || this.data.loading || this.data.rendering || this.data.acting || mode === this.data.mode || !["mine", "top"].includes(mode) ||
-      mode === "mine" && !this.data.canShareMine || mode === "top" && !this.data.canShareTop) return;
-    this.card = cards.leaderboardCard(this.source.profile, this.source.board, mode);
-    this.setData({ mode, description: cards.describe(this.card) });
-    return this.render();
   },
   retry() { return this.card ? this.render() : this.load(); },
   preview() {

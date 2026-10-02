@@ -11,6 +11,17 @@
   --third: #8ab8d9;
 }
 
+.web-account-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 12px 0 24px; }
+.web-account-row button { min-height: 44px; }
+.web-login-page { max-width: 440px; margin: 0 auto; padding: 20px 0 calc(24px + env(safe-area-inset-bottom)); text-align: center; }
+.web-login-page .page-title { font-size: clamp(22px, 5vw, 30px); }
+.web-login-page button { display: block; width: 100%; min-height: 48px; margin-top: 16px; }
+.web-login-code { width: min(280px, 100%); min-height: 280px; margin: 28px auto 20px; display: grid; place-items: center; border-radius: 16px; overflow: hidden; background: var(--surface); }
+.web-login-code img { display: block; width: 100%; height: auto; background: #fff; }
+.web-login-placeholder { padding: 24px; color: var(--muted); }
+.web-login-status { color: var(--accent); font-weight: 600; }
+.web-login-note { margin: 24px 0; text-align: left; }
+
 * {
   box-sizing: border-box;
 }

@@ -7,14 +7,14 @@ const { newRoom, enter, command, publicView, BOARDS } = require("../server/engin
 function client(fetch, storage = new Map([["session", "session"]]), layout, runtime = {}) {
   let scheduled, scheduledDelay;
   const events = {};
-  const scrolls = [], lookups = [];
+  const scrolls = [], lookups = [], navigations = [];
   const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
   if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
-    window: { history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
+    window: { location: { replace: url => navigations.push(url), reload: () => navigations.push('reload') }, history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
@@ -29,14 +29,105 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
+      initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
+      getWebSessionTag() { return webSessionTag; },
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
       stop() { foreground = false; }
     };
   })();`, context);
-  return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
+  return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页恢复 Cookie 身份并保留原游客；正式会话过期不会自动新建游客', async () => {
+  const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'guest-command'], ['roomCode', '123456']]), calls = [];
+  let expired = false;
+  const c = client(async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/web-auth/session')) return response({ enabled: true, authenticated: !expired, sessionTag: 'cookie-tag' });
+    if (expired) return { status: 401, json: async () => ({ error: '网页登录已过期' }) };
+    return response({ identityType: 'wx' });
+  }, storage);
+  await c.initializeWebAccount(); await c.login();
+  assert.equal(storage.get('guestSession'), 'guest-token'); assert.equal(storage.has('session'), false);
+  assert.equal(storage.has('pendingEntry'), false); assert.equal(storage.has('roomCode'), false);
+  assert.equal(c.getWebSessionTag(), 'cookie-tag');
+  await c.request('/api/me/profile');
+  assert.equal(calls.at(-1).options.headers['X-Web-Session'], 'cookie-tag');
+  assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer ');
+  expired = true;
+  await assert.rejects(c.request('/api/me/profile'), /过期/);
+  await assert.rejects(c.login(), /重新扫码/);
+  await c.initializeWebAccount(); await assert.rejects(c.login(), /重新扫码/);
+  assert.equal(calls.some(call => call.url === '/api/guest-login'), false);
+});
+test('扫码等待与确认分开，领取失败重试同一请求；登录后清除旧账号草稿并通知其他标签页', async () => {
+  const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'old-action'], ['nickname', 'old-name']]);
+  const calls = [];
+  let status = 'scanned', claims = 0;
+  const c = client(async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/web-auth/session')) return response({ enabled: true, authenticated: false });
+    if (url.endsWith('/web-auth/requests')) return response({ id: 'a'.repeat(32), qrCode: 'data:image/png;base64,AA==', expiresAt: Date.now() + 120000 });
+    if (url.endsWith('/claim')) {
+      if (++claims === 1) throw new Error('response lost');
+      return response({ authenticated: true, sessionTag: 'new-tag' });
+    }
+    return response({ status });
+  }, storage);
+  c.setConfirm(async () => true);
+  Object.assign(c.state, { page: 'login', loading: false });
+  await c.initializeWebAccount();
+  await c.startWebLogin(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(c.state.webLoginStatus, 'scanned'); assert.equal(claims, 0);
+  assert.match(c.viewWebLogin(), /已扫码，请在小程序中确认/);
+  status = 'confirmed'; await c.pollWebLogin();
+  assert.equal(claims, 1); assert.match(c.state.webLoginError, /未确认/);
+  await c.pollWebLogin();
+  assert.equal(claims, 2); assert.equal(storage.get('guestSession'), 'guest-token');
+  assert.equal(storage.has('session'), false); assert.equal(storage.get('webAccount'), 'wechat');
+  assert.equal(storage.has('pendingEntry'), false); assert.equal(storage.has('nickname'), false);
+  assert.ok(storage.get('accountRevision'));
+  assert.deepEqual(c.navigations, ['/#/me', 'reload']); assert.equal(c.state.webLoginError, '');
+  const paths = calls.filter(call => call.url.endsWith('/claim')).map(call => call.url);
+  assert.equal(paths[0], paths[1]);
+});
+test('刷新发生在旧轮询途中，新小程序码仍继续轮询；取消后旧响应不能领取会话', async () => {
+  let generation = 0, release;
+  const calls = [];
+  const c = client(async (url) => {
+    calls.push(url);
+    if (url.endsWith('/requests')) return response({ id: (++generation === 1 ? 'a' : 'b').repeat(32), expiresAt: Date.now() + 120000 });
+    if (url.endsWith('/cancel')) return response({ status: 'cancelled' });
+    if (url.includes('a'.repeat(32))) return new Promise(resolve => { release = resolve; });
+    return response({ status: 'pending' });
+  });
+  c.state.page = 'login';
+  await c.startWebLogin(); await new Promise(resolve => setImmediate(resolve));
+  await c.startWebLogin();
+  release(response({ status: 'confirmed' })); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(c.scheduledDelay(), 0); await c.scheduled()();
+  assert.ok(calls.some(url => url.endsWith('b'.repeat(32))));
+  assert.equal(calls.some(url => url.endsWith('/claim')), false);
+  await c.cancelWebLogin(); assert.equal(c.state.webLogin, null);
+});
+test('退出只撤销网页会话并恢复原游客；同一微信会话刷新保留待核对请求', async () => {
+  const storage = new Map([['webAccount', 'wechat'], ['guestSession', 'original-guest'], ['pendingEntry', 'wechat-pending']]);
+  const calls = [];
+  const c = client(async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/web-auth/session')) return response({ enabled: true, authenticated: true, sessionTag: 'cookie-tag' });
+    return response(url.endsWith('/logout') ? { ok: true } : { identityType: 'guest' });
+  }, storage);
+  await c.initializeWebAccount(); assert.equal(storage.get('pendingEntry'), 'wechat-pending');
+  c.setConfirm(async () => true); await c.continueAsGuest();
+  assert.equal(storage.get('session'), 'original-guest');
+  assert.equal(storage.has('guestSession'), false); assert.equal(storage.has('webAccount'), false);
+  assert.equal(storage.has('pendingEntry'), false);
+  assert.equal(calls.find(c => c.url.endsWith('/logout')).options.headers['X-Web-Session'], 'cookie-tag');
+  assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer original-guest');
+  assert.deepEqual(c.navigations, ['/#/me', 'reload']);
+});
 test('网页慢请求十秒后中止，成功与失败均释放超时计时器', async () => {
   const timers = new Map(); let next = 0, slow = true, signal;
   const c = client(async (_url, options) => {

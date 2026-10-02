@@ -49,6 +49,8 @@ function createApp({
   adminOrigin = "",
   adminKey = "",
   webOrigin = "",
+  webWechatLogin = false,
+  wechatCode,
   exchangeCode,
   trustedProxies = "",
   logger = console,
@@ -126,6 +128,12 @@ function createApp({
     check(data.openid && !data.errcode, "微信登录凭证已失效，请重新登录", 401);
     return data.openid;
   }
+  const webAuth = webOrigin ? require("./web-auth").createWebAuth({
+    store, origin: webOrigin,
+    enabled: !!(webWechatLogin && (wechatCode || (appId && appSecret))),
+    qrCode: wechatCode || require("./wechat-code").createWechatCode({ appId, appSecret, clock }),
+    body, limit, clientAddress, clock,
+  }) : null;
   const admin =
     adminOrigin && adminKey
       ? require("./admin").createAdmin({
@@ -165,6 +173,7 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account read/write and login/create limits below apply independently.
       limit(`ip:${clientAddress(req)}`, 6000);
+      if (webAuth && await webAuth.handle(req, res, path, send)) return;
       if (req.method === "GET" && path === "/api/scoring/rules")
         return send(200, scoreRules());
       const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
@@ -207,8 +216,9 @@ function createApp({
         return send(200, { token });
       }
       const token = (req.headers.authorization || "").replace(/^Bearer /, "");
-      check(/^[a-f0-9]{64}$/.test(token), "请重新登录", 401);
-      const session = store.session(hash(token));
+      const browserSession = webAuth?.authenticate(req);
+      check(browserSession || /^[a-f0-9]{64}$/.test(token), "请重新登录", 401);
+      const session = browserSession || store.session(hash(token));
       check(session, "登录已过期，请重新登录", 401);
       const uid = session.uid;
       if (uid.startsWith("test:")) {

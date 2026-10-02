@@ -17,8 +17,8 @@
   <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
   <block wx:if="{{board}}">
+    <view wx:if="{{board.rows.length || shareable}}" class="rank-list-heading small muted"><view class="rank-heading-label"><text>排名 / 玩家</text><button class="share-entry-button" bindtap="shareLeaderboard" disabled="{{loading || loadingMore || error || visibilitySaving || !shareable}}" hover-class="none" aria-label="分享我的榜单成绩"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
     <view wx:if="{{board.rows.length}}" class="rank-list">
-      <view class="rank-list-heading small muted"><view class="rank-heading-label"><text>排名 / 玩家</text><button class="share-entry-button" bindtap="shareLeaderboard" disabled="{{loading || loadingMore || error || visibilitySaving}}" hover-class="none" aria-label="分享当前榜单图片"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
       <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
         <view class="rank-number rank-place-{{item.rank}}" aria-label="第{{item.rank}}名"><image wx:if="{{3 >= item.rank}}" class="rank-crown" src="/assets/rank-{{item.rank}}.svg" aria-hidden="true" /><text>{{item.rank}}</text></view>
         <image wx:if="{{item.avatarUrl}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true" />
@@ -27,7 +27,7 @@
         <view class="rank-value">{{item.value}}<text class="rank-unit">{{item.unit}}</text></view>
       </view>
     </view>
-    <view wx:else class="rank-empty muted">暂无战绩</view>
+    <view wx:else class="rank-empty muted">暂无公开排名</view>
     <button hover-class="none" wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
     <view class="rank-mine" aria-label="我的排名">
       <button class="disclosure-button rank-mine-toggle" bindtap="toggleMine" aria-expanded="{{mineExpanded}}" aria-label="我的排名，详情与公开设置" hover-class="none">
@@ -45,7 +45,7 @@
       </view>
       <view wx:if="{{board.fun}}" class="small muted fun-mine-sample">{{board.me.knownGames?board.me.count+" / "+board.me.opportunities+" 次机会":"暂无完整样本"}}<text wx:if="{{board.me.statusLabel}}"> · {{board.me.statusLabel}}</text><text wx:if="{{board.me.unknownGames}}"> · {{board.me.unknownGames}} 局未记录</text></view>
       <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
-      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">公开的昵称与成绩可出现在榜单分享图片中；关闭后，已发出的图片仍会保留。</view>
+      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">关闭后不参与公开排名，仍可分享本人成绩；已发送图片不会撤回。</view>
       <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button hover-class="none" bindtap="retryVisibility" disabled="{{visibilitySaving}}">重试</button></view>
         </scroll-view>
       </view>

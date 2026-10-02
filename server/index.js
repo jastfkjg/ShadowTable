@@ -22,6 +22,7 @@ const { server, store } = createApp({
   adminOrigin: process.env.ADMIN_ORIGIN,
   adminKey: process.env.ADMIN_KEY,
   webOrigin: process.env.WEB_ORIGIN,
+  webWechatLogin: process.env.WECHAT_WEB_LOGIN === "1",
   database,
   trustedProxies: process.env.TRUSTED_PROXY_CIDRS || "",
   devAuth,
