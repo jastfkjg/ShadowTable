@@ -9,6 +9,7 @@ const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { auditGroups } = require("../audit");
 const scoring = require("../scoring");
+const fun = require("../fun");
 const { RuleError, command, roomSummary } = require("../engine");
 const digest = (s) => createHash("sha256").update(s).digest();
 const fail = (ok, message, status = 400) => {
@@ -165,6 +166,20 @@ function createAdmin({ store, origin, key, body, limit }) {
     }
     const session = authenticate(req);
     limit("admin:" + session.hash, 600);
+    const scoringMutation = (path,input,action,operation) => {
+      fail(typeof input.reason === "string" && input.reason.trim().length>=2 && input.reason.length<=200,"请填写2–200字的调整原因");
+      fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId),"缺少合法请求编号");
+      const actor="admin:scoring", fingerprint=digest(JSON.stringify([path,input])).toString("hex");
+      return store.transaction(()=>{
+        const cached=store.receipt(actor,input.requestId);
+        if (cached) {fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
+        const changed=operation();
+        store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
+          .run(action,changed.code || "",input.reason.trim(),Date.now(),JSON.stringify({...changed,administrator:session.hash}));
+        const response={id:changed.id,revision:changed.revision,...(changed.delta===undefined?{}:{before:changed.before,after:changed.after,delta:changed.delta})};
+        store.addReceipt(actor,input.requestId,fingerprint,response);return response;
+      });
+    };
     if (path === "/api/admin/logout" && req.method === "POST") {
       sessions.delete(session.hash);
       res.setHeader("Set-Cookie", cookie("", 0));
@@ -246,21 +261,43 @@ function createAdmin({ store, origin, key, body, limit }) {
       const matches = store.db.prepare("SELECT id,snapshot FROM matches WHERE json_extract(snapshot,'$.code')=? ORDER BY json_extract(snapshot,'$.endedAt') DESC LIMIT 50").all(code).map(row=>{
         const saved=JSON.parse(row.snapshot);
         return {id:row.id,boardName:saved.boardName,endedAt:saved.endedAt,winner:saved.winner,revision:saved.scoreRevision || 0,
-          options:saved.scorePolicy && !saved.scoreEligibilityReason ? scoring.optionsFor(saved.board, saved.scorePolicy) : [],
+          correctionKind:saved.scorePolicy && !saved.scoreEligibilityReason ? "score" : "fun", needsActor:fun.modeFor(saved.board)==="knights" && !!saved.funFacts,
+          options:saved.scorePolicy && !saved.scoreEligibilityReason ? scoring.optionsFor(saved.board, saved.scorePolicy) : saved.funFacts && saved.excludedReason!=="对局终止" ? fun.settlementOptions(saved.board) : [],
           players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name,alive:player.alive ?? true};})};
       });
       send(200,{matches});return true;
+    }
+    if (path === "/api/admin/score-players" && req.method === "GET") {
+      const query=new URL(req.url,origin).searchParams,search=(query.get("q") || "").trim(),offset=query.get("offset") || "0";
+      fail(search.length>=1 && search.length<=200,"请输入玩家昵称或账号标识");
+      fail(/^(0|[1-9]\d{0,6})$/.test(offset),"页码无效");
+      send(200,store.searchScorePlayers(search,Number(offset)));return true;
+    }
+    if (path === "/api/admin/score-adjustments" && req.method === "GET") {
+      const query=new URL(req.url,origin).searchParams,uid=query.get("uid"),offset=query.get("offset") || "0";
+      fail(typeof uid==='string' && uid.length>0 && uid.length<=500 && /^(0|[1-9]\d{0,6})$/.test(offset),"玩家或页码无效");
+      send(200,{...store.playerScore(uid),adjustments:store.scoreAdjustments(uid,Number(offset))});return true;
+    }
+    if (path === "/api/admin/score-adjustments" && req.method === "POST") {
+      const input=await body(req);fail(typeof input.uid==='string' && input.uid.length>0 && input.uid.length<=500,"玩家无效");
+      send(200,scoringMutation(path,input,"adjust-player-score",()=>store.adjustPlayerScore(input)));return true;
+    }
+    const matchScores=path.match(/^\/api\/admin\/matches\/([a-f0-9-]{36})\/scores$/);
+    if (matchScores && req.method==='GET') {send(200,store.matchScoreData(matchScores[1]));return true;}
+    if (matchScores && req.method==='POST') {
+      const input=await body(req);
+      send(200,scoringMutation(path,input,"adjust-match-scores",()=>store.adjustMatchScores(matchScores[1],input)));return true;
     }
     const correction = path.match(/^\/api\/admin\/matches\/([a-f0-9-]{36})\/correct$/);
     if (correction && req.method === "POST") {
       const b = await body(req);
       fail(typeof b.reason === "string" && b.reason.trim().length >= 2 && b.reason.length <= 200,"请填写2–200字的更正原因");
       fail(typeof b.requestId === "string" && /^[a-f0-9-]{36}$/.test(b.requestId),"缺少合法请求编号");
-      const actor = "admin:" + session.hash, fingerprint = digest(JSON.stringify([path,b])).toString("hex");
+      const actor = "administrator:correct-result", fingerprint = digest(JSON.stringify([path,b])).toString("hex");
       const result=store.transaction(()=>{
-        const cached=store.receipt(actor,b.requestId);
+        const cached=store.receipt(actor,b.requestId) || store.receipt("admin:"+session.hash,b.requestId);
         if(cached) {fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
-        const changed=store.correctMatch(correction[1],b);
+        const changed=b.funReason !== undefined ? store.correctFunMatch(correction[1],b) : store.correctMatch(correction[1],b);
         const code=JSON.parse(store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(correction[1]).snapshot).code;
         store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)").run("correct-result",code,b.reason.trim(),Date.now(),JSON.stringify(changed));
         const response={id:changed.id,winner:changed.winner,revision:changed.revision};store.addReceipt(actor,b.requestId,fingerprint,response);return response;

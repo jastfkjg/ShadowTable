@@ -6,6 +6,8 @@
     <view class="stats-overview" aria-label="总战绩">
       <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">总胜场数</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
     </view>
+    <view class="stats-tabs" aria-label="战绩分类"><button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}">胜负积分</button><button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}">趣味记录</button></view>
+    <block wx:if="{{tab!=='fun'}}">
     <view class="stats-points">
       <view class="personal-metrics"><view><view class="metric-value accent">{{stats.score.total}}</view><text class="small muted">总积分</text></view><view><view class="metric-value">{{stats.score.games}}</view><text class="small muted">计分局数</text></view><view><view class="metric-value">{{stats.scoreAverageLabel}}</view><text class="small muted">场均积分</text></view></view>
       <view class="small muted score-streak">当前 {{stats.score.current}} 连胜 · 最高 {{stats.score.best}} 连胜</view>
@@ -23,6 +25,22 @@
         </view>
       </view>
       </block>
+    </view>
+    </block>
+    <view wx:if="{{tab==='fun'}}" class="fun-content">
+      <view wx:if="{{!stats.fun.available}}" class="muted">趣味记录将在服务更新后开放</view>
+      <view wx:elif="{{!stats.fun.cards.length}}" class="fun-empty muted">还没有趣味记录。结束对局时登记实际结束原因，或完成十二骑士技能后，记录会出现在这里。</view>
+      <view wx:if="{{stats.fun.legacyGames}}" class="fun-note small muted">{{stats.fun.legacyGames}} 局旧对局未记录完整过程，缺失数据不按零次计算。</view>
+      <view wx:for="{{stats.fun.cards}}" wx:for-item="card" wx:key="id" class="fun-card">
+        <view class="fun-heading"><text>{{card.title}}</text><text class="small muted">{{card.modeLabel}}</text></view>
+        <view class="fun-metrics {{card.isCombat?'three':''}}"><navigator wx:for="{{card.metrics}}" wx:for-item="metric" wx:key="id" url="{{metric.url}}" class="fun-metric" hover-class="fun-pressed" aria-label="{{metric.label}} {{metric.valueLabel}}{{metric.unit}}，查看相关对局"><view class="fun-number {{metric.color}}">{{metric.valueLabel}}<text class="small muted"> {{metric.unit}}</text></view><view class="small">{{metric.label}} ›</view></navigator></view>
+        <view wx:if="{{card.isCombat && card.opportunities}}" class="fun-bar" aria-hidden="true"><view wx:for="{{card.metrics}}" wx:for-item="metric" wx:key="id" class="fun-bar-{{metric.color}}" style="width:{{metric.percent}}%"></view></view>
+        <view class="fun-caption small muted">{{card.isCombat?'有效敌方命中率':'成功率'}} {{card.rateLabel}} · {{card.opportunities}} {{card.isCombat?'次出手':'次机会'}}</view>
+        <view wx:if="{{card.aimLabel}}" class="small muted">{{card.aimLabel}}；选中敌方但被挡下仍计未生效。</view>
+        <view class="small muted">{{card.coverage}}</view>
+        <block wx:if="{{card.isCombat && card.roles.length}}"><button hover-class="none" class="disclosure-button fun-role-toggle" bindtap="toggleFunRoles" data-id="{{card.id}}" aria-expanded="{{funRoles[card.id]}}">按出刀角色查看 {{funRoles[card.id]?'⌄':'›'}}</button><view wx:if="{{funRoles[card.id]}}" class="fun-roles"><navigator wx:for="{{card.roles}}" wx:for-item="role" wx:key="role" url="{{role.url}}" class="fun-role" hover-class="fun-pressed"><view>{{role.label}} ›</view><view class="small muted">{{role.value===null?"尚无完整记录":"敌方 "+role.countLabel+" · 同伴 "+role.ally+" · 未生效 "+role.failed+" / "+role.opportunities+" 次"}}</view></navigator></view></block>
+      </view>
+      <view wx:if="{{stats.fun.cards.length}}" class="fun-note small muted">派西按初始身份记三绿／三炸；梅林只统计最终刺杀机会。轮内刀、枪、决斗与最终刀分别记录；空刀单列。未使用和作废不计失败。</view>
     </view>
   </block>
 </view>

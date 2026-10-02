@@ -1329,21 +1329,26 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   finishTools() {
     if (!this.data.room?.canUseTools || this.data.busy || this.pending) return;
     this.resultStage = this.data.room.stage;
-    this.setData({ resultDialog: true, resultChoice: "", resultReason: "", resultTarget: null, resultRequiresTarget: false });
+    this.setData({ resultDialog: true, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false });
   },
   closeResult() { if (!this.data.busy) this.setData({ resultDialog: false }); },
   pickResult(e) { this.setData({ resultChoice: e.currentTarget.dataset.value, resultReason: "", resultRequiresTarget: false, resultTarget: null }); },
   pickScoreReason(e) {
-    const reason = this.data.room?.scoreSettlement?.find(item => item.id === e.currentTarget.dataset.id);
-    if (reason) this.setData({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null });
+    const room = this.data.room;
+    const reason = (room?.scoreSettlement?.length ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === e.currentTarget.dataset.id);
+    if (reason) this.setData({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
   },
   pickScoreTarget(e) { this.setData({ resultTarget: Number(e.currentTarget.dataset.seat) }); },
+  pickFunActor(e) { this.setData({ resultActor: Number(e.currentTarget.dataset.seat), ...(Number(e.currentTarget.dataset.seat) === this.data.resultTarget ? { resultTarget: null } : {}) }); },
   viewScoreRecord() { wx.navigateTo({ url: "/pages/matches/matches?scored=1" }); },
+  viewFunRecord() { wx.navigateTo({ url: "/pages/stats/stats?tab=fun" }); },
   async saveResult() {
     const room = this.data.room, choice = this.data.resultChoice;
-    const reason = room?.scoreSettlement?.find(item => item.id === this.data.resultReason);
+    const scoring = !!room?.scoreSettlement?.length;
+    const reason = (scoring ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === this.data.resultReason);
     if (!this.data.resultDialog || (!choice && !reason) || this.data.busy || this.pending) return;
     if (reason?.requiresTarget && !Number.isInteger(this.data.resultTarget)) return;
+    if (reason?.requiresTarget && room.knights && room.funSettlement && !Number.isInteger(this.data.resultActor)) return;
     if (!room || room.stage !== this.resultStage) {
       this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" });
       return;
@@ -1351,11 +1356,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = this.data.resultTarget;
-    const details = reason ? { scoreReason: reason.id, ...(reason.requiresTarget ? { scoreTarget: target } : {}) }
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(room.knights && room.funSettlement ? { funActor: this.data.resultActor } : {}) } : {}) }
       : { winner: choice === "none" ? null : choice };
     this.setData({ resultDialog: false });
     return this.confirmCommand("确认结束本局？",
-      (reason ? "登记「" + reason.label + "」" + (reason.requiresTarget ? "，" + (target === 0 ? "空刀" : "刺杀" + target + "号") : "") + "。结束后结算本人积分。"
+      (reason ? "登记「" + reason.label + "」" + (reason.requiresTarget ? "，" + (target === 0 ? "空刀" : "刺杀" + target + "号") : "") + (scoring ? "。结束后结算本人积分与趣味记录。" : "。结束后归档胜负与趣味记录，本局不计积分。")
         : option ? "登记为「" + option.label + "」，未填写计分依据，不计积分。" : "本局不计战绩及积分。") +
       "胜负确认后将归档，不能直接修改。" +
       (room.hasActiveOperation ? "当前未结算的操作将作废。" : ""),

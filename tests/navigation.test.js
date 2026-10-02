@@ -34,6 +34,18 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+test('小程序本人积分调整独立分页，失败保留记录可重试，读取期间不混合筛选，卸载丢弃旧响应',async()=>{
+  const ledger={id:'a',created:1,delta:-3,beforePoints:5,afterPoints:2,reason:'现场修正'};
+  let reads=0,finish;
+  const {p}=page('matches',{...apiBase,request:async url=>{
+    if(url.includes('/score-adjustments')) {reads++;assert.equal(url,'/api/me/score-adjustments?offset=1');if(reads===1)throw Error('网络中断');return new Promise(resolve=>{finish=resolve;});}
+    return {records:[],total:0,hasMore:false,adjustments:{records:[ledger],total:2,hasMore:true}};
+  }});
+  await p.onLoad();assert.equal(p.data.adjustments[0].pointsLabel,'-3 分');
+  await p.loadAdjustments();assert.equal(p.data.adjustments.length,1);assert.equal(p.data.adjustmentsError,'网络中断');
+  const pending=p.loadAdjustments();await p.loadAdjustments();p.filterScores({currentTarget:{dataset:{scored:'1'}}});assert.equal(reads,2);assert.equal(p.data.scoredOnly,false);
+  p.onUnload();finish({records:[{...ledger,id:'b'}],total:2,hasMore:false});await pending;assert.equal(p.data.adjustments.length,1);
+});
 test('头像按风格筛选，浏览分类保留选择和昵称；新风格可保存并恢复选中', async () => {
   const presets = require('../miniprogram/builtin-avatars');
   const pixel = presets.find(item => item.id === 'pixel-32'), crayon = presets.find(item => item.id === 'crayon-32');
@@ -427,7 +439,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
   assert.match(editor,/选择内置头像/);
-  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
+  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
   assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
   const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
   assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
@@ -484,7 +496,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/help/help?section=scoring','/pages/matches/matches?scored=1',...['stats','matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/help/help?section=scoring','/pages/matches/matches?scored=1','/pages/stats/stats','/pages/stats/stats?tab=fun',...['matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
     assert.equal(node.attr.hoverStartTime,0);
@@ -803,6 +815,35 @@ test('计分表单接受服务端结束原因，提交实际目标；分值与�
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const rendered=JSON.stringify(factory('pages/matches/matches.wxml')({records:presented.map(row=>({...row,expanded:true})),total:1}));
   assert.match(rendered,/服务端新增奖励/);assert.match(rendered,/9 分/);
+});
+test('不计积分的骑士登记要求实际带刀人和目标，自选目标会清空，提交独立趣味事实',async()=>{
+  const {p}=page('table',apiBase);let submission;
+  p.data.room={canUseTools:true,stage:'fun-stage',knights:{},players:[{seat:1,name:'甲'},{seat:2,name:'乙'}],winnerOptions:[],scoreSettlement:[],funSettlement:[{id:'early_assassination',requiresTarget:true},{id:'quest_fail',winner:'evil'}]};
+  p.confirmCommand=async(title,message,type,body)=>submission={type,body};
+  const choose=(handler,dataset)=>p[handler]({currentTarget:{dataset}});
+  p.finishTools();choose('pickScoreReason',{id:'early_assassination'});choose('pickScoreTarget',{seat:2});await p.saveResult();assert.equal(submission,undefined);
+  choose('pickFunActor',{seat:2});assert.equal(p.data.resultTarget,null);await p.saveResult();assert.equal(submission,undefined);
+  choose('pickScoreTarget',{seat:1});await p.saveResult();assert.equal(submission.body.funReason,'early_assassination');assert.equal(submission.body.funTarget,1);assert.equal(submission.body.funActor,2);assert.ok(!Object.hasOwn(submission.body,'scoreReason'));
+});
+test('小程序趣味战绩保留未知而非零，指标回查与分页持续保留玩法和出刀角色',async()=>{
+  const aggregate=require('../server/fun').aggregate;
+  const fun=aggregate([{match_id:'old',mode:'knights',metric:'knife_enemy',role:'gareth',role_label:'加雷斯',status:'unknown',count:0,opportunities:0}]);
+  const stats=page('stats',{...apiBase,request:async()=>({...emptyStats,fun})}).p;await stats.onLoad({tab:'fun'});
+  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.cards[0].metrics[0].valueLabel,'—');assert.equal(stats.data.stats.fun.cards[0].roles[0].countLabel,'—');
+  const urls=[];const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[]}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unfiltered',members:[]}],total:1}},{}]});
+  await p.onLoad({fun:'knife_enemy',mode:'knights',role:'gareth'});await p.loadMore();
+  assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
+  await p.clearFunFilter();assert.equal(urls.at(-1),'/api/me/matches?offset=0');
+});
+test('小程序趣味榜保留筛选与样本门槛，迟到响应不能覆盖新选择，旧服务回退独立于积分',async()=>{
+  const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
+  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'knights',sort:'rate',role:'gareth',unit:'%',metricLabel:'命中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);return result();}});
+  const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
+  await p.load(false,{metric:'fun_knife_enemy',funMode:'knights',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
+  assert.match(urls[1],/mode=knights&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_knife_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
+  const fallback=page('leaderboard',{...apiBase,request:async url=>{if(url.includes('metric=fun_'))throw Object.assign(Error('排行榜参数无效'),{status:400});return rankResult('games',{availableMetrics:['points','games']});}}).p;
+  await fallback.load(false,{metric:'fun_merlin_evade'});assert.equal(fallback.data.metric,'games');assert.equal(fallback.data.pointsAvailable,true);assert.equal(fallback.data.funAvailable,false);assert.match(fallback.data.notice,/趣味榜/);
 });
 test('积分明细入口不复用全部对局预取，过滤与后续分页持续使用计分局口径',async()=>{
   const urls=[];

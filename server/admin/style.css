@@ -507,3 +507,15 @@ dialog::backdrop {
   text-align: center;
   padding: 24px 0;
 }
+
+.score-editor-row { display: grid; grid-template-columns: minmax(0,1fr) 160px auto; gap: 16px; align-items: center; border-top: 1px solid var(--line); padding: 16px 0; }
+.score-editor-row label { margin: 0; overflow-wrap: anywhere; }
+.score-editor-row small { display: block; color: var(--muted); }
+.score-history-row { border-top: 1px solid var(--line); padding: 14px 0; overflow-wrap: anywhere; }
+.score-history-row p { margin: 4px 0; }
+#match-score-form { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 20px; }
+#player-score-history { margin-top: 24px; }
+@media (max-width: 600px) {
+  .score-editor-row { grid-template-columns: minmax(0,1fr) 112px; gap: 12px; }
+  .score-editor-row button { grid-column: 1 / -1; justify-self: start; }
+}

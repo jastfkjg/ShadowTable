@@ -1,9 +1,10 @@
 const api = require("../../api");
 const { presentStats, backToMe, personalPreview } = require("../../profile");
 Page({
-  data: { loading: true, error: "", stats: null, overviewExpanded: false },
-  onLoad() {
+  data: { loading: true, error: "", stats: null, overviewExpanded: false, tab: "records", funRoles: {} },
+  onLoad(options = {}) {
     this.alive = true;
+    this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
     const preview = personalPreview("stats");
     if (preview) this.setData({ stats: preview });
     return this.load();
@@ -25,6 +26,8 @@ Page({
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
   toggleOverview() { this.setData({ overviewExpanded: !this.data.overviewExpanded }); },
+  chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
+  toggleFunRoles(e) { const id = e.currentTarget.dataset.id; this.setData({ funRoles: { ...this.data.funRoles, [id]: !this.data.funRoles[id] } }); },
   toggleFaction(e) {
     const faction = e.currentTarget.dataset.faction;
     const stats = this.data.stats;

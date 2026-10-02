@@ -1,6 +1,7 @@
 "use strict";
 const { randomUUID, randomInt } = require("node:crypto");
 const { roles } = require("./variants");
+const fun = require("./fun");
 const swords = [
   "gareth",
   "gaheris",
@@ -295,6 +296,8 @@ function begin(room, kind, check) {
       deck: [...k.deck],
     };
     k.events = [];
+    k.funEvents = [];
+    k.funCycle = room.activity?.number || room.stage;
     k.cycleEliminated = [];
     k.cycleRestored = [];
     k.guards = {};
@@ -322,10 +325,27 @@ function cancel(room) {
     deck: k.snapshot.deck,
   });
   room.roles = k.snapshot.roles;
+  delete k.funEvents;
   delete k.snapshot;
 }
 function settle(room, check, allRoles) {
   const k = room.knights;
+  const entity = uid => {
+    if (!uid) return null;
+    const role = k.snapshot?.roles[uid] || room.roles[uid];
+    const state = k.snapshot?.players[uid] || k.players[uid];
+    return { uid, seat: room.players.find(p => p.uid === uid).seat, role, faction: state.faction || allRoles[role][1] };
+  };
+  const attackEvent = (actor, value, target, result, type) => {
+    if (!room.fun) return;
+    const attacker = entity(actor), selected = entity(room.players.find(p => p.seat === Number(value.split(":")[1]))?.uid);
+    const recipient = entity(result?.recipient || target);
+    const effect = result?.effect || "invalid_role";
+    const effective = ["eliminated", "disarmed"].includes(effect);
+    (k.funEvents ||= []).push({ id: `attack:${k.funCycle}:${actor}:${type}`, kind: "attack", round: k.round, type,
+      actor: attacker, selected, recipient, effect,
+      outcome: effective ? recipient.faction === attacker.faction ? "ally" : "enemy" : "failed" });
+  };
   // Continue rooms whose skill cycle began before this version.
   k.cycleEliminated ||= room.players
     .filter((p) => k.snapshot?.players[p.uid].alive && !k.players[p.uid].alive)
@@ -351,7 +371,7 @@ function settle(room, check, allRoles) {
     selfDestruct = false,
     attacker = null,
   ) => {
-    if (!uid || !k.players[uid].alive || visited.has(uid)) return;
+    if (!uid || !k.players[uid].alive || visited.has(uid)) return { effect: "already_out", recipient: uid };
     visited.add(uid);
     // A mapped protection/substitute target can be reached indirectly, too.
     if (
@@ -370,7 +390,7 @@ function settle(room, check, allRoles) {
           k.deaths = k.deaths.filter((d) => d.uid !== uid);
           k.deaths.push({ uid, substitute: true, round: k.round });
         }
-        return;
+        return { effect: "eliminated", recipient: uid };
       }
       if (
         paladinState?.alive &&
@@ -384,7 +404,7 @@ function settle(room, check, allRoles) {
         k.events.push(
           `${room.players.find((p) => p.uid === uid).seat}号反伤，${room.players.find((p) => p.uid === attacker).seat}号出局`,
         );
-        return;
+        return { effect: "reflected", recipient: uid };
       }
     }
     const guard = Object.keys(k.guards).find(
@@ -392,7 +412,7 @@ function settle(room, check, allRoles) {
     );
     if (guard && !selfDestruct) {
       k.players[guard].used = true;
-      return;
+      return { effect: "guarded", recipient: uid };
     }
     if (
       !substitute &&
@@ -403,8 +423,7 @@ function settle(room, check, allRoles) {
     ) {
       k.players[uid].used = true;
       if (k.witches[uid] !== uid) {
-        kill(k.witches[uid], true, visited);
-        return;
+        return kill(k.witches[uid], true, visited);
       }
       substitute = true;
     }
@@ -422,6 +441,7 @@ function settle(room, check, allRoles) {
       k.planned?.[uid]?.startsWith("passive:")
     )
       k.hunters.push(uid);
+    return { effect: "eliminated", recipient: uid };
   };
   if (room.phase === "skillPrepare") {
     const magician = room.players.find(
@@ -493,7 +513,8 @@ function settle(room, check, allRoles) {
     k.players[actor].used = true;
     kill(actor, false, new Set(), true);
     const target = targetUid(value, true);
-    kill(target, false, new Set(), false, actor);
+    const result = kill(target, false, new Set(), false, actor);
+    attackEvent(actor, value, target, result, "gun");
     k.events.push(
       `${room.players.find((p) => p.uid === actor).seat}号主动自爆并开枪，目标${value.split(":")[1]}号`,
     );
@@ -507,25 +528,28 @@ function settle(room, check, allRoles) {
     const target = targetUid(value, true),
       targetRole = room.roles[target];
     k.players[actor].used = true;
+    let resolution;
     if (hunter || ["blueAwakened", "redAwakened"].includes(role))
-      kill(target, false, new Set(), false, actor);
-    else if (["blueKnight", "redKnight"].includes(role))
-      kill(
-        side(room, actor, allRoles) ===
-          (targetRole === "mordred" ? "good" : side(room, target, allRoles))
-          ? actor
-          : target,
+      resolution = kill(target, false, new Set(), false, actor);
+    else if (["blueKnight", "redKnight"].includes(role)) {
+      const failed = side(room, actor, allRoles) === (targetRole === "mordred" ? "good" : side(room, target, allRoles));
+      resolution = kill(
+        failed ? actor : target,
         false,
         new Set(),
         false,
         actor,
       );
+      if (failed) resolution = { effect: "duel_failed", recipient: target };
+    }
     else if (swords.includes(role)) {
       if (targetRole === "assassin") {
+        resolution = { effect: k.players[target].used ? "already_used" : "disarmed", recipient: target };
         k.players[target].used = true;
       } else if (swords.includes(targetRole) || k.players[target].b)
-        kill(target, false, new Set(), false, actor);
+        resolution = kill(target, false, new Set(), false, actor);
     }
+    attackEvent(actor, value, target, resolution, hunter ? "gun" : fun.combatType(role));
     const dead = room.players
       .filter((p) => aliveBefore.has(p.uid) && !k.players[p.uid].alive)
       .map((p) => p.seat);
@@ -592,6 +616,8 @@ function settle(room, check, allRoles) {
     ),
   };
   k.skillRound = k.round;
+  if (room.fun) room.fun.events.push(...(k.funEvents || []));
+  delete k.funEvents;
   delete k.snapshot;
   delete k.planned;
   return true;

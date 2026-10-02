@@ -4,6 +4,7 @@ const variants = require("./variants");
 const knights = require("./knights");
 const fairy = require("./fairy");
 const scoring = require("./scoring");
+const fun = require("./fun");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
@@ -242,6 +243,7 @@ function stage(room, phase) {
 function end(room, winner, reason, source = "system", facts = null) {
   room.result = { winner, reason, source };
   room.scoringFacts = facts;
+  if (room.fun) room.fun.terminal = fun.terminal(room, facts || room.fun.pendingTerminal, ROLES, source);
   stage(room, "ended");
 }
 function winnerOptions(room) {
@@ -266,6 +268,7 @@ function archiveResult(room) {
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
+    funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
       alive: room.knights?.players[p.uid].alive ?? true,
@@ -275,6 +278,8 @@ function archiveResult(room) {
         outcome: ROLES[room.roles[p.uid]] && faction(room, p.uid) === room.result?.winner ? "win" : "loss" }, room.scoringFacts, room.scorePolicy, scoreExcludedReason),
     })),
   };
+  const projections = fun.project(room.matchRecord, room.matchRecord.players, ROLES);
+  for (const player of room.matchRecord.players) player.fun = projections.find(row => row.uid === player.uid).fun;
 }
 function roleDeck(boardId, capacity) {
   if (variants.decks[boardId]) return [...variants.decks[boardId]];
@@ -398,6 +403,7 @@ function start(room, flexible = false) {
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
+  fun.init(room);
   room.game++;
   room.matchId = randomUUID();
   room.startedAt = Date.now();
@@ -950,7 +956,7 @@ function settleActivity(room) {
     const fails = participants.filter(
       (p) => room.submissions[p.uid] === "fail",
     ).length;
-    room.history.push({
+    const result = {
       kind: "toolQuest",
       number,
       team: [...room.team],
@@ -963,7 +969,9 @@ function settleActivity(room) {
             room.activity.threshold,
           )
         : {}),
-    });
+    };
+    room.history.push(result);
+    fun.recordQuest(room, result);
   } else {
     const assassin = room.players.find((p) =>
       room.knights
@@ -988,7 +996,7 @@ function settleActivity(room) {
       if (room.roles[target.uid] === "reverse")
         room.convertedReverse = target.uid;
       room.history.push({ kind: "toolReverse", number });
-    } else
+    } else {
       room.history.push({
         kind: "toolKnife",
         number,
@@ -999,6 +1007,9 @@ function settleActivity(room) {
             : !knights.living(room).some((p) => room.roles[p.uid] === "merlin")
           : room.roles[target.uid] === "merlin",
       });
+      // An assist-mode knife proves a final shot, but does not prove three green quests.
+      if (room.fun) room.fun.lastFinal = { reason: "final_action", target: target?.seat ?? 0, actor: assassin.seat };
+    }
   }
   room.activity = null;
   room.team = [];
@@ -1172,9 +1183,11 @@ function publicView(room, uid) {
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
     scoreSettlement: scoring.settlementOptions(room),
+    funSettlement: fun.settlementOptions(room.board),
     scoreSettings: scoring.settings(room),
     scoreNotice: room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
+    myFun: room.matchRecord?.players.find(player => player.uid === uid)?.fun || null,
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),
@@ -1464,7 +1477,28 @@ function applyCommand(room, uid, input) {
       // Resolve hidden identity only as part of ending the game; no preview oracle.
       winner = scoring.resolveWinner(option, input.scoreTarget, players, next.board, next.scorePolicy);
       facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
-    } else winner = manualResult(next, input);
+    } else if (input.funReason !== undefined) {
+      const option = fun.settlementOptions(next.board).find(item => item.id === input.funReason);
+      requireRule(option, "趣味结束原因无效");
+      const players = next.players.map(player => ({ seat: player.seat, roleId: next.roles[player.uid], alive: next.knights?.players[player.uid].alive ?? true }));
+      const rules = { targetModes: next.knights ? { [next.board]: "living_merlin" } : {} };
+      if (option.requiresTarget) requireRule(scoring.validTarget(input.funTarget, players, next.board, rules), "请选择实际在场刺杀目标或空刀");
+      winner = scoring.resolveWinner(option, input.funTarget, players, next.board, rules);
+      if (next.fun) next.fun.pendingTerminal = { reason: option.id, ...(option.requiresTarget ? { target: input.funTarget } : {}) };
+    } else {
+      winner = manualResult(next, input);
+      if (next.fun?.lastFinal && winner) {
+        const terminal = fun.terminal(next, next.fun.lastFinal, ROLES, "system");
+        if ((terminal.hit || terminal.emptyWin ? "evil" : "good") === winner) next.fun.pendingTerminal = next.fun.lastFinal;
+      }
+    }
+    if (input.funActor !== undefined) {
+      const finalFacts = facts || next.fun?.pendingTerminal;
+      requireRule(next.knights && ["assassination", "early_assassination"].includes(finalFacts?.reason), "仅最终盘刀可登记带刀人");
+      requireRule(next.players.some(player => player.seat === input.funActor && next.knights.players[player.uid].alive), "请选择实际在场带刀人");
+      requireRule(input.funActor !== finalFacts.target, "带刀人不能选择自己");
+      finalFacts.actor = input.funActor;
+    }
     if (active) next.history.push({ kind: "toolCanceled" });
     next.flexible = true;
     next.activity = null;
@@ -1600,6 +1634,7 @@ function applyCommand(room, uid, input) {
       "matchRecord",
       "scorePolicy",
       "scoringFacts",
+      "fun",
     ])
       delete room[key];
     room.history = [];
@@ -1762,6 +1797,7 @@ function applyCommand(room, uid, input) {
       };
       room.quests.push(result);
       room.history.push({ kind: "quest", ...result });
+      fun.recordQuest(room, result);
       if (room.quests.filter((q) => !q.success).length === 3) {
         if (room.board === "shadow-assist") stage(room, "offlineFinal");
         else end(room, "evil", "三次任务失败，坏人获胜", "system", { reason: "quest_fail" });

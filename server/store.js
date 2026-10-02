@@ -3,9 +3,14 @@ const { DatabaseSync } = require("node:sqlite");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { dirname } = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { roomSummary, RuleError } = require("./engine");
+const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
+const fun = require("./fun");
 const { migrate: migrateKnights } = require("./knights");
+const adjustmentReason = reason => {
+  if (typeof reason!=="string" || reason.trim().length<2 || reason.length>200) throw new RuleError("请填写2–200字的调整原因");
+  return reason.trim();
+};
 class Store {
   constructor(path) {
     this.leaderboardRevision = 0;
@@ -28,6 +33,13 @@ class Store {
       CREATE TABLE IF NOT EXISTS match_scores(match_id TEXT NOT NULL, uid TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('scored','excluded')), points INTEGER NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
       CREATE INDEX IF NOT EXISTS match_scores_user ON match_scores(uid,ended);
       CREATE INDEX IF NOT EXISTS match_scores_rank ON match_scores(ended,uid,points) WHERE status='scored';
+      CREATE TABLE IF NOT EXISTS match_events(match_id TEXT NOT NULL,event_id TEXT NOT NULL,snapshot TEXT NOT NULL,PRIMARY KEY(match_id,event_id));
+      CREATE TABLE IF NOT EXISTS match_fun_stats(match_id TEXT NOT NULL,uid TEXT NOT NULL,mode TEXT NOT NULL,metric TEXT NOT NULL,role TEXT NOT NULL,role_label TEXT NOT NULL,count INTEGER NOT NULL,opportunities INTEGER NOT NULL,status TEXT NOT NULL,ended INTEGER NOT NULL,PRIMARY KEY(match_id,uid,metric,role));
+      CREATE INDEX IF NOT EXISTS match_fun_user ON match_fun_stats(uid,mode,metric,ended);
+      CREATE INDEX IF NOT EXISTS match_fun_rank ON match_fun_stats(mode,metric,ended,uid) WHERE status='known';
+      CREATE TABLE IF NOT EXISTS score_versions(uid TEXT PRIMARY KEY, revision INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
     if (!profileColumns.some(column => column.name === "leaderboard_visible"))
@@ -54,11 +66,46 @@ class Store {
         WHERE f.uid IS NULL AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%')`).all())
         this.initializeLeaderboardProfile(row.uid);
       this.restoreCompanionMatches();
+      this.restoreFunRecords();
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);
         if (migrateKnights(room)) this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), row.code);
       }
     });
+  }
+  restoreFunRecords() {
+    const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all();
+    for (const row of rows) {
+      const match = JSON.parse(row.snapshot), players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(row.id).map(p => ({ uid: p.uid, ...JSON.parse(p.snapshot) }));
+      // Only classical frozen identities and explicit terminal facts can be recovered.
+      if (!match.funFacts && fun.modeFor(match.board) === "classic" && match.scoringFacts && players.every(p => p.roleId)) {
+        const room = { board: match.board, players, roles: Object.fromEntries(players.map(p => [p.uid,p.roleId])) };
+        match.funFacts = { version: fun.VERSION, initialRoles: { ...room.roles }, events: [], attacksComplete: false,
+          terminal: fun.terminal(room, match.scoringFacts, null, match.source) };
+        this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match), match.id);
+      }
+      this.rebuildFun(match, players);
+    }
+  }
+  writeFun(match, uid, projection) {
+    this.db.prepare("DELETE FROM match_fun_stats WHERE match_id=? AND uid=?").run(match.id, uid);
+    const insert = this.db.prepare("INSERT INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)");
+    for (const row of projection.metrics) insert.run(match.id, uid, projection.mode, row.id, row.role, roleName(row.role) || "未知角色", row.count, row.opportunities, row.status, match.endedAt);
+  }
+  rebuildFun(match, players) {
+    const projections = fun.project(match, players, roleName);
+    for (const player of players) {
+      player.fun = projections.find(p => p.uid === player.uid).fun;
+      this.writeFun(match, player.uid, player.fun);
+      const { uid, ...snapshot } = player;
+      this.db.prepare("UPDATE match_players SET outcome=?,snapshot=? WHERE match_id=? AND uid=?").run(snapshot.outcome, JSON.stringify(snapshot), match.id, uid);
+    }
+    this.invalidateLeaderboard();
+  }
+  funFor(uid) {
+    const rows = this.db.prepare("SELECT f.* FROM match_fun_stats f JOIN match_players p ON p.match_id=f.match_id AND p.uid=f.uid WHERE f.uid=? AND p.outcome IN ('win','loss') ORDER BY f.mode,f.metric,f.role").all(uid);
+    const legacy = this.db.prepare("SELECT count(*) AS n FROM match_players WHERE uid=? AND json_extract(snapshot,'$.fun.status')='legacy'").get(uid).n;
+    return fun.aggregate(rows, legacy);
   }
   restoreCompanionMatches() {
     const matches = this.db.prepare("SELECT id, snapshot FROM matches WHERE json_extract(snapshot, '$.excludedReason')='测试局'").all();
@@ -166,8 +213,11 @@ class Store {
   archiveMatch(record) {
     const { players, ...match } = record;
     this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
+    const projections = fun.project(record, players, roleName);
+    for (const event of record.funFacts?.events || []) this.db.prepare("INSERT OR IGNORE INTO match_events VALUES(?,?,?)").run(match.id, event.id, JSON.stringify(event));
     const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
     for (const { uid, ...player } of players) {
+      player.fun = projections.find(p => p.uid === uid).fun;
       this.initializeLeaderboardProfile(uid);
       if (player.score?.status === "scored" && !this.db.prepare("SELECT 1 FROM match_players WHERE match_id=? AND uid=?").get(match.id, uid)) {
         const streak = player.outcome === "win" ? this.streakFor(uid).current + 1 : 0;
@@ -181,8 +231,10 @@ class Store {
       }
       const result = insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
       if (result.changes) {
+        this.writeFun(match, uid, player.fun);
         if (player.score) this.db.prepare("INSERT INTO match_scores VALUES(?,?,?,?,?,?)").run(match.id, uid, player.score.status, player.score.total, match.endedAt, JSON.stringify(player.score));
         this.invalidateLeaderboard();
+        this.touchScore(uid);
       }
     }
   }
@@ -207,7 +259,7 @@ class Store {
         label: row.name + " · " + row.capacity + "人", ...summary(row) }));
     const recent = this.db.prepare("SELECT m.snapshot AS game, p.snapshot AS player FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
       .map(row => {
-        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, ...game } = JSON.parse(row.game);
+        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, ...game } = JSON.parse(row.game);
         const { roleId, ...player } = JSON.parse(row.player);
         return { ...game, ...player };
       });
@@ -220,8 +272,9 @@ class Store {
     const monthEnd = Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1) - 8 * 3600000;
     for (const row of byFaction) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction));
     for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
-    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent,
-      score: { ...aggregate(scoreRows), month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total, ...this.streakFor(uid) } };
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(CASE WHEN created>=? AND created<? THEN delta ELSE 0 END),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=?").get(monthStart,monthEnd,uid);
+    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
+      score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual, ...this.streakFor(uid) } };
   }
   streakFor(uid) {
     const rows = this.db.prepare(`SELECT p.outcome FROM match_scores s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid
@@ -246,6 +299,14 @@ class Store {
     match.winner = scoring.resolveWinner(option, input.scoreTarget, players, match.board, match.scorePolicy);
     match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
     match.source = "manual"; match.excludedReason = null; match.scoreExcludedReason = null;
+    if (match.funFacts) {
+      const knight = fun.modeFor(match.board) === "knights";
+      const actor = input.funActor ?? (knight && option.requiresTarget && match.funFacts.terminal?.actor ? players.find(p => p.uid === match.funFacts.terminal.actor.uid)?.seat : undefined);
+      const room = { players, roles: Object.fromEntries(players.map(p => [p.uid,p.roleId])),
+        ...(fun.modeFor(match.board) === "knights" ? { knights: { players: Object.fromEntries(players.map(p => [p.uid,{ alive: p.alive !== false, faction: p.faction }])) } } : {}) };
+      if (actor !== undefined && (!knight || !option.requiresTarget || !players.some(p => p.seat === actor && p.alive !== false) || actor === input.scoreTarget)) throw new RuleError("请选择实际在场带刀人且不能自刀");
+      match.funFacts.terminal = fun.terminal(room, { ...match.scoringFacts, ...(actor !== undefined ? { actor } : {}) }, null, "manual");
+    }
     match.scoreRevision = (match.scoreRevision || 0) + 1;
     this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
     for (const {uid,...player} of players) {
@@ -254,17 +315,47 @@ class Store {
       this.db.prepare("UPDATE match_scores SET status='scored' WHERE match_id=? AND uid=?").run(id,uid);
       this.rebuildScores(uid);
     }
+    this.rebuildFun(match, this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(id).map(p => ({ uid: p.uid, ...JSON.parse(p.snapshot) })));
+    this.syncScoreRooms(id);
+    this.invalidateLeaderboard();
+    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision}};
+  }
+  correctFunMatch(id, input) {
+    if (!this.inTransaction) throw Error("对局更正必须在事务中执行");
+    const row = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
+    if (!row) throw new RuleError("对局不存在",404);
+    const match = JSON.parse(row.snapshot);
+    if (!match.funFacts || match.excludedReason === "对局终止") throw new RuleError("本局无法更正趣味记录");
+    if (match.scorePolicy && !match.scoreEligibilityReason) return this.correctMatch(id,{...input,scoreReason:input.funReason,scoreTarget:input.funTarget});
+    if (!Number.isSafeInteger(input.revision) || input.revision !== (match.scoreRevision || 0)) throw new RuleError("对局已更新，请重新加载",409);
+    const option = fun.settlementOptions(match.board).find(item=>item.id===input.funReason);
+    if (!option) throw new RuleError("趣味结束原因无效");
+    const players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(id).map(p=>({uid:p.uid,...JSON.parse(p.snapshot)}));
+    if (!players.length || players.some(p=>!p.roleId || p.faction==='unknown')) throw new RuleError("身份信息不完整，不能更正");
+    const knight = fun.modeFor(match.board)==='knights', rules = {targetModes: knight ? {[match.board]:"living_merlin"} : {}};
+    if (option.requiresTarget && !scoring.validTarget(input.funTarget,players,match.board,rules)) throw new RuleError("请选择实际在场刺杀目标或空刀");
+    const actor = input.funActor ?? (knight && option.requiresTarget ? players.find(p=>p.uid===match.funFacts.terminal?.actor?.uid)?.seat : undefined);
+    if (actor!==undefined && (!knight || !option.requiresTarget || !players.some(p=>p.seat===actor && p.alive!==false) || actor===input.funTarget)) throw new RuleError("请选择实际在场带刀人且不能自刀");
+    const before = {winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision || 0};
+    const room = {players,roles:Object.fromEntries(players.map(p=>[p.uid,p.roleId])),...(knight ? {knights:{players:Object.fromEntries(players.map(p=>[p.uid,{alive:p.alive!==false,faction:p.faction}]))}} : {})};
+    match.funFacts.terminal = fun.terminal(room,{reason:option.id,...(option.requiresTarget ? {target:input.funTarget,...(actor!==undefined ? {actor} : {})} : {})},null,"manual");
+    match.winner = scoring.resolveWinner(option,input.funTarget,players,match.board,rules);
+    match.source="manual";match.excludedReason=null;match.scoreRevision=(match.scoreRevision || 0)+1;
+    this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
+    players.forEach(p=>p.outcome=p.faction===match.winner ? "win" : "loss");
+    this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
+    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision}};
+  }
+  syncScoreRooms(resultId = null) {
     // Synchronize any still-visible completed table, including later streak awards.
     for (const roomRow of this.db.prepare("SELECT code,state FROM rooms WHERE json_extract(state,'$.matchRecord.id') IS NOT NULL").all()) {
       const room = JSON.parse(roomRow.state), archived = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(room.matchRecord.id);
       if (!archived) continue;
       const saved = JSON.parse(archived.snapshot);
       room.matchRecord = {...saved,players:this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(saved.id).map(p=>({uid:p.uid,...JSON.parse(p.snapshot)}))};
-      if (saved.id === id) {room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;}
+      if (saved.id === resultId) {room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;}
       this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room),room.code);
     }
-    this.invalidateLeaderboard();
-    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision}};
   }
   rebuildScores(uid) {
     const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM match_scores s
@@ -277,17 +368,107 @@ class Store {
       const score = {...scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null),streak};
       const bonus = game.scorePolicy.streakBonus;
       if (bonus.enabled && streak === bonus.threshold) {score.breakdown.push({id:"streak",label:bonus.label,points:bonus.points});score.total+=bonus.points;}
+      const override = JSON.parse(row.score).manualOverride;
+      if (override) {
+        score.manualOverride = override;
+        score.breakdown.push({id:"admin",label:"管理员调整",points:override.points-score.total});
+        score.total = override.points;
+      }
       player.score=score;
       this.db.prepare("UPDATE match_scores SET points=?,snapshot=? WHERE match_id=? AND uid=?").run(score.total,JSON.stringify(score),row.match_id,uid);
       this.db.prepare("UPDATE match_players SET snapshot=? WHERE match_id=? AND uid=?").run(JSON.stringify(player),row.match_id,uid);
     }
+    this.touchScore(uid);
   }
-  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false) {
-    const filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
-    const total = this.db.prepare("SELECT count(*) AS total FROM match_players p WHERE uid=?" + filter).get(uid).total;
+  scoreRevision(uid) { return this.db.prepare("SELECT revision FROM score_versions WHERE uid=?").get(uid)?.revision || 0; }
+  touchScore(uid) {
+    this.db.prepare("INSERT INTO score_versions VALUES(?,1) ON CONFLICT(uid) DO UPDATE SET revision=revision+1").run(uid);
+  }
+  playerScore(uid) {
+    const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM match_scores WHERE uid=? AND status='scored'").get(uid);
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM score_adjustments WHERE uid=?").get(uid).points;
+    return {uid,points:matchPoints.points+manual,matchPoints:matchPoints.points,manualPoints:manual,games:matchPoints.games,revision:this.scoreRevision(uid)};
+  }
+  scoreAdjustments(uid, offset = 0, limit = 20) {
+    const total = this.db.prepare("SELECT count(*) AS total FROM score_adjustments WHERE uid=?").get(uid).total;
+    const records = this.db.prepare("SELECT id,delta,mode,before_points AS beforePoints,after_points AS afterPoints,reason,created FROM score_adjustments WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT ? OFFSET ?").all(uid,limit,offset);
+    return {records,total,hasMore:offset+records.length<total};
+  }
+  searchScorePlayers(query, offset = 0) {
+    const sql = `WITH known AS (SELECT uid FROM profiles UNION SELECT uid FROM match_players UNION SELECT json_extract(p.value,'$.uid') FROM rooms r,json_each(r.state,'$.players') p),
+      players AS (SELECT k.uid,f.public_id AS publicId,coalesce(nullif(f.nickname,''),
+        (SELECT json_extract(p.snapshot,'$.name') FROM match_players p WHERE p.uid=k.uid ORDER BY p.ended DESC LIMIT 1),
+        (SELECT json_extract(p.value,'$.name') FROM rooms r,json_each(r.state,'$.players') p WHERE json_extract(p.value,'$.uid')=k.uid LIMIT 1),k.uid) AS name
+        FROM known k LEFT JOIN profiles f ON f.uid=k.uid)
+      SELECT * FROM players WHERE instr(lower(name),lower(?))>0 OR uid=? OR publicId=? ORDER BY name,uid LIMIT 51 OFFSET ?`;
+    const rows = this.db.prepare(sql).all(query,query,query,offset);
+    return {players:rows.slice(0,50).map(player=>({...player,...this.playerScore(player.uid)})),hasMore:rows.length>50};
+  }
+  adjustPlayerScore(input) {
+    if (!this.inTransaction) throw Error("积分调整必须在事务中执行");
+    const reason=adjustmentReason(input.reason);
+    const known = this.db.prepare("SELECT 1 FROM profiles WHERE uid=? UNION SELECT 1 FROM match_players WHERE uid=? UNION SELECT 1 FROM rooms r,json_each(r.state,'$.players') p WHERE json_extract(p.value,'$.uid')=? LIMIT 1").get(input.uid,input.uid,input.uid);
+    if (!known) throw new RuleError("玩家不存在",404);
+    if (!['delta','set'].includes(input.mode) || !Number.isSafeInteger(input.points) || Math.abs(input.points)>1000000) throw new RuleError("请输入-1000000至1000000的整数积分");
+    const before = this.playerScore(input.uid);
+    if (!Number.isSafeInteger(input.revision) || input.revision!==before.revision) throw new RuleError("玩家积分已变化，请重新查询",409);
+    const delta = input.mode==='set' ? input.points-before.points : input.points;
+    if (!delta) throw new RuleError("积分没有变化");
+    const id=randomUUID(),created=Date.now(),after=before.points+delta;
+    if (!Number.isSafeInteger(after)) throw new RuleError("积分超出有效范围");
+    this.initializeLeaderboardProfile(input.uid);
+    this.db.prepare("INSERT INTO score_adjustments VALUES(?,?,?,?,?,?,?,?)").run(id,input.uid,delta,input.mode,before.points,after,reason,created);
+    this.touchScore(input.uid);this.invalidateLeaderboard();
+    return {id,uid:input.uid,before:before.points,after,delta,revision:this.scoreRevision(input.uid)};
+  }
+  matchScoreData(id) {
+    const row=this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
+    if (!row) throw new RuleError("对局不存在",404);
+    const match=JSON.parse(row.snapshot);
+    return {id,code:match.code,boardName:match.boardName,endedAt:match.endedAt,revision:match.scoreRevision || 0,
+      players:this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')").all(id).map(row=>{
+        const player=JSON.parse(row.snapshot),score=player.score;
+        return {uid:row.uid,name:player.name,seat:player.seat,editable:score?.status==='scored',score:score || null};
+      })};
+  }
+  adjustMatchScores(id,input) {
+    if (!this.inTransaction) throw Error("积分调整必须在事务中执行");
+    const reason=adjustmentReason(input.reason);
+    const data=this.matchScoreData(id);
+    if (!Number.isSafeInteger(input.revision) || input.revision!==data.revision) throw new RuleError("对局已更新，请重新查询",409);
+    if (!Array.isArray(input.scores) || !input.scores.length || input.scores.length>13 || input.scores.some(row=>!row || typeof row.uid!=="string") || new Set(input.scores.map(row=>row.uid)).size!==input.scores.length) throw new RuleError("请选择不同的玩家并填写积分");
+    for (const change of input.scores) {
+      const player=data.players.find(player=>player.uid===change.uid);
+      if (!player?.editable) throw new RuleError("该玩家本局未计分，不能修改本局积分");
+      if (change.points!==null && (!Number.isSafeInteger(change.points) || Math.abs(change.points)>1000000)) throw new RuleError("请输入-1000000至1000000的整数积分");
+    }
+    const before=[],created=Date.now();
+    for (const change of input.scores) {
+      const player=data.players.find(player=>player.uid===change.uid),score={...player.score};
+      before.push({uid:player.uid,seat:player.seat,name:player.name,points:score.total,override:score.manualOverride || null});
+      if (change.points===null) delete score.manualOverride;
+      else score.manualOverride={points:change.points,reason,created};
+      this.db.prepare("UPDATE match_scores SET snapshot=? WHERE match_id=? AND uid=?").run(JSON.stringify(score),id,change.uid);
+      this.rebuildScores(change.uid);
+    }
+    const match=JSON.parse(this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id).snapshot);
+    match.scoreRevision=data.revision+1;
+    this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
+    this.syncScoreRooms();this.invalidateLeaderboard();
+    const after=this.matchScoreData(id);
+    return {id,code:data.code,revision:after.revision,before,after:after.players.filter(player=>input.scores.some(row=>row.uid===player.uid)).map(player=>({uid:player.uid,seat:player.seat,name:player.name,points:player.score.total,override:player.score.manualOverride || null}))};
+  }
+  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null) {
+    let filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
+    const args = [uid];
+    if (funFilter) {
+      filter += " AND EXISTS (SELECT 1 FROM match_fun_stats f WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.mode=? AND f.status='known' AND f.count>0" + (funFilter.role ? " AND f.role=?" : "") + ")";
+      args.push(funFilter.metric, funFilter.mode, ...(funFilter.role ? [funFilter.role] : []));
+    }
+    const total = this.db.prepare("SELECT count(*) AS total FROM match_players p WHERE uid=?" + filter).get(...args).total;
     const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
       FROM match_players p JOIN matches m ON m.id=p.match_id
-      WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(uid, limit, offset);
+      WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
     const members = this.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')");
     const records = rows.map(row => {
       const game = JSON.parse(row.game), player = JSON.parse(row.player);
@@ -297,6 +478,7 @@ class Store {
         source: game.source, excludedReason: game.excludedReason,
         name: player.name, seat: player.seat, role: player.role,
         faction: player.faction, outcome: player.outcome,
+        fun: player.fun || null,
         score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
         scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
         members: members.all(row.match_id).map(member => {

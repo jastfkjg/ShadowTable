@@ -12,6 +12,12 @@ const factory = vm.runInContext(
 );
 const renderTable = factory("pages/table/table.wxml"), renderLobby = factory("pages/lobby/lobby.wxml");
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('积分调整记录与单局手动原因在个人记录中可见，恢复自动后不显示手动原因',()=>{
+  const renderMatches=factory('pages/matches/matches.wxml'),record={id:'m',members:[],expanded:true,score:{status:'scored',total:8,breakdown:[{id:'admin',label:'管理员调整',points:4}],manualOverride:{reason:'挡刀核对'} }};
+  const data={records:[record],adjustments:[{id:'a',dateLabel:'今天',pointsLabel:'+2 分',beforePoints:8,afterPoints:10,reason:'额外奖励'}],adjustmentsTotal:1};
+  const html=JSON.stringify(renderMatches(data));assert.match(html,/挡刀核对/);assert.match(html,/额外奖励/);assert.match(html,/管理员积分调整/);
+  delete record.score.manualOverride;assert.doesNotMatch(JSON.stringify(renderMatches(data)),/挡刀核对/);
+});
 const base = {
   loading: false,
   busy: false,

@@ -28,4 +28,11 @@ button.matches-more { width: auto; min-height: 88rpx; margin: 24rpx 0; padding: 
 .matches-filters button { flex: 1; width: 0; min-height: 48px; margin: 0; background: var(--surface); color: var(--muted); }
 .matches-filters button.selected { color: var(--accent); }
 .match-score { margin-top: 8rpx; font-size: 26rpx; font-weight: 500; }
+.match-fun-label { color: var(--accent); margin-top: 10rpx; font-size: 25rpx; }
+.fun-filter { display: flex; justify-content: space-between; align-items: center; gap: 16rpx; margin-bottom: 16rpx; color: var(--accent); }
+.fun-filter button { width: auto; margin: 0; min-height: 48px; padding: 12rpx 0; color: var(--accent); font-size: 26rpx; }
+.match-fun { padding-top: 12rpx; margin-top: 16rpx; border-top: 1rpx solid var(--border); }
+.fun-event { padding: 16rpx 0; }
+.adjustment-history { margin-top: 36rpx; }
+.adjustment-entry { padding: 24rpx 0; line-height: 1.6; overflow-wrap: anywhere; }
 .score-breakdown { margin-top: 16rpx; padding-top: 12rpx; border-top: 1rpx solid var(--border); }

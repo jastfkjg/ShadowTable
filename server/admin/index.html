@@ -14,7 +14,7 @@
         <div>
           <p class="eyebrow">SHADOWTABLE / OPERATIONS</p>
           <h1>桌边助手管理平台</h1>
-          <p>管理牌桌，连接陪测，追踪操作记录。</p>
+          <p>管理牌桌和积分，连接陪测，追踪操作记录。</p>
         </div>
         <button id="logout" hidden>退出登录</button>
       </header>
@@ -61,8 +61,25 @@
             ><button id="next">下一页</button>
           </div>
         </section>
+        <section id="player-score-section">
+          <h2>玩家积分管理</h2>
+          <form id="score-player-search"><label for="score-player-query">玩家昵称或账号标识</label><input id="score-player-query" required maxlength="200" /><button id="score-player-find" type="submit">查找玩家</button></form>
+          <div class="pager"><button id="score-player-prev" disabled>上一页</button><span id="score-player-page"></span><button id="score-player-next" disabled>下一页</button></div>
+          <label for="score-player">选择玩家</label><select id="score-player" disabled><option value="">请先查找玩家</option></select>
+          <p id="score-player-summary"></p>
+          <form id="player-score-form">
+            <label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta">加减积分</option><option value="set">设置总积分</option></select>
+            <label for="player-score-points">积分数值</label><input id="player-score-points" type="number" step="1" min="-1000000" max="1000000" required aria-describedby="player-score-help" />
+            <p id="player-score-help">加减积分时，正数加分、负数扣分。总分调整不改变胜负、连胜或场均积分。</p>
+            <label for="player-score-reason">调整原因</label><input id="player-score-reason" required minlength="2" maxlength="200" />
+            <p id="player-score-status" role="status" aria-live="polite"></p>
+            <button id="player-score-submit" class="danger" disabled>确认调整玩家积分</button>
+          </form>
+          <div id="player-score-history"></div>
+          <button id="player-score-history-more" hidden>加载更多调整记录</button>
+        </section>
         <section>
-          <h2>更正已归档结果</h2>
+          <h2>对局积分与结果管理</h2>
           <p>按本局开局时的规则重算积分，并同步战绩和连胜。每次更正会保留原因和前后记录。</p>
           <label for="correction-code">房间号</label><input id="correction-code" inputmode="numeric" maxlength="6" placeholder="6位房间号" />
           <button id="correction-load" type="button">查找最近50场对局</button>
@@ -70,9 +87,18 @@
             <label for="correction-match">选择对局</label><select id="correction-match" required disabled><option value="">请先查找对局</option></select>
             <label for="correction-result">实际结束原因</label><select id="correction-result" required disabled></select>
             <div id="correction-target-row" hidden><label for="correction-target">实际刺杀目标</label><select id="correction-target"></select></div>
+            <div id="correction-actor-row" hidden><label for="correction-actor">实际带刀人（可保持未记录）</label><select id="correction-actor"></select></div>
             <label for="correction-reason">更正原因</label><input id="correction-reason" required minlength="2" maxlength="200" />
             <p id="correction-status" role="status" aria-live="polite"></p>
             <button id="correction-submit" class="danger" disabled>确认更正整局结果</button>
+          </form>
+          <form id="match-score-form">
+            <h3>本局玩家积分</h3>
+            <p>修改得分保留原胜负和连胜。恢复自动计分后，按本局规则重新计算。</p>
+            <div id="match-score-players"></div>
+            <label for="match-score-reason">积分调整原因</label><input id="match-score-reason" required minlength="2" maxlength="200" />
+            <p id="match-score-status" role="status" aria-live="polite"></p>
+            <button id="match-score-submit" class="danger" disabled>保存本局积分调整</button>
           </form>
         </section>
         <section>
@@ -81,7 +107,7 @@
             <span id="audit-count"></span>
           </div>
           <p>
-            按阶段汇总玩家操作，显示行动当时的身份与操作发起时间。仅管理员可见。
+            玩家操作按阶段汇总，显示行动当时的身份与时间；管理员改分保留原因和前后数据。仅管理员可见。
           </p>
           <label for="audit-room">选择房间</label>
           <button

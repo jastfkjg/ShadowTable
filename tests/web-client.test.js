@@ -20,13 +20,13 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
     fetch,
     setTimeout(fn) { scheduled = fn; return 1; },
     clearTimeout() { scheduled = undefined; },
-    URL, console,
+    URL, URLSearchParams, console,
   };
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
     window.test = { state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError,
+      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
@@ -36,6 +36,19 @@ function client(fetch, storage = new Map([["session", "session"]]), layout) {
   return { ...context.window.test, scrolls, lookups, events, document: context.document, scheduled: () => scheduled };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页显示本人积分调整和原因，分页重试不重复，切换页面后不接收旧调整响应',async()=>{
+  const row={id:'adjustment',created:1,delta:-2,beforePoints:4,afterPoints:2,reason:'<img src=x onerror=evil()>修正'};
+  let requests=0,finish;
+  const c=client(async url=>{
+    if(url.includes('/score-adjustments')) {requests++;if(requests===1)throw Error('网络中断');return new Promise(resolve=>{finish=resolve;});}
+    return response({records:[],total:0,hasMore:false,adjustments:{records:[row],total:2,hasMore:true}});
+  });
+  await c.applyRoute('#/matches');let html=c.viewMatches();assert.match(html,/管理员积分调整 · 2 条/);assert.match(html,/-2 分/);assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img src=x'));
+  await c.ACTIONS.moreScoreAdjustments();assert.match(c.viewMatches(),/网络未确认|重试加载调整记录/);
+  const pending=c.ACTIONS.moreScoreAdjustments();c.ACTIONS.moreScoreAdjustments();assert.equal(requests,2);
+  await c.applyRoute('#/lobby');finish(response({records:[{...row,id:'stale'}],total:2,hasMore:false}));await pending;
+  await c.applyRoute('#/matches');assert.equal((c.viewMatches().match(/总积分 4/g)||[]).length,1);
+});
 test('网页按风格筛选头像，切换分类保留草稿和预览并且不触发保存', async () => {
   const presets = require('../miniprogram/builtin-avatars');
   const geometric = presets.find(item => item.id === 'geometric-32'), crayon = presets.find(item => item.id === 'crayon-32');
@@ -1031,4 +1044,33 @@ test('网页排行榜底栏直接开关，失败重试保留请求，资料页�
   await c.CHANGES.rankVisibility({checked:false});assert.equal(c.state.rankVisible,false);assert.equal(c.state.rankBoard.me.status,'hidden');
   c.state.rankBoard.me.status='unsupported';await c.CHANGES.rankVisibility({checked:true});assert.equal(posts.length,3);
   await c.applyRoute('#/profile');assert.doesNotMatch(c.viewProfileEditor(),/profileLeaderboard|在排行榜公开展示/);
+});
+test('网页趣味卡片用可点击数字和CSP兼容比例条，未知角色不显示虚构的零',async()=>{
+  const {aggregate}=require('../server/fun');
+  const rows=['enemy','ally','failed','aim_enemy'].map((suffix,i)=>({match_id:'known',mode:'knights',metric:'knife_'+suffix,role:'gareth',role_label:'<坏标签>',status:'known',count:[2,0,1,3][i],opportunities:3}));
+  const unknown=['enemy','ally','failed','aim_enemy'].map(suffix=>({match_id:'unknown',mode:'knights',metric:'knife_'+suffix,role:'gaheris',role_label:'加荷里斯',status:'unknown',count:0,opportunities:0}));
+  const c=client(async()=>response({total:2,wins:1,winRate:50,byFaction:[],byRole:[],byBoard:[],recent:[],fun:aggregate([...rows,...unknown],1)}));
+  await c.applyRoute('#/stats?tab=fun');assert.equal(c.state.statsTab,'fun');const html=c.viewStats();
+  assert.match(html,/<button[^>]+data-metric="knife_enemy"[^>]*><span class="fun-number good">2/);assert.doesNotMatch(html,/&lt;span|style="width:/);assert.match(html,/<svg class="fun-bar"/);
+  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/命中敌方 —/);assert.match(html,/&lt;坏标签&gt;/);
+});
+test('网页趣味回查深链与分页保留过滤，清除回到全部，不混入管理员积分调整',async()=>{
+  const urls=[];const c=client(async url=>{urls.push(url);return response({records:[{id:String(urls.length),endedAt:1,members:[],role:'梅林',outcome:'win',fun:{events:[],highlights:[],reason:'旧数据'}}],total:2,hasMore:urls.length===1,adjustments:{records:[{id:'a',delta:2,reason:'积分调整'}],total:1,hasMore:false}});});
+  await c.applyRoute('#/matches?fun=knife_enemy&mode=knights&role=gareth');await c.loadMatches(true);
+  assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);assert.doesNotMatch(c.viewMatches(),/管理员积分调整/);
+  await c.applyRoute('#/matches');assert.equal(urls.at(-1),'/api/me/matches?offset=0');assert.match(c.viewMatches(),/管理员积分调整/);
+});
+test('网页趣味榜模式角色筛选与迟到响应隔离，未达门槛展示本人分母',async()=>{
+  const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
+  const result=metric=>webRanks(metric,{fun:true,mode:'knights',sort:'rate',role:'gareth',metricLabel:'命中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
+  const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);return response(result('fun_knife_enemy'));});
+  const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
+  await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunMode:'knights',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
+  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=knights&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
+});
+test('网页不计积分的骑士终局必须选实际带刀人，切换带刀人排除自刀目标',async()=>{
+  const c=client(async()=>response({}));c.state.room={canUseTools:true,stage:'fun-stage',knights:{},scoreSettlement:[],funSettlement:[{id:'early_assassination',label:'提前盘刀',requiresTarget:true}],players:[{seat:1,name:'<甲>'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}]};
+  c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'early_assassination'}});c.ACTIONS.pickScoreTarget({dataset:{seat:2}});
+  assert.match(c.viewResultDialog(),/实际带刀人/);assert.match(c.viewResultDialog(),/data-action="saveResult" disabled/);assert.doesNotMatch(c.viewResultDialog(),/data-seat="3"/);
+  c.ACTIONS.pickFunActor({dataset:{seat:2}});assert.equal(c.state.resultTarget,null);assert.match(c.viewResultDialog(),/pickScoreTarget" disabled data-seat="2"/);assert.match(c.viewResultDialog(),/1号 · &lt;甲&gt;/);assert.doesNotMatch(c.viewResultDialog(),/&amp;lt;/);
 });
