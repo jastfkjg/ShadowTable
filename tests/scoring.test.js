@@ -32,7 +32,7 @@ test('十二骑士10到13人默认计分，所有结局与派西挡刀沿用现�
     const room=newRoom('123456','wx:host','房主',board,capacity);
     assert.equal(room.scoreEnabled,true);assert.equal(publicView(room,room.host).scoreSettings.unavailableReason,null);
     const good=deal({board,capacity}),target=good.players.find(player=>good.roles[player.uid]==='percival').seat;
-    assert.ok(publicView(good,good.host).scoreSettlement.some(option=>option.id==='early_assassination'));
+    assert.deepEqual(publicView(good,good.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
     finish(good,{scoreReason:'assassination',scoreTarget:target});
     for(const player of good.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?0:player.roleId==='percival'?5:player.roleId==='merlin'?3:2);
     for(const reason of ['assassination','quest_fail','five_rejections','early_assassination']) {
@@ -199,7 +199,7 @@ test('正式玩家与陪测账号同桌的十二骑士正常结算并计入积�
     const player=room.players[11],previousUid=player.uid;player.uid='test:companion';
     room.roles[player.uid]=room.roles[previousUid];delete room.roles[previousUid];
     room.knights.players[player.uid]=room.knights.players[previousUid];delete room.knights.players[previousUid];
-    assert.ok(publicView(room,room.host).scoreSettlement.some(option=>option.id==='early_assassination'));
+    assert.deepEqual(publicView(room,room.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
     finish(room,{scoreReason:'early_assassination',scoreTarget:1});
     store.transaction(()=>store.save(room));
     assert.ok(room.matchRecord.players.every(player=>player.score.status==='scored'));

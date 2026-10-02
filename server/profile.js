@@ -53,7 +53,7 @@ function readProfile(store, uid) {
   const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
-    leaderboardVisible: /^(wx|dev):/.test(uid) && (row ? !!row.leaderboard_visible : true), nicknameConfirmed: !!row?.nickname_confirmed };
+    leaderboardVisible: /^(wx|dev|test):/.test(uid) && (row ? !!row.leaderboard_visible : true), nicknameConfirmed: !!row?.nickname_confirmed };
 }
 // Room presentation uses current avatars without copying profile data into game state.
 function readAvatarUrls(store, uids) {
@@ -68,7 +68,7 @@ function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
   if (old.version !== input.version) throw new RuleError("资料已在其他设备更新，请重新载入后编辑", 409);
   fail(input.leaderboardVisible === undefined || typeof input.leaderboardVisible === "boolean", "排行榜展示设置无效");
   const visible = input.leaderboardVisible ?? old.leaderboardVisible;
-  fail(!visible || /^(wx|dev):/.test(uid), "微信或开发账号可参与公开排行榜");
+  fail(!visible || /^(wx|dev|test):/.test(uid), "微信、开发或陪测账号可参与公开排行榜");
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
   if (input.avatar === null) avatarHash = null;
   else if (input.avatar !== undefined) {

@@ -1140,6 +1140,13 @@ function publicView(room, uid) {
   const action = actionSpec(room, uid);
   const fairyResult = fairy.result(room, uid);
   const awaiting = !!action && !Object.hasOwn(room.submissions || {}, uid);
+  // Finishing discards pending skills; derive the form from the same restored state.
+  const settlementSnapshot = hasActiveOperation(room) ? room.knights?.snapshot : null;
+  const settlementRoles = settlementSnapshot?.roles || room.roles;
+  const settlementPlayers = settlementSnapshot?.players || room.knights?.players;
+  const requiresActor = fun.settlementOptions(room.board).length > 0 && !room.players.some(player =>
+    settlementRoles?.[player.uid] === "assassin" && settlementPlayers?.[player.uid].alive !== false);
+  const registrationOptions = options => options.filter(option => !["early_assassination", "five_rejections"].includes(option.id));
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
     code: room.code,
@@ -1182,8 +1189,9 @@ function publicView(room, uid) {
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
-    scoreSettlement: scoring.settlementOptions(room),
-    funSettlement: fun.settlementOptions(room.board),
+    scoreSettlement: registrationOptions(scoring.settlementOptions(room)),
+    funSettlement: registrationOptions(fun.settlementOptions(room.board)),
+    settlementRequiresActor: room.host === uid && canUseTools(room) ? requiresActor : null,
     scoreSettings: scoring.settings(room),
     scoreNotice: room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
@@ -1492,10 +1500,14 @@ function applyCommand(room, uid, input) {
         if ((terminal.hit || terminal.emptyWin ? "evil" : "good") === winner) next.fun.pendingTerminal = next.fun.lastFinal;
       }
     }
-    if (input.funActor !== undefined) {
-      const finalFacts = facts || next.fun?.pendingTerminal;
-      requireRule(next.knights && ["assassination", "early_assassination"].includes(finalFacts?.reason), "仅最终盘刀可登记带刀人");
-      requireRule(next.players.some(player => player.seat === input.funActor && next.knights.players[player.uid].alive), "请选择实际在场带刀人");
+    const finalFacts = facts || next.fun?.pendingTerminal;
+    const assassin = next.players.find(player => next.roles[player.uid] === "assassin" && next.knights?.players[player.uid].alive !== false);
+    if (assassin && ["assassination", "early_assassination"].includes(finalFacts?.reason)) {
+      requireRule(input.funActor === undefined || input.funActor === assassin.seat, "场上有刺客，无需另选带刀人");
+      finalFacts.actor = assassin.seat;
+    } else if (input.funActor !== undefined) {
+      requireRule(["assassination", "early_assassination"].includes(finalFacts?.reason), "仅最终盘刀可登记带刀人");
+      requireRule(next.players.some(player => player.seat === input.funActor && next.knights?.players[player.uid].alive !== false), "请选择实际在场带刀人");
       requireRule(input.funActor !== finalFacts.target, "带刀人不能选择自己");
       finalFacts.actor = input.funActor;
     }

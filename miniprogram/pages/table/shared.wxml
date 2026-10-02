@@ -227,7 +227,7 @@
           <view class="small muted">{{resultStep==='actor'?'选择线下实际执行最终刺杀的玩家。':'选择线下实际刺杀的目标；未指定目标请选择空刀。'}}</view>
           <view class="score-targets capacity-grid">
             <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='actor'}}" class="secondary {{resultActor===item.seat?'is-selected':''}}" bindtap="pickFunActor" data-seat="{{item.seat}}" aria-pressed="{{resultActor===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
-            <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===item.seat?'is-selected':''}}" bindtap="pickScoreTarget" disabled="{{room.knights && resultActor===item.seat}}" data-seat="{{item.seat}}" aria-pressed="{{resultTarget===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
+            <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===item.seat?'is-selected':''}}" bindtap="pickScoreTarget" disabled="{{resultNeedsActor && resultActor===item.seat}}" data-seat="{{item.seat}}" aria-pressed="{{resultTarget===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
             <button wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===0?'is-selected':''}}" bindtap="pickScoreTarget" data-seat="0" aria-pressed="{{resultTarget===0}}" hover-class="none">空刀</button>
           </view>
         </block>

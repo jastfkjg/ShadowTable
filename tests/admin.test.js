@@ -226,6 +226,68 @@ test("现有房间开启陪测，绑定房间与管理员，关闭/退出阻止�
   assert.equal(a.app.store.get(code).players.length, 1);
   assert.equal(a.app.store.get(code).players[0].uid.startsWith("wx:"), true);
 });
+test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话与测试房间", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code, token } = await a.room();
+  await a.action(code, "test-on");
+  const panel = new Companion({ request: (path, actorToken, data, id) =>
+    a.api(path === "/api/dev-login" ? "/api/admin/actors" : path, data,
+      { ...a.auth(actorToken), ...(id ? { "Idempotency-Key": id } : {}) }) });
+  await panel.add(code);await panel.fill();
+  const hostCommand = (type, extra = {}) => a.api("/api/rooms/" + code + "/commands",
+    {type, stage:a.app.store.get(code).stage, ...extra}, a.auth(token));
+  await hostCommand("updateSettings", {board:"classic",capacity:6,visible:false,scoreEnabled:true});
+  await panel.refresh();await panel.batch("ready");await hostCommand("ready",{ready:true});
+  await hostCommand("start",{flexible:true});
+  const room=a.app.store.get(code);
+  room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,["morgana","merlin","percival","servant","servant","assassin"][i]]));
+  room.fun.initialRoles={...room.roles};a.app.store.save(room);
+  const body={type:"finishTools",stage:room.stage,scoreReason:"assassination",scoreTarget:4},id=randomUUID();
+  for(let i=0;i<2;i++) await a.api("/api/rooms/"+code+"/commands",body,{...a.auth(token),"Idempotency-Key":id});
+  for(const [i,actor] of panel.actors.entries()) {
+    const auth=a.auth(actor.token),uid=room.players[i+1].uid;
+    const profile=await a.api("/api/me/profile",undefined,auth);
+    assert.equal(profile.identityType,"test");assert.equal(profile.leaderboardVisible,true);
+    await a.api("/api/me/profile",{nickname:actor.name,version:profile.version},auth);
+    const stats=await a.api("/api/me/stats",undefined,auth);
+    const matches=await a.api("/api/me/matches?scored=1",undefined,auth);
+    assert.equal(stats.total,1);assert.equal(stats.score.games,1);
+    assert.ok(stats.byRole.length);assert.ok(stats.byFaction.length);assert.ok(stats.byBoard.length);
+    assert.equal(matches.total,1);assert.equal(matches.records[0].fun.status,"recorded");
+    assert.equal(matches.records[0].score.status,"scored");
+    assert.deepEqual(stats,JSON.parse(JSON.stringify(a.app.store.statsFor(uid))));
+    for(const metric of ["points","games","overall"]) {
+      const board=await a.api("/api/leaderboard?metric="+metric,undefined,auth);
+      assert.equal(board.me.status,"ranked");assert.ok(board.rows.some(row=>row.isSelf));
+    }
+    for(const metric of stats.fun.metrics.filter(row=>row.ranked&&row.count>0)) {
+      const board=await a.api("/api/leaderboard?metric=fun_"+metric.id,undefined,auth);
+      assert.equal(board.me.status,"ranked");assert.equal(board.me.count,metric.count);
+      const filtered=await a.api("/api/me/matches?fun="+metric.id+"&mode="+metric.mode,undefined,auth);
+      assert.equal(filtered.total,1);assert.ok(filtered.records[0].fun.highlights.length);
+    }
+    assert.equal((await a.api("/api/me/rooms",undefined,auth)).rooms.length,1);
+    assert.equal((await a.api("/api/me/score-adjustments",undefined,auth)).total,0);
+    assert.doesNotMatch(JSON.stringify({stats,matches}),/test:|wx:|"uid"/);
+  }
+  const bot=panel.actors[0],auth=a.auth(bot.token);
+  await a.api("/api/me/leaderboard-visibility",{leaderboardVisible:false},auth);
+  assert.equal((await a.api("/api/leaderboard",undefined,auth)).me.status,"hidden");
+  await a.api("/api/me/leaderboard-visibility",{leaderboardVisible:true},auth);
+  await hostCommand("rematch");
+  assert.equal((await a.api("/api/me/matches",undefined,auth)).total,1);
+  const other=await a.room();
+  await assert.rejects(a.api("/api/rooms/"+other.code,undefined,auth),e=>e.status===403);
+  await assert.rejects(a.api("/api/rooms",{name:"越界创建"},auth),e=>e.status===403);
+  await assert.rejects(a.api("/api/me/stats",undefined,{...auth,Cookie:""}),e=>e.status===401);
+  await a.api("/api/admin/logout",{});await a.login();
+  await assert.rejects(a.api("/api/me/stats",undefined,auth),e=>e.status===403);
+  await a.action(code,"clear-testers");
+  assert.equal(a.app.store.matchesFor(room.players[1].uid).total,1);
+  assert.equal(a.app.store.statsFor(room.players[1].uid).fun.metrics.find(row=>row.id==="merlin_evade").count,1);
+  await assert.rejects(a.api("/api/me/matches",undefined,auth),e=>e.status===401);
+});
 test("管理写操作原因选填，保留状态冲突检查与概览身份隔离", async (t) => {
   const a = await setup(t);
   await a.login();

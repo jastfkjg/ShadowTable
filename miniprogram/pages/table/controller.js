@@ -7,7 +7,7 @@ function resultFlow(data) {
   const players = (room.players || []).filter(player => player.alive !== false);
   const actor = players.find(player => player.seat === data.resultActor);
   const target = players.find(player => player.seat === data.resultTarget);
-  const needsActor = !!(reason?.requiresTarget && room.knights && room.funSettlement);
+  const needsActor = !!(reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)));
   const steps = [{ id: "reason", label: "结束原因" }];
   if (needsActor) steps.push({ id: "actor", label: "实际带刀人" });
   if (reason?.requiresTarget) steps.push({ id: "target", label: "实际刺杀目标" });
@@ -24,7 +24,7 @@ function resultFlow(data) {
   const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。" : "仅保存胜负，不计积分；缺失的趣味结果保留未知。";
   return { resultSteps: steps, resultStep: current.id, resultStepIndex: index, resultStepTitle: current.label,
     resultNextEnabled: current.id === "reason" ? selected : current.id === "actor" ? actorValid : current.id === "target" ? targetValid : ready,
-    resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
+    resultNeedsActor: needsActor, resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
 }
 function roomListItems(rooms) {
   return rooms.map(r => {
@@ -1401,7 +1401,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   pickScoreTarget(e) {
     const seat = Number(e.currentTarget.dataset.seat), room = this.data.room;
     if (seat !== 0 && !room?.players?.some(player => player.seat === seat && player.alive !== false)) return;
-    if (room?.knights && this.data.resultActor === seat) return;
+    if ((room?.settlementRequiresActor ?? room?.knights) && this.data.resultActor === seat) return;
     this.setResultDraft({ resultTarget: seat });
   },
   pickFunActor(e) {
@@ -1417,7 +1417,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const reason = (scoring ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === this.data.resultReason);
     if (!this.data.resultDialog || this.data.resultStep !== "review" || !resultFlow(this.data).resultReady || (!choice && !reason) || this.data.busy || this.pending || this.resultConfirming) return;
     if (reason?.requiresTarget && !Number.isInteger(this.data.resultTarget)) return;
-    if (reason?.requiresTarget && room.knights && room.funSettlement && !Number.isInteger(this.data.resultActor)) return;
+    if (reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)) && !Number.isInteger(this.data.resultActor)) return;
     if (!room || room.stage !== this.resultStage) {
       this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" });
       return;
@@ -1425,7 +1425,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = this.data.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(room.knights && room.funSettlement ? { funActor: this.data.resultActor } : {}) } : {}) }
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? { funActor: this.data.resultActor } : {}) } : {}) }
       : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(this.data), stage = room.stage;
     this.resultConfirming = true;

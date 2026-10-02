@@ -363,6 +363,36 @@ test("空刀单列且不增加刺中梅林或歪刀；只归给实际带刀人",
     assert.equal(r.result.winner, alive ? "good" : "evil");
   }
 });
+test("测试和开发账号的骑士技能、终局趣味、积分与分享数据完整归档", () => {
+  const { presentStats, presentMatches } = require('../miniprogram/profile');
+  const { statsCard, funCard } = require('../miniprogram/share-card');
+  for(const prefix of ['dev:','test:']) for(const [role,metric] of [['gareth','knife_enemy'],['blueKnight','duel_enemy'],['blueHunter','gun_enemy']]) {
+    const uid=prefix+'actor',store=new Store(':memory:');
+    try {
+      const r=deal(true,uid);r.testRoom=true;
+      configure(r,{[uid]:role,'wx:2':'redSwordsman','wx:3':'merlin','wx:4':'percival'});
+      skills(r,{[uid]:role==='blueHunter'?'detonate:2':'target:2'});
+      const finalActor=role==='blueHunter'?'wx:5':uid;
+      finish(r,{scoreReason:'assassination',scoreTarget:3,funActor:role==='blueHunter'?5:1});
+      store.transaction(()=>store.save(r));store.transaction(()=>store.save(r));
+      const stats=store.statsFor(uid),history=store.matchesFor(uid);
+      assert.equal(stats.total,1);assert.equal(stats.score.games,1);
+      assert.equal(stats.fun.metrics.find(row=>row.id===metric).count,1);
+      assert.equal(store.funFor(finalActor).metrics.find(row=>row.id==='final_hit').count,1);
+      assert.equal(history.records[0].fun.status,'recorded');
+      assert.ok(history.records[0].fun.events.some(event=>event.label==='命中敌方'));
+      assert.ok(store.matchesFor(finalActor).records[0].fun.events.some(event=>event.label==='刺中梅林'));
+      assert.ok(publicView(store.get(r.code),uid).myFun.events.length);
+      assert.ok(presentStats(stats).fun.cards.length);
+      assert.equal(presentMatches(history.records)[0].hasFunEvents,true);
+      const board=new Leaderboard(store).read(uid,new URLSearchParams('metric=fun_'+metric+'&mode=knights&role='+role));
+      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,1);
+      assert.equal(store.matchesFor(uid,0,20,false,{metric,mode:'knights',role}).total,1);
+      assert.ok(statsCard(readProfile(store,uid),stats));
+      assert.ok(funCard(readProfile(store,uid),stats,'knights:'+metric.split('_')[0],metric));
+    }finally{store.close();}
+  }
+});
 test("十二骑士转阵营后按当前阵营记录，互刀同时计数，抽B不改写出刀角色", () => {
   const r = deal(true);
   configure(r, { "wx:1": "blueLancelot", "wx:2": "gaheris" });

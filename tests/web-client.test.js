@@ -1299,3 +1299,24 @@ test('网页分步结算保留返回草稿，取消终确认不提交，重复�
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(writes.length,1);assert.equal(writes[0].scoreReason,'early');assert.equal(writes[0].funActor,1);assert.equal(writes[0].scoreTarget,2);
 });
+
+test('网页按服务端刺客状态跳过带刀人，计分和不计分均可直接提交目标', async () => {
+  for (const scoring of [false, true]) {
+    const writes=[];
+    const c=client(async(url,options)=>{if(options.method==='POST')writes.push(JSON.parse(options.body));return response({});});
+    c.setRefresh(async()=>{});c.setConfirm(async()=>true);
+    const reason={id:'assassination',label:'三绿，已完成最终刺杀',requiresTarget:true};
+    c.state.room={code:'123456',stage:'flow',canUseTools:true,knights:{},settlementRequiresActor:false,scoreSettlement:scoring?[reason]:[],funSettlement:[reason],players:[{seat:1,name:'甲'},{seat:2,name:'乙'}]};
+    c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'assassination'}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'target');assert.equal(c.state.resultSteps.length,3);
+    c.ACTIONS.pickScoreTarget({dataset:{seat:1}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'review');assert.doesNotMatch(c.viewResultDialog(),/实际带刀人/);
+    await c.ACTIONS.saveResult();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(writes.length,1);assert.equal(writes[0][scoring?'scoreTarget':'funTarget'],1);assert.ok(!Object.hasOwn(writes[0],'funActor'));
+    c.state.room.settlementRequiresActor=true;delete c.state.room.knights;
+    c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'assassination'}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'actor');
+    c.ACTIONS.pickFunActor({dataset:{seat:1}});c.ACTIONS.nextResult();c.ACTIONS.pickScoreTarget({dataset:{seat:1}});
+    assert.equal(c.state.resultTarget,null);
+  }
+});

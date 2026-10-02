@@ -226,10 +226,17 @@ function createApp({
         const adminSession = admin.authenticate(req);
         const [, code, owner] = uid.split(":");
         check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
+        const ownDataRead = req.method === "GET" && [
+          "/api/me/profile", "/api/me/stats", "/api/me/matches",
+          "/api/me/score-adjustments", "/api/me/rooms", "/api/leaderboard",
+        ].includes(path);
+        const ownProfileWrite = req.method === "POST" && [
+          "/api/me/profile", "/api/me/leaderboard-visibility",
+        ].includes(path);
         check(
           path.startsWith(`/api/rooms/${code}/`) ||
-            path === `/api/rooms/${code}`,
-          "陪测账号只能访问绑定房间",
+            path === `/api/rooms/${code}` || ownDataRead || ownProfileWrite,
+          "陪测账号只能访问绑定房间、本人数据和排行榜",
           403,
         );
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);

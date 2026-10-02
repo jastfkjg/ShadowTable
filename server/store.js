@@ -74,11 +74,11 @@ class Store {
     this.transaction(() => {
       // A missing public ID marks legacy profiles that never saved a visibility choice.
       const initializePublicProfile = this.db.prepare("UPDATE profiles SET leaderboard_visible=1, public_id=? WHERE uid=?");
-      for (const row of this.db.prepare("SELECT uid FROM profiles WHERE public_id IS NULL AND (uid LIKE 'wx:%' OR uid LIKE 'dev:%')").all())
+      for (const row of this.db.prepare("SELECT uid FROM profiles WHERE public_id IS NULL AND (uid LIKE 'wx:%' OR uid LIKE 'dev:%' OR uid LIKE 'test:%')").all())
         initializePublicProfile.run(randomUUID(), row.uid);
       // Older archives may contain players who never saved personal details.
       for (const row of this.db.prepare(`SELECT DISTINCT p.uid FROM match_players p LEFT JOIN profiles f ON f.uid=p.uid
-        WHERE f.uid IS NULL AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%')`).all())
+        WHERE f.uid IS NULL AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%' OR p.uid LIKE 'test:%')`).all())
         this.initializeLeaderboardProfile(row.uid);
       this.restoreCompanionMatches();
       this.restoreFunRecords();
@@ -90,7 +90,7 @@ class Store {
     require("./retention").initialize(this);
   }
   restoreFunRecords() {
-    const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
+    const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='excluded' AND json_extract(m.snapshot,'$.excludedReason') IS NULL AND p.outcome IN ('win','loss')) OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
     for (const row of rows) {
       const match = JSON.parse(row.snapshot), players = this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(row.id).map(p => ({ uid: p.uid, ...JSON.parse(p.snapshot) }));
       // Only classical frozen identities and explicit terminal facts can be recovered.
@@ -165,7 +165,7 @@ class Store {
     else this.leaderboardRevision++;
   }
   initializeLeaderboardProfile(uid) {
-    if (!/^(wx|dev):/.test(uid)) return;
+    if (!/^(wx|dev|test):/.test(uid)) return;
     // Persist the default visibility and public ID without changing unsaved details
     // or overwriting an existing visibility choice, nickname, avatar or version.
     const result = this.db.prepare(`INSERT OR IGNORE INTO profiles(uid,nickname,version,updated,leaderboard_visible,public_id)

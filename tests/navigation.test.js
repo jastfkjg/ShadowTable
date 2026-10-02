@@ -902,3 +902,18 @@ test('小程序分步结算取消终确认保留摘要，改原因清除旧目�
   assert.match(p.data.resultNotice,/不计战绩及积分/);
   await p.saveResult();assert.equal(writes.length,1);assert.equal(writes[0].body.winner,null);
 });
+
+test('小程序按刺客状态跳过带刀步骤，无刺客板子仍要求选人且禁止自刀',async()=>{
+  for(const scoring of [false,true]){
+    const {p}=page('table',apiBase);const writes=[];p.cmd=(type,body)=>writes.push(body);p.confirm=async()=>true;
+    const reason={id:'assassination',label:'三绿，已完成最终刺杀',requiresTarget:true};
+    p.data.room={code:'123456',stage:'flow',canUseTools:true,knights:{},settlementRequiresActor:false,scoreSettlement:scoring?[reason]:[],funSettlement:[reason],players:[{seat:1,name:'甲'},{seat:2,name:'乙'}]};
+    const choose=(handler,dataset)=>p[handler]({currentTarget:{dataset}});
+    p.finishTools();choose('pickScoreReason',{id:'assassination'});p.nextResult();assert.equal(p.data.resultStep,'target');assert.equal(p.data.resultSteps.length,3);
+    choose('pickScoreTarget',{seat:1});p.nextResult();assert.equal(p.data.resultStep,'review');await p.saveResult();
+    assert.equal(writes.length,1);assert.equal(writes[0][scoring?'scoreTarget':'funTarget'],1);assert.ok(!Object.hasOwn(writes[0],'funActor'));
+    p.data.room.settlementRequiresActor=true;delete p.data.room.knights;
+    p.finishTools();choose('pickScoreReason',{id:'assassination'});p.nextResult();assert.equal(p.data.resultStep,'actor');
+    choose('pickFunActor',{seat:1});p.nextResult();choose('pickScoreTarget',{seat:1});assert.equal(p.data.resultTarget,null);assert.equal(p.data.resultNeedsActor,true);
+  }
+});

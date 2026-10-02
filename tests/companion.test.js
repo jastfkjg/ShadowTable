@@ -143,6 +143,9 @@ test("陪测账号经HTTP完成任务和刺杀，不替真人提交", async () =
         ...extra,
       });
     assert.equal((await view()).me.ready, false);
+    await command("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true });
+    await panel.refresh();
+    await panel.batch("ready");
     await command("ready", { ready: true });
     await command("start");
     await panel.refresh();
@@ -199,6 +202,21 @@ test("陪测账号经HTTP完成任务和刺杀，不替真人提交", async () =
     const matches = await a.request("/api/me/matches", host);
     assert.equal(matches.records[0].excludedReason, null);
     assert.ok(["win", "loss"].includes(matches.records[0].outcome));
+    for (const token of [host, ...panel.actors.map(actor => actor.token)]) {
+      const personal = await a.request("/api/me/stats", token);
+      const history = await a.request("/api/me/matches?scored=1", token);
+      assert.equal(personal.total, 1);
+      assert.equal(personal.score.games, 1);
+      assert.equal(history.total, 1);
+      assert.equal(history.records[0].fun.status, "recorded");
+      assert.equal(history.records[0].score.status, "scored");
+      assert.equal((await a.request("/api/leaderboard?metric=points", token)).me.status, "ranked");
+      for (const metric of personal.fun.metrics.filter(row => row.ranked && row.count > 0)) {
+        const board = await a.request("/api/leaderboard?metric=fun_" + metric.id, token);
+        assert.equal(board.me.status, "ranked");
+        assert.equal(board.me.count, metric.count);
+      }
+    }
     await command("rematch");
     await panel.refresh();
     assert.ok(panel.actors.every((p) => !p.secret && !p.room.me.ready));

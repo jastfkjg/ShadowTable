@@ -21,7 +21,7 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
-test('未保存资料的微信和开发账号首局自动公开，五榜无需切换开关且不公开牌桌昵称', () => {
+test('未保存资料的微信、开发和陪测账号首局自动公开，五榜无需切换开关且不公开牌桌昵称', () => {
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store), uids=['wx:new','dev:new','guest:new','test:new'];
@@ -35,9 +35,9 @@ test('未保存资料的微信和开发账号首局自动公开，五榜无需�
     }));
     assert.deepEqual(readProfile(store,'wx:new'),original);
     const ids=new Map();
-    for(const metric of ['points','games','overall','good','evil']) for(const uid of uids.slice(0,2)) {
+    for(const metric of ['points','games','overall','good','evil']) for(const uid of uids.filter(uid=>!uid.startsWith('guest:'))) {
       const result=query(board,uid,'metric='+metric);
-      assert.equal(result.eligibleCount,2);
+      assert.equal(result.eligibleCount,3);
       assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
       const own=result.rows.find(row=>row.isSelf);
       assert.ok(own);assert.equal(own.nickname,'新朋友');assert.match(own.publicId,/^[\da-f-]{36}$/);
@@ -47,11 +47,11 @@ test('未保存资料的微信和开发账号首局自动公开，五榜无需�
     }
     assert.notEqual(query(board,'wx:new').version,empty.version);
     assert.equal(query(board,'guest:new').me.status,'unsupported');
-    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,2);
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,3);
     profile(store,'wx:new',false);
     games(store,'wx:new',1,1);
     assert.equal(query(board,'wx:new').me.status,'hidden');
-    assert.equal(query(board,'dev:new').eligibleCount,1);
+    assert.equal(query(board,'dev:new').eligibleCount,2);
   } finally {store.close();}
 });
 test('默认公开资料与战绩同事务回滚，重复归档不改变公开ID或榜单缓存', () => {
@@ -80,11 +80,11 @@ test('重启补齐已有战绩但无资料的账号，保留主动隐藏设置�
     profile(store,'wx:hidden',false);
     for(const uid of ['wx:missing','dev:missing','guest:missing','test:missing','wx:hidden']) games(store,uid,1,1);
     // Reproduce databases written before archives initialized public profiles.
-    store.db.prepare("DELETE FROM profiles WHERE uid IN ('wx:missing','dev:missing')").run();
+    store.db.prepare("DELETE FROM profiles WHERE uid IN ('wx:missing','dev:missing','test:missing')").run();
     const hidden=store.db.prepare("SELECT * FROM profiles WHERE uid='wx:hidden'").get();
     store.close();store=new Store(path);
     const first=query(new Leaderboard(store),'wx:missing');
-    assert.equal(first.me.rank,1);assert.equal(first.rows.length,2);
+    assert.equal(first.me.rank,1);assert.equal(first.rows.length,3);
     assert.equal(first.rows[0].nickname,'新朋友');
     assert.equal(readProfile(store,'wx:missing').version,0);
     assert.equal(readProfile(store,'wx:hidden').leaderboardVisible,false);
@@ -92,10 +92,10 @@ test('重启补齐已有战绩但无资料的账号，保留主动隐藏设置�
     const ids=first.rows.map(row=>row.publicId);
     store.close();store=new Store(path);
     assert.deepEqual(query(new Leaderboard(store),'wx:missing').rows.map(row=>row.publicId),ids);
-    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,3);
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,4);
   } finally {store?.close();rmSync(dir,{recursive:true,force:true});}
 });
-test('开发账号默认公开并参与四榜，关闭后隐藏；游客和陪测账号仍不能公开', () => {
+test('开发账号默认公开并参与四榜，关闭后隐藏；游客仍不能公开', () => {
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store);
@@ -111,10 +111,8 @@ test('开发账号默认公开并参与四榜，关闭后隐藏；游客和陪�
     profile(store,'dev:me',false);
     assert.equal(query(board,'dev:me').rows.length,0);
     assert.equal(query(board,'dev:me').me.total,2);
-    for(const uid of ['guest:me','test:me']) {
-      assert.equal(readProfile(store,uid).leaderboardVisible,false);
-      assert.throws(()=>profile(store,uid,true),/微信或开发账号/);
-    }
+    assert.equal(readProfile(store,'guest:me').leaderboardVisible,false);
+    assert.throws(()=>profile(store,'guest:me',true),/微信、开发或陪测账号/);
   } finally {store.close();}
 });
 test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来源和门槛一致；隐藏及游客不公开', () => {

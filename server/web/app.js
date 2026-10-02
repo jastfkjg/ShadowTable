@@ -933,7 +933,7 @@
     return html;
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，十二骑士还需登记实际带刀人。非梅林好人挡刀会记录次数及成功率，分母是作为在场非梅林好人面对最终非空刀的局数。缺失过程保留未知。趣味排行跨板子汇总，横栏可左右滑动切换指标，只公开正向指标；成功率需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。非梅林好人挡刀会记录次数及成功率，分母是作为在场非梅林好人面对最终非空刀的局数。缺失过程保留未知。趣味排行跨板子汇总，横栏可左右滑动切换指标，只公开正向指标；成功率需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1557,7 +1557,7 @@ function roomListItems(rooms) {
     const players = (room.players || []).filter(player => player.alive !== false);
     const actor = players.find(player => player.seat === data.resultActor);
     const target = players.find(player => player.seat === data.resultTarget);
-    const needsActor = !!(reason?.requiresTarget && room.knights && room.funSettlement);
+    const needsActor = !!(reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)));
     const steps = [{ id: "reason", label: "结束原因" }];
     if (needsActor) steps.push({ id: "actor", label: "实际带刀人" });
     if (reason?.requiresTarget) steps.push({ id: "target", label: "实际刺杀目标" });
@@ -1574,7 +1574,7 @@ function roomListItems(rooms) {
     const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。" : "仅保存胜负，不计积分；缺失的趣味结果保留未知。";
     return { resultSteps: steps, resultStep: current.id, resultStepIndex: index, resultStepTitle: current.label,
       resultNextEnabled: current.id === "reason" ? selected : current.id === "actor" ? actorValid : current.id === "target" ? targetValid : ready,
-      resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
+      resultNeedsActor: needsActor, resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
   }
 
   function updateResult(patch) {
@@ -1593,14 +1593,14 @@ function roomListItems(rooms) {
     const reason = (scoring ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === state.resultReason);
     if (!state.resultDialog || state.resultStep !== "review" || !resultFlow(state).resultReady || (!choice && !reason) || state.busy || pending || resultConfirming) return;
     if (reason?.requiresTarget && !Number.isInteger(state.resultTarget)) return;
-    if (reason?.requiresTarget && room.knights && room.funSettlement && !Number.isInteger(state.resultActor)) return;
+    if (reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)) && !Number.isInteger(state.resultActor)) return;
     if (!room || room.stage !== resultStage) {
       setState({ resultDialog: false, error: "阶段已变化，请重新登记胜负" }); return;
     }
     var option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = state.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(room.knights && room.funSettlement ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(state), stage = room.stage;
     resultConfirming = true;
     try {
@@ -1637,7 +1637,7 @@ function roomListItems(rooms) {
       if (reasons.length) html += '<button class="disclosure-button score-other-toggle" data-action="toggleResultOther" aria-expanded="' + !!state.resultOther + '">其他登记方式 <span>' + (state.resultOther ? '收起' : '展开') + '</span></button>';
       if (state.resultOther || !reasons.length) html += '<div class="result-options"><p class="small muted">信息不完整时可仅登记胜方；不确定胜负时选“不计战绩”。以下选项不计积分。</p>' + (room.winnerOptions || []).concat([{value:'none',label:'不计战绩'}]).map(option => '<button class="secondary '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+(option.value==='none'?'':'仅登记胜方 · ')+esc(option.label)+'</button>').join('')+'</div>';
     } else if (step === 'actor' || step === 'target') {
-      html += '<p class="small muted">' + (step === 'actor' ? '选择线下实际执行最终刺杀的玩家。' : '选择线下实际刺杀的目标；未指定目标请选择空刀。') + '</p><div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && room.knights && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
+      html += '<p class="small muted">' + (step === 'actor' ? '选择线下实际执行最终刺杀的玩家。' : '选择线下实际刺杀的目标；未指定目标请选择空刀。') + '</p><div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && (room.settlementRequiresActor ?? room.knights) && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
     } else {
       html += '<div class="result-review">' + flow.resultSummary.map(row => '<div class="result-review-row"><span class="small muted">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('') + '</div><p class="result-review-note">'+esc(flow.resultNotice)+'</p>' + (room.hasActiveOperation ? '<p class="result-warning">当前未结算的操作将作废。</p>' : '');
     }
@@ -4286,7 +4286,7 @@ function roomListItems(rooms) {
     pickScoreTarget: el => {
       const seat=Number(el.dataset.seat);
       if (seat!==0 && !state.room?.players?.some(player=>player.seat===seat && player.alive!==false)) return;
-      if (state.room?.knights && state.resultActor===seat) return;
+      if ((state.room?.settlementRequiresActor ?? state.room?.knights) && state.resultActor===seat) return;
       updateResult({resultTarget:seat});
     },
     scoreRecords: function () { return navigate('matches?scored=1'); },

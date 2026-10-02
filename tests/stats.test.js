@@ -157,6 +157,45 @@ test('旧陪测归档启动时补算，保留未判胜负和身份不完整局�
     store.close();store=new Store(path);verify();
   } finally {store.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('旧测试局恢复战绩时同步恢复趣味记录，已恢复胜负的旧数据也修复，重启不重复', () => {
+  const dir=mkdtempSync(join(tmpdir(),'shadowtable-test-fun-')),path=join(dir,'db.sqlite');
+  let store=new Store(path);
+  try {
+    const rooms=[];
+    for(const alreadyRestored of [false,true]) {
+      const r=deal('classic',6,'test:');r.testRoom=true;
+      r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
+      r.fun.initialRoles={...r.roles};
+      run(r,'finishTools',{funReason:'assassination',funTarget:3});
+      r.matchRecord.excludedReason='测试局';r.matchRecord.players.forEach(p=>p.outcome='excluded');
+      store.save(r);rooms.push(r);
+      if(alreadyRestored) {
+        store.db.prepare("UPDATE matches SET snapshot=json_set(snapshot,'$.excludedReason',NULL) WHERE id=?").run(r.matchId);
+        store.db.prepare("UPDATE match_players SET outcome=CASE WHEN faction='good' THEN 'win' ELSE 'loss' END,snapshot=json_set(snapshot,'$.outcome',CASE WHEN faction='good' THEN 'win' ELSE 'loss' END) WHERE match_id=?").run(r.matchId);
+      }
+    }
+    const unknown=deal('classic',6,'test:');unknown.testRoom=true;finish(store,unknown);
+    const terminated=deal('classic',6,'test:');run(terminated,'terminate');store.save(terminated);
+    store.close();store=new Store(path);
+    const verify=()=>{
+      const stats=store.statsFor('test:3');assert.equal(stats.total,3);assert.equal(stats.excluded,1);
+      const shield=stats.fun.metrics.find(row=>row.id==='good_shield');
+      assert.equal(shield.count,2);assert.equal(shield.knownGames,2);
+      for(const r of rooms) {
+        const record=store.matchesFor('test:3').records.find(record=>record.id===r.matchId);
+        assert.equal(record.fun.status,'recorded');assert.equal(record.excludedReason,null);
+        assert.ok(record.fun.events.some(event=>event.label==='成功挡刀'));
+      }
+      assert.equal(store.matchesFor('test:3',0,20,false,{metric:'good_shield',mode:'classic'}).total,2);
+      const board=new Leaderboard(store).read('test:3',new URLSearchParams('metric=fun_good_shield'));
+      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,2);
+      assert.equal(store.matchesFor('test:3').records.find(record=>record.id===unknown.matchId).fun.status,'partial');
+      assert.equal(store.matchesFor('test:3').records.find(record=>record.id===terminated.matchId).fun.status,'excluded');
+    };
+    verify();rooms.forEach(room=>store.save(room));verify();
+    store.remove(rooms[0].code);store.close();store=new Store(path);verify();
+  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
+});
 test('胜方受板子及房主权限约束，第三阵营与系统判定来源正确', () => {
   const store = new Store(':memory:');
   try {
