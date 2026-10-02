@@ -6,6 +6,7 @@
     <view wx:if="{{tab!=='fun'}}" class="stats-overview" aria-label="总战绩">
       <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">总胜场数</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
     </view>
+    <button wx:if="{{tab!=='fun' && stats.total}}" class="stats-share" bindtap="shareStats" disabled="{{loading || error}}" hover-class="none">分享战绩图片</button>
     <view class="stats-tabs" aria-label="战绩分类"><button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}">胜负积分</button><button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}">趣味记录</button></view>
     <block wx:if="{{tab!=='fun'}}">
     <view class="stats-points">
@@ -40,6 +41,7 @@
         <view wx:if="{{funRulesExpanded && (card.id==='classic:shield' || card.id==='knights:shield' || card.id==='other:shield')}}" class="small muted">挡刀率以终局时作为在场非梅林好人、面对最终非空刀的局数为分母。</view>
         <view wx:if="{{funRulesExpanded && card.aimLabel}}" class="small muted">{{card.aimLabel}}；选中敌方但被挡下仍计未生效。</view>
         <view class="small muted">{{card.coverage}}</view>
+        <button wx:if="{{card.shareMetric}}" class="fun-share" bindtap="shareFun" data-card="{{card.id}}" disabled="{{loading || error}}" hover-class="none">分享{{card.shareLabel}}图片</button>
         <block wx:if="{{card.isCombat && card.roles.length}}"><button hover-class="none" class="disclosure-button fun-role-toggle" bindtap="toggleFunRoles" data-id="{{card.id}}" aria-expanded="{{funRoles[card.id]}}">按出刀角色查看 {{funRoles[card.id]?'⌄':'›'}}</button><view wx:if="{{funRoles[card.id]}}" class="fun-roles"><navigator wx:for="{{card.roles}}" wx:for-item="role" wx:key="role" url="{{role.url}}" class="fun-role" hover-class="fun-pressed"><view>{{role.label}} ›</view><view class="small muted">{{role.value===null?"尚无完整记录":"敌方 "+role.countLabel+" · 同伴 "+role.ally+" · 未生效 "+role.failed+" / "+role.opportunities+" 次"}}</view></navigator></view></block>
       </view>
       <button wx:if="{{stats.fun.cards.length > 3}}" class="disclosure-button secondary fun-more" bindtap="toggleFunCards" aria-expanded="{{funExpanded}}" hover-class="none">{{funExpanded?'收起更多记录':'查看其余 '+(stats.fun.cards.length-3)+' 项趣味记录'}}</button>

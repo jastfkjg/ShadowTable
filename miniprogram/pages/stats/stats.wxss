@@ -1,4 +1,6 @@
 .stats-page { padding-top: 26rpx; }
+button.stats-share { width: 100%; min-height: 48px; margin: 12rpx 0 0; padding: 12rpx 20rpx; font-size: 28rpx; color: var(--accent); }
+button.fun-share { width: auto; min-height: 48px; margin: 12rpx 0 0; padding: 12rpx 0; justify-content: flex-start; font-size: 26rpx; color: var(--accent); }
 .stats-overview { border-radius: 24rpx; background: var(--surface); padding: 8rpx 28rpx 12rpx; }
 .stats-overview .personal-metrics { padding: 20rpx 0; gap: 12rpx; }
 .stats-overview .metric-value { font-size: 44rpx; line-height: 1.35; }

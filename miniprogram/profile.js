@@ -43,7 +43,7 @@ function presentFun(value) {
       ally: metrics.find(row => row.id.endsWith("ally"))?.byRole.find(row => row.role === role.role)?.count || 0,
       failed: metrics.find(row => row.id.endsWith("failed"))?.byRole.find(row => row.role === role.role)?.count || 0,
       url: primary ? primary.url + "&role=" + role.role : "" }));
-    return { ...card, metrics, roles, isCombat: ["knife","gun","duel"].some(group => card.id.endsWith(":"+group)),
+    return { ...card, metrics, roles, shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat: ["knife","gun","duel"].some(group => card.id.endsWith(":"+group)),
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
   });

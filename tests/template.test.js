@@ -43,6 +43,20 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test('图片预览准备完成后才能发送或保存；不支持发送与相册拒绝均有明确出口', () => {
+  const renderShare=factory('pages/share/share.wxml');
+  const loading=renderShare({loading:true,imageMenu:true,imagePath:''});
+  assert.equal(byHandler(loading,'send').attr.disabled,true);assert.equal(byHandler(loading,'save').attr.disabled,true);
+  const ready=renderShare({loading:false,rendering:false,acting:false,imagePath:'wxfile://preview',description:'小林，62.5%胜率',imageMenu:true});
+  assert.equal(byHandler(ready,'send').attr.disabled,false);
+  assert.equal(nodes(ready).find(node=>node.tag==='wx-image').attr.src,'wxfile://preview');
+  assert.match(byHandler(ready,'preview').attr.ariaLabel,/小林，62.5%胜率/);
+  assert.ok(!nodes(ready).some(node=>node.attr?.openType==='share'));
+  const fallback=renderShare({imagePath:'wxfile://preview',imageMenu:false,actionError:'需要相册权限',albumDenied:true});
+  assert.equal(byHandler(fallback,'send'),undefined);assert.ok(byHandler(fallback,'save'));assert.ok(byHandler(fallback,'openAlbumSettings'));
+  const unknown=renderShare({leaderboard:true,canShareMine:false,canShareTop:true,mode:'top',imagePath:'wxfile://preview',imageMenu:true});
+  assert.equal(nodes(unknown).find(node=>node.attr?.['data-mode']==='mine').attr.disabled,true);
+});
 test('趣味指标全部以横向滚动按钮呈现，不再弹出玩法或指标选择器', () => {
   const defs=require('../server/fun').publicMetrics();
   const tree=factory('pages/leaderboard/leaderboard.wxml')({

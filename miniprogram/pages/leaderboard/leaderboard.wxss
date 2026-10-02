@@ -1,4 +1,5 @@
 .leaderboard-page { padding-top: 16rpx; padding-bottom: calc(180rpx + env(safe-area-inset-bottom)); }
+button.rank-share { width: 100%; min-height: 48px; margin: 0 0 12rpx; padding: 12rpx; color: var(--accent); font-size: 28rpx; }
 .rank-period { display: flex; gap: 8rpx; padding: 6rpx; background: var(--surface); border-radius: 20rpx; }
 .rank-period button { flex: 1 1 0%; width: 0; min-width: 0; margin: 0; min-height: 48px; padding: 12rpx; color: var(--muted); }
 .rank-period button.selected { color: var(--text); background: var(--bg); }

@@ -34,6 +34,21 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+test('分享入口只传内容选择，拦截旧预览和读取失败，不传个人成绩或内部标识', () => {
+  const {p,navigations}=page('stats',apiBase);
+  p.setData({loading:true,stats:{total:10}});p.shareStats();assert.equal(navigations.length,0);
+  p.setData({loading:false,error:'网络错误'});p.shareStats();assert.equal(navigations.length,0);
+  p.setData({error:'',stats:{total:10,fun:{cards:[{id:'classic:merlin',shareMetric:'merlin_evade'}]}}});
+  p.shareStats();p.shareFun({currentTarget:{dataset:{card:'classic:merlin'}}});
+  assert.equal(navigations[0],'/pages/share/share?kind=stats');
+  const query=new URL('https://example.test'+navigations[1]).searchParams;
+  assert.equal(query.get('card'),'classic:merlin');assert.equal(query.get('metric'),'merlin_evade');
+  const ranking=page('leaderboard',apiBase);
+  ranking.p.setData({loading:false,board:{rows:[{}],metric:'fun_knife_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
+  ranking.p.shareLeaderboard();
+  assert.equal(ranking.navigations[0],'/pages/share/share?kind=leaderboard&metric=fun_knife_enemy&period=month&mode=knights&sort=rate&role=gareth');
+  ranking.p.setData({visibilitySaving:true});ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
+});
 test('小程序本人积分调整独立分页，失败保留记录可重试，读取期间不混合筛选，卸载丢弃旧响应',async()=>{
   const ledger={id:'a',created:1,delta:-3,beforePoints:5,afterPoints:2,reason:'现场修正'};
   let reads=0,finish;

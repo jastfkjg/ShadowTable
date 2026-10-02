@@ -5,6 +5,7 @@
     "pages/profile/profile",
     "pages/stats/stats",
     "pages/leaderboard/leaderboard",
+    "pages/share/share",
     "pages/matches/matches",
     "pages/table/table",
     "pages/settings/settings",

@@ -1,10 +1,15 @@
 const api = require("../../api");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
 const { backToMe } = require("../../profile");
+const { boardSelection, queryString } = require("../../share-card");
 Page({
   data: { mineExpanded: false, rulesExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funActiveId: "", funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, visible: false, visibilitySaving: false, visibilityError: "" },
   onLoad() { this.alive = true; },
   onShow() { return this.load(); },
+  shareLeaderboard() {
+    if (!this.data.board || this.data.loading || this.data.loadingMore || this.data.error || this.data.visibilitySaving || !this.data.board.rows.length) return;
+    wx.navigateTo({ url: "/pages/share/share?" + queryString(boardSelection(this.data.board)) });
+  },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; },
   async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },
   async load(more = false, selection = {}) {
