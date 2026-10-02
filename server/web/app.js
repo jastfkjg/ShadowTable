@@ -2216,6 +2216,7 @@ function roomListItems(rooms) {
       boardId: "",
       visible: false,
       fairyEnabled: false,
+      scoreEnabled: false,
       dirty: false,
       pendingKick: !!settingsKickPending && settingsKickPending.code === roomCode,
       pendingSave: !!settingsSavePending && settingsSavePending.code === roomCode,
@@ -2279,6 +2280,7 @@ function roomListItems(rooms) {
         boardId: room.board,
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
+        scoreEnabled: room.scoreSettings?.enabled === true,
         dirty: false,
       });
       updateSettingsChoices(room.capacity, room.board);
@@ -2301,6 +2303,7 @@ function roomListItems(rooms) {
     if (!selected) return;
     setSettings({
       fairyEnabled: capacity !== s.capacity ? capacity >= 8 : s.fairyEnabled,
+      scoreEnabled: capacity !== s.capacity && s.room?.scoreSettings ? capacity >= s.room.scoreSettings.defaultEnabledMinPlayers : s.scoreEnabled,
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
@@ -2315,6 +2318,7 @@ function roomListItems(rooms) {
       dirty:
         !!r &&
         (s.fairyEnabled !== (r.fairyEnabled === true) ||
+          !!r.scoreSettings && s.scoreEnabled !== r.scoreSettings.enabled ||
           s.capacity !== r.capacity ||
           s.boardId !== r.board ||
           s.visible !== (["knights", "knights-10", "knights-11", "knights-13"].includes(r.board) && r.showSkillDetails === true)),
@@ -2331,6 +2335,7 @@ function roomListItems(rooms) {
       settingsSavePending = { id: requestId(), code: roomCode, data: {
         type: "updateSettings", stage: settingsOriginal.stage,
         board: s.boardId, capacity: s.capacity, visible: s.visible, fairyEnabled: s.fairyEnabled,
+        ...(settingsOriginal.scoreSettings ? { scoreEnabled: s.scoreEnabled } : {}),
       } };
     }
     var saved = settingsSavePending;
@@ -2383,7 +2388,7 @@ function roomListItems(rooms) {
     var s = state.settings;
     var requestData = settingsKickPending;
     if (!s || s.busy || !requestData || requestData.code !== roomCode) return;
-    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled } : null;
+    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled, scoreEnabled: s.scoreEnabled } : null;
     setSettings({ busy: true, pendingKick: true, error: "" });
     try {
       await login();
@@ -2395,7 +2400,7 @@ function roomListItems(rooms) {
       if (state.settings === s && s.authorized && draft) {
         setSettings({ visible: draft.visible });
         updateSettingsChoices(draft.capacity, draft.boardId);
-        setSettings({ fairyEnabled: draft.fairyEnabled });
+        setSettings({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled });
         updateSettingsDirty();
       }
       if (foreground) toast("玩家已移出");
@@ -3042,6 +3047,7 @@ function roomListItems(rooms) {
       resultHtml += '</div>';
     }
     html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
+    if (r.scoreSettings) html += '<div class="small muted">' + esc(r.scoreNotice || (r.scoreSettings.enabled ? '本局计分已开启' : '本局计分已关闭')) + '</div>';
     if (r.phase === "lobby") {
       html +=
         '<div class="panel"><span class="muted small">' +
@@ -3362,6 +3368,12 @@ function roomListItems(rooms) {
           "</span></div>";
       }
       html += "</div>";
+      if (room.scoreSettings) html += '<div class="settings-section-title">积分</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>本局计分</span><span class="settings-caption">' +
+        (s.scoreEnabled ? '已开启' : '已关闭') + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
+        '</span></span><input type="checkbox" aria-label="本局计分" data-change="settingsScoring"' + (s.scoreEnabled ? ' checked' : '') +
+        (settingsLocked() || !room.scoreSettings.editable ? ' disabled' : '') + ' /></label></div><div class="settings-help">' +
+        room.scoreSettings.defaultEnabledMinPlayers + '人及以上默认开启，其他默认关闭。更换人数会重设默认值。</div>' +
+        (room.scoreSettings.unavailableReason ? '<div class="settings-help">' + esc(room.scoreSettings.unavailableReason) + '，开启开关也不计积分。</div>' : '');
       html += '<div class="settings-section-title">湖中仙女</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>启用湖中仙女</span><span class="settings-caption">' +
         (s.capacity < 7 ? "5、6人局不支持" : s.fairyEnabled ? "持有者对所有玩家公开" : "本房间不使用仙女查验") +
         '</span></span><input type="checkbox" aria-label="启用湖中仙女" data-change="settingsFairy"' +
@@ -3937,6 +3949,13 @@ function roomListItems(rooms) {
       var s = state.settings;
       if (settingsLocked() || s.capacity < 7 || s.room.phase === "fairy") return;
       setSettings({ fairyEnabled: el.checked });
+      updateSettingsDirty();
+      return settingsSave();
+    },
+    settingsScoring: function (el) {
+      const s = state.settings;
+      if (settingsLocked() || !s.room?.scoreSettings?.editable) return;
+      setSettings({ scoreEnabled: el.checked });
       updateSettingsDirty();
       return settingsSave();
     },

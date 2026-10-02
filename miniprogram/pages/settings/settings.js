@@ -16,6 +16,7 @@ Page({
     capacity: 0,
     visible: false,
     fairyEnabled: false,
+    scoreEnabled: false,
     dirty: false,
     transferPlayers: [],
     showTransferPicker: false,
@@ -72,6 +73,7 @@ Page({
         boardId: room.board,
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
+        scoreEnabled: room.scoreSettings?.enabled === true,
         dirty: false,
       });
       this.updateChoices(room.capacity, room.board);
@@ -89,6 +91,8 @@ Page({
     const selected = choices.find((b) => b.id === boardId) || choices[0];
     this.setData({
       fairyEnabled: capacity !== this.data.capacity ? capacity >= 8 : this.data.fairyEnabled,
+      scoreEnabled: capacity !== this.data.capacity && this.data.room?.scoreSettings
+        ? capacity >= this.data.room.scoreSettings.defaultEnabledMinPlayers : this.data.scoreEnabled,
       capacity,
       boardId: selected.id,
       choices,
@@ -104,6 +108,7 @@ Page({
       dirty:
         !!r &&
         (this.data.fairyEnabled !== (r.fairyEnabled === true) ||
+          !!r.scoreSettings && this.data.scoreEnabled !== r.scoreSettings.enabled ||
           this.data.capacity !== r.capacity ||
           this.data.boardId !== r.board ||
           this.data.visible !==
@@ -137,6 +142,12 @@ Page({
     this.updateDirty();
     return this.save();
   },
+  toggleScoring(e) {
+    if (this.settingsLocked() || !this.data.room?.scoreSettings?.editable) return;
+    this.setData({ scoreEnabled: e.detail.value });
+    this.updateDirty();
+    return this.save();
+  },
   toggleVisibility(e) {
     if (this.settingsLocked()) return;
     this.setData({ visible: e.detail.value });
@@ -163,6 +174,7 @@ Page({
         capacity: this.data.capacity,
         visible: this.data.visible,
         fairyEnabled: this.data.fairyEnabled,
+        ...(this.original.scoreSettings ? { scoreEnabled: this.data.scoreEnabled } : {}),
       },
     };
     return this.sendPending();
@@ -335,7 +347,8 @@ Page({
           capacity: this.data.capacity,
           boardId: this.data.boardId,
           visible: this.data.visible,
-        fairyEnabled: this.data.fairyEnabled,
+          fairyEnabled: this.data.fairyEnabled,
+          scoreEnabled: this.data.scoreEnabled,
         }
       : null;
     this.setData({ busy: true, error: "", pendingKick: true });
@@ -354,7 +367,7 @@ Page({
       if (this.data.authorized && draft) {
         this.setData({ visible: draft.visible });
         this.updateChoices(draft.capacity, draft.boardId);
-        this.setData({ fairyEnabled: draft.fairyEnabled });
+        this.setData({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled });
         this.updateDirty();
       }
       if (this.foreground && this.data.authorized)

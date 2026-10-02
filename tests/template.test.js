@@ -37,6 +37,12 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{
+  const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
+  const ended=render({...base,room});assert.match(JSON.stringify(ended),/本局 \+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);
+  room.myScore={status:'excluded',reason:'本局未开启计分'};assert.match(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
+  room.phase='lobby';assert.doesNotMatch(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
+});
 test("座位头像固定占位且失败回退，保留座位按钮和全部公开状态", () => {
   const room = { phase: "proposal", flexible: false, leader: 1, fairyHolder: 1, capacity: 6, me: { seat: 1 } };
   const seat = { seat: 1, name: "甲", occupied: true, mine: true, host: true, alive: false, selected: true,

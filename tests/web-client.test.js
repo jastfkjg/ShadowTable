@@ -591,6 +591,24 @@ test("网页普通玩家看到湖仙座位标记，传递刷新后移动，关�
   assert.doesNotMatch(c.viewRoom(), /seat-fairy/);
 });
 
+test('网页房主计分开关自动保存，人数默认值及发牌锁定与服务端一致',async()=>{
+  const room=newRoom('123456','host','房主','classic',6),writes=[];
+  const c=client(async(path,options)=>{
+    if(options?.method==='POST'){const data=JSON.parse(options.body);writes.push(data);command(room,'host',data);return response({accepted:true});}
+    return response(path==='/api/boards'?{boards:BOARDS}:publicView(room,'host'));
+  });
+  c.state.showRoomSettings=true;c.state.settings={busy:false};await c.loadSettings();
+  assert.equal(c.state.settings.scoreEnabled,false);assert.match(c.viewSettingsDialog(),/aria-label="本局计分"/);
+  await c.CHANGES.settingsScoring({checked:true});assert.equal(room.scoreEnabled,true);assert.equal(writes[0].scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'12'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsScoring({checked:false});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsCapacity({value:'10'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'6'});assert.equal(room.scoreEnabled,false);
+  for(let i=2;i<=6;i++)enter(room,'p'+i,'玩家'+i);room.players.forEach(p=>p.ready=true);
+  command(room,'host',{type:'start',stage:room.stage,flexible:true});await c.loadSettings();const count=writes.length;
+  assert.match(c.viewSettingsDialog(),/data-change="settingsScoring" disabled/);
+  await c.CHANGES.settingsScoring({checked:true});assert.equal(writes.length,count);assert.equal(room.scoreEnabled,false);
+});
 test("网页人数、板子及开关更改即保存，成功后保留表单且无底部保存按钮", async () => {
   const r = newRoom("123456", "host", "房主", "classic", 7);
   const writes = [];

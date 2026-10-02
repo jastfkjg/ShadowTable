@@ -21,6 +21,15 @@
       </picker>
       <view wx:else class="settings-row"><text>板子</text><text class="muted settings-value">{{room.boardName}}</text></view>
     </view>
+    <block wx:if="{{room.scoreSettings}}">
+      <view class="settings-section-title">积分</view>
+      <view class="settings-section"><view class="settings-row">
+        <view><view>本局计分</view><view class="settings-caption">{{scoreEnabled?'已开启':'已关闭'}} · {{room.scoreSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
+        <switch checked="{{scoreEnabled}}" bindchange="toggleScoring" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.scoreSettings.editable}}" aria-label="本局计分" />
+      </view></view>
+      <view class="settings-help">{{room.scoreSettings.defaultEnabledMinPlayers}}人及以上默认开启，其他默认关闭。更换人数会重设默认值。</view>
+      <view wx:if="{{room.scoreSettings.unavailableReason}}" class="settings-help">{{room.scoreSettings.unavailableReason}}，开启开关也不计积分。</view>
+    </block>
     <view class="settings-section-title">湖中仙女</view>
     <view class="settings-section">
       <view class="settings-row">

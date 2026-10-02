@@ -82,6 +82,7 @@ function actionDetails(room, uid, type, input) {
     "revision",
     "winner",
     "scoreReason",
+    "scoreEnabled",
     "scoreTarget",
   ])
     if (input[field] !== undefined) details.parameters[field] = input[field];

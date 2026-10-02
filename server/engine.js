@@ -199,6 +199,7 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     host: uid,
     board: boardId,
     capacity,
+    scoreEnabled: scoring.defaultEnabled(capacity),
     fairyEnabled: capacity >= 8,
     phase: "lobby",
     stage: randomUUID(),
@@ -399,6 +400,7 @@ function start(room, flexible = false) {
   room.game++;
   room.matchId = randomUUID();
   room.startedAt = Date.now();
+  room.scoreEnabled = scoring.enabled(room);
   room.scorePolicy = scoring.policy();
   room.scoringFacts = null;
   delete room.matchRecord;
@@ -1169,7 +1171,8 @@ function publicView(room, uid) {
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
     scoreSettlement: scoring.settlementOptions(room),
-    scoreNotice: scoring.exclusion(room),
+    scoreSettings: scoring.settings(room),
+    scoreNotice: room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     canKick:
       room.host === uid &&
@@ -1323,6 +1326,15 @@ function applyCommand(room, uid, input) {
           next.players.forEach((player) => (player.ready = false));
           stage(next, "lobby");
         }
+      }
+    }
+    if (input.scoreEnabled !== undefined) {
+      requireRule(typeof input.scoreEnabled === "boolean", "计分设置无效");
+      if (input.scoreEnabled !== scoring.enabled(next)) {
+        requireRule(next.phase === "lobby", "计分开关只能在发牌前修改", 409);
+        next.scoreEnabled = input.scoreEnabled;
+        next.players.forEach(player => (player.ready = false));
+        stage(next, "lobby");
       }
     }
     Object.assign(room, next);
@@ -1539,7 +1551,10 @@ function applyCommand(room, uid, input) {
       room.players.every((p) => p.seat <= input.capacity),
       "请先让超出新人数的玩家换座或离开",
     );
-    if (room.capacity !== input.capacity) room.fairyEnabled = input.capacity >= 8;
+    if (room.capacity !== input.capacity) {
+      room.fairyEnabled = input.capacity >= 8;
+      room.scoreEnabled = scoring.defaultEnabled(input.capacity);
+    }
     room.board = input.board;
     room.capacity = input.capacity;
     room.players.forEach((p) => (p.ready = false));
@@ -1581,6 +1596,8 @@ function applyCommand(room, uid, input) {
       "matchId",
       "startedAt",
       "matchRecord",
+      "scorePolicy",
+      "scoringFacts",
     ])
       delete room[key];
     room.history = [];

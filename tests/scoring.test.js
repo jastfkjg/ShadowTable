@@ -12,14 +12,64 @@ const { saveProfile } = require("../server/profile");
 const { publicRules, validateRules, policy } = require("../server/scoring");
 const configured = require("../server/scoring-rules.json");
 function run(room,type,extra={},uid=room.host) { command(room,uid,{type,stage:room.stage,...extra}); }
-function deal({prefix="wx:",board="classic",capacity=6}={}) {
+function deal({prefix="wx:",board="classic",capacity=6,scoreEnabled=true}={}) {
   const room=newRoom("123456",prefix+"1","房主",board,capacity);
   for(let i=2;i<=capacity;i++) enter(room,prefix+i,"玩家"+i);
+  run(room,"updateSettings",{board,capacity,visible:false,scoreEnabled});
   room.players.forEach(p=>p.ready=true);run(room,"start",{flexible:true});
   if(capacity===6) room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,["merlin","percival","servant","servant","morgana","assassin"][i]]));
   return room;
 }
 function finish(room,extra={scoreReason:"assassination",scoreTarget:3}) {run(room,"finishTools",{replace:true,...extra});return room.matchRecord.players.map(p=>p.score.total);}
+test('计分开关按服务端人数默认，房主可修改，切换人数重设默认并让全员重新准备',()=>{
+  for(const [board,capacity,expected] of [['classic',6,false],['classic',9,false],['classic-court',10,true],['classic-court',12,true],['knights-13',13,true]]) {
+    const room=newRoom('123456','wx:host','房主',board,capacity);
+    assert.equal(room.scoreEnabled,expected);assert.equal(publicView(room,room.host).scoreSettings.enabled,expected);
+  }
+  const room=newRoom('123456','wx:1','房主');enter(room,'wx:2','朋友');room.players.forEach(p=>p.ready=true);
+  const initial=structuredClone(room);
+  assert.throws(()=>run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true},'wx:2'),e=>e.status===403);
+  assert.deepEqual(room,initial);
+  assert.throws(()=>run(room,'updateSettings',{board:'classic-court',capacity:10,visible:false,scoreEnabled:'true'}),/计分设置/);
+  assert.deepEqual(room,initial);
+  run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true});
+  assert.equal(room.scoreEnabled,true);assert.ok(room.players.every(p=>!p.ready));assert.notEqual(room.stage,initial.stage);
+  run(room,'configure',{board:'classic-court',capacity:10});assert.equal(room.scoreEnabled,true);
+  run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:false});
+  run(room,'configure',{board:'classic',capacity:6});assert.equal(room.scoreEnabled,false);
+  run(room,'configure',{board:'classic-court',capacity:12});assert.equal(room.scoreEnabled,true);
+});
+test('开关默认阈值可仅改服务端；发牌后锁定，旧进行中牌局兼容且重开保留房主选择',()=>{
+  const original=configured.defaultEnabledMinPlayers;
+  try {configured.defaultEnabledMinPlayers=6;assert.equal(newRoom('123456','wx:host','房主').scoreEnabled,true);assert.match(publicRules().notes.join(''),/6人及以上默认开启/);}
+  finally {configured.defaultEnabledMinPlayers=original;}
+  const room=deal();const snapshot=structuredClone(room);
+  assert.equal(publicView(room,room.host).scoreSettings.editable,false);
+  assert.throws(()=>run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:false}),e=>e.status===409);
+  assert.deepEqual(room,snapshot);
+  delete room.scoreEnabled;delete room.scorePolicy.defaultEnabledMinPlayers;
+  assert.equal(publicView(room,room.host).scoreSettings.enabled,true);assert.equal(finish(room)[2],4);
+  run(room,'rematch');assert.equal(room.scorePolicy,undefined);assert.equal(room.scoringFacts,undefined);
+  assert.equal(publicView(room,room.host).scoreSettings.enabled,false);
+  const enabledRoom=deal();finish(enabledRoom);run(enabledRoom,'rematch');assert.equal(enabledRoom.scoreEnabled,true);
+});
+test('房主关闭只排除积分，胜负仍归档，不影响连胜；开启不能绕过板子和测试排除',()=>{
+  const store=new Store(':memory:');
+  try {
+    const first=deal();finish(first);store.transaction(()=>store.save(first));
+    const off=deal({scoreEnabled:false});
+    assert.equal(publicView(off,off.host).scoreSettlement.length,0);
+    assert.throws(()=>finish(off),/计分结束原因无效/);
+    run(off,'finishTools',{winner:'evil'});store.transaction(()=>store.save(off));
+    assert.equal(off.matchRecord.players[2].score.status,'excluded');assert.equal(off.matchRecord.players[2].score.reason,'本局未开启计分');
+    assert.equal(store.statsFor('wx:3').losses,1);assert.equal(store.statsFor('wx:3').score.games,1);
+    assert.equal(store.streakFor('wx:3').current,1);
+    assert.throws(()=>store.transaction(()=>store.correctMatch(off.matchId,{revision:0,scoreReason:'quest_fail'})),/不在计分范围/);
+    for(const room of [deal({capacity:9}),deal({prefix:'test:'})]) {
+      run(room,'finishTools',{winner:'good'});assert.ok(room.matchRecord.players.every(p=>p.score.status==='excluded'));
+    }
+  } finally {store.close();}
+});
 test("三绿刺中、未中、派西挡刀、刺到坏人和空刀正确分解积分",()=>{
   assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:1}),[1,1,1,1,3,3]);
   assert.deepEqual(finish(deal()),[3,3,4,2,0,0]);
@@ -142,6 +192,7 @@ test("HTTP积分结算同事务、幂等、本人可见，规则公开且筛选�
     const tokens=[];for(let i=0;i<6;i++) tokens.push((await req("/api/login",null,{code:"score-api-"+i})).data.token);
     const uids=tokens.map(token=>app.store.session(createHash("sha256").update(token).digest("hex")).uid);
     const room=newRoom("123456",uids[0],"房主","classic",6);uids.slice(1).forEach((uid,i)=>enter(room,uid,"玩家"+(i+2)));
+    run(room,"updateSettings",{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true});
     room.players.forEach(p=>p.ready=true);run(room,"start",{flexible:true});
     room.roles=Object.fromEntries(uids.map((uid,i)=>[uid,["merlin","percival","servant","servant","morgana","assassin"][i]]));
     app.store.transaction(()=>app.store.save(room));

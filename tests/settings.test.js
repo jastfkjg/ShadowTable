@@ -44,6 +44,35 @@ const room = () => ({
   me: { isHost: true },
   showSkillDetails: false,
 });
+test('计分开关自动保存且使用服务端默认人数，发牌后锁定，旧服务不发送新字段',async()=>{
+  let r={...room(),phase:'lobby',board:'classic',capacity:6,scoreSettings:{enabled:false,editable:true,defaultEnabledMinPlayers:10,unavailableReason:null}};
+  const writes=[];
+  const p=page({login:async()=>{},requestId:()=> 'score-setting',request:async(url,method,data)=>{
+    if(method==='POST'){writes.push(data);r={...r,board:data.board,capacity:data.capacity,scoreSettings:{...r.scoreSettings,enabled:data.scoreEnabled}};return {ok:true};}
+    return url==='/api/boards'?{boards:BOARDS}:structuredClone(r);
+  }});
+  await p.load();assert.equal(p.data.scoreEnabled,false);
+  await p.toggleScoring({detail:{value:true}});assert.equal(writes[0].scoreEnabled,true);assert.equal(p.data.dirty,false);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(12)}});assert.equal(p.data.scoreEnabled,true);
+  await p.toggleScoring({detail:{value:false}});assert.equal(p.data.scoreEnabled,false);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(10)}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(6)}});assert.equal(p.data.scoreEnabled,false);
+  r.phase='tools';r.scoreSettings.editable=false;await p.load();const count=writes.length;
+  await p.toggleScoring({detail:{value:true}});assert.equal(writes.length,count);
+  delete r.scoreSettings;await p.load();await p.toggleFairy({detail:{value:false}});
+  assert.equal(p.data.dirty,false);
+});
+test('计分保存结果未确认时锁定开关并保留同一请求重试',async()=>{
+  let fail=true,r={...room(),phase:'lobby',scoreSettings:{enabled:true,editable:true,defaultEnabledMinPlayers:10}};
+  const writes=[];
+  const p=page({login:async()=>{},requestId:()=> 'same-score-id',request:async(url,method,data,id)=>{
+    if(method==='POST'){writes.push({id,data:JSON.stringify(data)});if(fail)throw Error('网络未确认');r.scoreSettings.enabled=data.scoreEnabled;return {ok:true};}
+    return url==='/api/boards'?{boards:BOARDS}:structuredClone(r);
+  }});
+  await p.load();await p.toggleScoring({detail:{value:false}});assert.equal(p.data.pendingSave,true);
+  await p.toggleScoring({detail:{value:true}});assert.equal(writes.length,1);assert.equal(p.data.scoreEnabled,false);
+  fail=false;await p.save();assert.deepEqual(writes[0],writes[1]);assert.equal(p.data.scoreEnabled,false);assert.equal(p.data.pendingSave,false);
+});
 test("设置页仅管理员可进入，不读取他人的设置表单", async () => {
   const p = page({
     login: async () => {},

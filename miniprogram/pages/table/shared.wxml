@@ -346,16 +346,14 @@
       <block wx:if="{{room.phase==='tools' || room.phase==='ended'}}"><template is="tableResult" data="{{room, latestResult}}" /><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
       <block wx:else><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
     </view>
+    <view wx:if="{{room.scoreSettings}}" class="small muted">{{room.scoreNotice || (room.scoreSettings.enabled?'本局计分已开启':'本局计分已关闭')}}</view>
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"
         >
         <text class="muted small">{{startHint}}</text>
         <button hover-class="none" wx:if="{{room.me.seat!==null}}" class="primary" bindtap="ready" disabled="{{hasPendingRequest || busy}}">
           {{room.me.ready?'取消准备':'我准备好了'}}</button
-        ><view wx:if="{{room.myScore}}" class="score-result">
-          <block wx:if="{{room.myScore.status==='scored'}}"><view class="metric-value accent">本局 {{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</view><view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view><button class="text-button" hover-class="none" bindtap="viewScoreRecord">查看积分明细 ›</button></block>
-          <view wx:else class="small muted">不计积分 · {{room.myScore.reason}}</view>
-        </view><button hover-class="none"
+        ><button hover-class="none"
           wx:if="{{room.me.isHost}}"
           class="secondary"
           bindtap="start"
@@ -365,6 +363,10 @@
         </button></view
       >
     </block>
+    <view wx:if="{{room.myScore && (room.phase==='ended' || room.phase==='terminated')}}" class="score-result">
+      <block wx:if="{{room.myScore.status==='scored'}}"><view class="metric-value accent">本局 {{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</view><view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view><button class="text-button" hover-class="none" bindtap="viewScoreRecord">查看积分明细 ›</button></block>
+      <view wx:else class="small muted">不计积分 · {{room.myScore.reason}}</view>
+    </view>
       <view wx:if="{{room.canUseTools}}" class="panel host-panel">
         <view class="label">房主操作</view>
         <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · B牌剩余{{room.knights.remainingCards}}张</view>

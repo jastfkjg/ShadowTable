@@ -424,6 +424,7 @@ test('管理员更正计分结果鉴权、幂等和版本校验，并保留整�
   const a=await setup(t),{newRoom,enter,command}=require('../server/engine');
   const room=newRoom('123456','wx:score-1','房主','classic',6);
   for(let i=2;i<=6;i++)enter(room,'wx:score-'+i,'玩家'+i);
+  command(room,room.host,{type:'updateSettings',stage:room.stage,board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true});
   room.players.forEach(p=>p.ready=true);
   command(room,room.host,{type:'start',stage:room.stage,flexible:true});
   room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
