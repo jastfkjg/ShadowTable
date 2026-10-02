@@ -7,11 +7,32 @@
   <view class="rank-metrics" aria-label="排行指标"><button wx:for="{{groups}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))?'selected':''}}" bindtap="chooseGroup" data-id="{{item.id}}" disabled="{{(item.id==='points' && !pointsAvailable) || (item.id==='fun' && !funAvailable)}}" aria-pressed="{{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button></view>
   <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
   <view wx:if="{{funSelected}}" class="fun-rank-filters">
-    <view class="rank-filter-heading"><button class="disclosure-button rank-disclosure" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" hover-class="none">{{metricsExpanded?'收起指标':'全部指标'}} {{metricsExpanded?'⌃':'⌄'}}</button></view>
-    <scroll-view class="fun-rank-tabs {{metricsExpanded?'is-expanded':''}}" scroll-x="{{true}}" scroll-into-view="{{funActiveId}}" aria-label="趣味指标，可左右滑动"><view class="fun-rank-tabs-inner"><button wx:for="{{funOptions}}" wx:key="key" id="rank-{{item.key}}" class="fun-rank-tab {{metric===item.key?'selected':''}}" bindtap="chooseFunMetric" data-id="{{item.key}}" aria-pressed="{{metric===item.key}}" hover-class="none">{{item.tabLabel}}</button></view></scroll-view>
-    <view class="fun-rank-selects"><view class="fun-sort"><button hover-class="none" bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}">次数</button><button hover-class="none" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}">成功率</button></view><picker wx:if="{{funRoleOptions.length>1}}" range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="出刀角色"><view class="fun-picker">{{funRoleOptions[funRoleIndex].label}} ▾</view></picker></view>
-    <view wx:if="{{board.fun}}" class="rank-rule-heading"><text class="small muted">{{funSort==='rate'?'至少 '+board.threshold+' 次机会':'累计次数 · 同次数并列'}}</text><button class="disclosure-button rank-disclosure" bindtap="toggleRules" aria-expanded="{{rulesExpanded}}" hover-class="none">如何计算 {{rulesExpanded?'⌃':'⌄'}}</button></view>
-    <view wx:if="{{board.fun && rulesExpanded}}" class="small muted rank-rule-detail">{{funSort==='rate'?'至少 '+board.threshold+' 次机会；按未舍入比例排名':'按累计次数排名，同次数并列'}}。{{metric==='fun_good_shield'?'挡刀率 = 挡刀次数 / 作为非梅林好人面对最终非空刀的局数。':''}}空刀单列，缺失记录不参与。</view>
+    <view class="fun-metric-selector {{metricsExpanded?'is-expanded':''}}">
+      <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" hover-class="none">
+        <view class="fun-metric-current">
+          <block wx:for="{{funOptions}}" wx:key="key"><text wx:if="{{metric===item.key}}" class="fun-metric-name">{{item.tabLabel}}</text></block>
+        </view>
+        <view class="fun-metric-action"><text>{{metricsExpanded?'收起':'切换'}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view>
+      </button>
+      <view wx:if="{{metricsExpanded}}" class="fun-metric-options" aria-label="选择趣味指标">
+        <button wx:for="{{funOptions}}" wx:key="key" class="fun-metric-option {{metric===item.key?'selected':''}}" bindtap="chooseFunMetric" data-id="{{item.key}}" aria-label="{{item.tabLabel}}" aria-pressed="{{metric===item.key}}" hover-class="none">
+          <view class="fun-option-copy"><text class="fun-option-title">{{item.title}}</text><text class="fun-option-label">{{item.label}}</text></view>
+          <view wx:if="{{metric===item.key}}" class="fun-option-check" aria-hidden="true"></view>
+        </button>
+      </view>
+    </view>
+    <view class="fun-sort-row">
+      <text class="fun-filter-label">排序</text>
+      <view class="fun-sort" aria-label="排序方式">
+        <button hover-class="none" bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}"><view class="fun-sort-dot" aria-hidden="true"></view><text>按次数</text></button>
+        <button hover-class="none" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}"><view class="fun-sort-dot" aria-hidden="true"></view><text>按成功率</text></button>
+      </view>
+    </view>
+    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter">
+      <text class="fun-filter-label">出刀角色</text>
+      <picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="出刀角色"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker>
+    </view>
+    <view wx:if="{{board.fun && funSort==='rate'}}" class="small muted fun-rank-threshold">至少 {{board.threshold}} 次机会参与排名</view>
   </view>
   <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>

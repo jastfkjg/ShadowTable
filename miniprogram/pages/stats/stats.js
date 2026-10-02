@@ -2,7 +2,7 @@ const api = require("../../api");
 const { presentStats, backToMe, personalPreview } = require("../../profile");
 const { queryString } = require("../../share-card");
 Page({
-  data: { loading: true, error: "", stats: null, overviewExpanded: true, funExpanded: false, funRulesExpanded: false, tab: "records", funRoles: {} },
+  data: { loading: true, error: "", stats: null, funExpanded: false, funRulesExpanded: false, tab: "records", funRoles: {} },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
@@ -37,7 +37,6 @@ Page({
     if (card?.shareMetric) wx.navigateTo({ url: "/pages/share/share?" + queryString({ kind: "fun", card: card.id, metric: card.shareMetric }) });
   },
   toggleFunRules() { this.setData({ funRulesExpanded: !this.data.funRulesExpanded }); },
-  toggleOverview() { this.setData({ overviewExpanded: !this.data.overviewExpanded }); },
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
   toggleFunRoles(e) { const id = e.currentTarget.dataset.id; this.setData({ funRoles: { ...this.data.funRoles, [id]: !this.data.funRoles[id] } }); },
   toggleFaction(e) {

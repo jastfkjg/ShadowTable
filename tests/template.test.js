@@ -56,6 +56,33 @@ const byHandler = (tree, name) =>
   nodes(tree).find(
     (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
   );
+test('战绩区分未计分与零分计分局，没有计分局也保留独立调分', () => {
+  const renderStats = factory('pages/stats/stats.wxml');
+  const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join(' ');
+  const score = { total: 0, games: 0, average: null, current: 0, best: 0 };
+  const role = { role: '派西维尔', total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—' };
+  const faction = { faction: 'good', label: '好人阵营', ...role, expanded: true, roles: [role] };
+  const stats = { total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—', byFaction: [faction] };
+  const show = value => text(renderStats({ loading: false, tab: 'records', stats: value }));
+  const unscored = show(stats);
+  assert.match(unscored, /暂无计分对局/);
+  assert.match(unscored, /派西维尔/);
+  assert.doesNotMatch(unscored, /场均|计分局连胜|0 分/);
+
+  const scored = { ...score, games: 1, average: 0 };
+  const zeroPoints = show({ ...stats, score: scored, scoreAverageLabel: '0.00', byFaction: [{ ...faction, score: scored, scoreAverageLabel: '0.00', roles: [{ ...role, score: scored, scoreAverageLabel: '0.00' }] }] });
+  assert.doesNotMatch(zeroPoints, /暂无计分对局/);
+  assert.match(zeroPoints, /计分局连胜/);
+  assert.match(zeroPoints, /0 分 · 场均 0.00/);
+
+  for (const total of [-5, 5]) {
+    const adjusted = show({ ...stats, score: { ...score, total } });
+    assert.match(adjusted, new RegExp('总积分\\s+' + total));
+    assert.match(adjusted, /暂无计分对局/);
+    assert.match(adjusted, /积分调整可在对局记录中查看/);
+    assert.doesNotMatch(adjusted, /场均|计分局连胜/);
+  }
+});
 test('图片预览准备完成后才能发送或保存；不支持发送与相册拒绝均有明确出口', () => {
   const renderShare=factory('pages/share/share.wxml');
   const loading=renderShare({loading:true,imageMenu:true,imagePath:''});
@@ -78,17 +105,32 @@ test('没有公开榜单时本人仍可分享成绩；只有他人成绩时禁�
   const empty=renderRank({board:{rows:[{rank:1,nickname:'其他玩家'}],metric:'games'},shareable:false});
   assert.equal(byHandler(empty,'shareLeaderboard').attr.disabled,true);
 });
-test('趣味指标全部以横向滚动按钮呈现，不再弹出玩法或指标选择器', () => {
-  const defs=require('../server/fun').publicMetrics();
-  const tree=factory('pages/leaderboard/leaderboard.wxml')({
+test('趣味榜显示当前指标，展开后可选全部指标，排序独立呈现并保留样本门槛', () => {
+  const defs=require('../server/fun').publicMetrics().filter(m=>m.key!=='fun_final_hit');
+  const renderRank=factory('pages/leaderboard/leaderboard.wxml');
+  const data={
     groups:require('../miniprogram/leaderboard').groups,metric:'fun_good_shield',funSelected:true,funAvailable:true,
-    funOptions:defs.map(m=>({...m,tabLabel:m.title+' · '+m.label})),funActiveId:'rank-fun_good_shield',funSort:'count',funRoleOptions:[],
-  });
+    funOptions:defs.map(m=>({...m,title:m.key==='fun_good_shield'?'好人':m.title,tabLabel:(m.key==='fun_good_shield'?'好人':m.title)+' · '+m.label})),funSort:'count',funRoleOptions:[],metricsExpanded:false,
+    board:{fun:true,threshold:5,rows:[],me:{}},
+  };
+  const collapsed=renderRank(data);
+  assert.match(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/好人 · 成功挡刀/);
+  assert.equal(byHandler(collapsed,'toggleMetrics').attr.ariaExpanded,false);
+  assert.ok(!byHandler(collapsed,'chooseFunMetric'));
+  assert.doesNotMatch(JSON.stringify(collapsed),/如何计算|累计次数|参与排名/);
+  const sorts=nodes(collapsed).filter(n=>n.attr?.bindtap==='chooseFunSort');
+  assert.equal(sorts.length,2);
+  assert.equal(sorts.find(n=>n.attr['data-id']==='count').attr.ariaPressed,true);
+  assert.match(JSON.stringify(sorts),/按次数/);assert.match(JSON.stringify(sorts),/按成功率/);
+  const rate=renderRank({...data,funSort:'rate'});
+  assert.match(JSON.stringify(rate),/次机会参与排名/);
+  assert.equal(nodes(rate).find(n=>n.attr?.['data-id']==='rate').attr.ariaPressed,true);
+  const tree=renderRank({...data,metricsExpanded:true});
   const all=nodes(tree), tabs=all.filter(n=>n.attr?.bindtap==='chooseFunMetric');
   assert.equal(tabs.length,defs.length);assert.ok(tabs.every(n=>n.tag==='wx-button'));
-  assert.ok(all.some(n=>n.tag==='wx-scroll-view'));
+  assert.equal(byHandler(tree,'toggleMetrics').attr.ariaExpanded,true);
   assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
-  assert.match(JSON.stringify(tree),/好人（非梅林） · 成功挡刀/);assert.match(JSON.stringify(tree),/轮内刀法 · 命中敌方/);
+  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'轮内刀法 · 命中敌方');
   assert.ok(!all.some(n=>n.attr?.bindchange==='chooseFunMode' || n.attr?.bindchange==='chooseFunMetric'));
 });
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{

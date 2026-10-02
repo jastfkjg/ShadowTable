@@ -5,28 +5,33 @@
   <block wx:if="{{stats}}">
     <view wx:if="{{tab!=='fun'}}" class="stats-overview" aria-label="总战绩">
       <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">总胜场数</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">总胜率</text></view></view>
+      <navigator class="stats-record-link" url="/pages/matches/matches" hover-class="stats-link-pressed"><text>查看对局记录</text><view class="stats-chevron" aria-hidden="true"></view></navigator>
     </view>
-    <view class="stats-tabs" aria-label="战绩分类"><button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}">胜负积分</button><button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}">趣味记录</button></view>
+    <view class="stats-tabs" aria-label="战绩分类"><button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}"><text class="stats-tab-label">战绩统计</text></button><button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}"><text class="stats-tab-label">趣味记录</text></button></view>
     <block wx:if="{{tab!=='fun'}}">
-    <view class="stats-points">
-      <view class="personal-metrics"><view><view class="metric-value accent">{{stats.score.total}}</view><text class="small muted">总积分</text></view><view><view class="metric-value">{{stats.score.games}}</view><text class="small muted">计分局数</text></view><view><view class="metric-value">{{stats.scoreAverageLabel}}</view><text class="small muted">场均积分</text></view></view>
-      <view class="small muted score-streak">当前 {{stats.score.current}} 连胜 · 最高 {{stats.score.best}} 连胜</view>
+    <view wx:if="{{stats.score.games}}" class="stats-points">
+      <view class="personal-metrics"><view><view class="metric-value">{{stats.score.total}}</view><text class="small muted">总积分</text></view><view><view class="metric-value">{{stats.score.games}}</view><text class="small muted">计分局数</text></view><view><view class="metric-value">{{stats.scoreAverageLabel}}</view><text class="small muted">场均积分</text></view></view>
+      <view class="small muted score-streak"><text>计分局连胜</text><text>当前 {{stats.score.current}} · 最高 {{stats.score.best}}</text></view>
+    </view>
+    <view wx:else class="stats-points stats-points-empty">
+      <view wx:if="{{stats.score.total}}" class="score-adjusted-total"><text class="small muted">总积分</text><text class="metric-value">{{stats.score.total}}</text></view>
+      <view class="score-empty-title">暂无计分对局</view>
+      <view class="small muted score-empty-note">{{stats.score.total ? '积分调整可在对局记录中查看。' : stats.total ? '未计分对局也可累计胜负战绩。' : '完成计分对局后展示积分与连胜。'}}</view>
     </view>
     <view wx:if="{{stats.total}}" class="stats-breakdown">
-      <button hover-class="none" class="disclosure-button stats-breakdown-toggle" bindtap="toggleOverview" aria-expanded="{{overviewExpanded}}" aria-label="{{overviewExpanded?'收起阵营战绩':'展开阵营战绩'}}"><text>阵营战绩</text><text class="faction-chevron" aria-hidden="true">{{overviewExpanded?'⌄':'›'}}</text></button>
-      <block wx:if="{{overviewExpanded}}">
+      <view class="stats-section-title">阵营战绩</view>
       <view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
         <button hover-class="none" class="disclosure-button faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
-          <view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}}局 · {{item.wins}}胜 · 胜率 {{item.rateLabel}}</text><text class="faction-detail">{{item.score.total}}分 · {{item.score.games}}场计分局 · 场均 {{item.scoreAverageLabel}}</text></view><text class="faction-chevron" aria-hidden="true">{{item.expanded?'⌄':'›'}}</text>
+          <view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}} 局 · {{item.wins}} 胜</text><text wx:if="{{item.score.games}}" class="faction-detail faction-score">{{item.score.total}} 分 · {{item.score.games}} 场计分 · 场均 {{item.scoreAverageLabel}}</text></view>
+          <view class="faction-result"><text class="faction-rate">{{item.rateLabel}}</text><text class="faction-detail">胜率</text></view>
+          <view class="stats-chevron faction-chevron {{item.expanded?'expanded':''}}" aria-hidden="true"></view>
         </button>
         <view wx:if="{{item.expanded}}" class="role-list">
-          <view class="role-list-heading"><text>角色</text><text>局数</text><text>胜场</text><text>胜率</text></view>
-          <view wx:for="{{item.roles}}" wx:for-item="role" wx:key="role" class="role-row"><view class="role-name"><text>{{role.role}}</text><view class="small muted">{{role.score.total}}分 · 场均{{role.scoreAverageLabel}}</view></view><text>{{role.total}}</text><text>{{role.wins}}</text><text>{{role.rateLabel}}</text></view>
+          <view class="role-list-heading"><text>角色</text><text class="role-stat">局数</text><text class="role-stat">胜场</text><text class="role-stat">胜率</text></view>
+          <view wx:for="{{item.roles}}" wx:for-item="role" wx:key="role" class="role-row"><view class="role-name"><text>{{role.role}}</text><view wx:if="{{role.score.games}}" class="small muted">{{role.score.total}} 分 · 场均 {{role.scoreAverageLabel}}</view></view><text class="role-stat">{{role.total}}</text><text class="role-stat">{{role.wins}}</text><text class="role-stat">{{role.rateLabel}}</text></view>
         </view>
       </view>
-      </block>
     </view>
-    <navigator class="stats-record-link" url="/pages/matches/matches" hover-class="fun-pressed">对局记录 ›</navigator>
     </block>
     <view wx:if="{{tab==='fun'}}" class="fun-content">
       <view wx:if="{{!stats.fun.available}}" class="muted">趣味记录将在服务更新后开放</view>

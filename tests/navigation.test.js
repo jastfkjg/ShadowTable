@@ -390,21 +390,17 @@ test('后台资料刷新不打断已进入但尚未输入的昵称编辑，迟�
   assert.equal(p.data.dirty,false);
   p.keyboardHeightChange({detail:{height:300}}); assert.equal(p.data.keyboardHeight,0);
 });
-test('战绩逐层展开，记录逐场展开成员并可继续分页', async () => {
+test('战绩按阵营展开角色，记录逐场展开成员并可继续分页', async () => {
   const detailedStats = { ...emptyStats, total: 2, wins: 1, losses: 1, winRate: 50,
     byFaction: [{ faction: 'good', label: '好人阵营', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }],
     byRole: [{ faction: 'good', role: '梅林', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }] };
   const stats = page('stats',{...apiBase,request:async()=>detailedStats}).p;
   await stats.load();
-  assert.equal(stats.data.overviewExpanded,true);
-  stats.toggleOverview(); assert.equal(stats.data.overviewExpanded,false);
-  stats.toggleOverview();
+  assert.equal(stats.data.stats.byFaction[0].expanded,false);
   stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
   assert.equal(stats.data.stats.byFaction[0].expanded,true);
   assert.equal(stats.data.stats.byFaction[0].roles[0].rateLabel,'50%');
   stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
-  stats.toggleOverview();
-  assert.equal(stats.data.overviewExpanded,false);
   assert.equal(stats.data.stats.byFaction[0].expanded,false);
   assert.equal(stats.data.stats.total,2);
 
@@ -457,7 +453,7 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
   assert.match(editor,/选择头像/);
-  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]},overviewExpanded:true}));
+  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]}}));
   assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
   const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
   assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
@@ -860,9 +856,12 @@ test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到�
   const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
   await p.load(false,{metric:'fun_knife_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
   assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_knife_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
-  assert.equal(p.data.funOptions.length,defs.length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_good_shield'));
+  assert.equal(p.data.funOptions.length,defs.filter(m=>m.key!=='fun_final_hit').length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_good_shield'));assert.ok(!p.data.funOptions.some(m=>m.key==='fun_final_hit'));
+  p.toggleMetrics();assert.equal(p.data.metricsExpanded,true);
   await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
-  assert.equal(p.data.funActiveId,'rank-fun_good_shield');assert.equal(p.data.funRole,'');
+  assert.equal(p.data.metric,'fun_good_shield');assert.equal(p.data.funRole,'');assert.equal(p.data.metricsExpanded,false);
+  p.toggleMetrics();const reads=urls.length;
+  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.equal(p.data.metricsExpanded,false);assert.equal(urls.length,reads);
   const fallback=page('leaderboard',{...apiBase,request:async url=>{if(url.includes('metric=fun_'))throw Object.assign(Error('排行榜参数无效'),{status:400});return rankResult('games',{availableMetrics:['points','games']});}}).p;
   await fallback.load(false,{metric:'fun_merlin_evade'});assert.equal(fallback.data.metric,'games');assert.equal(fallback.data.pointsAvailable,true);assert.equal(fallback.data.funAvailable,false);assert.match(fallback.data.notice,/趣味榜/);
 });
