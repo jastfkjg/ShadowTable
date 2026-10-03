@@ -10,7 +10,8 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   context,
 );
-const renderTable = factory("pages/table/table.wxml"), renderLobby = factory("pages/lobby/lobby.wxml");
+const renderTable = factory("pages/table/table.wxml");
+const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
 test('小程序网页登录确认页显示真实网站与账号，加载、过期后不可确认，成功后有返回入口', () => {
   const renderLogin = factory('pages/web-login/web-login.wxml');

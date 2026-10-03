@@ -84,8 +84,8 @@
     </block>
   </view>
 </view>
-<app-nav wx:if="{{isLobby}}" title="对局" />
-<app-nav wx:else title="牌桌" back="{{true}}" backLabel="返回对局" bindback="returnHome" />
+<app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
+<app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backLabel="返回对局" bindback="returnHome" />
 <view class="page {{isLobby ? 'tab-page' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view class="brand">
     <view class="brand-identity">

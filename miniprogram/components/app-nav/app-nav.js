@@ -1,4 +1,3 @@
-const { restorePageBackground } = require("../../ui-theme");
 const windowInfo = wx.getWindowInfo?.() || wx.getSystemInfoSync();
 const statusBarHeight = windowInfo.statusBarHeight || 20;
 const menu = wx.getMenuButtonBoundingClientRect?.();
@@ -10,8 +9,6 @@ const shareTitleShift = windowWidth < 360 ? 12 : 0;
 const shareTitleWidth = Math.max(44, Math.min(windowWidth * .52, 2 * ((menu?.left || windowWidth - 96) - 8 + shareTitleShift) - windowWidth));
 
 Component({
-  lifetimes: { attached() { restorePageBackground(); } },
-  pageLifetimes: { show() { restorePageBackground(); } },
   properties: {
     title: { type: String, value: "" },
     back: { type: Boolean, value: false },

@@ -1,39 +1,9 @@
-<app-nav title="我的" />
-<view class="page personal-page me-page tab-page">
-  <view wx:if="{{loading && !profile}}" class="status" role="status">正在读取个人资料…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
-  <block wx:if="{{profile}}">
-    <navigator class="me-profile" url="/pages/profile/profile" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="编辑资料，头像和昵称">
-      <view class="me-profile-main">
-        <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" aria-label="我的头像" />
-        <view wx:else class="profile-avatar avatar-fallback" aria-hidden="true">{{profile.initial}}</view>
-        <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view></view>
-        <view class="me-profile-action"><text>编辑</text><view class="me-chevron" aria-hidden="true"></view></view>
-      </view>
-    </navigator>
-    <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
-    <view class="me-overview">
-    <navigator class="me-results" url="/pages/stats/stats" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看详细战绩统计">
-      <view class="me-results-heading"><text>战绩概览</text><view class="me-results-detail"><text>战绩详情</text><view class="me-chevron" aria-hidden="true"></view></view></view>
-      <view class="me-stats-panel" aria-label="{{!stats && loading ? '正在读取战绩' : '战绩概览'}}">
-        <view class="personal-metrics"><view><view class="metric-value">{{stats ? stats.total : '—'}}</view><text class="small muted">总局数</text></view><view><view class="metric-value">{{stats ? stats.wins : '—'}}</view><text class="small muted">胜场</text></view><view><view class="metric-value {{stats && stats.total ? 'accent' : 'muted'}}">{{stats ? stats.rateLabel : '—'}}</view><text class="small muted">胜率</text></view></view>
-      </view>
-    </navigator>
-    <view class="me-points">
-      <view class="me-results-heading"><text>积分</text><navigator class="me-results-detail" url="/pages/help/help?section=scoring" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}">积分规则 ›</navigator></view>
-      <navigator url="/pages/matches/matches?scored=1" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看积分明细">
-        <view class="score-overview"><view><view class="metric-value accent">{{stats ? stats.score.total : '—'}}</view><text class="small muted">总积分</text></view><view><view class="metric-value">{{stats ? stats.score.month : '—'}}</view><text class="small muted">本月积分</text></view><view class="me-results-detail">明细 ›</view></view>
-      </navigator>
-    </view>
-    </view>
-    <view class="personal-links me-links me-links-primary">
-      <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-spark" aria-hidden="true"></view><view class="me-link-copy"><view>趣味记录</view><view wx:if="{{stats.fun.teaser}}" class="small muted">{{stats.fun.teaser}}</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy">对局记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-rank" aria-hidden="true"></view><view class="me-link-copy">排行榜</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-    </view>
-    <view class="personal-links me-links me-links-secondary">
-      <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-book" aria-hidden="true"></view><view class="me-link-copy">帮助与规则</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon me-icon-info" aria-hidden="true"></view><view class="me-link-copy">关于</view><view class="me-chevron" aria-hidden="true"></view></button>
-    </view>
-  </block>
+<import src="../home/panels.wxml" />
+<import src="../me/shared.wxml" />
+<app-nav title="{{activeTab === 1 ? '我的' : '对局'}}" />
+<view class="main-panel" hidden="{{activeTab !== 0}}">
+  <template is="lobbyPanel" data="{{...lobby, homeShell: true}}" />
+</view>
+<view class="main-panel" hidden="{{activeTab !== 1}}">
+  <template is="personalPanel" data="{{...personal}}" />
 </view>

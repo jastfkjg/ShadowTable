@@ -6,13 +6,14 @@ const vm = require('node:vm');
 const { BOARDS, newRoom, publicView } = require('../server/engine');
 const { wxmlToJs } = require('miniprogram-compiler');
 const root = path.resolve(__dirname,'../miniprogram');
-function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {} } = {}) {
+function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false } = {}) {
   let definition;
   const navigations = [];
   const wx = {
     getStorageSync: key => storage.get(key), setStorageSync: (key,value) => storage.set(key,value), removeStorageSync: key => storage.delete(key),
     navigateTo: o => { navigations.push(o.url); o.complete?.(); }, switchTab: o => navigations.push(o.url),
     navigateBack: () => navigations.push('back'), showToast() {},
+    onNetworkStatusChange() {}, offNetworkStatusChange() {},
     enableAlertBeforeUnload() {}, disableAlertBeforeUnload() {},
     showModal: o => o.success({ confirm: true }), ...overrides,
   };
@@ -25,15 +26,131 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
     }, { filename: file });
     return mod.exports;
   }
-  load(path.join(root,'pages',route,route+'.js'));
+  if (!home && route === 'lobby') definition = load(path.join(root,'pages/table/controller.js'))({ lobby: true });
+  else if (!home && route === 'me') definition = load(path.join(root,'pages/me/controller.js'))();
+  else load(path.join(root,'pages',route,route+'.js'));
   const p = { ...definition, data: structuredClone(definition.data), alive: true, foreground: true,
-    setData(patch,callback) { Object.assign(this.data,patch); callback?.(); } };
+    setData(patch,callback) {
+      for (const [key, value] of Object.entries(patch)) {
+        const parts = key.split('.'); let target = this.data;
+        for (const part of parts.slice(0, -1)) target = target[part];
+        target[parts[parts.length - 1]] = value;
+      }
+      callback?.();
+    } };
   if (p.schedule) p.schedule = () => {};
   return { p, wx, navigations, storage, appState };
 }
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+function renderMainPanel(factory, index, data) {
+  const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
+  const find = node => typeof node === 'object' &&
+    (node.attr?.class === 'main-panel' && !node.attr.hidden ? node : (node.children || []).map(find).find(Boolean));
+  return find(tree);
+}
+
+test('首页在同一窗口保留两个区域、表单和滚动位置，切回时刷新且不调用页面导航', async () => {
+  const scrolls = [], pages = [];
+  const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [], total: 0 } };
+  const { p, navigations } = page('lobby', api, { home: true, pages, wx: { pageScrollTo: options => { scrolls.push(options.scrollTop); options.complete(); } } });
+  p.route = 'pages/lobby/lobby'; pages.push(p);
+  p.onLoad(); await p.onShow();
+  p.inputName({ detail: { value: '本桌草稿' } });
+  p.setData({ 'lobby.code': '654321' }); p.lobbyController.data.code = '654321';
+  p.onPageScroll({ scrollTop: 240 });
+  await p.switchMainTab(1);
+  const shownProfile = p.data.personal.profile;
+  assert.equal(p.data.activeTab, 1);
+  assert.equal(shownProfile.displayName, '林间');
+  p.onPageScroll({ scrollTop: 120 });
+  await p.switchMainTab(0);
+  assert.equal(p.data.activeTab, 0);
+  assert.equal(p.data.lobby.name, '本桌草稿');
+  assert.equal(p.data.lobby.code, '654321');
+  assert.equal(p.data.personal.profile, shownProfile);
+  await p.switchMainTab(1);
+  assert.equal(p.data.personal.profile, shownProfile);
+  assert.deepEqual(scrolls, [0, 240, 120]);
+  assert.equal(navigations.length, 0);
+  assert.equal(p.route, 'pages/lobby/lobby');
+  p.onUnload();
+});
+
+test('我的入口首次只读个人数据，资料与记录预览仍从当前首页传给下一页', async () => {
+  const reads = [], pages = [];
+  const api = { ...apiBase, request: async url => { reads.push(url); return url.endsWith('/profile') ? profile
+    : url.endsWith('/stats') ? emptyStats : { records: [], total: 0, hasMore: false }; } };
+  const { p } = page('me', api, { home: true, pages });
+  p.route = 'pages/me/me'; pages.push(p); p.onLoad(); await p.onShow();
+  assert.equal(p.data.activeTab, 1);
+  assert.ok(!reads.includes('/api/boards'));
+  assert.ok(!reads.includes('/api/me/rooms'));
+  const { p: editor } = page('profile', api, { pages: [p, {}] });
+  const loading = editor.onLoad();
+  assert.equal(editor.data.nickname, '林间');
+  assert.equal(editor.data.profile.displayName, '林间');
+  await loading;
+  const { p: records } = page('matches', api, { pages: [p, {}] });
+  const recordsLoading = records.onLoad();
+  assert.equal(records.data.loaded, true); await recordsLoading;
+  p.onUnload();
+});
+
+test('从我的入口进入的牌桌返回原首页对局区域，隐藏页不提前刷新', async () => {
+  const reads = [], pages = [];
+  const api = { ...apiBase, request: async url => { reads.push(url); return url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [] }; } };
+  const { p: home } = page('me', api, { home: true, pages });
+  home.route = 'pages/me/me'; pages.push(home); home.onLoad(); await home.onShow(); home.onHide();
+  const back = [];
+  const { p: table } = page('table', api, { pages, wx: { navigateBack: options => back.push(options) } });
+  table.route = 'pages/table/table'; table.data.room = { code: '123456' }; table.roomCode = '123456'; pages.push(table);
+  reads.length = 0; await table.returnHome();
+  assert.equal(back[0].delta, 1);
+  assert.equal(home.data.activeTab, 0);
+  assert.equal(table.data.room.code, '123456');
+  assert.equal(reads.length, 0);
+  pages.pop(); await home.onShow();
+  assert.ok(reads.includes('/api/me/rooms')); home.onUnload();
+});
+
+test('同一首页模板保留两个区域，仅隐藏非当前区域且顶部导航只渲染一次', () => {
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const nodes = n => typeof n === 'object' ? [n, ...(n.children || []).flatMap(nodes)] : [];
+  for (const activeTab of [0, 1]) {
+    const tree = factory('pages/lobby/lobby.wxml')({ activeTab, lobby: { isLobby: true, name: '草稿' }, personal: { profile: { displayName: '林间' } } });
+    const panels = nodes(tree).filter(node => node.attr?.class === 'main-panel');
+    assert.equal(panels.length, 2);
+    assert.equal(panels[activeTab].attr.hidden, false);
+    assert.equal(panels[1 - activeTab].attr.hidden, true);
+    assert.ok(panels.every(panel => panel.children.length > 0));
+    assert.equal(nodes(tree).filter(node => node.tag === 'wx-app-nav').length, 1);
+  }
+});
+
+test('独立页面通过原入口返回时指定目标区域，旧首页的选中状态不会覆盖返回目标', async () => {
+  const appState = { homeTabRequest: { selected: 1 } }, reads = [];
+  const api = { ...apiBase, request: async url => { reads.push(url); return url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [] }; } };
+  const { p: home } = page('lobby', api, { home: true, appState });
+  home.onLoad(); await home.onShow();
+  assert.equal(home.data.activeTab, 1);
+  assert.equal(appState.homeTabRequest, undefined);
+  assert.ok(!reads.includes('/api/boards'));
+  await home.switchMainTab(0); home.onHide();
+  const { p: detail, navigations } = page('stats', api, { pages: [{}], appState });
+  detail.back();
+  assert.equal(navigations[0], '/pages/me/me');
+  assert.equal(appState.homeTabRequest.selected, 1);
+  await home.onShow();
+  assert.equal(home.data.activeTab, 1);
+  assert.equal(appState.homeTabRequest, undefined);
+  home.onUnload();
+});
 test('分享入口只传内容选择，拦截旧预览和读取失败，不传个人成绩或内部标识', () => {
   const {p,navigations}=page('stats',apiBase);
   p.setData({loading:true,stats:{total:10}});p.shareStats();assert.equal(navigations.length,0);
@@ -374,6 +491,55 @@ test('离开牌桌遮盖身份；未确认操作在内存中恢复并复用请�
   const resumed = page('table',api,{appState}); resumed.p.inviteCode='123456'; await resumed.p.bootstrap();
   assert.equal(ids.length,2); assert.equal(ids[0],ids[1]); assert.equal(appState.pendingTableRequest,null);
 });
+test('返回已存在的对局页直接回退，过渡保留牌桌及座位，只遮盖秘密且不读取旧页列表', async () => {
+  const room = publicView(newRoom('123456', 'p1', '林间'), 'p1');
+  const storage = new Map([['roomCode', room.code]]), requests = [], frames = [];
+  const { p } = page('table', { ...apiBase, request: async url => { throw Error('旧页面不应读取 ' + url); } }, {
+    storage, pages: [{ route: 'pages/lobby/lobby' }, { route: 'pages/table/table' }],
+    wx: { offNetworkStatusChange() {}, navigateBack: options => { requests.push(options); frames.push({ room: p.data.room, secret: p.data.secret, revealed: p.data.revealed }); } },
+  });
+  p.roomCode = room.code;
+  p.setData({ room, loading: false, secret: { role: '梅林' }, revealed: true });
+  await p.returnHome(); await p.returnHome();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].delta, 1);
+  assert.equal(frames[0].room, room);
+  assert.equal(frames[0].secret, null);
+  assert.equal(frames[0].revealed, false);
+  assert.equal(storage.get('roomCode'), room.code);
+  p.onHide(); p.onUnload();
+  assert.equal(p.data.room, room);
+  assert.equal(storage.get('roomCode'), room.code);
+});
+test('直接邀请返回对局及回退失败均可切换到大厅，跳转失败保留牌桌并允许重试', async () => {
+  for (const cachedLobby of [false, true]) {
+    const requests = [];
+    const pages = [...(cachedLobby ? [{ route: 'pages/lobby/lobby' }] : []), { route: 'pages/table/table' }];
+    const { p } = page('table', { ...apiBase, request: async () => { throw Error('不应读取旧页'); } }, {
+      pages, wx: { navigateBack: options => options.fail(), switchTab: options => requests.push(options) },
+    });
+    const room = { code: '123456' }; p.roomCode = room.code; p.data.room = room;
+    await p.returnHome(); await p.returnHome();
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, '/pages/lobby/lobby');
+    requests[0].fail(); requests[0].complete();
+    assert.equal(p.data.room, room);
+    assert.equal(p.roomCode, room.code);
+    assert.match(p.data.error, /未能返回对局/);
+    await p.returnHome();
+    assert.equal(requests.length, 2);
+  }
+});
+test('牌桌仍有未确认操作时返回被阻止，原房间和请求保持可重试', async () => {
+  const { p, navigations } = page('table', apiBase);
+  const pending = { id: 'pending-request', data: { type: 'ready' } }, room = { code: '123456' };
+  p.pending = pending; p.data.room = room;
+  await p.returnHome();
+  assert.equal(navigations.length, 0);
+  assert.equal(p.pending, pending);
+  assert.equal(p.data.room, room);
+  assert.match(p.data.error, /未确认请求/);
+});
 test('个人资料失败保留草稿，重试复用编号；冲突不覆盖其他设备资料', async () => {
   let writes=0; const ids=[];
   const api = {...apiBase,request:async(url,method,body,id)=>{
@@ -500,9 +666,9 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
 test('新页面模板编译，资料与战绩只出现在个人页面，牌桌无底部导航内容', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
-  const lobby=JSON.stringify(factory('pages/lobby/lobby.wxml')({isLobby:true,room:null,memberRooms:[],visibleMemberRooms:[]}));
+  const lobby=JSON.stringify(renderMainPanel(factory,0,{isLobby:true,room:null,memberRooms:[],visibleMemberRooms:[]}));
   assert.doesNotMatch(lobby,/今晚，开一桌|和朋友面对面|总胜率|编辑资料/);
-  const me=JSON.stringify(factory('pages/me/me.wxml')({profile:{displayName:'林间',initial:'林'},stats:{total:0,wins:0,rateLabel:'—'}}));
+  const me=JSON.stringify(renderMainPanel(factory,1,{profile:{displayName:'林间',initial:'林'},stats:{total:0,wins:0,rateLabel:'—'}}));
   assert.match(me,/编辑资料/); assert.match(me,/对局记录/);
   assert.doesNotMatch(me,/去开一局|还没有有效战绩|逐场查看/);
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
@@ -530,7 +696,9 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
     assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);
-    if (route.endsWith('/lobby/lobby') || route.endsWith('/table/table')) {
+    if (route.endsWith('/lobby/lobby') || route.endsWith('/me/me')) {
+      assert.match(template, /<app-nav/);
+    } else if (route.endsWith('/table/table')) {
       assert.match(fs.readFileSync(path.join(root, 'pages/table/shared.wxml'), 'utf8'), /<app-nav/);
     } else assert.match(template, /<app-nav/);
   }
@@ -563,7 +731,7 @@ test('一级页面在慢网读取前同步底栏选中态，重复显示不重�
 test('个人入口使用原生导航与即时轻按态，不触发默认白色按钮背景', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
   const factory = vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
-  const tree = factory('pages/me/me.wxml')({profile:{displayName:'林间'},error:'断线'});
+  const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
   assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/help/help?section=scoring','/pages/matches/matches?scored=1','/pages/stats/stats?tab=fun',...['matches','leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
@@ -781,7 +949,7 @@ test('切回我的页即时保留内容，相同资料刷新不重新绑定头�
   assert.equal(p.data.stats, previousStats);
   const context = { window: {}, global: {} }; vm.createContext(context);
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
-  const rendered = JSON.stringify(factory('pages/me/me.wxml')(p.data));
+  const rendered = JSON.stringify(renderMainPanel(factory,1,p.data));
   assert.match(rendered, /林间/);
   assert.doesNotMatch(rendered, /正在读取个人资料/);
   profileRead.resolve(structuredClone(profile)); statsRead.resolve(structuredClone(emptyStats));
@@ -825,7 +993,7 @@ test('我的页资料先返回即可使用，战绩占位保留入口布局且�
   assert.equal(p.data.stats, null);
   const context = { window: {}, global: {} }; vm.createContext(context);
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
-  const rendered = JSON.stringify(factory('pages/me/me.wxml')(p.data));
+  const rendered = JSON.stringify(renderMainPanel(factory,1,p.data));
   assert.match(rendered, /me-stats-panel/);
   assert.match(rendered, /对局记录/);
   assert.doesNotMatch(rendered, /正在读取个人资料/);
@@ -850,12 +1018,37 @@ test('大厅刷新保留空状态与表单，不插入页面加载文字，重�
   assert.equal(p.data.loading, false);
   const context = { window: {}, global: {} }; vm.createContext(context);
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
-  const rendered = JSON.stringify(factory('pages/lobby/lobby.wxml')(p.data));
+  const rendered = JSON.stringify(renderMainPanel(factory,0,p.data));
   assert.match(rendered, /还没有牌桌/);
   assert.match(rendered, /刷新中/);
   assert.doesNotMatch(rendered, /正在连接牌桌/);
   roomsRead.resolve({ rooms: [] }); await refreshing;
   assert.equal(p.data.roomsRefreshing, false);
+});
+test('切回对局时相同列表与表单不提交视图更新，实际变化仍正常显示', async () => {
+  let currentProfile = profile, rooms = [];
+  const { p } = page('lobby', { ...apiBase, request: async url => url.endsWith('/profile') ? currentProfile : { rooms } });
+  await p.refreshLobby(); p.data.loading = false;
+  const patches = [], previousRooms = p.data.memberRooms, setData = p.setData;
+  p.setData = function(patch) { patches.push(patch); setData.call(this, patch); };
+  p.onShow(); await new Promise(setImmediate);
+  assert.equal(patches.length, 0);
+  assert.equal(p.data.memberRooms, previousRooms);
+  currentProfile = { ...profile, nickname: '晚风', version: 2 };
+  rooms = [{ code: '123456', status: 'lobby', seat: 2, capacity: 6, players: 2 }];
+  p.onShow(); await new Promise(setImmediate);
+  assert.equal(p.data.name, '晚风');
+  assert.equal(p.data.memberRooms[0].code, '123456');
+  assert.equal(p.data.memberRooms[0].seat, 2);
+  assert.ok(patches.some(patch => 'memberRooms' in patch));
+});
+test('快速切回大厅时旧房间列表响应不覆盖新的列表', async () => {
+  const oldRooms = deferred(); let reads = 0;
+  const { p } = page('lobby', { ...apiBase, request: async () => ++reads === 1 ? oldRooms.promise : { rooms: [{ code: '234567', status: 'lobby', capacity: 6, players: 2 }] } });
+  const old = p.loadRooms(); await p.loadRooms();
+  oldRooms.resolve({ rooms: [{ code: '123456', status: 'lobby', capacity: 6, players: 1 }] });
+  await old;
+  assert.equal(p.data.memberRooms[0].code, '234567');
 });
 
 test('预取记录立即可见，首屏刷新失败后重试首屏，不误用加载更多', async () => {

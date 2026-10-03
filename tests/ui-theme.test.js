@@ -21,21 +21,18 @@ function definition(entry, wx, pages = []) {
   return result;
 }
 
-test("所有页面的导航初次挂载及再次显示时恢复 iOS 上下窗口底色", () => {
-  const calls = [];
+test("深色窗口由静态配置提供，导航挂载和页面显示不再写入原生背景", () => {
   const nav = definition("components/app-nav/app-nav.js", {
     getWindowInfo: () => ({ statusBarHeight: 47 }),
-    setBackgroundColor: options => calls.push(options),
+    setBackgroundColor() { throw new Error('切换期间不应重绘原生背景'); },
   });
-  nav.lifetimes.attached();
-  nav.pageLifetimes.show();
-  nav.pageLifetimes.show();
-  assert.equal(calls.length, 3);
-  for (const options of calls) {
-    for (const key of ["backgroundColor", "backgroundColorTop", "backgroundColorBottom"]) {
-      assert.equal(options[key], config.window[key]);
-    }
+  for (const key of ["backgroundColor", "backgroundColorTop", "backgroundColorBottom"]) {
+    assert.equal(config.window[key], '#101c24');
   }
+  assert.match(fs.readFileSync(path.join(root, 'app.wxss'), 'utf8'), /page\s*\{[^}]*background:\s*#101c24;/);
+  nav.lifetimes?.attached?.();
+  nav.pageLifetimes?.show?.();
+  nav.pageLifetimes?.show?.();
 });
 
 test("后台仍遮盖身份，不再通过原生底栏外观 API 重绘；缺少外观 API 可正常执行", () => {
@@ -45,8 +42,8 @@ test("后台仍遮盖身份，不再通过原生底栏外观 API 重绘；缺少
   app.onShow?.(); app.onHide(); app.onShow?.();
   assert.equal(masked, 1);
   const legacyNav = definition("components/app-nav/app-nav.js", { getSystemInfoSync: () => ({}) });
-  assert.doesNotThrow(() => legacyNav.lifetimes.attached());
-  assert.doesNotThrow(() => legacyNav.pageLifetimes.show());
+  assert.doesNotThrow(() => legacyNav.lifetimes?.attached?.());
+  assert.doesNotThrow(() => legacyNav.pageLifetimes?.show?.());
 });
 
 function tabBar(pages, wx = {}) {
@@ -87,6 +84,24 @@ test("快速重复点击只发起一次切换，失败保留选中态并允许�
   assert.equal(requests.length, 2);
   spec.pageLifetimes.show.call(instance);
   assert.equal(instance.switching, false);
+});
+
+test("底栏在同一首页切换内容，选中态跟随内容而非入口路由，不调用原生页面切换", () => {
+  const selections = [];
+  const home = { route: 'pages/lobby/lobby', data: { activeTab: 0 }, switchMainTab(index) {
+    selections.push(index); this.data.activeTab = index;
+  } };
+  const { spec, instance } = tabBar([home], { switchTab() { throw Error('底栏不应切换窗口'); } });
+  spec.lifetimes.attached.call(instance);
+  instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+  instance.syncSelection();
+  assert.equal(home.route, 'pages/lobby/lobby');
+  assert.equal(instance.data.selected, 1);
+  instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+  instance.switchTab({ currentTarget: { dataset: { index: 0 } } });
+  instance.syncSelection();
+  assert.equal(instance.data.selected, 0);
+  assert.deepEqual(selections, [1, 0]);
 });
 
 test("键盘弹出时收起底栏，关闭后恢复，卸载移除自己的键盘监听", () => {

@@ -4,4 +4,20 @@ function selectTab(page, selected) {
   if (tabBar && tabBar.data.selected !== selected) tabBar.setData({ selected });
 }
 
-module.exports = { selectTab };
+// Compatibility entry points still use native routing from independent pages.
+function switchHomeTab(selected, options = {}) {
+  if (![0, 1].includes(selected)) return;
+  const app = typeof getApp === "function" ? getApp() : null;
+  const request = { selected };
+  if (app) app.homeTabRequest = request;
+  wx.switchTab({
+    ...options,
+    url: selected === 0 ? "/pages/lobby/lobby" : "/pages/me/me",
+    fail(error) {
+      if (app?.homeTabRequest === request) delete app.homeTabRequest;
+      options.fail?.(error);
+    },
+  });
+}
+
+module.exports = { selectTab, switchHomeTab };

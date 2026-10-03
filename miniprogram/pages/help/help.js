@@ -1,4 +1,5 @@
 const api = require("../../api");
+const { switchHomeTab } = require("../../tab-navigation");
 
 Page({
   data: {
@@ -46,7 +47,7 @@ Page({
   onUnload() { this.alive = false; },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();
-    else wx.switchTab({ url: "/pages/lobby/lobby" });
+    else switchHomeTab(0);
   },
   async loadBoards() {
     if (this.fetchingBoards) return;

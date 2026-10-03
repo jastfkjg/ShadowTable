@@ -1,5 +1,5 @@
 const api = require("../../api");
-const { selectTab } = require("../../tab-navigation");
+const { selectTab, switchHomeTab } = require("../../tab-navigation");
 function resultFlow(data) {
   const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
   const reason = reasons.find(item => item.id === data.resultReason);
@@ -269,10 +269,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
     };
     wx.onNetworkStatusChange(this.networkListener);
-    this.bootstrap();
+    return this.bootstrap();
   },
   onShow() {
     if (this.data.isLobby) selectTab(this, 0);
+    this.returningHome = false;
     this.foreground = true;
     if (this.alive) {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
@@ -383,7 +384,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         await this.refresh();
         if (!this.data.room && this.pendingInvitation) {
           wx.setStorageSync("invitedRoom", this.pendingInvitation);
-          wx.switchTab({ url: "/pages/lobby/lobby" });
+          switchHomeTab(0);
         }
       }
     } catch (e) {
@@ -408,15 +409,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       // entered during this refresh and avatar-only edits retain the user's name.
       if (profile) {
         const confirmed = profile.nicknameConfirmed ?? !!(profile.nickname && profile.nickname !== "新朋友");
-        this.setData({ nicknameSetup: !confirmed, nicknameVersion: profile.version });
+        const values = { nicknameSetup: !confirmed, nicknameVersion: profile.version };
         if (!preserveName && this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
             nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
         this.lobbyProfileNickname = profile.nickname;
-        if (!this.nameEdited) this.setData({ name: (confirmed ? profile.nickname : "") || wx.getStorageSync("nickname") || "" });
+        if (!this.nameEdited) values.name = (confirmed ? profile.nickname : "") || wx.getStorageSync("nickname") || "";
+        this.updateChangedData(values);
       }
       const held = typeof getApp === "function" && getApp().pendingTableRequest;
-      if (held) this.setData({ pendingTableCode: held.code });
-      else this.setData({ pendingTableCode: "" });
+      this.updateChangedData({ pendingTableCode: held ? held.code : "" });
       const invited = wx.getStorageSync("invitedRoom");
       if (invited) {
         this.setData({ code: invited, entryMode: "join", notice: "朋友邀请你加入房间 " + invited });
@@ -437,11 +438,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       fail: () => this.setData({ error: "未能打开牌桌，请在我的牌桌中重试" }), complete: resolve }));
   },
   async loadRooms() {
+    const sequence = this.roomsReadSequence = (this.roomsReadSequence || 0) + 1;
     const { rooms } = await api.request("/api/me/rooms");
-    if (this.alive) {
+    if (this.alive && sequence === this.roomsReadSequence) {
       this.connectionRecovered();
       const items = roomListItems(rooms);
-      this.setData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false), visibleMemberRooms: items.filter(r => this.data.roomListFilter === "all" || r.status === this.data.roomListFilter), serverConnected: true, network: true });
+      this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false), visibleMemberRooms: items.filter(r => this.data.roomListFilter === "all" || r.status === this.data.roomListFilter), serverConnected: true, network: true });
     }
   },
   handleError(e) {
@@ -874,11 +876,30 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ error: "仍有未确认请求，请先重试原请求" });
       return;
     }
-    this.clearRoom();
-    this.setData({ notice: "" });
     if (!this.data.isLobby) {
-      wx.switchTab({ url: "/pages/lobby/lobby" });
+      if (this.returningHome) return;
+      this.returningHome = true;
+      // Do not replace the visible table with the entry form before navigating.
+      // The cached lobby refreshes in onShow; this page only masks secrets.
+      this.mask();
+      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+      const lobbyIndex = pages.findIndex(page => page.route === "pages/lobby/lobby" ||
+        (page.route === "pages/me/me" && typeof page.switchMainTab === "function"));
+      if (lobbyIndex >= 0) pages[lobbyIndex].switchMainTab?.(0);
+      const finish = () => { this.returningHome = false; };
+      const switchToLobby = () => switchHomeTab(0, {
+        fail: () => {
+          if (this.alive) this.setData({ error: "未能返回对局，请重试" });
+        },
+        complete: finish,
+      });
+      if (lobbyIndex >= 0 && lobbyIndex < pages.length - 1 && wx.navigateBack) {
+        wx.navigateBack({ delta: pages.length - 1 - lobbyIndex, success: finish, fail: switchToLobby });
+      } else switchToLobby();
+      return;
     }
+    this.clearRoom();
+    this.updateChangedData({ notice: "" });
     try {
       await this.loadRooms();
     } catch (e) {

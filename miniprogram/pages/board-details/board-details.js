@@ -1,4 +1,5 @@
 const api = require("../../api");
+const { switchHomeTab } = require("../../tab-navigation");
 Page({
   data: {
     directoryExpanded: false,
@@ -90,6 +91,6 @@ Page({
   },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();
-    else wx.switchTab({ url: "/pages/lobby/lobby" });
+    else switchHomeTab(0);
   },
 });

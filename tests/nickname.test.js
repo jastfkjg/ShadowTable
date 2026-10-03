@@ -133,16 +133,17 @@ function miniPage(route, api, storage = new Map()) {
       Page: page => definition = page, wx, getApp: () => appState, getCurrentPages: () => [{},{}], setTimeout, clearTimeout });
     return mod.exports;
   }
-  load(join(root, 'pages', route, route + '.js'));
+  if (route === 'lobby') definition = load(join(root, 'pages/table/controller.js'))({ lobby: true });
+  else load(join(root, 'pages', route, route + '.js'));
   return { ...definition, data: structuredClone(definition.data), alive: true, foreground: true,
     setData(patch, callback) { Object.assign(this.data, patch); callback?.(); }, schedule() {} };
 }
 const miniApi = { login: async () => {}, requestId: randomUUID, assetUrl: path => path };
 async function idle(page) { while (page.data.busy) await new Promise(resolve => setImmediate(resolve)); }
 const template = vm.runInNewContext('(function(global){' +
-  wxmlToJs(root, { wxmlList: ['pages/lobby/lobby.wxml','pages/table/shared.wxml'], wxsList: [] }) + '})(global)',
+  wxmlToJs(root, { wxmlList: ['pages/lobby/lobby.wxml','pages/table/shared.wxml','pages/home/panels.wxml','pages/me/shared.wxml'], wxsList: [] }) + '})(global)',
   { window: {}, global: {} });
-function entryTree(page) { return JSON.stringify(template('pages/lobby/lobby.wxml')(page.data)); }
+function entryTree(page) { return JSON.stringify(template('pages/lobby/lobby.wxml')({ activeTab: 0, lobby: page.data, personal: {} })); }
 test('小程序历史默认名预填本桌名并显式确认，网络重试保留请求和最终表单值；确认后只改本桌名', async () => {
   let current = { nickname: '新朋友', nicknameConfirmed: false, version: 1 }, fail = true;
   const writes = [], storage = new Map([['nickname','原本桌名字']]);

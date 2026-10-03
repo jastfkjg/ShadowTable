@@ -1,9 +1,14 @@
 const api = require("./api");
 const { canShareFun } = require("./share-card");
+const { switchHomeTab } = require("./tab-navigation");
 // Only reuse the immediately preceding personal page; never persist account data.
 function personalPreview(kind) {
   const pages = getCurrentPages();
   const previous = pages[pages.length - 2];
+  if (typeof previous?.getPersonalPreview === "function") {
+    const value = previous.getPersonalPreview(kind);
+    return value ? JSON.parse(JSON.stringify(value)) : null;
+  }
   if (previous?.route !== "pages/me/me") return null;
   const value = kind === "matches" ? previous.matchesPreview : previous.data?.[kind];
   return value ? JSON.parse(JSON.stringify(value)) : null;
@@ -80,7 +85,7 @@ function presentMatches(records) {
 }
 function backToMe() {
   if (getCurrentPages().length > 1) wx.navigateBack();
-  else wx.switchTab({ url: "/pages/me/me" });
+  else switchHomeTab(1);
 }
 const presentAdjustments = records => records.map(record=>({...record,dateLabel:new Date(record.created).toLocaleString("zh-CN",{hour12:false}),pointsLabel:(record.delta>=0?'+':'')+record.delta+' 分'}));
 module.exports = { presentProfile, presentStats, presentMatches, presentFun, presentAdjustments, backToMe, personalPreview };

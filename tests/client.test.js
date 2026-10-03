@@ -4,7 +4,7 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const { createApp } = require("../server/app");
-function page(api, storage = new Map(), layout) {
+function page(api, storage = new Map(), layout, lobby = false) {
   let definition;
   const scrolls = [];
   const wx = {
@@ -13,6 +13,7 @@ function page(api, storage = new Map(), layout) {
     setStorageSync: (k, v) => storage.set(k, v),
     removeStorageSync: (k) => storage.delete(k),
     switchTab() {},
+    navigateTo(options) { options.complete?.(); },
     showModal: (o) => o.success({ confirm: true }),
   };
   if (layout) wx.createSelectorQuery = () => {
@@ -27,10 +28,15 @@ function page(api, storage = new Map(), layout) {
     fs.readFileSync(
       require.resolve("../miniprogram/pages/table/controller.js"),
       "utf8",
-    ) + "\nPage(module.exports());",
+    ) + "\nPage(module.exports({ lobby: " + lobby + " }));",
     {
       module: { exports: {} },
-      require: () => api,
+      require: name => {
+        if (name !== '../../tab-navigation') return api;
+        const module = { exports: {} };
+        vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/tab-navigation.js'), 'utf8'), { module, wx });
+        return module.exports;
+      },
       Page: (p) => (definition = p),
       wx,
       setTimeout,
@@ -50,6 +56,7 @@ function page(api, storage = new Map(), layout) {
     },
   };
   p.schedule = () => {};
+  p.freshPage = (isLobby = false) => page(api, storage, layout, isLobby);
   return p;
 }
 async function server() {
@@ -680,9 +687,11 @@ test("房主删除后双方回到入口，成员不再轮询已删牌桌", async
     guest.join();
     await settle(guest);
     await host.returnHome();
-    await host.deleteRoom({ currentTarget: { dataset: { code } } });
-    assert.equal(host.data.notice, "房间已解散");
-    assert.equal(host.data.memberRooms[0].available, false);
+    const lobby = host.freshPage(true);
+    await lobby.bootstrap();
+    await lobby.deleteRoom({ currentTarget: { dataset: { code } } });
+    assert.equal(lobby.data.notice, "房间已解散");
+    assert.equal(lobby.data.memberRooms[0].available, false);
     await guest.refresh();
     assert.equal(guest.roomCode, null);
     assert.equal(guest.data.room, null);
@@ -1630,7 +1639,7 @@ test("查看最近结果清除记录筛选并在渲染后定位目标记录", ()
 
 test("首页个人牌桌备注、移除撤销和重新进入保持座位，列表操作复用幂等请求", async () => {
   const a = await server();
-  let guest;
+  let guest, lobby;
   try {
     const host = await a.actor(); guest = await a.actor();
     await host.bootstrap(); await guest.bootstrap();
@@ -1638,22 +1647,25 @@ test("首页个人牌桌备注、移除撤销和重新进入保持座位，列�
     const code = host.roomCode;
     guest.setData({ name: '玩家', code }); guest.join(); await settle(guest);
     await guest.returnHome();
-    assert.equal(guest.data.memberRooms[0].seat, 2);
-    guest.openRoomMenu({currentTarget:{dataset:{code}}});
-    await guest.roomMenuAction({currentTarget:{dataset:{kind:'note'}}});
-    guest.inputRoomNote({detail:{value:'周五朋友局'}});
-    await guest.saveRoomNote();
-    assert.equal(guest.data.memberRooms[0].note, '周五朋友局');
-    guest.openRoomMenu({currentTarget:{dataset:{code}}});
-    await guest.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
-    assert.equal(guest.data.memberRooms.length, 0);
-    assert.equal(guest.data.undoRoom.code, code);
-    await guest.undoRemoveRoom();
-    assert.equal(guest.data.memberRooms[0].note, '周五朋友局');
-    await guest.openRoom({currentTarget:{dataset:{code}}});
-    assert.equal(guest.data.room.me.seat, 2);
-    assert.equal(guest.roomCode, code);
-  } finally { clearTimeout(guest?.undoRoomTimer); await a.close(); }
+    guest.onHide();
+    lobby = guest.freshPage(true); await lobby.bootstrap();
+    assert.equal(lobby.data.memberRooms[0].seat, 2);
+    lobby.openRoomMenu({currentTarget:{dataset:{code}}});
+    await lobby.roomMenuAction({currentTarget:{dataset:{kind:'note'}}});
+    lobby.inputRoomNote({detail:{value:'周五朋友局'}});
+    await lobby.saveRoomNote();
+    assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
+    lobby.openRoomMenu({currentTarget:{dataset:{code}}});
+    await lobby.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+    assert.equal(lobby.data.memberRooms.length, 0);
+    assert.equal(lobby.data.undoRoom.code, code);
+    await lobby.undoRemoveRoom();
+    assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
+    await lobby.openRoom({currentTarget:{dataset:{code}}});
+    const resumed = guest.freshPage(); await resumed.bootstrap();
+    assert.equal(resumed.data.room.me.seat, 2);
+    assert.equal(resumed.roomCode, code);
+  } finally { clearTimeout(lobby?.undoRoomTimer); await a.close(); }
 });
 
 test("个人记录写入响应丢失时保留原幂等键，重试确认后再刷新列表", async () => {

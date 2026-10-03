@@ -18,7 +18,8 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   ctx,
 );
-const render = data => factory(data.room ? "pages/table/table.wxml" : "pages/lobby/lobby.wxml")({ ...data, isLobby: !data.room });
+const render = data => factory(data.room ? "pages/table/table.wxml" : "pages/lobby/lobby.wxml")(data.room
+  ? { ...data, isLobby: false } : { activeTab: 0, lobby: { ...data, isLobby: true }, personal: {} });
 const escape = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -45,14 +46,14 @@ function html(n) {
     n.attr = { ...n.attr, style: (n.attr?.style || "") + ";overflow-y:auto" };
   const attrs = Object.entries(n.attr || {})
     .filter(([k]) =>
-      ["class", "disabled", "placeholder", "value", "role", "style", "src"].includes(
+      ["class", "disabled", "hidden", "placeholder", "value", "role", "style", "src"].includes(
         k,
       ),
     )
     .map(([k, v]) =>
-      k === "disabled"
+      k === "disabled" || k === "hidden"
         ? v
-          ? "disabled"
+          ? k
           : ""
         : `${k}="${escape(k === "style" ? String(v).replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)") : v)}"`,
     )
@@ -320,7 +321,7 @@ const meCss = fs
   .readFileSync(path.join(root, "pages/me/me.wxss"), "utf8")
   .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const personalTemplates = { personalMe: "me", personalEditor: "profile", personalStats: "stats" };
-scenes.personalMe = { profile: {displayName: "林间", initial: "林", identityLabel: "微信账号"}, stats: {total: 24,wins: 15,rateLabel: "62.5%"} };
+scenes.personalMe = { activeTab: 1, lobby: { isLobby: true }, personal: { profile: {displayName: "林间", initial: "林", identityLabel: "微信账号"}, stats: {total: 24,wins: 15,rateLabel: "62.5%"} } };
 scenes.personalEditor = {profile: {}, nickname: "林间", initial: "林",loading:false};
 scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:0,byFaction:[],byBoard:[],recent:[]},loading:false};
 const css = fs

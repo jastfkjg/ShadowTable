@@ -1,3 +1,4 @@
+const { switchHomeTab } = require("../tab-navigation");
 Component({
   data: {
     selected: 0,
@@ -25,19 +26,25 @@ Component({
   methods: {
     syncSelection() {
       const pages = getCurrentPages();
-      const route = pages[pages.length - 1]?.route;
-      const selected = this.data.list.findIndex(item => item.pagePath === "/" + route);
+      const page = pages[pages.length - 1];
+      const selected = typeof page?.switchMainTab === "function" ? page.data.activeTab
+        : this.data.list.findIndex(item => item.pagePath === "/" + page?.route);
       if (selected >= 0 && selected !== this.data.selected) this.setData({ selected });
     },
     switchTab(event) {
       const index = Number(event.currentTarget.dataset.index);
       const item = this.data.list[index];
       if (!item || index === this.data.selected || this.switching) return;
+      const pages = getCurrentPages();
+      const page = pages[pages.length - 1];
+      if (typeof page?.switchMainTab === "function") {
+        page.switchMainTab(index);
+        return;
+      }
       this.switching = true;
       // Let the destination page select its own instance. Keep this one correct
       // if switching fails or the user returns from another page.
-      wx.switchTab({
-        url: item.pagePath,
+      switchHomeTab(index, {
         complete: () => { this.switching = false; },
       });
     },

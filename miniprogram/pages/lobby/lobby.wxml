@@ -1,1 +1,9 @@
-<include src="../table/shared.wxml" />
+<import src="../home/panels.wxml" />
+<import src="../me/shared.wxml" />
+<app-nav title="{{activeTab === 1 ? '我的' : '对局'}}" />
+<view class="main-panel" hidden="{{activeTab !== 0}}">
+  <template is="lobbyPanel" data="{{...lobby, homeShell: true}}" />
+</view>
+<view class="main-panel" hidden="{{activeTab !== 1}}">
+  <template is="personalPanel" data="{{...personal}}" />
+</view>
