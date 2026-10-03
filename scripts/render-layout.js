@@ -55,7 +55,7 @@ function html(n) {
         ? v
           ? k
           : ""
-        : `${k}="${escape(k === "style" ? String(v).replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)") : v)}"`,
+        : `${k}="${escape(k === "style" ? String(v).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)") : v)}"`,
     )
     .join(" ");
   return `<${tag} ${attrs}>${(n.children || []).map(html).join("")}${tag === "input" ? "" : `</${tag}>`}`;
@@ -296,7 +296,7 @@ const detailsRender = factory("pages/board-details/board-details.wxml");
 const boardDetail = require("../server/board-info").knights;
 scenes.boardDetails = { loading: false, error: "", hasDetail: true, title: "阿瓦隆 · 十二骑士", capacity: 12, directoryExpanded: false, ...boardDetail, summary: "" };
 scenes.boardDirectory = { ...scenes.boardDetails, directoryExpanded: true };
-const detailsCss = fs.readFileSync(path.join(root, "pages/board-details/board-details.wxss"), "utf8").replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const detailsCss = fs.readFileSync(path.join(root, "pages/board-details/board-details.wxss"), "utf8").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const settingsRender = factory("pages/settings/settings.wxml");
 scenes.roomSettings = {
   loading: false,
@@ -316,23 +316,40 @@ scenes.roomSettings.transferPlayers = Array.from({ length: 11 }, (_, i) => ({ se
 scenes.roomSettingsPicker = { ...scenes.roomSettings, showTransferPicker: true };
 const settingsCss = fs
   .readFileSync(path.join(root, "pages/settings/settings.wxss"), "utf8")
-  .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+  .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const meCss = fs
   .readFileSync(path.join(root, "pages/me/me.wxss"), "utf8")
-  .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+  .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const profileCss = fs
+  .readFileSync(path.join(root, "pages/profile/profile.wxss"), "utf8")
+  .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const personalTemplates = { personalMe: "me", personalEditor: "profile", personalStats: "stats" };
 scenes.personalMe = { activeTab: 1, lobby: { isLobby: true }, personal: { profile: {displayName: "林间", initial: "林", identityLabel: "微信账号"}, stats: {total: 24,wins: 15,rateLabel: "62.5%"} } };
-scenes.personalEditor = {profile: {}, nickname: "林间", initial: "林",loading:false};
+const { avatarLibrary } = require("../miniprogram/avatar-library");
+scenes.personalEditor = { profile: {}, nickname: "子龙", initial: "子", loading: false, canUpload: true,
+  avatarPreview: "/pages/profile/assets/avatars/avatar-01.jpg", selectedAvatar: "avatar-01", ...avatarLibrary() };
+for (const [suffix, extra] of Object.entries({
+  Uploading: { uploadStatus: "uploading", uploadProgress: 42, uploadBusy: true },
+  Preparing: { uploadStatus: "pending" },
+  Ready: { uploadStatus: "approved" },
+  Failed: { uploadStatus: "failed", uploadError: "上传未完成，请检查网络后重试。" },
+  Rejected: { uploadStatus: "rejected", uploadError: "这张图片暂时无法使用，请重新选择。" },
+  Unavailable: { canUpload: false },
+})) {
+  const name = "personalEditor" + suffix;
+  scenes[name] = { ...scenes.personalEditor, ...extra };
+  personalTemplates[name] = "profile";
+}
 scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:0,byFaction:[],byBoard:[],recent:[]},loading:false};
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace(/^page\s*\{/m, "body {")
-  .replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+  .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");

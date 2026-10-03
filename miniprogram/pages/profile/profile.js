@@ -37,22 +37,25 @@ Page({
   clearCustomAvatar() {
     this.stopAvatarReview();
     this.customAvatarPath = ""; this.uploadRequest = null; this.uploadRecord = null;
+    this.avatarBeforeUpload = null;
     this.uploadPolls = 0;
     this.setData({ uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0 });
   },
   async chooseCustomAvatar(e) {
     const path = e.detail?.avatarUrl;
-    if (!path || !this.original || !this.data.canUpload || this.data.busy || this.pending || this.data.uploadBusy) return;
+    if (!path || !this.original || !this.data.canUpload || this.data.busy || this.pending) return;
+    const before = this.avatarBeforeUpload || { avatar: this.avatar, preview: this.data.avatarPreview, selected: this.data.selectedAvatar };
     this.clearCustomAvatar();
+    this.avatarBeforeUpload = before;
     this.customAvatarPath = path; this.avatar = "local";
     this.setData({ avatarPreview: path, selectedAvatar: "", error: "" }); this.markDirty();
     await this.retryAvatarUpload();
   },
   cancelCustomAvatar() {
-    if (!this.original || this.data.busy || this.pending) return;
-    this.clearCustomAvatar(); this.avatar = undefined;
-    const url = this.original.avatarUrl || "";
-    this.setData({ avatarPreview: url && (/^https?:\/\//.test(url) ? url : api.assetUrl(url)), selectedAvatar: presetId(url) });
+    if (!this.avatarBeforeUpload || this.data.busy || this.pending) return;
+    const before = this.avatarBeforeUpload;
+    this.clearCustomAvatar(); this.avatar = before.avatar;
+    this.setData({ avatarPreview: before.preview, selectedAvatar: before.selected });
     this.markDirty();
   },
   async retryAvatarUpload() {
@@ -70,7 +73,7 @@ Page({
       if (!this.alive || epoch !== this.uploadEpoch) return;
       this.uploadRequest ||= api.requestId();
       const result = await api.uploadAvatar(path, code, this.uploadRequest, progress => {
-        if (this.alive && epoch === this.uploadEpoch) this.setData({ uploadProgress: progress });
+        if (this.alive && epoch === this.uploadEpoch) this.setData({ uploadProgress: Math.max(0, Math.min(100, Number(progress) || 0)) });
       });
       if (!this.alive || epoch !== this.uploadEpoch) return;
       this.applyAvatarReview(result);
@@ -90,10 +93,10 @@ Page({
     } else if (["pending", "processing"].includes(result.status)) {
       this.uploadPolls = (this.uploadPolls || 0) + 1;
       if (this.uploadPolls <= 200) this.uploadTimer = setTimeout(() => { this.uploadTimer = null; this.checkAvatarReview(); }, 3000);
-      else this.setData({ uploadError: "图片仍在审核，可稍后继续检查，或选择内置头像。" });
+      else this.setData({ uploadError: "头像准备时间较长，请重试或选择其他头像。" });
     } else {
       this.uploadRequest = null;
-      this.setData({ uploadError: result.status === "rejected" ? "图片未通过审核，请重新选择。" : "图片审核暂不可用，请重试上传。" });
+      this.setData({ uploadError: result.status === "rejected" ? "这张图片暂时无法使用，请重新选择。" : "头像暂时无法处理，请重试。" });
     }
   },
   async checkAvatarReview() {
@@ -183,7 +186,7 @@ Page({
   },
   async save(e) {
     if (this.data.busy || this.data.loading || this.data.conflict) return;
-    if (this.customAvatarPath && this.avatar === "local") return this.setData({ uploadError: "请等待图片审核通过，或选择内置头像后保存。" });
+    if (this.customAvatarPath && this.avatar === "local") return this.setData({ uploadError: "头像尚未准备好，请稍候或重新选择。" });
     if (!this.pending) {
       const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
       this.setData({ nickname });

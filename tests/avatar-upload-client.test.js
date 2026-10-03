@@ -70,7 +70,7 @@ test("网络结果未确认时重试同一图片编号；审核故障明确后�
   } }); await ready(client);
   await choose(client.p); assert.match(client.p.data.uploadError, /网络/);
   next = "failed"; await client.p.retryAvatarUpload(); assert.equal(attempts[0], attempts[1]);
-  assert.match(client.p.data.uploadError, /审核暂不可用/);
+  assert.match(client.p.data.uploadError, /暂时无法处理/);
   next = "approved"; await client.p.retryAvatarUpload(); assert.notEqual(attempts[2], attempts[1]);
   assert.equal(client.p.data.uploadStatus, "approved"); client.p.onUnload();
 });
@@ -112,6 +112,33 @@ test("取消更换恢复原头像，保留昵称编辑并允许保存，迟到�
   await client.p.save(); assert.deepEqual(client.writes[0].data, { nickname: "只改昵称", version: 3 }); client.p.onUnload();
 });
 
+test("上传途中可以重新选图，旧进度和迟到结果不覆盖新图片；撤销恢复之前的内置头像草稿", async () => {
+  const requests = [];
+  const client = page({ uploadAvatar: (path, _code, id, progress) => new Promise(resolve => requests.push({ path, id, progress, resolve })) });
+  await ready(client);
+  client.p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: "pixel-01" } } });
+  const before = client.p.data.avatarPreview;
+  const first = choose(client.p, "wxfile://first"); await flush();
+  requests[0].progress(42); assert.equal(client.p.data.uploadProgress, 42);
+  const second = choose(client.p, "wxfile://second"); await flush();
+  assert.equal(requests.length, 2); assert.notEqual(requests[0].id, requests[1].id);
+  requests[1].progress(27); requests[0].progress(100);
+  requests[0].resolve({ id: "old-result", status: "approved" }); await first;
+  assert.equal(client.p.data.avatarPreview, "wxfile://second");
+  assert.equal(client.p.data.uploadProgress, 27); assert.equal(client.p.avatar, "local");
+  assert.equal(client.p.data.uploadBusy, true);
+  client.p.inputName({ detail: { value: "保留昵称" } });
+  client.p.cancelCustomAvatar();
+  const snapshot = structuredClone(client.p.data);
+  requests[1].resolve({ id: "cancelled-result", status: "pending" }); await second;
+  assert.deepEqual(JSON.parse(JSON.stringify(client.p.data)), JSON.parse(JSON.stringify(snapshot)));
+  assert.equal(client.p.avatar, "builtin:pixel-01"); assert.equal(client.p.data.selectedAvatar, "pixel-01");
+  assert.equal(client.p.data.avatarPreview, before); assert.equal(client.timers.size, 0);
+  await client.p.save();
+  assert.deepEqual(client.writes[0].data, { nickname: "保留昵称", version: 3, avatar: "builtin:pixel-01" });
+  client.p.onUnload();
+});
+
 test("审核拒绝和状态查询失败保留编辑并提供恢复；过期可重新上传", async () => {
   let status = "pending", failed = false;
   const client = page({ uploadAvatar: async () => ({ id: "upload-one", status: "pending" }), request: async url => {
@@ -121,29 +148,46 @@ test("审核拒绝和状态查询失败保留编辑并提供恢复；过期可�
     return { id: "upload-one", status };
   } }); await ready(client); await choose(client.p);
   status = "rejected"; await client.p.checkAvatarReview();
-  assert.equal(client.p.data.uploadStatus, "rejected"); assert.match(client.p.data.uploadError, /未通过/);
+  assert.equal(client.p.data.uploadStatus, "rejected"); assert.match(client.p.data.uploadError, /无法使用/);
   await client.p.save(); assert.equal(client.writes.length, 0);
   await choose(client.p, "wxfile://second-avatar"); failed = true; await client.p.checkAvatarReview();
   assert.equal(client.p.uploadRecord, null); assert.equal(client.p.data.uploadStatus, "failed");
   assert.match(client.p.data.uploadError, /已过期/); client.p.onUnload();
 });
 
-test("小程序模板按能力显示上传按钮，审核时禁用保存，保留内置头像网格和错误重试", () => {
+test("头像本身可更换，准备时禁用保存但允许重新选图，成功后没有常驻说明，错误可恢复", () => {
   const context = vm.createContext({ window: {}, global: {}, console });
   const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
   const render = factory("pages/profile/profile.wxml"), data = page().p.data;
   function nodes(node) { return typeof node === "object" ? [node, ...(node.children || []).flatMap(nodes)] : []; }
   const base = { ...data, loading: false, profile, nickname: profile.nickname, canUpload: true };
   const chooseButton = tree => nodes(tree).find(node => node.attr?.openType === "chooseAvatar");
-  assert.ok(chooseButton(render(base)));
+  const idle = render(base);
+  assert.ok(chooseButton(idle));
+  assert.ok(nodes(chooseButton(idle)).some(node => node.attr?.class === "avatar-change-badge"));
+  assert.equal(nodes(idle).find(node => node.attr?.class === "avatar-change-label"), undefined);
   assert.equal(chooseButton(render({ ...base, canUpload: false })), undefined);
   for (const uploadStatus of ["pending", "processing", "uploading", "failed", "rejected"]) {
-    const save = nodes(render({ ...base, uploadStatus })).find(node => node.attr?.formType === "submit");
+    const tree = render({ ...base, uploadStatus, uploadBusy: true });
+    const save = nodes(tree).find(node => node.attr?.formType === "submit");
     assert.equal(save.attr.disabled, true);
+    assert.equal(chooseButton(tree).attr.disabled, false);
+    assert.equal(nodes(tree).find(node => node.attr?.bindtap === "cancelCustomAvatar"), undefined);
   }
-  assert.equal(nodes(render({ ...base, uploadStatus: "approved" })).find(node => node.attr?.formType === "submit").attr.disabled, false);
+  const approved = render({ ...base, uploadStatus: "approved" });
+  assert.equal(nodes(approved).find(node => node.attr?.formType === "submit").attr.disabled, false);
+  const visibleText = tree => typeof tree === "string" || typeof tree === "number" ? String(tree) : (tree.children || []).map(visibleText).join(" ");
+  assert.doesNotMatch(visibleText(approved), /更换头像|撤销更换|审核|JPG|PNG|2MB|保存资料即可使用|重新选择图片|上传自己的图片/);
+  const uploading = render({ ...base, uploadStatus: "uploading", uploadProgress: 42 });
+  const progress = nodes(uploading).find(node => node.attr?.role === "progressbar");
+  assert.equal(progress.attr.ariaValuenow, 42);
+  assert.match(JSON.stringify(uploading), /头像上传中/);
+  assert.match(JSON.stringify(render({ ...base, uploadStatus: "pending" })), /正在准备头像/);
+  const failed = render({ ...base, uploadStatus: "failed", uploadError: "网络中断" });
+  assert.ok(nodes(failed).some(node => node.attr?.bindtap === "retryAvatarUpload"));
   const rejected = render({ ...base, uploadStatus: "rejected", uploadError: "未通过审核" });
   assert.ok(nodes(rejected).some(node => node.attr?.role === "alert"));
+  assert.equal(nodes(rejected).find(node => node.attr?.bindtap === "retryAvatarUpload"), undefined);
   assert.equal(nodes(rejected).filter(node => node.attr?.bindtap === "chooseBuiltinAvatar").length, 32);
 });
 
