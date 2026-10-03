@@ -6,7 +6,7 @@ function presetId(url) {
   return avatarPreset(url)?.id || "";
 }
 Page({
-  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", ...avatarLibrary(), initial: "友", profile: null },
+  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", canUpload: false, uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0, ...avatarLibrary(), initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -16,9 +16,102 @@ Page({
       this.original = preview;
       this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
     }
-    return this.load({ preserveEdits: true });
+    const loading = this.load({ preserveEdits: true });
+    this.loadUploadCapability();
+    return loading;
   },
-  onUnload() { this.alive = false; },
+  onUnload() { this.alive = false; this.stopAvatarReview(); },
+  async loadUploadCapability() {
+    if (typeof api.uploadAvatar !== "function") return;
+    try {
+      await api.login();
+      const result = await api.request("/api/me/avatar-uploads");
+      if (this.alive) this.setData({ canUpload: !!result?.enabled && (!wx.canIUse || wx.canIUse("button.open-type.chooseAvatar")) });
+    } catch { /* Old servers and unavailable upload services keep the existing avatar picker. */ }
+  },
+  stopAvatarReview() {
+    this.uploadEpoch = (this.uploadEpoch || 0) + 1;
+    if (this.uploadTimer) clearTimeout(this.uploadTimer);
+    this.uploadTimer = null;
+  },
+  clearCustomAvatar() {
+    this.stopAvatarReview();
+    this.customAvatarPath = ""; this.uploadRequest = null; this.uploadRecord = null;
+    this.uploadPolls = 0;
+    this.setData({ uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0 });
+  },
+  async chooseCustomAvatar(e) {
+    const path = e.detail?.avatarUrl;
+    if (!path || !this.original || !this.data.canUpload || this.data.busy || this.pending || this.data.uploadBusy) return;
+    this.clearCustomAvatar();
+    this.customAvatarPath = path; this.avatar = "local";
+    this.setData({ avatarPreview: path, selectedAvatar: "", error: "" }); this.markDirty();
+    await this.retryAvatarUpload();
+  },
+  cancelCustomAvatar() {
+    if (!this.original || this.data.busy || this.pending) return;
+    this.clearCustomAvatar(); this.avatar = undefined;
+    const url = this.original.avatarUrl || "";
+    this.setData({ avatarPreview: url && (/^https?:\/\//.test(url) ? url : api.assetUrl(url)), selectedAvatar: presetId(url) });
+    this.markDirty();
+  },
+  async retryAvatarUpload() {
+    if (!this.customAvatarPath || this.data.busy || this.pending || this.data.uploadBusy) return;
+    if (this.uploadRecord && ["processing", "pending"].includes(this.uploadRecord.status)) return this.checkAvatarReview();
+    const epoch = this.uploadEpoch, path = this.customAvatarPath;
+    this.setData({ uploadBusy: true, uploadStatus: "uploading", uploadError: "", uploadProgress: 0 });
+    try {
+      await api.login();
+      if (!this.alive || epoch !== this.uploadEpoch) return;
+      const code = this.original.identityType === "wx" ? await new Promise((resolve, reject) => wx.login({
+        success: r => r.code ? resolve(r.code) : reject(new Error("微信登录失败，请重试上传")),
+        fail: () => reject(new Error("微信登录失败，请重试上传")),
+      })) : "";
+      if (!this.alive || epoch !== this.uploadEpoch) return;
+      this.uploadRequest ||= api.requestId();
+      const result = await api.uploadAvatar(path, code, this.uploadRequest, progress => {
+        if (this.alive && epoch === this.uploadEpoch) this.setData({ uploadProgress: progress });
+      });
+      if (!this.alive || epoch !== this.uploadEpoch) return;
+      this.applyAvatarReview(result);
+    } catch (error) {
+      if (!this.alive || epoch !== this.uploadEpoch) return;
+      if (error.status && error.status < 500 && ![401, 429].includes(error.status)) this.uploadRequest = null;
+      this.setData({ uploadStatus: "failed", uploadError: error.message });
+    } finally {
+      if (this.alive && epoch === this.uploadEpoch) this.setData({ uploadBusy: false });
+    }
+  },
+  applyAvatarReview(result) {
+    this.uploadRecord = result;
+    this.setData({ uploadStatus: result.status, uploadError: "" });
+    if (result.status === "approved") {
+      this.avatar = "upload:" + result.id; this.markDirty();
+    } else if (["pending", "processing"].includes(result.status)) {
+      this.uploadPolls = (this.uploadPolls || 0) + 1;
+      if (this.uploadPolls <= 200) this.uploadTimer = setTimeout(() => { this.uploadTimer = null; this.checkAvatarReview(); }, 3000);
+      else this.setData({ uploadError: "图片仍在审核，可稍后继续检查，或选择内置头像。" });
+    } else {
+      this.uploadRequest = null;
+      this.setData({ uploadError: result.status === "rejected" ? "图片未通过审核，请重新选择。" : "图片审核暂不可用，请重试上传。" });
+    }
+  },
+  async checkAvatarReview() {
+    if (!this.uploadRecord || !this.alive || this.data.uploadBusy) return;
+    if (this.uploadTimer) clearTimeout(this.uploadTimer);
+    this.uploadTimer = null;
+    const epoch = this.uploadEpoch;
+    this.setData({ uploadBusy: true, uploadError: "" });
+    try {
+      const result = await api.request("/api/me/avatar-uploads/" + this.uploadRecord.id);
+      if (this.alive && epoch === this.uploadEpoch) this.applyAvatarReview(result);
+    } catch (error) {
+      if (this.alive && epoch === this.uploadEpoch) {
+        if ([404, 410].includes(error.status)) { this.uploadRecord = null; this.uploadRequest = null; this.setData({ uploadStatus: "failed" }); }
+        this.setData({ uploadError: error.message });
+      }
+    } finally { if (this.alive && epoch === this.uploadEpoch) this.setData({ uploadBusy: false }); }
+  },
   async load({ preserveEdits = false } = {}) {
     if (this.data.busy) return;
     this.setData({ loading: true, error: "", conflict: false });
@@ -28,6 +121,7 @@ Page({
       if (!this.alive) return;
       // A background refresh must never replace edits started from the preview.
       if (preserveEdits && (this.data.dirty || this.data.editingNickname || this.pending)) return;
+      this.clearCustomAvatar();
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
       const style = preserveEdits && this.avatarStyleTouched ? this.data.avatarStyle : avatarPreset(profile.avatarUrl)?.style;
@@ -76,17 +170,20 @@ Page({
     if (!this.original || this.data.busy || this.pending) return;
     const preset = builtinAvatars.find(item => item.id === e.currentTarget.dataset.id);
     if (!preset) return;
+    this.clearCustomAvatar();
     this.avatar = presetId(this.original.avatarUrl) === preset.id ? undefined : "builtin:" + preset.id;
     this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, ...avatarLibrary(preset.style), error: "" });
     this.markDirty();
   },
   removeAvatar() {
     if (this.data.busy || this.pending) return;
+    this.clearCustomAvatar();
     this.avatar = this.original?.avatarUrl ? null : undefined;
     this.setData({ avatarPreview: "", selectedAvatar: "", error: "" }); this.markDirty();
   },
   async save(e) {
     if (this.data.busy || this.data.loading || this.data.conflict) return;
+    if (this.customAvatarPath && this.avatar === "local") return this.setData({ uploadError: "请等待图片审核通过，或选择内置头像后保存。" });
     if (!this.pending) {
       const nickname = (e?.detail?.value?.nickname ?? this.data.nickname).trim();
       this.setData({ nickname });

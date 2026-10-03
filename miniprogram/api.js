@@ -100,4 +100,34 @@ function requestId() {
     Math.random().toString(36).slice(2)
   );
 }
-module.exports = { request, login, requestId, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };
+function uploadAvatar(filePath, code, id, onProgress) {
+  if (Date.now() < retryAt) return Promise.reject(Object.assign(new Error("请求冷却中，请稍后重试"), { status: 429 }));
+  const token = wx.getStorageSync("session") || "";
+  return new Promise((resolve, reject) => {
+    const task = wx.uploadFile({
+      url: config.baseUrl + "/api/me/avatar-uploads", filePath, name: "file", timeout: 45000,
+      header: { Authorization: "Bearer " + token, "Idempotency-Key": id },
+      formData: code ? { code } : {},
+      success(res) {
+        let data;
+        try { data = typeof res.data === "string" ? JSON.parse(res.data) : res.data; }
+        catch { return reject(new Error("上传结果尚未确认，请重试上传")); }
+        if (res.statusCode >= 200 && res.statusCode < 300 && data?.id && data?.status) return resolve(data);
+        const error = Object.assign(new Error(data?.error || "上传失败，请重试"), { status: res.statusCode });
+        if (error.status === 429) {
+          const headers = res.header || {}, key = Object.keys(headers).find(k => k.toLowerCase() === "retry-after");
+          const seconds = Number(headers[key]);
+          retryAt = Date.now() + (Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 60000);
+        }
+        if (error.status === 401 && token === (wx.getStorageSync("session") || "")) { wx.removeStorageSync("session"); roomCache.clear(); cacheEpoch++; }
+        reject(error);
+      },
+      fail(error) {
+        const domain = /url not in domain list|不在.*合法域名/i.test(error?.errMsg || "");
+        reject(new Error(domain ? "上传地址未通过微信域名校验，请联系管理员检查配置" : "上传结果尚未确认，请检查网络后重试上传"));
+      },
+    });
+    task?.onProgressUpdate?.(value => onProgress?.(value.progress));
+  });
+}
+module.exports = { request, login, requestId, uploadAvatar, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };

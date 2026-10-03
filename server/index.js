@@ -29,6 +29,10 @@ const { server, store } = createApp({
   devPanel: process.env.DEV_PANEL === "1",
   appId: process.env.WECHAT_APP_ID,
   appSecret: process.env.WECHAT_APP_SECRET,
+  avatarUploads: process.env.AVATAR_UPLOADS === "1",
+  avatarPublicOrigin: process.env.AVATAR_PUBLIC_ORIGIN || "",
+  wechatMessageToken: process.env.WECHAT_MESSAGE_TOKEN || "",
+  wechatMessageAESKey: process.env.WECHAT_MESSAGE_AES_KEY || "",
 });
 const backups = require("./backup").startBackups(store, { database, directory: resolve(process.env.BACKUP_DIR || join(dirname(database), "backups")) });
 const stopMaintenance = process.env.CLEANUP_ENABLED === "0" ? () => {} : require("./retention").startMaintenance(store, { ...cleanupPolicy, canCleanup: backups.hasRecentBackup });

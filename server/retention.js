@@ -68,6 +68,7 @@ function cleanup(store, options = {}) {
     result.entries = db.prepare(`DELETE FROM room_entries WHERE rowid IN
       (SELECT rowid FROM room_entries WHERE unavailable_since>0 AND unavailable_since<? AND note='' ORDER BY unavailable_since LIMIT ?)`)
       .run(now - policy.entryDays * DAY, limit).changes;
+    require("./avatar-uploads").cleanup(store, { batchSize: limit, retentionMs: policy.receiptDays * DAY });
     db.prepare("INSERT OR REPLACE INTO maintenance_meta VALUES('last-cleanup',?)").run(JSON.stringify({ at: now, ...result }));
     return result;
   });

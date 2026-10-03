@@ -98,7 +98,56 @@ test('对局记录分页返回完整历史，成员只包含座位与当时昵�
 function enterObserver(room) {
   room.spectators = [{ uid: 'wx:observer', name: '旁观者', seat: null }];
 }
-test('终止、不计战绩及身份不完整仍排除，陪测房间和陪测身份正常统计', () => {
+test('陪测只保留同桌上下文，真实玩家可更正陪测目标，重启和管理操作不生成陪测统计', () => {
+  const dir=mkdtempSync(join(tmpdir(),'shadowtable-companion-context-')),path=join(dir,'db.sqlite');
+  let store=new Store(path);
+  try {
+    const r=deal();r.testRoom=true;r.scoreEnabled=true;
+    r.players[2].uid='test:merlin';
+    r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['servant','percival','merlin','servant','morgana','assassin'][i]]));
+    r.fun.initialRoles={...r.roles};
+    run(r,'finishTools',{scoreReason:'assassination',scoreTarget:4});
+    const record=structuredClone(r.matchRecord);
+    const verify=()=>{
+      for(const table of ['match_players','match_scores','match_fun_stats','score_versions'])
+        assert.equal(store.db.prepare(`SELECT count(*) AS n FROM ${table} WHERE uid LIKE 'test:%'`).get().n,0);
+      assert.equal(store.matchesFor('test:merlin').total,0);
+      assert.equal(store.statsFor('test:merlin').total,0);
+      assert.deepEqual(store.funFor('test:merlin').metrics,[]);
+      const game=JSON.parse(store.db.prepare('SELECT snapshot FROM matches WHERE id=?').get(r.matchId).snapshot);
+      assert.equal(game.companions.length,1);
+      assert.deepEqual(Object.keys(game.companions[0]).sort(),['alive','faction','name','role','roleId','seat','uid']);
+      assert.equal(store.matchesFor('wx:1').records[0].members.length,6);
+      assert.doesNotMatch(JSON.stringify(store.statsFor('wx:1')),/test:|"companions"/);
+      const view=publicView(store.get(r.code),'test:merlin');
+      assert.equal(view.myScore?.status || null,store.get(r.code).recordManagement.state==='excluded' ? 'excluded' : null);
+      assert.equal(publicView(store.get(r.code),'test:merlin').myFun,null);
+    };
+    assert.throws(()=>store.transaction(()=>{store.save(r);throw Error('rollback');}),/rollback/);
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
+    store.transaction(()=>store.save(r));
+    store.transaction(()=>store.archiveMatch(record));
+    assert.equal(store.statsFor('wx:1').wins,1);verify();
+    store.close();store=new Store(path);verify();
+    const listed=store.managedMatches(new URLSearchParams('companion=1'));
+    assert.equal(listed.total,1);assert.equal(listed.matches[0].players.length,6);
+    assert.equal(listed.matches[0].players.find(p=>p.companion).points,null);
+    store.transaction(()=>store.correctMatch(r.matchId,{revision:0,scoreReason:'assassination',scoreTarget:3}));
+    assert.equal(store.statsFor('wx:1').losses,1);
+    assert.equal(store.funFor('wx:6').metrics.find(m=>m.id==='assassin_hit').count,1);verify();
+    const input={action:'exclude',matches:[{id:r.matchId,revision:1}]};
+    assert.equal(store.transaction(()=>store.previewMatches(input)).affectedPlayers,5);verify();
+    assert.equal(store.transaction(()=>store.manageMatches(input)).affectedPlayers,5);verify();
+    store.transaction(()=>store.manageMatches({action:'include',matches:[{id:r.matchId,revision:2}]}));
+    // The unscored correction path also needs the companion's Merlin identity.
+    store.db.prepare("UPDATE matches SET snapshot=json_set(snapshot,'$.scoreEligibilityReason','本局未开启计分') WHERE id=?").run(r.matchId);
+    store.transaction(()=>store.correctFunMatch(r.matchId,{revision:3,funReason:'assassination',funTarget:4}));
+    assert.equal(store.statsFor('wx:1').wins,1);
+    assert.equal(store.funFor('wx:4').metrics.find(m=>m.id==='good_shield').count,1);verify();
+    store.close();store=new Store(path);verify();
+  } finally {store.close();rmSync(dir,{recursive:true,force:true});}
+});
+test('终止、不计战绩及身份不完整仍排除，陪测房间保留真实玩家统计，陪测身份不归档', () => {
   const store = new Store(':memory:');
   try {
     let r = deal(); finish(store, r, null);
@@ -108,7 +157,7 @@ test('终止、不计战绩及身份不完整仍排除，陪测房间和陪测�
     for (const prefix of ['dev:', 'test:']) {
       r = deal(); r.players[1].uid = prefix+'tester'; r.roles[prefix+'tester'] = 'assassin';
       r.roles['wx:1']='merlin'; finish(store, r, 'evil');
-      assert.equal(store.statsFor(prefix+'tester').wins,1);
+      assert.equal(store.statsFor(prefix+'tester').wins,prefix==='test:' ? 0 : 1);
     }
     r = deal(); r.testRoom=true; delete r.roles['wx:2']; finish(store,r);
     const stats = store.statsFor('wx:1');
@@ -163,7 +212,7 @@ test('旧测试局恢复战绩时同步恢复趣味记录，已恢复胜负的�
   try {
     const rooms=[];
     for(const alreadyRestored of [false,true]) {
-      const r=deal('classic',6,'test:');r.testRoom=true;
+      const r=deal('classic',6,'dev:');r.testRoom=true;
       r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
       r.fun.initialRoles={...r.roles};
       run(r,'finishTools',{funReason:'assassination',funTarget:3});
@@ -174,25 +223,25 @@ test('旧测试局恢复战绩时同步恢复趣味记录，已恢复胜负的�
         store.db.prepare("UPDATE match_players SET outcome=CASE WHEN faction='good' THEN 'win' ELSE 'loss' END,snapshot=json_set(snapshot,'$.outcome',CASE WHEN faction='good' THEN 'win' ELSE 'loss' END) WHERE match_id=?").run(r.matchId);
       }
     }
-    const unknown=deal('classic',6,'test:');unknown.testRoom=true;finish(store,unknown);
-    const terminated=deal('classic',6,'test:');run(terminated,'terminate');store.save(terminated);
+    const unknown=deal('classic',6,'dev:');unknown.testRoom=true;finish(store,unknown);
+    const terminated=deal('classic',6,'dev:');run(terminated,'terminate');store.save(terminated);
     store.close();store=new Store(path);
     const verify=()=>{
-      const stats=store.statsFor('test:3');assert.equal(stats.total,3);assert.equal(stats.excluded,1);
+      const stats=store.statsFor('dev:3');assert.equal(stats.total,3);assert.equal(stats.excluded,1);
       const shield=stats.fun.metrics.find(row=>row.id==='good_shield');
       assert.equal(shield.count,2);assert.equal(shield.knownGames,2);
       for(const r of rooms) {
-        const record=store.matchesFor('test:3').records.find(record=>record.id===r.matchId);
+        const record=store.matchesFor('dev:3').records.find(record=>record.id===r.matchId);
         assert.equal(record.fun.status,'recorded');assert.equal(record.excludedReason,null);
         assert.ok(record.fun.events.some(event=>event.label==='成功挡刀'));
       }
-      assert.equal(store.matchesFor('test:3',0,20,false,{metric:'good_shield',mode:'classic'}).total,2);
-      const board=new Leaderboard(store).read('test:3',new URLSearchParams('metric=fun_good_shield&nearby=1'));
-      assert.equal(board.me.status,'unsupported');assert.equal(board.me.count,2);
-      assert.equal(board.me.rank,null);assert.equal(board.eligibleCount,0);
-      assert.deepEqual(board.rows,[]);assert.deepEqual(board.nearby,[]);
-      assert.equal(store.matchesFor('test:3').records.find(record=>record.id===unknown.matchId).fun.status,'partial');
-      assert.equal(store.matchesFor('test:3').records.find(record=>record.id===terminated.matchId).fun.status,'excluded');
+      assert.equal(store.matchesFor('dev:3',0,20,false,{metric:'good_shield',mode:'classic'}).total,2);
+      const board=new Leaderboard(store).read('dev:3',new URLSearchParams('metric=fun_good_shield&nearby=1'));
+      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,2);
+      assert.equal(board.me.rank,1);assert.equal(board.eligibleCount,1);
+      assert.equal(board.rows.length,1);assert.equal(board.nearby.length,1);
+      assert.equal(store.matchesFor('dev:3').records.find(record=>record.id===unknown.matchId).fun.status,'partial');
+      assert.equal(store.matchesFor('dev:3').records.find(record=>record.id===terminated.matchId).fun.status,'excluded');
     };
     verify();rooms.forEach(room=>store.save(room));verify();
     store.remove(rooms[0].code);store.close();store=new Store(path);verify();

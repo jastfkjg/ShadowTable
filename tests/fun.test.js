@@ -436,7 +436,7 @@ test("空刀单列且不增加刺中梅林或歪刀；只归给实际带刀人",
     assert.equal(r.result.winner, alive ? "good" : "evil");
   }
 });
-test("测试和开发账号的骑士技能、终局趣味、积分与分享数据完整归档", () => {
+test("开发账号完整归档，陪测技能保留真实玩家趣味结果但不归档陪测个人数据", () => {
   const { presentStats, presentMatches } = require('../miniprogram/profile');
   const { statsCard, funCard } = require('../miniprogram/share-card');
   for(const prefix of ['dev:','test:']) for(const [role,metric] of [['gareth','knife_enemy'],['blueKnight','duel_enemy'],['blueHunter','gun_enemy']]) {
@@ -449,6 +449,18 @@ test("测试和开发账号的骑士技能、终局趣味、积分与分享数�
       finish(r,{scoreReason:'assassination',scoreTarget:3,funActor:role==='blueHunter'?5:1});
       store.transaction(()=>store.save(r));store.transaction(()=>store.save(r));
       const stats=store.statsFor(uid),history=store.matchesFor(uid);
+      if(prefix==='test:') {
+        assert.equal(stats.total,0);assert.equal(stats.score.games,0);
+        assert.deepEqual(stats.fun.metrics,[]);assert.equal(history.total,0);
+        assert.equal(publicView(store.get(r.code),uid).myFun,null);
+        assert.equal(store.statsFor('wx:3').total,1);
+        assert.equal(store.funFor('wx:3').metrics.find(row=>row.id==='merlin_hit').count,1);
+        if(finalActor!==uid) assert.equal(store.funFor(finalActor).metrics.find(row=>row.id==='final_hit').count,1);
+        store.transaction(()=>store.correctMatch(r.matchId,{revision:0,scoreReason:'assassination',scoreTarget:3,funActor:role==='blueHunter'?5:1}));
+        assert.equal(store.funFor('wx:3').metrics.find(row=>row.id==='merlin_hit').count,1);
+        assert.deepEqual(store.funFor(uid).metrics,[]);
+        continue;
+      }
       assert.equal(stats.total,1);assert.equal(stats.score.games,1);
       assert.equal(stats.fun.metrics.find(row=>row.id===metric).count,1);
       assert.equal(store.funFor(finalActor).metrics.find(row=>row.id==='final_hit').count,1);
@@ -459,20 +471,7 @@ test("测试和开发账号的骑士技能、终局趣味、积分与分享数�
       assert.ok(presentStats(stats).fun.cards.length);
       assert.equal(presentMatches(history.records)[0].hasFunEvents,true);
       const board=new Leaderboard(store).read(uid,new URLSearchParams('metric=fun_'+metric+'&mode=knights&role='+role));
-      assert.equal(board.me.status,prefix==='test:'?'unsupported':'ranked');assert.equal(board.me.count,1);
-      if(prefix==='test:') {
-        // Exceed rate thresholds so exclusion cannot be explained by insufficient samples.
-        store.db.prepare('UPDATE match_fun_stats SET count=10,opportunities=10 WHERE uid=? AND metric=?').run(uid,metric);
-        assert.equal(board.me.rank,null);
-        assert.equal(board.rows.length,0);
-        for(const period of ['all','month']) for(const sort of ['count','rate']) {
-          const filtered=new Leaderboard(store).read(uid,new URLSearchParams('metric=fun_'+metric+'&period='+period+'&sort='+sort+'&nearby=1'));
-          assert.equal(filtered.me.status,'unsupported');
-          assert.equal(filtered.me.rank,null);
-          assert.equal(filtered.rows.length,0);
-          assert.deepEqual(filtered.nearby,[]);
-        }
-      }
+      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,1);
       assert.equal(store.matchesFor(uid,0,20,false,{metric,mode:'knights',role}).total,1);
       assert.ok(statsCard(readProfile(store,uid),stats));
       assert.ok(funCard(readProfile(store,uid),stats,'knights:'+metric.split('_')[0],metric));

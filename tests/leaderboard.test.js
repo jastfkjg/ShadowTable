@@ -50,7 +50,7 @@ test('微信、开发账号首局自动上榜，陪测和游客不参与五榜�
       const companion=query(board,'test:new','metric='+metric+'&period='+period+'&nearby=1');
       assert.equal(companion.me.status,'unsupported');
       assert.equal(companion.me.rank,null);
-      assert.ok(companion.me.total>0);
+      assert.equal(companion.me.total,0);
       assert.deepEqual(companion.nearby,[]);
       assert.ok(companion.rows.every(row=>!row.isSelf));
     }
@@ -102,7 +102,7 @@ test('重启补齐已有战绩但无资料的账号，保留主动隐藏设置�
     const ids=first.rows.map(row=>row.publicId);
     store.close();store=new Store(path);
     assert.deepEqual(query(new Leaderboard(store),'wx:missing').rows.map(row=>row.publicId),ids);
-    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,4);
+    assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,3);
   } finally {store?.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('开发账号默认公开并参与四榜，关闭后隐藏；游客仍不能公开', () => {

@@ -159,7 +159,7 @@ test("三绿刺中、未中、派西挡刀、刺到坏人和空刀正确分解�
   for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[3,3,2,2,0,0]);
   for(const reason of ["quest_fail","five_rejections"]) assert.deepEqual(finish(deal(),{scoreReason:reason}),[0,0,0,0,3,3]);
 });
-test('测试房间、开发与陪测账号可设置、结算、归档及更正积分，已有开局也可计分',()=>{
+test('测试房间和开发账号可归档及更正积分，纯陪测对局不归档',()=>{
   for(const prefix of ['wx:','dev:','test:']) {
     const lobby=newRoom('123456',prefix+'1','房主','knights',12);lobby.testRoom=true;
     assert.equal(publicView(lobby,lobby.host).scoreSettings.unavailableReason,null);
@@ -178,6 +178,13 @@ test('测试房间、开发与陪测账号可设置、结算、归档及更正�
         assert.deepEqual(finish(room),[3,3,4,2,0,0]);
         store.transaction(()=>store.save(room));store.transaction(()=>store.save(room));
         const uid=prefix+'3';
+        if(prefix==='test:') {
+          assert.equal(store.statsFor(uid).score.games,0);
+          assert.equal(store.matchesFor(uid).total,0);
+          assert.equal(store.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
+          assert.equal(publicView(room,uid).myScore,null);
+          continue;
+        }
         assert.equal(store.statsFor(uid).score.total,4);
         assert.equal(store.statsFor(uid).score.games,1);
         assert.equal(store.streakFor(uid).current,1);
@@ -191,7 +198,7 @@ test('测试房间、开发与陪测账号可设置、结算、归档及更正�
       } finally {store.close();}
     }
   }
-  assert.match(publicRules().notes.join(''),/测试房间、陪测和开发账号参与的对局正常计分/);
+  assert.match(publicRules().notes.join(''),/陪测账号不保存个人战绩、积分及趣味记录/);
 });
 test('正式玩家与陪测账号同桌的十二骑士正常结算并计入积分榜',()=>{
   const store=new Store(':memory:');try {
@@ -202,9 +209,10 @@ test('正式玩家与陪测账号同桌的十二骑士正常结算并计入积�
     assert.deepEqual(publicView(room,room.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
     finish(room,{scoreReason:'early_assassination',scoreTarget:1});
     store.transaction(()=>store.save(room));
-    assert.ok(room.matchRecord.players.every(player=>player.score.status==='scored'));
-    assert.equal(store.statsFor(player.uid).score.games,1);
-    assert.equal(store.statsFor(player.uid).score.total,1);
+    assert.ok(room.matchRecord.players.filter(player=>!player.uid.startsWith('test:')).every(player=>player.score.status==='scored'));
+    assert.equal(store.statsFor(player.uid).score.games,0);
+    assert.equal(store.statsFor(player.uid).score.total,0);
+    assert.equal(publicView(room,player.uid).myScore,null);
     saveProfile(store,'wx:1',{nickname:'房主',version:0,leaderboardVisible:true});
     const ranking=new Leaderboard(store).read('wx:1',new URLSearchParams('metric=points'));
     assert.equal(ranking.me.points,1);assert.equal(ranking.me.total,1);assert.equal(ranking.me.status,'ranked');

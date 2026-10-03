@@ -51,21 +51,16 @@ function detail(store, id) {
   fail(row, "对局不存在", 404);
   const game = JSON.parse(row.snapshot),
     c = control(store, id);
-  const players = store.db
-    .prepare(
-      "SELECT uid,snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')",
-    )
-    .all(id)
-    .map((row) => {
-      const p = JSON.parse(row.snapshot);
+  const players = store.matchParticipants(game)
+    .map((p) => {
       return {
-        uid: row.uid,
+        uid: p.uid,
         name: p.name,
         seat: p.seat,
         outcome: p.outcome,
         points: p.score?.total ?? null,
         alive: p.alive ?? true,
-        companion: row.uid.startsWith("test:"),
+        companion: p.uid.startsWith("test:"),
       };
     });
   return {
@@ -168,7 +163,7 @@ function list(store, query) {
   );
   if (query.has("companion"))
     where.push(
-      "EXISTS(SELECT 1 FROM match_players p WHERE p.match_id=m.id AND p.uid LIKE 'test:%')",
+      "(json_array_length(m.snapshot,'$.companions')>0 OR EXISTS(SELECT 1 FROM match_players p WHERE p.match_id=m.id AND p.uid LIKE 'test:%'))",
     );
   const sql =
     " FROM matches m LEFT JOIN match_controls c ON c.match_id=m.id" +
@@ -272,7 +267,7 @@ function change(store, input) {
     store.db
       .prepare("UPDATE matches SET snapshot=? WHERE id=?")
       .run(JSON.stringify(game), d.id);
-    d.players.forEach((p) => uids.add(p.uid));
+    d.players.filter(p => !p.companion).forEach((p) => uids.add(p.uid));
   }
   for (const uid of uids) store.rebuildScores(uid);
   store.syncScoreRooms();
@@ -292,7 +287,7 @@ function preview(store, input) {
   if (!store.inTransaction) throw Error("预览必须在事务中执行");
   const selected = validate(store, input),
     players = new Map();
-  for (const d of selected) for (const p of d.players) players.set(p.uid, p);
+  for (const d of selected) for (const p of d.players) if (!p.companion) players.set(p.uid, p);
   const summary = (uid) => {
     const stats = store.statsFor(uid);
     return {

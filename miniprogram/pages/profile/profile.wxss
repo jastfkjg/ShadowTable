@@ -34,6 +34,16 @@ button.nickname-done,
 button.nickname-done[disabled]:not([type]) { width: auto; flex-shrink: 0; min-height: 96rpx; margin: 0; padding: 12rpx 16rpx; color: var(--accent); background: transparent; font-size: 28rpx; }
 .nickname-error { margin-top: 12rpx; color: var(--evil); font-size: 26rpx; }
 .avatar-library { margin: 0; }
+.custom-avatar-editor { margin: 0 0 32rpx; }
+.custom-avatar-actions { display: flex; gap: 12rpx; }
+button.custom-avatar-button,
+button.custom-avatar-retry { width: 100%; min-height: 96rpx; margin: 0; }
+button.custom-avatar-button { flex: 1; min-width: 0; }
+button.custom-avatar-cancel { flex-shrink: 0; width: auto; min-height: 96rpx; margin: 0; padding: 12rpx 20rpx; background: transparent; color: var(--muted); }
+.avatar-upload-hint { margin-top: 12rpx; }
+.avatar-upload-status { margin-top: 12rpx; color: var(--accent); }
+.avatar-upload-error { margin-top: 12rpx; color: var(--evil); font-size: 26rpx; line-height: 1.5; }
+button.custom-avatar-retry { margin-top: 16rpx; }
 .avatar-library .field-title { margin: 0; padding-bottom: 20rpx; border-bottom: 2rpx solid var(--border); font-size: 30rpx; }
 .avatar-styles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16rpx; padding-top: 16rpx; }
 button.avatar-style,

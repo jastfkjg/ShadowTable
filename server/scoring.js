@@ -92,7 +92,7 @@ function publicRules(rules = policy()) {
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
     notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，历史积分保留。",
-      "测试房间、陪测和开发账号参与的对局正常计分；终止及缺少计分依据的对局不计积分。", "连胜仅统计计分局；失利归零，不计分局不推进或打断。",
+      "测试房间及有陪测参与的对局中，真实玩家和开发账号正常计分；陪测账号不保存个人战绩、积分及趣味记录。终止及缺少计分依据的对局不计积分。", "连胜仅统计计分局；失利归零，不计分局不推进或打断。",
       rules.streakBonus.enabled ? `每段连胜首次达到${rules.streakBonus.threshold}连胜额外+${rules.streakBonus.points}分。` : "连胜先做荣誉展示，不额外加分。", ...(rules.notes || [])] };
 }
 module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

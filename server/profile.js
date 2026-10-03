@@ -5,6 +5,7 @@ const { join } = require("node:path");
 const { RuleError } = require("./engine");
 const builtinAvatars = require("../miniprogram/builtin-avatars");
 const builtinCache = new Map();
+const uploads = require("./avatar-uploads");
 const MAX_AVATAR_BYTES = 256 * 1024;
 function fail(ok, message) { if (!ok) throw new RuleError(message, 400); }
 function decodeAvatar(value) {
@@ -70,7 +71,9 @@ function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
   const visible = input.leaderboardVisible ?? old.leaderboardVisible;
   fail(!visible || /^(wx|dev|test):/.test(uid), "微信、开发或陪测账号可参与公开排行榜");
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
+  const oldHash = avatarHash;
   if (input.avatar === null) avatarHash = null;
+  else if (typeof input.avatar === "string" && input.avatar.startsWith("upload:")) avatarHash = uploads.resolveUpload(store, uid, input.avatar.slice(7));
   else if (input.avatar !== undefined) {
     const avatar = resolveAvatar(input.avatar);
     store.db.prepare("INSERT OR IGNORE INTO avatars VALUES(?,?,?)").run(avatar.hash, avatar.mime, avatar.data);
@@ -80,6 +83,7 @@ function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
     nickname=excluded.nickname, avatar_hash=excluded.avatar_hash, version=excluded.version, updated=excluded.updated,
     leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id), nickname_confirmed=excluded.nickname_confirmed`)
     .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID(), confirmNickname || old.nicknameConfirmed ? 1 : 0);
+  uploads.trackReferences(store, oldHash, avatarHash);
   store.invalidateLeaderboard();
   return readProfile(store, uid);
 }

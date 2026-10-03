@@ -226,7 +226,7 @@ test("现有房间开启陪测，绑定房间与管理员，关闭/退出阻止�
   assert.equal(a.app.store.get(code).players.length, 1);
   assert.equal(a.app.store.get(code).players[0].uid.startsWith("wx:"), true);
 });
-test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话与测试房间", async (t) => {
+test("在线陪测不归档个人对局数据，接口仍绑定管理会话与测试房间", async (t) => {
   const a = await setup(t);
   await a.login();
   const { code, token } = await a.room();
@@ -252,10 +252,10 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
     await a.api("/api/me/profile",{nickname:actor.name,version:profile.version},auth);
     const stats=await a.api("/api/me/stats",undefined,auth);
     const matches=await a.api("/api/me/matches?scored=1",undefined,auth);
-    assert.equal(stats.total,1);assert.equal(stats.score.games,1);
-    assert.ok(stats.byRole.length);assert.ok(stats.byFaction.length);assert.ok(stats.byBoard.length);
-    assert.equal(matches.total,1);assert.equal(matches.records[0].fun.status,"recorded");
-    assert.equal(matches.records[0].score.status,"scored");
+    assert.equal(stats.total,0);assert.equal(stats.score.games,0);
+    assert.deepEqual(stats.byRole,[]);assert.deepEqual(stats.byFaction,[]);assert.deepEqual(stats.byBoard,[]);
+    assert.equal(matches.total,0);assert.deepEqual(matches.records,[]);
+    assert.deepEqual(stats.fun.metrics,[]);
     assert.deepEqual(stats,JSON.parse(JSON.stringify(a.app.store.statsFor(uid))));
     for(const metric of ["points","games","overall"]) {
       const board=await a.api("/api/leaderboard?metric="+metric+"&nearby=1",undefined,auth);
@@ -263,14 +263,10 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
       assert.equal(board.me.total,stats.total);assert.ok(board.rows.every(row=>!row.isSelf));
       assert.equal(board.eligibleCount,1);assert.deepEqual(board.nearby,[]);
     }
-    for(const metric of stats.fun.metrics.filter(row=>row.ranked&&row.count>0)) {
-      const board=await a.api("/api/leaderboard?metric=fun_"+metric.id+"&nearby=1",undefined,auth);
-      assert.equal(board.me.status,"unsupported");assert.equal(board.me.count,metric.count);
-      assert.equal(board.me.rank,null);assert.ok(board.rows.every(row=>!row.isSelf));
-      assert.deepEqual(board.nearby,[]);
-      const filtered=await a.api("/api/me/matches?fun="+metric.id+"&mode="+metric.mode,undefined,auth);
-      assert.equal(filtered.total,1);assert.ok(filtered.records[0].fun.highlights.length);
-    }
+    const funBoard=await a.api("/api/leaderboard?metric=fun_merlin_evade&nearby=1",undefined,auth);
+    assert.equal(funBoard.me.status,"unsupported");assert.equal(funBoard.me.count,0);
+    const filtered=await a.api("/api/me/matches?fun=merlin_evade&mode=classic",undefined,auth);
+    assert.equal(filtered.total,0);
     assert.equal((await a.api("/api/me/rooms",undefined,auth)).rooms.length,1);
     assert.equal((await a.api("/api/me/score-adjustments",undefined,auth)).total,0);
     assert.doesNotMatch(JSON.stringify({stats,matches}),/test:|wx:|"uid"/);
@@ -283,7 +279,7 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
   assert.equal((await a.api("/api/me/profile",undefined,auth)).leaderboardVisible,true);
   assert.equal((await a.api("/api/leaderboard",undefined,auth)).me.status,"unsupported");
   await hostCommand("rematch");
-  assert.equal((await a.api("/api/me/matches",undefined,auth)).total,1);
+  assert.equal((await a.api("/api/me/matches",undefined,auth)).total,0);
   const other=await a.room();
   await assert.rejects(a.api("/api/rooms/"+other.code,undefined,auth),e=>e.status===403);
   await assert.rejects(a.api("/api/rooms",{name:"越界创建"},auth),e=>e.status===403);
@@ -291,8 +287,9 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
   await a.api("/api/admin/logout",{});await a.login();
   await assert.rejects(a.api("/api/me/stats",undefined,auth),e=>e.status===403);
   await a.action(code,"clear-testers");
-  assert.equal(a.app.store.matchesFor(room.players[1].uid).total,1);
-  assert.equal(a.app.store.statsFor(room.players[1].uid).fun.metrics.find(row=>row.id==="merlin_evade").count,1);
+  assert.equal(a.app.store.matchesFor(room.players[1].uid).total,0);
+  assert.deepEqual(a.app.store.statsFor(room.players[1].uid).fun.metrics,[]);
+  assert.equal(a.app.store.statsFor(room.host).total,1);
   await assert.rejects(a.api("/api/me/matches",undefined,auth),e=>e.status===401);
 });
 test("管理写操作原因选填，保留状态冲突检查与概览身份隔离", async (t) => {

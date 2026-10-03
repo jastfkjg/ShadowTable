@@ -52,6 +52,11 @@ function createApp({
   webWechatLogin = false,
   wechatCode,
   exchangeCode,
+  avatarUploads = false,
+  avatarPublicOrigin = "",
+  wechatMessageToken = "",
+  wechatMessageAESKey = "",
+  avatarReview,
   trustedProxies = "",
   logger = console,
   clock = () => Date.now(),
@@ -128,6 +133,17 @@ function createApp({
     check(data.openid && !data.errcode, "微信登录凭证已失效，请重新登录", 401);
     return data.openid;
   }
+  let wechatAvatarReview;
+  if (avatarUploads && appId && appSecret && avatarPublicOrigin && wechatMessageToken && wechatMessageAESKey) {
+    const origin = new URL(avatarPublicOrigin);
+    if (origin.protocol !== "https:" || origin.origin !== avatarPublicOrigin) throw new Error("AVATAR_PUBLIC_ORIGIN 必须是完整的HTTPS源地址，不含路径");
+    wechatAvatarReview = require("./wechat-avatar-review").createWechatAvatarReview({ appId, appSecret, token: wechatMessageToken, aesKey: wechatMessageAESKey, clock });
+  }
+  const uploads = require("./avatar-uploads").createAvatarUploads({
+    store, enabled: avatarUploads && !!(wechatAvatarReview || avatarReview || devAuth), publicOrigin: avatarPublicOrigin,
+    review: avatarReview || wechatAvatarReview?.submit || (devAuth ? async () => ({ approved: true }) : null),
+    exchangeCode: wechatLogin, devAuth, limit,
+  });
   const webAuth = webOrigin ? require("./web-auth").createWebAuth({
     store, origin: webOrigin,
     enabled: !!(webWechatLogin && (wechatCode || (appId && appSecret))),
@@ -173,6 +189,20 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account read/write and login/create limits below apply independently.
       limit(`ip:${clientAddress(req)}`, 6000);
+      if (path === "/api/wechat/avatar-review" && wechatAvatarReview) {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        if (req.method === "GET") return send(200, wechatAvatarReview.verify(requestUrl.searchParams), true);
+        check(req.method === "POST", "接口不存在", 404);
+        uploads.complete(wechatAvatarReview.event(requestUrl.searchParams, await body(req, 65536)));
+        return send(200, "success", true);
+      }
+      const reviewMedia = path.match(/^\/api\/avatar-review-media\/([a-f0-9]{64})$/);
+      if (req.method === "GET" && reviewMedia) {
+        const bytes = uploads.media(reviewMedia[1]);
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("X-Robots-Tag", "noindex");
+        return send(200, bytes, true);
+      }
       if (webAuth && await webAuth.handle(req, res, path, send)) return;
       if (req.method === "GET" && path === "/api/scoring/rules")
         return send(200, scoreRules());
@@ -242,6 +272,13 @@ function createApp({
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
+      if (path === "/api/me/avatar-uploads") {
+        if (req.method === "GET") return send(200, { enabled: uploads.enabled && (uid.startsWith("wx:") || devAuth && uid.startsWith("dev:")) });
+        check(req.method === "POST", "接口不存在", 404);
+        return send(202, await uploads.upload(req, uid));
+      }
+      const uploadStatus = path.match(/^\/api\/me\/avatar-uploads\/([a-f0-9-]{36})$/);
+      if (req.method === "GET" && uploadStatus) return send(200, require("./avatar-uploads").readUpload(store, uid, uploadStatus[1]));
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
       if (path === "/api/me/profile" || path === "/api/me/leaderboard-visibility") {

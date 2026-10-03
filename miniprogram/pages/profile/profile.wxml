@@ -20,6 +20,18 @@
         <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
       </view>
     </view>
+    <view wx:if="{{canUpload}}" class="custom-avatar-editor">
+      <view class="custom-avatar-actions">
+        <button hover-class="none" class="secondary custom-avatar-button" open-type="chooseAvatar" bindchooseavatar="chooseCustomAvatar" disabled="{{busy || pendingSave || uploadBusy}}" aria-label="上传自己的头像图片">{{uploadStatus ? '重新选择图片' : '上传自己的图片'}}</button>
+        <button wx:if="{{uploadStatus}}" hover-class="none" class="custom-avatar-cancel" bindtap="cancelCustomAvatar" disabled="{{busy || pendingSave}}">取消更换</button>
+      </view>
+      <view class="small muted avatar-upload-hint">JPG / PNG，最大2MB；审核通过后点击保存生效。</view>
+      <view wx:if="{{uploadStatus === 'uploading'}}" class="small avatar-upload-status" role="status">{{uploadProgress < 100 ? '正在上传 ' + uploadProgress + '%' : '正在处理图片…'}}</view>
+      <view wx:elif="{{uploadStatus === 'pending' || uploadStatus === 'processing'}}" class="small avatar-upload-status" role="status">图片正在审核，当前头像继续使用。</view>
+      <view wx:elif="{{uploadStatus === 'approved'}}" class="small avatar-upload-status" role="status">审核通过，点击保存资料即可使用。</view>
+      <view wx:if="{{uploadError}}" class="avatar-upload-error" role="alert">{{uploadError}}</view>
+      <button wx:if="{{uploadError && uploadStatus !== 'rejected'}}" hover-class="none" class="secondary custom-avatar-retry" bindtap="retryAvatarUpload" disabled="{{uploadBusy || busy || pendingSave}}">{{uploadStatus === 'pending' || uploadStatus === 'processing' ? '继续检查审核结果' : '重试上传'}}</button>
+    </view>
     <view class="avatar-library">
       <view class="field-title">选择头像</view>
       <view class="avatar-styles" role="group" aria-label="头像风格">
@@ -35,7 +47,7 @@
     <view wx:if="{{!keyboardHeight}}" class="profile-save-bar">
       <view class="profile-save-content">
         <view wx:if="{{pendingSave && !busy}}" class="profile-save-hint small muted">保存结果尚未确认，请重试保存。</view>
-        <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || conflict}}">{{busy ? '正在保存…' : (pendingSave ? '重试保存' : '保存资料')}}</button>
+        <button hover-class="none" class="primary profile-save" form-type="submit" loading="{{busy}}" disabled="{{loading || busy || conflict || uploadStatus === 'uploading' || uploadStatus === 'pending' || uploadStatus === 'processing' || uploadStatus === 'failed' || uploadStatus === 'rejected'}}">{{busy ? '正在保存…' : (pendingSave ? '重试保存' : '保存资料')}}</button>
       </view>
     </view>
   </form>
