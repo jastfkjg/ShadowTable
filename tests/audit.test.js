@@ -388,15 +388,22 @@ test("技能审计保留守护挡刀与刀错身份的判定，而非只记录�
   assert.doesNotMatch(JSON.stringify(result), /p1|p2|p3/);
 });
 
-test("阵营转换与空刀结算使用实际状态，空刀不会记成命中梅林", () => {
+test("阵营转换审计记录两名兰斯洛特转换后的实际阵营", () => {
   const { room, run } = reviewRoom("knights", 12);
+  for (const player of room.players) room.roles[player.uid] = "servant";
+  Object.assign(room.roles, { p1: "redLancelot", p2: "blueLancelot" });
   room.knights.conversions = [true];
-  const lancelots = room.players.filter((player) =>
-    ["blueLancelot", "redLancelot"].includes(room.roles[player.uid]),
-  );
   const conversion = run("p1", "beginActivity", { kind: "conversion" });
   assert.equal(conversion.outcomes[0].text, "本轮阵营转换");
-  assert.equal(conversion.outcomes[0].lines.length, lancelots.length);
+  assert.equal(room.knights.players.p1.faction, "good");
+  assert.equal(room.knights.players.p2.faction, "evil");
+  assert.equal(conversion.outcomes[0].lines.length, 2);
+  assert.match(conversion.outcomes[0].lines[0], /1号·玩家1.*→ 好人$/);
+  assert.match(conversion.outcomes[0].lines[1], /2号·玩家2.*→ 坏人$/);
+});
+
+test("空刀审计记录场上无梅林，不会记成命中梅林", () => {
+  const { room, run } = reviewRoom("knights", 12);
   for (const player of room.players) room.roles[player.uid] = "servant";
   room.roles.p1 = "assassin";
   run("p1", "beginActivity", { kind: "assassination", actor: 1 });
