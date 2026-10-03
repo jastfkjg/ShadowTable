@@ -1269,14 +1269,22 @@ test('网页不计积分的骑士终局必须选实际带刀人，切换带刀�
   c.ACTIONS.pickFunActor({dataset:{seat:2}});assert.equal(c.state.resultTarget,null);c.ACTIONS.nextResult();assert.match(c.viewResultDialog(),/pickScoreTarget" disabled data-seat="2"/);assert.match(c.viewResultDialog(),/1号<\/span><span class="score-player-name">&lt;甲&gt;/);assert.doesNotMatch(c.viewResultDialog(),/&amp;lt;/);
 });
 
-test('个人趣味入口正常渲染且仍转义动态文字，排名详情按需打开', async () => {
+test('个人趣味入口不显示预览，昵称仍转义动态文字，排名详情按需打开', async () => {
   const c = client(async () => response(webRanks()));
-  c.state.profile = {nickname:'林间',identityType:'wx'};
+  c.state.profile = {nickname:'<img src=x onerror=attack()>昵称',identityType:'wx'};
   c.state.stats = {total:1,wins:1,winRate:100,fun:{teaser:'<img src=x onerror=attack()>战报'}};
   const html = c.viewMe();
   assert.match(html, /data-page="stats\?tab=fun"/);
   assert.doesNotMatch(html, /&lt;span|<img src=x/);
-  assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;战报/);
+  assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;昵称/);
+  assert.doesNotMatch(html, /战报/);
+  const overview = html.slice(html.indexOf('<div class="me-overview">'), html.indexOf('<div class="personal-links'));
+  const controls = [...overview.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
+  assert.equal(controls.length, 3);
+  assert.ok(controls.every(([, , content]) => !content.includes('<button')));
+  assert.match(controls[0][1], /data-action="navigate" data-page="stats"/);
+  assert.match(controls[1][1], /data-action="scoreRecords"/);
+  assert.match(controls[2][1], /data-action="navigate" data-page="help"/);
   await c.applyRoute('#/leaderboard');
   assert.doesNotMatch(c.viewLeaderboard(), /role="switch"/);
   c.ACTIONS.rankToggleMine();

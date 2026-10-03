@@ -1999,12 +1999,24 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 .me-overview-page .profile-edit { margin: 0; color: var(--muted); }
 .me-overview-page .account-note { margin: 12px 0; font-size: 13px; }
 .me-overview { margin-top: 16px; padding: 0 16px; background: var(--surface); border-radius: 16px; }
-.me-overview .personal-section { margin: 0; padding: 12px 0; border: 0; }
-.me-overview .score-overview { border-top: 1px solid var(--border); }
-.me-overview .section-title { margin: 0; font-size: 15px; min-height: 44px; }
-.me-overview .personal-metrics { padding: 8px 0; gap: 8px; }
-.me-overview .metric-value { font-size: 24px; }
+.me-overview .personal-section { margin: 0; padding: 0; border: 0; }
+.me-overview .score-overview { position: relative; border-top: 1px solid var(--border); }
+.me-overview-link { display: block; width: 100%; margin: 0; padding: 4px 0 8px; border: 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; }
+.me-overview-link .section-title { font-weight: 600; }
+.me-overview .me-results-detail { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 44px; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.me-overview .me-chevron { flex-shrink: 0; width: 6px; height: 6px; margin-right: 2px; border-top: 1px solid var(--muted); border-right: 1px solid var(--muted); transform: rotate(45deg); }
+.me-overview .section-title { margin: 0; font-size: 17px; min-height: 44px; }
+.me-overview .personal-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; padding: 2px 0 0; gap: 8px; text-align: center; }
+.me-overview .score-overview .personal-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.me-overview .me-metric { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 2px; }
+.me-overview .metric-value { font-size: 28px; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+.me-overview .me-metric .small { display: block; font-size: 12px; line-height: 1.4; }
 .me-overview .history-toggle, .me-overview .text-button { margin: 0; min-height: 44px; width: auto; padding: 8px 0; font-size: 13px; }
+.me-overview .history-heading .history-toggle, .me-overview .history-heading .text-button { color: var(--muted); font-weight: 400; }
+.me-overview .me-rules-trigger { position: absolute; z-index: 1; left: 40px; top: 4px; display: flex; align-items: center; justify-content: flex-start; width: 44px; min-height: 44px; margin: 0; padding: 0; color: var(--muted); }
+.me-rules-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.me-overview-link:focus-visible, .me-rules-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.me-overview-page .profile-edit::after { content: ""; flex-shrink: 0; width: 6px; height: 6px; margin-right: 2px; border-top: 1px solid var(--muted); border-right: 1px solid var(--muted); transform: rotate(45deg); }
 .me-overview-page .personal-links { border: 0; margin-top: 12px; }
 .me-overview-page .personal-link { margin: 0; min-height: 56px; padding: 14px 8px; border-bottom: 1px solid rgba(177,191,198,.14); }
 .me-overview-page .me-links-secondary { border-top: 1px solid var(--border); }
