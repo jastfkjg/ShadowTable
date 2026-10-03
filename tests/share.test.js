@@ -41,14 +41,15 @@ test("角色合并不同最终阵营，小样本和零胜率照实呈现，未�
   assert.deepEqual(small.roles.map(row=>row.total),[1,1]);
   assert.ok(cards.dimensions(small).height<cards.dimensions(card).height);
 });
-test("趣味图片仅输出所选正向指标，区分未知、真实零和无机会，附已知与未知样本", () => {
+test("趣味图片仅输出所选正向指标，区分未知、真实零和无机会，不展示未记录局数说明", () => {
   const stats = copy(fixtures.stats), metric = stats.fun.cards[0].metrics[0];
   const create = () => cards.funCard(fixtures.profile, stats, "classic:merlin", "merlin_evade", fixtures.now);
   assert.equal(create().hero, "8");
   assert.equal(create().chart.value, "80%");
   assert.match(cards.describe(create()), /成功率 80%/);
   assert.deepEqual(create().metrics.map(item=>item.value), ["10", "10"]);
-  assert.match(create().notes.join(), /2 局未记录/);
+  assert.deepEqual(create().notes, []);
+  assert.doesNotMatch(cards.describe(create()), /另有.*未记录/);
   Object.assign(metric, { count: 0, value: 0, rate: 0 });
   assert.equal(create().hero, "0");
   assert.equal(create().chart.value, "0%");
@@ -105,10 +106,26 @@ test("趣味榜图片完整带上指标、排序、角色、玩法和周期，�
   assert.deepEqual(card.metrics.map(item=>item.value), ["10","16","12"]);
   assert.match(card.notes.join(), /至少 10 次有效机会/);
   const pending = cards.leaderboardCard(fixtures.profile, {...board,me:{...board.me,status:"not_enough",rank:null,opportunities:4,count:2,rate:50,remaining:6}});
-  assert.equal(pending.rankLabel,"未上榜");assert.equal(pending.hero,"50");assert.match(pending.notes.join(),/尚未达到上榜条件 · 还差 6 次/);
+  assert.equal(pending.rankLabel,"未上榜");assert.equal(pending.hero,"50");assert.match(pending.notes.join(),/尚未达到上榜条件 · 还差 6 次有效机会/);
   assert.equal(cards.canShareLeaderboard({...board,me:{knownGames:2,opportunities:0,rate:null}}),false);
   assert.throws(() => cards.parseSelection({ ...selection, role: "../secret" }), /筛选无效/);
   assert.throws(() => cards.parseSelection({ kind: "somebody", uid: "other" }), /无效/);
+});
+test("分享资格由本人成绩决定，未上榜与真实零次可分享，无记录或无成功率给出一致原因", () => {
+  const board={metric:"fun_good_shield",metricLabel:"成功挡刀次数",fun:true,sort:"count",unit:"次",period:"all",me:{status:"not_enough",knownGames:2,count:0,opportunities:0,rate:null,remaining:1}};
+  assert.equal(cards.leaderboardShareError(board),"");
+  const card=cards.leaderboardCard(fixtures.profile,board);
+  assert.equal(card.hero,"0");assert.equal(card.rankLabel,"未上榜");
+  assert.match(card.notes.join(),/还差 1 次/);
+  const rate={...board,sort:"rate"};
+  assert.match(cards.leaderboardShareError(rate),/暂无有效机会.*次数榜/);
+  assert.throws(()=>cards.leaderboardCard(fixtures.profile,rate),{message:cards.leaderboardShareError(rate)});
+  const empty={...board,me:{...board.me,knownGames:0}};
+  assert.match(cards.leaderboardShareError(empty),/暂无本人成绩.*完成相关对局/);
+  assert.throws(()=>cards.leaderboardCard(fixtures.profile,empty),{message:cards.leaderboardShareError(empty)});
+  const small={metric:"overall",period:"all",me:{status:"not_enough",rank:null,total:2,wins:1,winRate:50,remaining:8}};
+  assert.equal(cards.leaderboardShareError(small),"");
+  assert.match(cards.leaderboardCard(fixtures.profile,small).notes.join(),/还差 8 局/);
 });
 
 function page({ api, render, overrides = {} } = {}) {
@@ -224,8 +241,8 @@ test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退",
     require: name => name === "./api" ? { assetUrl: value => "https://example.test" + value } : cards });
   const card = cards.statsCard({ ...fixtures.profile, avatarUrl: "/api/avatars/" + "a".repeat(64) }, fixtures.stats, fixtures.now);
   assert.equal(await mod.exports.renderImage({ alive: true }, card), "wxfile://native");
-  assert.equal(canvas.width, 1080); assert.equal(canvas.height, 1424);
-  assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,1424);
+  assert.equal(canvas.width, 1080); assert.equal(canvas.height, cards.dimensions(card).height);
+  assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,cards.dimensions(card).height);
   assert.equal(exported.height,canvas.height);assert.equal(exported.fileType, "png"); assert.ok(drawing.includes("小"));
 });
 
@@ -259,4 +276,76 @@ test("分享榜单突出标题，全部时间及全部玩法不输出，未知�
   assert.deepEqual(card.notes, []);
   assert.doesNotMatch(cards.describe(card), /全部时间|全部玩法|好人|非梅林|我的附近|另有.*未记录/);
   assert.equal(card.metrics[2].value, '1');
+});
+
+test("附近玩家头像保留安全地址，本人行使用当前头像，非法图片地址不进入画布", () => {
+  const avatar = "/api/avatars/" + "a".repeat(64), nearbyAvatar = "/api/avatars/" + "b".repeat(64);
+  const board = copy(fixtures.board);
+  board.nearby[0].avatarUrl = nearbyAvatar;
+  board.nearby[1].avatarUrl = "https://example.test/untrusted-avatar.jpg";
+  board.nearby[2].avatarUrl = "/api/avatars/" + "c".repeat(64);
+  const card = cards.leaderboardCard({ ...fixtures.profile, avatarUrl: avatar }, board);
+  assert.equal(card.nearby[0].avatar, nearbyAvatar);
+  assert.equal(card.nearby[1].avatar, "");
+  assert.equal(card.nearby[2].avatar, avatar);
+  assert.doesNotMatch(JSON.stringify(card), /untrusted-avatar|publicId|must-not-export/);
+});
+
+test("分享画布等待所有头像加载并去重，绘制附近玩家头像，单张失败仍可导出", async () => {
+  const avatar = "/api/avatars/" + "a".repeat(64), neighbor = "/api/avatars/" + "b".repeat(64), failed = "/api/avatars/" + "c".repeat(64);
+  const board = copy(fixtures.board);
+  board.nearby[0].avatarUrl = neighbor; board.nearby[1].avatarUrl = failed; board.nearby[3].avatarUrl = neighbor;
+  const card = cards.leaderboardCard({ ...fixtures.profile, avatarUrl: avatar }, board);
+  const drawn = [], drawing = [], images = [];
+  const context = { fillRect() {}, strokeRect() {}, save() {}, restore() {}, beginPath() {}, closePath() {}, arc() {}, clip() {}, moveTo() {}, lineTo() {}, stroke() {}, measureText: text => ({ width: text.length * 20 }), fillText: text => drawing.push(text), drawImage: (...args) => drawn.push(args) };
+  const canvas = { getContext: () => context, createImage() { const image = { width: 120, height: 80, set src(value) { this.url=value; images.push(this); } }; return image; } };
+  let exported;
+  const wx = { createSelectorQuery() { const query = { in() { return query; }, select() { return query; }, fields() { return query; }, exec(callback) { callback([{ node: canvas }]); } }; return query; },
+    canvasToTempFilePath(options) { exported=options; options.success({tempFilePath:"wxfile://avatars"}); } };
+  const mod = {exports:{}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../miniprogram/share-image.js"), "utf8"), { module:mod, wx, setTimeout, clearTimeout,
+    require: name => name === "./api" ? {assetUrl:value=>"https://example.test"+value} : cards });
+  const rendering = mod.exports.renderImage({alive:true}, card);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(images.length, 3); assert.equal(exported, undefined);
+  images.find(image=>image.url.endsWith(neighbor)).onload();
+  images.find(image=>image.url.endsWith(failed)).onerror();
+  assert.equal(exported, undefined);
+  images.find(image=>image.url.endsWith(avatar)).onload();
+  assert.equal(await rendering, "wxfile://avatars");
+  const rows = drawn.filter(args=>args[5]===202);
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map(args=>args[0].url), [neighbor,avatar,neighbor].map(value=>"https://example.test"+value));
+  for (const args of rows) assert.deepEqual(args.slice(1,5), [20,0,80,80]);
+  assert.ok(drawing.includes("阿"));assert.ok(drawing.includes("栗"));
+  assert.equal(exported.fileType,"png");
+});
+
+test("刀客分享同时展示出刀与三种结果，旧标题不影响新卡片，未知结果保留未知", () => {
+  const stats=copy(fixtures.fullFunStats);
+  stats.fun.cards.find(group=>group.id==='knights:knife').title='轮内刀法';
+  const card=cards.funCard(fixtures.profile,stats,'knights:knife','knife_enemy',fixtures.now);
+  assert.equal(card.title,'刀客刀法');
+  assert.deepEqual(card.metrics.map(row=>[row.label,row.value]),[['出刀次数','6'],['未刀中次数','2'],['刀中敌方次数','3'],['刀中友方次数','1']]);
+  assert.doesNotMatch(cards.describe(card),/轮内刀法|成功率|未记录|undefined/);
+  const failed=stats.fun.cards.at(-1).metrics.find(row=>row.id==='knife_failed');failed.value=null;failed.knownGames=0;
+  assert.equal(cards.funCard(fixtures.profile,stats,'knights:knife','knife_enemy',fixtures.now).metrics[1].value,'—');
+});
+
+test("完整趣味分享汇总全部项目且跨玩法合并，未知数据不冒充零，不导出个人明细", async () => {
+  const stats=copy(fixtures.fullFunStats);
+  stats.fun.cards.push({id:'knights:merlin',title:'梅林',metrics:[{...fixtures.metric,count:2,value:2,opportunities:4,knownGames:3}]});
+  stats.fun.cards.push({id:'knights:duel',title:'骑士决斗',metrics:[{id:'duel_enemy',label:'命中敌方',value:null,count:0,knownGames:0}]});
+  stats.fun.cards[0].privateStory='must-not-export';
+  const card=cards.funSummaryCard(fixtures.profile,stats,fixtures.now);
+  assert.equal(card.sections.length,3);assert.equal(card.sections[0].metrics[0].value,'10');
+  assert.equal(card.sections[2].metrics.length,4);
+  assert.doesNotMatch(JSON.stringify(card),/must-not-export|privateStory|十二骑士|经典|未记录|mode|byRole|好人/);
+  assert.equal(cards.canShareFun(stats.fun),true);
+  assert.throws(()=>cards.funSummaryCard(fixtures.profile,{fun:{cards:[stats.fun.cards.at(-1)]}},fixtures.now),/还没有完整/);
+  assert.deepEqual(cards.parseSelection({kind:'funSummary',uid:'ignored'}),{kind:'funSummary'});
+  const {p,requests,renderCount}=page({api:{login:async()=>{},request:async url=>{requests.push(url);return url.includes('profile')?fixtures.profile:stats;}}});
+  await p.onLoad({kind:'funSummary'});await p.onReady();
+  assert.ok(p.data.imagePath);assert.equal(renderCount(),1);assert.match(p.data.description,/完整趣味记录.*梅林.*成功挡刀.*刀客刀法/);
+  assert.deepEqual(requests.sort(),['/api/me/profile','/api/me/stats']);
 });

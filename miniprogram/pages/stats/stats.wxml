@@ -1,4 +1,4 @@
-<app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" share="{{tab!=='fun' && !!stats.total}}" shareDisabled="{{loading || !!error}}" shareLabel="分享战绩图片" bindshare="shareStats" />
+<app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" share="{{tab==='fun' ? stats.fun.shareable : !!stats.total}}" shareDisabled="{{loading || !!error}}" shareLabel="{{tab==='fun' ? '分享完整趣味记录图片' : '分享战绩图片'}}" bindshare="shareStats" />
 <view class="page personal-page stats-page">
   <view wx:if="{{loading && !stats}}" class="status">正在读取战绩…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>

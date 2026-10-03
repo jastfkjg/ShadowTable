@@ -1,14 +1,24 @@
 const api = require("../../api");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
 const { backToMe } = require("../../profile");
-const { boardSelection, queryString, canShareLeaderboard } = require("../../share-card");
+const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { mineExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareable: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { mineExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   onLoad() { this.alive = true; },
   onShow() { return this.load(); },
   shareLeaderboard() {
-    if (this.data.loading || this.data.loadingMore || this.data.error || this.data.visibilitySaving || !canShareLeaderboard(this.data.board)) return;
-    wx.navigateTo({ url: "/pages/share/share?" + queryString(boardSelection(this.data.board)) });
+    if (this.data.loading || this.data.loadingMore || this.data.visibilitySaving || this.data.shareOpening) return;
+    const error = this.data.error ? "请先重试读取榜单，再分享成绩。" : leaderboardShareError(this.data.board);
+    if (error) return this.showShareNotice(error);
+    this.setData({ shareNotice: "", shareOpening: true });
+    wx.navigateTo({ url: "/pages/share/share?" + queryString(boardSelection(this.data.board)),
+      fail: () => { if (this.alive) this.showShareNotice("分享页暂时无法打开，请稍后重试。"); },
+      complete: () => { if (this.alive) this.setData({ shareOpening: false }); },
+    });
+  },
+  showShareNotice(message) {
+    this.setData({ shareNotice: message });
+    wx.showToast({ title: message, icon: "none", duration: 3000 });
   },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; },
   async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },
@@ -20,7 +30,7 @@ Page({
     let append = more, pointsUnavailable = false, funUnavailable = false;
     this.failedSelection = null;
     // Keep the rendered snapshot mounted until the replacement is ready.
-    this.setData({ ...selection, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "" });
+    this.setData({ ...selection, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "", shareNotice: "" });
     try {
       await api.login();
       const query = "?metric=" + metric + "&period=" + period + (metric.startsWith("fun_") ? "&mode=" + funMode + "&sort=" + funSort + (funRole ? "&role=" + funRole : "") : "") + (more ? "&offset=" + board.nextOffset + "&version=" + board.version : "");
@@ -45,7 +55,7 @@ Page({
         return { ...item, title, tabLabel: title + " · " + item.label };
       });
       const funRoleOptions = [{ id:"", label:"全部角色" }, ...(result.roleOptions || [])];
-      this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, shareable: canShareLeaderboard(result), loading: false, loadingMore: false,
+      this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, loading: false, loadingMore: false,
         funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
         notice: funUnavailable ? "当前服务尚未开放趣味榜，已显示局数榜。" : pointsAvailable ? "" : pointsUnavailable ? "当前服务尚未开放积分榜，已显示局数榜。" : "当前服务尚未开放积分榜。",
         ...(!this.visibilityPending ? { visible: !['hidden','unsupported'].includes(result.me.status) } : {}) });

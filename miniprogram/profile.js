@@ -1,4 +1,5 @@
 const api = require("./api");
+const { canShareFun } = require("./share-card");
 // Only reuse the immediately preceding personal page; never persist account data.
 function personalPreview(kind) {
   const pages = getCurrentPages();
@@ -47,7 +48,7 @@ function presentFun(value) {
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
   });
-  return { ...value, available: true, cards };
+  return { ...value, available: true, cards, shareable: canShareFun(value) };
 }
 function presentMatches(records) {
   return records.map(record => {

@@ -35,7 +35,7 @@ Page({
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
       this.card = kind === "leaderboard" ? cards.leaderboardCard(profile, result)
-        : kind === "stats" ? cards.statsCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
+        : kind === "stats" ? cards.statsCard(profile, result, now) : kind === "funSummary" ? cards.funSummaryCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
       this.setData({ description: cards.describe(this.card) });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { this.fetching = false; if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }

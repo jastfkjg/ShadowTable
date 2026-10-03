@@ -20,4 +20,11 @@ const board = { metric: "points", period: "month", periodStart: Date.UTC(2026, 8
   { rank: 9, nickname: "北川", publicId: "not-needed", points: 271, total: 22 },
   { rank: 10, nickname: "栗子", publicId: "not-needed", points: 260, total: 20 },
 ], me: { status: "ranked", rank: 8, points: 286, total: 24, wins: 15, losses: 9, winRate: 62.5 } };
-module.exports = { now, profile, metric, stats, board };
+const knife = {id:"knights:knife",mode:"knights",modeLabel:"十二骑士",title:"刀客刀法",metrics:[
+  {id:"knife_enemy",label:"命中敌方",unit:"次",ranked:true,count:3,value:3,opportunities:6,knownGames:4,rate:50},
+  {id:"knife_ally",label:"命中同伴",unit:"次",ranked:false,count:1,value:1,opportunities:6,knownGames:4,rate:16.7},
+  {id:"knife_failed",label:"未生效",unit:"次",ranked:false,count:2,value:2,opportunities:6,knownGames:4,rate:33.3},
+]};
+const fullFunStats = {fun:{cards:[...stats.fun.cards,
+  {id:"knights:shield",mode:"knights",modeLabel:"十二骑士",title:"好人",metrics:[{id:"good_shield",label:"成功挡刀",unit:"次",ranked:true,count:1,value:1,opportunities:1,knownGames:1,unknownGames:2,rate:100}]},knife]}};
+module.exports = { now, profile, metric, stats, board, knife, fullFunStats };

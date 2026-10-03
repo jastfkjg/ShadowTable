@@ -28,8 +28,13 @@ Page({
   },
   toggleFunCards() { this.setData({ funExpanded: !this.data.funExpanded }); },
   shareStats() {
+    if (this.data.tab === "fun") return this.shareFunSummary();
     if (this.data.loading || this.data.error || !this.data.stats?.total) return;
     wx.navigateTo({ url: "/pages/share/share?kind=stats" });
+  },
+  shareFunSummary() {
+    if (this.data.loading || this.data.error || !this.data.stats?.fun?.shareable) return;
+    wx.navigateTo({ url: "/pages/share/share?kind=funSummary" });
   },
   shareFun(event) {
     if (this.data.loading || this.data.error) return;

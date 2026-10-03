@@ -123,6 +123,9 @@ test('图片预览准备完成后才能发送或保存；不支持发送与相�
   const renderShare=factory('pages/share/share.wxml');
   const loading=renderShare({loading:true,imageMenu:true,imagePath:''});
   assert.equal(byHandler(loading,'send').attr.disabled,true);assert.equal(byHandler(loading,'save').attr.disabled,true);
+  assert.equal(byHandler(loading,'send').attr.loading,true);assert.match(JSON.stringify(byHandler(loading,'send')),/正在读取/);
+  const rendering=renderShare({loading:false,rendering:true,imageMenu:true,imagePath:''});
+  assert.equal(byHandler(rendering,'save').attr.loading,true);assert.match(JSON.stringify(byHandler(rendering,'save')),/正在生成/);
   const ready=renderShare({loading:false,rendering:false,acting:false,imagePath:'wxfile://preview',description:'小林，62.5%胜率',imageMenu:true});
   assert.equal(byHandler(ready,'send').attr.disabled,false);
   assert.equal(nodes(ready).find(node=>node.tag==='wx-image').attr.src,'wxfile://preview');
@@ -133,13 +136,24 @@ test('图片预览准备完成后才能发送或保存；不支持发送与相�
   assert.ok(!nodes(ready).some(node=>node.attr?.bindtap==='chooseMode'));
   assert.doesNotMatch(JSON.stringify(ready),/榜单前三位/);
 });
-test('没有公开榜单时本人仍可分享成绩；只有他人成绩时禁止生成个人图片', () => {
-  const renderRank=factory('pages/leaderboard/leaderboard.wxml');
-  const own=renderRank({board:{rows:[],metric:'games'},shareable:true});
+test('榜单分享入口在本人未上榜或暂无记录时均可点击，忙碌时显示等待状态', () => {
+  const template=factory('pages/leaderboard/leaderboard.wxml');
+  const renderRank=data=>template({loading:false,loadingMore:false,visibilitySaving:false,shareOpening:false,...data});
+  const own=renderRank({board:{rows:[],metric:'games'}});
   assert.equal(byHandler(own,'shareLeaderboard').attr.disabled,false);
   assert.match(JSON.stringify(own),/暂无公开排名/);
-  const empty=renderRank({board:{rows:[{rank:1,nickname:'其他玩家'}],metric:'games'},shareable:false});
-  assert.equal(byHandler(empty,'shareLeaderboard').attr.disabled,true);
+  const board={rows:[],metric:'games'};
+  const empty=renderRank({board,shareNotice:'当前榜单暂无本人成绩，完成相关对局后再来分享。'});
+  assert.equal(byHandler(empty,'shareLeaderboard').attr.disabled,false);
+  assert.ok(nodes(empty).some(node=>node.attr?.role==='alert'));
+  assert.match(JSON.stringify(empty),/暂无本人成绩/);
+  for (const key of ['loading','loadingMore','visibilitySaving','shareOpening']) {
+    const busy=renderRank({board,[key]:true});
+    const entry=byHandler(busy,'shareLeaderboard');
+    assert.equal(entry.attr.disabled,true);assert.equal(entry.attr.loading,true);
+    assert.match(entry.attr.ariaLabel,/正在/);
+    assert.ok(nodes(busy).some(node=>node.attr?.role==='status'));
+  }
 });
 test('趣味榜显示当前指标，展开后可选全部指标，排序独立呈现并保留样本门槛', () => {
   const defs=require('../server/fun').publicMetrics().filter(m=>m.key!=='fun_final_hit');
@@ -958,4 +972,14 @@ test("结算需要主动选择胜方，支持第三阵营；零有效局不显�
   const stats = factory("pages/stats/stats.wxml")({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
   assert.doesNotMatch(JSON.stringify(stats), /还没有有效战绩|去开一局|按阵营与角色查看/);
   assert.doesNotMatch(JSON.stringify(stats), /0%/);
+});
+
+test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐藏，单项分享仍可使用',()=>{
+  const renderStats=factory('pages/stats/stats.wxml');
+  const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'命中敌方'}]}}};
+  const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
+  assert.equal(nav.attr.share,true);assert.equal(nav.attr.shareLabel,'分享完整趣味记录图片');
+  assert.ok(byHandler(ready,'shareFun'));
+  const empty=renderStats({...data,stats:{...data.stats,fun:{...data.stats.fun,shareable:false}}});
+  assert.equal(nodes(empty).find(node=>node.tag==='wx-app-nav').attr.share,false);
 });

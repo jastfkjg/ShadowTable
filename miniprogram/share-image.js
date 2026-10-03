@@ -27,9 +27,10 @@ async function renderImage(page, card) {
   const canvas = await canvasFor(page);
   const { width, height } = dimensions(card);
   canvas.width = width; canvas.height = height;
-  const avatar = await avatarFor(canvas, card.avatar);
+  const paths = [...new Set([card.avatar, ...(card.nearby || []).map(row => row.avatar)].filter(Boolean))];
+  const avatars = new Map(await Promise.all(paths.map(async path => [path, await avatarFor(canvas, path)])));
   if (!page.alive) return null;
-  drawCard(canvas.getContext("2d"), card, avatar);
+  drawCard(canvas.getContext("2d"), card, avatars.get(card.avatar), avatars);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("图片生成超时，请重试。")), 10000);
     wx.canvasToTempFilePath({ canvas, x: 0, y: 0, width, height, destWidth: width, destHeight: height, fileType: "png",

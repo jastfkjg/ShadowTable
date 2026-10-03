@@ -18,8 +18,9 @@ function identity(profile) {
   return { name: clean(profile.nickname) || "新朋友", avatar: /^\/api\/avatars\/[a-f0-9]{64}$/.test(profile.avatarUrl || "") ? profile.avatarUrl : "" };
 }
 function describe(card) {
-  return [card.name, card.title, card.context, card.scope, card.label, card.hero + card.unit, card.rank ? "第 " + card.rank + " 名" : card.rankLabel,
-    ...(card.chart ? [card.chart.label + " " + card.chart.value] : []), ...card.metrics.map(item => item.label + " " + item.value), ...(card.notes || []),
+  return [card.name, card.title, card.context, card.scope, card.label, card.hero == null ? "" : card.hero + card.unit, card.rank ? "第 " + card.rank + " 名" : card.rankLabel,
+    ...(card.chart ? [card.chart.label + " " + card.chart.value] : []), ...(card.metrics || []).map(item => item.label + " " + item.value), ...(card.notes || []),
+    ...(card.sections || []).flatMap(section => [section.title, ...section.metrics.map(item => item.label + " " + item.value)]),
     ...(card.factions || []).map(row => row.label + " " + recordDescription(row)),
     ...(card.roles || []).map(row => row.label + " " + recordDescription(row)),
     ...(card.otherRoles ? ["其他角色 " + recordDescription(card.otherRoles)] : []),
@@ -59,18 +60,55 @@ function statsCard(profile, stats, now) {
     metrics: [stat(stats.total, "有效局数"), stat(stats.wins, "胜场"), stat(stats.losses ?? stats.total - stats.wins, "负场")],
     ...breakdown(stats), asOf: now };
 }
-function recordNotes(row) {
-  return row.unknownGames ? ["另有 " + number(row.unknownGames) + " 局未记录，不计入本项"] : [];
+function canShareFun(fun) {
+  return !!fun?.cards?.some(group => group.metrics.some(row => !row.id.endsWith("aim_enemy") && Number.isFinite(row.value) && row.knownGames > 0));
+}
+function knifeMetrics(group) {
+  const row = id => group.metrics.find(metric => metric.id === "knife_" + id);
+  const known = metric => metric && Number.isFinite(metric.value) && metric.knownGames > 0;
+  const enemy = row("enemy");
+  return [
+    { label: "出刀次数", value: known(enemy) ? number(enemy.opportunities) : "—", color: "accent" },
+    { label: "未刀中次数", value: known(row("failed")) ? number(row("failed").count) : "—", color: "muted" },
+    { label: "刀中敌方次数", value: known(enemy) ? number(enemy.count) : "—", color: "good" },
+    { label: "刀中友方次数", value: known(row("ally")) ? number(row("ally").count) : "—", color: "evil" },
+  ];
 }
 function funCard(profile, stats, cardId, metricId, now) {
   const group = stats.fun?.cards?.find(card => card.id === cardId);
   const metric = group?.metrics?.find(row => row.id === metricId && row.ranked);
   if (!metric || metric.value == null || !metric.knownGames) throw new Error("这项成绩还没有完整记录，暂时无法生成图片。");
-  return { kind: "fun", ...identity(profile), context: "趣味成绩 · 全部时间", scope: metricId === "good_shield" ? "" : clean(group.title),
+  if (cardId.endsWith(":knife")) return { kind: "combat", ...identity(profile), context: "趣味成绩", scope: "", title: "刀客刀法", metrics: knifeMetrics(group), notes: [], asOf: now };
+  return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: metricId === "good_shield" ? "" : clean(group.title),
     hero: number(metric.count), unit: clean(metric.unit), label: clean(metric.label),
     chart: { ratio: metric.opportunities ? metric.count / metric.opportunities : null, value: percent(metric.rate), label: "成功率" },
     metrics: [stat(metric.opportunities, "有效机会"), stat(metric.knownGames, "有记录局数")],
-    notes: [...(!metric.opportunities ? ["暂无有效机会，成功率暂不计算"] : []), ...recordNotes(metric)], asOf: now };
+    notes: !metric.opportunities ? ["暂无有效机会，成功率暂不计算"] : [], asOf: now };
+}
+function funSummaryCard(profile, stats, now) {
+  if (!canShareFun(stats.fun)) throw new Error("还没有完整的趣味记录，完成相关对局后再来分享。");
+  const groups = new Map();
+  for (const group of stats.fun.cards) {
+    const key = group.id.split(":").pop();
+    const combined = groups.get(key) || { title: key === "knife" ? "刀客刀法" : key === "shield" ? "成功挡刀" : clean(group.title), metrics: new Map() };
+    for (const metric of group.metrics) {
+      if (metric.id.endsWith("aim_enemy")) continue;
+      const item = combined.metrics.get(metric.id) || { id: metric.id, label: clean(metric.label), unit: clean(metric.unit), ranked: metric.ranked, count: 0, opportunities: 0, knownGames: 0, value: null };
+      if (Number.isFinite(metric.value) && metric.knownGames > 0) {
+        item.count += metric.count; item.opportunities += metric.opportunities; item.knownGames += metric.knownGames; item.value = item.count;
+      }
+      combined.metrics.set(metric.id, item);
+    }
+    groups.set(key, combined);
+  }
+  const sections = [...groups.entries()].filter(([, group]) => [...group.metrics.values()].some(row => row.knownGames > 0)).map(([key, group]) => {
+    const rows = [...group.metrics.values()], primary = rows.find(row => row.ranked && row.knownGames > 0);
+    return { title: group.title,
+      metrics: key === "knife" ? knifeMetrics({metrics: rows}) : rows.map(row => ({label: row.label + (row.unit === "局" ? "局数" : "次数"), value: row.value == null ? "—" : number(row.count), color: /_(ally|hit|bust|miss|loss)$/.test(row.id) ? "evil" : row.id.endsWith("failed") ? "muted" : "good"})),
+      caption: key !== "knife" && primary?.opportunities ? "成功率 " + percent(primary.count / primary.opportunities * 100) + " · " + number(primary.opportunities) + " 次机会" : "",
+    };
+  });
+  return { kind: "funSummary", ...identity(profile), context: "完整趣味记录", scope: "", sections, metrics: [], notes: [], asOf: now };
 }
 function boardSelection(board) {
   return { kind: "leaderboard", metric: board.metric, period: board.period,
@@ -88,6 +126,7 @@ function parseSelection(options) {
     catch { throw new Error("分享内容无效，请返回原页面重新生成。"); }
   }
   if (options.kind === "stats") return { kind: "stats" };
+  if (options.kind === "funSummary") return { kind: "funSummary" };
   if (options.kind === "fun" && /^(classic|knights|other):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };
   if (options.kind !== "leaderboard" || !["all", "month"].includes(options.period) ||
@@ -106,6 +145,12 @@ function canShareLeaderboard(board) {
   return board.fun ? me.knownGames > 0 && (board.sort !== "rate" || me.opportunities > 0 && Number.isFinite(me.rate))
     : me.total > 0 || board.metric === "points" && Number.isFinite(me.points) && me.points !== 0;
 }
+function leaderboardShareError(board) {
+  if (canShareLeaderboard(board)) return "";
+  if (board?.fun && board.sort === "rate" && board.me?.knownGames > 0)
+    return "暂无有效机会，可切换次数榜分享成绩。";
+  return "当前榜单暂无本人成绩，完成相关对局后再来分享。";
+}
 function nearbyProjection(profile, board, rank) {
   const rows = board.nearby;
   const value = row => board.fun ? board.sort === "rate" ? row.rate : row.count : board.metric === "points" ? row.points : board.metric === "games" ? row.total : row.winRate;
@@ -116,11 +161,12 @@ function nearbyProjection(profile, board, rank) {
   const previous = rows[index - 1], count = board.fun ? board.sort === "count" : board.metric === "points" || board.metric === "games";
   const distance = previous && previous.rank < rank && count ? value(previous) - value(own) : 0;
   const unit = board.fun ? clean(board.unit) : board.metric === "points" ? "分" : "局";
-  return { nearby: rows.map(row => ({ rank: row.rank, name: row.isSelf ? identity(profile).name : clean(row.nickname) || "新朋友", value: decimal(value(row)), isSelf: row.isSelf === true })),
+  return { nearby: rows.map(row => ({ rank: row.rank, name: row.isSelf ? identity(profile).name : clean(row.nickname) || "新朋友", avatar: identity(row.isSelf ? profile : row).avatar, value: decimal(value(row)), isSelf: row.isSelf === true })),
     gap: distance > 0 ? "距上一位 " + decimal(distance) + " " + unit : "" };
 }
 function leaderboardCard(profile, board) {
-  if (!canShareLeaderboard(board)) throw new Error("当前范围还没有可分享的本人成绩，完成相关对局后再来。");
+  const error = leaderboardShareError(board);
+  if (error) throw new Error(error);
   const me = board.me, points = board.metric === "points", games = board.metric === "games";
   const period = board.period === "month" ? shanghaiTime(board.periodStart, true).replace(".", " 年 ") + " 月" : "";
   const title = board.fun ? clean(board.metricLabel) + "榜" : metricNames[board.metric];
@@ -130,7 +176,7 @@ function leaderboardCard(profile, board) {
   const notes = [];
   if (me.status === "hidden") notes.push("未公开排行榜 · 仅分享本人成绩");
   else if (me.status === "unsupported") notes.push("当前账号不参与排行榜");
-  else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? " 次" : " 局") : ""));
+  else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? board.sort === "rate" ? " 次有效机会" : " 次" : " 局") : ""));
   if (board.fun && board.sort === "rate") notes.push("上榜需至少 " + number(board.threshold) + " 次有效机会");
   return { kind: "rank", ...identity(profile), title, context: period,
     scope: board.fun ? [board.metric === "fun_good_shield" ? "" : clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role)].filter(Boolean).join(" · ") : "",
@@ -148,15 +194,23 @@ function leaderboardCard(profile, board) {
 function layout(card) {
   const heroTop = card.kind === "rank" ? (card.context || card.scope ? 332 : 292) : card.scope ? 284 : 232;
   if (card.kind === "stats") {
-    let cursor = 458;
-    const factionColumns = card.factions.length === 3 ? 3 : Math.min(2, card.factions.length);
+    let cursor = 508;
     const factionsTop = cursor;
-    if (factionColumns) cursor += 290 + 228 * (Math.ceil(card.factions.length / factionColumns) - 1);
+    if (card.factions.length) cursor += 152 + card.factions.length * 184;
     const rolesTop = cursor;
-    if (card.roles.length) cursor += 160 + card.roles.length * 84 + (card.otherRoles ? 56 : 0);
+    if (card.roles.length) cursor += 160 + card.roles.length * 96 + (card.otherRoles ? 56 : 0);
     const notesTop = cursor + 20;
     const footerTop = cursor + card.notes.length * 42 + 24;
-    return { heroTop, factionColumns, factionsTop, rolesTop, notesTop, footerTop, height: footerTop + 100 };
+    return { heroTop, factionsTop, rolesTop, notesTop, footerTop, height: footerTop + 100 };
+  }
+  if (card.kind === "combat") {
+    const footerTop = heroTop + 500;
+    return { heroTop, metricsTop: heroTop + 72, footerTop, height: footerTop + 100 };
+  }
+  if (card.kind === "funSummary") {
+    let cursor = 232;
+    const sectionTops = card.sections.map(section => { const top = cursor; cursor += 100 + Math.ceil(section.metrics.length / 2) * 164 + (section.caption ? 56 : 0) + 40; return top; });
+    return { heroTop, sectionTops, footerTop: cursor, height: cursor + 100 };
   }
   if (card.kind === "rank") {
     const nearbyTop = heroTop + 258 + (card.gap ? 56 : 0);
@@ -171,7 +225,7 @@ function layout(card) {
 const dimensions = card => ({ width: SIZE, height: layout(card).height });
 
 // Same renderer runs on a native Canvas 2D node and in visual verification.
-function drawCard(ctx, card, avatar) {
+function drawCard(ctx, card, avatar, nearbyAvatars = new Map()) {
   const box = layout(card), { heroTop, footerTop, height } = box;
   const font = (size, weight = 400) => { ctx.font = weight + " " + size + "px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif"; };
   const text = (value, x, y, size, color = COLORS.text, width = 936, align = "left", weight = 400) => {
@@ -234,6 +288,13 @@ function drawCard(ctx, card, avatar) {
       if (index) line(72 + column * index, top + 32, 72 + column * index, top + 120);
     });
   };
+  const metricGrid = (metrics, top, cellHeight = 164) => {
+    metrics.forEach((item, index) => {
+      const col = index % 2, row = Math.floor(index / 2), x = 72 + col * 496, y = top + row * cellHeight;
+      text(item.value, x, y + 84, fit(item.value, 96, 440, 48), COLORS[item.color] || COLORS.text, 440, "left", 600);
+      text(item.label, x, y + 134, fit(item.label, 34, 440), COLORS.muted, 440);
+    });
+  };
   rect(0, 0, SIZE, height, COLORS.background);
   ctx.strokeStyle = COLORS.border; ctx.lineWidth = 1; ctx.strokeRect(24, 24, SIZE - 48, height - 48);
   line(24, 24, 116, 24, COLORS.accent, 3); line(24, 24, 24, 90, COLORS.accent, 3);
@@ -270,19 +331,17 @@ function drawCard(ctx, card, avatar) {
     const result = card.summary.wins + " 胜 · " + card.summary.losses + " 负";
     text(result, 732, heroTop + 178, fit(result, 38, 276), COLORS.muted, 276);
     if (card.factions.length) {
-      const top = box.factionsTop, column = 936 / box.factionColumns;
+      const top = box.factionsTop;
       line(72, top, 1008, top);
-      text("阵营表现", 72, top + 56, 42, COLORS.text, 440, "left", 600);
+      text("阵营表现", 72, top + 64, 42, COLORS.text, 440, "left", 600);
       card.factions.forEach((row, index) => {
-        const col = index % box.factionColumns, y = top + Math.floor(index / box.factionColumns) * 228, x = 72 + column * col;
-        const color = COLORS[row.id] || COLORS.accent;
-        emblem(x + 26, y + 102, row.id === "good" ? "shield" : row.id === "evil" ? "mask" : "star", color, 44);
-        text(row.label, x + 64, y + 116, 38, COLORS.text, column - 90, "left", 500);
-        text(row.rate, x, y + 188, fit(row.rate, 78, column - 52), color, column - 52, "left", 600);
-        const record = row.wins + " 胜 · " + row.losses + " 负";
-        text(record, x, y + 234, fit(record, 34, column - 52), COLORS.muted, column - 52);
-        bar(x, y + 254, column - 52, row.ratio, color);
-        if (col) line(x - 26, y + 90, x - 26, y + 266);
+        const y = top + 104 + index * 184, color = COLORS[row.id] || COLORS.accent;
+        emblem(98, y + 36, row.id === "good" ? "shield" : row.id === "evil" ? "mask" : "star", color, 42);
+        text(row.label, 140, y + 50, 40, COLORS.text, 400, "left", 500);
+        const result = row.wins + " 胜 · " + row.losses + " 负";
+        text(result, 140, y + 100, fit(result, 34, 500), COLORS.muted, 500);
+        text(row.rate, 1008, y + 76, fit(row.rate, 78, 300), color, 300, "right", 600);
+        bar(140, y + 128, 868, row.ratio, color);
       });
     }
     if (card.roles.length) {
@@ -295,7 +354,7 @@ function drawCard(ctx, card, avatar) {
       text("胜率", 690, top + 112, 30, COLORS.muted, 250);
       line(72, top + 132, 1008, top + 132);
       card.roles.forEach((row, index) => {
-        const y = top + 132 + index * 84;
+        const y = top + 132 + index * 96;
         const type = ({ "梅林": "star", "派西维尔": "shield", "刺客": "blade", "莫甘娜": "mask" })[row.label] || "star";
         emblem(98, y + 42, type, COLORS.accent, 36);
         text(row.label, 136, y + 54, fit(row.label, 38, 250), COLORS.text, 250, "left", 500);
@@ -303,10 +362,21 @@ function drawCard(ctx, card, avatar) {
         text(record, 512, y + 54, fit(record, 34, 234), COLORS.muted, 234, "center");
         bar(690, y + 36, 184, row.ratio, COLORS.accent);
         text(row.rate, 1008, y + 54, fit(row.rate, 36, 118), COLORS.text, 118, "right", 500);
-        line(72, y + 84, 1008, y + 84);
+        line(72, y + 96, 1008, y + 96);
       });
-      if (card.otherRoles) text("其他角色：" + card.otherRoles.total + " 局 · " + card.otherRoles.wins + " 胜 · " + card.otherRoles.losses + " 负", 72, top + 132 + card.roles.length * 84 + 54, 32, COLORS.muted);
+      if (card.otherRoles) text("其他角色：" + card.otherRoles.total + " 局 · " + card.otherRoles.wins + " 胜 · " + card.otherRoles.losses + " 负", 72, top + 132 + card.roles.length * 96 + 54, 32, COLORS.muted);
     }
+  } else if (card.kind === "combat") {
+    text(card.title, 72, heroTop + 40, 48, COLORS.text, 936, "left", 600);
+    metricGrid(card.metrics, box.metricsTop, 192);
+  } else if (card.kind === "funSummary") {
+    card.sections.forEach((section, index) => {
+      const top = box.sectionTops[index];
+      if (index) line(72, top - 12, 1008, top - 12);
+      text(section.title, 72, top + 48, 46, COLORS.text, 936, "left", 600);
+      metricGrid(section.metrics, top + 72);
+      if (section.caption) text(section.caption, 72, top + 96 + Math.ceil(section.metrics.length / 2) * 164, 32, COLORS.muted);
+    });
   } else if (card.kind === "rank") {
     text(card.rank ? "我的排名" : "排名状态", 72, heroTop + 32, 42, COLORS.text, 506, "left", 500);
     const rank = card.rank ? "第 " + card.rank + " 名" : card.rankLabel;
@@ -325,8 +395,14 @@ function drawCard(ctx, card, avatar) {
         if (row.isSelf) { rect(72, y, 936, 96, COLORS.self); rect(72, y, 5, 96, COLORS.accent); }
         else line(72, y, 1008, y);
         text(row.rank, 126, y + 63, fit(row.rank, 44, 96), color, 96, "center", 600);
+        const rowAvatar = row.avatar && (row.avatar === card.avatar ? avatar : nearbyAvatars.get(row.avatar));
+        if (rowAvatar) {
+          ctx.save(); ctx.beginPath(); ctx.arc(234, y + 48, 32, 0, Math.PI * 2); ctx.clip();
+          const side = Math.min(rowAvatar.width, rowAvatar.height);
+          ctx.drawImage(rowAvatar, (rowAvatar.width - side) / 2, (rowAvatar.height - side) / 2, side, side, 202, y + 16, 64, 64);
+          ctx.restore();
+        } else text(Array.from(row.name)[0], 234, y + 61, 34, color, 56, "center");
         ctx.beginPath(); ctx.arc(234, y + 48, 32, 0, Math.PI * 2); ctx.strokeStyle = row.isSelf ? COLORS.accent : COLORS.border; ctx.lineWidth = 2; ctx.stroke();
-        text(Array.from(row.name)[0], 234, y + 61, 34, color, 56, "center");
         text(row.name, 292, y + 63, 40, color, row.isSelf ? 354 : 438, "left", row.isSelf ? 600 : 400);
         if (row.isSelf) {
           font(40, 600); const nameWidth = Math.min(354, ctx.measureText(clean(row.name)).width);
@@ -355,4 +431,4 @@ function drawCard(ctx, card, avatar) {
   text("桌边助手", 72, footerTop + 57, 30, COLORS.muted, 220, "left", 500);
   text("截至 " + shanghaiTime(card.asOf), 1008, footerTop + 57, 28, COLORS.muted, 680, "right");
 }
-module.exports = { SIZE, COLORS, statsCard, funCard, leaderboardCard, canShareLeaderboard, boardSelection, parseSelection, queryString, describe, drawCard, dimensions, shanghaiTime };
+module.exports = { SIZE, COLORS, statsCard, funCard, funSummaryCard, canShareFun, leaderboardCard, canShareLeaderboard, leaderboardShareError, boardSelection, parseSelection, queryString, describe, drawCard, dimensions, shanghaiTime };

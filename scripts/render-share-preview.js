@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { wxmlToJs } = require("miniprogram-compiler");
 const cards = require("../miniprogram/share-card");
-const { now, profile, stats, board } = require("../tests/helpers/share-fixtures");
+const { now, profile, stats, board, fullFunStats } = require("../tests/helpers/share-fixtures");
 const root = path.resolve(__dirname, "../miniprogram");
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
@@ -26,6 +26,9 @@ function html(node) {
   return `<${tag} ${attrs}>${(node.children || []).map(html).join("")}${tag === "img" ? "" : `</${tag}>`}`;
 }
 const scenes = {
+  combat: cards.funCard(profile, fullFunStats, "knights:knife", "knife_enemy", now),
+  funSummary: cards.funSummaryCard(profile, fullFunStats, now),
+  singleFaction: cards.statsCard(profile, {total:3,wins:2,losses:1,winRate:66.7,byFaction:[{faction:"good",total:3,wins:2}],byRole:[{role:"蓝兰斯洛特",total:1,wins:1},{role:"魔术师",total:1,wins:1},{role:"派西维尔",total:1,wins:0}]}, now),
   shield: cards.leaderboardCard({nickname:"子龙xxx"}, { ...board, period:"all", fun:true, metric:"fun_good_shield", title:"好人", metricLabel:"成功挡刀次数", mode:"all", sort:"count", unit:"次", me:{status:"ranked",rank:1,count:1,rate:100,opportunities:1,knownGames:1,unknownGames:2}, nearby:[{rank:1,isSelf:true,nickname:"子龙xxx",count:1}] }),
   stats: cards.statsCard(profile, stats, now),
   fun: cards.funCard(profile, stats, "classic:merlin", "merlin_evade", now),
@@ -55,6 +58,6 @@ for (const [name, card] of Object.entries(scenes)) {
   fs.writeFileSync(path.join(output, `share-${name}.html`), base + `<style>body{margin:0}button{font:inherit;border:0}nav{height:64px;display:flex;align-items:center;gap:16px;padding:0 20px;background:#101c24}nav button{width:44px;font-size:32px}img{height:auto} ${css("app.wxss")} ${css("pages/share/share.wxss")}</style>` + html(tree) + script(card) + "</html>");
   fs.writeFileSync(path.join(output, `share-card-${name}.html`), base + '<style>body{margin:0;background:#101c24}canvas{display:block;width:1080px;height:auto}</style><canvas class="card"></canvas>' + script(card) + "</html>");
 }
-const labels = { shield:"挡刀次数榜", stats: "战绩 · 阵营与常玩角色", fun: "趣味成绩", rank: "积分 · 本人成绩", third: "第三阵营", games: "局数 · 本人成绩", short: "仅两局战绩", pending: "暂未上榜", long: "长昵称与大数字", hidden:"未公开排名",unknown:"未知样本与长角色名称" };
+const labels = { combat:"刀客刀法",funSummary:"完整趣味记录",singleFaction:"单阵营战绩",shield:"挡刀次数榜", stats: "战绩 · 阵营与常玩角色", fun: "趣味成绩", rank: "积分 · 本人成绩", third: "第三阵营", games: "局数 · 本人成绩", short: "仅两局战绩", pending: "暂未上榜", long: "长昵称与大数字", hidden:"未公开排名",unknown:"未知样本与长角色名称" };
 fs.writeFileSync(path.join(output, "share-gallery.html"), base + '<style>body{margin:32px;background:#e9e5dd;font:16px sans-serif;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}section{width:280px}canvas{width:280px;height:auto;display:block;margin-top:10px}a{color:#101c24;text-decoration:none}</style>' + Object.entries(scenes).map(([name, card]) => `<section><a href="share-${name}.html">${labels[name]}</a><canvas id="${name}"></canvas><script>{const module={exports:{}};${source}\nconst card=${JSON.stringify(card)};const canvas=document.getElementById('${name}');Object.assign(canvas,module.exports.dimensions(card));module.exports.drawCard(canvas.getContext('2d'),card);}</script></section>`).join("") + "</html>");
 console.log("Share previews: output/playwright/share-gallery.html");

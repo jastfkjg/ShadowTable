@@ -53,6 +53,48 @@ test('分享入口只传内容选择，拦截旧预览和读取失败，不传�
   ranking.p.setData({visibilitySaving:false,board:{rows:[{rank:1}],metric:'points',me:{total:0,points:0}}});
   ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
 });
+test('榜单未上榜仍可分享本人真实成绩，暂无记录与无机会点击后说明原因', () => {
+  const notices = [];
+  const {p,navigations} = page('leaderboard', apiBase, {wx:{showToast: options => notices.push(options)}});
+  p.setData({loading:false,board:{rows:[],metric:'overall',period:'all',me:{status:'not_enough',rank:null,total:2,wins:1,winRate:50,remaining:8}}});
+  p.shareLeaderboard();
+  assert.equal(navigations[0],'/pages/share/share?kind=leaderboard&metric=overall&period=all');
+  assert.equal(p.data.shareOpening,false);
+  assert.equal(notices.length,0);
+  p.setData({board:{rows:[{rank:1,nickname:'其他玩家'}],metric:'overall',me:{status:'no_games',total:0}}});
+  p.shareLeaderboard();
+  assert.match(p.data.shareNotice,/暂无本人成绩.*完成相关对局/);
+  assert.equal(notices[0].title,p.data.shareNotice);
+  assert.equal(notices[0].icon,'none');
+  assert.equal(navigations.length,1);
+  const fun={rows:[],metric:'fun_good_shield',period:'all',fun:true,sort:'rate',mode:'all',me:{status:'not_enough',knownGames:2,count:0,opportunities:0,rate:null}};
+  p.setData({board:fun});p.shareLeaderboard();
+  assert.match(notices.at(-1).title,/暂无有效机会.*切换次数榜/);
+  assert.equal(navigations.length,1);
+  p.setData({board:{...fun,sort:'count'}});p.shareLeaderboard();
+  assert.equal(navigations[1],'/pages/share/share?kind=leaderboard&metric=fun_good_shield&period=all&mode=all&sort=count');
+  assert.equal(p.data.shareNotice,'');
+  p.setData({error:'网络错误'});p.shareLeaderboard();
+  assert.match(notices.at(-1).title,/重试读取榜单/);
+  assert.equal(navigations.length,2);
+});
+test('榜单分享打开期间不重复跳转，打开失败可重试，卸载后不更新旧页面', () => {
+  const requests = [];
+  const {p} = page('leaderboard',apiBase,{wx:{navigateTo:options=>requests.push(options)}});
+  const board={metric:'games',period:'all',rows:[],me:{status:'ranked',total:2,rank:1}};
+  p.setData({loading:false,board});
+  for (const key of ['loading','loadingMore','visibilitySaving']) {
+    p.setData({[key]:true});p.shareLeaderboard();assert.equal(requests.length,0);p.setData({[key]:false});
+  }
+  p.shareLeaderboard();p.shareLeaderboard();
+  assert.equal(requests.length,1);assert.equal(p.data.shareOpening,true);
+  requests[0].fail();requests[0].complete();
+  assert.match(p.data.shareNotice,/分享页暂时无法打开/);
+  assert.equal(p.data.shareOpening,false);
+  p.shareLeaderboard();assert.equal(requests.length,2);assert.equal(p.data.shareNotice,'');
+  p.onUnload();requests[1].fail();requests[1].complete();
+  assert.equal(p.data.shareNotice,'');assert.equal(p.data.shareOpening,true);
+});
 test('小程序本人积分调整独立分页，失败保留记录可重试，读取期间不混合筛选，卸载丢弃旧响应',async()=>{
   const ledger={id:'a',created:1,delta:-3,beforePoints:5,afterPoints:2,reason:'现场修正'};
   let reads=0,finish;
@@ -605,7 +647,8 @@ test('小程序切换周期保留榜单和底栏，完成后一次更新，失�
   p.setData=function(patch){setData.call(this,patch);frames.push({...this.data});};
   const change=p.choosePeriod({currentTarget:{dataset:{id:'month'}}});await tick();
   assert.equal(p.data.period,'month');assert.equal(p.data.board,board);
-  assert.match(render(),/rank-list/);assert.match(render(),/rank-mine/);assert.doesNotMatch(render(),/正在读取榜单/);
+  assert.match(render(),/rank-list/);assert.match(render(),/rank-mine/);assert.doesNotMatch(render(),/"class":"status"/);
+  assert.match(render(),/rank-share-status.*正在读取榜单/);
   await p.choosePeriod({currentTarget:{dataset:{id:'month'}}});assert.equal(requests.length,2);
   requests[1].resolve(rankResult('games',{period:'month',rows:[]}));await change;
   assert.equal(frames.length,2);assert.ok(frames.every(frame=>frame.board));
@@ -918,4 +961,13 @@ test('小程序按刺客状态跳过带刀步骤，无刺客板子仍要求选�
     p.finishTools();choose('pickScoreReason',{id:'assassination'});p.nextResult();assert.equal(p.data.resultStep,'actor');
     choose('pickFunActor',{seat:1});p.nextResult();choose('pickScoreTarget',{seat:1});assert.equal(p.data.resultTarget,null);assert.equal(p.data.resultNeedsActor,true);
   }
+});
+
+test('趣味记录页顶部分享入口生成完整分享，单项入口仍保留，未知或读取失败时禁止分享',()=>{
+  const {p,navigations}=page('stats',apiBase);
+  p.setData({tab:'fun',loading:false,error:'',stats:{fun:{shareable:true,cards:[{id:'knights:knife',shareMetric:'knife_enemy'}]}}});
+  p.shareStats();assert.equal(navigations[0],'/pages/share/share?kind=funSummary');
+  p.shareFun({currentTarget:{dataset:{card:'knights:knife'}}});assert.match(navigations[1],/kind=fun&card=knights%3Aknife&metric=knife_enemy/);
+  p.data.stats.fun.shareable=false;p.shareStats();assert.equal(navigations.length,2);
+  p.data.stats.fun.shareable=true;p.data.error='读取失败';p.shareStats();assert.equal(navigations.length,2);
 });
