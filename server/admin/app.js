@@ -577,7 +577,9 @@ $('correction-form').addEventListener('submit',async event=>{
   if(!correctionPending) {
     const option=match.options.find(reason=>reason.id===$('correction-result').value);
     if(!option){$('correction-status').textContent='请选择实际结束方式';return;}
-    if(!window.confirm(`确认将这场对局更正为「${option.label}」？战绩、趣味记录及适用的积分和连胜奖励会同步重算，并保留更正记录。`)) return;
+    const description=`确认将这场对局更正为「${option.label}」？战绩、趣味记录及适用的积分和连胜奖励会同步重算，并保留更正记录。`;
+    if(!await (window.AdminUI ? window.AdminUI.confirm({title:'更正对局结果',description,danger:true}) : window.confirm(description))) return;
+    if(correctionBusy || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading || correctionMatch()!==match) return;
     correctionPending={id:match.id,data:{requestId:crypto.randomUUID(),revision:match.revision,[match.correctionKind === "fun" ? "funReason" : "scoreReason"]:option.id,
       ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {})}};
   }
@@ -732,8 +734,10 @@ async function submitScoreWrite(kind) {
       if(!selectedScorePlayer)return;
       const raw=$('player-score-points').value,points=Number(raw);if(!raw || !Number.isSafeInteger(points) || Math.abs(points)>1000000){status.textContent='请输入 -1000000 至 1000000 之间的整数积分';return;}
       const mode=$('player-score-mode').value,after=mode==='set'?points:selectedScorePlayer.points+points;
-      if(!window.confirm(`调整 ${selectedScorePlayer.name} 的总积分：${selectedScorePlayer.points} → ${after} 分？`))return;
-      path='score-adjustments';data={uid:selectedScorePlayer.uid,revision:selectedScorePlayer.revision,mode,points};
+      const player=selectedScorePlayer,description=`调整 ${player.name} 的总积分：${player.points} → ${after} 分？`;
+      if(!await (window.AdminUI ? window.AdminUI.confirm({title:'调整玩家积分',description}) : window.confirm(description)))return;
+      if(scoreBusy || correctionBusy || correctionPending || correctionLoading || matchScoreLoading || scoreWritePending || selectedScorePlayer!==player)return;
+      path='score-adjustments';data={uid:player.uid,revision:player.revision,mode,points};
     } else {
       if(!matchScoreDetail)return;
       const scores=[];
@@ -745,8 +749,10 @@ async function submitScoreWrite(kind) {
         }
       }
       if(!scores.length){status.textContent='没有需要保存的积分变化';return;}
-      if(!window.confirm(`确认修改本局 ${scores.length} 名玩家的积分？胜负与连胜保持原结果。`))return;
-      path='matches/'+matchScoreDetail.id+'/scores';data={revision:matchScoreDetail.revision,scores};
+      const match=matchScoreDetail,description=`确认修改本局 ${scores.length} 名玩家的积分？胜负与连胜保持原结果。`;
+      if(!await (window.AdminUI ? window.AdminUI.confirm({title:'保存本局积分',description}) : window.confirm(description)))return;
+      if(scoreBusy || correctionBusy || correctionPending || correctionLoading || matchScoreLoading || scoreWritePending || matchScoreDetail!==match)return;
+      path='matches/'+match.id+'/scores';data={revision:match.revision,scores};
     }
     scoreWritePending={kind,path,data:{...data,requestId:crypto.randomUUID()}};
   }

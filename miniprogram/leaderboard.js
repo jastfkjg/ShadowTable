@@ -10,6 +10,7 @@ function presentLeaderboard(result) {
   const statusLabel = me.rank ? "第 " + me.rank + " 名" : result.fun && me.status === "not_enough" ? `还差 ${me.remaining} ${result.sort === "rate" ? "次机会" : result.unit}上榜` : result.fun && me.status === "no_records" ? "尚无完整记录" : "";
   return { ...result,
     metricLabel: result.fun ? result.metricLabel : metrics.find(item => item.id === result.metric).label,
+    rateLabel: result.rateLabel || result.availableFunMetrics?.find(item => item.key === result.metric)?.rateLabel || "成功率",
     rows: result.rows.map(row => ({ ...row, value: value(row), unit: unit(row), sampleLabel: result.fun ? `${row.count} / ${row.opportunities} 次机会` : "", initial: (row.nickname || "友").slice(0, 1), avatarUrl: row.avatarUrl ? api.assetUrl(row.avatarUrl) : "" })),
     me: { ...me, value: value(me), unit: unit(me), statusLabel },
   };

@@ -1254,6 +1254,13 @@ test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应�
   const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
   c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
+  for (const [key,label] of [['fun_percival_bust','派西维尔 · 三炸车'],['fun_merlin_hit','梅林 · 被刺'],['fun_assassin_miss','刺客 · 歪刀'],['fun_knife_ally','刀客刀法 · 刀中友方'],['fun_duel_ally','骑士决斗 · 命中友方']]) {
+    assert.ok(html.includes(label));
+    await c.ACTIONS.funRankMetric({dataset:{value:key}});
+    assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));
+    assert.equal(c.state.rankBoard.metric,key);
+    assert.match(c.viewLeaderboard(),/data-action="funRankSort" data-value="rate"[^>]*>发生率/);
+  }
 });
 test('网页不计积分的骑士终局必须选实际带刀人，切换带刀人排除自刀目标',async()=>{
   const c=client(async()=>response({}));c.state.room={canUseTools:true,stage:'fun-stage',knights:{},scoreSettlement:[],funSettlement:[{id:'early_assassination',label:'提前盘刀',requiresTarget:true}],players:[{seat:1,name:'<甲>'},{seat:2,name:'乙'},{seat:3,name:'出局',alive:false}]};

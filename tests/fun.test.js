@@ -95,6 +95,79 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
+test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不计机会，支持比例与公开开关", () => {
+  const store = new Store(":memory:");
+  try {
+    for (let i = 0; i < 7; i++) {
+      const knight = i >= 4, r = deal(knight);
+      if (knight) configure(r, { "wx:1": "merlin", "wx:2": "percival", "wx:6": "assassin" });
+      finish(r, i < 2 ? { funReason: "quest_fail" } : {
+        funReason: "assassination", funTarget: i < 4 ? 1 : 3,
+        ...(knight ? { funActor: 6 } : {}),
+      });
+      store.transaction(() => store.save(r));
+    }
+    const unknown = deal(); finish(unknown, { winner: "good" });
+    store.transaction(() => store.save(unknown));
+    const board = new Leaderboard(store);
+    for (const [metric, uid, count, opportunities, rate, label] of [
+      ["percival_bust", "wx:2", 2, 7, 28.6, "三炸车"],
+      ["merlin_hit", "wx:1", 2, 5, 40, "被刺"],
+      ["assassin_miss", "wx:6", 3, 5, 60, "歪刀"],
+    ]) {
+      const read = query => board.read(uid, new URLSearchParams("metric=fun_" + metric + query));
+      const counts = read("");
+      assert.equal(counts.me.count, count); assert.equal(counts.me.opportunities, opportunities);
+      assert.equal(counts.me.unknownGames, 1); assert.equal(counts.me.status, "ranked");
+      assert.equal(counts.metricLabel, label + "次数");
+      const rates = read("&sort=rate");
+      assert.equal(rates.me.rate, rate); assert.equal(rates.threshold, 5);
+      assert.equal(rates.rateLabel, "发生率"); assert.equal(rates.me.status, "ranked");
+      assert.equal(read("&mode=classic&sort=rate").me.status, "not_enough");
+      assert.doesNotMatch(JSON.stringify(rates), /wx:|"uid"|target|events/);
+      const stats = require("../miniprogram/profile").presentStats(store.statsFor(uid));
+      assert.equal(stats.fun.cards.flatMap(card => card.metrics).find(row => row.id === metric).color, "evil");
+    }
+    store.transaction(() => saveProfile(store, "wx:6", {
+      nickname: "刺客", version: readProfile(store, "wx:6").version, leaderboardVisible: false,
+    }));
+    const hidden = board.read("wx:6", new URLSearchParams("metric=fun_assassin_miss"));
+    assert.equal(hidden.me.status, "hidden"); assert.deepEqual(hidden.rows, []);
+    const card = require("../miniprogram/share-card").funCard(readProfile(store, "wx:1"), store.statsFor("wx:1"), "classic:merlin", "merlin_hit");
+    assert.equal(card.chart.label, "发生率");
+    const fun = require("../server/fun");
+    const adverse = fun.aggregate([{ metric: "percival_bust", mode: "classic", role: "percival", role_label: "派西维尔", match_id: "known", status: "known", count: 1, opportunities: 1 }]);
+    assert.equal(adverse.teaser, "");
+  } finally { store.close(); }
+});
+test("刀客和骑士友方命中榜按实际承受者统计，比例需十次出手并可筛选角色", () => {
+  for (const [metric, role] of [["knife_ally", "blueAwakened"], ["duel_ally", "blueKnight"]]) {
+    const uid = "wx:" + metric, store = new Store(":memory:");
+    try {
+      const board = new Leaderboard(store);
+      const read = suffix => board.read(uid, new URLSearchParams("metric=fun_" + metric + suffix));
+      for (let i = 0; i < 10; i++) {
+        const r = deal(true, uid);
+        configure(r, { [uid]: role, "wx:2": "witch" });
+        skills(r, { [uid]: "target:2", ...(i < 6 ? { "wx:2": "target:3" } : {}) });
+        finish(r, { winner: "good" });
+        store.transaction(() => store.save(r));
+        if (i === 8) {
+          assert.equal(read("&sort=rate").me.status, "not_enough");
+          assert.equal(read("&sort=rate").me.remaining, 1);
+        }
+      }
+      assert.equal(read("").me.count, 6);
+      const rate = read("&sort=rate&role=" + role);
+      assert.equal(rate.me.opportunities, 10); assert.equal(rate.me.rate, 60);
+      assert.equal(rate.threshold, 10); assert.equal(rate.me.status, "ranked");
+      assert.equal(rate.rateLabel, "发生率");
+      assert.ok(rate.roleOptions.some(item => item.id === role));
+      assert.equal(store.matchesFor(uid, 0, 20, false, { metric, mode: "knights", role }).total, 6);
+      assert.throws(() => read("&role=" + (metric === "knife_ally" ? "blueKnight" : "blueAwakened")), /参数无效/);
+    } finally { store.close(); }
+  }
+});
 test("非梅林好人挡刀按实际最终目标计数，每位在场非梅林好人形成一次非空刀机会", () => {
   for (const target of [1, 2, 3, 5]) {
     const r = deal();
@@ -386,7 +459,20 @@ test("测试和开发账号的骑士技能、终局趣味、积分与分享数�
       assert.ok(presentStats(stats).fun.cards.length);
       assert.equal(presentMatches(history.records)[0].hasFunEvents,true);
       const board=new Leaderboard(store).read(uid,new URLSearchParams('metric=fun_'+metric+'&mode=knights&role='+role));
-      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,1);
+      assert.equal(board.me.status,prefix==='test:'?'unsupported':'ranked');assert.equal(board.me.count,1);
+      if(prefix==='test:') {
+        // Exceed rate thresholds so exclusion cannot be explained by insufficient samples.
+        store.db.prepare('UPDATE match_fun_stats SET count=10,opportunities=10 WHERE uid=? AND metric=?').run(uid,metric);
+        assert.equal(board.me.rank,null);
+        assert.equal(board.rows.length,0);
+        for(const period of ['all','month']) for(const sort of ['count','rate']) {
+          const filtered=new Leaderboard(store).read(uid,new URLSearchParams('metric=fun_'+metric+'&period='+period+'&sort='+sort+'&nearby=1'));
+          assert.equal(filtered.me.status,'unsupported');
+          assert.equal(filtered.me.rank,null);
+          assert.equal(filtered.rows.length,0);
+          assert.deepEqual(filtered.nearby,[]);
+        }
+      }
       assert.equal(store.matchesFor(uid,0,20,false,{metric,mode:'knights',role}).total,1);
       assert.ok(statsCard(readProfile(store,uid),stats));
       assert.ok(funCard(readProfile(store,uid),stats,'knights:'+metric.split('_')[0],metric));
@@ -656,7 +742,9 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
     assert.deepEqual(board.read("wx:b",new URLSearchParams("metric=fun_merlin_evade&nearby=1")).nearby,[]);
     assert.doesNotMatch(JSON.stringify(rate), /wx:|"uid"|target|events/);
     for (const q of [
-      "metric=fun_knife_ally",
+      "metric=fun_gun_ally",
+      "metric=fun_final_miss",
+      "metric=fun_knife_failed",
       "metric=fun_merlin_evade&mode=bad",
       "metric=games&sort=rate",
       "metric=fun_knife_enemy&role=merlin",

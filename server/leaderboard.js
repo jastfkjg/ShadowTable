@@ -78,7 +78,7 @@ class Leaderboard {
         else aggregates.push({...adjustment,total:0,wins:0});
       }
     }
-    const eligible = aggregates.filter(row => /^(wx|dev|test):/.test(row.uid) && row.leaderboard_visible && row.public_id && row.total >= METRICS[metric]);
+    const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && row.total >= METRICS[metric]);
     eligible.sort((a, b) => compare(a, b, metric) || a.public_id.localeCompare(b.public_id));
     let rank = 0;
     eligible.forEach((row, index) => {
@@ -103,7 +103,7 @@ class Leaderboard {
     if (metric === "points") ownStats.points = own?.points || 0;
     // Profiles without games do not appear in the aggregation.
     const visible = readProfile(this.store, uid).leaderboardVisible;
-    const status = !/^(wx|dev|test):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
+    const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     const present = row => ({
       publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
@@ -140,7 +140,7 @@ class Leaderboard {
         FROM match_fun_stats s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
         WHERE p.outcome IN ('win','loss') AND s.metric=? ${mode === "all" ? "" : "AND s.mode=?"} AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
         GROUP BY s.uid`).all(def.id, ...(mode === "all" ? [] : [mode]), range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
-      const eligible = aggregates.filter(row => /^(wx|dev|test):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);
+      const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);
       eligible.sort((a,b) => comparator(a,b) || a.public_id.localeCompare(b.public_id));
       let rank = 0;
       eligible.forEach((row,i) => { if (!i || comparator(eligible[i-1],row)) rank = i+1; row.rank = rank; });
@@ -157,10 +157,10 @@ class Leaderboard {
     };
     const own = snapshot.aggregates.get(uid), stats = present(own), visible = readProfile(this.store,uid).leaderboardVisible;
     const remaining = Math.max(0,threshold - (sort === "rate" ? stats.opportunities : stats.count));
-    const status = !/^(wx|dev|test):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
+    const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
     const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,isSelf:row.uid===uid,...present(row)});
-    return { metric, period, mode, role, sort, fun: true, metricLabel: def.label + (sort === "rate" ? "率" : "次数"), title: def.title,
+    return { metric, period, mode, role, sort, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.title, rateLabel: def.rateLabel,
       unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && (def.group === "final" || fun.combatType(role)===def.group)).map(role=>({id:role,label:roleName(role)})),
       periodStart: range.start,periodEnd:range.end,timezone:"Asia/Shanghai",eligibleCount:snapshot.eligible.length,maxRows:MAX_ROWS,updatedAt:snapshot.updatedAt,version:snapshot.version,

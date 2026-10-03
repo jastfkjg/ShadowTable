@@ -21,7 +21,7 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
-test('未保存资料的微信、开发和陪测账号首局自动公开，五榜无需切换开关且不公开牌桌昵称', () => {
+test('微信、开发账号首局自动上榜，陪测和游客不参与五榜且不公开牌桌昵称', () => {
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store), uids=['wx:new','dev:new','guest:new','test:new'];
@@ -35,9 +35,9 @@ test('未保存资料的微信、开发和陪测账号首局自动公开，五�
     }));
     assert.deepEqual(readProfile(store,'wx:new'),original);
     const ids=new Map();
-    for(const metric of ['points','games','overall','good','evil']) for(const uid of uids.filter(uid=>!uid.startsWith('guest:'))) {
+    for(const metric of ['points','games','overall','good','evil']) for(const uid of uids.filter(uid=>/^(wx|dev):/.test(uid))) {
       const result=query(board,uid,'metric='+metric);
-      assert.equal(result.eligibleCount,3);
+      assert.equal(result.eligibleCount,2);
       assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
       const own=result.rows.find(row=>row.isSelf);
       assert.ok(own);assert.equal(own.nickname,'新朋友');assert.match(own.publicId,/^[\da-f-]{36}$/);
@@ -46,12 +46,22 @@ test('未保存资料的微信、开发和陪测账号首局自动公开，五�
       assert.doesNotMatch(JSON.stringify(result),/wx:|dev:|guest:|test:|牌桌昵称/);
     }
     assert.notEqual(query(board,'wx:new').version,empty.version);
+    for (const metric of ['points','games','overall','good','evil']) for (const period of ['all','month']) {
+      const companion=query(board,'test:new','metric='+metric+'&period='+period+'&nearby=1');
+      assert.equal(companion.me.status,'unsupported');
+      assert.equal(companion.me.rank,null);
+      assert.ok(companion.me.total>0);
+      assert.deepEqual(companion.nearby,[]);
+      assert.ok(companion.rows.every(row=>!row.isSelf));
+    }
+    profile(store,'test:new',true,'陪测玩家');
+    assert.equal(query(board,'wx:new').rows.some(row=>row.nickname==='陪测玩家'),false);
     assert.equal(query(board,'guest:new').me.status,'unsupported');
     assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,3);
     profile(store,'wx:new',false);
     games(store,'wx:new',1,1);
     assert.equal(query(board,'wx:new').me.status,'hidden');
-    assert.equal(query(board,'dev:new').eligibleCount,2);
+    assert.equal(query(board,'dev:new').eligibleCount,1);
   } finally {store.close();}
 });
 test('默认公开资料与战绩同事务回滚，重复归档不改变公开ID或榜单缓存', () => {
@@ -84,7 +94,7 @@ test('重启补齐已有战绩但无资料的账号，保留主动隐藏设置�
     const hidden=store.db.prepare("SELECT * FROM profiles WHERE uid='wx:hidden'").get();
     store.close();store=new Store(path);
     const first=query(new Leaderboard(store),'wx:missing');
-    assert.equal(first.me.rank,1);assert.equal(first.rows.length,3);
+    assert.equal(first.me.rank,1);assert.equal(first.rows.length,2);
     assert.equal(first.rows[0].nickname,'新朋友');
     assert.equal(readProfile(store,'wx:missing').version,0);
     assert.equal(readProfile(store,'wx:hidden').leaderboardVisible,false);

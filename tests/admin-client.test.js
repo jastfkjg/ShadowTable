@@ -406,6 +406,20 @@ test('玩家查询失败后清除旧编辑目标，不把改分提交给上一�
   await c.searchScorePlayers();assert.equal(c.$('player-score-editor').hidden,true);assert.equal(c.$('player-score-submit').disabled,true);
   await c.submitScoreWrite('player');assert.equal(writes,0);assert.match(c.$('player-score-status').textContent,/读取失败/);
 });
+test('自定义确认弹窗取消不提交，等待确认时更换玩家不把旧分值写给新玩家',async()=>{
+  let writes=0,resolveConfirmation;
+  const c=scoringClient(async(path,body)=>{if(body)writes++;});
+  c.context.window.AdminUI={confirm:()=>new Promise(resolve=>{resolveConfirmation=resolve;})};
+  c.player({uid:'old',name:'旧玩家',points:5,revision:0});
+  c.$('player-score-points').value='7';c.$('player-score-mode').value='delta';
+  const canceled=c.submitScoreWrite('player');
+  assert.equal(writes,0);resolveConfirmation(false);await canceled;
+  assert.equal(writes,0);assert.equal(c.pending(),null);
+  const stale=c.submitScoreWrite('player');
+  c.player({uid:'new',name:'新玩家',points:20,revision:1});
+  resolveConfirmation(true);await stale;
+  assert.equal(writes,0);assert.equal(c.pending(),null);
+});
 test('管理员不计分对局更正提交趣味目标与带刀人，失败重试保持原数据，筛掉已出局玩家',async()=>{
   const source=fs.readFileSync(require.resolve('../server/admin/app.js'),'utf8'),elements=new Map(),writes=[];
   const node=(tag='div',textContent='')=>({tag,textContent,value:'',children:[],listeners:{},replaceChildren(...rows){this.children=rows;},addEventListener(type,fn){this.listeners[type]=fn;}});

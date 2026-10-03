@@ -920,6 +920,12 @@ test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到�
   assert.equal(p.data.metric,'fun_good_shield');assert.equal(p.data.funRole,'');assert.equal(p.data.metricsExpanded,false);
   p.toggleMetrics();const reads=urls.length;
   await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.equal(p.data.metricsExpanded,false);assert.equal(urls.length,reads);
+  for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally']) {
+    await p.chooseFunMetric({currentTarget:{dataset:{id:key}}});
+    assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));
+    assert.equal(p.data.board.metric,key);assert.equal(p.data.board.rateLabel,'发生率');
+    assert.equal(p.data.metricsExpanded,false);
+  }
   const fallback=page('leaderboard',{...apiBase,request:async url=>{if(url.includes('metric=fun_'))throw Object.assign(Error('排行榜参数无效'),{status:400});return rankResult('games',{availableMetrics:['points','games']});}}).p;
   await fallback.load(false,{metric:'fun_merlin_evade'});assert.equal(fallback.data.metric,'games');assert.equal(fallback.data.pointsAvailable,true);assert.equal(fallback.data.funAvailable,false);assert.match(fallback.data.notice,/趣味榜/);
 });

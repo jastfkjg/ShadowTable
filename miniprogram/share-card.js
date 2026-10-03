@@ -81,9 +81,9 @@ function funCard(profile, stats, cardId, metricId, now) {
   if (cardId.endsWith(":knife")) return { kind: "combat", ...identity(profile), context: "趣味成绩", scope: "", title: "刀客刀法", metrics: knifeMetrics(group), notes: [], asOf: now };
   return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: metricId === "good_shield" ? "" : clean(group.title),
     hero: number(metric.count), unit: clean(metric.unit), label: clean(metric.label),
-    chart: { ratio: metric.opportunities ? metric.count / metric.opportunities : null, value: percent(metric.rate), label: "成功率" },
+    chart: { ratio: metric.opportunities ? metric.count / metric.opportunities : null, value: percent(metric.rate), label: metric.rateLabel || "成功率" },
     metrics: [stat(metric.opportunities, "有效机会"), stat(metric.knownGames, "有记录局数")],
-    notes: !metric.opportunities ? ["暂无有效机会，成功率暂不计算"] : [], asOf: now };
+    notes: !metric.opportunities ? ["暂无有效机会，" + (metric.rateLabel || "成功率") + "暂不计算"] : [], asOf: now };
 }
 function funSummaryCard(profile, stats, now) {
   if (!canShareFun(stats.fun)) throw new Error("还没有完整的趣味记录，完成相关对局后再来分享。");
@@ -93,7 +93,7 @@ function funSummaryCard(profile, stats, now) {
     const combined = groups.get(key) || { title: key === "knife" ? "刀客刀法" : key === "shield" ? "成功挡刀" : clean(group.title), metrics: new Map() };
     for (const metric of group.metrics) {
       if (metric.id.endsWith("aim_enemy")) continue;
-      const item = combined.metrics.get(metric.id) || { id: metric.id, label: clean(metric.label), unit: clean(metric.unit), ranked: metric.ranked, count: 0, opportunities: 0, knownGames: 0, value: null };
+      const item = combined.metrics.get(metric.id) || { id: metric.id, label: clean(metric.label), unit: clean(metric.unit), ranked: metric.ranked, positive: metric.positive, count: 0, opportunities: 0, knownGames: 0, value: null };
       if (Number.isFinite(metric.value) && metric.knownGames > 0) {
         item.count += metric.count; item.opportunities += metric.opportunities; item.knownGames += metric.knownGames; item.value = item.count;
       }
@@ -102,7 +102,7 @@ function funSummaryCard(profile, stats, now) {
     groups.set(key, combined);
   }
   const sections = [...groups.entries()].filter(([, group]) => [...group.metrics.values()].some(row => row.knownGames > 0)).map(([key, group]) => {
-    const rows = [...group.metrics.values()], primary = rows.find(row => row.ranked && row.knownGames > 0);
+    const rows = [...group.metrics.values()], primary = rows.find(row => (row.positive ?? row.ranked) && row.knownGames > 0);
     return { title: group.title,
       metrics: key === "knife" ? knifeMetrics({metrics: rows}) : rows.map(row => ({label: row.label + (row.unit === "局" ? "局数" : "次数"), value: row.value == null ? "—" : number(row.count), color: /_(ally|hit|bust|miss|loss)$/.test(row.id) ? "evil" : row.id.endsWith("failed") ? "muted" : "good"})),
       caption: key !== "knife" && primary?.opportunities ? "成功率 " + percent(primary.count / primary.opportunities * 100) + " · " + number(primary.opportunities) + " 次机会" : "",

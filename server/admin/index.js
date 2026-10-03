@@ -87,6 +87,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         "/admin": ["index.html", "text/html; charset=utf-8"],
         "/admin/": ["index.html", "text/html; charset=utf-8"],
         "/admin/app.js": ["app.js", "text/javascript; charset=utf-8"],
+        "/admin/controls.js": ["controls.js", "text/javascript; charset=utf-8"],
         "/admin/style.css": ["style.css", "text/css; charset=utf-8"],
       };
       if (assets[path]) {

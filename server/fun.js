@@ -8,6 +8,13 @@ const modeFor = (board) =>
     : ["classic", "classic-court"].includes(board)
       ? "classic"
       : "other";
+const extraRankings = {
+  percival_bust: { label: "三炸车", rateThreshold: 5 },
+  merlin_hit: { label: "被刺", rateThreshold: 5 },
+  assassin_miss: { label: "歪刀", rateThreshold: 5 },
+  knife_ally: { label: "刀中友方", rateThreshold: 10 },
+  duel_ally: { label: "命中友方", rateThreshold: 10 },
+};
 const definitions = [
   ["percival_green", "三绿达成", "percival", "派西维尔", "局", true, 5],
   ["percival_bust", "三炸收场", "percival", "派西维尔", "局", false],
@@ -55,14 +62,17 @@ const definitions = [
       false,
     ],
   ]),
-].map(([id, label, group, title, unit, ranked, rateThreshold]) => ({
+].map(([id, label, group, title, unit, positive, rateThreshold]) => ({
   id,
   label,
   group,
   title,
   unit,
-  ranked,
-  rateThreshold: rateThreshold || 0,
+  positive,
+  ranked: positive || Object.hasOwn(extraRankings, id),
+  rankLabel: extraRankings[id]?.label || label,
+  rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
+  rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
 }));
 const metrics = Object.fromEntries(definitions.map((item) => [item.id, item]));
 const combatType = (role) =>
@@ -476,7 +486,7 @@ function aggregate(rows, legacyGames = 0) {
     cards.set(key, card);
   }
   const highlights = list
-    .filter((row) => row.ranked && row.count > 0)
+    .filter((row) => row.positive && row.count > 0)
     .sort((a, b) => b.count - a.count);
   return {
     version: VERSION,
@@ -491,7 +501,7 @@ function aggregate(rows, legacyGames = 0) {
 function publicMetrics() {
   return definitions
     .filter((item) => item.ranked)
-    .map((item) => ({ ...item, key: "fun_" + item.id }));
+    .map((item) => ({ ...item, label: item.rankLabel, key: "fun_" + item.id }));
 }
 module.exports = {
   VERSION,

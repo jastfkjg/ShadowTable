@@ -181,6 +181,13 @@ test('趣味榜显示当前指标，展开后可选全部指标，排序独立�
   assert.equal(byHandler(tree,'toggleMetrics').attr.ariaExpanded,true);
   assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
   assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'刀客刀法 · 命中敌方');
+  for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally']) {
+    assert.ok(tabs.some(n=>n.attr['data-id']===key));
+  }
+  const adverse=renderRank({...data,metric:'fun_knife_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
+  assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/刀客刀法 · 刀中友方/);
+  assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/按发生率/);
+  assert.match(JSON.stringify(adverse),/至少 10 次机会/);
   assert.ok(!all.some(n=>n.attr?.bindchange==='chooseFunMode' || n.attr?.bindchange==='chooseFunMetric'));
 });
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{

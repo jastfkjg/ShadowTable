@@ -36,8 +36,8 @@ function presentFun(value) {
       valueLabel: row.value === null ? "—" : String(row.count), rateLabel: row.rate === null ? "暂无机会" : row.rate.toFixed(1) + "%",
       url: "/pages/matches/matches?fun=" + row.id + "&mode=" + row.mode,
       percent: row.opportunities ? Math.round(row.count / row.opportunities * 100) : 0,
-      color: /_(ally|hit|bust|miss)$/.test(row.id) && !row.ranked ? "evil" : row.id.endsWith("failed") ? "muted" : "good" }));
-    const primary = metrics.find(row => row.ranked) || metrics[0];
+      color: /_(ally|hit|bust|miss)$/.test(row.id) && !(row.positive ?? row.ranked) ? "evil" : row.id.endsWith("failed") ? "muted" : "good" }));
+    const primary = metrics.find(row => row.positive ?? row.ranked) || metrics[0];
     const aim = card.metrics.find(row => row.id.endsWith("aim_enemy"));
     const roles = (primary?.byRole || []).map(role => ({ ...role,
       countLabel: role.value === null ? "—" : String(role.count),

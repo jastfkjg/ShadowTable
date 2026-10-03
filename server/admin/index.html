@@ -7,6 +7,7 @@
     <title>桌边助手 · 管理平台</title>
     <link rel="stylesheet" href="/admin/style.css" />
     <script src="/admin/app.js" defer></script>
+    <script src="/admin/controls.js" defer></script>
   </head>
   <body>
     <main>
@@ -40,11 +41,15 @@
         </form>
       </section>
       <div id="dashboard" hidden>
-        <nav>
-          <button id="refresh">刷新列表</button
-          ><a href="/admin/companion">打开陪测台 →</a>
-        </nav>
-        <section>
+        <div class="dashboard-toolbar">
+          <nav class="dashboard-tabs" role="tablist" aria-label="管理平台导航">
+            <button id="dashboard-tab-rooms" type="button" role="tab" aria-selected="true" aria-controls="room-overview">房间概览</button>
+            <button id="dashboard-tab-scores" type="button" role="tab" aria-selected="false" aria-controls="score-management" tabindex="-1">计分管理</button>
+            <button id="dashboard-tab-audit" type="button" role="tab" aria-selected="false" aria-controls="audit-section" tabindex="-1">操作记录</button>
+          </nav>
+          <div class="dashboard-tools"><button id="refresh">刷新列表</button><a href="/admin/companion">打开陪测台 →</a></div>
+        </div>
+        <section id="room-overview" role="tabpanel" aria-labelledby="dashboard-tab-rooms" tabindex="0">
           <div class="section-heading">
             <h2>房间概览</h2>
             <span id="count"></span>
@@ -61,9 +66,9 @@
             ><button id="next">下一页</button>
           </div>
         </section>
-        <section id="score-management" aria-labelledby="score-title">
+        <section id="score-management" role="tabpanel" aria-labelledby="dashboard-tab-scores" tabindex="0" hidden>
           <div class="score-heading">
-            <div><h2 id="score-title">积分管理</h2><p>调整玩家总分，或按对局管理积分与结果。</p></div>
+            <div><h2 id="score-title">计分管理</h2><p>调整玩家总分，或按对局管理积分与结果。</p></div>
             <div class="score-tabs" role="tablist" aria-label="积分管理范围">
               <button id="score-tab-player" type="button" role="tab" aria-selected="true" aria-controls="player-score-section">玩家</button>
               <button id="score-tab-match" type="button" role="tab" aria-selected="false" aria-controls="match-score-section" tabindex="-1">对局</button>
@@ -88,7 +93,7 @@
               </dl>
               <form id="player-score-form">
                 <div class="score-fields">
-                  <div class="score-field"><label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta">加减积分</option><option value="set">设置总积分</option></select></div>
+                  <div class="score-field"><label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta" data-hint="在当前总积分上增加或扣除">加减积分</option><option value="set" data-hint="将总积分调整到指定数值">设置总积分</option></select></div>
                   <div class="score-field"><label id="player-score-points-label" for="player-score-points">调整分值</label><input id="player-score-points" type="number" step="1" min="-1000000" max="1000000" required placeholder="如 5 或 -5" aria-describedby="player-score-help player-score-preview" /></div>
                 </div>
                 <p id="player-score-help" class="score-hint">正数加分，负数扣分；不改变胜负、连胜或场均积分。</p>
@@ -131,7 +136,7 @@
             <p id="correction-status" class="score-status" role="status" aria-live="polite"></p>
           </div>
         </section>
-        <section>
+        <section id="audit-section" role="tabpanel" aria-labelledby="dashboard-tab-audit" tabindex="0" hidden>
           <div class="section-heading">
             <h2>操作记录</h2>
             <span id="audit-count"></span>
@@ -170,6 +175,17 @@
           autocomplete="off"
         />
         <div id="room-options" class="room-options"></div>
+      </dialog>
+      <dialog id="score-confirm-dialog" aria-labelledby="score-confirm-title" aria-describedby="score-confirm-description">
+        <form method="dialog">
+          <p class="eyebrow">确认变更</p>
+          <h2 id="score-confirm-title"></h2>
+          <p id="score-confirm-description"></p>
+          <div class="dialog-actions">
+            <button value="cancel" autofocus>取消</button>
+            <button id="score-confirm-accept" class="primary" value="confirm">确认保存</button>
+          </div>
+        </form>
       </dialog>
       <dialog
         id="confirm-dialog"
