@@ -187,8 +187,10 @@ test('旧测试局恢复战绩时同步恢复趣味记录，已恢复胜负的�
         assert.ok(record.fun.events.some(event=>event.label==='成功挡刀'));
       }
       assert.equal(store.matchesFor('test:3',0,20,false,{metric:'good_shield',mode:'classic'}).total,2);
-      const board=new Leaderboard(store).read('test:3',new URLSearchParams('metric=fun_good_shield'));
-      assert.equal(board.me.status,'ranked');assert.equal(board.me.count,2);
+      const board=new Leaderboard(store).read('test:3',new URLSearchParams('metric=fun_good_shield&nearby=1'));
+      assert.equal(board.me.status,'unsupported');assert.equal(board.me.count,2);
+      assert.equal(board.me.rank,null);assert.equal(board.eligibleCount,0);
+      assert.deepEqual(board.rows,[]);assert.deepEqual(board.nearby,[]);
       assert.equal(store.matchesFor('test:3').records.find(record=>record.id===unknown.matchId).fun.status,'partial');
       assert.equal(store.matchesFor('test:3').records.find(record=>record.id===terminated.matchId).fun.status,'excluded');
     };

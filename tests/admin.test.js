@@ -258,12 +258,16 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
     assert.equal(matches.records[0].score.status,"scored");
     assert.deepEqual(stats,JSON.parse(JSON.stringify(a.app.store.statsFor(uid))));
     for(const metric of ["points","games","overall"]) {
-      const board=await a.api("/api/leaderboard?metric="+metric,undefined,auth);
-      assert.equal(board.me.status,"ranked");assert.ok(board.rows.some(row=>row.isSelf));
+      const board=await a.api("/api/leaderboard?metric="+metric+"&nearby=1",undefined,auth);
+      assert.equal(board.me.status,"unsupported");assert.equal(board.me.rank,null);
+      assert.equal(board.me.total,stats.total);assert.ok(board.rows.every(row=>!row.isSelf));
+      assert.equal(board.eligibleCount,1);assert.deepEqual(board.nearby,[]);
     }
     for(const metric of stats.fun.metrics.filter(row=>row.ranked&&row.count>0)) {
-      const board=await a.api("/api/leaderboard?metric=fun_"+metric.id,undefined,auth);
-      assert.equal(board.me.status,"ranked");assert.equal(board.me.count,metric.count);
+      const board=await a.api("/api/leaderboard?metric=fun_"+metric.id+"&nearby=1",undefined,auth);
+      assert.equal(board.me.status,"unsupported");assert.equal(board.me.count,metric.count);
+      assert.equal(board.me.rank,null);assert.ok(board.rows.every(row=>!row.isSelf));
+      assert.deepEqual(board.nearby,[]);
       const filtered=await a.api("/api/me/matches?fun="+metric.id+"&mode="+metric.mode,undefined,auth);
       assert.equal(filtered.total,1);assert.ok(filtered.records[0].fun.highlights.length);
     }
@@ -273,8 +277,11 @@ test("在线陪测能读取完整个人数据和榜单，仍绑定管理会话�
   }
   const bot=panel.actors[0],auth=a.auth(bot.token);
   await a.api("/api/me/leaderboard-visibility",{leaderboardVisible:false},auth);
-  assert.equal((await a.api("/api/leaderboard",undefined,auth)).me.status,"hidden");
+  assert.equal((await a.api("/api/me/profile",undefined,auth)).leaderboardVisible,false);
+  assert.equal((await a.api("/api/leaderboard",undefined,auth)).me.status,"unsupported");
   await a.api("/api/me/leaderboard-visibility",{leaderboardVisible:true},auth);
+  assert.equal((await a.api("/api/me/profile",undefined,auth)).leaderboardVisible,true);
+  assert.equal((await a.api("/api/leaderboard",undefined,auth)).me.status,"unsupported");
   await hostCommand("rematch");
   assert.equal((await a.api("/api/me/matches",undefined,auth)).total,1);
   const other=await a.room();
