@@ -165,6 +165,8 @@ NODE_ENV=production DEV_AUTH=0 DEV_PANEL=0 PORT=8787 npm start
 
 小程序需单独上传发布：配置自己的 AppID、HTTPS `baseUrl` 和 request 合法域名，将客户端 `devAuth` 改为 `false`。AppSecret 仅放在服务端。
 
+资料编辑页及 160 张内置头像位于 `pages/profile` 普通分包，页面路由仍为 `/pages/profile/profile`；一级导航和其他页面留在主包。`npm test` 包含主包与各分包的源码体积检查，最终包体积需在微信开发者工具的代码包分析中确认。头像文件路径与服务端镜像共用，发布时先更新服务端镜像，再上传小程序；仅移动资源不改变头像编号、内容哈希或已有用户头像，无需数据库迁移。
+
 正式管理平台支持房间概览、为准备阶段房间开启陪测、清理测试座位、终止／删除房间及操作审计。生产陪测不依赖开发登录开关。
 
 SQLite 仅由一个服务实例写入；备份使用 SQLite 在线备份或停服备份完整数据目录，不要在运行时仅复制主文件而遗漏 WAL。发布失败时的自动回退只恢复应用镜像，不恢复数据库。main 只运行 CI 并构建镜像；通过 GitHub Actions 的 Deploy tested image 手动选择目标和构建编号发布。

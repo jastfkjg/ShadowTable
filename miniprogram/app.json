@@ -2,7 +2,6 @@
   "pages": [
     "pages/lobby/lobby",
     "pages/me/me",
-    "pages/profile/profile",
     "pages/stats/stats",
     "pages/leaderboard/leaderboard",
     "pages/share/share",
@@ -12,6 +11,12 @@
     "pages/board-details/board-details",
     "pages/help/help",
     "pages/web-login/web-login"
+  ],
+  "subPackages": [
+    {
+      "root": "pages/profile",
+      "pages": ["profile"]
+    }
   ],
   "window": {
     "navigationBarTitleText": "桌边助手 · ShadowTable",

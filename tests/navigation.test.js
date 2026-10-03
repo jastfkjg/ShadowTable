@@ -525,7 +525,8 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
   assert.equal(config.tabBar.backgroundColor, color);
   assert.equal(config.window.navigationStyle, 'custom');
   assert.equal(config.tabBar.custom, true);
-  for (const route of config.pages) {
+  const routes = [...config.pages, ...(config.subPackages || []).flatMap(pkg => pkg.pages.map(route => pkg.root + '/' + route))];
+  for (const route of routes) {
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
     assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);

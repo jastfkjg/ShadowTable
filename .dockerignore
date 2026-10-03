@@ -6,6 +6,8 @@
 !miniprogram/
 !miniprogram/builtin-avatars.js
 !miniprogram/avatar-library.js
-!miniprogram/assets/
-!miniprogram/assets/avatars/
-!miniprogram/assets/avatars/**
+!miniprogram/pages/
+!miniprogram/pages/profile/
+!miniprogram/pages/profile/assets/
+!miniprogram/pages/profile/assets/avatars/
+!miniprogram/pages/profile/assets/avatars/**

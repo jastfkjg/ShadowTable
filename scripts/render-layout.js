@@ -148,7 +148,7 @@ for (let i = 2; i <= 12; i++) enter(avatarRoom, "p" + i, i === 4 ? "这是一个
 const avatarScene = roomData(avatarRoom);
 scenes.seatAvatars = { ...avatarScene, seats: Array.from({ length: 13 }, (_, i) => {
   const player = avatarScene.seats.find(p => p.seat === i + 1);
-  return player ? { ...player, avatarUrl: i === 2 ? "" : "../../miniprogram/assets/avatars/avatar-" + String(i + 1).padStart(2, "0") + ".jpg" }
+  return player ? { ...player, avatarUrl: i === 2 ? "" : "../../miniprogram/pages/profile/assets/avatars/avatar-" + String(i + 1).padStart(2, "0") + ".jpg" }
     : { seat: i + 1, name: "空位", occupied: false, mine: false, avatarInitial: "+" };
 }) };
 scenes.seatAvatarStates = { ...scenes.seatAvatars,
@@ -156,7 +156,7 @@ scenes.seatAvatarStates = { ...scenes.seatAvatars,
   seats: scenes.seatAvatars.seats.map(p => ({ ...p, selected: p.seat === 1, alive: p.seat !== 1, avatarFailed: p.seat === 5 })) };
 const emptyLobby = roomData(newRoom("628421", "p1", "zz", "classic", 6));
 scenes.seatCardsLobby = { ...emptyLobby, seats: Array.from({ length: 6 }, (_, i) => i === 0
-  ? { ...emptyLobby.seats[0], avatarUrl: "../../miniprogram/assets/avatars/avatar-01.jpg" }
+  ? { ...emptyLobby.seats[0], avatarUrl: "../../miniprogram/pages/profile/assets/avatars/avatar-01.jpg" }
   : { seat: i + 1, name: "空位", occupied: false, mine: false, avatarInitial: "+" }) };
 r.players.forEach((p) =>
   command(r, p.uid, { type: "ready", ready: true, stage: r.stage }),

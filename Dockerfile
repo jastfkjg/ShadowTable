@@ -4,7 +4,7 @@ WORKDIR /app
 COPY --chown=node:node server ./server
 COPY --chown=node:node miniprogram/builtin-avatars.js ./miniprogram/builtin-avatars.js
 COPY --chown=node:node miniprogram/avatar-library.js ./miniprogram/avatar-library.js
-COPY --chown=node:node miniprogram/assets/avatars ./miniprogram/assets/avatars
+COPY --chown=node:node miniprogram/pages/profile/assets/avatars ./miniprogram/pages/profile/assets/avatars
 COPY --chown=node:node package.json ./package.json
 RUN mkdir /data && chown node:node /data
 USER node
