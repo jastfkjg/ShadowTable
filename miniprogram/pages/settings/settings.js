@@ -17,6 +17,7 @@ Page({
     visible: false,
     fairyEnabled: false,
     scoreEnabled: false,
+    recordPurpose: "normal",
     dirty: false,
     transferPlayers: [],
     showTransferPicker: false,
@@ -74,6 +75,7 @@ Page({
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
         scoreEnabled: room.scoreSettings?.enabled === true,
+        recordPurpose: room.recordSettings?.purpose || "normal",
         dirty: false,
       });
       this.updateChoices(room.capacity, room.board);
@@ -102,6 +104,12 @@ Page({
     });
     this.updateDirty();
   },
+  toggleRecordPurpose(e) {
+    if (this.settingsLocked() || !this.data.room?.recordSettings?.editable) return;
+    this.setData({recordPurpose:e.detail.value ? "test" : "normal"});
+    this.updateDirty();
+    return this.save();
+  },
   updateDirty() {
     const r = this.original;
     this.setData({
@@ -109,6 +117,7 @@ Page({
         !!r &&
         (this.data.fairyEnabled !== (r.fairyEnabled === true) ||
           !!r.scoreSettings && this.data.scoreEnabled !== r.scoreSettings.enabled ||
+          !!r.recordSettings && this.data.recordPurpose !== r.recordSettings.purpose ||
           this.data.capacity !== r.capacity ||
           this.data.boardId !== r.board ||
           this.data.visible !==
@@ -175,6 +184,7 @@ Page({
         visible: this.data.visible,
         fairyEnabled: this.data.fairyEnabled,
         ...(this.original.scoreSettings ? { scoreEnabled: this.data.scoreEnabled } : {}),
+        ...(this.original.recordSettings ? { recordPurpose: this.data.recordPurpose } : {}),
       },
     };
     return this.sendPending();
@@ -349,6 +359,7 @@ Page({
           visible: this.data.visible,
           fairyEnabled: this.data.fairyEnabled,
           scoreEnabled: this.data.scoreEnabled,
+          recordPurpose: this.data.recordPurpose,
         }
       : null;
     this.setData({ busy: true, error: "", pendingKick: true });
@@ -367,7 +378,7 @@ Page({
       if (this.data.authorized && draft) {
         this.setData({ visible: draft.visible });
         this.updateChoices(draft.capacity, draft.boardId);
-        this.setData({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled });
+        this.setData({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, recordPurpose: draft.recordPurpose });
         this.updateDirty();
       }
       if (this.foreground && this.data.authorized)

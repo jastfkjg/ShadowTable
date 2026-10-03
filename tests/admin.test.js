@@ -511,3 +511,75 @@ test('管理员更正计分结果鉴权、幂等和版本校验，并保留整�
   assert.equal((await a.raw(path,{...body,requestId:randomUUID(),revision:1,reason:{}})).status,400);
   assert.equal(a.app.store.db.prepare("SELECT reason FROM admin_audit WHERE action='correct-result'").get().reason,'');
 });
+
+test("自动结算与行动审计同事务提交，重试只记录一次且秘密结果仅管理员可读", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code, token } = await a.room();
+  const { enter, command } = require("../server/engine");
+  const room = a.app.store.get(code);
+  const host = room.host;
+  for (let seat = 2; seat <= room.capacity; seat++)
+    enter(room, `review:${seat}`, `队员${seat}`);
+  for (const player of room.players)
+    command(room, player.uid, {
+      type: "ready",
+      ready: true,
+      stage: room.stage,
+    });
+  command(room, host, { type: "start", flexible: true, stage: room.stage });
+  room.roles[host] = "servant";
+  a.app.store.save(room);
+  await a.api(
+    `/api/rooms/${code}/commands`,
+    {
+      type: "beginActivity",
+      stage: room.stage,
+      kind: "quest",
+      team: [1],
+      threshold: 1,
+    },
+    a.auth(token),
+  );
+  const stage = a.app.store.get(code).stage;
+  const input = {
+    type: "submit",
+    stage,
+    value: "success",
+    secret: "DO_NOT_LOG",
+  };
+  const headers = { ...a.auth(token), "Idempotency-Key": randomUUID() };
+  await a.api(`/api/rooms/${code}/commands`, input, headers);
+  await a.api(`/api/rooms/${code}/commands`, input, headers);
+  const result = await a.api(`/api/admin/audit?grouped=1&code=${code}`);
+  const group = result.groups.find((group) =>
+    group.entries.some((entry) => entry.details.phaseKey === "quest"),
+  );
+  assert.equal(group.entries.length, 2);
+  assert.equal(group.active, false);
+  const outcome = group.entries.flatMap(
+    (entry) => entry.details.outcomes || [],
+  );
+  assert.equal(outcome.length, 1);
+  assert.equal(outcome[0].text, "任务成功");
+  assert.equal(outcome[0].counts.success, 1);
+  assert.doesNotMatch(JSON.stringify(result), /DO_NOT_LOG|review:/);
+  const publicData = await a.api(
+    `/api/rooms/${code}`,
+    undefined,
+    a.auth(token),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(publicData),
+    /outcomes|participants|auditVersion/,
+  );
+  assert.equal(
+    (
+      await a.raw(`/api/admin/audit?grouped=1&code=${code}`, undefined, {
+        Cookie: "",
+        ...a.auth(token),
+      })
+    ).status,
+    401,
+  );
+});

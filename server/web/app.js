@@ -2591,6 +2591,7 @@ function roomListItems(rooms) {
       visible: false,
       fairyEnabled: false,
       scoreEnabled: false,
+      recordPurpose: "normal",
       dirty: false,
       pendingKick: !!settingsKickPending && settingsKickPending.code === roomCode,
       pendingSave: !!settingsSavePending && settingsSavePending.code === roomCode,
@@ -2655,6 +2656,7 @@ function roomListItems(rooms) {
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
         scoreEnabled: room.scoreSettings?.enabled === true,
+        recordPurpose: room.recordSettings?.purpose || "normal",
         dirty: false,
       });
       updateSettingsChoices(room.capacity, room.board);
@@ -2693,6 +2695,7 @@ function roomListItems(rooms) {
         !!r &&
         (s.fairyEnabled !== (r.fairyEnabled === true) ||
           !!r.scoreSettings && s.scoreEnabled !== r.scoreSettings.enabled ||
+          !!r.recordSettings && s.recordPurpose !== r.recordSettings.purpose ||
           s.capacity !== r.capacity ||
           s.boardId !== r.board ||
           s.visible !== (["knights", "knights-10", "knights-11", "knights-13"].includes(r.board) && r.showSkillDetails === true)),
@@ -2710,6 +2713,7 @@ function roomListItems(rooms) {
         type: "updateSettings", stage: settingsOriginal.stage,
         board: s.boardId, capacity: s.capacity, visible: s.visible, fairyEnabled: s.fairyEnabled,
         ...(settingsOriginal.scoreSettings ? { scoreEnabled: s.scoreEnabled } : {}),
+        ...(settingsOriginal.recordSettings ? { recordPurpose: s.recordPurpose } : {}),
       } };
     }
     var saved = settingsSavePending;
@@ -2762,7 +2766,7 @@ function roomListItems(rooms) {
     var s = state.settings;
     var requestData = settingsKickPending;
     if (!s || s.busy || !requestData || requestData.code !== roomCode) return;
-    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled, scoreEnabled: s.scoreEnabled } : null;
+    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled, scoreEnabled: s.scoreEnabled, recordPurpose: s.recordPurpose } : null;
     setSettings({ busy: true, pendingKick: true, error: "" });
     try {
       await login();
@@ -2774,7 +2778,7 @@ function roomListItems(rooms) {
       if (state.settings === s && s.authorized && draft) {
         setSettings({ visible: draft.visible });
         updateSettingsChoices(draft.capacity, draft.boardId);
-        setSettings({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled });
+        setSettings({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, recordPurpose: draft.recordPurpose });
         updateSettingsDirty();
       }
       if (foreground) toast("玩家已移出");
@@ -3422,6 +3426,7 @@ function roomListItems(rooms) {
       resultHtml += '</div>';
     }
     html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
+    if (r.recordNotice) html += '<div class="small muted">' + esc(r.recordNotice) + '</div>';
     if (r.scoreSettings) html += '<div class="small muted">' + esc(r.scoreNotice || (r.scoreSettings.enabled ? '本局计分已开启' : '本局计分已关闭')) + '</div>';
     if (r.phase === "lobby") {
       html +=
@@ -3744,6 +3749,7 @@ function roomListItems(rooms) {
           "</span></div>";
       }
       html += "</div>";
+      if (room.recordSettings) html += '<div class="settings-section-title">对局用途</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>仅测试，不计战绩</span><span class="settings-caption">保留对局记录，不计入胜率、积分和趣味统计。' + (room.recordSettings.editable ? '发牌后固定' : '本局设置已固定') + '</span></span><input type="checkbox" aria-label="仅测试，不计战绩" data-change="settingsRecordPurpose"' + (s.recordPurpose === "test" ? ' checked' : '') + (settingsLocked() || !room.recordSettings.editable ? ' disabled' : '') + ' /></label></div>';
       if (room.scoreSettings) html += '<div class="settings-section-title">积分</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>本局计分</span><span class="settings-caption">' +
         esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
         '</span></span><input type="checkbox" aria-label="本局计分" data-change="settingsScoring"' + (s.scoreEnabled ? ' checked' : '') +
@@ -4367,6 +4373,13 @@ function roomListItems(rooms) {
       var s = state.settings;
       if (settingsLocked() || s.capacity < 7 || s.room.phase === "fairy") return;
       setSettings({ fairyEnabled: el.checked });
+      updateSettingsDirty();
+      return settingsSave();
+    },
+    settingsRecordPurpose: function (el) {
+      const s = state.settings;
+      if (settingsLocked() || !s.room?.recordSettings?.editable) return;
+      setSettings({recordPurpose:el.checked ? "test" : "normal"});
       updateSettingsDirty();
       return settingsSave();
     },

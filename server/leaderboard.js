@@ -62,8 +62,8 @@ class Leaderboard {
     const aggregates = this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
       ${metric === "points" ? "sum(s.points) AS points," : ""}
       f.nickname, f.avatar_hash, f.public_id, f.leaderboard_visible
-      FROM match_players p LEFT JOIN profiles f ON f.uid=p.uid
-      ${metric === "points" ? "JOIN match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'" : ""}
+      FROM visible_match_players p LEFT JOIN profiles f ON f.uid=p.uid
+      ${metric === "points" ? "JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'" : ""}
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
       .all(range.start, ...(range.end === null ? [] : [range.end]), ...(faction ? [faction] : []));
@@ -137,7 +137,7 @@ class Leaderboard {
         count(DISTINCT CASE WHEN s.status='known' THEN s.match_id END) AS knownGames,
         count(DISTINCT CASE WHEN s.status='unknown' THEN s.match_id END) AS unknownGames,
         f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
-        FROM match_fun_stats s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
+        FROM match_fun_stats s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
         WHERE p.outcome IN ('win','loss') AND s.metric=? ${mode === "all" ? "" : "AND s.mode=?"} AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
         GROUP BY s.uid`).all(def.id, ...(mode === "all" ? [] : [mode]), range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
       const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);

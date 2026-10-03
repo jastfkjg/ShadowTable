@@ -2,7 +2,7 @@
 const http = require("node:http");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
-const { actionDetails } = require("./audit");
+const { actionDetails, completeActionDetails } = require("./audit");
 const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
 const { Leaderboard } = require("./leaderboard");
 const { publicRules: scoreRules } = require("./scoring");
@@ -358,7 +358,7 @@ function createApp({
           store.addReceipt(uid, id, fingerprint, response);
           return response;
         }
-        let room, response, details;
+        let room, response, details, auditBefore;
         if (path === "/api/rooms") {
           limit(`create:${uid}`, 8);
           let code;
@@ -371,6 +371,7 @@ function createApp({
         } else {
           room = store.get(match[1]);
           check(room, "房间不存在", 404);
+          auditBefore = structuredClone(room);
           if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid))
             details = actionDetails(
               room,
@@ -396,6 +397,7 @@ function createApp({
           if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };
         }
+        details = completeActionDetails(details, auditBefore, room);
         if (match?.[2] === "delete") store.remove(room.code);
         else {
           store.save(room);

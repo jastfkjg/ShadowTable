@@ -21,6 +21,13 @@
       </picker>
       <view wx:else class="settings-row"><text>板子</text><text class="muted settings-value">{{room.boardName}}</text></view>
     </view>
+    <block wx:if="{{room.recordSettings}}">
+      <view class="settings-section-title">对局用途</view>
+      <view class="settings-section"><view class="settings-row">
+        <view><view>仅测试，不计战绩</view><view class="settings-caption">保留对局记录，不计入胜率、积分和趣味统计。{{room.recordSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
+        <switch checked="{{recordPurpose==='test'}}" bindchange="toggleRecordPurpose" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.recordSettings.editable}}" aria-label="仅测试，不计战绩" />
+      </view></view>
+    </block>
     <block wx:if="{{room.scoreSettings}}">
       <view class="settings-section-title">积分</view>
       <view class="settings-section"><view class="settings-row">

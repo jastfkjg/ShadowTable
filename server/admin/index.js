@@ -88,6 +88,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         "/admin/": ["index.html", "text/html; charset=utf-8"],
         "/admin/app.js": ["app.js", "text/javascript; charset=utf-8"],
         "/admin/controls.js": ["controls.js", "text/javascript; charset=utf-8"],
+        "/admin/matches.js": ["matches.js", "text/javascript; charset=utf-8"],
         "/admin/style.css": ["style.css", "text/css; charset=utf-8"],
       };
       if (assets[path]) {
@@ -267,6 +268,27 @@ function createAdmin({ store, origin, key, body, limit }) {
           players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name,alive:player.alive ?? true};})};
       });
       send(200,{matches});return true;
+    }
+    if (path === "/api/admin/match-records" && req.method === "GET") {
+      send(200,store.managedMatches(new URL(req.url,origin).searchParams));return true;
+    }
+    if (path === "/api/admin/match-records/preview" && req.method === "POST") {
+      const input=await body(req);
+      send(200,store.transaction(()=>store.previewMatches(input)));return true;
+    }
+    if (path === "/api/admin/match-records/manage" && req.method === "POST") {
+      const input=await body(req);
+      fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId),"缺少合法请求编号");
+      const actor="admin:match-management",fingerprint=digest(JSON.stringify([path,input])).toString("hex");
+      const result=store.transaction(()=>{
+        const cached=store.receipt(actor,input.requestId);
+        if(cached){fail(cached.fingerprint===fingerprint,"请求编号已用于其他操作",409);return JSON.parse(cached.result);}
+        const changed=store.manageMatches(input);
+        for(const match of changed.matches) store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
+          .run("match-"+input.action,match.code,input.reason?.trim() || "",Date.now(),JSON.stringify({...match,label:{delete:"删除对局记录",restore:"恢复对局记录",exclude:"设置不计战绩",include:"恢复计入战绩"}[input.action],administrator:session.hash}));
+        store.addReceipt(actor,input.requestId,fingerprint,changed);return changed;
+      });
+      send(200,result);return true;
     }
     if (path === "/api/admin/score-players" && req.method === "GET") {
       const query=new URL(req.url,origin).searchParams,search=(query.get("q") || "").trim(),offset=query.get("offset") || "0";

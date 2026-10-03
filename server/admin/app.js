@@ -11,6 +11,10 @@ const labels = {
   "correct-result": "更正对局结果",
   "adjust-player-score": "调整玩家积分",
   "adjust-match-scores": "调整本局积分",
+  "match-delete": "删除对局记录",
+  "match-restore": "恢复对局记录",
+  "match-exclude": "设置不计战绩",
+  "match-include": "恢复计入战绩",
   companion: "陪测玩家",
   player: "玩家",
 };
@@ -34,12 +38,14 @@ async function api(path, data) {
   return result;
 }
 function showSession(on) {
+  if(on) window.MatchRecords?.resume();
   $("login").hidden = on;
   $("dashboard").hidden = !on;
   $("logout").hidden = !on;
   if (!on) {
     $("rooms").replaceChildren();
     $("audit").replaceChildren();
+    window.MatchRecords?.clear();
   }
 }
 function el(tag, text, cls) {
@@ -241,123 +247,282 @@ function renderAudit({ groups, total, pageSize }) {
   $("audit-prev").disabled = auditOffset === 0;
   $("audit-next").disabled = auditOffset + pageSize >= total;
   if (!groups.length) $("audit").append(el("p", "暂无操作记录"));
+  const activityNames = {
+    vote: "全员投票",
+    quest: "任务出牌",
+    skills: "放技能阶段",
+    fairy: "湖仙查验",
+    conversion: "阵营转换",
+    assassination: "刀梅林",
+    reverseStrike: "刀逆仆",
+    offline: "线下刀人",
+  };
+  const actorLabel = (player, game) => {
+    const role = player.role === undefined && game ? "身份未记录" : player.role;
+    return `${player.seat == null ? "旁观者" : player.seat + "号"}·${player.name}${role ? "·" + role : ""}`;
+  };
   for (const group of groups) {
-    const entries = group.entries;
-    const d = entries[0].details;
+    const entries = [...group.entries].sort(
+      (a, b) => (a.id ?? a.created) - (b.id ?? b.created),
+    );
+    const d =
+      entries.find((entry) => entry.details.command === "submit")?.details ||
+      entries[0].details;
+    const event =
+      ["tools", "ended", "terminated"].includes(d.phaseKey) ||
+      ["等待房主发起操作", "对局结束", "对局已终止"].includes(d.phase) ||
+      ["start", "rematch", "finishTools"].includes(d.command);
+    const title = event
+      ? d.command === "beginActivity"
+        ? "发起" + (activityNames[d.parameters?.kind] || "操作")
+        : d.label || labels[entries[0].action] || "房间操作"
+      : d.phaseKey === "skillPrepare"
+        ? "放技能阶段"
+        : d.phaseKey === "fairy"
+          ? "湖仙查验"
+          : d.phase || d.label || labels[entries[0].action] || "房间操作";
+    const operation =
+      !event &&
+      ([
+        "quest",
+        "teamVote",
+        "skillPrepare",
+        "skillTurn",
+        "hunterTurn",
+        "paladinTurn",
+        "fairy",
+        "assassination",
+        "reverseStrike",
+      ].includes(d.phaseKey) ||
+        /技能|任务|表决|投票|仙女|湖仙|最终行动/.test(d.phase || ""));
+    const quest = d.phaseKey === "quest" || /任务/.test(d.phase || "");
+    const skills =
+      /skill|hunterTurn|paladinTurn/.test(d.phaseKey || "") ||
+      /技能/.test(d.phase || "");
     const block = el("div", "", "audit-stage");
     const header = el("div", "", "audit-stage-heading");
-    const title = d.phase
-      ? d.phaseKey === "skillPrepare"
-        ? "放技能阶段"
-        : d.phase
-      : d.label || labels[entries[0].action] || "房间操作";
+    const heading = el("div");
+    heading.append(el("h3", title));
+    const context = [
+      d.game ? `第 ${d.game} 局` : "",
+      operation && d.round ? `第 ${d.round} 轮` : "",
+      d.activityNumber ? `操作 #${d.activityNumber}` : "",
+    ].filter(Boolean);
+    if (context.length)
+      heading.append(el("span", context.join(" · "), "audit-context"));
     const startedAt = entries.find((entry) => entry.details.activityStartedAt)
       ?.details.activityStartedAt;
-    const timestamp =
-      startedAt || Math.min(...entries.map((entry) => entry.created));
+    const timestamp = startedAt || entries[0].created;
     header.append(
-      el("h3", title),
+      heading,
       el(
         "time",
         `${startedAt ? "发起于" : "记录于"} ${new Date(timestamp).toLocaleString()}`,
       ),
     );
     block.append(header);
+
     const players = new Map();
-    for (const entry of [...entries].reverse()) {
+    for (const entry of entries)
       for (const player of entry.details.participants || [])
         players.set(player.seat, player);
-      if (entry.details.player && !players.has(entry.details.player.seat))
-        players.set(entry.details.player.seat, entry.details.player);
+    if (
+      quest &&
+      operation &&
+      d.team?.length &&
+      !entries.some((entry) => entry.details.outcomes?.length)
+    ) {
+      const team = d.team
+        .map(
+          (seat) =>
+            `${seat}号${players.get(seat)?.name ? "·" + players.get(seat).name : ""}`,
+        )
+        .join("、");
+      block.append(
+        el(
+          "p",
+          `队伍：${team}${d.threshold ? ` · 失败门槛 ${d.threshold} 张` : ""}`,
+          "audit-note",
+        ),
+      );
     }
     const summary = el("div", "", "audit-players");
-    for (const player of [...players.values()].sort(
-      (a, b) => a.seat - b.seat,
-    )) {
-      const actions = [...entries]
-        .reverse()
-        .filter((entry) => entry.details.player?.seat === player.seat);
-      const submissions = actions.filter(
-        (entry) => entry.details.command === "submit",
-      );
-      const primary = submissions.length
-        ? submissions
-        : actions.filter(
-            (entry) =>
-              !["ackIdentity", "ackFairyResult"].includes(
-                entry.details.command,
-              ),
-          );
-      let text;
-      if (player.required && !submissions.length)
-        text = group.active ? "未提交" : "未提交（阶段已结束）";
-      else if (primary.length)
-        text = [
-          ...new Set(
-            primary.map((entry) => {
-              const detail = entry.details;
-              if (detail.value === "pass") return "未使用技能";
-              if (detail.choice) return detail.choice;
-              if (detail.command === "ready")
-                return detail.parameters.ready ? "已准备" : "取消准备";
-              if (detail.command === "seat")
-                return `换到${detail.parameters.seat}号`;
-              return detail.label;
-            }),
+    const submissions = entries.filter(
+      (entry) => entry.details.command === "submit",
+    );
+    const passive = { pass: [], confirm: [] };
+    for (const entry of entries) {
+      const detail = entry.details;
+      if (["ackIdentity", "ackFairyResult"].includes(detail.command)) continue;
+      if (
+        operation &&
+        [
+          "beginActivity",
+          "advance",
+          "settleTool",
+          "closeWaiting",
+          "cancelActivity",
+        ].includes(detail.command)
+      ) {
+        block.append(
+          el(
+            "p",
+            `${detail.player ? actorLabel(detail.player, d.game) + " " : ""}${detail.label || detail.command}`,
+            "audit-note",
           ),
-        ].join("、");
-      else if (player.required)
-        text = group.active ? "未提交" : "未提交（阶段已结束）";
-      else if (actions.length)
-        text = [...new Set(actions.map((entry) => entry.details.label))].join(
-          "、",
         );
-      else text = player.required === false ? "无需操作" : "未记录操作";
-      // Prefer the actor snapshot over later participant snapshots (e.g. after drawing B).
-      const actor =
-        primary.at(-1)?.details.player ||
-        actions.at(-1)?.details.player ||
-        player;
-      const role =
-        actor.role === undefined && d.game ? "身份未记录" : actor.role;
+        continue;
+      }
+      if (
+        detail.command === "submit" &&
+        ["pass", "confirm"].includes(detail.value)
+      ) {
+        // Off-team confirmations in saved sequential games aren't quest plays.
+        if (!quest && detail.player)
+          passive[detail.value].push(detail.player.seat);
+        continue;
+      }
+      if (!detail.player) continue;
+      let action =
+        detail.choice || detail.label || labels[entry.action] || detail.command;
+      if (detail.command === "ready")
+        action = detail.parameters?.ready ? "已准备" : "取消准备";
+      if (detail.command === "seat")
+        action = `入座／换到 ${detail.parameters?.seat} 号`;
       const line = el("span", "", "audit-player");
       line.append(
-        el("strong", `${actor.seat}号·${actor.name}${role ? "·" + role : ""}`),
+        el("strong", actorLabel(detail.player, d.game)),
+        document.createTextNode(" " + action),
+        el(
+          "time",
+          new Date(entry.created).toLocaleTimeString(),
+          "audit-action-time",
+        ),
+      );
+      summary.append(line);
+    }
+    const earlyClosed = entries.find(
+      (entry) => entry.details.earlyClosed,
+    )?.details;
+    for (const player of players.values()) {
+      if (
+        !operation ||
+        !player.required ||
+        submissions.some((entry) => entry.details.player?.seat === player.seat)
+      )
+        continue;
+      if (quest && d.team?.length && !d.team.includes(player.seat)) continue;
+      const skipped = earlyClosed?.skippedSeats?.includes(player.seat);
+      const text = skipped
+        ? skills
+          ? "未提交（提前截止，按跳过处理）"
+          : d.phaseKey === "teamVote"
+            ? "未提交（提前截止，记弃权）"
+            : "未提交（操作已作废）"
+        : group.active
+          ? "未提交"
+          : "未提交（阶段已结束）";
+      const line = el("span", "", "audit-player audit-pending");
+      line.append(
+        el("strong", actorLabel(player, d.game)),
         document.createTextNode(" " + text),
       );
       summary.append(line);
     }
-    if (players.size) block.append(summary);
-    if (!d.stage && d.phase)
-      block.append(
-        el("p", "旧记录按连续阶段归组，未提交情况无法追溯。", "audit-note"),
+    if (summary.children.length) block.append(summary);
+    for (const [value, seats] of Object.entries(passive)) {
+      if (seats.length)
+        block.append(
+          el(
+            "p",
+            `${value === "pass" ? "未使用技能／确认" : "已确认"}：${[...new Set(seats)].sort((a, b) => a - b).join("、")}号`,
+            "audit-note",
+          ),
+        );
+    }
+    const outcomes = entries.flatMap((entry) =>
+      (entry.details.outcomes || []).map((outcome) => ({
+        ...outcome,
+        created: entry.created,
+      })),
+    );
+    for (const outcome of outcomes) {
+      const result = el("div", "", "audit-result");
+      const resultHeading = el("div", "", "audit-result-heading");
+      resultHeading.append(
+        el("strong", outcome.text, "audit-result-title"),
+        el(
+          "time",
+          `${outcome.kind === "cancel" ? "作废于" : outcome.kind === "offline" ? "转线下于" : "结算于"} ${new Date(outcome.created).toLocaleTimeString()}`,
+        ),
       );
-    if (!players.size) {
-      for (const entry of entries) {
-        const change=entry.details;
-        if (entry.action==='adjust-player-score') block.append(el('p', `${change.uid} · ${change.before} → ${change.after} 分`, 'audit-note'));
-        if (entry.action==='adjust-match-scores') for (const player of change.after || []) {
-          const before=change.before?.find(row=>row.uid===player.uid);
-          block.append(el('p', `${player.seat}号 ${player.name} · ${before?.points ?? '—'} → ${player.points} 分`, 'audit-note'));
-        }
-      }
+      result.append(resultHeading);
+      for (const line of outcome.lines || [])
+        result.append(el("p", line, "audit-result-line"));
+      block.append(result);
+    }
+    if (operation && !outcomes.length) {
+      const required = [...players.values()].filter(
+        (player) =>
+          player.required &&
+          (!quest || !d.team?.length || d.team.includes(player.seat)),
+      );
+      const submitted = required.filter((player) =>
+        submissions.some((entry) => entry.details.player?.seat === player.seat),
+      );
       block.append(
         el(
           "p",
-          [
-            ...new Set(
-              entries.map((entry) =>
-                [
-                  entry.details.label || labels[entry.action] || entry.action,
-                  entry.reason,
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-              ),
-            ),
-          ].join("；"),
+          group.active
+            ? `进行中 · 已提交 ${submitted.length}/${required.length}`
+            : d.auditVersion === 2
+              ? "阶段已结束，未记录结算结果"
+              : "旧记录未保存结算结果",
+          "audit-note",
         ),
       );
+    }
+    for (const entry of entries) {
+      const change = entry.details;
+      if (entry.action?.startsWith("match-"))
+        block.append(
+          el(
+            "p",
+            `${change.id} · ${{ active: "正常", excluded: "不计战绩", deleted: "已删除" }[change.before]} → ${{ active: "正常", excluded: "不计战绩", deleted: "已删除" }[change.after]}`,
+            "audit-note",
+          ),
+        );
+      if (entry.action === "adjust-player-score")
+        block.append(
+          el(
+            "p",
+            `${change.uid} · ${change.before} → ${change.after} 分`,
+            "audit-note",
+          ),
+        );
+      if (entry.action === "adjust-match-scores")
+        for (const player of change.after || []) {
+          const before = change.before?.find((row) => row.uid === player.uid);
+          block.append(
+            el(
+              "p",
+              `${player.seat}号 ${player.name} · ${before?.points ?? "—"} → ${player.points} 分`,
+              "audit-note",
+            ),
+          );
+        }
+      if (!entry.details.player && !operation)
+        block.append(
+          el(
+            "p",
+            [
+              entry.details.label || labels[entry.action] || entry.action,
+              entry.reason,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          ),
+        );
     }
     $("audit").append(block);
   }
@@ -547,6 +712,7 @@ function updateCorrectionMatch() {
   return loadMatchScores();
 }
 async function loadCorrectionMatches() {
+  if(window.MatchRecords) return window.MatchRecords.refresh();
   if(correctionBusy || correctionPending || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading) return;
   const code=$('correction-code').value.trim();
   if(!/^\d{6}$/.test(code)) {$('correction-status').textContent='请输入6位房间号';return;}
@@ -625,6 +791,7 @@ function lockScoreControls() {
   $('score-player-find').textContent=scoreBusy && !selectedScorePlayer && !scoreWritePending?'查找中…':'查找玩家';
   $('correction-load').textContent=correctionLoading?'查找中…':'查找对局';
   $('score-management').setAttribute('aria-busy',String(scoreBusy || correctionBusy || correctionLoading || matchScoreLoading));
+  window.MatchRecords?.syncLock();
 }
 function renderPlayerScoreSummary() {
   $('player-score-editor').hidden=!selectedScorePlayer;
@@ -691,7 +858,7 @@ function renderMatchScorePlayers() {
   for(const player of matchScoreDetail?.players || []) {
     const row=el('div','','score-editor-row'),label=el('label',`${player.seat}号 ${player.name}`),input=el('input'),reset=el('button','恢复自动计分');
     input.id='match-points-'+player.seat;label.htmlFor=input.id;
-    const caption=player.editable?`当前 ${player.score.total} 分${player.score.manualOverride?' · 已手动设置':''}`:player.score?.reason || '本局未计分';
+    const caption=player.editable?`当前 ${player.score.total} 分${player.score.manualOverride?' · 已手动设置':''}`:player.score?.status==='scored'?`原始 ${player.score.total} 分 · 已排除统计`:player.score?.reason || '本局未计分';
     label.append(el('small',caption));
     input.type='number';input.min='-1000000';input.max='1000000';input.step='1';input.value=player.editable?String(player.score.total):'';
     input.dataset.scoreUid=player.uid;input.dataset.editable=String(player.editable);input.setAttribute('aria-label',`${player.seat}号 ${player.name}的本局积分`);
@@ -763,6 +930,7 @@ async function submitScoreWrite(kind) {
     scoreBusy=false;const loaded=kind==='player'?await loadPlayerScore():await loadMatchScores();
     status.textContent=loaded?'已保存，积分及排行榜已更新。':'已保存；读取最新积分失败，请重新查询。';
     if(kind==='match' && selectedScorePlayer)await loadPlayerScore();
+    if(kind==='match' && window.MatchRecords)await window.MatchRecords.refresh();
   }catch(error){
     if(error.status && error.status<500 && ![401,429].includes(error.status))scoreWritePending=null;
     status.textContent=error.message+(scoreWritePending?'；请重试确认结果。':'；请重新查询后操作。');

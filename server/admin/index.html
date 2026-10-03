@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/admin/style.css" />
     <script src="/admin/app.js" defer></script>
     <script src="/admin/controls.js" defer></script>
+    <script src="/admin/matches.js" defer></script>
   </head>
   <body>
     <main>
@@ -15,7 +16,7 @@
         <div>
           <p class="eyebrow">SHADOWTABLE / OPERATIONS</p>
           <h1>桌边助手管理平台</h1>
-          <p>管理牌桌和积分，连接陪测，追踪操作记录。</p>
+          <p>管理牌桌、战绩和积分，连接陪测，追踪操作记录。</p>
         </div>
         <button id="logout" hidden>退出登录</button>
       </header>
@@ -44,7 +45,7 @@
         <div class="dashboard-toolbar">
           <nav class="dashboard-tabs" role="tablist" aria-label="管理平台导航">
             <button id="dashboard-tab-rooms" type="button" role="tab" aria-selected="true" aria-controls="room-overview">房间概览</button>
-            <button id="dashboard-tab-scores" type="button" role="tab" aria-selected="false" aria-controls="score-management" tabindex="-1">计分管理</button>
+            <button id="dashboard-tab-scores" type="button" role="tab" aria-selected="false" aria-controls="score-management" tabindex="-1">战绩管理</button>
             <button id="dashboard-tab-audit" type="button" role="tab" aria-selected="false" aria-controls="audit-section" tabindex="-1">操作记录</button>
           </nav>
           <div class="dashboard-tools"><button id="refresh">刷新列表</button><a href="/admin/companion">打开陪测台 →</a></div>
@@ -68,10 +69,10 @@
         </section>
         <section id="score-management" role="tabpanel" aria-labelledby="dashboard-tab-scores" tabindex="0" hidden>
           <div class="score-heading">
-            <div><h2 id="score-title">计分管理</h2><p>调整玩家总分，或按对局管理积分与结果。</p></div>
+            <div><h2 id="score-title">战绩管理</h2><p>查找对局、清理测试记录，或更正结果与积分。</p></div>
             <div class="score-tabs" role="tablist" aria-label="积分管理范围">
-              <button id="score-tab-player" type="button" role="tab" aria-selected="true" aria-controls="player-score-section">玩家</button>
-              <button id="score-tab-match" type="button" role="tab" aria-selected="false" aria-controls="match-score-section" tabindex="-1">对局</button>
+              <button id="score-tab-player" type="button" role="tab" aria-selected="true" aria-controls="player-score-section">玩家积分</button>
+              <button id="score-tab-match" type="button" role="tab" aria-selected="false" aria-controls="match-score-section" tabindex="-1">对局记录</button>
             </div>
           </div>
           <div id="player-score-section" role="tabpanel" aria-labelledby="score-tab-player" tabindex="0">
@@ -85,7 +86,7 @@
             </div>
             <p id="score-player-empty" class="score-empty">查找并选择玩家后，可查看积分和调整记录。</p>
             <div id="player-score-editor" class="score-editor" hidden>
-              <p id="score-player-summary" class="score-selected-name"></p>
+              <div class="section-heading"><p id="score-player-summary" class="score-selected-name"></p><button id="records-for-player" type="button">查看此人的对局</button></div>
               <dl class="score-metrics">
                 <div><dt>当前总积分</dt><dd id="score-total">—</dd></div>
                 <div><dt>对局积分</dt><dd id="score-match-total">—</dd></div>
@@ -104,7 +105,28 @@
             <p id="player-score-status" class="score-status" role="status" aria-live="polite"></p>
           </div>
           <div id="match-score-section" role="tabpanel" aria-labelledby="score-tab-match" tabindex="0" hidden>
-            <form id="correction-search" class="score-search">
+            <div id="record-workspace">
+              <form id="record-filter" class="record-filter">
+                <div class="record-search-line">
+                  <div class="score-field"><label for="record-mode">查找方式</label><select id="record-mode"><option value="player">按用户</option><option value="room">按房间</option><option value="all">全部对局</option></select></div>
+                  <div class="score-field" id="record-query-field"><label id="record-query-label" for="record-query">玩家昵称或账号标识</label><input id="record-query" type="search" maxlength="200" required placeholder="输入昵称、公开 ID 或账号标识" /></div>
+                  <button id="record-search" class="primary">查找对局</button>
+                </div>
+                <div id="record-player-field" class="score-field" hidden><label for="record-player">选择玩家</label><select id="record-player"></select><p id="record-player-help" class="score-hint"></p><div id="record-player-pager" class="score-pager" hidden><button id="record-player-prev" type="button">上一页玩家</button><span id="record-player-page"></span><button id="record-player-next" type="button">下一页玩家</button></div></div>
+                <details class="record-filter-more"><summary>筛选日期与状态</summary><div class="record-filter-fields">
+                  <div class="score-field"><label for="record-from">结束日期从</label><input id="record-from" type="date" /></div>
+                  <div class="score-field"><label for="record-to">结束日期至</label><input id="record-to" type="date" /></div>
+                  <div class="score-field"><label for="record-state">记录状态</label><select id="record-state"><option value="visible">未删除</option><option value="active">正常</option><option value="excluded">不计战绩</option><option value="deleted">已删除</option><option value="all">全部状态</option></select></div>
+                </div><label class="record-check"><input id="record-companion" type="checkbox" />仅看有陪测账号参与的对局</label><p class="score-hint">日期按北京时间筛选。陪测参与不代表整局无效，请核对后选择。</p></details>
+              </form>
+              <div class="record-results-heading"><label class="record-check"><input id="record-select-all" type="checkbox" disabled />选择本页</label><span id="record-count" class="score-hint">查找用户或房间，查看已归档对局。</span><button id="record-reload" type="button" disabled>刷新结果</button></div>
+              <div id="record-list" aria-label="对局列表"></div>
+              <div id="record-bulk" class="record-bulk" hidden><strong id="record-selection"></strong><div class="record-bulk-actions"><button id="record-clear" type="button">取消选择</button><button id="record-exclude" type="button">不计战绩</button><button id="record-include" type="button">计入战绩</button><button id="record-restore" type="button">恢复记录</button><button id="record-delete" type="button" class="danger">删除记录</button></div></div>
+              <p id="record-status" class="score-status" role="status" aria-live="polite"></p>
+              <div id="record-pager" class="pager" hidden><button id="record-prev" type="button">上一页</button><span id="record-page"></span><button id="record-next" type="button">下一页</button></div>
+            </div>
+            <div id="record-detail" hidden><div class="section-heading"><h3 id="record-detail-title">对局详情</h3><button id="record-detail-close" type="button">收起详情</button></div><p id="record-detail-summary" class="score-hint"></p><p id="record-detail-state" class="score-hint"></p>
+            <form id="correction-search" class="score-search" hidden>
               <div class="score-field"><label for="correction-code">查找对局</label><input id="correction-code" inputmode="numeric" required pattern="[0-9]{6}" maxlength="6" placeholder="输入6位房间号" /></div>
               <button id="correction-load" type="submit" class="primary">查找对局</button>
             </form>
@@ -134,6 +156,7 @@
             </div>
             <p id="match-score-status" class="score-status" role="status" aria-live="polite"></p>
             <p id="correction-status" class="score-status" role="status" aria-live="polite"></p>
+            </div>
           </div>
         </section>
         <section id="audit-section" role="tabpanel" aria-labelledby="dashboard-tab-audit" tabindex="0" hidden>
@@ -142,7 +165,7 @@
             <span id="audit-count"></span>
           </div>
           <p>
-            玩家操作按阶段汇总，显示行动当时的身份与时间；管理员改分保留前后数据。仅管理员可见。
+            按局、轮次和操作复盘，显示实际行动、未提交情况及结算结果；管理员改分保留前后数据。仅管理员可见。
           </p>
           <label for="audit-room">选择房间</label>
           <button
@@ -175,6 +198,14 @@
           autocomplete="off"
         />
         <div id="room-options" class="room-options"></div>
+      </dialog>
+      <dialog id="record-confirm" aria-labelledby="record-confirm-title" aria-describedby="record-confirm-description">
+        <h2 id="record-confirm-title"></h2><p id="record-confirm-description"></p>
+        <div id="record-confirm-matches" class="record-confirm-matches"></div>
+        <div class="score-field"><label for="record-reason">处理原因</label><select id="record-reason"><option value="陪测清理">陪测清理</option><option value="错误记录">错误记录</option><option value="重复记录">重复记录</option><option value="管理更正">管理更正</option></select></div>
+        <div class="score-field"><label for="record-note">备注（可选）</label><input id="record-note" maxlength="150" placeholder="补充说明本次处理" /></div>
+        <details class="record-impact"><summary id="record-impact-title">查看所有参与者的统计变化</summary><div id="record-impact-players"></div></details>
+        <p id="record-confirm-error" role="alert"></p><div class="dialog-actions"><button id="record-confirm-cancel" type="button">取消</button><button id="record-confirm-submit" type="button" class="danger">确认处理</button></div>
       </dialog>
       <dialog id="score-confirm-dialog" aria-labelledby="score-confirm-title" aria-describedby="score-confirm-description">
         <form method="dialog">

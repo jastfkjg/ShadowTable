@@ -201,6 +201,7 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     board: boardId,
     capacity,
     scoreEnabled: scoring.defaultEnabled(capacity),
+    recordPurpose: "normal",
     fairyEnabled: capacity >= 8,
     phase: "lobby",
     stage: randomUUID(),
@@ -264,6 +265,7 @@ function archiveResult(room) {
     id: room.matchId || randomUUID(), code: room.code, game: room.game,
     board: room.board, boardName: boardName(room), capacity: room.capacity,
     startedAt: room.startedAt || null, endedAt: Date.now(),
+    recordPurpose: room.recordPurpose || "normal",
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
     scoreEligibilityReason: scoring.exclusion(room),
@@ -411,6 +413,7 @@ function start(room, flexible = false) {
   room.scorePolicy = scoring.policy();
   room.scoringFacts = null;
   delete room.matchRecord;
+  delete room.recordManagement;
   room.leader = randomInt(1, room.capacity + 1);
   room.round = 1;
   room.rejects = 0;
@@ -1147,10 +1150,16 @@ function publicView(room, uid) {
   const requiresActor = fun.settlementOptions(room.board).length > 0 && !room.players.some(player =>
     settlementRoles?.[player.uid] === "assassin" && settlementPlayers?.[player.uid].alive !== false);
   const registrationOptions = options => options.filter(option => !["early_assassination", "five_rejections"].includes(option.id));
+  const managedState = room.recordManagement?.state;
+  const excludedRecord = managedState && managedState !== "active";
+  const recordNotice = managedState === "deleted" ? "管理员已删除本局记录，不计战绩"
+    : managedState === "excluded" ? "本局不计战绩" + (room.recordManagement.reason ? " · " + room.recordManagement.reason : "")
+    : room.recordPurpose === "test" ? managedState === "active" ? "测试用途 · 管理员已恢复计入战绩" : "测试对局，不计战绩、积分和趣味统计" : null;
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
     code: room.code,
     testRoom: room.testRoom === true,
+    recordPurpose: room.recordPurpose || "normal",
     board: room.board,
     boardName:
       room.board === "classic" && room.capacity === 10
@@ -1192,10 +1201,12 @@ function publicView(room, uid) {
     scoreSettlement: registrationOptions(scoring.settlementOptions(room)),
     funSettlement: registrationOptions(fun.settlementOptions(room.board)),
     settlementRequiresActor: room.host === uid && canUseTools(room) ? requiresActor : null,
+    recordSettings: {purpose:room.recordPurpose || "normal",editable:room.phase === "lobby"},
+    recordNotice,
     scoreSettings: scoring.settings(room),
-    scoreNotice: room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
-    myScore: room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
-    myFun: room.matchRecord?.players.find(player => player.uid === uid)?.fun || null,
+    scoreNotice: excludedRecord || room.recordPurpose === "test" && managedState !== "active" ? "本局不计积分" : room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
+    myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
+    myFun: excludedRecord ? null : room.matchRecord?.players.find(player => player.uid === uid)?.fun || null,
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),
@@ -1357,6 +1368,15 @@ function applyCommand(room, uid, input) {
         next.scoreEnabled = input.scoreEnabled;
         next.players.forEach(player => (player.ready = false));
         stage(next, "lobby");
+      }
+    }
+    if (input.recordPurpose !== undefined) {
+      requireRule(["normal","test"].includes(input.recordPurpose), "对局用途无效");
+      if (input.recordPurpose !== (next.recordPurpose || "normal")) {
+        requireRule(next.phase === "lobby", "对局用途只能在发牌前修改",409);
+        next.recordPurpose = input.recordPurpose;
+        next.players.forEach(player => (player.ready = false));
+        stage(next,"lobby");
       }
     }
     Object.assign(room, next);
@@ -1644,6 +1664,7 @@ function applyCommand(room, uid, input) {
       "matchId",
       "startedAt",
       "matchRecord",
+      "recordManagement",
       "scorePolicy",
       "scoringFacts",
       "fun",

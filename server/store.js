@@ -6,6 +6,7 @@ const { randomUUID, createHash } = require("node:crypto");
 const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
 const fun = require("./fun");
+const management = require("./match-management");
 const { migrate: migrateKnights } = require("./knights");
 const adjustmentReason = (reason = "") => {
   if (typeof reason!=="string" || reason.length>200) throw new RuleError("操作备注最多200字");
@@ -44,6 +45,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    management.initialize(this);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
     if (!profileColumns.some(column => column.name === "leaderboard_visible"))
       this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 1");
@@ -120,8 +122,8 @@ class Store {
     this.invalidateLeaderboard();
   }
   funFor(uid) {
-    const rows = this.db.prepare("SELECT f.* FROM match_fun_stats f JOIN match_players p ON p.match_id=f.match_id AND p.uid=f.uid WHERE f.uid=? AND p.outcome IN ('win','loss') ORDER BY f.mode,f.metric,f.role").all(uid);
-    const legacy = this.db.prepare("SELECT count(*) AS n FROM match_players WHERE uid=? AND json_extract(snapshot,'$.fun.status')='legacy'").get(uid).n;
+    const rows = this.db.prepare("SELECT f.* FROM match_fun_stats f JOIN visible_match_players p ON p.match_id=f.match_id AND p.uid=f.uid WHERE f.uid=? AND p.outcome IN ('win','loss') ORDER BY f.mode,f.metric,f.role").all(uid);
+    const legacy = this.db.prepare("SELECT count(*) AS n FROM visible_match_players WHERE uid=? AND json_extract(snapshot,'$.fun.status')='legacy' AND NOT EXISTS(SELECT 1 FROM match_controls c WHERE c.match_id=visible_match_players.match_id AND c.state='excluded')").get(uid).n;
     return fun.aggregate(rows, legacy);
   }
   restoreCompanionMatches() {
@@ -215,6 +217,7 @@ class Store {
   }
   save(room) {
     if (room.matchRecord) this.archiveMatch(room.matchRecord);
+    if (room.matchRecord) room.recordManagement = management.control(this,room.matchRecord.id);
     room.updatedAt = this.clock();
     this.db
       .prepare(
@@ -236,6 +239,7 @@ class Store {
   }
   archiveMatch(record) {
     const { players, ...match } = record;
+    if (record.recordPurpose === "test") this.db.prepare("INSERT OR IGNORE INTO match_controls(match_id,state,previous_state,reason,updated) VALUES(?,'excluded','active','测试对局，不计战绩',?)").run(record.id,this.clock());
     this.db.prepare("INSERT OR IGNORE INTO matches VALUES(?,?)").run(match.id, JSON.stringify(match));
     const projections = fun.project(record, players, roleName);
     for (const event of record.funFacts?.events || []) this.db.prepare("INSERT OR IGNORE INTO match_events VALUES(?,?,?)").run(match.id, event.id, JSON.stringify(event));
@@ -262,33 +266,40 @@ class Store {
       }
     }
   }
+  requireActiveMatch(id) {
+    if (management.control(this,id).state !== "active") throw new RuleError("请先恢复记录并计入战绩，再更正结果或积分",409);
+  }
+  managedMatches(query) { return management.list(this,query); }
+  previewMatches(input) { return management.preview(this,input); }
+  manageMatches(input) { return management.change(this,input); }
   statsFor(uid) {
     const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;
     const summary = row => {
       const wins = Number(row.wins || 0), losses = Number(row.losses || 0), total = wins + losses;
       return { total, wins, losses, excluded: Number(row.excluded || 0), winRate: total ? Math.round(wins / total * 1000) / 10 : null };
     };
-    const total = this.db.prepare(`SELECT ${counts} FROM match_players WHERE uid=?`).get(uid);
-    const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
+    const total = this.db.prepare(`SELECT ${counts} FROM visible_match_players WHERE uid=?`).get(uid);
+    const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM visible_match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
       .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
     const byRole = this.db.prepare(`SELECT faction, json_extract(snapshot,'$.role') AS role, ${counts}
-      FROM match_players WHERE uid=? AND outcome IN ('win','loss')
+      FROM visible_match_players WHERE uid=? AND outcome IN ('win','loss')
       GROUP BY faction,role ORDER BY faction,wins + losses DESC,role`).all(uid)
       .map(row => ({ faction: row.faction, role: row.role || "未知角色", ...summary(row) }));
     const byBoard = this.db.prepare(`SELECT p.board, json_extract(m.snapshot,'$.capacity') AS capacity,
       json_extract(m.snapshot,'$.boardName') AS name, ${counts}
-      FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=?
+      FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=?
       GROUP BY p.board,capacity ORDER BY p.board,capacity`).all(uid)
       .map(row => ({ board: row.board, capacity: row.capacity, key: row.board + ":" + row.capacity,
         label: row.name + " · " + row.capacity + "人", ...summary(row) }));
-    const recent = this.db.prepare("SELECT m.snapshot AS game, p.snapshot AS player FROM match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
+    const recent = this.db.prepare("SELECT p.match_id,m.snapshot AS game, p.snapshot AS player FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
       .map(row => {
-        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, ...game } = JSON.parse(row.game);
-        const { roleId, ...player } = JSON.parse(row.player);
+        const shown = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
+        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, ...game } = shown.game;
+        const { roleId, ...player } = shown.player;
         return { ...game, ...player };
       });
     const scoreRows = this.db.prepare(`SELECT p.faction,json_extract(p.snapshot,'$.role') AS role,s.points,s.ended
-      FROM match_scores s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored'`).all(uid);
+      FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored'`).all(uid);
     const aggregate = rows => ({ total: rows.reduce((sum,row) => sum + row.points,0), games: rows.length,
       average: rows.length ? Math.round(rows.reduce((sum,row) => sum + row.points,0) / rows.length * 100) / 100 : null });
     const now = new Date(Date.now() + 8 * 3600000);
@@ -301,7 +312,7 @@ class Store {
       score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual, ...this.streakFor(uid) } };
   }
   streakFor(uid) {
-    const rows = this.db.prepare(`SELECT p.outcome FROM match_scores s JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid
+    const rows = this.db.prepare(`SELECT p.outcome FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
       WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
     let current = 0, best = 0;
     for (const row of rows) { current = row.outcome === "win" ? current + 1 : 0; best = Math.max(best,current); }
@@ -312,6 +323,7 @@ class Store {
     const row = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
     if (!row) throw new RuleError("对局不存在",404);
     const match = JSON.parse(row.snapshot);
+    this.requireActiveMatch(id);
     if (!Number.isSafeInteger(input.revision) || input.revision !== (match.scoreRevision || 0)) throw new RuleError("对局已更新，请重新加载",409);
     if (!match.scorePolicy || match.scoreEligibilityReason) throw new RuleError("本局不在计分范围，不能补算积分");
     const option = scoring.optionsFor(match.board, match.scorePolicy).find(reason => reason.id === input.scoreReason);
@@ -349,6 +361,7 @@ class Store {
     const row = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
     if (!row) throw new RuleError("对局不存在",404);
     const match = JSON.parse(row.snapshot);
+    this.requireActiveMatch(id);
     if (!match.funFacts || match.excludedReason === "对局终止") throw new RuleError("本局无法更正趣味记录");
     if (match.scorePolicy && !match.scoreEligibilityReason) return this.correctMatch(id,{...input,scoreReason:input.funReason,scoreTarget:input.funTarget});
     if (!Number.isSafeInteger(input.revision) || input.revision !== (match.scoreRevision || 0)) throw new RuleError("对局已更新，请重新加载",409);
@@ -376,13 +389,14 @@ class Store {
       const room = JSON.parse(roomRow.state), archived = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(room.matchRecord.id);
       if (!archived) continue;
       const saved = JSON.parse(archived.snapshot);
+      room.recordManagement = management.control(this,saved.id);
       room.matchRecord = {...saved,players:this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=?").all(saved.id).map(p=>({uid:p.uid,...JSON.parse(p.snapshot)}))};
       if (saved.id === resultId) {room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;}
       this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room),room.code);
     }
   }
   rebuildScores(uid) {
-    const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM match_scores s
+    const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM active_match_scores s
       JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN matches m ON m.id=s.match_id
       WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
     let streak = 0;
@@ -409,7 +423,7 @@ class Store {
     this.db.prepare("INSERT INTO score_versions VALUES(?,1) ON CONFLICT(uid) DO UPDATE SET revision=revision+1").run(uid);
   }
   playerScore(uid) {
-    const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM match_scores WHERE uid=? AND status='scored'").get(uid);
+    const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM active_match_scores WHERE uid=? AND status='scored'").get(uid);
     const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM score_adjustments WHERE uid=?").get(uid).points;
     return {uid,points:matchPoints.points+manual,matchPoints:matchPoints.points,manualPoints:manual,games:matchPoints.games,revision:this.scoreRevision(uid)};
   }
@@ -452,7 +466,7 @@ class Store {
     return {id,code:match.code,boardName:match.boardName,endedAt:match.endedAt,revision:match.scoreRevision || 0,
       players:this.db.prepare("SELECT uid,snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')").all(id).map(row=>{
         const player=JSON.parse(row.snapshot),score=player.score;
-        return {uid:row.uid,name:player.name,seat:player.seat,editable:score?.status==='scored',score:score || null};
+        return {uid:row.uid,name:player.name,seat:player.seat,editable:management.control(this,id).state==='active' && score?.status==='scored',score:score || null};
       })};
   }
   adjustMatchScores(id,input) {
@@ -483,19 +497,19 @@ class Store {
     return {id,code:data.code,revision:after.revision,before,after:after.players.filter(player=>input.scores.some(row=>row.uid===player.uid)).map(player=>({uid:player.uid,seat:player.seat,name:player.name,points:player.score.total,override:player.score.manualOverride || null}))};
   }
   matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null) {
-    let filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
+    let filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM active_match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
     const args = [uid];
     if (funFilter) {
-      filter += " AND EXISTS (SELECT 1 FROM match_fun_stats f WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.mode=? AND f.status='known' AND f.count>0" + (funFilter.role ? " AND f.role=?" : "") + ")";
+      filter += " AND p.outcome IN ('win','loss') AND EXISTS (SELECT 1 FROM match_fun_stats f WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.mode=? AND f.status='known' AND f.count>0" + (funFilter.role ? " AND f.role=?" : "") + ")";
       args.push(funFilter.metric, funFilter.mode, ...(funFilter.role ? [funFilter.role] : []));
     }
-    const total = this.db.prepare("SELECT count(*) AS total FROM match_players p WHERE uid=?" + filter).get(...args).total;
+    const total = this.db.prepare("SELECT count(*) AS total FROM visible_match_players p WHERE uid=?" + filter).get(...args).total;
     const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
-      FROM match_players p JOIN matches m ON m.id=p.match_id
+      FROM visible_match_players p JOIN matches m ON m.id=p.match_id
       WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
     const members = this.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? ORDER BY json_extract(snapshot,'$.seat')");
     const records = rows.map(row => {
-      const game = JSON.parse(row.game), player = JSON.parse(row.player);
+      const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
       return {
         id: row.match_id, boardName: game.boardName, capacity: game.capacity,
         startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,

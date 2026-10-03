@@ -362,6 +362,7 @@
       <block wx:if="{{room.phase==='tools' || room.phase==='ended'}}"><template is="tableResult" data="{{room, latestResult}}" /><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
       <block wx:else><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
     </view>
+    <view wx:if="{{room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
     <view wx:if="{{room.scoreSettings}}" class="small muted">{{room.scoreNotice || (room.scoreSettings.enabled?'本局计分已开启':'本局计分已关闭')}}</view>
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="panel"

@@ -116,7 +116,7 @@ function auditRenderer() {
   };
 }
 
-test("操作记录显示行动当时身份和发起时间，不使用后续身份、不展示局轮或明细", () => {
+test("操作记录显示行动当时身份、局轮和发起时间，合并技能跳过", () => {
   const c = auditRenderer();
   const startedAt = new Date("2026-09-19T02:44:00Z").getTime();
   const actor = { seat: 1, name: "zzz", role: "魔术师", required: true };
@@ -164,7 +164,9 @@ test("操作记录显示行动当时身份和发起时间，不使用后续身�
   const nodes = c.nodes();
   const text = nodes.map((n) => n.text).join(" ");
   assert.match(text, /1号·zzz·魔术师/);
-  assert.doesNotMatch(text, /zzz·红猎人|第 1 局|第 2 轮|明细/);
+  assert.doesNotMatch(text, /zzz·红猎人|2号·other|明细/);
+  assert.match(text, /第 1 局 · 第 2 轮/);
+  assert.match(text, /未使用技能／确认：2号/);
   assert.equal(
     nodes.find((n) => n.tag === "time").text,
     "发起于 " + new Date(startedAt).toLocaleString(),
@@ -186,7 +188,8 @@ test("旧记录不猜身份，时间取首次记录；管理员操作保留简�
               game: 1,
               player: { seat: 1, name: "旧玩家" },
               command: "submit",
-              value: "pass",
+              value: "target:2",
+              choice: "对 2号开刀",
             },
           },
           { created: 1000, details: { stage: "s1", phase: "技能", game: 1 } },
@@ -435,4 +438,256 @@ test('管理员不计分对局更正提交趣味目标与带刀人，失败重�
   const submit=$('correction-form').listeners.submit;await submit({preventDefault(){}});assert.match($('correction-submit').textContent,/重试/);
   $('correction-target').value='0';await submit({preventDefault(){}});assert.deepEqual(writes[0],writes[1]);assert.equal(writes[0].funTarget,1);assert.equal(writes[0].funActor,2);assert.ok(!Object.hasOwn(writes[0],'scoreTarget'));assert.match($('correction-status').textContent,/趣味记录/);
   assert.ok(!Object.hasOwn(writes[0],'reason'));
+});
+
+test("任务复盘只显示任务队员及未提交者，并突出保存的票数与结算结果", () => {
+  const c = auditRenderer();
+  const participants = [
+    { seat: 1, name: "房主", role: "忠臣", required: false },
+    { seat: 2, name: "队员乙", role: "刺客", required: true },
+    { seat: 3, name: "队员丙", role: "忠臣", required: true },
+    { seat: 4, name: "围观队员", role: "梅林", required: false },
+  ];
+  const context = {
+    phaseKey: "quest",
+    phase: "任务出牌",
+    stage: "q",
+    game: 2,
+    round: 3,
+    auditVersion: 2,
+    team: [2, 3],
+    participants,
+  };
+  c.render({
+    groups: [
+      {
+        active: true,
+        entries: [
+          {
+            id: 1,
+            created: 1,
+            details: {
+              ...context,
+              command: "beginActivity",
+              label: "发起任务出牌",
+              player: participants[0],
+            },
+          },
+          {
+            id: 2,
+            created: 2,
+            details: {
+              ...context,
+              command: "submit",
+              value: "fail",
+              choice: "失败",
+              player: participants[1],
+            },
+          },
+        ],
+      },
+    ],
+    total: 1,
+    pageSize: 20,
+  });
+  let text = c
+    .nodes()
+    .map((node) => node.text)
+    .join(" ");
+  assert.match(text, /队员乙·刺客.*失败/);
+  assert.match(text, /队员丙·忠臣.*未提交/);
+  assert.match(text, /进行中 · 已提交 1\/2/);
+  assert.doesNotMatch(text, /围观队员|无需操作|未记录操作/);
+  c.render({
+    groups: [
+      {
+        active: false,
+        entries: [
+          {
+            id: 1,
+            created: 1,
+            details: {
+              ...context,
+              command: "submit",
+              value: "fail",
+              choice: "失败",
+              player: participants[1],
+            },
+          },
+          {
+            id: 2,
+            created: 2,
+            details: {
+              ...context,
+              command: "submit",
+              value: "success",
+              choice: "成功",
+              player: participants[2],
+              outcomes: [
+                {
+                  kind: "quest",
+                  text: "任务失败",
+                  lines: ["成功牌 1 张 · 失败牌 1 张 · 失败门槛 1 张"],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+    total: 1,
+    pageSize: 20,
+  });
+  text = c
+    .nodes()
+    .map((node) => node.text)
+    .join(" ");
+  assert.match(text, /任务失败.*成功牌 1 张 · 失败牌 1 张 · 失败门槛 1 张/);
+  assert.doesNotMatch(text, /房主|围观队员|未提交|未记录结算/);
+  assert.equal(
+    c.nodes().filter((node) => node.className === "audit-result").length,
+    1,
+  );
+});
+
+test("入座和重开只显示行动者，等待阶段用实际动作命名，重复准备保留时间顺序", () => {
+  const c = auditRenderer();
+  const actor = { seat: 1, name: "房主" };
+  const participants = [actor, { seat: 2, name: "其他玩家", required: false }];
+  c.render({
+    groups: [
+      {
+        entries: [
+          {
+            id: 3,
+            created: 3,
+            details: {
+              phaseKey: "lobby",
+              phase: "入座与准备",
+              player: actor,
+              participants,
+              command: "ready",
+              parameters: { ready: true },
+            },
+          },
+          {
+            id: 2,
+            created: 2,
+            details: {
+              phaseKey: "lobby",
+              phase: "入座与准备",
+              player: actor,
+              participants,
+              command: "ready",
+              parameters: { ready: false },
+            },
+          },
+          {
+            id: 1,
+            created: 1,
+            details: {
+              phaseKey: "lobby",
+              phase: "入座与准备",
+              player: actor,
+              participants,
+              command: "ready",
+              parameters: { ready: true },
+            },
+          },
+        ],
+      },
+      {
+        entries: [
+          {
+            created: 4,
+            details: {
+              phaseKey: "ended",
+              phase: "对局结束",
+              player: actor,
+              participants,
+              command: "rematch",
+              label: "同房重开",
+            },
+          },
+        ],
+      },
+      {
+        entries: [
+          {
+            created: 5,
+            details: {
+              phaseKey: "tools",
+              phase: "等待房主发起操作",
+              player: actor,
+              participants,
+              command: "beginActivity",
+              label: "发起操作",
+              parameters: { kind: "quest" },
+            },
+          },
+        ],
+      },
+    ],
+    total: 3,
+    pageSize: 20,
+  });
+  const nodes = c.nodes();
+  assert.deepEqual(
+    nodes.filter((node) => node.tag === "h3").map((node) => node.text),
+    ["入座与准备", "同房重开", "发起任务出牌"],
+  );
+  assert.doesNotMatch(
+    nodes.map((node) => node.text).join(" "),
+    /其他玩家|无需操作|等待房主发起操作|对局结束/,
+  );
+  const actions = nodes
+    .filter((node) => node.tag === "text")
+    .map((node) => node.text.trim());
+  assert.deepEqual(actions.slice(0, 3), ["已准备", "取消准备", "已准备"]);
+});
+
+test("提前截止保留缺交玩家和处理方式，作废操作不冒充任务结果", () => {
+  const c = auditRenderer();
+  const participants = [
+    { seat: 2, name: "缺交玩家", role: "忠臣", required: true },
+  ];
+  c.render({
+    groups: [
+      {
+        active: false,
+        entries: [
+          {
+            created: 1,
+            details: {
+              phaseKey: "quest",
+              phase: "任务出牌",
+              stage: "q",
+              participants,
+              team: [2],
+              command: "closeWaiting",
+              label: "提前结束等待",
+              earlyClosed: true,
+              skippedSeats: [2],
+              outcomes: [
+                {
+                  kind: "cancel",
+                  text: "本次操作已作废",
+                  lines: ["本次不产生结算结果。"],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+    total: 1,
+    pageSize: 20,
+  });
+  const text = c
+    .nodes()
+    .map((node) => node.text)
+    .join(" ");
+  assert.match(text, /缺交玩家·忠臣.*未提交（操作已作废）/);
+  assert.match(text, /本次操作已作废/);
+  assert.doesNotMatch(text, /任务成功|旧记录未保存|未记录结算/);
 });
