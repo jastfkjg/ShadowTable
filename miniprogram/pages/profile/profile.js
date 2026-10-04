@@ -37,26 +37,16 @@ Page({
   clearCustomAvatar() {
     this.stopAvatarReview();
     this.customAvatarPath = ""; this.uploadRequest = null; this.uploadRecord = null;
-    this.avatarBeforeUpload = null;
     this.uploadPolls = 0;
     this.setData({ uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0 });
   },
-  async chooseCustomAvatar(e) {
+  async chooseWechatAvatar(e) {
     const path = e.detail?.avatarUrl;
-    if (!path || !this.original || !this.data.canUpload || this.data.busy || this.pending) return;
-    const before = this.avatarBeforeUpload || { avatar: this.avatar, preview: this.data.avatarPreview, selected: this.data.selectedAvatar };
+    if (!this.alive || !path || !this.original || !this.data.canUpload || this.data.busy || this.pending) return;
     this.clearCustomAvatar();
-    this.avatarBeforeUpload = before;
     this.customAvatarPath = path; this.avatar = "local";
     this.setData({ avatarPreview: path, selectedAvatar: "", error: "" }); this.markDirty();
     await this.retryAvatarUpload();
-  },
-  cancelCustomAvatar() {
-    if (!this.avatarBeforeUpload || this.data.busy || this.pending) return;
-    const before = this.avatarBeforeUpload;
-    this.clearCustomAvatar(); this.avatar = before.avatar;
-    this.setData({ avatarPreview: before.preview, selectedAvatar: before.selected });
-    this.markDirty();
   },
   async retryAvatarUpload() {
     if (!this.customAvatarPath || this.data.busy || this.pending || this.data.uploadBusy) return;

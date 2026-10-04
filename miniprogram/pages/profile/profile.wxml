@@ -5,7 +5,7 @@
   <form wx:if="{{profile}}" bindsubmit="save">
     <view class="avatar-editor">
       <view class="avatar-preview">
-        <button wx:if="{{canUpload}}" hover-class="none" class="avatar-change" open-type="chooseAvatar" bindchooseavatar="chooseCustomAvatar" disabled="{{busy || pendingSave}}" aria-label="{{uploadStatus === 'uploading' ? '头像上传中，可以重新选择图片' : (uploadStatus === 'pending' || uploadStatus === 'processing' ? '正在准备头像，可以重新选择图片' : '更换头像，选择自己的图片')}}">
+        <button wx:if="{{canUpload}}" hover-class="none" class="avatar-change" open-type="chooseAvatar" bindchooseavatar="chooseWechatAvatar" disabled="{{busy || pendingSave}}" aria-label="{{uploadStatus === 'uploading' ? '头像上传中，可以重新选择图片' : (uploadStatus === 'pending' || uploadStatus === 'processing' ? '正在准备头像，可以重新选择图片' : '更换头像，可使用微信头像、从相册选择或拍照')}}">
           <view class="avatar-image-wrap">
             <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" aria-hidden="{{true}}" />
             <view wx:else class="profile-avatar large avatar-fallback">{{initial}}</view>

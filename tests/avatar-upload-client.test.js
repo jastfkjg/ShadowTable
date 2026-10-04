@@ -9,7 +9,7 @@ const profile = { nickname: "林间", avatarUrl: "/api/avatars/old", version: 3,
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function page(overrides = {}) {
   let spec, sequence = 0;
-  const timers = new Map(), writes = [], uploads = [], alerts = [], navigations = [];
+  const timers = new Map(), writes = [], uploads = [], alerts = [], navigations = [], toasts = [];
   const api = {
     login: async () => {}, requestId: () => "avatar-request-id-" + (++sequence), assetUrl: value => "https://api.example.test" + value,
     request: async (url, method, data, id) => {
@@ -20,7 +20,7 @@ function page(overrides = {}) {
   };
   const wx = { login: options => options.success({ code: "fresh-code" }), canIUse: () => true,
     enableAlertBeforeUnload: options => alerts.push(options), disableAlertBeforeUnload() {}, pageScrollTo() {},
-    navigateBack: () => navigations.push("back"), showToast() {}, showModal: options => options.success({ confirm: true }) };
+    navigateBack: () => navigations.push("back"), showToast: options => toasts.push(options), showModal: options => options.success({ confirm: true }) };
   function load(file) {
     if (file === path.join(root, "api.js")) return api;
     const module = { exports: {} };
@@ -31,11 +31,45 @@ function page(overrides = {}) {
     return module.exports;
   }
   load(path.join(root, "pages/profile/profile.js"));
-  const p = { ...spec, data: structuredClone(spec.data), setData(patch) { Object.assign(this.data, patch); } };
-  return { p, api, wx, timers, uploads, writes, alerts, navigations };
+  const p = { ...spec, data: structuredClone(spec.data), setData(patch, callback) { Object.assign(this.data, patch); callback?.(); } };
+  return { p, api, wx, timers, uploads, writes, alerts, navigations, toasts };
 }
 async function ready(client) { await client.p.onLoad(); await flush(); }
-const choose = (p, value = "wxfile://chosen-avatar") => p.chooseCustomAvatar({ detail: { avatarUrl: value } });
+const choose = (p, value = "wxfile://chosen-avatar") => p.chooseWechatAvatar({ detail: { avatarUrl: value } });
+
+test("微信内置选择结果直接预览并上传，不调用额外选图或裁剪，保留昵称编辑", async () => {
+  const client = page(); await ready(client);
+  client.p.inputName({ detail: { value: "保留昵称" } });
+  client.wx.chooseMedia = client.wx.chooseImage = client.wx.cropImage = client.wx.createSelectorQuery = client.wx.canvasToTempFilePath = () => { throw Error("不应再选图或裁剪"); };
+  await choose(client.p, "wxfile://wechat-result");
+  assert.equal(client.uploads.length, 1); assert.equal(client.uploads[0][0], "wxfile://wechat-result");
+  assert.equal(client.p.data.avatarPreview, "wxfile://wechat-result"); assert.equal(client.p.data.nickname, "保留昵称");
+  assert.equal(client.p.data.uploadStatus, "approved"); assert.equal(client.writes.length, 0); client.p.onUnload();
+});
+
+test("取消微信原生选择保留头像草稿和昵称，卸载后迟到回调不会修改资料或上传", async () => {
+  const client = page(); await ready(client); await choose(client.p);
+  client.p.inputName({ detail: { value: "保留昵称" } });
+  const snapshot = JSON.stringify(client.p.data);
+  await client.p.chooseWechatAvatar({ detail: {} });
+  assert.equal(JSON.stringify(client.p.data), snapshot); assert.equal(client.uploads.length, 1); assert.equal(client.toasts.length, 0);
+  client.p.onUnload();
+  const unloaded = JSON.stringify(client.p.data);
+  await choose(client.p, "wxfile://late-result");
+  assert.equal(JSON.stringify(client.p.data), unloaded); assert.equal(client.uploads.length, 1);
+});
+
+test("不支持微信原生头像选择时保留内置头像，保存过程中原生回调不覆盖正在提交的草稿", async () => {
+  const unsupported = page(); unsupported.wx.canIUse = () => false; await ready(unsupported);
+  assert.equal(unsupported.p.data.canUpload, false); await choose(unsupported.p);
+  assert.equal(unsupported.uploads.length, 0);
+  unsupported.p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: "pixel-01" } } });
+  await unsupported.p.save(); assert.equal(unsupported.writes[0].data.avatar, "builtin:pixel-01"); unsupported.p.onUnload();
+  const client = page(); await ready(client);
+  client.p.data.busy = true; await choose(client.p);
+  client.p.data.busy = false; client.p.pending = { id: "save-pending" }; await choose(client.p);
+  assert.equal(client.uploads.length, 0); assert.equal(client.p.data.dirty, false); client.p.onUnload();
+});
 
 test("上传使用新微信code和本地预览，审核通过只修改草稿，保存沿用版本和幂等编号", async () => {
   const client = page(); await ready(client);
@@ -95,24 +129,14 @@ test("上传服务禁用或旧服务不支持时内置选择和保存仍可用�
       if (url === "/api/me/avatar-uploads") { if (failure) throw Error("接口不存在"); return { enabled: false }; }
       return profile;
     } }); await ready(client);
-    assert.equal(client.p.data.canUpload, false); await client.p.chooseCustomAvatar({ detail: {} });
+    assert.equal(client.p.data.canUpload, false); await client.p.chooseWechatAvatar({ detail: {} });
     assert.equal(client.p.data.dirty, false);
     client.p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: "avatar-02" } } });
     assert.equal(client.p.avatar, "builtin:avatar-02"); assert.equal(client.p.data.dirty, true); client.p.onUnload();
   }
 });
 
-test("取消更换恢复原头像，保留昵称编辑并允许保存，迟到审核结果不再应用", async () => {
-  const client = page({ uploadAvatar: async () => ({ id: "upload-one", status: "pending" }) }); await ready(client);
-  await choose(client.p); client.p.inputName({ detail: { value: "只改昵称" } });
-  client.p.cancelCustomAvatar();
-  assert.equal(client.p.data.avatarPreview, "https://api.example.test/api/avatars/old");
-  assert.equal(client.p.avatar, undefined); assert.equal(client.p.data.nickname, "只改昵称");
-  assert.equal(client.p.data.dirty, true); assert.equal(client.timers.size, 0); assert.equal(client.p.data.uploadStatus, "");
-  await client.p.save(); assert.deepEqual(client.writes[0].data, { nickname: "只改昵称", version: 3 }); client.p.onUnload();
-});
-
-test("上传途中可以重新选图，旧进度和迟到结果不覆盖新图片；撤销恢复之前的内置头像草稿", async () => {
+test("上传途中可以重新选择，旧进度和迟到结果不覆盖新图片；选择内置头像后忽略未完成上传", async () => {
   const requests = [];
   const client = page({ uploadAvatar: (path, _code, id, progress) => new Promise(resolve => requests.push({ path, id, progress, resolve })) });
   await ready(client);
@@ -128,7 +152,7 @@ test("上传途中可以重新选图，旧进度和迟到结果不覆盖新图�
   assert.equal(client.p.data.uploadProgress, 27); assert.equal(client.p.avatar, "local");
   assert.equal(client.p.data.uploadBusy, true);
   client.p.inputName({ detail: { value: "保留昵称" } });
-  client.p.cancelCustomAvatar();
+  client.p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: "pixel-01" } } });
   const snapshot = structuredClone(client.p.data);
   requests[1].resolve({ id: "cancelled-result", status: "pending" }); await second;
   assert.deepEqual(JSON.parse(JSON.stringify(client.p.data)), JSON.parse(JSON.stringify(snapshot)));
@@ -161,12 +185,18 @@ test("头像本身可更换，准备时禁用保存但允许重新选图，成�
   const render = factory("pages/profile/profile.wxml"), data = page().p.data;
   function nodes(node) { return typeof node === "object" ? [node, ...(node.children || []).flatMap(nodes)] : []; }
   const base = { ...data, loading: false, profile, nickname: profile.nickname, canUpload: true };
-  const chooseButton = tree => nodes(tree).find(node => node.attr?.openType === "chooseAvatar");
+  const chooseButton = tree => nodes(tree).find(node => node.attr?.bindchooseavatar === "chooseWechatAvatar");
   const idle = render(base);
   assert.ok(chooseButton(idle));
+  assert.equal(chooseButton(idle).attr.openType, "chooseAvatar");
+  assert.equal(nodes(idle).filter(node => node.attr?.openType === "chooseAvatar").length, 1);
   assert.ok(nodes(chooseButton(idle)).some(node => node.attr?.class === "avatar-change-badge"));
   assert.equal(nodes(idle).find(node => node.attr?.class === "avatar-change-label"), undefined);
   assert.equal(chooseButton(render({ ...base, canUpload: false })), undefined);
+  for (const patch of [{ busy: true }, { pendingSave: true }])
+    assert.equal(chooseButton(render({ ...base, ...patch })).attr.disabled, true);
+  assert.equal(nodes(idle).find(node => node.attr?.role === "dialog"), undefined);
+  assert.equal(nodes(idle).find(node => node.tag === "wx-canvas" || node.tag === "wx-slider"), undefined);
   for (const uploadStatus of ["pending", "processing", "uploading", "failed", "rejected"]) {
     const tree = render({ ...base, uploadStatus, uploadBusy: true });
     const save = nodes(tree).find(node => node.attr?.formType === "submit");
@@ -177,7 +207,7 @@ test("头像本身可更换，准备时禁用保存但允许重新选图，成�
   const approved = render({ ...base, uploadStatus: "approved" });
   assert.equal(nodes(approved).find(node => node.attr?.formType === "submit").attr.disabled, false);
   const visibleText = tree => typeof tree === "string" || typeof tree === "number" ? String(tree) : (tree.children || []).map(visibleText).join(" ");
-  assert.doesNotMatch(visibleText(approved), /更换头像|撤销更换|审核|JPG|PNG|2MB|保存资料即可使用|重新选择图片|上传自己的图片/);
+  assert.doesNotMatch(visibleText(approved), /更换头像|撤销更换|使用微信头像|审核|JPG|PNG|2MB|保存资料即可使用|重新选择图片|上传自己的图片/);
   const uploading = render({ ...base, uploadStatus: "uploading", uploadProgress: 42 });
   const progress = nodes(uploading).find(node => node.attr?.role === "progressbar");
   assert.equal(progress.attr.ariaValuenow, 42);
