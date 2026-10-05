@@ -1,0 +1,73 @@
+<template name="historyPanel">
+<view class="page personal-page matches-page">
+  <view wx:if="{{funFilter}}" class="fun-filter"><text>相关趣味记录</text><button hover-class="none" bindtap="historyClearFunFilter" disabled="{{loading || loadingMore || adjustmentsLoading}}">查看全部 ›</button></view>
+  <view class="matches-toolbar">
+    <view class="matches-filters" aria-label="对局筛选">
+      <button hover-class="none" class="{{scoredOnly?'':'selected'}}" bindtap="historyFilterScores" data-scored="0" aria-pressed="{{!scoredOnly}}" disabled="{{loading || loadingMore || adjustmentsLoading}}"><text>全部对局</text></button>
+      <button hover-class="none" class="{{scoredOnly?'selected':''}}" bindtap="historyFilterScores" data-scored="1" aria-pressed="{{scoredOnly}}" disabled="{{loading || loadingMore || adjustmentsLoading}}"><text>计分对局</text></button>
+    </view>
+    <button wx:if="{{filtersAvailable}}" class="disclosure-button matches-filter-toggle {{filterCount?'active':''}}" bindtap="historyToggleFilters" aria-expanded="{{filtersExpanded}}" hover-class="none"><text>筛选{{filterCount?' · '+filterCount:''}}</text><view class="match-arrow {{filtersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
+  </view>
+  <view wx:if="{{filtersExpanded && filtersAvailable}}" class="matches-filter-panel">
+    <picker wx:for="{{filterGroups}}" wx:key="key" range="{{item.options}}" range-key="label" value="{{item.index}}" data-key="{{item.key}}" bindchange="historyChooseFilter" disabled="{{loading || loadingMore || adjustmentsLoading}}" aria-label="{{item.label+'筛选，'+item.valueLabel}}">
+      <view class="match-filter-field {{item.active?'active':''}}"><text class="match-filter-label">{{item.label}}</text><view class="match-filter-value"><text>{{item.valueLabel}}</text><view class="match-filter-chevron" aria-hidden="true"></view></view></view>
+    </picker>
+    <view class="match-filter-note">时间按北京时间计算；角色为结算时的身份。</view>
+  </view>
+  <view class="matches-result-summary" wx:if="{{loaded || filterCount}}">
+    <view class="matches-result-copy"><text wx:if="{{loaded}}" class="matches-count">{{filterCount?'筛选结果':'共'}} {{total}} 场</text><view wx:if="{{filterCount}}" class="match-filter-summary">{{filterSummary}}</view></view>
+    <button wx:if="{{filterCount}}" class="matches-filter-clear" bindtap="historyClearFilters" disabled="{{loading || loadingMore || adjustmentsLoading}}" hover-class="none">清空筛选</button>
+  </view>
+  <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="historyRetry" disabled="{{loading || loadingMore}}">重新加载</button></view>
+  <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>
+  <block wx:if="{{records.length}}">
+    <block wx:for="{{records}}" wx:key="id">
+      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day">{{item.dayLabel}}</view>
+      <view class="match-entry {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}}">
+        <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
+          <view class="match-top"><text class="match-board">{{item.boardName}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
+          <view class="match-secondary"><text>{{item.role}} · {{item.factionLabel}} · {{item.capacity}}人</text><view class="match-arrow {{item.expanded?'expanded':''}}" aria-hidden="true"></view></view>
+          <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored'?'accent':''}}">{{item.scoreLabel}}</text></view>
+          <view wx:if="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
+        </button>
+        <view wx:if="{{item.expanded}}" class="match-details">
+          <view class="match-result"><text>{{item.winner==='good' || item.winner==='evil' || item.winner==='third'?item.winnerLabel+'获胜':'胜方未登记'}}</text><text class="match-source">{{item.sourceLabel}}</text></view>
+          <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
+          <view wx:if="{{item.scoreEndReason}}" class="match-detail-row"><text>结束原因</text><text>{{item.scoreEndReason}}</text></view>
+          <view wx:if="{{item.score.status==='scored'}}" class="score-breakdown">
+            <view wx:for="{{item.score.breakdown}}" wx:for-item="award" wx:key="id" class="match-detail-row"><text>{{award.label}}</text><text>{{award.points>=0?'+':''}}{{award.points}}分</text></view>
+            <view class="match-detail-row score-total"><text>本局积分</text><text class="accent">{{item.score.total>=0?'+':''}}{{item.score.total}}分</text></view>
+            <view wx:if="{{item.score.manualOverride}}" class="match-detail-row"><text>管理员调整原因</text><text>{{item.score.manualOverride.reason}}</text></view>
+          </view>
+          <view wx:elif="{{item.score.reason && item.score.reason!==item.excludedReason}}" class="match-note">{{item.score.reason}}</view>
+          <view wx:if="{{item.hasFunEvents}}" class="match-fun">
+            <view class="match-section-label">我的趣味记录</view>
+            <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
+            <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
+            <view wx:for="{{item.fun.events}}" wx:for-item="event" wx:key="id" class="fun-event"><view><text wx:if="{{event.round}}">第 {{event.round}} 轮 · </text>{{event.role}} · {{event.label}}</view><view class="match-note">{{event.detail}}</view></view>
+          </view>
+          <block wx:else>
+            <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
+            <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
+          </block>
+          <view wx:if="{{item.members.length}}" class="match-members-section">
+            <button hover-class="none" class="disclosure-button match-members-toggle" bindtap="historyToggleMembers" data-id="{{item.id}}" aria-expanded="{{item.membersExpanded}}" aria-label="{{item.membersExpanded?'收起':'展开'}}同桌成员，共{{item.members.length}}人"><text>同桌成员<text class="match-member-count"> · {{item.members.length}}人</text></text><view class="match-arrow {{item.membersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
+            <view wx:if="{{item.membersExpanded}}" class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text class="match-seat">{{member.seat}}号</text><text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text></view></view>
+          </view>
+        </view>
+      </view>
+    </block>
+    <button hover-class="none" wx:if="{{hasMore && !error}}" class="matches-more" bindtap="historyLoadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
+  </block>
+  <view id="score-adjustments" wx:if="{{adjustments.length && !funFilter && !filterCount}}" class="adjustment-history">
+    <view class="section-title">管理员积分调整 · {{adjustmentsTotal}} 条</view>
+    <view wx:for="{{adjustments}}" wx:key="id" class="match-entry adjustment-entry">
+      <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="accent">{{item.pointsLabel}}</text></view>
+      <view>{{item.reason}}</view><view class="small muted">总积分 {{item.beforePoints}} → {{item.afterPoints}}</view>
+    </view>
+    <view wx:if="{{adjustmentsError}}" class="inline-error" role="alert">{{adjustmentsError}}</view>
+    <button wx:if="{{adjustmentsMore}}" class="matches-more" bindtap="historyLoadAdjustments" disabled="{{adjustmentsLoading}}" hover-class="none">{{adjustmentsLoading?'正在加载…':adjustmentsError?'重试加载调整记录':'加载更多调整记录'}}</button>
+  </view>
+</view>
+</template>

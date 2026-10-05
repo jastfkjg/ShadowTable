@@ -10,6 +10,8 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   context,
 );
+const renderStatsShell = data => factory('pages/stats/stats.wxml')({tab:data.tab || 'records', statistics:data, history:{}, historyStarted:false, scrollTops:{}});
+const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'matches', statistics:{}, history:data, historyStarted:true, scrollTops:{}});
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
@@ -27,7 +29,7 @@ test('小程序网页登录确认页显示真实网站与账号，加载、过�
   assert.ok(!byHandler(done, 'confirm')); assert.ok(byHandler(done, 'back'));
 });
 test('积分调整记录与单局手动原因在个人记录中可见，恢复自动后不显示手动原因',()=>{
-  const renderMatches=factory('pages/matches/matches.wxml'),record={id:'m',members:[],expanded:true,score:{status:'scored',total:8,breakdown:[{id:'admin',label:'管理员调整',points:4}],manualOverride:{reason:'挡刀核对'} }};
+  const renderMatches=renderHistoryShell,record={id:'m',members:[],expanded:true,score:{status:'scored',total:8,breakdown:[{id:'admin',label:'管理员调整',points:4}],manualOverride:{reason:'挡刀核对'} }};
   const data={records:[record],adjustments:[{id:'a',dateLabel:'今天',pointsLabel:'+2 分',beforePoints:8,afterPoints:10,reason:'额外奖励'}],adjustmentsTotal:1};
   const html=JSON.stringify(renderMatches(data));assert.match(html,/挡刀核对/);assert.match(html,/额外奖励/);assert.match(html,/管理员积分调整/);
   delete record.score.manualOverride;assert.doesNotMatch(JSON.stringify(renderMatches(data)),/挡刀核对/);
@@ -67,7 +69,7 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
     { ...record, id: 'two', endedAt: new Date(2026, 9, 1, 20, 48, 19).getTime(), score: { status: 'scored', total: 0, breakdown: [] } },
     { ...record, id: 'three', endedAt: new Date(2026, 8, 30, 23, 30).getTime() },
   ]);
-  const renderMatches = factory('pages/matches/matches.wxml');
+  const renderMatches = renderHistoryShell;
   const render = () => renderMatches({ records, total: 3, loaded: true });
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join(' ');
   assert.equal(nodes(render()).filter(n => n.attr?.class === 'match-day').length, 2);
@@ -81,7 +83,7 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   assert.match(text(render()), /同桌成员/);
   assert.match(text(render()), /本局暂无过程记录/);
   assert.doesNotMatch(text(render()), /我的趣味记录|林间/);
-  assert.equal(byHandler(render(), 'toggleMembers').attr.ariaExpanded, false);
+  assert.equal(byHandler(render(), 'historyToggleMembers').attr.ariaExpanded, false);
   records[0].membersExpanded = true;
   assert.match(text(render()), /林间/);
   assert.match(text(render()), /（我）/);
@@ -94,7 +96,7 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   assert.match(text(render()), /最终结果未记录/);
 });
 test('战绩区分未计分与零分计分局，没有计分局也保留独立调分', () => {
-  const renderStats = factory('pages/stats/stats.wxml');
+  const renderStats = renderStatsShell;
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join(' ');
   const score = { total: 0, games: 0, average: null, current: 0, best: 0 };
   const role = { role: '派西维尔', total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—' };
@@ -114,9 +116,9 @@ test('战绩区分未计分与零分计分局，没有计分局也保留独立�
 
   for (const total of [-5, 5]) {
     const adjusted = show({ ...stats, score: { ...score, total } });
-    assert.match(adjusted, new RegExp('总积分\\s+' + total));
+    assert.match(adjusted, new RegExp('积分\\s+' + total));
     assert.match(adjusted, /暂无计分对局/);
-    assert.match(adjusted, /积分调整可在对局记录中查看/);
+    assert.match(adjusted, /来自积分调整/);
     assert.doesNotMatch(adjusted, /场均|计分局连胜/);
   }
 });
@@ -977,13 +979,13 @@ test("结算需要主动选择胜方，支持第三阵营；零有效局不显�
   const knifeDialog = render({ ...base, room: knightRoom, resultDialog: true, resultStep:'target',resultStepTitle:'实际刺杀目标',resultPlayers:knightRoom.players.filter(p=>p.alive!==false), resultReason: 'early_assassination', resultRequiresTarget: true, resultTarget: null });
   assert.deepEqual(nodes(knifeDialog).filter(n => n.attr?.bindtap === 'pickScoreTarget').map(n => Number(n.attr['data-seat'])), [2, 0]);
   assert.match(JSON.stringify(knifeDialog), /实际刺杀目标/);
-  const stats = factory("pages/stats/stats.wxml")({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
+  const stats = renderStatsShell({ ...base, stats: { total: 0, wins: 0, losses: 0, excluded: 2, rateLabel: "—", byFaction: [], byBoard: [], recent: [] } });
   assert.doesNotMatch(JSON.stringify(stats), /还没有有效战绩|去开一局|按阵营与角色查看/);
   assert.doesNotMatch(JSON.stringify(stats), /0%/);
 });
 
 test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐藏，单项分享仍可使用',()=>{
-  const renderStats=factory('pages/stats/stats.wxml');
+  const renderStats=renderStatsShell;
   const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};
   const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
   assert.equal(nav.attr.share,true);assert.equal(nav.attr.shareLabel,'分享完整趣味记录图片');

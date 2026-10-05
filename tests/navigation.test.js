@@ -28,6 +28,7 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
   }
   if (!home && route === 'lobby') definition = load(path.join(root,'pages/table/controller.js'))({ lobby: true });
   else if (!home && route === 'me') definition = load(path.join(root,'pages/me/controller.js'))();
+  else if (!home && ['stats', 'matches'].includes(route)) definition = load(path.join(root,'pages',route,'controller.js'))();
   else load(path.join(root,'pages',route,route+'.js'));
   const p = { ...definition, data: structuredClone(definition.data), alive: true, foreground: true,
     setData(patch,callback) {
@@ -41,6 +42,9 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
   if (p.schedule) p.schedule = () => {};
   return { p, wx, navigations, storage, appState };
 }
+
+const renderStatsShell = factory => data => factory('pages/stats/stats.wxml')({tab:data.tab || 'records', statistics:data, history:{}, historyStarted:false, scrollTops:{}});
+const renderHistoryShell = factory => data => factory('pages/matches/matches.wxml')({tab:'matches', statistics:{}, history:data, historyStarted:true, scrollTops:{}});
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
@@ -654,12 +658,12 @@ test('战绩按阵营展开角色，对局详情与成员独立展开并在分�
     byRole: [{ faction: 'good', role: '梅林', total: 2, wins: 1, losses: 1, excluded: 0, winRate: 50 }] };
   const stats = page('stats',{...apiBase,request:async()=>detailedStats}).p;
   await stats.load();
-  assert.equal(stats.data.stats.byFaction[0].expanded,false);
-  stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
   assert.equal(stats.data.stats.byFaction[0].expanded,true);
+  stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
+  assert.equal(stats.data.stats.byFaction[0].expanded,false);
   assert.equal(stats.data.stats.byFaction[0].roles[0].rateLabel,'50%');
   stats.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
-  assert.equal(stats.data.stats.byFaction[0].expanded,false);
+  assert.equal(stats.data.stats.byFaction[0].expanded,true);
   assert.equal(stats.data.stats.total,2);
 
   const record = (id, endedAt) => ({ id, boardName: '经典', capacity: 6, endedAt, winner: 'good', source: 'manual', excludedReason: null,
@@ -722,11 +726,11 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
   assert.match(editor,/选择头像/);
-  const expandedStats=JSON.stringify(factory('pages/stats/stats.wxml')({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]}}));
-  assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营战绩/);
-  const matches=JSON.stringify(factory('pages/matches/matches.wxml')({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,membersExpanded:true,winner:'good',winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
+  const expandedStats=JSON.stringify(renderStatsShell(factory)({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]}}));
+  assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营与角色/);
+  const matches=JSON.stringify(renderHistoryShell(factory)({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,membersExpanded:true,winner:'good',winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
   assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
-  const emptyMatches=JSON.stringify(factory('pages/matches/matches.wxml')({loading:false,error:'',records:[],total:0}));
+  const emptyMatches=JSON.stringify(renderHistoryShell(factory)({loading:false,error:'',records:[],total:0}));
   assert.match(emptyMatches,/暂无对局记录/); assert.doesNotMatch(emptyMatches,/去开一局|逐场查看/);
 });
 test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面都有顶部导航', () => {
@@ -748,6 +752,9 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
       assert.match(template, /<app-nav/);
     } else if (route.endsWith('/table/table')) {
       assert.match(fs.readFileSync(path.join(root, 'pages/table/shared.wxml'), 'utf8'), /<app-nav/);
+    } else if (['pages/stats/stats','pages/matches/matches'].includes(route)) {
+      assert.match(template, /records\/shell.wxml/);
+      assert.match(fs.readFileSync(path.join(root,'pages/records/shell.wxml'),'utf8'), /<app-nav/);
     } else assert.match(template, /<app-nav/);
   }
 });
@@ -959,7 +966,7 @@ test('预览只来自直接上级的我的页，直接进入仍正常请求最�
   assert.equal(p.data.nickname,'最新');
 });
 
-test('战绩即时显示预览，刷新保留已展开的阵营且不修改上级数据', async () => {
+test('战绩即时显示预览，单阵营默认展开，刷新保留用户收起且不修改上级数据', async () => {
   const request=deferred();
   const stats={...previewStats,total:1,byFaction:[{faction:'good',total:1,expanded:false,roles:[]}]};
   const pages=priorMe();pages[0].data.stats=stats;
@@ -968,7 +975,7 @@ test('战绩即时显示预览，刷新保留已展开的阵营且不修改上�
   p.toggleFaction({currentTarget:{dataset:{faction:'good'}}});
   assert.equal(stats.byFaction[0].expanded,false);
   request.resolve({...emptyStats,total:2,byFaction:[{faction:'good',total:2,winRate:50}]}); await loading;
-  assert.equal(p.data.stats.total,2);assert.equal(p.data.stats.byFaction[0].expanded,true);
+  assert.equal(p.data.stats.total,2);assert.equal(p.data.stats.byFaction[0].expanded,false);
 });
 
 test('预取对局记录不阻塞我的页面，过期预取结果和失败均不覆盖当前状态', async () => {
@@ -1130,7 +1137,7 @@ test('计分表单接受服务端结束原因，提交实际目标；分值与�
   const presented=require('../miniprogram/profile').presentMatches([{id:'x',endedAt:1,members:[],score:{status:'scored',total:9,breakdown:[{id:'future-award',label:'服务端新增奖励',points:9}]}}]);
   const context={window:{},global:{}};vm.createContext(context);
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
-  const rendered=JSON.stringify(factory('pages/matches/matches.wxml')({records:presented.map(row=>({...row,expanded:true})),total:1}));
+  const rendered=JSON.stringify(renderHistoryShell(factory)({records:presented.map(row=>({...row,expanded:true})),total:1}));
   assert.match(rendered,/服务端新增奖励/);assert.match(rendered,/9 分/);
 });
 test('不计积分的骑士登记要求实际带刀人和目标，自选目标会清空，提交独立趣味事实',async()=>{
@@ -1221,4 +1228,91 @@ test('趣味记录页顶部分享入口生成完整分享，单项入口仍保�
   p.shareFun({currentTarget:{dataset:{card:'knights:knife'}}});assert.match(navigations[1],/kind=fun&card=knights%3Aknife&metric=knife_enemy/);
   p.data.stats.fun.shareable=false;p.shareStats();assert.equal(navigations.length,2);
   p.data.stats.fun.shareable=true;p.data.error='读取失败';p.shareStats();assert.equal(navigations.length,2);
+});
+
+test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠状态，只首次进入读取数据', async () => {
+  const reads = [], legacy = require('./helpers/fun-copy-fixtures');
+  const api = { ...apiBase, request: async url => {
+    reads.push(url);
+    return url.includes('/stats') ? legacy.stats : { records: [legacy.match], total: 1, hasMore: false,
+      filterOptions: { boards: [], roles: [{ id: '魔术师', label: '魔术师' }] } };
+  } };
+  const { p, navigations } = page('stats', api, { home: true });
+  await p.onLoad(); assert.equal(p.data.tab, 'records'); assert.equal(reads.length, 1);
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'records' } }, detail: { scrollTop: 180 } });
+  await p.switchPanel('matches');
+  await p.historyChooseFilter({ currentTarget: { dataset: { key: 'matchRole' } }, detail: { value: 1 } });
+  p.historyToggleRecord({ currentTarget: { dataset: { id: legacy.match.id } } });
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 350 } });
+  p.shareStats(); assert.equal(navigations.length, 0);
+  await p.switchPanel('fun'); p.toggleFunRules();
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'fun' } }, detail: { scrollTop: 90 } });
+  await p.switchPanel('matches');
+  assert.equal(p.data.history.filters.matchRole, '魔术师'); assert.equal(p.data.history.records[0].expanded, true);
+  assert.equal(p.data.scrollTops.matches, 350);
+  await p.switchPanel('records'); assert.equal(p.data.scrollTops.records, 180);
+  await p.switchPanel('fun'); assert.equal(p.data.scrollTops.fun, 90); assert.equal(p.data.statistics.funRulesExpanded, true);
+  assert.equal(reads.filter(url => url.includes('/stats')).length, 1); assert.equal(reads.length, 3);
+  assert.equal(navigations.length, 0);
+  p.shareStats(); assert.equal(navigations[0], '/pages/share/share?kind=funSummary');
+});
+
+test('旧对局入口直接选中记录页签；统计失败不阻塞记录，返回统计仍可重试', async () => {
+  let statsReads = 0;
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    if (!url.includes('/stats')) return { records: [], total: 0 };
+    if (++statsReads === 1) throw Error('统计暂不可用');
+    return emptyStats;
+  } }, { home: true });
+  await p.onLoad({ scored: '1' });
+  assert.equal(p.data.tab, 'matches'); assert.equal(p.data.history.scoredOnly, true); assert.equal(statsReads, 0);
+  await p.switchPanel('records'); assert.equal(p.data.statistics.error, '统计暂不可用');
+  await p.switchPanel('matches'); assert.equal(p.data.history.error, '');
+  await p.switchPanel('records'); await p.load();
+  assert.equal(p.data.statistics.error, ''); assert.equal(statsReads, 2);
+});
+
+test('趣味回查切到记录并可返回原位置，新回查和离开页面不被旧请求覆盖', async () => {
+  const first = deferred(), second = deferred(), reads = [];
+  const { p, navigations } = page('stats', { ...apiBase, request: url => {
+    if (url.includes('/stats')) return Promise.resolve(require('./helpers/fun-copy-fixtures').stats);
+    reads.push(url); return reads.length === 1 ? first.promise : second.promise;
+  } }, { home: true });
+  await p.onLoad({ tab: 'fun' });
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'fun' } }, detail: { scrollTop: 420 } });
+  const open = url => p.openFunMatches({ currentTarget: { dataset: { url } } });
+  const old = open('/pages/matches/matches?fun=knife_enemy&mode=knights&role=gaheris');
+  await new Promise(resolve => setImmediate(resolve));
+  const latest = open('/pages/matches/matches?fun=good_shield&mode=classic');
+  await new Promise(resolve => setImmediate(resolve));
+  second.resolve({ records: [{ id: 'new', endedAt: 1, members: [] }], total: 1 }); await latest;
+  first.resolve({ records: [{ id: 'old', endedAt: 1, members: [] }], total: 1 }); await old;
+  assert.equal(p.data.history.records[0].id, 'new'); assert.equal(p.data.history.funFilter.metric, 'good_shield');
+  assert.match(reads[0], /role=gaheris/); assert.equal(p.data.tab, 'matches');
+  await p.back(); assert.equal(p.data.tab, 'fun'); assert.equal(p.data.scrollTops.fun, 420); assert.equal(navigations.length, 0);
+  await p.switchPanel('matches'); await p.historyClearFunFilter();
+  assert.equal(p.data.historyFromFun, false); p.back(); assert.equal(navigations[0], 'back');
+  const slow = deferred(); p.historyController.onUnload();
+  // A fresh host tests actual disposal while its first request is outstanding.
+  const leaving = page('stats', { ...apiBase, request: () => slow.promise }, { home: true }).p;
+  const pending = leaving.onLoad(); leaving.onUnload();
+  slow.resolve(emptyStats); await pending; assert.equal(leaving.data.statistics.stats, null);
+});
+
+test('积分入口打开计分明细并定位调整；角色较多可展开且刷新保留选择', async () => {
+  const detail = { ...emptyStats, total: 12, score: { total: 2, games: 0, average: null },
+    byFaction: [{ faction: 'good', label: '好人阵营', total: 12, wins: 6, winRate: 50 }],
+    byRole: Array.from({ length: 7 }, (_, i) => ({ role: '角色' + i, faction: 'good', total: 1, wins: 0, winRate: 0 })) };
+  const { p } = page('stats', { ...apiBase, request: async url => url.includes('/stats') ? detail
+    : { records: [], total: 0, adjustments: { records: [{ id: 'adjustment', created: 1, delta: 2 }], total: 1 } } }, { home: true });
+  await p.onLoad(); assert.equal(p.data.statistics.stats.byFaction[0].expanded, true);
+  p.toggleFactionRoles({ currentTarget: { dataset: { faction: 'good' } } }); await p.load();
+  assert.equal(p.data.statistics.stats.byFaction[0].rolesExpanded, true);
+  p.toggleFaction({ currentTarget: { dataset: { faction: 'good' } } }); await p.load();
+  assert.equal(p.data.statistics.stats.byFaction[0].expanded, false);
+  await p.openScoreHistory(); assert.equal(p.data.tab, 'matches'); assert.equal(p.data.history.scoredOnly, true);
+  assert.equal(p.data.historyAnchor, 'score-adjustments'); assert.equal(p.data.historyFromFun, false);
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 300 } });
+  assert.equal(p.data.historyAnchor, '');
+  await p.switchPanel('records'); await p.switchPanel('matches'); assert.equal(p.data.scrollTops.matches, 300);
 });

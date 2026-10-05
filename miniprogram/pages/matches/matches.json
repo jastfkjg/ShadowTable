@@ -1,1 +1,1 @@
-{"navigationBarTitleText": "对局记录", "usingComponents": { "app-nav": "/components/app-nav/app-nav" }}
+{"navigationBarTitleText": "我的战绩", "disableScroll": true, "usingComponents": { "app-nav": "/components/app-nav/app-nav" }}
