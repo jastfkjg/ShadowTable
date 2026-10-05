@@ -15,6 +15,27 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('房间邀请在房间号旁，成员均可分享；首次昵称与失效提示保留在目标页面', () => {
+  for (const phase of ['lobby', 'identity']) {
+    const room = { code: '372338', phase, capacity: 6, boardName: '阿瓦隆', players: [], team: [], me: { seat: 2, isHost: false } };
+    const tree = renderTable({ ...base, room, isLobby: false, loading: false });
+    const button = nodes(tree).find(node => node.attr?.openType === 'share');
+    assert.ok(button);
+    assert.equal(button.attr.disabled, false);
+    assert.match(button.attr.ariaLabel, /372338/);
+    const loading = renderTable({ ...base, room, isLobby: false, loading: true });
+    assert.equal(nodes(loading).find(node => node.attr?.openType === 'share').attr.disabled, true);
+  }
+  const data = { ...base, isLobby: false, loading: false, invitation: { code: '372338', boardName: '阿瓦隆 · 十二骑士', capacity: 12, occupied: 12 }, invitationNeedsName: true };
+  const tree = renderTable(data);
+  assert.ok(nodes(tree).find(node => node.attr?.bindsubmit === 'submitInvitation'));
+  assert.equal(nodes(tree).filter(node => node.tag === 'wx-input').length, 1);
+  assert.match(JSON.stringify(tree), /372338|十二骑士|旁观者/);
+  const expired = renderTable({ ...data, invitationError: '该房间已解散', invitationNeedsName: false });
+  assert.ok(!nodes(expired).find(node => node.attr?.bindsubmit === 'submitInvitation'));
+  assert.ok(byHandler(expired, 'returnHome'));
+  assert.match(JSON.stringify(expired), /该房间已解散/);
+});
 test('小程序网页登录确认页显示真实网站与账号，加载、过期后不可确认，成功后有返回入口', () => {
   const renderLogin = factory('pages/web-login/web-login.wxml');
   const ready = { loading: false, busy: false, terminal: false, status: 'scanned', profile: { displayName: '小程序玩家', initial: '小' }, request: { website: 'https://play.example.com', device: 'Mac' } };

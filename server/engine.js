@@ -1139,6 +1139,18 @@ function operationProgress(room, uid) {
     completed: players.filter((p) => p.completed).length,
   };
 }
+// Invitation previews expose room context only, before the viewer has joined.
+function invitationView(room, uid) {
+  return {
+    code: room.code,
+    createdAt: room.createdAt || 0,
+    boardName: boardName(room),
+    capacity: room.capacity,
+    occupied: room.players.length,
+    phase: room.phase,
+    isMember: [...room.players, ...(room.spectators || [])].some(p => p.uid === uid),
+  };
+}
 function publicView(room, uid) {
   const p = member(room, uid);
   const action = actionSpec(room, uid);
@@ -1159,6 +1171,7 @@ function publicView(room, uid) {
   // Explicit allowlist only: never spread the authoritative room into a response.
   return {
     code: room.code,
+    createdAt: room.createdAt || 0,
     testRoom: room.testRoom === true,
     recordPurpose: room.recordPurpose || "normal",
     board: room.board,
@@ -1899,6 +1912,7 @@ module.exports = {
   enter,
   command,
   publicView,
+  invitationView,
   roomSummary,
   privateView,
   actionSpec,

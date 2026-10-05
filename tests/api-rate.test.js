@@ -18,6 +18,20 @@ test("小程序条件读取只复用同会话公开视图，304返回副本且�
   assert.match(headers[4]['Idempotency-Key'],/^v1_/);
   await api.request('/api/rooms/123456');assert.equal(headers[5]['If-None-Match'],undefined);
 });
+test("邀请实例的公开读取可条件缓存，不复用其他实例或邀请预览", async () => {
+  const headers = [], module = { exports: {} };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/api'), 'utf8'), { module, require: () => ({ baseUrl: 'http://test' }), wx: {
+    getStorageSync: () => 'same-session', request(options) {
+      headers.push(options.header);
+      options.success({ statusCode: options.header['If-None-Match'] ? 304 : 200, data: { code: '123456' }, header: { ETag: '"one"' } });
+    },
+  } });
+  for (const url of ['/api/rooms/123456?instance=100', '/api/rooms/123456?instance=100', '/api/rooms/123456?instance=200', '/api/rooms/123456/invitation?instance=100'])
+    await module.exports.request(url);
+  assert.equal(headers[1]['If-None-Match'], '"one"');
+  assert.equal(headers[2]['If-None-Match'], undefined);
+  assert.equal(headers[3]['If-None-Match'], undefined);
+});
 test("小程序遵守超过60秒的Retry-After，旧401响应不能清掉新登录", async () => {
   const module={exports:{}};let token='old',pending;
   vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/api'),'utf8'),{module,require:()=>({baseUrl:'http://test'}),wx:{getStorageSync:()=>token,removeStorageSync(){token='';},request:o=>{pending=o;}}});

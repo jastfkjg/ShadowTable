@@ -1,6 +1,7 @@
 const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const funCopy = require("../../fun-copy");
+const roomShare = require("../../room-share");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 function resultFlow(data) {
   const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
@@ -212,6 +213,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     entryNameError: "",
     entryCodeError: "",
     entryError: "",
+    invitation: null,
+    invitationError: "",
+    invitationNeedsName: false,
+    invitationRetry: false,
     showRoomRules: false,
     actionDialog: false,
     actionSecret: null,
@@ -266,15 +271,21 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     serverConnected: false,
     needsLogin: false,
   },
-  onLoad(query) {
+  onLoad(query = {}) {
     this.alive = true;
     this.foreground = true;
     this.generation = 0;
     this.inviteCode = /^\d{6}$/.test(query.code || "") ? query.code : null;
+    this.inviteInstance = query.instance == null ? null : String(query.instance);
+    this.inviteBound = query.instance != null;
+    this.resumingRoom = query.resume === "1" && !this.inviteBound;
+    this.invalidInvitation = query.code != null && !this.inviteCode ||
+      this.inviteBound && (!this.inviteCode || !/^\d+$/.test(this.inviteInstance));
     this.setData({
       name: wx.getStorageSync("nickname") || "",
       entryMode: "join",
       code: query.code || wx.getStorageSync("invitedRoom") || "",
+      invitation: !this.data.isLobby && !this.resumingRoom && (this.inviteCode || this.invalidInvitation) ? { code: query.code || "" } : null,
     });
     this.networkListener = (res) => {
       this.setData({ network: res.isConnected });
@@ -288,6 +299,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     wx.onNetworkStatusChange(this.networkListener);
     return this.bootstrap();
   },
+  onReady() {
+    this.shareCanvasReady = true;
+    this.prepareRoomShare();
+  },
   onShow() {
     if (this.data.isLobby) selectTab(this, 0);
     this.returningHome = false;
@@ -296,6 +311,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
       else if (this.data.isLobby && !this.data.loading) this.refreshLobby();
       else if (this.roomCode) this.refresh().catch((e) => this.handleError(e));
+      else if (this.inviteCode && !this.resumingRoom && !this.data.loading && !this.data.invitationNeedsName && !this.data.invitationError) this.retry();
       this.schedule();
     }
   },
@@ -369,6 +385,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   async bootstrap() {
     this.setData({ loading: true, error: "" });
     try {
+      if (this.invalidInvitation) { this.showInvitationError("房间邀请无效，请让朋友重新分享"); return; }
       await api.login();
       const { boards } = await api.request("/api/boards");
       this.setData({
@@ -381,6 +398,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         needsLogin: false,
       });
       this.selectCapacity(this.data.capacity);
+      // Explicit links take precedence over cached rooms and unrelated pending entries.
+      if (this.inviteCode && !this.data.isLobby && !this.resumingRoom) {
+        await this.openInvitation();
+        return;
+      }
       const held = !this.data.isLobby && typeof getApp === "function" && getApp().pendingTableRequest;
       if (held && (!this.inviteCode || held.code === this.inviteCode)) {
         this.roomCode = held.code; this.pending = held;
@@ -405,10 +427,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (code) {
         this.roomCode = code;
         await this.refresh();
-        if (!this.data.room && this.pendingInvitation) {
-          wx.setStorageSync("invitedRoom", this.pendingInvitation);
-          switchHomeTab(0);
-        }
       }
     } catch (e) {
       this.handleError(e);
@@ -416,6 +434,69 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ loading: false });
       this.schedule();
     }
+  },
+  showInvitationError(message, retry = false) {
+    this.connectionRecovered();
+    this.setData({ invitationError: message, invitationRetry: retry, invitationNeedsName: false, hasPendingRequest: !!this.pending, recoverableError: false, error: "", entryNameError: "", entryError: "" });
+  },
+  async openInvitation() {
+    const code = this.inviteCode;
+    if (!code || !this.alive) return;
+    this.setData({ invitation: { code }, invitationError: "", invitationNeedsName: false, entryNameError: "", entryError: "" });
+    let invitation;
+    try {
+      const query = this.inviteInstance == null ? "" : "?instance=" + encodeURIComponent(this.inviteInstance);
+      invitation = await api.request("/api/rooms/" + code + "/invitation" + query);
+    } catch (e) {
+      if (!this.alive) return;
+      if (e.status === 404 || e.status === 410) {
+        this.showInvitationError(e.status === 404 ? "该房间已解散" : "该邀请已失效，请让朋友重新分享");
+        return;
+      }
+      throw e;
+    }
+    if (!this.alive) return;
+    this.inviteInstance = String(invitation.createdAt);
+    this.setData({ invitation, code, serverConnected: true, needsLogin: false });
+    this.connectionRecovered();
+    const held = typeof getApp === "function" && getApp().pendingTableRequest;
+    const entry = wx.getStorageSync("pendingEntry");
+    const matches = request => request && (request.code === code || request.path === "/api/rooms/" + code + "/join") &&
+      (request.instance != null ? String(request.instance) === this.inviteInstance
+        : request.data?.createdAt != null ? String(request.data.createdAt) === this.inviteInstance
+        : request.after !== "enter" || !this.inviteBound);
+    const pending = matches(held) ? held : matches(entry) ? entry : null;
+    if (pending) {
+      this.roomCode = code;
+      this.pending = pending;
+      await this.executePending();
+      return;
+    }
+    if (invitation.isMember) {
+      this.roomCode = code;
+      wx.setStorageSync("roomCode", code);
+      await this.refresh();
+      return;
+    }
+    if (invitation.phase !== "lobby") {
+      this.showInvitationError("本局已开始，暂时无法加入，请等待房主开启下一局", true);
+      return;
+    }
+    if (held || entry) {
+      this.showInvitationError("另一项房间操作尚未确认，请返回对局处理后重试邀请", true);
+      return;
+    }
+    const profile = await api.request("/api/me/profile");
+    if (!this.alive) return;
+    const confirmed = profile.nicknameConfirmed ?? !!(profile.nickname && profile.nickname !== "新朋友");
+    this.setData({ name: confirmed ? profile.nickname : "", nicknameSetup: !confirmed, nicknameVersion: profile.version, invitationNeedsName: !confirmed });
+    if (confirmed && this.foreground) await this.join();
+  },
+  submitInvitation(e) {
+    if (this.data.busy || this.pending || this.data.loading) return;
+    const name = (e.detail?.value?.nickname || "").trim();
+    this.setData({ name, entryNameError: name ? "" : "请填写昵称", entryError: "" });
+    if (name) return this.join();
   },
   async refreshLobby({ preserveName = false } = {}) {
     const sequence = this.lobbyRefreshSequence = (this.lobbyRefreshSequence || 0) + 1;
@@ -460,7 +541,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({ entrySheet: false });
     this.resetEntryFocus();
     if (!this.foreground) return;
-    await new Promise(resolve => wx.navigateTo({ url: "/pages/table/table?code=" + code,
+    await new Promise(resolve => wx.navigateTo({ url: "/pages/table/table?code=" + code + "&resume=1",
       fail: () => this.setData({ error: "未能打开牌桌，请在我的牌桌中重试" }), complete: resolve }));
   },
   async loadRooms() {
@@ -544,7 +625,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       sequence = (this.refreshSequence = (this.refreshSequence || 0) + 1);
     let room;
     try {
-      room = funCopy.response(await api.request("/api/rooms/" + code));
+      const query = this.inviteCode === code && this.inviteInstance != null ? "?instance=" + encodeURIComponent(this.inviteInstance) : "";
+      room = funCopy.response(await api.request("/api/rooms/" + code + query));
     } catch (e) {
       if (
         !this.alive ||
@@ -552,9 +634,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         sequence !== this.refreshSequence
       )
         return;
-      if (e.status === 404 || e.status === 403) {
-        if (e.status === 403 && e.message !== "你已被房主移出房间" && this.inviteCode === code) this.pendingInvitation = code;
+      if (e.status === 404 || e.status === 403 || e.status === 410) {
         this.clearRoom();
+        if (this.inviteCode === code && !this.resumingRoom) {
+          this.setData({ invitation: { code } });
+          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? "该邀请已失效，请让朋友重新分享" : e.message);
+          return;
+        }
         this.setData({
           notice: e.status === 404 ? "牌桌已删除或不存在" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
@@ -570,6 +656,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     )
       return;
     this.connectionRecovered();
+    if (this.data.invitation) this.setData({ invitation: null, invitationNeedsName: false, invitationError: "", entryNameError: "", entryError: "" });
     const snapshot = JSON.stringify(room);
     this.unchangedPolls = snapshot === this.lastRoomSnapshot ? (this.unchangedPolls || 0) + 1 : 0;
     this.lastRoomSnapshot = snapshot;
@@ -757,6 +844,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       serverConnected: true,
       needsLogin: false,
     });
+    this.prepareRoomShare();
     if (
       (!room.needsSubmission || room.me.submitted) &&
       (this.data.actionDialog || this.data.actionLoading)
@@ -794,6 +882,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   clearRoom() {
     clearTimeout(this.timer);
+    this.shareCover = null;
     this.avatarFailures = new Set();
     this.refreshSequence = (this.refreshSequence || 0) + 1;
     this.mask();
@@ -1165,7 +1254,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async mutate(path, data, after) {
     if (this.data.busy) return;
-    if (this.data.isLobby && typeof getApp === "function" && getApp().pendingTableRequest) {
+    const held = typeof getApp === "function" && getApp().pendingTableRequest;
+    if (held && (this.data.isLobby || held.code !== this.roomCode || !this.pending)) {
       this.setData({ error: "牌桌中还有未确认的操作，请先返回牌桌重试" });
       return;
     }
@@ -1176,7 +1266,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
     this.refreshSequence = (this.refreshSequence || 0) + 1;
     this.pending = { path, data, id: api.requestId(), after };
-    if (!this.data.isLobby && typeof getApp === "function") getApp().pendingTableRequest = { ...this.pending, code: this.roomCode };
+    if (!this.data.isLobby && typeof getApp === "function") getApp().pendingTableRequest = { ...this.pending, code: this.roomCode || this.inviteCode, instance: this.data.room?.createdAt ?? this.data.invitation?.createdAt };
     // Only non-secret create/join requests survive an application restart.
     if (after === "enter") wx.setStorageSync("pendingEntry", this.pending);
     await this.executePending();
@@ -1237,6 +1327,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       } else {
         this.setData({ notice: "" });
         await this.refresh();
+        if (pending.after === "enter" && this.inviteCode && this.data.room?.me.seat === null)
+          this.setData({ notice: "座位已满，已以旁观者进入房间" });
       }
     } catch (e) {
       // Network/5xx uncertainty retains the exact command and idempotency key.
@@ -1246,6 +1338,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         if (pending.after === "enter") wx.removeStorageSync("pendingEntry");
       }
       this.setData({ notice: "" });
+      if (pending.after === "enter" && this.inviteCode && !this.pending && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429) {
+        this.connectionRecovered();
+        this.setData({ hasPendingRequest: false });
+        if (e.status === 404 || e.status === 410 || /游戏已开始/.test(e.message))
+          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? "该邀请已失效，请让朋友重新分享" : "本局已开始，暂时无法加入，请等待房主开启下一局", e.status !== 404 && e.status !== 410);
+        else if (e.status === 409) this.showInvitationError(e.message, true);
+        else this.setData({ invitationNeedsName: true, entryError: e.message, error: "" });
+        return;
+      }
       this.handleError(e);
       if (pending.after === "enter" && this.data.entrySheet && !this.pending && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429) {
         this.setData({ error: "", entryError: e.message });
@@ -1265,6 +1366,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ loading: true });
       if (this.roomCode) await this.refresh();
       else if (this.data.isLobby) await this.refreshLobby();
+      else if (this.inviteCode) await this.openInvitation();
       else await this.loadRooms();
     } catch (e) {
       this.handleError(e);
@@ -1312,9 +1414,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   join() {
     if (!this.data.name.trim() || !/^\d{6}$/.test(this.data.code))
       return this.setData({ error: "请填写昵称和6位房间码" });
-    this.mutate(
+    return this.mutate(
       "/api/rooms/" + this.data.code + "/join",
-      { name: this.data.name, ...(this.data.nicknameSetup ? { confirmNickname: true, profileVersion: this.data.nicknameVersion } : {}) },
+      { name: this.data.name, ...(this.data.nicknameSetup ? { confirmNickname: true, profileVersion: this.data.nicknameVersion } : {}),
+        ...(this.data.invitation ? { createdAt: this.data.invitation.createdAt } : {}) },
       "enter",
     );
   },
@@ -2159,11 +2262,24 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       { value: seat },
     );
   },
+  prepareRoomShare() {
+    const room = this.data.room;
+    if (!this.shareCanvasReady || !room) return;
+    const key = JSON.stringify([room.code, room.createdAt, room.boardName]);
+    if (this.shareCover?.key === key) return;
+    const previous = this.shareRenderPromise || Promise.resolve();
+    const cover = { key, path: null };
+    this.shareCover = cover;
+    cover.promise = previous.then(() => this.alive && this.shareCover === cover ? roomShare.renderRoomCover(this, room) : null).then(path => {
+      if (this.alive && this.shareCover === cover) cover.path = path;
+      return path;
+    }).catch(() => null);
+    this.shareRenderPromise = cover.promise;
+  },
   onShareAppMessage() {
-    return {
-      title: "桌边助手 · 一起入座",
-      path: "/pages/table/table?code=" + (this.roomCode || ""),
-      imageUrl: "/assets/share-cover.jpg",
-    };
+    const room = this.data.room;
+    const content = roomShare.shareContent(room, this.shareCover?.path || undefined);
+    if (!room || !this.shareCover?.promise) return content;
+    return { ...content, promise: this.shareCover.promise.then(path => roomShare.shareContent(room, path || undefined)) };
   },
 }; };

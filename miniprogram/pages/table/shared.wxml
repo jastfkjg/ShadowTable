@@ -88,7 +88,7 @@
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
 <app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
 <view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
-  <view wx:if="{{!room || room.phase!=='lobby'}}" class="brand">
+  <view wx:if="{{!invitation && (!room || room.phase!=='lobby')}}" class="brand">
     <view class="brand-identity">
       <text class="brand-mark">桌边助手</text>
       <button hover-class="none" class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || roomsRefreshing || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
@@ -98,8 +98,8 @@
     </view>
     <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry" bindtap="openHelp" aria-label="打开使用帮助"><text class="help-entry-icon" aria-hidden="true">?</text><text>帮助</text></button>
   </view>
-  <button hover-class="none" wx:if="{{!isLobby && !room && !loading}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
-  <view wx:if="{{loading}}" class="status" role="status">正在连接牌桌…</view>
+  <button hover-class="none" wx:if="{{!isLobby && !room && !loading && !invitation}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
+  <view wx:if="{{loading && !invitation}}" class="status" role="status">正在连接牌桌…</view>
   <view wx:if="{{error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="操作提示">
       <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>
@@ -207,6 +207,26 @@
   </view>
   <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button hover-class="none" class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
   <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+  <view wx:if="{{invitation && !room && !isLobby}}" class="room-invitation">
+    <text class="invitation-eyebrow">朋友邀请你同桌</text>
+    <view class="invitation-title">{{invitation.code ? '房间 '+invitation.code : '房间邀请'}}</view>
+    <view wx:if="{{invitation.boardName}}" class="invitation-board">{{invitation.boardName}}</view>
+    <view wx:if="{{invitationError}}" class="invitation-message" role="alert">{{invitationError}}</view>
+    <view wx:elif="{{loading || busy}}" class="invitation-message" role="status">{{hasPendingRequest?'正在确认加入结果…':'正在进入房间…'}}</view>
+    <form wx:if="{{invitationNeedsName && !invitationError}}" bindsubmit="submitInvitation" class="invitation-form">
+      <label class="label" for="invite-nickname">玩家昵称</label>
+      <input id="invite-nickname" class="input {{entryNameError?'has-error':''}}" name="nickname" type="nickname" maxlength="16" value="{{name}}" bindinput="inputName" placeholder="填写或选择微信昵称" disabled="{{busy || hasPendingRequest}}" />
+      <view wx:if="{{entryNameError}}" class="entry-field-error" role="alert">{{entryNameError}}</view>
+      <view class="small muted invitation-help">首次确认后用于牌桌和排行榜，可在“我的”中修改。</view>
+      <view wx:if="{{invitation.occupied >= invitation.capacity}}" class="invitation-message">座位已满，将以旁观者进入房间。</view>
+      <view wx:if="{{entryError}}" class="entry-field-error" role="alert">{{entryError}}</view>
+      <button class="primary" hover-class="none" form-type="submit" loading="{{busy}}" disabled="{{busy || loading || hasPendingRequest || !network || needsLogin}}">进入房间</button>
+    </form>
+    <view class="invitation-actions">
+      <button wx:if="{{invitationError && invitationRetry}}" class="secondary" hover-class="none" bindtap="retry" disabled="{{busy || loading}}">重试邀请</button>
+      <button class="text-button" hover-class="none" bindtap="returnHome" disabled="{{busy || hasPendingRequest}}">返回对局</button>
+    </view>
+  </view>
   <view wx:if="{{resultDialog && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog score-dialog" role="dialog" aria-modal="true" aria-label="登记本局结果">
       <view class="score-header"><view class="dialog-title">登记本局结果</view><view class="score-step-label" role="status">{{resultStepIndex+1}} / {{resultSteps.length}} · {{resultStepTitle}}</view></view>
@@ -287,6 +307,7 @@
     <view wx:if="{{room.phase==='lobby'}}" class="lobby-room-header">
       <view class="lobby-room-row">
         <button hover-class="none" class="copy-room lobby-room-code" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}"><text>房间 {{room.code}}</text><view class="lobby-copy-icon" aria-hidden="true" /></button>
+        <button class="lobby-header-link room-invite-button" hover-class="room-invite-pressed" open-type="share" disabled="{{busy || loading || hasPendingRequest || reconnecting || !network}}" aria-label="{{'邀请好友加入房间'+room.code}}">邀请好友</button>
       </view>
       <view class="lobby-room-row lobby-board-row">
         <text class="lobby-board-name">{{room.boardName}}</text>
@@ -312,6 +333,7 @@
           <button hover-class="none" class="identity-hint-close" bindtap="dismissIdentityHint" aria-label="关闭身份入口提示">×</button>
         </view>
       </view>
+      <button class="lobby-header-link room-invite-button" hover-class="room-invite-pressed" open-type="share" disabled="{{busy || loading || hasPendingRequest || reconnecting || !network}}" aria-label="{{'分享房间'+room.code}}">邀请好友</button>
     </view>
     <view class="row subline room-subline">
       <view class="room-board-info">
@@ -513,3 +535,4 @@
     </view>
   </block>
 </view>
+<canvas wx:if="{{!isLobby}}" type="2d" id="room-share-canvas" class="room-share-canvas" aria-hidden="{{true}}" />

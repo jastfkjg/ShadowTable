@@ -97,7 +97,7 @@ module.exports = function createHomePage(initialTab = 0) {
     about() { return this.personalController.about(); },
     onShareAppMessage() { return { title: "桌边助手 · ShadowTable", path: "/pages/lobby/lobby" }; },
   };
-  const lifecycles = new Set(["onLoad", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);
+  const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);
   for (const name of Object.keys(lobby)) {
     if (typeof lobby[name] === "function" && !lifecycles.has(name)) {
       page[name] = function(...args) { return this.lobbyController[name](...args); };

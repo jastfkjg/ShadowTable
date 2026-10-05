@@ -35,6 +35,58 @@ async function users(app, n = 6) {
     result.push((await app.req("/api/dev-login", null, {})).data.token);
   return result;
 }
+test("房间邀请仅返回公开预览，校验房间实例，加入满座旁观且不自动准备", async () => {
+  const a = await launch();
+  try {
+    const tokens = await users(a, 7);
+    const created = await a.req('/api/rooms', tokens[0], { name: '子龙', board: 'classic', capacity: 6 });
+    const path = '/api/rooms/' + created.data.code;
+    assert.equal((await a.req(path + '/invitation')).status, 401);
+    const preview = await a.req(path + '/invitation', tokens[6]);
+    assert.equal(preview.status, 200);
+    assert.deepEqual(Object.keys(preview.data).sort(), ['boardName', 'capacity', 'code', 'createdAt', 'isMember', 'occupied', 'phase']);
+    assert.equal(preview.data.isMember, false);
+    assert.equal(preview.data.occupied, 1);
+    const instance = preview.data.createdAt;
+    assert.equal((await a.req(path + '/invitation?instance=' + instance, tokens[0])).data.isMember, true);
+    assert.equal((await a.req(path + '/invitation?instance=' + (instance - 1), tokens[6])).status, 410);
+    assert.equal((await a.req(path + '/join', tokens[6], { name: '晚风', createdAt: instance - 1 })).status, 410);
+    assert.equal((await a.req(path + '/join', tokens[6], { name: '晚风', createdAt: String(instance) })).status, 400);
+    for (let i = 1; i < 6; i++) await a.req(path + '/join', tokens[i], { name: '玩家' + i, createdAt: instance });
+    assert.equal((await a.req(path + '/join', tokens[6], { name: '晚风', createdAt: instance })).status, 200);
+    const spectator = await a.req(path + '?instance=' + instance, tokens[6]);
+    assert.equal(spectator.data.me.seat, null);
+    assert.equal(spectator.data.me.ready, false);
+    assert.equal(spectator.data.createdAt, instance);
+    let view = (await a.req(path, tokens[0])).data;
+    for (const token of tokens.slice(0, 6)) await a.req(path + '/commands', token, { type: 'ready', stage: view.stage, ready: true });
+    await a.req(path + '/commands', tokens[0], { type: 'start', stage: view.stage });
+    const afterDeal = await a.req(path + '/invitation?instance=' + instance, tokens[6]);
+    assert.equal(afterDeal.data.phase, 'identity');
+    assert.deepEqual(Object.keys(afterDeal.data).sort(), Object.keys(preview.data).sort());
+    assert.doesNotMatch(JSON.stringify(afterDeal.data), /roles|information|submissions|membershipId|uid|梅林|刺客/);
+  } finally { await a.close(); }
+});
+test("解散后同房间号复用，旧邀请的预览、加入及恢复均拒绝，新邀请和旧房间码入口有效", async () => {
+  const a = await launch();
+  try {
+    const tokens = await users(a, 2);
+    const created = await a.req('/api/rooms', tokens[0], { name: '子龙' });
+    const path = '/api/rooms/' + created.data.code;
+    const old = a.store.get(created.data.code);
+    await a.req(path + '/delete', tokens[0], { stage: old.stage });
+    assert.equal((await a.req(path + '/invitation', tokens[1])).status, 404);
+    const replacement = require('../server/engine').newRoom(old.code, old.host, '新房主');
+    replacement.createdAt = old.createdAt + 100;
+    a.store.save(replacement);
+    assert.equal((await a.req(path + '/invitation?instance=' + old.createdAt, tokens[1])).status, 410);
+    assert.equal((await a.req(path + '?instance=' + old.createdAt, tokens[0])).status, 410);
+    assert.equal((await a.req(path + '/join', tokens[1], { name: '晚风', createdAt: old.createdAt })).status, 410);
+    assert.equal(a.store.get(old.code).players.length, 1);
+    assert.equal((await a.req(path + '/invitation?instance=' + replacement.createdAt, tokens[1])).status, 200);
+    assert.equal((await a.req(path + '/join', tokens[1], { name: '晚风' })).status, 200);
+  } finally { await a.close(); }
+});
 test("HTTP完整创建/加入/并发准备/开始/确认/终止/同房再开，跨房拒绝", async () => {
   const a = await launch();
   try {

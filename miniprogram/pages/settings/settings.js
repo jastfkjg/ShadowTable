@@ -280,7 +280,7 @@ Page({
         wx.showToast({ title: "房主已移交", icon: "success" });
         wx.navigateBack({
           fail: () =>
-            wx.redirectTo({ url: "/pages/table/table?code=" + this.code }),
+            wx.redirectTo({ url: "/pages/table/table?code=" + this.code + "&resume=1" }),
         });
       }
     } catch (e) {
@@ -428,7 +428,7 @@ Page({
     }
     wx.navigateBack({
       fail: () =>
-        wx.redirectTo({ url: "/pages/table/table?code=" + this.code }),
+        wx.redirectTo({ url: "/pages/table/table?code=" + this.code + "&resume=1" }),
     });
   },
 });

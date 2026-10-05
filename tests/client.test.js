@@ -34,6 +34,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
       require: name => {
         if (name === '../../player-card') return require('../miniprogram/player-card');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
+        if (name === '../../room-share') return require('../miniprogram/room-share');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
         vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/tab-navigation.js'), 'utf8'), { module, wx });
@@ -524,7 +525,7 @@ for (const [board, count] of [
   });
 }
 
-test("新邀请不会被本地旧房间覆盖，仍可从成员列表恢复旧房间", async () => {
+test("新邀请不会被本地旧房间覆盖，首次昵称直接在目标房间填写", async () => {
   const storage = new Map([["roomCode", "111111"]]);
   const paths = [];
   const p = page(
@@ -533,9 +534,8 @@ test("新邀请不会被本地旧房间覆盖，仍可从成员列表恢复旧�
       request: async (path) => {
         paths.push(path);
         if (path === "/api/boards") return { boards: [] };
-        if (path === "/api/me/rooms")
-          return { rooms: [{ code: "111111", seat: 1 }] };
-        if (path === "/api/rooms/222222") throw Object.assign(new Error("你不在该房间"), { status: 403 });
+        if (path === "/api/rooms/222222/invitation") return { code: "222222", createdAt: 123, phase: "lobby", isMember: false, boardName: "阿瓦隆", capacity: 6, occupied: 1 };
+        if (path === "/api/me/profile") return { nickname: "新朋友", nicknameConfirmed: false, version: 0 };
         throw new Error("不应自动进入旧房间");
       },
     },
@@ -543,12 +543,50 @@ test("新邀请不会被本地旧房间覆盖，仍可从成员列表恢复旧�
   );
   p.inviteCode = "222222";
   await p.bootstrap();
-  assert.equal(p.roomCode, null);
-  assert.equal(storage.get("invitedRoom"), "222222");
-  assert.equal(p.data.memberRooms[0].code, "111111");
+  assert.equal(p.data.room, null);
+  assert.equal(storage.get("invitedRoom"), undefined);
+  assert.equal(p.data.invitation.code, "222222");
+  assert.equal(p.data.invitationNeedsName, true);
+  assert.equal(p.data.code, "222222");
   assert.ok(!paths.includes("/api/rooms/111111"));
 });
 
+test("真实 HTTP 邀请完成首次昵称确认，后续点击另一房间邀请自动加入并保留原座位", async () => {
+  const a = await server();
+  try {
+    const host = await a.actor();
+    await host.mutate('/api/rooms', { name: '子龙', confirmNickname: true, profileVersion: 0 }, 'enter');
+    const firstRoom = host.data.room;
+    const friend = await a.actor(new Map([['roomCode', '111111']]));
+    friend.inviteCode = firstRoom.code;
+    friend.inviteInstance = String(firstRoom.createdAt);
+    friend.inviteBound = true;
+    await friend.bootstrap();
+    assert.equal(friend.data.invitationNeedsName, true);
+    assert.equal(friend.data.room, null);
+    await friend.submitInvitation({ detail: { value: { nickname: '晚风' } } });
+    assert.equal(friend.data.room.code, firstRoom.code);
+    assert.equal(friend.data.room.me.name, '晚风');
+    assert.equal(friend.data.room.me.seat, 2);
+    assert.equal(friend.data.room.me.ready, false);
+    assert.equal(friend.data.nicknameSetup, false);
+    await host.mutate('/api/rooms', { name: '子龙', board: 'knights', capacity: 12 }, 'enter');
+    const secondRoom = host.data.room;
+    const invitedAgain = friend.freshPage();
+    invitedAgain.inviteCode = secondRoom.code;
+    invitedAgain.inviteInstance = String(secondRoom.createdAt);
+    invitedAgain.inviteBound = true;
+    await invitedAgain.bootstrap();
+    assert.equal(invitedAgain.data.room.code, secondRoom.code);
+    assert.equal(invitedAgain.data.room.me.name, '晚风');
+    assert.equal(invitedAgain.data.invitationNeedsName, false);
+    const returning = friend.freshPage();
+    returning.inviteCode = firstRoom.code;
+    await returning.bootstrap();
+    assert.equal(returning.data.room.me.seat, 2);
+    assert.equal(returning.data.room.players.length, 2);
+  } finally { await a.close(); }
+});
 test("先选人数：自动匹配可用板子，切板不改变人数", async () => {
   const a = await server();
   try {

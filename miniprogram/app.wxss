@@ -1196,6 +1196,17 @@ button.seat.seat-empty[disabled]:not([type]) { background: var(--bg); border-sty
 .page.table-lobby { padding-top: 16rpx; padding-bottom: calc(192rpx + env(safe-area-inset-bottom)); }
 .lobby-room-header { padding-bottom: 24rpx; border-bottom: 1rpx solid var(--border); }
 .lobby-room-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.room-share-canvas { position: fixed; left: -2000px; top: 0; width: 600px; height: 480px; pointer-events: none; }
+button.lobby-header-link.room-invite-button { min-height: 48px; }
+button.room-invite-pressed { opacity: .65; }
+.room-invitation { padding: 64rpx 0 24rpx; }
+.invitation-eyebrow { color: var(--accent); font-size: 26rpx; }
+.invitation-title { margin-top: 16rpx; color: var(--text); font-size: 44rpx; font-weight: 600; overflow-wrap: anywhere; }
+.invitation-board { margin-top: 16rpx; color: var(--muted); font-size: 28rpx; overflow-wrap: anywhere; }
+.invitation-message { margin-top: 32rpx; color: var(--muted); font-size: 28rpx; line-height: 1.6; }
+.invitation-form { margin-top: 48rpx; }
+.invitation-help { margin: 16rpx 0 32rpx; }
+.invitation-actions { margin-top: 32rpx; }
 .lobby-room-code { flex: 0 1 auto; min-width: 0; }
 .table-lobby button.lobby-room-code { min-height: 44px; color: var(--text); font-size: 36rpx; font-weight: 600; }
 .lobby-room-code text { overflow-wrap: anywhere; }

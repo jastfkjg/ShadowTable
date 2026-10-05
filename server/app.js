@@ -16,6 +16,7 @@ const {
   enter,
   command,
   publicView,
+  invitationView,
   roomSummary,
   privateView,
 } = require("./engine");
@@ -365,11 +366,17 @@ function createApp({
       }
       const personal = path.match(/^\/api\/me\/rooms\/(\d{6})$/);
       const match = path.match(
-        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management))?$/,
+        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management|invitation))?$/,
       );
       if (req.method === "GET" && match) {
         const room = store.get(match[1]);
         check(room, "房间不存在", 404);
+        if (requestUrl.searchParams.has("instance"))
+          check(requestUrl.searchParams.get("instance") === String(room.createdAt || 0), "该邀请已失效", 410);
+        if (match[2] === "invitation") {
+          res.setHeader("Cache-Control", "no-store");
+          return send(200, invitationView(room, uid));
+        }
         if (match[2] === "management") {
           check(room.host === uid, "只有房主可以管理牌桌", 403);
           return send(200, { ...roomSummary(room, uid), stage: room.stage });
@@ -459,6 +466,10 @@ function createApp({
             );
             room.players = [];
           } else if (match[2] === "join") {
+            if (Object.hasOwn(b, "createdAt")) {
+              check(Number.isSafeInteger(b.createdAt) && b.createdAt >= 0, "房间邀请无效");
+              check(b.createdAt === (room.createdAt || 0), "该邀请已失效", 410);
+            }
             // A concurrent human join must not turn a fill operation into spectators.
             if (b.requireSeat === true)
               check(room.players.some(p => p.uid === uid) || room.players.length < room.capacity,

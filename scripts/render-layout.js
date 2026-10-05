@@ -18,7 +18,7 @@ const factory = vm.runInContext(
   "(function(global){" + wxmlToJs(root) + "})(global)",
   ctx,
 );
-const render = data => factory(data.room ? "pages/table/table.wxml" : "pages/lobby/lobby.wxml")(data.room
+const render = data => factory(data.room || data.invitation ? "pages/table/table.wxml" : "pages/lobby/lobby.wxml")(data.room || data.invitation
   ? { ...data, isLobby: false } : { activeTab: 0, lobby: { ...data, isLobby: true }, personal: {} });
 const escape = (s) =>
   String(s).replace(
@@ -147,6 +147,9 @@ const scenes = {
     })),
   },
   lobby: roomData(),
+  roomInvitation: { ...base, invitation: { code: "372338", boardName: "阿瓦隆 · 十二骑士", capacity: 12, occupied: 1 }, invitationNeedsName: true },
+  roomInvitationFull: { ...base, invitation: { code: "372338", boardName: "阿瓦隆 · 十二骑士", capacity: 12, occupied: 12 }, invitationNeedsName: true },
+  roomInvitationExpired: { ...base, invitation: { code: "372338" }, invitationError: "该房间已解散" },
 };
 
 const homeRooms = [
@@ -407,7 +410,9 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}[hidden]{display:none!important}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${navCss}${tabCss}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}${!data.room && !personalTemplates[name] && !name.startsWith("boardD") && !name.startsWith("roomSettings") ? html(tabRender({...tabData,keyboardVisible:!!data.entryKeyboardHeight,entrySheetVisible:!!data.entrySheet})) : ""}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}[hidden]{display:none!important}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${navCss}${tabCss}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}${!data.room && !data.invitation && !personalTemplates[name] && !name.startsWith("boardD") && !name.startsWith("roomSettings") ? html(tabRender({...tabData,keyboardVisible:!!data.entryKeyboardHeight,entrySheetVisible:!!data.entrySheet})) : ""}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");
+const roomShareSource = fs.readFileSync(path.join(root, "room-share.js"), "utf8");
+fs.writeFileSync("output/playwright/room-share-cover.html", `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>房间邀请封面</title><style>body{margin:0;background:#131e25}canvas{display:block;width:100%;max-width:600px;height:auto}</style><canvas id="cover"></canvas><script>{const module={exports:{}};${roomShareSource}\nconst canvas=document.getElementById('cover');canvas.width=module.exports.width;canvas.height=module.exports.height;module.exports.drawRoomCover(canvas.getContext('2d'),${JSON.stringify({ code: "372338", boardName: "阿瓦隆 · 十二骑士" })});}</script></html>`);

@@ -11,7 +11,7 @@ function request(path, method = "GET", data, requestId) {
       }),
     );
   const token = wx.getStorageSync("session") || "";
-  const cacheKey = token + path, cacheable = method === "GET" && /^\/api\/rooms\/\d{6}$/.test(path);
+  const cacheKey = token + path, cacheable = method === "GET" && /^\/api\/rooms\/\d{6}(?:\?instance=\d+)?$/.test(path);
   if (method !== "GET") { roomCache.clear(); cacheEpoch++; }
   const cached = cacheable && roomCache.get(cacheKey), epoch = cacheEpoch;
   return new Promise((resolve, reject) =>

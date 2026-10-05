@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { BOARDS, newRoom, publicView } = require('../server/engine');
+const { BOARDS, newRoom, publicView, invitationView, enter } = require('../server/engine');
 const { wxmlToJs } = require('miniprogram-compiler');
 const root = path.resolve(__dirname,'../miniprogram');
 function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false } = {}) {
@@ -531,15 +531,186 @@ test('实际清空本桌昵称后刷新仍保留空值，提交不得偷偷复�
   }
   assert.equal(writes.length, 0);
 });
-test('首页进入独立牌桌，切后台时建房成功不强行跳转；直接邀请提示加入', async () => {
-  const api = { ...apiBase, request: async (url,method) => method==='POST' ? {code:'234567'} : url==='/api/boards' ? {boards:BOARDS} : url==='/api/me/rooms' ? {rooms:[]} : url==='/api/me/profile' ? profile : Promise.reject(Object.assign(new Error('你不在该房间'),{status:403})) };
+test('首页进入独立牌桌，切后台时建房成功不强行跳转；邀请留在目标房间填写昵称', async () => {
+  const api = { ...apiBase, request: async (url,method) => method==='POST' ? {code:'234567'} : url==='/api/boards' ? {boards:BOARDS} : url==='/api/me/rooms' ? {rooms:[]} : url==='/api/me/profile' ? {nickname:'新朋友',nicknameConfirmed:false,version:0} : {code:'654321',createdAt:123,phase:'lobby',isMember:false} };
   const first = page('lobby',api); first.p.data.name='林间';
   await first.p.mutate('/api/rooms',{name:'林间'},'enter');
-  assert.deepEqual(first.navigations,['/pages/table/table?code=234567']); assert.equal(first.p.data.room,null);
+  assert.deepEqual(first.navigations,['/pages/table/table?code=234567&resume=1']); assert.equal(first.p.data.room,null);
   first.navigations.length=0; first.p.foreground=false;
   await first.p.mutate('/api/rooms',{name:'林间'},'enter'); assert.equal(first.navigations.length,0);
   const invited = page('table',api); invited.p.inviteCode='654321'; await invited.p.bootstrap();
-  assert.equal(invited.storage.get('invitedRoom'),'654321'); assert.deepEqual(invited.navigations,['/pages/lobby/lobby']);
+  assert.equal(invited.p.data.invitation.code,'654321'); assert.equal(invited.p.data.invitationNeedsName,true); assert.deepEqual(invited.navigations,[]);
+});
+test('返回已有牌桌沿用成员接口，服务端尚未部署邀请接口时仍可进入', async () => {
+  const room = newRoom('654321', 'host', '子龙');
+  const calls = [];
+  const api = { ...apiBase, request: async url => {
+    calls.push(url);
+    if (url === '/api/boards') return { boards: BOARDS };
+    if (url === '/api/me/rooms') return { rooms: [] };
+    if (url === '/api/rooms/654321') return publicView(room, 'host');
+    throw Object.assign(Error('接口不存在'), { status: 404 });
+  } };
+  const home = page('lobby', api);
+  await home.p.enterTable(room.code);
+  const query = Object.fromEntries(new URL('https://test.invalid' + home.navigations[0]).searchParams);
+  const table = page('table', api);
+  await table.p.onLoad(query);
+  assert.equal(table.p.data.room.code, room.code);
+  assert.equal(table.p.data.invitation, null);
+  assert.equal(table.p.data.error, '');
+  assert.equal(calls.some(url => url.includes('/invitation')), false);
+  table.p.onUnload();
+});
+function invitationClient(room, { nicknameConfirmed = true, uid = 'friend', storage = new Map(), appState = {}, failJoin = false } = {}) {
+  const calls = [], writes = [];
+  const api = { ...apiBase, request: async (url, method, body, id) => {
+    calls.push(url);
+    const pathname = url.split('?')[0];
+    if (pathname === '/api/boards') return { boards: BOARDS };
+    if (pathname.endsWith('/invitation')) return invitationView(room, uid);
+    if (pathname === '/api/me/profile') return { nickname: nicknameConfirmed ? '晚风' : '新朋友', nicknameConfirmed, version: 0 };
+    if (method === 'POST') {
+      writes.push({ url, body, id });
+      enter(room, uid, body.name);
+      if (failJoin && writes.length === 1) throw Error('response lost');
+      return { code: room.code };
+    }
+    return publicView(room, uid);
+  } };
+  return { ...page('table', api, { storage, appState }), calls, writes };
+}
+test('分享自动加入指定房间，优先于旧房间；有昵称无需确认，不自动准备', async () => {
+  const room = newRoom('654321', 'host', '子龙', 'knights', 12);
+  const c = invitationClient(room, { storage: new Map([['roomCode', '123456']]) });
+  await c.p.onLoad({ code: room.code, instance: String(room.createdAt) });
+  assert.equal(c.p.data.room.code, room.code);
+  assert.equal(c.p.data.room.me.name, '晚风');
+  assert.equal(c.p.data.room.me.ready, false);
+  assert.equal(c.p.data.room.me.seat, 2);
+  assert.equal(c.storage.get('roomCode'), room.code);
+  assert.equal(c.writes.length, 1);
+  assert.equal(c.writes[0].body.createdAt, room.createdAt);
+  assert.equal(c.calls.some(url => url.includes('123456')), false);
+  assert.deepEqual(c.navigations, []);
+});
+test('首次邀请只填写昵称，读取原生表单最终值，确认后仍进入原目标房间', async () => {
+  const room = newRoom('654321', 'host', '子龙');
+  const c = invitationClient(room, { nicknameConfirmed: false });
+  await c.p.onLoad({ code: room.code, instance: String(room.createdAt) });
+  assert.equal(c.writes.length, 0);
+  assert.equal(c.p.data.invitationNeedsName, true);
+  await c.p.submitInvitation({ detail: { value: { nickname: '  ' } } });
+  assert.equal(c.p.data.entryNameError, '请填写昵称');
+  assert.equal(c.writes.length, 0);
+  await c.p.submitInvitation({ detail: { value: { nickname: ' 微信最终昵称 ', code: '123456' } } });
+  assert.equal(c.writes[0].body.name, '微信最终昵称');
+  assert.equal(c.writes[0].body.confirmNickname, true);
+  assert.equal(c.writes[0].url, '/api/rooms/654321/join');
+  assert.equal(c.p.data.room.code, room.code);
+  assert.equal(c.p.data.invitation, null);
+  assert.equal(c.p.data.entryNameError, '');
+});
+test('满座邀请进入旁观，开局后新成员被提示，原成员恢复自己的座位', async () => {
+  const full = newRoom('654321', 'host', '子龙');
+  for (let i = 1; i < full.capacity; i++) enter(full, 'p' + i, '玩家' + i);
+  const spectator = invitationClient(full);
+  await spectator.p.onLoad({ code: full.code });
+  assert.equal(spectator.p.data.room.me.seat, null);
+  assert.match(spectator.p.data.notice, /座位已满.*旁观者/);
+  const playing = newRoom('234567', 'host', '子龙');
+  playing.phase = 'identity';
+  const newcomer = invitationClient(playing);
+  await newcomer.p.onLoad({ code: playing.code });
+  assert.equal(newcomer.writes.length, 0);
+  assert.match(newcomer.p.data.invitationError, /本局已开始/);
+  assert.deepEqual(newcomer.navigations, []);
+  const member = invitationClient(playing, { uid: 'host' });
+  await member.p.onLoad({ code: playing.code });
+  assert.equal(member.p.data.room.me.seat, 1);
+  assert.equal(member.writes.length, 0);
+});
+test('加入响应丢失后保留目标、创建信息与编号，重试只恢复同一成员', async () => {
+  const room = newRoom('654321', 'host', '子龙');
+  const c = invitationClient(room, { failJoin: true });
+  await c.p.onLoad({ code: room.code, instance: String(room.createdAt) });
+  assert.equal(c.p.data.reconnecting, true);
+  assert.ok(c.storage.has('pendingEntry'));
+  await c.p.retry();
+  assert.equal(c.writes.length, 2);
+  assert.equal(c.writes[0].id, c.writes[1].id);
+  assert.equal(c.writes[1].body.createdAt, room.createdAt);
+  assert.equal(room.players.filter(p => p.uid === 'friend').length, 1);
+  assert.equal(c.p.data.room.code, room.code);
+  assert.equal(c.storage.has('pendingEntry'), false);
+});
+test('断线加入重试确认已经开局后停止重连，清除待确认状态并允许返回', async () => {
+  let joins = 0;
+  const c = page('table', { ...apiBase, request: async (url, method) => {
+    if (url === '/api/boards') return { boards: BOARDS };
+    if (url.includes('/invitation')) return { code: '654321', createdAt: 100, isMember: false, phase: 'lobby' };
+    if (url === '/api/me/profile') return { nickname: '晚风', nicknameConfirmed: true, version: 0 };
+    if (method === 'POST') {
+      if (++joins === 1) throw Error('offline');
+      throw Object.assign(Error('游戏已开始，无法加入'), { status: 400 });
+    }
+    throw Error('不应恢复旧房间');
+  } });
+  await c.p.onLoad({ code: '654321', instance: '100' });
+  assert.equal(c.p.data.hasPendingRequest, true);
+  await c.p.retry();
+  assert.equal(c.p.pending, null);
+  assert.equal(c.p.data.hasPendingRequest, false);
+  assert.equal(c.p.data.reconnecting, false);
+  assert.equal(c.storage.has('pendingEntry'), false);
+  assert.match(c.p.data.invitationError, /本局已开始/);
+  await c.p.returnHome();
+  assert.deepEqual(c.navigations, ['/pages/lobby/lobby']);
+});
+test('无效、解散及过期邀请原地显示原因，不恢复本地旧房间', async () => {
+  for (const [status, text] of [[404, /已解散/], [410, /已失效/]]) {
+    const calls = [];
+    const c = page('table', { ...apiBase, request: async url => {
+      calls.push(url);
+      if (url === '/api/boards') return { boards: BOARDS };
+      throw Object.assign(Error('invitation unavailable'), { status });
+    } }, { storage: new Map([['roomCode', '123456']]) });
+    await c.p.onLoad({ code: '654321', instance: '123' });
+    assert.match(c.p.data.invitationError, text);
+    assert.equal(c.p.data.room, null);
+    assert.equal(calls.some(url => url.includes('123456')), false);
+    assert.deepEqual(c.navigations, []);
+  }
+  const c = page('table', { ...apiBase, request: async () => { throw Error('不得读取'); } });
+  await c.p.onLoad({ code: 'bad-code', instance: '123' });
+  assert.match(c.p.data.invitationError, /邀请无效/);
+});
+test('其他房间的待确认加入保持原请求，邀请不会恢复或覆盖它', async () => {
+  const pending = { path: '/api/rooms/123456/join', data: { name: '旧昵称' }, after: 'enter', id: 'original-request-key' };
+  const storage = new Map([['pendingEntry', pending], ['roomCode', '123456']]);
+  const c = invitationClient(newRoom('654321', 'host', '子龙'), { storage });
+  await c.p.onLoad({ code: '654321' });
+  assert.equal(c.writes.length, 0);
+  assert.equal(storage.get('pendingEntry'), pending);
+  assert.match(c.p.data.invitationError, /尚未确认/);
+  assert.equal(c.p.data.invitation.code, '654321');
+  assert.deepEqual(c.navigations, []);
+});
+test('按钮与菜单分享同一房间实例，只用专用封面，不包含身份或实时人数', async () => {
+  const room = publicView(newRoom('654321', 'host', '子龙', 'knights', 12), 'host');
+  const c = page('table', apiBase);
+  c.p.data.room = room;
+  c.p.data.secret = { role: '梅林', information: '私密同伴' };
+  c.p.shareCover = { path: null, promise: Promise.resolve('temp-room-cover.png') };
+  const content = c.p.onShareAppMessage({ from: 'button' });
+  assert.equal(content.path, `/pages/table/table?code=654321&instance=${room.createdAt}`);
+  assert.equal(content.title, '子龙邀你加入阿瓦隆 · 房间 654321');
+  assert.equal(content.imageUrl, '/assets/share-cover.jpg');
+  assert.equal((await content.promise).imageUrl, 'temp-room-cover.png');
+  assert.equal(c.p.onShareAppMessage({ from: 'menu' }).path, content.path);
+  assert.doesNotMatch(JSON.stringify(content), /梅林|私密同伴|players|ready|occupied/);
+  c.p.clearRoom();
+  assert.equal(c.p.onShareAppMessage().path, '/pages/lobby/lobby');
 });
 test('离开牌桌遮盖身份；未确认操作在内存中恢复并复用请求编号', async () => {
   let calls = 0; const ids = [];
@@ -718,7 +889,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
