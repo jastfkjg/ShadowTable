@@ -227,14 +227,15 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   assert.equal(empty.attr.disabled, false);
   assert.equal(empty.attr.ariaLabel, "2号，空位，可入座");
   assert.match(empty.attr.class, /seat-empty/);
-  assert.match(JSON.stringify(empty), /点击入座/);
+  assert.deepEqual(Array.from(nodes(empty).find(n => n.attr?.class === "seat-empty-label").children), ["入座"]);
   assert.ok(!nodes(empty).some(n => n.tag === "wx-image" || n.attr?.class === "seat-meta"));
   const gameEmpty = byHandler(render({ ...base, room, seats: [{ seat: 2, name: "空位", occupied: false }] }), "seat");
   assert.doesNotMatch(JSON.stringify(gameEmpty), /点击入座/);
   const occupied = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, mine: false }] }), "seat");
   assert.equal(occupied.attr.disabled, true);
   assert.equal(nodes(occupied).find(n => n.attr?.class === "seat-self"), undefined);
-  assert.match(JSON.stringify(occupied), /未准备/);
+  assert.match(occupied.attr.ariaLabel, /未准备/);
+  assert.ok(!nodes(occupied).some(n => n.attr?.class?.startsWith("seat-status")));
   const ready = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, ready: true }] }), "seat");
   assert.match(JSON.stringify(ready), /已准备/);
   assert.doesNotMatch(JSON.stringify(ready), /未准备/);
@@ -246,9 +247,9 @@ test("座位区保留人数和准备统计，长昵称保留在原卡片且不�
   const tree = render({ ...base, room, seats, seatOccupiedCount: 2, seatReadyCount: 1 });
   assert.doesNotMatch(JSON.stringify(tree), /玩家名单|关闭名单|秘密角色/);
   const count = nodes(tree).find(n => n.attr?.class === "seat-count");
-  assert.equal(count.attr.ariaLabel, "已入座2人，共13个座位");
-  const caption = nodes(tree).find(n => n.attr?.class === "seat-section-caption");
-  assert.match(JSON.stringify(caption), /已准备 1\/2/);
+  assert.equal(count.attr.ariaLabel, "已入座2人，共13个座位，1人已准备");
+  assert.deepEqual(Array.from(count.children), ["2/13 人入座 · 1 人已准备"]);
+  assert.ok(!nodes(tree).some(n => n.attr?.class === "seat-section-caption"));
   const button = byHandler(tree, "seat");
   assert.match(button.attr.ariaLabel, /这是一个很长的完整玩家昵称/);
   assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-name").children), ["这是一个很长的完整玩家昵称"]);
@@ -381,6 +382,17 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
   assert.equal(byHandler(guest, "start"), undefined);
   assert.ok(byHandler(guest, "ready"));
   assert.ok(byHandler(guest, "copyRoomCode"));
+  const footer = nodes(guest).find(n => n.attr?.class === "lobby-action-bar");
+  assert.ok(byHandler(footer, "ready"));
+  assert.deepEqual(Array.from(byHandler(guest, "ready").children), ["准备"]);
+  for (const blocked of [{ network: false }, { busy: true }, { hasPendingRequest: true }]) {
+    assert.equal(byHandler(render({ ...base, room, ...blocked }), "ready").attr.disabled, true);
+  }
+  const prepared = render({ ...base, room: { ...room, me: { ...room.me, ready: true } } });
+  assert.deepEqual(Array.from(byHandler(prepared, "ready").children), ["取消准备"]);
+  const spectator = render({ ...base, room: { ...room, me: { ...room.me, seat: null } } });
+  assert.equal(byHandler(spectator, "ready"), undefined);
+  assert.ok(byHandler(spectator, "leave"));
   const host = render({
     ...base,
     room: { ...room, me: { isHost: true, seat: 1 } },

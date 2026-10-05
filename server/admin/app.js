@@ -70,8 +70,8 @@ async function fetchAudit(code, start) {
   const path = "audit?grouped=1&code=" + encodeURIComponent(code || "");
   const result = await api(path + "&offset=" + start);
   if (result.displayFiltered) return result;
-  // Older running servers may still return account-creation and standalone
-  // activity-start events. Filter before local pagination so counts stay correct.
+  // Older running servers may still include routine room events. Filter before
+  // local pagination so counts and page boundaries stay correct.
   let groups = start === 0 ? [...result.groups] : [];
   for (let cursor = 0; cursor < result.total; cursor += result.pageSize) {
     if (cursor === start) {
@@ -84,7 +84,7 @@ async function fetchAudit(code, start) {
   groups = groups
     .map((group) => ({
       ...group,
-      entries: group.entries.filter((entry) => entry.action !== "actor"),
+      entries: visibleAuditEntries(group),
     }))
     .filter((group) => group.entries.length && !redundantBeginGroup(group));
   return {
@@ -92,6 +92,20 @@ async function fetchAudit(code, start) {
     total: groups.length,
     pageSize: result.pageSize,
   };
+}
+function routineRoomEntry(entry) {
+  const detail = entry.details || {};
+  return !detail.outcomes?.length &&
+    (["join", "seat", "stand", "ready", "leave"].includes(detail.command) ||
+      (!detail.command &&
+        ["加入房间", "入座或换座", "站起围观", "准备", "离开房间"].includes(
+          detail.label,
+        )));
+}
+function visibleAuditEntries(group) {
+  return group.entries.filter(
+    (entry) => entry.action !== "actor" && !routineRoomEntry(entry),
+  );
 }
 function redundantBeginGroup(group) {
   return group.entries.every((entry) => {
@@ -259,7 +273,9 @@ function renderAudit({ groups, total, pageSize }) {
   $("audit-page").textContent = `第 ${auditOffset / pageSize + 1} 页`;
   $("audit-prev").disabled = auditOffset === 0;
   $("audit-next").disabled = auditOffset + pageSize >= total;
-  const visibleGroups = groups.filter((group) => !redundantBeginGroup(group));
+  const visibleGroups = groups
+    .map((group) => ({ ...group, entries: visibleAuditEntries(group) }))
+    .filter((group) => group.entries.length && !redundantBeginGroup(group));
   if (!visibleGroups.length) $("audit").append(el("p", "暂无操作记录"));
   const activityNames = {
     vote: "全员投票",
@@ -286,10 +302,15 @@ function renderAudit({ groups, total, pageSize }) {
       ["tools", "ended", "terminated"].includes(d.phaseKey) ||
       ["等待房主发起操作", "对局结束", "对局已终止"].includes(d.phase) ||
       ["start", "rematch", "finishTools"].includes(d.command);
+    const lobby = d.phaseKey === "lobby" || d.phase === "入座与准备";
     const title = event
       ? d.command === "beginActivity"
         ? activityNames[d.parameters?.kind] || "操作"
         : d.label || labels[entries[0].action] || "房间操作"
+      : lobby
+        ? entries.length === 1
+          ? d.label || "房间管理"
+          : "房间管理"
       : d.phaseKey === "skillPrepare"
         ? "放技能阶段"
         : d.phaseKey === "fairy"

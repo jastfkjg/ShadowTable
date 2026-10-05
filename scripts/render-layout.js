@@ -30,6 +30,10 @@ const escape = (s) =>
   );
 function html(n) {
   if (typeof n === "string" || typeof n === "number") return escape(n);
+  if (n.tag === "wx-app-nav")
+    return html(factory("components/app-nav/app-nav.wxml")({
+      ...n.attr, statusBarHeight: 20, navHeight: 44, totalHeight: 64,
+    }));
   // Approximate the native switch only in this layout projection.
   if (n.tag === "wx-switch")
     return `<span role="switch" aria-checked="${!!n.attr?.checked}" style="display:inline-block;flex-shrink:0;width:50px;height:30px;border-radius:20px;background:${n.attr?.checked ? "#c3a361" : "#536570"};padding:3px;box-sizing:border-box"><span style="display:block;width:24px;height:24px;border-radius:50%;background:#f2eee5;margin-left:${n.attr?.checked ? 20 : 0}px"></span></span>`;
@@ -159,6 +163,24 @@ const emptyLobby = roomData(newRoom("628421", "p1", "zz", "classic", 6));
 scenes.seatCardsLobby = { ...emptyLobby, seats: Array.from({ length: 6 }, (_, i) => i === 0
   ? { ...emptyLobby.seats[0], avatarUrl: "../../miniprogram/pages/profile/assets/avatars/avatar-01.jpg" }
   : { seat: i + 1, name: "空位", occupied: false, mine: false, avatarInitial: "+" }) };
+// Preparation layouts exercise the same room with player, host and spectator controls.
+const compactSeats = roomData().seats.map(p => [4, 11].includes(p.seat)
+  ? { seat: p.seat, name: "空位", occupied: false, mine: false }
+  : { ...p, mine: p.seat === 2, ready: p.seat === 1,
+    avatarUrl: p.seat === 2 ? "../../miniprogram/pages/profile/assets/avatars/avatar-02.jpg" : "" });
+const compactRoom = { ...publicView(r, "p2"), scoreSettings: { enabled: true }, scoreNotice: null };
+scenes.lobbyCompact = { ...base, room: compactRoom, seats: compactSeats, seatOccupiedCount: 10, seatReadyCount: 1, canStart: false };
+scenes.lobbyPrepared = { ...scenes.lobbyCompact, room: { ...compactRoom, me: { ...compactRoom.me, ready: true } },
+  seats: compactSeats.map(p => ({ ...p, ready: p.occupied && (p.ready || p.mine) })), seatReadyCount: 2 };
+scenes.lobbyHost = { ...scenes.lobbyCompact, room: { ...compactRoom, me: { ...compactRoom.me, isHost: true } },
+  seats: compactSeats.map(p => ({ ...p, host: p.mine })), startHint: "还差 2 人入座" };
+scenes.lobbyHostPrepared = { ...scenes.lobbyPrepared, room: { ...scenes.lobbyPrepared.room, me: { ...scenes.lobbyPrepared.room.me, isHost: true } },
+  seats: scenes.lobbyPrepared.seats.map(p => ({ ...p, host: p.mine })), startHint: "还差 2 人入座" };
+scenes.lobbyHostStart = { ...scenes.lobbyHostPrepared, seats: roomData().seats.map(p => ({ ...p, ready: true, mine: p.seat === 2, host: p.seat === 2 })),
+  seatOccupiedCount: 12, seatReadyCount: 12, canStart: true };
+scenes.lobbySpectator = { ...scenes.lobbyCompact, room: { ...compactRoom, me: { ...compactRoom.me, seat: null } }, seats: compactSeats.map(p => ({ ...p, mine: false })) };
+scenes.lobbyOffline = { ...scenes.lobbyCompact, network: false };
+scenes.lobbyLongNames = { ...scenes.lobbyHostPrepared, seats: scenes.lobbyHostPrepared.seats.map(p => p.occupied ? { ...p, name: "这是一个很长的玩家昵称" } : p) };
 r.players.forEach((p) =>
   command(r, p.uid, { type: "ready", ready: true, stage: r.stage }),
 );
@@ -345,11 +367,15 @@ const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace(/^page\s*\{/m, "body {")
   .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const navCss = fs.readFileSync(path.join(root, "components/app-nav/app-nav.wxss"), "utf8")
+  .replace(/^@import.*$/m, "")
+  .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)")
+  + ".app-nav-back{width:44px;min-height:44px}";
 fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${navCss}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");

@@ -61,11 +61,19 @@ test("旧接口的账号创建记录在分页前过滤，数量和后续页保�
   assert.equal(next.groups[0].key, "42");
 });
 
-test("旧接口分页前隐藏独立发起组，保留带结算结果的发起事件", async () => {
+test("旧接口分页前隐藏独立发起、加入和准备组，保留实际操作", async () => {
   const groups = Array.from({ length: 21 }, (_, i) => [
     {
       key: `begin-${i}`,
       entries: [{ details: { command: "beginActivity", phaseKey: "tools", outcomes: [] } }],
+    },
+    {
+      key: `join-${i}`,
+      entries: [{ details: { command: "join", phaseKey: "lobby" } }],
+    },
+    {
+      key: `ready-${i}`,
+      entries: [{ details: { command: "ready", phaseKey: "lobby" } }],
     },
     {
       key: `quest-${i}`,
@@ -76,16 +84,17 @@ test("旧接口分页前隐藏独立发起组，保留带结算结果的发起�
     key: "conversion",
     entries: [{ details: { command: "beginActivity", phaseKey: "tools", outcomes: [{ kind: "conversion" }] } }],
   });
+  groups.push({ key: "create", entries: [{ details: { command: "create", phaseKey: "lobby" } }] });
   const c = client(async (path) => {
     const start = Number(new URL(path, "http://localhost").searchParams.get("offset"));
     return { filtered: true, groups: groups.slice(start, start + 20), total: groups.length, pageSize: 20 };
   });
   const first = await c.fetchAudit("123456", 0);
-  assert.equal(first.total, 22);
+  assert.equal(first.total, 23);
   assert.equal(first.groups.length, 20);
   assert.ok(first.groups.every((group) => group.key.startsWith("quest-")));
   const next = await c.fetchAudit("123456", 20);
-  assert.deepEqual(Array.from(next.groups, (group) => group.key), ["quest-20", "conversion"]);
+  assert.deepEqual(Array.from(next.groups, (group) => group.key), ["quest-20", "conversion", "create"]);
 });
 
 test("新版接口保留服务端分页，不额外读取全部日志", async () => {
@@ -131,7 +140,7 @@ function auditRenderer() {
   );
   vm.runInNewContext(
     source.slice(
-      source.indexOf("function redundantBeginGroup("),
+      source.indexOf("function routineRoomEntry("),
       source.indexOf("async function refresh()"),
     ) + source.slice(
       source.indexOf("function renderAudit("),
@@ -580,7 +589,7 @@ test("任务复盘只显示任务队员及未提交者，并突出保存的票�
   );
 });
 
-test("入座和重开只显示行动者，隐藏单独发起记录，重复准备保留时间顺序", () => {
+test("隐藏加入与反复准备，只保留重开等有效记录", () => {
   const c = auditRenderer();
   const actor = { seat: 1, name: "房主" };
   const participants = [actor, { seat: 2, name: "其他玩家", required: false }];
@@ -664,16 +673,36 @@ test("入座和重开只显示行动者，隐藏单独发起记录，重复准�
   const nodes = c.nodes();
   assert.deepEqual(
     nodes.filter((node) => node.tag === "h3").map((node) => node.text),
-    ["入座与准备", "同房重开"],
+    ["同房重开"],
   );
   assert.doesNotMatch(
     nodes.map((node) => node.text).join(" "),
-    /其他玩家|无需操作|等待房主发起操作|对局结束|发起任务出牌/,
+    /其他玩家|无需操作|等待房主发起操作|对局结束|发起任务出牌|已准备|取消准备/,
   );
   const actions = nodes
     .filter((node) => node.tag === "text")
     .map((node) => node.text.trim());
-  assert.deepEqual(actions.slice(0, 3), ["已准备", "取消准备", "已准备"]);
+  assert.deepEqual(actions, ["同房重开"]);
+});
+
+test("准备流水混在房间设置中时只显示有意义的变更", () => {
+  const c = auditRenderer();
+  const actor = { seat: 1, name: "房主" };
+  c.render({
+    groups: [{ entries: [
+      { id: 1, created: 1, details: { command: "create", phaseKey: "lobby", phase: "入座与准备", label: "创建房间", player: actor } },
+      { id: 2, created: 2, details: { command: "join", phaseKey: "lobby", phase: "入座与准备", label: "加入房间", player: { seat: 2, name: "乙" } } },
+      { id: 3, created: 3, details: { command: "ready", phaseKey: "lobby", phase: "入座与准备", label: "准备", player: actor } },
+      { id: 4, created: 4, details: { command: "configure", phaseKey: "lobby", phase: "入座与准备", label: "修改板子", player: actor } },
+    ] }],
+    total: 1,
+    pageSize: 20,
+  });
+  const nodes = c.nodes();
+  assert.deepEqual(nodes.filter((node) => node.tag === "h3").map((node) => node.text), ["房间管理"]);
+  const text = nodes.map((node) => node.text).join(" ");
+  assert.match(text, /创建房间|修改板子/);
+  assert.doesNotMatch(text, /加入房间|已准备|取消准备|入座与准备/);
 });
 
 test("发起时已有结算结果仍显示结果，不重复显示发起动作", () => {

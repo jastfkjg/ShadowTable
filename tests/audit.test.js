@@ -117,6 +117,28 @@ test("操作记录分页不计入独立发起组，保留发起时产生的结�
   assert.equal(store.db.prepare("SELECT count(*) AS n FROM admin_audit").get().n, 44);
 });
 
+test("入座和准备流水不占操作记录分页，建房与设置仍可查", (t) => {
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const insert = store.db.prepare(
+    "INSERT INTO admin_audit(action,code,reason,created,details) VALUES('player','123456','',1,?)",
+  );
+  insert.run(JSON.stringify({ command: "create", phaseKey: "lobby", stage: "lobby", label: "创建房间" }));
+  for (let i = 0; i < 30; i++)
+    insert.run(JSON.stringify({ command: i % 2 ? "ready" : "join", phaseKey: "lobby", stage: "lobby" }));
+  insert.run(JSON.stringify({ phaseKey: "lobby", stage: "lobby", label: "加入房间" }));
+  insert.run(JSON.stringify({ command: "configure", phaseKey: "lobby", stage: "lobby", label: "修改板子" }));
+  for (let i = 0; i < 21; i++)
+    insert.run(JSON.stringify({ command: "submit", phaseKey: "quest", stage: `quest-${i}` }));
+  const first = auditGroups(store, "123456", 0);
+  const second = auditGroups(store, "123456", 20);
+  assert.equal(first.total, 22);
+  assert.equal(first.groups.length, 20);
+  assert.equal(second.groups.length, 2);
+  assert.deepEqual(second.groups[1].entries.map((entry) => entry.details.command), ["configure", "create"]);
+  assert.equal(store.db.prepare("SELECT count(*) AS n FROM admin_audit").get().n, 54);
+});
+
 test("猎人预选技能记录保存发起时间，整轮自动结算记录沿用同次时间", () => {
   const { enter, command } = require("../server/engine");
   const room = newRoom("123456", "p1", "房主", "knights", 12);

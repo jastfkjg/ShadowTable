@@ -527,6 +527,16 @@ function auditGroups(store, code, offset) {
     FROM admin_audit WHERE action != 'actor'
       AND coalesce(json_extract(details, '$.command'), '') NOT IN ('ackIdentity', 'ackFairyResult')
       AND NOT (
+        (
+          coalesce(json_extract(details, '$.command'), '') IN ('join', 'seat', 'stand', 'ready', 'leave')
+          OR (
+            coalesce(json_extract(details, '$.command'), '') = ''
+            AND coalesce(json_extract(details, '$.label'), '') IN ('加入房间', '入座或换座', '站起围观', '准备', '离开房间')
+          )
+        )
+        AND coalesce(json_array_length(details, '$.outcomes'), 0) = 0
+      )
+      AND NOT (
         coalesce(json_extract(details, '$.command'), '') = 'beginActivity'
         AND (
           coalesce(json_extract(details, '$.phaseKey'), '') IN ('tools', 'ended', 'terminated')
