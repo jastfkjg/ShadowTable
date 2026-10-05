@@ -16,7 +16,7 @@ function archive(store, id, faction, outcome, score) {
     players:[{uid:'wx:target',name:'历史昵称',seat:2,role:'梅林',faction,outcome,
       score: {status:'scored',total:score,breakdown:[]} }] });
 }
-test('同房卡片遵守独立公开设置，只返回历史汇总，统计与本人战绩一致', () => {
+test('同房所有玩家战绩开放，不受旧公开设置影响，只返回历史汇总', () => {
   const store = new Store(':memory:');
   try {
     const room = newRoom('123456','wx:host','房主','classic',6);
@@ -25,12 +25,12 @@ test('同房卡片遵守独立公开设置，只返回历史汇总，统计与�
     archive(store,'m1','good','win',3); archive(store,'m2','evil','loss',0);
     archive(store,'m3','good','excluded',0);
     assert.equal(readProfile(store,target.uid).roomStatsVisible,false);
-    assert.deepEqual(Object.keys(readRoomPlayerStats(store,room,'wx:host',id)).sort(),['player','status']);
-    assert.equal(readRoomPlayerStats(store,room,'wx:host',id).status,'hidden');
+    assert.deepEqual(Object.keys(readRoomPlayerStats(store,room,'wx:host',id)).sort(),['player','stats','status']);
+    assert.equal(readRoomPlayerStats(store,room,'wx:host',id).status,'available');
     const own = readRoomPlayerStats(store,room,target.uid,id);
     assert.equal(own.status,'available');
     const before = readProfile(store,target.uid);
-    saveProfile(store,target.uid,{nickname:'个人昵称',version:before.version,roomStatsVisible:true,leaderboardVisible:false});
+    saveProfile(store,target.uid,{nickname:'个人昵称',version:before.version,roomStatsVisible:false,leaderboardVisible:false});
     const value = readRoomPlayerStats(store,room,'wx:host',id), mine = store.statsFor(target.uid);
     assert.equal(value.player.name,'本桌昵称');
     assert.deepEqual(value.stats,{total:mine.total,wins:mine.wins,winRate:mine.winRate,scoreTotal:mine.score.total,
@@ -46,9 +46,16 @@ test('同房卡片遵守独立公开设置，只返回历史汇总，统计与�
     assert.throws(()=>readRoomPlayerStats(store,room,'wx:host',id),e=>e.status===404);
     enter(room,'wx:replacement','本桌昵称');
     assert.notEqual(playerStatsId(room,room.players.find(p=>p.uid==='wx:replacement')),id);
+    for (const uid of ['guest:guest','dev:dev','test:companion']) {
+      enter(room,uid,'测试昵称');
+      const player=room.players.find(p=>p.uid===uid);
+      const card=readRoomPlayerStats(store,room,'wx:host',playerStatsId(room,player));
+      assert.equal(card.status,uid.startsWith('test:')?'untracked':'available');
+      if(card.status==='available')assert.equal(card.stats.total,0);
+    }
   } finally { store.close(); }
 });
-test('同房可见设置默认关闭、保存及重启保留，旧客户端保存不会覆盖设置', () => {
+test('旧同房设置保留兼容数据，但关闭或重启后仍可查看战绩', () => {
   const dir = mkdtempSync(join(tmpdir(),'shadow-player-card-')), path=join(dir,'data.sqlite');
   let store = new Store(path);
   try {
@@ -59,9 +66,13 @@ test('同房可见设置默认关闭、保存及重启保留，旧客户端保�
     store.close(); store=new Store(path);
     assert.equal(readProfile(store,'wx:target').roomStatsVisible,true);
     assert.equal(readProfile(store,'wx:new').roomStatsVisible,false);
+    const room=newRoom('123456','wx:new','房主','classic',6);
+    enter(room,'wx:target','乙');
+    assert.equal(readRoomPlayerStats(store,room,'wx:new',playerStatsId(room,room.players[1])).status,'available');
+    assert.equal(readRoomPlayerStats(store,room,'wx:target',playerStatsId(room,room.players[0])).status,'available');
   } finally {store.close();rmSync(dir,{recursive:true,force:true});}
 });
-test('同房战绩 HTTP 鉴权、公开撤回、离房及房间删除立即生效，响应不缓存', async () => {
+test('同房战绩 HTTP 默认开放且忽略旧开关，鉴权、离房及房间删除仍生效', async () => {
   const app=createApp({database:':memory:',exchangeCode:async code=>code});
   await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
   const origin='http://127.0.0.1:'+app.server.address().port;
@@ -73,7 +84,7 @@ test('同房战绩 HTTP 鉴权、公开撤回、离房及房间删除立即生�
     const host=(await req('/api/login',null,{code:'host'})).data.token;
     const peer=(await req('/api/login',null,{code:'peer'})).data.token;
     const stranger=(await req('/api/login',null,{code:'stranger'})).data.token;
-    await req('/api/me/profile',host,{nickname:'房主',version:0,roomStatsVisible:true});
+    await req('/api/me/profile',host,{nickname:'房主',version:0});
     const {data:created}=await req('/api/rooms',host,{name:'房主',board:'classic',capacity:6});
     const roomPath='/api/rooms/'+created.code;
     await req(roomPath+'/join',peer,{name:'乙'});
@@ -87,7 +98,7 @@ test('同房战绩 HTTP 鉴权、公开撤回、离房及房间删除立即生�
     assert.equal(success.headers.get('cache-control'),'no-store');
     const profile=(await req('/api/me/profile',host)).data;
     await req('/api/me/profile',host,{nickname:'房主',version:profile.version,roomStatsVisible:false});
-    const hidden=await req(path,peer);assert.equal(hidden.data.status,'hidden');assert.equal(hidden.data.stats,undefined);
+    const available=await req(path,peer);assert.equal(available.data.status,'available');assert.deepEqual(available.data.stats,success.data.stats);
     assert.equal((await req(path,host)).data.status,'available');
     const current=(await req(roomPath,peer)).data;
     assert.equal((await req(roomPath+'/commands',peer,{type:'leave',stage:current.stage})).status,200);

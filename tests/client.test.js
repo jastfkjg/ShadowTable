@@ -1884,6 +1884,19 @@ test('战绩卡：准备点自己站起，点别人只读，游戏点自己和�
   await p.seat({currentTarget:{dataset:{seat:1}}});await p.seat({currentTarget:{dataset:{seat:2}}});
   assert.deepEqual(opened,[1,2]);assert.equal(writes.length,1);
 });
+test('战绩卡：旧版未开放或异常响应显示错误，更新服务后重试显示真实汇总', async () => {
+  const player={seat:1,name:'甲',statsId:'a'.repeat(64)}, info={id:player.statsId,seat:1};
+  for (const old of [{player:info,status:'hidden'},{player:info,status:'unknown'},{player:info,status:'available'},null]) {
+    let payload=old;
+    const p=page({request:async()=>payload});p.data.room=dealtRoom({players:[player]});
+    await p.openPlayerCard(1);
+    assert.equal(p.data.playerCard.name,'甲');assert.equal(p.data.playerCardStats,null);
+    assert.equal(p.data.playerCardLoading,false);assert.match(p.data.playerCardError,/战绩暂时无法读取/);
+    payload={player:info,status:'available',stats:{total:3,wins:2,winRate:200/3,scoreTotal:2,byFaction:[]}};
+    await p.retryPlayerCard();
+    assert.equal(p.data.playerCardError,'');assert.equal(p.data.playerCardStats.total,3);assert.equal(p.data.playerCardStats.rateLabel,'66.7%');
+  }
+});
 test('战绩卡：关闭、切后台及阶段变化丢弃迟到响应，重试与换座不会串人', async () => {
   let resolveStats, fail=false, room=dealtRoom({players:[{seat:1,name:'甲',statsId:'a'.repeat(64)}]});
   const p=page({request:async path=>{
@@ -1896,6 +1909,6 @@ test('战绩卡：关闭、切后台及阶段变化丢弃迟到响应，重试�
   opening=p.openPlayerCard(1);p.onHide();resolveStats(result);await opening;assert.equal(p.data.playerCard,null);
   p.foreground=true;opening=p.openPlayerCard(1);room.stage='new-stage';await p.refresh();resolveStats(result);await opening;assert.equal(p.data.playerCard,null);
   fail=true;await p.openPlayerCard(1);assert.equal(p.data.playerCardError,'网络暂不可用');assert.equal(p.data.error,'');
-  fail=false;opening=p.retryPlayerCard();resolveStats(result);await opening;assert.equal(p.data.playerCardStatus,'hidden');assert.equal(p.data.playerCardError,'');
+  fail=false;opening=p.retryPlayerCard();resolveStats(result);await opening;assert.equal(p.data.playerCardStatus,'');assert.match(p.data.playerCardError,/战绩暂时无法读取/);assert.equal(p.data.playerCardLoading,false);
   room.players[0]={seat:1,name:'甲',statsId:'b'.repeat(64)};await p.refresh();assert.equal(p.data.playerCard,null);
 });

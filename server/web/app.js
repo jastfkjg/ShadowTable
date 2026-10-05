@@ -671,7 +671,7 @@
     } catch (e) { if (sequence === routeSequence) handleError(e); }
   }
   function profileDraft(profile) {
-    return { nickname: profile.nickname, roomStatsVisible: !!profile.roomStatsVisible, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
+    return { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
   }
   function needsNicknameSetup() {
     return !(state.profile?.nicknameConfirmed ?? !!(state.profile?.nickname && state.profile.nickname !== '新朋友'));
@@ -701,7 +701,7 @@
     } finally { if (sequence === profileSequence && route === routeSequence) setState({ profileLoading: false }); }
   }
   function profileDirty() {
-    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined || state.profileDraft.roomStatsVisible !== !!state.profile?.roomStatsVisible) });
+    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
   }
   const builtinAvatars = window.shadowtableBuiltinAvatars || [];
   const avatarStyles = window.shadowtableAvatarStyles || [];
@@ -752,7 +752,7 @@
         app.querySelector('#profile-nickname')?.focus();
         return;
       }
-      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version, ...(state.profileDraft.roomStatsVisible !== !!state.profile?.roomStatsVisible ? { roomStatsVisible: state.profileDraft.roomStatsVisible } : {}),
+      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version,
         ...(state.profileDraft.avatar !== undefined ? { avatar: state.profileDraft.avatar } : {}) } };
     }
     setState({ profileSaving: true, profileError: '', profileEditingNickname: false, profileNicknameError: '' });
@@ -814,7 +814,7 @@
       html += '<button type="button" class="nickname-display" data-action="editProfileNickname" aria-label="修改个人昵称，当前昵称：' + esc(draft.nickname || '新朋友') + '"' + (locked ? ' disabled' : '') + '><span class="nickname-text">' + esc(draft.nickname || '新朋友') + '</span><svg class="nickname-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1L20 7.5a2.8 2.8 0 0 0-4-4L4.5 15Z"/></svg></button>';
     }
     if (state.profileNicknameError) html += '<div id="profile-nickname-error" class="nickname-error" role="alert">' + esc(state.profileNicknameError) + '</div>';
-    html += '</div></div><label class="profile-room-visibility"><span>允许同房玩家查看战绩<span class="small muted">仅展示历史汇总，与排行榜公开设置独立</span></span><input type="checkbox" role="switch" aria-label="允许同房玩家查看战绩" data-change="profileRoomStatsVisibility"' + (draft.roomStatsVisible ? ' checked' : '') + (locked || state.profileLoading ? ' disabled' : '') + ' /></label>';
+    html += '</div></div>';
     const selected = profilePreset(draft.avatarPreview)?.id;
     const style = draft.avatarStyle || 'classic';
     const visibleAvatars = builtinAvatars.filter(item => item.style === style);
@@ -935,7 +935,7 @@
     const me = board.me;
     const place = me.rank ? '<span class="rank-mine-prefix">第</span>' + me.rank + '<span class="rank-mine-unit">名</span>' : '未上榜';
     html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="'+!!state.rankMineExpanded+'" aria-label="我的排名，详情与公开设置"><span class="rank-mine-brief"><span class="small muted">我的名次</span><span class="rank-mine-place">'+place+'</span></span><span class="rank-mine-brief rank-mine-metric"><span class="rank-mine-value">'+value(me)+'</span><span class="small muted">详情与设置 ›</span></span></button></aside>';
-    if (state.rankMineExpanded) html += '<div class="dialog-backdrop rank-details-backdrop"><div class="error-dialog rank-details-dialog" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><div class="rank-details-header"><div class="dialog-title">我的排名</div>'+btn('rank-disclosure','rankToggleMine','关闭')+'</div><div class="rank-details-body"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="rank-mine-label">我的名次</div><div class="rank-mine-place' + (me.rank ? '' : ' is-unranked') + '" aria-label="' + (me.rank ? '第 ' + me.rank + ' 名' : '未上榜') + '">' + place + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + (displayMetric === 'games' ? '总局数' : metricLabel) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (board.fun ? '<div class="small muted fun-mine-sample">' + (me.knownGames ? me.count + ' / ' + me.opportunities + ' 次机会' : '暂无完整样本') + (me.status === 'not_enough' ? ' · 还差 ' + me.remaining + (board.sort === 'rate' ? ' 次机会' : board.unit) + '上榜' : me.status === 'no_records' ? ' · 尚无完整记录' : '') + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (me.status !== 'unsupported' ? '<div class="small muted">公开后，其他玩家可点击头像查看历史战绩汇总。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></div></div>';
+    if (state.rankMineExpanded) html += '<div class="dialog-backdrop rank-details-backdrop"><div class="error-dialog rank-details-dialog" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><div class="rank-details-header"><div class="dialog-title">我的排名</div>'+btn('rank-disclosure','rankToggleMine','关闭')+'</div><div class="rank-details-body"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="rank-mine-label">我的名次</div><div class="rank-mine-place' + (me.rank ? '' : ' is-unranked') + '" aria-label="' + (me.rank ? '第 ' + me.rank + ' 名' : '未上榜') + '">' + place + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + (displayMetric === 'games' ? '总局数' : metricLabel) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (board.fun ? '<div class="small muted fun-mine-sample">' + (me.knownGames ? me.count + ' / ' + me.opportunities + ' 次机会' : '暂无完整样本') + (me.status === 'not_enough' ? ' · 还差 ' + me.remaining + (board.sort === 'rate' ? ' 次机会' : board.unit) + '上榜' : me.status === 'no_records' ? ' · 尚无完整记录' : '') + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (me.status !== 'unsupported' ? '<div class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></div></div>';
     html += '</section>';
     return html;
   }
@@ -1968,6 +1968,9 @@ function roomListItems(rooms) {
       if (!card.id) throw new Error("当前服务暂不支持查看玩家战绩，请更新服务端后重试");
       const result = await request(path);
       if (!active()) return;
+      if (!result?.player || !['available', 'untracked'].includes(result.status) ||
+        result.status === 'available' && (!result.stats || !Array.isArray(result.stats.byFaction)))
+        throw new Error('战绩暂时无法读取，请稍后重试');
       if (result.player.id !== card.id || card.seat != null && result.player.seat !== card.seat) return closePlayerCard(false);
       const rateLabel = value => value == null ? "—" : value.toFixed(1) + "%";
       const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
@@ -2939,16 +2942,15 @@ function roomListItems(rooms) {
   function viewPlayerCard() {
     const p = state.playerCard, stats = state.playerCardStats;
     if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult) return "";
-    let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span><span class="small muted">' + (p.scope === 'leaderboard' ? '全部历史战绩' : p.seat + '号位' + (p.isHost ? ' · 房主' : '')) + '</span></div></div>';
+    let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div></div>';
     if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
-    else if (state.playerCardStatus === 'hidden') html += '<div class="player-card-message muted">该玩家未开放战绩</div>';
     else if (state.playerCardStatus === 'untracked') html += '<div class="player-card-message muted">陪测玩家不记录个人战绩</div>';
     else if (stats) {
       html += '<div class="player-card-summary">' + [[stats.total,'有效局数'],[stats.wins,'胜场'],[stats.rateLabel,'总胜率']].map(row => '<div class="player-card-stat"><span class="player-card-number">' + esc(row[0]) + '</span><span class="small muted">' + row[1] + '</span></div>').join('') + '</div>';
       html += stats.total ? '<div class="player-card-factions"><div class="player-card-section-title">阵营表现</div>' + stats.byFaction.map(row => '<div class="player-card-faction"><span class="faction-' + esc(row.faction) + '">' + esc(row.label) + '</span><span class="small muted">' + row.wins + '胜 / ' + row.total + '局</span><span>' + esc(row.rateLabel) + '</span></div>').join('') + '</div>' : '<div class="player-card-empty small muted">暂无有效战绩</div>';
-      html += '<div class="player-card-score"><span>总积分</span><span class="player-card-score-value">' + stats.scoreTotal + '</span></div><div class="player-card-note small muted">' + (p.scope === 'leaderboard' ? '全部历史有效对局 · 不含进行中的对局' : '历史有效对局 · 不含正在进行的本局') + '</div>';
-    }
+      html += '<div class="player-card-score"><span>总积分</span><span class="player-card-score-value">' + stats.scoreTotal + '</span></div>';
+    } else html += '<div class="player-card-message" role="alert">战绩暂时无法读取，请稍后重试' + btn('text-button','retryPlayerCard','重试') + '</div>';
     return html + '</div></section></div>';
   }
   function viewFairyResult() {
@@ -4408,7 +4410,6 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
-    profileRoomStatsVisibility: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.roomStatsVisible = el.checked; profileDirty(); } },
     funRankRole: el => loadLeaderboard(false,{rankFunRole:el.value}),
     rankVisibility: el => changeRankVisibility(el.checked),
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },

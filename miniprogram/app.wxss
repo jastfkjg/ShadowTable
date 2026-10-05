@@ -1597,12 +1597,12 @@ button.player-card-close { margin: 0 -16rpx 0 0; padding: 0; width: 48px; min-he
 .player-card-section-title { padding: 20rpx 0 8rpx; font-size: 28rpx; }
 .player-card-faction { display: flex; align-items: baseline; justify-content: space-between; gap: 12rpx; padding: 14rpx 0; font-size: 28rpx; }
 .player-card-faction > text:last-child { min-width: 100rpx; text-align: right; font-weight: 600; }
-.player-card-score { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; border-block: 1rpx solid var(--border); margin-top: 12rpx; }
+.player-card-score { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; border-top: 1rpx solid var(--border); margin-top: 12rpx; }
 .player-card-score-value { color: var(--accent); font-size: 38rpx; font-weight: 600; }
-.player-card-note, .player-card-empty { padding-top: 20rpx; }
+.player-card-empty { padding-top: 20rpx; }
 .player-card-message { padding: 48rpx 0; text-align: center; }
 .proposal-player-options { display: flex; flex-wrap: wrap; gap: 16rpx; padding: 16rpx 0; }
 .proposal-player-options button { min-width: 28%; margin: 0; border: 1rpx solid var(--border); }
 .proposal-player-options button.selected { border-color: var(--accent); color: var(--accent); }
-.profile-room-visibility { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 24rpx 0; border-block: 1rpx solid var(--border); margin-bottom: 24rpx; }
-.profile-room-visibility switch { flex-shrink: 0; }
+
+@import "pages/home/home.wxss";

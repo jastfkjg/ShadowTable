@@ -118,3 +118,27 @@ test("键盘弹出时收起底栏，关闭后恢复，卸载移除自己的键�
   spec.lifetimes.detached.call(instance);
   assert.equal(removed, listener);
 });
+
+test('表单打开时底栏独立于键盘保持隐藏，延迟挂载和重新显示均恢复表单状态', () => {
+  let keyboard;
+  const selections = [];
+  const home = { route: 'pages/lobby/lobby', data: { activeTab: 0, lobby: { entrySheet: true } }, switchMainTab: index => selections.push(index) };
+  const { spec, instance } = tabBar([home], { onKeyboardHeightChange: fn => { keyboard = fn; } });
+  spec.lifetimes.attached.call(instance);
+  assert.equal(instance.data.entrySheetVisible, true);
+  assert.equal(instance.data.keyboardVisible, false);
+  keyboard({ height: 280 });
+  keyboard({ height: 0 });
+  assert.equal(instance.data.entrySheetVisible, true);
+  instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+  assert.equal(selections.length, 0);
+  home.data.lobby.entrySheet = false;
+  spec.pageLifetimes.show.call(instance);
+  assert.equal(instance.data.entrySheetVisible, false);
+  instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+  assert.deepEqual(selections, [1]);
+  home.data.lobby.entrySheet = true;
+  home.data.activeTab = 1;
+  spec.pageLifetimes.show.call(instance);
+  assert.equal(instance.data.entrySheetVisible, false);
+});

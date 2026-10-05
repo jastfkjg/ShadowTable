@@ -1,7 +1,12 @@
 // A custom tab bar belongs to each tab page. Update it before starting any reads.
 function selectTab(page, selected) {
   const tabBar = page.getTabBar?.();
-  if (tabBar && tabBar.data.selected !== selected) tabBar.setData({ selected });
+  if (!tabBar) return;
+  const entrySheetVisible = selected === 0 && !!(page.data?.lobby?.entrySheet || page.data?.entrySheet);
+  const patch = {};
+  if (tabBar.data.selected !== selected) patch.selected = selected;
+  if (!!tabBar.data.entrySheetVisible !== entrySheetVisible) patch.entrySheetVisible = entrySheetVisible;
+  if (Object.keys(patch).length) tabBar.setData(patch);
 }
 
 // Compatibility entry points still use native routing from independent pages.

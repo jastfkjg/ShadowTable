@@ -87,13 +87,13 @@
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
 <app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
-<view class="page {{isLobby ? 'tab-page' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
+<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view wx:if="{{!room || room.phase!=='lobby'}}" class="brand">
     <view class="brand-identity">
       <text class="brand-mark">桌边助手</text>
       <button hover-class="none" class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || roomsRefreshing || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
         <view class="connection-dot {{reconnecting?'pending':!network || needsLogin ? 'offline' : loading || roomsRefreshing || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
-        <text wx:if="{{reconnecting || !network || needsLogin}}" class="connection-label">{{reconnecting?'重连中':'连接断开'}}</text>
+        <text wx:if="{{isLobby || reconnecting || !network || needsLogin}}" class="connection-label">{{reconnecting?'重连中':!network || needsLogin?'连接断开':loading || roomsRefreshing || busy || hasPendingRequest?'同步中':serverConnected?'已连接':'连接中'}}</text>
       </button>
     </view>
     <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry" bindtap="openHelp" aria-label="打开使用帮助"><text class="help-entry-icon" aria-hidden="true">?</text><text>帮助</text></button>
@@ -242,61 +242,31 @@
   </view>
   <block wx:if="{{isLobby}}">
     <view wx:if="{{pendingTableCode}}" class="inline-error"><view>房间 {{pendingTableCode}} 有一项操作尚未确认。</view><button hover-class="none" class="secondary" bindtap="resumePending">返回牌桌处理</button></view>
-    <form class="panel entry-panel" bindsubmit="submitEntry">
-      <view class="entry-tabs">
-        <button hover-class="none" class="entry-tab {{entryMode!=='join'?'active':''}}" data-mode="create" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode!=='join'}}">创建房间</button>
-        <button hover-class="none" class="entry-tab {{entryMode==='join'?'active':''}}" data-mode="join" bindtap="switchEntry" disabled="{{busy}}" aria-pressed="{{entryMode==='join'}}">加入房间</button>
-      </view>
-      <label class="label" for="nickname">{{nicknameSetup?'玩家昵称':'本桌昵称'}}</label>
-      <input class="input" id="nickname" name="nickname" type="nickname" maxlength="16"
-        value="{{name}}" bindinput="inputName" bindblur="inputName"
-        placeholder="{{nicknameSetup?'填写或选择微信昵称':'默认使用个人昵称，也可为本桌修改'}}" disabled="{{busy}}" />
-      <view wx:if="{{nicknameSetup}}" class="small muted">用于牌桌和排行榜，可在“我的”中修改。</view>
-      <block wx:if="{{entryMode!=='join'}}">
-        <view class="field-title">人数</view>
-        <view class="capacity-grid">
-          <button hover-class="none" wx:for="{{capacities}}" wx:key="*this" class="capacity-option {{capacity===item?'active':''}}"
-            data-capacity="{{item}}" bindtap="pickCapacity" disabled="{{busy || loading}}"
-            aria-label="{{item+'人'+(capacity===item?'，已选':'')}}">{{item}}人</button>
-        </view>
-        <view class="field-title">板子</view>
-        <view wx:if="{{availableBoards.length===1}}" class="single-board">{{boardName}}</view>
-        <view wx:else class="board-options">
-          <button hover-class="none" wx:for="{{availableBoards}}" wx:key="id" class="board-option {{boardId===item.id?'active':''}}"
-            data-index="{{index}}" bindtap="pickBoard" disabled="{{busy || loading}}">
-            <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
-          </button>
-        </view>
-        <view class="field-title">角色配置</view>
-        <view class="rules-detail">
-          <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
-        </view>
-        <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading}}">板子详情 ›</button>
-        <button hover-class="none" class="primary" form-type="submit" data-action="create" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">{{nicknameSetup?'确认昵称并创建':'创建'}} {{capacity}} 人房间</button>
-      </block>
-      <block wx:else>
-        <label class="field-title" for="room-code">房间码</label>
-        <input class="input room-input" id="room-code" name="code" type="number" maxlength="6"
-          value="{{code}}" bindinput="inputCode" placeholder="输入6位房间码" disabled="{{busy}}" />
-        <button hover-class="none" class="primary" form-type="submit" data-action="join" loading="{{busy && busyAction==='enter' && !enteringCode}}" disabled="{{hasPendingRequest || loading || busy}}">{{nicknameSetup?'确认昵称并加入房间':'加入房间'}}</button>
-      </block>
-    </form>
-    <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button hover-class="none" class="history-toggle room-refresh" bindtap="refreshRooms" disabled="{{busy || loading || roomsRefreshing || hasPendingRequest}}">{{roomsRefreshing?'刷新中…':'刷新'}}</button></view>
+    <view class="home-entry-actions">
+      <button class="home-action home-action-create" hover-class="none" data-mode="create" bindtap="switchEntry" disabled="{{busy || loading || hasPendingRequest}}">
+        <image class="home-action-icon" src="/assets/home-create.svg" aria-hidden="true" />
+        <text class="home-action-title">创建房间</text><text class="home-action-hint">选人数，开新局</text>
+      </button>
+      <button class="home-action home-action-join" hover-class="none" data-mode="join" data-action="join" bindtap="switchEntry" disabled="{{busy || loading || hasPendingRequest}}">
+        <image class="home-action-icon" src="/assets/home-join.svg" aria-hidden="true" />
+        <text class="home-action-title">加入房间</text><text class="home-action-hint">输入 6 位房间码</text>
+      </button>
+    </view>
+    <include src="../home/entry-sheet.wxml" />
+    <view class="section-title history-heading"><text>我的牌桌<text wx:if="{{memberRooms.length}}" class="room-count">{{memberRooms.length}}</text></text><button hover-class="none" class="history-toggle room-refresh" bindtap="refreshRooms" disabled="{{busy || loading || roomsRefreshing || hasPendingRequest}}"><image class="room-refresh-icon {{roomsRefreshing?'is-refreshing':''}}" src="/assets/home-refresh.svg" aria-hidden="true" />{{roomsRefreshing?'刷新中…':'刷新'}}</button></view>
     <view wx:if="{{memberRooms.length>=6 || roomListFilter!=='all'}}" class="room-filters">
       <button hover-class="none" wx:for="{{roomFilters}}" wx:key="id" class="room-filter {{roomListFilter===item.id?'active':''}}" bindtap="filterRooms" data-filter="{{item.id}}" aria-pressed="{{roomListFilter===item.id}}">{{item.label}}</button>
     </view>
     <view wx:if="{{undoRoom}}" class="room-undo" role="status"><text>已从列表移除 {{undoRoom.code}}</text><button hover-class="none" class="history-toggle" bindtap="undoRemoveRoom" disabled="{{busy || hasPendingRequest}}">撤销</button></view>
-    <view wx:for="{{visibleMemberRooms}}" wx:key="code" class="member-room room-list-item {{item.available===false?'is-unavailable':''}}">
-      <button hover-class="none" class="room-list-open" data-code="{{item.code}}" bindtap="openRoom" disabled="{{busy || loading || hasPendingRequest || item.available===false}}" aria-label="{{'进入房间'+item.code+'，'+item.statusLabel}}">
-        <view class="room-list-top"><text class="room-list-title">{{item.note || '房间 '+item.code}}</text><text class="room-status {{item.status}}">{{enteringCode===item.code?'正在进入…':item.statusLabel}}</text></view>
-        <view wx:if="{{item.note}}" class="small muted">房间 {{item.code}}</view>
-        <view class="room-list-board">{{item.boardName}} · {{item.peopleLabel}}</view>
-        <view class="room-list-meta"><text wx:if="{{item.hostName}}" class="room-host-name">房主：{{item.hostName}}</text><text>{{item.relationLabel}}</text></view>
-        <view wx:if="{{item.updatedAt}}" class="room-list-time">最近活动 {{item.activityLabel}}</view>
-      </button>
-      <button hover-class="none" class="room-more" data-code="{{item.code}}" bindtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
+    <view wx:for="{{visibleMemberRooms}}" wx:key="code" class="member-room room-list-item {{item.available===false?'is-unavailable':''}}" data-code="{{item.code}}" bindtap="openRoom">
+      <view class="room-list-top"><text class="room-list-title">{{item.note || item.boardName || '房间 '+item.code}}</text><text class="room-status {{item.status}}">{{enteringCode===item.code?'进入中…':item.statusLabel}}</text></view>
+      <view wx:if="{{item.note && item.boardName}}" class="room-list-board">{{item.boardName}}</view>
+      <view class="room-list-code"><text>房间 {{item.code}}</text><button class="room-list-copy" hover-class="none" data-code="{{item.code}}" catchtap="copyListedRoom" aria-label="{{'复制房间码'+item.code}}"><view class="lobby-copy-icon" aria-hidden="true" /></button></view>
+      <view class="room-list-meta"><text class="room-list-people">{{item.peopleLabel}}</text><text class="room-list-relation">{{item.compactRelation || item.relationLabel}}</text></view>
+      <view class="room-list-footer"><text class="room-list-time">{{item.updatedAt?'最近活动 '+item.activityLabel:''}}</text><button class="room-list-open" hover-class="none" data-code="{{item.code}}" catchtap="openRoom" disabled="{{busy || loading || hasPendingRequest || enteringCode || item.available===false}}" aria-label="{{(item.entryLabel || '返回牌桌')+'，房间'+item.code+'，'+item.statusLabel}}"><text>{{enteringCode===item.code?'正在进入…':item.entryLabel || '返回牌桌'}}</text><text wx:if="{{item.available!==false}}" aria-hidden="true">→</text></button></view>
+      <button hover-class="none" class="room-more" data-code="{{item.code}}" catchtap="openRoomMenu" disabled="{{busy || loading || hasPendingRequest}}" aria-label="{{'管理房间'+item.code+'的个人记录'}}">⋯</button>
     </view>
-    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view>还没有牌桌</view><view class="room-empty-actions"><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="join" data-scroll="true" disabled="{{busy || hasPendingRequest}}">加入房间</button><button hover-class="none" class="secondary" bindtap="switchEntry" data-mode="create" data-scroll="true" disabled="{{busy || hasPendingRequest}}">创建房间</button></view></view>
+    <view wx:if="{{!memberRooms.length && !loading}}" class="room-empty"><view class="room-empty-title">还没有牌桌</view><view class="room-empty-hint">创建新房间，或输入房间码与朋友同桌。</view></view>
     <view wx:elif="{{memberRooms.length && !visibleMemberRooms.length}}" class="room-empty"><text>没有符合条件的牌桌</text><button hover-class="none" class="history-toggle" bindtap="filterRooms" data-filter="all">查看全部</button></view>
     <view wx:if="{{roomMenu && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll"><view class="error-dialog room-list-dialog room-menu-dialog" role="dialog" aria-modal="true" aria-label="{{'房间管理，房间'+roomMenu.code}}">
       <view class="room-menu-header"><view class="room-menu-heading">房间管理</view><view class="room-menu-code">房间 {{roomMenu.code}}</view></view>

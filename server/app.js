@@ -288,7 +288,7 @@ function createApp({
       const rankedPlayerStats = path.match(/^\/api\/leaderboard\/players\/([a-f0-9-]{36})\/stats$/);
       if (req.method === "GET" && rankedPlayerStats) {
         res.setHeader("Cache-Control", "no-store");
-        return send(200, readLeaderboardPlayerStats(store, uid, rankedPlayerStats[1]));
+        return send(200, readLeaderboardPlayerStats(store, rankedPlayerStats[1]));
       }
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));

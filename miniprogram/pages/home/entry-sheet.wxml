@@ -1,0 +1,55 @@
+<view wx:if="{{entrySheet}}" class="entry-backdrop" catchtap="closeEntry" catchtouchmove="blockScroll">
+  <form class="entry-panel entry-sheet {{entryMode==='create'?'is-create':''}} {{entryKeyboardHeight?'has-keyboard':''}}" style="bottom: {{entryKeyboardHeight}}px; max-height: calc(100vh - {{entryKeyboardHeight}}px - 64px);" catchtap="blockScroll" bindsubmit="submitEntry" role="dialog" aria-modal="true" aria-label="{{entryMode==='join'?'加入房间':'创建房间'}}">
+    <view class="entry-sheet-handle" aria-hidden="true" />
+    <view class="entry-sheet-heading">
+      <view class="entry-sheet-title">{{entryMode==='join'?'加入房间':'创建房间'}}</view>
+      <view wx:if="{{entryMode==='create'}}" class="entry-sheet-hint">选择人数和板子，邀请朋友入座</view>
+      <button class="entry-sheet-close" hover-class="none" bindtap="closeEntry" disabled="{{busy || hasPendingRequest}}" aria-label="关闭房间面板">×</button>
+    </view>
+    <scroll-view class="entry-sheet-body" scroll-y enhanced scroll-into-view="{{entryScrollTarget}}" show-scrollbar="{{false}}" style="max-height: calc(100vh - {{entryKeyboardHeight}}px - 216px);">
+      <view class="entry-sheet-fields">
+        <view id="entry-name-block">
+        <label class="label" for="nickname">{{nicknameSetup?'玩家昵称':'本桌昵称'}}</label>
+        <input wx:if="{{entryEditingName || nicknameSetup || !name}}" class="input entry-name-input {{entryNameError?'has-error':''}}" id="nickname" name="nickname" type="nickname" maxlength="16" value="{{name}}" bindinput="inputName" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="nickname" focus="{{entryFocusedField==='nickname'}}" adjust-position="{{false}}" placeholder="填写或选择微信昵称" disabled="{{busy || hasPendingRequest}}" />
+        <button wx:else class="entry-name-summary" hover-class="none" bindtap="editEntryName" disabled="{{busy || hasPendingRequest}}" aria-label="{{'修改本桌昵称，当前为'+name}}"><text class="entry-name-value">{{name}}</text><text class="entry-name-edit">修改 <text aria-hidden="true">›</text></text></button>
+        <view wx:if="{{entryNameError}}" class="entry-field-error" role="alert">{{entryNameError}}</view>
+        <view wx:if="{{nicknameSetup}}" class="entry-field-help">首次确认后用于牌桌和排行榜，可在“我的”中修改。</view>
+        </view>
+        <view wx:if="{{entryMode==='join'}}" id="entry-code-block">
+          <label class="field-title" for="room-code">房间码</label>
+          <view class="entry-code-field {{entryFocusedField==='code'?'is-focused':''}} {{entryCodeError?'has-error':''}}">
+            <input class="room-input" id="room-code" name="code" type="number" maxlength="6" value="{{code}}" bindinput="inputCode" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="code" focus="{{entryFocusedField==='code'}}" adjust-position="{{false}}" placeholder="输入 6 位房间码" placeholder-class="entry-code-placeholder" disabled="{{busy || hasPendingRequest}}" />
+            <button class="entry-paste" hover-class="none" bindtap="pasteRoomCode" disabled="{{busy || hasPendingRequest}}">粘贴</button>
+          </view>
+          <view wx:if="{{entryCodeError}}" class="entry-field-error" role="alert">{{entryCodeError}}</view>
+        </view>
+        <block wx:else>
+        <view class="field-title">人数</view>
+        <view class="capacity-grid">
+          <button hover-class="none" wx:for="{{capacities}}" wx:key="*this" class="capacity-option {{capacity===item?'active':''}}"
+            data-capacity="{{item}}" bindtap="pickCapacity" disabled="{{busy || loading || hasPendingRequest}}"
+            aria-label="{{item+'人'+(capacity===item?'，已选':'')}}">{{item}}人</button>
+        </view>
+        <view class="field-title">板子</view>
+        <view wx:if="{{availableBoards.length===1}}" class="single-board">{{boardName}}</view>
+        <view wx:else class="board-options">
+          <button hover-class="none" wx:for="{{availableBoards}}" wx:key="id" class="board-option {{boardId===item.id?'active':''}}"
+            data-index="{{index}}" bindtap="pickBoard" disabled="{{busy || loading || hasPendingRequest}}">
+            <text>{{item.name}}</text><text class="selection-mark">{{boardId===item.id?'已选':'选择'}}</text>
+          </button>
+        </view>
+        <view class="field-title">角色配置</view>
+        <view class="rules-detail">
+          <view wx:for="{{boardRoleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
+        </view>
+        <button hover-class="none" class="text-button" bindtap="openBoardDetails" disabled="{{busy || loading || hasPendingRequest}}">板子详情 ›</button>
+        </block>
+      </view>
+    </scroll-view>
+    <view class="entry-sheet-footer">
+      <view wx:if="{{entryError}}" class="entry-field-error" role="alert">{{entryError}}</view>
+      <view wx:if="{{hasPendingRequest || reconnecting}}" class="entry-field-help" role="status">{{hasPendingRequest?'请求尚未确认，连接恢复后会自动重试，请勿重复提交。':'正在恢复连接…'}}</view>
+      <button class="primary entry-submit" hover-class="none" form-type="submit" data-action="{{entryMode==='join'?'join':'create'}}" loading="{{busy && busyAction==='enter'}}" disabled="{{hasPendingRequest || loading || busy || !network || reconnecting}}">{{busy && busyAction==='enter'?(entryMode==='join'?'加入中…':'创建中…'):entryMode==='join'?(nicknameSetup?'确认昵称并加入房间':'加入房间'):(nicknameSetup?'确认昵称并创建':'创建')+' '+capacity+' 人房间'}}</button>
+    </view>
+  </form>
+</view>

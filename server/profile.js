@@ -51,6 +51,7 @@ function resolveAvatar(value) {
   return builtinCache.get(preset.id);
 }
 function readProfile(store, uid) {
+  // Retain roomStatsVisible for older clients; player cards are always available.
   const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, room_stats_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,

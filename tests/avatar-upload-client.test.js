@@ -241,12 +241,11 @@ test("wx.uploadFile携带会话与幂等编号，解析字符串响应，401只�
   await assert.rejects(current); assert.equal(storage.has("session"), false);
 });
 
-test('同房战绩开关参与未保存提示，取消修改恢复干净，保存只提交明确变更', async () => {
+test('资料页移除同房战绩开关，保存昵称无需提交战绩设置', async () => {
   const client=page();await ready(client);const p=client.p;
-  assert.equal(p.data.roomStatsVisible,false);
-  p.changeRoomStatsVisibility({detail:{value:true}});assert.equal(p.data.dirty,true);
-  p.changeRoomStatsVisibility({detail:{value:false}});assert.equal(p.data.dirty,false);
-  p.changeRoomStatsVisibility({detail:{value:true}});await p.save();
-  assert.equal(client.writes[0].data.roomStatsVisible,true);assert.equal(client.writes[0].data.version,3);
+  assert.equal(p.changeRoomStatsVisibility,undefined);
+  p.inputName({detail:{value:'新昵称'}});await p.save();
+  assert.equal(client.writes[0].data.nickname,'新昵称');assert.equal(client.writes[0].data.version,3);
+  assert.equal(client.writes[0].data.roomStatsVisible,undefined);
   assert.equal(client.writes[0].data.leaderboardVisible,undefined);p.onUnload();
 });

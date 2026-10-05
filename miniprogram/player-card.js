@@ -16,6 +16,9 @@ function playerCardMethods(api) {
         if (!card.id) throw new Error("当前服务暂不支持查看玩家战绩，请更新服务端后重试");
         const result = await api.request(path);
         if (!active()) return;
+        if (!result?.player || !["available", "untracked"].includes(result.status) ||
+          result.status === "available" && (!result.stats || !Array.isArray(result.stats.byFaction)))
+          throw new Error("战绩暂时无法读取，请稍后重试");
         if (result.player.id !== card.id || card.seat != null && result.player.seat !== card.seat) return this.closePlayerCard();
         const rateLabel = value => value == null ? "—" : value.toFixed(1) + "%";
         const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),

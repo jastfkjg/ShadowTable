@@ -2119,15 +2119,13 @@ button.player-card-close { margin: 0 -8px 0 0; padding: 0; width: 48px; min-heig
 .player-card-section-title { padding: 10px 0 4px; font-size: 14px; }
 .player-card-faction { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 7px 0; font-size: 14px; }
 .player-card-faction > span:last-child { min-width: 50px; text-align: right; font-weight: 600; }
-.player-card-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-block: 0.5px solid var(--border); margin-top: 6px; }
+.player-card-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 0.5px solid var(--border); margin-top: 6px; }
 .player-card-score-value { color: var(--accent); font-size: 19px; font-weight: 600; }
-.player-card-note, .player-card-empty { padding-top: 10px; }
+.player-card-empty { padding-top: 10px; }
 .player-card-message { padding: 24px 0; text-align: center; }
 .proposal-player-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
 .proposal-player-options button { min-width: 28%; margin: 0; border: 0.5px solid var(--border); }
 .proposal-player-options button.selected { border-color: var(--accent); color: var(--accent); }
-.profile-room-visibility { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-block: 0.5px solid var(--border); margin-bottom: 12px; }
-.profile-room-visibility input { flex-shrink: 0; }
 
 .player-card-body { overflow-y: auto; overscroll-behavior: contain; }
 body:has(.player-card-backdrop) { overflow: hidden; }

@@ -24,6 +24,9 @@ module.exports = function createHomePage(initialTab = 0) {
           const patch = {};
           for (const name of Object.keys(values)) patch[key + "." + name] = values[name];
           host.setData(patch, callback);
+          // The custom tab bar lives outside the page's stacking context.
+          // Remove it while the sheet is open, even when the keyboard is closed.
+          if (key === "lobby" && "entrySheet" in values) selectTab(host, host.data.activeTab);
         },
       });
       this.lobbyController = attach(lobby, "lobby");

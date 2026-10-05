@@ -1353,6 +1353,22 @@ test('网页按服务端刺客状态跳过带刀人，计分和不计分均可�
   }
 });
 
+test('网页战绩卡兼容旧版未开放和异常响应，保留提示与重试，恢复后显示真实统计', async () => {
+  const player={seat:1,name:'甲',statsId:'a'.repeat(64)}, info={id:player.statsId,seat:1};
+  for (const old of [{player:info,status:'hidden'},{player:info,status:'unknown'},{player:info,status:'available'},null]) {
+    let payload=old;
+    const c=client(async()=>response(payload));c.state.room=dealtWebRoom({players:[player]});
+    await c.openPlayerCard(1);
+    assert.equal(c.state.playerCard.name,'甲');assert.equal(c.state.playerCardStats,null);assert.equal(c.state.playerCardLoading,false);
+    assert.match(c.viewPlayerCard(),/战绩暂时无法读取/);assert.match(c.viewPlayerCard(),/data-action="retryPlayerCard"/);
+    payload={player:info,status:'available',stats:{total:3,wins:2,winRate:200/3,scoreTotal:2,byFaction:[]}};
+    await c.ACTIONS.retryPlayerCard();
+    assert.equal(c.state.playerCardError,'');assert.equal(c.state.playerCardStats.total,3);assert.match(c.viewPlayerCard(),/66.7%/);
+    c.state.playerCardStats=null;c.state.playerCardStatus='hidden';
+    assert.match(c.viewPlayerCard(),/战绩暂时无法读取/);assert.match(c.viewPlayerCard(),/data-action="retryPlayerCard"/);
+  }
+});
+
 test('网页主座位在准备时看他人战绩、游戏时看自己；关闭和阶段变化丢弃响应', async () => {
   let resolveStats;
   const players=[{seat:1,name:'甲',statsId:'a'.repeat(64)},{seat:2,name:'<乙>',statsId:'b'.repeat(64)}];
@@ -1390,7 +1406,7 @@ test('网页排行榜头像与占位头像打开同一战绩卡，支持错误�
   fail=false;await c.ACTIONS.retryPlayerCard();
   assert.equal(calls.at(-1),'/api/leaderboard/players/public-player/stats');
   assert.equal(c.state.playerCardStats.rateLabel,'62.5%');
-  assert.match(c.viewPlayerCard(),/&lt;新昵称&gt;/);assert.match(c.viewPlayerCard(),/全部历史战绩/);
+  assert.match(c.viewPlayerCard(),/&lt;新昵称&gt;/);assert.doesNotMatch(c.viewPlayerCard(),/全部历史战绩|历史有效对局|不含进行中的对局/);
   assert.doesNotMatch(c.viewPlayerCard(),/号位|<新昵称>/);
 });
 test('网页排行榜离开、关闭与换榜丢弃迟到响应，快速点击只显示最后一人', async () => {
@@ -1414,12 +1430,11 @@ test('网页排行榜离开、关闭与换榜丢弃迟到响应，快速点击�
   assert.equal(c.state.playerCard.id,'b');assert.equal(c.state.playerCardError,'');assert.match(c.viewPlayerCard(),/暂无有效战绩/);
 });
 
-test('网页编辑资料独立切换同房战绩公开，草稿标脏且不修改排行榜设置', async () => {
+test('网页编辑资料移除同房战绩开关，旧设置不影响昵称编辑', async () => {
   const c=client(async()=>response({nickname:'甲',version:2,roomStatsVisible:false,leaderboardVisible:true}));
   c.state.page='profile';await c.loadProfile(true);
-  c.CHANGES.profileRoomStatsVisibility({checked:true});
-  assert.equal(c.state.profileDirty,true);assert.equal(c.state.profileDraft.roomStatsVisible,true);
-  assert.equal(c.state.profile.leaderboardVisible,true);
-  assert.match(c.viewProfileEditor(),/允许同房玩家查看战绩/);
-  c.CHANGES.profileRoomStatsVisibility({checked:false});assert.equal(c.state.profileDirty,false);
+  assert.equal(c.CHANGES.profileRoomStatsVisibility,undefined);
+  assert.doesNotMatch(c.viewProfileEditor(),/允许同房玩家查看战绩|profileRoomStatsVisibility/);
+  c.INPUTS.profileName({value:'乙'});assert.equal(c.state.profileDirty,true);
+  c.INPUTS.profileName({value:'甲'});assert.equal(c.state.profileDirty,false);
 });

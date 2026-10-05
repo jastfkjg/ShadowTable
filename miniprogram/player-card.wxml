@@ -2,14 +2,13 @@
   <view class="player-card-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerCard.name+'的玩家战绩'}}">
     <view class="player-card-handle" aria-hidden="{{true}}" />
     <view class="player-card-heading"><text>玩家战绩</text><button hover-class="none" class="player-card-close" bindtap="closePlayerCard" aria-label="关闭玩家战绩">×</button></view>
-    <scroll-view scroll-y="{{true}}" class="player-card-body" style="height:{{playerCardStats ? 560 + playerCardStats.byFaction.length * 88 : 420}}rpx;">
+    <scroll-view scroll-y="{{true}}" class="player-card-body" style="height:{{playerCardStats ? 480 + playerCardStats.byFaction.length * 88 : 420}}rpx;">
       <view class="player-card-identity">
         <view class="player-card-avatar"><text>{{playerCard.initial}}</text><image class="player-card-avatar-image" wx:if="{{playerCard.avatarUrl && !playerCard.avatarFailed}}" src="{{playerCard.avatarUrl}}" mode="aspectFill" binderror="playerCardAvatarError" aria-hidden="{{true}}" /></view>
-        <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text class="small muted">{{playerCard.scope==='leaderboard'?'全部历史战绩':playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>
+        <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text wx:if="{{playerCard.scope!=='leaderboard'}}" class="small muted">{{playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>
       </view>
       <view wx:if="{{playerCardLoading}}" class="player-card-message muted" role="status">正在读取战绩…</view>
       <view wx:elif="{{playerCardError}}" class="player-card-message" role="alert"><text>{{playerCardError}}</text><button hover-class="none" class="text-button" bindtap="retryPlayerCard">重试</button></view>
-      <view wx:elif="{{playerCardStatus==='hidden'}}" class="player-card-message muted">该玩家未开放战绩</view>
       <view wx:elif="{{playerCardStatus==='untracked'}}" class="player-card-message muted">陪测玩家不记录个人战绩</view>
       <block wx:elif="{{playerCardStats}}">
         <view class="player-card-summary">
@@ -20,8 +19,8 @@
         <view wx:if="{{playerCardStats.total}}" class="player-card-factions"><view class="player-card-section-title">阵营表现</view><view wx:for="{{playerCardStats.byFaction}}" wx:key="faction" class="player-card-faction"><text class="faction-{{item.faction}}">{{item.label}}</text><text class="small muted">{{item.wins}}胜 / {{item.total}}局</text><text>{{item.rateLabel}}</text></view></view>
         <view wx:else class="player-card-empty small muted">暂无有效战绩</view>
         <view class="player-card-score"><text>总积分</text><text class="player-card-score-value">{{playerCardStats.scoreTotal}}</text></view>
-        <view class="player-card-note small muted">{{playerCard.scope==='leaderboard'?'全部历史有效对局 · 不含进行中的对局':'历史有效对局 · 不含正在进行的本局'}}</view>
       </block>
+      <view wx:else class="player-card-message" role="alert"><text>战绩暂时无法读取，请稍后重试</text><button hover-class="none" class="text-button" bindtap="retryPlayerCard">重试</button></view>
     </scroll-view>
   </view>
 </view>

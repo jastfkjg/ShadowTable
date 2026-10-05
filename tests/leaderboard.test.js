@@ -21,7 +21,7 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
-test('排行榜战绩卡鉴权、汇总全部历史、仅按最新排行榜公开设置授权', async () => {
+test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可查看战绩', async () => {
   const app=createApp({database:':memory:',clock:()=>NOW});
   await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
   const base='http://127.0.0.1:'+app.server.address().port;
@@ -51,14 +51,16 @@ test('排行榜战绩卡鉴权、汇总全部历史、仅按最新排行榜公�
     assert.doesNotMatch(JSON.stringify(card.data),/wx:|guest:|本人角色|历史昵称|records|recent|excluded|membership/);
     app.store.transaction(()=>saveProfile(app.store,owner,{nickname:'公开昵称',version:readProfile(app.store,owner).version,leaderboardVisible:false,roomStatsVisible:true}));
     const hidden=await get(path,viewer);
-    assert.equal(hidden.status,404);assert.equal(hidden.cache,'no-store');assert.equal(hidden.data.player,undefined);
+    assert.equal(hidden.status,200);assert.equal(hidden.cache,'no-store');assert.deepEqual(hidden.data,card.data);
+    assert.equal((await get('/api/leaderboard?metric=games',viewer)).data.rows.length,0);
     assert.equal((await get(path,owner)).status,200);
     const missing=await get('/api/leaderboard/players/'+randomUUID()+'/stats',viewer);
-    assert.deepEqual(missing.data,hidden.data);
+    assert.equal(missing.status,404);assert.equal(missing.data.player,undefined);
     for(const uid of ['guest:hidden-target','test:hidden-target']) {
       profile(app.store,uid,false);
       const publicId=app.store.db.prepare('SELECT public_id FROM profiles WHERE uid=?').get(uid).public_id;
-      assert.equal((await get('/api/leaderboard/players/'+publicId+'/stats',viewer)).status,404);
+      const value=await get('/api/leaderboard/players/'+publicId+'/stats',viewer);
+      assert.equal(value.status,200);assert.equal(value.data.status,uid.startsWith('test:')?'untracked':'available');
     }
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });

@@ -37,6 +37,7 @@ test('对局记录保留单局调整原因，不再混入独立积分调整',()=
 const base = {
   loading: false,
   busy: false,
+  hasPendingRequest: false,
   error: "",
   notice: "",
   room: null,
@@ -57,7 +58,7 @@ function nodes(node) {
 }
 const byHandler = (tree, name) =>
   nodes(tree).find(
-    (n) => n.attr?.bindtap === name || n.attr?.["data-action"] === name,
+    (n) => n.attr?.bindtap === name || n.attr?.catchtap === name || n.attr?.["data-action"] === name,
   );
 test('对局列表同日合并，详情不提前显示成员，旧过程说明与真实事件分别展示', () => {
   const { presentMatches } = require('../miniprogram/profile');
@@ -342,7 +343,7 @@ test("我的牌桌统一更多入口，只有房主菜单显示解散，非房�
   const data = { ...base, memberRooms: rooms, visibleMemberRooms: rooms };
   const tree = render(data);
   assert.ok(byHandler(tree, "join"));
-  assert.equal(nodes(tree).filter(n => n.attr?.bindtap === "openRoomMenu").length, 2);
+  assert.equal(nodes(tree).filter(n => n.attr?.catchtap === "openRoomMenu").length, 2);
   assert.equal(byHandler(tree, "deleteRoom"), undefined);
   for (const room of rooms) {
     const menu = render({ ...data, roomMenu: room });
@@ -414,6 +415,7 @@ test("说明仅列阵营角色，房间内玩家可打开当前配置弹窗", ()
   const home = render({
     ...base,
     entryMode: "create",
+    entrySheet: true,
     showRules: true,
     boardRoleConfiguration: roles,
     boardDescription: "不应显示的玩法描述",
@@ -819,7 +821,7 @@ test("房间设置仅在可移出阶段开放成员选择，对局中说明原�
 });
 
 test("创建页提供板子详情入口，目录采用文字链接", () => {
-  const tree = render({ ...base, entryMode: "create", availableBoards: [{ id: "classic", name: "经典" }] });
+  const tree = render({ ...base, entryMode: "create", entrySheet: true, availableBoards: [{ id: "classic", name: "经典" }] });
   assert.ok(byHandler(tree, "openBoardDetails"));
   const detail = factory("pages/board-details/board-details.wxml")({ loading: false, hasDetail: true, directoryExpanded: true, sections: [{ title: "角色技能", navTitle: "B牌 · 蓝方", kind: "roles", items: [] }] });
   const link = byHandler(detail, "jumpSection");
@@ -955,7 +957,7 @@ test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限�
   assert.ok(text.includes("离开权限暂未同步"));
   const leave = nodes(tree).find(n => n.attr?.["data-kind"] === "leave");
   assert.equal(leave.attr.disabled, true);
-  const current = { ...legacy, hostName: "小王", updatedAt: 123, activityLabel: "9/22 11:10", canLeave: true };
+  const current = { ...legacy, hostName: "小王", isHost: false, compactRelation: "房主：小王 · 我在3号", updatedAt: 123, activityLabel: "9/22 11:10", canLeave: true };
   const fresh = render({ ...data, visibleMemberRooms: [current], roomMenu: current });
   assert.ok(JSON.stringify(fresh).includes("小王"));
   assert.ok(JSON.stringify(fresh).includes("9/22 11:10"));
@@ -1045,21 +1047,90 @@ test('排行榜有图与无图头像均为可点击入口，并复用无座位�
   const tree=rank(data),buttons=nodes(tree).filter(n=>n.attr?.bindtap==='openRankPlayerCard');
   assert.equal(buttons.length,2);assert.equal(buttons[0].tag,'wx-button');assert.equal(buttons[1].attr['data-id'],'b');
   assert.equal(buttons[0].attr.ariaLabel,'查看甲的玩家战绩');
-  assert.match(JSON.stringify(tree),/全部历史战绩|暂无有效战绩/);assert.doesNotMatch(JSON.stringify(tree),/号位/);
+  assert.match(JSON.stringify(tree),/暂无有效战绩/);assert.doesNotMatch(JSON.stringify(tree),/号位|全部历史|历史有效对局|不含进行中的对局/);
   assert.ok(byHandler(tree,'closePlayerCard'));
   assert.equal(byHandler(rank({...data,loading:true}),'openRankPlayerCard').attr.disabled,true);
 });
 
-test('玩家战绩卡呈现加载、隐私、空数据、阵营及积分，空座位不可在游戏中触发', () => {
+test('玩家战绩卡呈现加载、陪测、空数据、阵营及积分，空座位不可在游戏中触发', () => {
   const room={phase:'tools',capacity:6,me:{seat:1},team:[]};
   const card={id:'a',seat:2,name:'乙',initial:'乙',isHost:true};
   const data={...base,room,playerCard:card};
   assert.match(JSON.stringify(render({...data,playerCardLoading:true})),/正在读取战绩/);
-  assert.match(JSON.stringify(render({...data,playerCardStatus:'hidden'})),/该玩家未开放战绩/);
+  for (const status of ['hidden','unknown','']) {
+    const unavailable=render({...data,playerCardStatus:status,playerCardLoading:false});
+    assert.match(JSON.stringify(unavailable),/战绩暂时无法读取/);assert.ok(byHandler(unavailable,'retryPlayerCard'));
+  }
+  assert.match(JSON.stringify(render({...data,playerCardStatus:'untracked'})),/陪测玩家不记录个人战绩/);
   assert.match(JSON.stringify(render({...data,playerCardError:'网络中断'})),/retryPlayerCard/);
   const stats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
   assert.match(JSON.stringify(render({...data,playerCardStats:stats})),/暂无有效战绩/);
+  assert.doesNotMatch(JSON.stringify(render({...data,playerCardStats:stats})),/历史有效对局|不含正在进行|未开放战绩/);
   assert.match(JSON.stringify(render({...data,playerCardStats:{...stats,total:2,wins:1,rateLabel:'50.0%',scoreTotal:3,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50.0%'}]}})),/好人阵营/);
   assert.ok(!byHandler(render({...data,actionDialog:true}),'closePlayerCard'));
   assert.equal(byHandler(render({...base,room,seats:[{seat:2,occupied:false}]}),'seat').attr.disabled,true);
+});
+
+test('首页仅展示快捷入口，表单按需展开，复制与更多使用独立的非冒泡按钮', () => {
+  const room = { code: '123456', boardName: '阿瓦隆 · 十二骑士', status: 'lobby', statusLabel: '待开局', peopleLabel: '1/12 人已入座', compactRelation: '我是房主 · 1号', entryLabel: '返回牌桌' };
+  const tree = render({ ...base, entrySheet: false, memberRooms: [room], visibleMemberRooms: [room] });
+  assert.equal(nodes(tree).filter(n => n.tag === 'wx-form').length, 0);
+  assert.equal(nodes(tree).filter(n => n.attr?.class?.includes('home-action-title')).length, 2);
+  assert.equal(byHandler(tree, 'copyListedRoom').attr.catchtap, 'copyListedRoom');
+  assert.equal(byHandler(tree, 'openRoomMenu').attr.catchtap, 'openRoomMenu');
+  const sheet = render({ ...base, entrySheet: true, name: '子龙', nicknameSetup: false, entryKeyboardHeight: 280, entryCodeError: '请输入完整的 6 位数字房间码' });
+  const form = nodes(sheet).find(n => n.tag === 'wx-form');
+  assert.match(form.attr.style, /bottom: 280px/);
+  assert.equal(form.attr.role, 'dialog');
+  assert.ok(byHandler(sheet, 'editEntryName'));
+  assert.ok(byHandler(sheet, 'pasteRoomCode'));
+  const code = nodes(sheet).find(n => n.tag === 'wx-input' && n.attr.name === 'code');
+  assert.equal(code.attr.adjustPosition, false);
+  assert.equal(code.attr.type, 'number');
+  assert.equal(nodes(sheet).filter(n => n.attr?.role === 'alert').length, 1);
+});
+
+test('点击卡片标题、房间号文字和空白进入房间，仅复制图标捕获复制事件', () => {
+  const room = { code: '123456', boardName: '阿瓦隆 · 十二骑士', status: 'lobby', statusLabel: '待开局', compactRelation: '我是房主 · 1号' };
+  const tree = render({ ...base, memberRooms: [room], visibleMemberRooms: [room] });
+  const card = nodes(tree).find(n => n.attr?.class?.includes('room-list-item'));
+  const copy = byHandler(tree, 'copyListedRoom');
+  const codeRow = nodes(card).find(n => n.attr?.class === 'room-list-code');
+  const title = nodes(card).find(n => n.attr?.class === 'room-list-title');
+  const more = byHandler(tree, 'openRoomMenu');
+  function pathTo(node, target) {
+    if (node === target) return [node];
+    for (const child of node.children || []) {
+      if (typeof child !== 'object') continue;
+      const path = pathTo(child, target);
+      if (path) return [node, ...path];
+    }
+  }
+  function tap(target) {
+    const handlers = [];
+    for (const node of pathTo(card, target).reverse()) {
+      if (node.attr?.catchtap) { handlers.push(node.attr.catchtap); break; }
+      if (node.attr?.bindtap) handlers.push(node.attr.bindtap);
+    }
+    return handlers;
+  }
+  assert.deepEqual(tap(card), ['openRoom']);
+  assert.deepEqual(tap(title), ['openRoom']);
+  assert.deepEqual(tap(codeRow), ['openRoom']);
+  assert.deepEqual(tap(codeRow.children[0]), ['openRoom']);
+  assert.deepEqual(tap(copy), ['copyListedRoom']);
+  assert.deepEqual(tap(copy.children[0]), ['copyListedRoom']);
+  assert.deepEqual(tap(more), ['openRoomMenu']);
+  assert.ok(!nodes(copy).some(n => n.tag === 'wx-text'));
+});
+
+test('表单和键盘任意一项打开时移除底栏节点，均关闭后恢复', () => {
+  const renderTabBar = factory('custom-tab-bar/index.wxml');
+  for (const entrySheetVisible of [false, true]) {
+    for (const keyboardVisible of [false, true]) {
+      const tree = renderTabBar({ entrySheetVisible, keyboardVisible, selected: 0, list: [] });
+      const hasTabBar = nodes(tree).some(n => n.attr?.role === 'tablist');
+      assert.equal(hasTabBar, !entrySheetVisible && !keyboardVisible);
+    }
+  }
 });

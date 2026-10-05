@@ -29,13 +29,19 @@ function resultFlow(data) {
     resultNeedsActor: needsActor, resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
 }
 function roomListItems(rooms) {
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   return rooms.map(r => {
     const time = r.updatedAt ? new Date(r.updatedAt) : null;
+    const clock = time ? `${String(time.getHours()).padStart(2,"0")}:${String(time.getMinutes()).padStart(2,"0")}` : "";
+    const day = time?.toDateString() === today.toDateString() ? "" : time?.toDateString() === yesterday.toDateString() ? "昨天 " : time ? `${time.getFullYear() === today.getFullYear() ? "" : time.getFullYear() + "/"}${time.getMonth()+1}/${time.getDate()} ` : "";
     return { ...r,
       statusLabel: ({ lobby: "待开局", playing: "进行中", ended: "已结束", unavailable: "已失效" })[r.status] || r.phaseName || "待开局",
-      peopleLabel: r.status === "lobby" ? `${r.occupied || 0}/${r.capacity}人已入座` : `${r.capacity}人`,
+      peopleLabel: r.status === "lobby" ? `${r.occupied || 0}/${r.capacity} 人已入座` : `${r.capacity} 人`,
       relationLabel: r.available === false ? r.phaseName : `${r.isHost ? "我是房主" : r.relation === "旁观者" ? "旁观者" : "玩家"}${r.seat != null ? " · 我在" + r.seat + "号" : ""}`,
-      activityLabel: time ? `${time.getMonth()+1}/${time.getDate()} ${String(time.getHours()).padStart(2,"0")}:${String(time.getMinutes()).padStart(2,"0")}` : "暂无活动时间",
+      compactRelation: r.available === false ? r.phaseName : [r.isHost ? "我是房主" : r.hostName ? "房主：" + r.hostName : "", r.seat != null ? (r.isHost ? "" : "我在") + r.seat + "号" : r.relation === "旁观者" ? "旁观者" : "未入座"].filter(Boolean).join(" · "),
+      entryLabel: r.available === false ? "已失效" : r.status === "ended" ? "查看结果" : "返回牌桌",
+      activityLabel: time ? day + clock : "暂无活动时间",
     };
   });
 }
@@ -198,6 +204,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     boards: [],
     availableBoards: [],
     entryMode: "join",
+    entrySheet: false,
+    entryEditingName: false,
+    entryFocusedField: "",
+    entryScrollTarget: "",
+    entryKeyboardHeight: 0,
+    entryNameError: "",
+    entryCodeError: "",
+    entryError: "",
     showRoomRules: false,
     actionDialog: false,
     actionSecret: null,
@@ -287,6 +301,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   onHide() {
     this.foreground = false;
+    this.resetEntryFocus();
     clearTimeout(this.timer);
     this.mask();
   },
@@ -379,6 +394,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       if (this.data.isLobby) {
         await this.refreshLobby();
+        if (this.inviteCode && !this.data.entrySheet) {
+          this.setData({ code: this.inviteCode });
+          this.switchEntry({ currentTarget: { dataset: { mode: "join" } } });
+        }
         return;
       }
       await this.loadRooms();
@@ -425,6 +444,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const invited = wx.getStorageSync("invitedRoom");
       if (invited) {
         this.setData({ code: invited, entryMode: "join", notice: "朋友邀请你加入房间 " + invited });
+        this.switchEntry({ currentTarget: { dataset: { mode: "join" } } });
         wx.removeStorageSync("invitedRoom");
       }
       if (profileResult.status === "rejected") throw profileResult.reason;
@@ -437,6 +457,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ error: "房间 " + held.code + " 还有未确认操作，请先返回处理" }); return;
     }
     this.roomCode = null;
+    this.setData({ entrySheet: false });
+    this.resetEntryFocus();
     if (!this.foreground) return;
     await new Promise(resolve => wx.navigateTo({ url: "/pages/table/table?code=" + code,
       fail: () => this.setData({ error: "未能打开牌桌，请在我的牌桌中重试" }), complete: resolve }));
@@ -813,6 +835,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     try {
       if (this.data.isLobby) await this.refreshLobby();
       else await this.loadRooms();
+      if (this.alive && !this.data.error && !this.data.reconnecting) wx.showToast?.({ title: "牌桌已更新", icon: "none" });
     } catch (e) { this.handleError(e); }
     finally { this.setData({ roomsRefreshing: false }); }
   },
@@ -927,10 +950,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     try {
       if (target?.isHost && target.seat === null && !target.isMember) {
         if (!this.data.name.trim()) {
+          this.switchEntry({ currentTarget: { dataset: { mode: "join" } } });
           this.setData({
             code: target.code,
             entryMode: "join",
-            error: "请填写昵称后重新入座",
+            entryNameError: "请填写昵称后重新入座",
           });
           return;
         }
@@ -950,18 +974,83 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (e.detail.value === this.data.name) return;
     this.nameInputRevision = (this.nameInputRevision || 0) + 1;
     this.nameEdited = true;
-    this.setData({ name: e.detail.value });
+    this.setData({ name: e.detail.value, entryNameError: "", entryError: "" });
   },
   inputCode(e) {
-    this.setData({ code: e.detail.value.replace(/\D/g, "").slice(0, 6) });
+    const code = e.detail.value.replace(/\D/g, "").slice(0, 6);
+    this.setData({ code, entryCodeError: "", entryError: "" });
+    return code;
   },
   switchEntry(e) {
     if (this.data.busy || this.pending) return;
+    const mode = e.currentTarget.dataset.mode;
+    if (!["join", "create"].includes(mode)) return;
+    this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
     this.setData({
-      entryMode: e.currentTarget.dataset.mode,
+      entryMode: mode,
+      entrySheet: true,
+      entryEditingName: this.data.nicknameSetup || !this.data.name.trim(),
+      entryFocusedField: "",
+      entryKeyboardHeight: 0,
+      entryNameError: "", entryCodeError: "", entryError: "",
       error: "",
       notice: "",
-    }, () => { if (e.currentTarget.dataset.scroll) wx.pageScrollTo({ selector: ".entry-panel", duration: 250 }); });
+    }, () => {
+      if (mode === "join" && this.data.entrySheet && this.foreground)
+        this.setData({ entryFocusedField: this.data.entryEditingName ? "nickname" : "code" });
+    });
+  },
+  resetEntryFocus() {
+    this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
+    if (this.data.entryFocusedField || this.data.entryKeyboardHeight) {
+      this.setData({ entryFocusedField: "", entryKeyboardHeight: 0 });
+      wx.hideKeyboard?.();
+    }
+  },
+  closeEntry() {
+    if (this.data.busy || this.pending) return;
+    this.setData({ entrySheet: false });
+    this.resetEntryFocus();
+  },
+  editEntryName() {
+    if (this.data.busy || this.pending) return;
+    this.setData({ entryEditingName: true, entryFocusedField: "nickname" });
+  },
+  entryInputFocus(e) {
+    if (!this.data.entrySheet || !this.foreground) return;
+    this.setData({ entryFocusedField: e.currentTarget.dataset.field });
+    this.entryKeyboardChange(e);
+  },
+  entryInputBlur(e) {
+    if (e.currentTarget.dataset.field === "nickname") this.inputName(e);
+    if (this.data.entryFocusedField === e.currentTarget.dataset.field) this.setData({ entryFocusedField: "" });
+  },
+  entryKeyboardChange(e) {
+    if (!this.data.entrySheet || !this.foreground || !Number.isFinite(e.detail.height)) return;
+    this.setData({ entryKeyboardHeight: Math.max(0, e.detail.height), entryScrollTarget: "" }, () => {
+      if (this.data.entrySheet && this.foreground && this.data.entryFocusedField)
+        this.setData({ entryScrollTarget: this.data.entryFocusedField === "code" ? "entry-code-block" : "entry-name-block" });
+    });
+  },
+  pasteRoomCode() {
+    if (this.data.busy || this.pending || !this.data.entrySheet) return;
+    const revision = this.entrySheetRevision;
+    wx.getClipboardData?.({
+      success: ({ data }) => {
+        if (!this.alive || !this.foreground || !this.data.entrySheet || revision !== this.entrySheetRevision || this.data.busy || this.pending) return;
+        const code = String(data || "").trim();
+        if (!/^\d{6}$/.test(code)) return this.setData({ entryCodeError: "请复制完整的 6 位数字房间码" });
+        this.setData({ code, entryCodeError: "", entryError: "", entryFocusedField: "code" });
+      },
+      fail: () => {
+        if (this.alive && this.foreground && this.data.entrySheet && revision === this.entrySheetRevision && !this.data.busy && !this.pending)
+          this.setData({ entryCodeError: "未能读取剪贴板，请手动输入房间码" });
+      },
+    });
+  },
+  copyListedRoom(e) {
+    const code = e.currentTarget.dataset.code;
+    if (this.data.memberRooms.some(room => room.code === code)) wx.setClipboardData?.({ data: code });
   },
   filteredHistory(history, expanded, filter) {
     const entries = history.filter(h => filter === "all" || h.category === filter);
@@ -1158,6 +1247,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       this.setData({ notice: "" });
       this.handleError(e);
+      if (pending.after === "enter" && this.data.entrySheet && !this.pending && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429) {
+        this.setData({ error: "", entryError: e.message });
+      }
       if (e.status === 409 && pending.after === "enter" && this.data.isLobby) await this.refreshLobby({ preserveName: true });
     } finally {
       this.setData({ busy: false, busyAction: "" });
@@ -1181,13 +1273,25 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   submitEntry(e) {
-    if (this.data.busy || this.data.loading) return;
+    if (this.data.busy || this.data.loading || this.pending || this.data.hasPendingRequest) return;
     // Read the native form value: nickname autofill/security checks may skip input events.
     this.nameEdited = true;
     this.nameInputRevision = (this.nameInputRevision || 0) + 1;
-    this.setData({ name: (e.detail.value.nickname || "").trim() });
+    const values = e.detail?.value || {};
+    this.setData({ name: (Object.prototype.hasOwnProperty.call(values, "nickname") ? values.nickname : this.data.name).trim() });
     if (this.data.entryMode === "join") {
-      this.setData({ code: (e.detail.value.code || "").trim() });
+      this.setData({ code: (Object.prototype.hasOwnProperty.call(values, "code") ? values.code : this.data.code).trim() });
+    }
+    if (this.data.entrySheet) {
+      const entryNameError = this.data.name ? "" : "请填写昵称";
+      const entryCodeError = this.data.entryMode === "join" && !/^\d{6}$/.test(this.data.code) ? "请输入完整的 6 位数字房间码" : "";
+      this.setData({ entryNameError, entryCodeError, entryError: "" });
+      if (entryNameError || entryCodeError) {
+        this.setData({ entryEditingName: this.data.entryEditingName || !!entryNameError, entryFocusedField: entryNameError ? "nickname" : "code" });
+        return;
+      }
+    }
+    if (this.data.entryMode === "join") {
       return this.join();
     }
     return this.create();

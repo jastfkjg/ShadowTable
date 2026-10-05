@@ -500,7 +500,7 @@ test('实际清空本桌昵称后刷新仍保留空值，提交不得偷偷复�
   for (const mode of ['create', 'join']) {
     lobby.switchEntry({ currentTarget: { dataset: { mode } } });
     lobby.submitEntry({ detail: { value: { nickname: '', code: '123456' } } });
-    assert.match(lobby.data.error, /请填写昵称/);
+    assert.match(lobby.data.entryNameError, /请填写昵称/);
   }
   assert.equal(writes.length, 0);
 });
@@ -1386,4 +1386,147 @@ test('积分分页期间分数变化会重新读取，零分与只有调整均�
   detail.p.back(); assert.equal(detail.navigations[0], 'back');
   const removed = page('match-detail', { ...apiBase, request: async () => { throw Error('对局记录不存在或已移除'); } }).p;
   await removed.onLoad({ id: 'gone' }); assert.equal(removed.data.record, null); assert.match(removed.data.error, /已移除/);
+});
+
+test('首页入口按需展开，关闭保留草稿且清理键盘；原生键盘晚到的事件不会复活面板', () => {
+  let hidden = 0;
+  const { p } = page('lobby', apiBase, { wx: { hideKeyboard() { hidden++; } } });
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  assert.equal(p.data.entrySheet, false);
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  assert.equal(p.data.entrySheet, true);
+  assert.equal(p.data.entryEditingName, false);
+  assert.equal(p.data.entryFocusedField, 'code');
+  p.entryKeyboardChange({ detail: { height: 280 } });
+  assert.equal(p.data.entryKeyboardHeight, 280);
+  p.inputCode({ detail: { value: '062819' } });
+  p.closeEntry();
+  assert.equal(p.data.code, '062819');
+  assert.equal(p.data.entryKeyboardHeight, 0);
+  assert.equal(hidden, 1);
+  p.entryKeyboardChange({ detail: { height: 280 } });
+  assert.equal(p.data.entryKeyboardHeight, 0);
+  p.switchEntry({ currentTarget: { dataset: { mode: 'create' } } });
+  assert.equal(p.data.entryFocusedField, '');
+  p.editEntryName();
+  assert.equal(p.data.entryFocusedField, 'nickname');
+  p.onHide();
+  assert.equal(p.data.entryFocusedField, '');
+});
+
+test('粘贴只接受完整六码、保留前导零，关闭或切换面板后忽略剪贴板回调', () => {
+  const callbacks = [];
+  const { p } = page('lobby', apiBase, { wx: { getClipboardData(options) { callbacks.push(options); } } });
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
+  open('join');
+  p.pasteRoomCode(); callbacks.pop().success({ data: ' 062819 ' });
+  assert.equal(p.data.code, '062819');
+  p.pasteRoomCode(); callbacks.pop().success({ data: '1234567' });
+  assert.match(p.data.entryCodeError, /完整/);
+  assert.equal(p.data.code, '062819');
+  p.pasteRoomCode(); p.closeEntry(); open('join');
+  callbacks.pop().success({ data: '999999' });
+  assert.equal(p.data.code, '062819');
+  p.pasteRoomCode(); open('create');
+  callbacks.pop().fail();
+  assert.equal(p.data.entryCodeError, '');
+});
+
+test('加入面板提交收起的昵称；显式清空和不完整房间码就近校验，不发请求', async () => {
+  const writes = [];
+  const { p } = page('lobby', apiBase);
+  p.mutate = async (...args) => writes.push(args);
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  p.submitEntry({ detail: { value: { code: '062819' } } });
+  assert.equal(writes[0][0], '/api/rooms/062819/join');
+  assert.equal(writes[0][1].name, '子龙');
+  p.submitEntry({ detail: { value: { nickname: '', code: '062819' } } });
+  assert.match(p.data.entryNameError, /昵称/);
+  assert.equal(p.data.entryFocusedField, 'nickname');
+  assert.equal(p.data.error, '');
+  p.submitEntry({ detail: { value: { nickname: '新名字', code: '123' } } });
+  assert.match(p.data.entryCodeError, /6 位/);
+  assert.equal(p.data.entryFocusedField, 'code');
+  assert.equal(writes.length, 1);
+});
+
+test('加入面板中的业务错误保留表单，未确认的网络请求锁住面板且复用幂等键', async () => {
+  const writes = []; let failure = 'business';
+  const { p } = page('lobby', { ...apiBase, request: async (url, method, body, id) => {
+    if (method !== 'POST') return { rooms: [] };
+    writes.push({ url, body, id });
+    if (failure === 'business') throw Object.assign(Error('房间不存在'), { status: 404 });
+    if (failure === 'network') throw Error('offline');
+    return { code: '123456' };
+  } });
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  const form = { detail: { value: { code: '123456' } } };
+  p.submitEntry(form); while (p.data.busy) await new Promise(setImmediate);
+  assert.equal(p.data.entrySheet, true);
+  assert.equal(p.data.entryError, '房间不存在');
+  assert.equal(p.data.error, '');
+  failure = 'network';
+  p.submitEntry(form); while (p.data.busy) await new Promise(setImmediate);
+  assert.equal(p.data.hasPendingRequest, true);
+  p.closeEntry();
+  assert.equal(p.data.entrySheet, true);
+  const original = p.pending;
+  p.submitEntry(form);
+  assert.equal(p.pending, original);
+  failure = '';
+  await p.retry();
+  assert.equal(writes[1].id, writes[2].id);
+  assert.deepEqual(writes[1].body, writes[2].body);
+  assert.equal(p.data.entrySheet, false);
+});
+
+test('分享邀请自动打开加入面板，首页列表合并房主信息且复制不触发访问', async () => {
+  const copies = [], writes = [];
+  const { p } = page('lobby', { ...apiBase, request: async (url, method) => {
+    if (method === 'POST') writes.push(url);
+    if (url.endsWith('/boards')) return { boards: BOARDS };
+    if (url.endsWith('/profile')) return profile;
+    return { rooms: [{ code: '123456', boardName: '阿瓦隆 · 十二骑士', capacity: 12, occupied: 1, isHost: true, hostName: '林间', seat: 1, status: 'lobby' }] };
+  } }, { wx: { setClipboardData(options) { copies.push(options.data); } } });
+  await p.onLoad({ code: '062819' });
+  assert.equal(p.data.entrySheet, true);
+  assert.equal(p.data.code, '062819');
+  assert.equal(p.data.entryFocusedField, 'code');
+  assert.equal(p.data.memberRooms[0].compactRelation, '我是房主 · 1号');
+  p.copyListedRoom({ currentTarget: { dataset: { code: '123456' } } });
+  assert.deepEqual(copies, ['123456']);
+  assert.equal(writes.length, 0);
+});
+
+test('首页表单打开立即收起底栏，关闭、成功进入房间和切换区域时正确恢复', async () => {
+  const bar = { data: { selected: 0, entrySheetVisible: false }, setData(patch) { Object.assign(this.data, patch); } };
+  const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [], total: 0 } };
+  const { p } = page('lobby', api, { home: true });
+  p.getTabBar = () => bar;
+  p.onLoad(); await p.onShow();
+  const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
+  for (const mode of ['join', 'create']) {
+    open(mode);
+    assert.equal(bar.data.entrySheetVisible, true);
+    p.entryKeyboardChange({ detail: { height: 280 } });
+    p.entryKeyboardChange({ detail: { height: 0 } });
+    assert.equal(bar.data.entrySheetVisible, true);
+    p.closeEntry();
+    assert.equal(bar.data.entrySheetVisible, false);
+  }
+  open('join');
+  p.onHide(); await p.onShow();
+  assert.equal(bar.data.entrySheetVisible, true);
+  await p.enterTable('123456');
+  assert.equal(bar.data.entrySheetVisible, false);
+  open('create');
+  await p.switchMainTab(1);
+  assert.equal(bar.data.entrySheetVisible, false);
+  await p.switchMainTab(0);
+  assert.equal(bar.data.entrySheetVisible, true);
+  p.onUnload();
 });

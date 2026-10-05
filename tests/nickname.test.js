@@ -141,7 +141,7 @@ function miniPage(route, api, storage = new Map()) {
 const miniApi = { login: async () => {}, requestId: randomUUID, assetUrl: path => path };
 async function idle(page) { while (page.data.busy) await new Promise(resolve => setImmediate(resolve)); }
 const template = vm.runInNewContext('(function(global){' +
-  wxmlToJs(root, { wxmlList: ['pages/lobby/lobby.wxml','pages/table/shared.wxml','pages/home/panels.wxml','pages/me/shared.wxml'], wxsList: [] }) + '})(global)',
+  wxmlToJs(root, { wxmlList: ['pages/lobby/lobby.wxml','pages/table/shared.wxml','pages/home/panels.wxml','pages/home/entry-sheet.wxml','pages/me/shared.wxml'], wxsList: [] }) + '})(global)',
   { window: {}, global: {} });
 function entryTree(page) { return JSON.stringify(template('pages/lobby/lobby.wxml')({ activeTab: 0, lobby: page.data, personal: {} })); }
 test('小程序历史默认名预填本桌名并显式确认，网络重试保留请求和最终表单值；确认后只改本桌名', async () => {
@@ -159,6 +159,7 @@ test('小程序历史默认名预填本桌名并显式确认，网络重试保�
   const lobby = miniPage('lobby', api, storage);
   lobby.setData({ loading: false }); await lobby.refreshLobby();
   assert.equal(lobby.data.name, '原本桌名字'); assert.equal(lobby.data.nicknameSetup, true);
+  lobby.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
   assert.match(entryTree(lobby), /玩家昵称|确认昵称并加入房间/);
   assert.match(entryTree(lobby), /用于牌桌和排行榜/);
   lobby.setData({ entryMode: 'create', name: '事件未更新的名字' });

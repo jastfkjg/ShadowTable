@@ -129,15 +129,15 @@ function roomData(source = r) {
 }
 const scenes = {
   home: base,
-  homeRules: { ...base, showRules: true },
+  homeRules: { ...base, entrySheet: true, showRules: true },
   roomRules: { ...roomData(), showRoomRules: true },
   home12: {
-    ...base,
+    ...base, entrySheet: true,
     capacity: 12,
     boardId: "classic-court",
     availableBoards: BOARDS.filter((b) => b.available && b.counts.includes(12)),
   },
-  join: { ...base, entryMode: "join" },
+  join: { ...base, entryMode: "join", entrySheet: true, entryKeyboardHeight: 0 },
   joinWithRooms: {
     ...base, entryMode: "join", name: "zzl",
     memberRooms: [{ code: "759429" }, { code: "471755" }],
@@ -148,10 +148,24 @@ const scenes = {
   },
   lobby: roomData(),
 };
+
+const homeRooms = [
+  { code: "455552", status: "lobby", statusLabel: "待开局", occupied: 1, peopleLabel: "1/12 人已入座", compactRelation: "我是房主 · 1号", activityLabel: "20:28", entryLabel: "返回牌桌" },
+  { code: "202430", status: "lobby", statusLabel: "待开局", occupied: 6, peopleLabel: "6/12 人已入座", compactRelation: "房主：小林 · 我在3号", activityLabel: "19:46", entryLabel: "返回牌桌" },
+  { code: "308216", status: "ended", statusLabel: "已结束", peopleLabel: "12 人", compactRelation: "我在5号", activityLabel: "昨天 21:10", entryLabel: "查看结果" },
+].map(room => ({ ...room, boardName: "阿瓦隆 · 十二骑士", updatedAt: 1, available: true }));
+scenes.homeRedesign = { ...base, entrySheet: false, serverConnected: true, name: "子龙", nicknameSetup: false, memberRooms: homeRooms, visibleMemberRooms: homeRooms };
+scenes.homeJoinSheet = { ...scenes.homeRedesign, entryMode: "join", entrySheet: true, entryKeyboardHeight: 0, code: "628193", entryFocusedField: "code" };
+scenes.homeJoinKeyboard = { ...scenes.homeJoinSheet, entryKeyboardHeight: 280 };
+scenes.homeJoinError = { ...scenes.homeJoinSheet, entryKeyboardHeight: 280, code: "123", entryCodeError: "请输入完整的 6 位数字房间码" };
+scenes.homeCreateSheet = { ...scenes.homeRedesign, entryMode: "create", entrySheet: true, entryKeyboardHeight: 0 };
+scenes.homeFirstJoin = { ...scenes.homeJoinKeyboard, name: "", nicknameSetup: true, code: "", entryEditingName: true, entryFocusedField: "nickname" };
+scenes.homeLongNames = { ...scenes.homeRedesign, visibleMemberRooms: [{ ...homeRooms[0], note: "周五朋友十二骑士聚会的很长很长的牌桌备注", compactRelation: "房主：这是一个很长的玩家昵称 · 我在12号" }] };
+
 const playerCard = { id: "preview", seat: 3, name: "小林", initial: "小", isHost: true, avatarUrl: "/pages/profile/assets/avatars/avatar-03.jpg" };
 scenes.playerStats = { ...scenes.lobby, playerCard, playerCardStatus: "available", playerCardStats: { total: 48, wins: 29, rateLabel: "60.4%", scoreTotal: 126,
   byFaction: [{faction:"good",label:"好人阵营",wins:21,total:32,rateLabel:"65.6%"},{faction:"evil",label:"坏人阵营",wins:8,total:16,rateLabel:"50.0%"}] } };
-scenes.playerStatsHidden = { ...scenes.lobby, playerCard, playerCardStatus: "hidden" };
+scenes.playerStatsUntracked = { ...scenes.lobby, playerCard, playerCardStatus: "untracked" };
 scenes.playerStatsEmpty = { ...scenes.playerStats, playerCardStats: {total:0,wins:0,rateLabel:"—",scoreTotal:0,byFaction:[]} };
 scenes.playerStatsError = { ...scenes.lobby, playerCard, playerCardError:"暂时无法读取战绩，请重试" };
 const avatarRoom = newRoom("628420", "p1", "zz", BOARDS.find(b => b.available && b.counts.includes(13)).id, 13);
@@ -379,8 +393,12 @@ for (const [suffix, extra] of Object.entries({
 scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:0,byFaction:[],byBoard:[],recent:[]},loading:false};
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
+  .replace('@import "pages/home/home.wxss";', fs.readFileSync(path.join(root, "pages/home/home.wxss"), "utf8"))
   .replace(/^page\s*\{/m, "body {")
   .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const tabCss = fs.readFileSync(path.join(root, "custom-tab-bar/index.wxss"), "utf8");
+const tabRender = factory("custom-tab-bar/index.wxml");
+const tabData = { selected: 0, keyboardVisible: false, list: [{pagePath:"/pages/lobby/lobby",text:"对局",icon:"/assets/tab-table.png",activeIcon:"/assets/tab-table-active.png"},{pagePath:"/pages/me/me",text:"我的",icon:"/assets/tab-me.png",activeIcon:"/assets/tab-me-active.png"}] };
 const navCss = fs.readFileSync(path.join(root, "components/app-nav/app-nav.wxss"), "utf8")
   .replace(/^@import.*$/m, "")
   .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)")
@@ -389,7 +407,7 @@ fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(
     `output/playwright/${name}.html`,
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${navCss}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}</html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边助手 · 编译模板布局检查</title><style>body{margin:0}[hidden]{display:none!important}button,input{font:inherit;border:0}span{white-space:normal}form{display:block}button{width:100%}input{display:block;width:100%}${css}${navCss}${tabCss}${settingsCss}${name === "personalMe" ? meCss : ""}${name.startsWith("personalEditor") ? profileCss : ""}${name.startsWith("boardD") ? detailsCss : ""}</style>${html(personalTemplates[name] ? factory("pages/" + personalTemplates[name] + "/" + personalTemplates[name] + ".wxml")(data) : name.startsWith("boardD") ? detailsRender(data) : name.startsWith("roomSettings") ? settingsRender(data) : render(data))}${!data.room && !personalTemplates[name] && !name.startsWith("boardD") && !name.startsWith("roomSettings") ? html(tabRender({...tabData,keyboardVisible:!!data.entryKeyboardHeight,entrySheetVisible:!!data.entrySheet})) : ""}</html>`,
   );
 }
 console.log("Layout projections: output/playwright/{home,lobby,identity}.html");
