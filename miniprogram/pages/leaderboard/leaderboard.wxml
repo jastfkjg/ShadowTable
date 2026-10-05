@@ -1,81 +1,85 @@
 <app-nav title="排行榜" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page leaderboard-page {{board.fun?'fun-leaderboard':''}}">
-  <view class="rank-period" aria-label="统计周期">
-    <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
-    <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
+  <view class="rank-toolbar">
+    <view class="rank-period" aria-label="统计周期">
+      <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
+      <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
+    </view>
+    <view class="rank-tools">
+      <button class="disclosure-button rank-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><text>规则</text><text class="rank-info-icon" aria-hidden="true">i</text></button>
+      <button class="rank-tool" bindtap="shareLeaderboard" disabled="{{!board || loading || loadingMore || visibilitySaving || shareOpening}}" loading="{{loading || loadingMore || visibilitySaving || shareOpening}}" hover-class="none" aria-label="{{shareOpening?'正在打开分享页':visibilitySaving?'正在保存公开设置':loading || loadingMore?'正在读取榜单':'分享我的榜单成绩'}}"><image wx:if="{{!loading && !loadingMore && !visibilitySaving && !shareOpening}}" class="rank-tool-icon" src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button>
+    </view>
   </view>
-  <view class="rank-metrics" aria-label="排行指标"><button wx:for="{{groups}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))?'selected':''}}" bindtap="chooseGroup" data-id="{{item.id}}" disabled="{{(item.id==='points' && !pointsAvailable) || (item.id==='fun' && !funAvailable)}}" aria-pressed="{{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button></view>
-  <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
+  <view class="rank-metrics" aria-label="排行指标">
+    <button wx:for="{{groups}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))?'selected':''}}" bindtap="chooseGroup" data-id="{{item.id}}" disabled="{{(item.id==='points' && !pointsAvailable) || (item.id==='fun' && !funAvailable)}}" aria-pressed="{{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button>
+  </view>
+  <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates" aria-label="胜率阵营"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
   <view wx:if="{{funSelected}}" class="fun-rank-filters">
-    <view class="fun-metric-selector {{metricsExpanded?'is-expanded':''}}">
-      <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" hover-class="none">
-        <view class="fun-metric-current">
-          <block wx:for="{{funOptions}}" wx:key="key"><text wx:if="{{metric===item.key}}" class="fun-metric-name">{{item.tabLabel}}</text></block>
-        </view>
-        <view class="fun-metric-action"><text>{{metricsExpanded?'收起':'切换'}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view>
-      </button>
-      <view wx:if="{{metricsExpanded}}" class="fun-metric-options" aria-label="选择趣味指标">
-        <button wx:for="{{funOptions}}" wx:key="key" class="fun-metric-option {{metric===item.key?'selected':''}}" bindtap="chooseFunMetric" data-id="{{item.key}}" aria-label="{{item.tabLabel}}" aria-pressed="{{metric===item.key}}" hover-class="none">
-          <view class="fun-option-copy"><text class="fun-option-title">{{item.title}}</text><text class="fun-option-label">{{item.label}}</text></view>
-          <view wx:if="{{metric===item.key}}" class="fun-option-check" aria-hidden="true"></view>
-        </button>
-      </view>
-    </view>
+    <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" aria-label="选择趣味指标" hover-class="none">
+      <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><text class="fun-metric-role">{{item.title}}</text><text class="fun-metric-name">{{item.label}}</text></view></block></view>
+      <view class="fun-filter-chevron" aria-hidden="true"></view>
+    </button>
     <view class="fun-sort-row">
-      <text class="fun-filter-label">排序</text>
       <view class="fun-sort" aria-label="排序方式">
-        <button hover-class="none" bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}"><view class="fun-sort-dot" aria-hidden="true"></view><text>按次数</text></button>
-        <button hover-class="none" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}"><view class="fun-sort-dot" aria-hidden="true"></view><text>按{{board.rateLabel || '成功率'}}</text></button>
+        <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">按次数</button>
+        <button bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}" hover-class="none">按{{board.rateLabel || '成功率'}}</button>
       </view>
+      <text class="fun-sort-direction">由高到低</text>
     </view>
-    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter">
-      <text class="fun-filter-label">出刀角色</text>
-      <picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="出刀角色"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker>
-    </view>
-    <view wx:if="{{board.fun && funSort==='rate'}}" class="small muted fun-rank-threshold">至少 {{board.threshold}} 次机会参与排名</view>
+    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter"><text class="fun-filter-label">出刀角色</text><picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="出刀角色"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker></view>
   </view>
   <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
-  <view wx:if="{{notice}}" class="small muted" role="status">{{notice}}</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重试</button></view>
+  <view wx:if="{{notice}}" class="rank-notice small muted" role="status">{{notice}}</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}" hover-class="none">重试</button></view>
   <block wx:if="{{board}}">
-    <view class="rank-list-heading small muted"><view class="rank-heading-label"><text>排名 / 玩家</text><button class="share-entry-button" bindtap="shareLeaderboard" disabled="{{loading || loadingMore || visibilitySaving || shareOpening}}" loading="{{loading || loadingMore || visibilitySaving || shareOpening}}" hover-class="none" aria-label="{{shareOpening?'正在打开分享页':visibilitySaving?'正在保存公开设置':loading || loadingMore?'正在读取榜单':'分享我的榜单成绩'}}"><image wx:if="{{!loading && !loadingMore && !visibilitySaving && !shareOpening}}" class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view><text>{{board.metric==='games'?'有效局数':board.metricLabel}}</text></view>
     <view wx:if="{{loading || loadingMore || visibilitySaving || shareOpening}}" class="rank-share-status small muted" role="status">{{shareOpening?'正在打开分享页…':visibilitySaving?'正在保存公开设置…':'正在读取榜单…'}}</view>
     <view wx:if="{{shareNotice}}" class="rank-share-status small muted" role="alert">{{shareNotice}}</view>
+    <view class="rank-list-heading"><text>排名 / 玩家</text><text>{{board.valueHeading || (board.metric==='games'?'有效局数':board.metricLabel)}}</text></view>
     <view wx:if="{{board.rows.length}}" class="rank-list">
-      <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
-        <view class="rank-number rank-place-{{item.rank}}" aria-label="第{{item.rank}}名"><image wx:if="{{3 >= item.rank}}" class="rank-crown" src="/assets/rank-{{item.rank}}.svg" aria-hidden="true" /><text>{{item.rank}}</text></view>
-        <button class="rank-avatar-button" hover-class="none" bindtap="openRankPlayerCard" data-id="{{item.publicId}}" disabled="{{loading || loadingMore || visibilitySaving}}" aria-label="{{'查看'+item.nickname+'的玩家战绩'}}">
-          <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" binderror="rankAvatarError" data-id="{{item.publicId}}" data-url="{{item.avatarUrl}}" aria-hidden="true" />
-          <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
-        </button>
-        <view class="rank-identity"><view class="rank-name">{{item.nickname}}<text wx:if="{{item.isSelf}}" class="rank-self-label"> · 我</text></view><view class="small muted">{{board.fun?item.sampleLabel:board.metric==='points'?item.total+'场计分局':item.wins+'胜 · '+item.total+'局'}}</view></view>
-        <view class="rank-value">{{item.value}}<text class="rank-unit">{{item.unit}}</text></view>
-      </view>
-    </view>
-    <view wx:else class="rank-empty muted">暂无公开排名</view>
-    <button hover-class="none" wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
-    <view class="rank-mine" aria-label="我的排名">
-      <button class="disclosure-button rank-mine-toggle" bindtap="toggleMine" aria-expanded="{{mineExpanded}}" aria-label="我的排名，详情与公开设置" hover-class="none">
-        <view class="rank-mine-brief"><text class="small muted">我的名次</text><text class="rank-mine-place">{{board.me.rank?'第 '+board.me.rank+' 名':'未上榜'}}</text></view>
-        <view class="rank-mine-brief rank-mine-metric"><text class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></text><text class="small muted">详情与设置 ›</text></view>
+      <button wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}" bindtap="openRankPlayerCard" data-id="{{item.publicId}}" disabled="{{loading || loadingMore || visibilitySaving}}" hover-class="none" aria-label="{{'查看'+item.nickname+'的玩家战绩'+(item.rank?'，'+(item.tied?'并列':'')+'第'+item.rank+'名':'')}}">
+        <view class="rank-number rank-place-{{item.rank}}" aria-hidden="true"><image wx:if="{{item.rank===1}}" class="rank-crown" src="/assets/rank-1.svg" /><text>{{item.rank}}</text><text wx:if="{{item.tied}}" class="rank-tie">并列</text></view>
+        <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" binderror="rankAvatarError" data-id="{{item.publicId}}" data-url="{{item.avatarUrl}}" aria-hidden="true" />
+        <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
+        <view class="rank-identity"><view class="rank-name"><text class="rank-nickname">{{item.nickname}}</text><text wx:if="{{item.isSelf}}" class="rank-self-label">我</text></view><view class="rank-secondary">{{item.secondaryLabel}}</view></view>
+        <view class="rank-value {{item.valueCompact?'is-compact':''}}">{{item.value}}<text class="rank-unit">{{item.unit}}</text></view>
       </button>
     </view>
-    <view wx:if="{{mineExpanded}}" class="dialog-backdrop rank-details-backdrop" catchtap="toggleMine" catchtouchmove="blockScroll">
-      <view class="error-dialog rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置">
-        <view class="rank-details-header"><view class="dialog-title">我的排名</view><button class="rank-disclosure" bindtap="toggleMine" hover-class="none">关闭</button></view>
-        <scroll-view scroll-y class="rank-details-body">
-      <view class="rank-mine-content">
-        <view class="rank-mine-copy"><view class="rank-mine-label">我的名次</view><view class="rank-mine-place {{board.me.rank?'':'is-unranked'}}"><block wx:if="{{board.me.rank}}"><text class="rank-mine-prefix">第</text><text>{{board.me.rank}}</text><text class="rank-mine-unit">名</text></block><text wx:else>未上榜</text></view></view>
-        <view class="rank-mine-metric"><view class="rank-mine-label">{{board.metric==='games'?'总局数':board.metricLabel}}</view><view class="rank-mine-value">{{board.me.value}}<text class="rank-mine-unit">{{board.me.unit}}</text></view></view>
-      </view>
-      <view wx:if="{{board.fun}}" class="small muted fun-mine-sample">{{board.me.knownGames?board.me.count+" / "+board.me.opportunities+" 次机会":"暂无完整样本"}}<text wx:if="{{board.me.statusLabel}}"> · {{board.me.statusLabel}}</text><text wx:if="{{board.me.unknownGames}}"> · {{board.me.unknownGames}} 局未记录</text></view>
-      <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
-      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。公开昵称和成绩可能出现在附近排名分享图中。关闭后仍可分享本人成绩；已发送图片不会撤回。</view>
-      <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button hover-class="none" bindtap="retryVisibility" disabled="{{visibilitySaving}}">重试</button></view>
-        </scroll-view>
-      </view>
+    <view wx:else class="rank-empty"><view class="rank-empty-title">{{board.emptyTitle || '暂无公开排名'}}</view><view class="small muted">{{board.emptyHint}}</view></view>
+    <button wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}" hover-class="none">{{loadingMore?'正在加载…':'加载更多'}}</button>
+    <view wx:elif="{{board.rows.length && !loading}}" class="rank-list-end {{board.eligibleCount===1?'is-sparse':''}}"><view>{{board.eligibleCount===1?'当前仅 1 位玩家满足上榜条件':board.endLabel}}</view><view wx:if="{{board.eligibleCount===1}}" class="rank-end-hint">有新的有效记录后，榜单会同步更新</view></view>
+    <view class="rank-mine" aria-label="我的排名">
+      <button class="disclosure-button rank-mine-toggle" bindtap="toggleMine" aria-expanded="{{mineExpanded}}" aria-label="我的排名，详情与公开设置" hover-class="none">
+        <view class="rank-mine-stats"><view class="rank-mine-brief"><text class="rank-mine-label">我的排名</text><text class="rank-mine-place">{{board.me.placeLabel || (board.me.rank?'第 '+board.me.rank+' 名':'未上榜')}}</text></view><view class="rank-mine-brief rank-mine-metric"><text class="rank-mine-label">{{board.valueHeading || board.metricLabel}}</text><text class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></text></view></view>
+        <view class="rank-mine-entry"><text>我的榜单</text><view class="rank-chevron" aria-hidden="true"></view></view>
+      </button>
     </view>
   </block>
 </view>
 
+<view wx:if="{{metricsExpanded}}" class="dialog-backdrop rank-sheet-backdrop" catchtap="toggleMetrics" catchtouchmove="blockScroll">
+  <view class="rank-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="选择趣味指标">
+    <view class="rank-sheet-handle" aria-hidden="true"></view>
+    <view class="rank-sheet-header"><view class="rank-sheet-title">选择趣味指标</view><button class="rank-sheet-close" bindtap="toggleMetrics" aria-label="关闭趣味指标选择" hover-class="none">关闭</button></view>
+    <view class="fun-categories" aria-label="角色分类"><button wx:for="{{funCategories}}" wx:key="id" class="{{funCategory===item.id?'selected':''}}" bindtap="chooseFunCategory" data-id="{{item.id}}" aria-pressed="{{funCategory===item.id}}" hover-class="none">{{item.label}}</button></view>
+    <scroll-view scroll-y class="fun-metric-options" scroll-into-view="fun-option-{{pendingFunMetric}}" enhanced show-scrollbar="{{false}}">
+      <button wx:for="{{filteredFunOptions}}" wx:key="key" id="fun-option-{{item.key}}" class="fun-metric-option {{pendingFunMetric===item.key?'selected':''}}" bindtap="previewFunMetric" data-id="{{item.key}}" aria-label="{{item.tabLabel}}" aria-pressed="{{pendingFunMetric===item.key}}" hover-class="none"><view class="fun-option-copy"><view><text class="fun-option-title">{{item.title}}</text><text class="fun-option-label">{{item.label}}</text></view></view><view class="fun-option-radio" aria-hidden="true"><view wx:if="{{pendingFunMetric===item.key}}" class="fun-option-check"></view></view></button>
+      <view wx:if="{{!filteredFunOptions.length}}" class="small muted rank-category-empty">当前暂无此类指标</view>
+    </scroll-view>
+    <view class="rank-sheet-footer"><view wx:if="{{pendingFunOption}}" class="rank-sheet-note">已选：{{pendingFunOption.tabLabel}}</view><button class="rank-confirm" bindtap="confirmFunMetric" disabled="{{!pendingFunMetric || loading}}" hover-class="none">查看榜单</button></view>
+  </view>
+</view>
+<view wx:if="{{rulesExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop" catchtap="toggleRules" catchtouchmove="blockScroll">
+  <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close" bindtap="toggleRules" hover-class="none">关闭</button></view><scroll-view scroll-y class="rank-rules-body"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.period==='month'?'本月':'全部'}}</view><view wx:for="{{board.ruleLines}}" wx:key="*this" class="rank-rule-line">{{item}}</view></scroll-view></view>
+</view>
+<view wx:if="{{mineExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop rank-details-backdrop" catchtap="toggleMine" catchtouchmove="blockScroll">
+  <view class="rank-sheet rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">我的榜单</view><button class="rank-sheet-close" bindtap="toggleMine" hover-class="none">关闭</button></view>
+    <scroll-view scroll-y class="rank-details-body"><view class="rank-mine-content"><view><view class="rank-mine-label">我的排名</view><view class="rank-mine-place">{{board.me.placeLabel || (board.me.rank?'第 '+board.me.rank+' 名':'未上榜')}}</view></view><view class="rank-mine-metric"><view class="rank-mine-label">{{board.valueHeading || board.metricLabel}}</view><view class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view></view>
+      <view wx:if="{{!board.me.rank}}" class="rank-status-label">{{board.me.statusLabel}}</view>
+      <view wx:if="{{board.fun}}" class="small muted fun-mine-sample">{{board.me.sampleLabel}}<text wx:if="{{board.me.unknownGames}}"> · {{board.me.unknownGames}} 局未记录</text></view>
+      <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
+      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。公开昵称和成绩可能出现在附近排名分享图中。关闭后仍可分享本人成绩；已发送图片不会撤回。</view>
+      <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button bindtap="retryVisibility" disabled="{{visibilitySaving}}" hover-class="none">重试</button></view>
+    </scroll-view>
+  </view>
+</view>
 <include src="../../player-card.wxml" />

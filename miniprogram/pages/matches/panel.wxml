@@ -7,35 +7,50 @@
       <button hover-class="none" class="{{scoredOnly?'':'selected'}}" bindtap="historyFilterScores" data-scored="0" aria-pressed="{{!scoredOnly}}" disabled="{{loading || loadingMore}}"><text>全部对局</text></button>
       <button hover-class="none" class="{{scoredOnly?'selected':''}}" bindtap="historyFilterScores" data-scored="1" aria-pressed="{{scoredOnly}}" disabled="{{loading || loadingMore}}"><text>计分对局</text></button>
     </view>
-    <button wx:if="{{filtersAvailable}}" class="disclosure-button matches-filter-toggle {{filterCount?'active':''}}" bindtap="historyToggleFilters" aria-expanded="{{filtersExpanded}}" hover-class="none"><text>筛选{{filterCount?' · '+filterCount:''}}</text><view class="match-arrow {{filtersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
-  </view>
-  <view wx:if="{{filtersExpanded && filtersAvailable}}" class="matches-filter-panel">
-    <picker wx:for="{{filterGroups}}" wx:key="key" range="{{item.options}}" range-key="label" value="{{item.index}}" data-key="{{item.key}}" bindchange="historyChooseFilter" disabled="{{loading || loadingMore}}" aria-label="{{item.label+'筛选，'+item.valueLabel}}">
-      <view class="match-filter-field {{item.active?'active':''}}"><text class="match-filter-label">{{item.label}}</text><view class="match-filter-value"><text>{{item.valueLabel}}</text><view class="match-filter-chevron" aria-hidden="true"></view></view></view>
-    </picker>
-    <view class="match-filter-note">时间按北京时间计算；角色为结算时的身份。</view>
+    <button wx:if="{{filtersAvailable}}" class="disclosure-button matches-filter-toggle {{filterCount?'active':''}}" bindtap="historyToggleFilters" aria-expanded="{{filtersExpanded}}" disabled="{{loading || loadingMore}}" hover-class="none"><image src="/assets/record-filter.svg" aria-hidden="true" /><text>筛选{{filterCount?' · '+filterCount:''}}</text></button>
   </view>
   <view class="matches-result-summary" wx:if="{{loaded || filterCount}}">
     <view class="matches-result-copy"><text wx:if="{{loaded}}" class="matches-count">{{filterCount?'筛选结果':'共'}} {{total}} 场</text><view wx:if="{{filterCount}}" class="match-filter-summary">{{filterSummary}}</view></view>
     <button wx:if="{{filterCount}}" class="matches-filter-clear" bindtap="historyClearFilters" disabled="{{loading || loadingMore}}" hover-class="none">清空筛选</button>
+    <text wx:elif="{{loaded && outcomeSummary}}" class="matches-outcome-summary">{{outcomeSummary}}</text>
   </view>
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="historyRetry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>
   <block wx:if="{{records.length}}">
     <block wx:for="{{records}}" wx:key="id">
-      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day">{{item.dayLabel}}</view>
+      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day"><text>{{item.dayShortLabel || item.dayLabel}}</text><text wx:if="{{item.yearLabel}}" class="match-year">{{item.yearLabel}}</text><view class="match-day-line" aria-hidden="true"></view></view>
       <view class="match-entry {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}}">
         <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
           <view class="match-top"><text class="match-board">{{item.boardName}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
-          <view class="match-secondary"><text>{{item.role}} · {{item.factionLabel}} · {{item.capacity}}人</text><view class="match-arrow {{item.expanded?'expanded':''}}" aria-hidden="true"></view></view>
+          <view class="match-secondary"><view class="match-identity"><text class="match-role">{{item.role}}</text><text class="match-context">{{item.factionLabel}} · {{item.capacity}} 人</text></view><view class="match-arrow {{item.expanded?'expanded':''}}" aria-hidden="true"></view></view>
           <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored'?'accent':''}}">{{item.scoreLabel}}</text></view>
-          <view wx:if="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
+          <view wx:if="{{item.funHighlights.length}}" class="match-highlights"><text wx:for="{{item.funHighlights}}" wx:for-item="highlight" wx:key="id" class="match-highlight {{highlight.color}}">{{highlight.label}}</text></view>
+          <view wx:elif="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
         </button>
         <template wx:if="{{item.expanded}}" is="matchDetails" data="{{item}}" />
       </view>
     </block>
     <button hover-class="none" wx:if="{{hasMore && !error}}" class="matches-more" bindtap="historyLoadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
+    <view wx:elif="{{loaded && !error}}" class="matches-end">已显示全部 {{total}} 场对局</view>
   </block>
 </view>
+</template>
+
+<template name="historyFilterSheet">
+  <view class="matches-filter-backdrop" catchtap="historyCloseFilters" catchtouchmove="historyBlockScroll">
+    <view class="matches-filter-sheet" catchtap="historyBlockScroll" role="dialog" aria-modal="true" aria-label="筛选对局">
+      <view class="matches-sheet-handle" aria-hidden="true"></view>
+      <view class="matches-sheet-heading"><text>筛选对局</text><button class="matches-sheet-close" hover-class="none" bindtap="historyCloseFilters" aria-label="关闭筛选">×</button></view>
+      <scroll-view scroll-y="{{true}}" class="matches-sheet-body">
+        <view class="matches-filter-panel">
+          <picker wx:for="{{draftFilterGroups}}" wx:key="key" range="{{item.options}}" range-key="label" value="{{item.index}}" data-key="{{item.key}}" bindchange="historyChooseFilter" disabled="{{loading || loadingMore}}" aria-label="{{item.label+'筛选，'+item.valueLabel}}">
+            <view class="match-filter-field {{item.active?'active':''}}"><text class="match-filter-label">{{item.label}}</text><view class="match-filter-value"><text>{{item.valueLabel}}</text><view class="match-filter-chevron" aria-hidden="true"></view></view></view>
+          </picker>
+        </view>
+        <view class="match-filter-note">时间按北京时间计算；角色为结算时的身份。</view>
+      </scroll-view>
+      <view class="matches-sheet-actions"><button class="matches-filter-reset" hover-class="none" bindtap="historyResetDraftFilters" disabled="{{loading || loadingMore}}">重置</button><button class="matches-filter-apply" hover-class="none" bindtap="historyConfirmFilters" disabled="{{loading || loadingMore}}">查看对局</button></view>
+    </view>
+  </view>
 </template>

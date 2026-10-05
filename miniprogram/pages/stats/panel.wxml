@@ -4,13 +4,14 @@
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
     <view class="stats-overview" aria-label="总战绩">
-      <view class="personal-metrics"><view><view class="metric-value">{{stats.total}}</view><text class="small muted">对局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜场</text></view><view><view class="metric-value accent">{{stats.rateLabel}}</view><text class="small muted">胜率</text></view></view>
+      <view class="records-scope"><text>全部对局</text><button wx:if="{{stats.total}}" class="records-share" hover-class="none" bindtap="shareStats" disabled="{{loading || !!error}}" aria-label="分享战绩图片"><image src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button></view>
+      <view class="personal-metrics"><view class="overview-rate"><view class="metric-value accent">{{stats.rateValue || stats.rateLabel}}<text wx:if="{{stats.rateUnit}}" class="rate-unit">{{stats.rateUnit}}</text></view><text class="small muted">总胜率</text></view><view><view class="metric-value">{{stats.total}}</view><text class="small muted">对局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜场</text></view></view>
     </view>
     <view wx:if="{{stats.total}}" class="stats-breakdown">
-      <view class="stats-section-title">阵营与角色</view>
+      <view class="stats-section-title"><text>阵营与角色</text><text wx:if="{{stats.roleCount}}" class="stats-section-note">共 {{stats.roleCount}} 个角色</text></view>
       <view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
         <button hover-class="none" class="disclosure-button faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
-          <view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}} 局 · {{item.wins}} 胜</text><text wx:if="{{item.score.games}}" class="faction-detail faction-score">{{item.score.total}} 分 · {{item.score.games}} 场计分 · 场均 {{item.scoreAverageLabel}}</text></view>
+          <image class="faction-emblem" src="{{item.faction==='good'?'/assets/record-shield-good.svg':'/assets/record-shield.svg'}}" aria-hidden="true" /><view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}} 局 · {{item.wins}} 胜</text><text wx:if="{{item.score.games}}" class="faction-detail faction-score">{{item.score.total}} 分 · {{item.score.games}} 场计分 · 场均 {{item.scoreAverageLabel}}</text></view>
           <view class="faction-result"><text class="faction-rate">{{item.rateLabel}}</text><text class="faction-detail">胜率</text></view>
           <view class="stats-chevron faction-chevron {{item.expanded?'expanded':''}}" aria-hidden="true"></view>
         </button>

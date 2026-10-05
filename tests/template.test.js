@@ -159,41 +159,40 @@ test('榜单分享入口在本人未上榜或暂无记录时均可点击，忙�
     assert.ok(nodes(busy).some(node=>node.attr?.role==='status'));
   }
 });
-test('趣味榜显示当前指标，展开后可选全部指标，排序独立呈现并保留样本门槛', () => {
-  const defs=require('../server/fun').publicMetrics().filter(m=>m.key!=='fun_final_hit');
+test('趣味榜指标在分组弹层中选择，排序独立且不显示重复说明和样本门槛', () => {
+  const presentation=require('../miniprogram/leaderboard-presentation');
+  const options=presentation.funOptions(require('../server/fun').publicMetrics());
   const renderRank=factory('pages/leaderboard/leaderboard.wxml');
-  const data={
-    groups:require('../miniprogram/leaderboard').groups,metric:'fun_good_shield',funSelected:true,funAvailable:true,
-    funOptions:defs.map(m=>({...m,title:m.key==='fun_good_shield'?'好人':m.title,tabLabel:(m.key==='fun_good_shield'?'好人':m.title)+' · '+m.label})),funSort:'count',funRoleOptions:[],metricsExpanded:false,
-    board:{fun:true,threshold:5,rows:[],me:{}},
-  };
+  const data={groups:require('../miniprogram/leaderboard').groups,metric:'fun_good_shield',funSelected:true,funAvailable:true,
+    funOptions:options,funSort:'count',funRoleOptions:[],metricsExpanded:false,funCategories:presentation.categories,
+    pendingFunMetric:'fun_good_shield',pendingFunOption:options.find(item=>item.key==='fun_good_shield'),
+    board:{fun:true,threshold:1,rows:[],me:{}}};
   const collapsed=renderRank(data);
-  assert.match(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/好人 · 成功挡刀/);
+  assert.match(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/成功挡刀/);
   assert.equal(byHandler(collapsed,'toggleMetrics').attr.ariaExpanded,false);
-  assert.ok(!byHandler(collapsed,'chooseFunMetric'));
-  assert.doesNotMatch(JSON.stringify(collapsed),/如何计算|累计次数|参与排名/);
+  assert.ok(!byHandler(collapsed,'previewFunMetric'));
+  assert.ok(!nodes(collapsed).some(n=>n.attr?.role==='dialog'));
   const sorts=nodes(collapsed).filter(n=>n.attr?.bindtap==='chooseFunSort');
-  assert.equal(sorts.length,2);
-  assert.equal(sorts.find(n=>n.attr['data-id']==='count').attr.ariaPressed,true);
-  assert.match(JSON.stringify(sorts),/按次数/);assert.match(JSON.stringify(sorts),/按成功率/);
-  const rate=renderRank({...data,funSort:'rate'});
-  assert.match(JSON.stringify(rate),/次机会参与排名/);
-  assert.equal(nodes(rate).find(n=>n.attr?.['data-id']==='rate').attr.ariaPressed,true);
-  const tree=renderRank({...data,metricsExpanded:true});
-  const all=nodes(tree), tabs=all.filter(n=>n.attr?.bindtap==='chooseFunMetric');
-  assert.equal(tabs.length,defs.length);assert.ok(tabs.every(n=>n.tag==='wx-button'));
-  assert.equal(byHandler(tree,'toggleMetrics').attr.ariaExpanded,true);
-  assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
-  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'刀客刀法 · 刀中敌方');
-  for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally']) {
-    assert.ok(tabs.some(n=>n.attr['data-id']===key));
+  assert.equal(sorts.length,2);assert.equal(sorts[0].attr.ariaPressed,true);
+  const keys=[];
+  for(const category of presentation.categories) {
+    const filtered=options.filter(item=>item.category===category.id);
+    const tree=renderRank({...data,metricsExpanded:true,funCategory:category.id,filteredFunOptions:filtered});
+    assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标'));
+    const choices=nodes(tree).filter(n=>n.attr?.bindtap==='previewFunMetric');
+    assert.equal(choices.length,filtered.length);
+    assert.ok(choices.every(n=>n.tag==='wx-button'));
+    keys.push(...choices.map(n=>n.attr['data-id']));
+    assert.ok(byHandler(tree,'confirmFunMetric'));
+    assert.doesNotMatch(JSON.stringify(tree), /查看不同角色的高光|至少|次数榜/);
   }
+  assert.deepEqual(keys.sort(),options.map(item=>item.key).sort());
   const adverse=renderRank({...data,metric:'fun_knife_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
-  assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/刀客刀法 · 刀中友方/);
+  assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/刀中友方/);
   assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/按发生率/);
-  assert.match(JSON.stringify(adverse),/至少 10 次机会/);
-  assert.ok(!all.some(n=>n.attr?.bindchange==='chooseFunMode' || n.attr?.bindchange==='chooseFunMetric'));
+  assert.doesNotMatch(JSON.stringify(adverse),/至少.*次机会/);
 });
+
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{
   const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
   const ended=render({...base,room});assert.match(JSON.stringify(ended),/本局 \+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);
@@ -1013,10 +1012,39 @@ test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐�
   const renderStats=renderStatsShell;
   const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};
   const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
-  assert.equal(nav.attr.share,true);assert.equal(nav.attr.shareLabel,'分享完整趣味记录图片');
+  assert.ok(!nav.attr.share);assert.equal(byHandler(ready,'shareStats').attr.ariaLabel,'分享完整趣味记录图片');
   assert.ok(byHandler(ready,'shareFun'));
   const empty=renderStats({...data,stats:{...data.stats,fun:{...data.stats.fun,shareable:false}}});
-  assert.equal(nodes(empty).find(node=>node.tag==='wx-app-nav').attr.share,false);
+  assert.ok(!byHandler(empty,'shareStats'));
+});
+
+test('筛选弹层在滚动区域外，关闭时不渲染，展示时锁定列表滚动并显示草稿选项', () => {
+  const history = { filtersAvailable: true, filtersExpanded: true, filters: { outcome: 'win' },
+    draftFilterGroups: [{ key: 'outcome', label: '胜负', index: 2, valueLabel: '失利', active: true, options: [{id:'',label:'全部结果'},{id:'win',label:'胜利'},{id:'loss',label:'失利'}] }], records: [], total: 0, loaded: true };
+  const tree = renderHistoryShell(history);
+  const body = nodes(tree).find(n => n.attr?.class === 'records-body');
+  assert.ok(!byHandler(body, 'historyConfirmFilters'));
+  assert.equal(body.attr.ariaHidden, true);
+  const pane = nodes(tree).find(n => n.attr?.['data-tab'] === 'matches');
+  assert.equal(pane.attr.scrollY, false);
+  const picker = nodes(tree).find(n => n.tag === 'wx-picker');
+  assert.equal(picker.attr.value, 2);
+  assert.ok(byHandler(tree, 'historyResetDraftFilters')); assert.ok(byHandler(tree, 'historyConfirmFilters'));
+  assert.ok(!byHandler(renderHistoryShell({ ...history, filtersExpanded: false }), 'historyConfirmFilters'));
+});
+
+test('趣味单指标把比例和样本一起呈现，未知与零机会不显示成功率，已知零次仍可回查', () => {
+  const { presentFun } = require('../miniprogram/profile');
+  const metric = { id:'good_shield', label:'成功挡刀', mode:'classic', positive:true, ranked:true, unit:'次', count:0, value:0, opportunities:1, knownGames:1, unknownGames:0, rate:0 };
+  const renderMetric = extra => renderStatsShell({tab:'fun',stats:{fun:presentFun({legacyGames:0,cards:[{id:'classic:shield',title:'好人',metrics:[{...metric,...extra}]}]})}});
+  const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
+  const zero = renderMetric({});
+  assert.match(textOf(zero), /0%.*成功率.*共 1 次机会.*成功 0 \/ 1/);
+  assert.ok(byHandler(zero,'openFunMatches'));
+  const unknown = textOf(renderMetric({value:null,rate:null}));
+  assert.match(unknown,/—.*暂无完整样本/); assert.doesNotMatch(unknown,/成功率|成功 0/);
+  const noChance = textOf(renderMetric({opportunities:0,rate:null}));
+  assert.match(noChance,/暂无有效机会/); assert.doesNotMatch(noChance,/成功率|0%/);
 });
 
 test('积分页只有真实空数据才显示空态，按北京日期分组，调整不可点，对局可点且零分不遗漏', () => {

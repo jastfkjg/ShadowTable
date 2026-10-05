@@ -80,12 +80,16 @@ test('对局筛选重置分页、保留趣味回查条件，失败可重试并�
   p.toggleFilters(); assert.equal(p.data.filtersExpanded, true);
   const choose = (key, value) => p.chooseFilter({ currentTarget: { dataset: { key } }, detail: { value } });
   await choose('period', 1); await choose('board', 1); await choose('matchRole', 1); await choose('outcome', 1);
+  assert.equal(urls.length, 1); assert.equal(p.data.filterCount, 0);
+  await p.confirmFilters(); assert.equal(urls.length, 2); assert.equal(p.data.filtersExpanded, false);
+  assert.equal(p.data.outcomeSummary, '');
   assert.equal(p.data.filterCount, 4); assert.match(p.data.filterSummary, /本月.*十二骑士.*魔术师.*胜利/);
   const query = new URL('http://test' + urls.at(-1)).searchParams;
   for (const [key, value] of Object.entries({ scored: '1', fun: 'knife_enemy', role: 'gaheris', matchRole: '魔术师', board: 'knights', outcome: 'win', period: 'month', offset: '0' }))
     assert.equal(query.get(key), value);
   await p.loadMore(); assert.equal(p.data.records.length, 2); assert.equal(new URL('http://test' + urls.at(-1)).searchParams.get('offset'), '1');
-  fail = true; await choose('outcome', 2);
+  assert.equal(p.data.outcomeSummary, '2 胜 · 0 负');
+  fail = true; p.toggleFilters(); await choose('outcome', 2); await p.confirmFilters();
   assert.equal(p.data.records.length, 0); assert.equal(p.data.error, '网络中断'); assert.equal(p.data.filters.outcome, 'loss');
   const failedUrl = urls.at(-1); await p.retry(); assert.equal(urls.at(-1), failedUrl); assert.equal(p.data.error, '');
   filterOptions.boards = []; filterOptions.roles = [];
@@ -95,6 +99,29 @@ test('对局筛选重置分页、保留趣味回查条件，失败可重试并�
   assert.equal(urls.at(-1), '/api/me/matches?offset=0&scored=1&fun=knife_enemy&mode=knights&role=gaheris');
   const old = page('matches', { ...apiBase, request: async () => ({ records: [], total: 0 }) }).p;
   await old.onLoad({}); assert.equal(old.data.filtersAvailable, false);
+});
+test('筛选弹层的关闭放弃草稿，重置只改草稿，重复确认不请求且不丢失已展开记录', async () => {
+  const urls = [];
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    urls.push(url);
+    return { records: [{ id: 'one', endedAt: 1, members: [] }], total: 1, hasMore: false, filterOptions: { boards: [], roles: [] } };
+  } });
+  await p.onLoad();
+  const choose = index => p.chooseFilter({ currentTarget: { dataset: { key: 'outcome' } }, detail: { value: index } });
+  choose(1); assert.equal(p.data.draftFilters.outcome, '');
+  p.toggleFilters(); choose(1); p.closeFilters();
+  assert.equal(p.data.filters.outcome, ''); assert.equal(urls.length, 1);
+  p.toggleFilters(); assert.equal(p.data.draftFilters.outcome, '');
+  choose(2); await p.confirmFilters(); assert.equal(p.data.filters.outcome, 'loss');
+  p.toggleRecord({ currentTarget: { dataset: { id: 'one' } } });
+  p.toggleFilters(); await p.confirmFilters();
+  assert.equal(urls.length, 2); assert.equal(p.data.records[0].expanded, true);
+  p.toggleFilters(); p.resetDraftFilters();
+  assert.equal(p.data.draftFilters.outcome, ''); assert.equal(p.data.filters.outcome, 'loss');
+  p.closeFilters(); p.toggleFilters(); assert.equal(p.data.draftFilters.outcome, 'loss');
+  p.resetDraftFilters(); await p.confirmFilters();
+  assert.equal(p.data.filterCount, 0); assert.equal(urls.length, 3);
+  p.fetching = true; p.toggleFilters(); assert.equal(p.data.filtersExpanded, false);
 });
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
@@ -777,9 +804,9 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/help/help?section=scoring','/pages/matches/matches','/pages/stats/stats?tab=fun',...['leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
   const points = nodes(tree).find(n => n.attr?.class === 'me-points');
-  assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores', '/pages/help/help?section=scoring']);
+  assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores']);
   assert.ok(links.every(n => !nodes(n).slice(1).some(child => child.tag === 'wx-navigator')));
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
@@ -955,18 +982,18 @@ test('排行榜底栏可开关公开展示，失败重试同一请求，游客�
   assert.equal(writes[2].url,'/api/me/leaderboard-visibility');
   p.data.board.me.status='unsupported';await p.changeVisibility({detail:{value:true}});assert.equal(writes.length,3);
 });
-test('小程序排行榜保留空榜、错误、样本量与参与入口，移除说明性文案', () => {
+test('小程序排行榜保留空榜、错误、样本量与参与入口，规则按需展示', () => {
   const context={window:{},global:{},console};vm.createContext(context);
   const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
   const rank=page('leaderboard',apiBase).p;
   const render=data=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')({...rank.data,loading:false,...data}));
   const board={...rankResult(),metricLabel:'局数',me:{...rankResult().me,status:'hidden',rank:null,statusLabel:''},rows:[]};
   const tree=render({board,error:'请求失败',mineExpanded:true});
-  assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无公开排名/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
+  assert.match(tree,/在排行榜公开展示/);assert.match(tree,/暂无公开排名/);assert.match(tree,/请求失败/);assert.doesNotMatch(tree,/同桌相聚|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   const template=fs.readFileSync(path.join(root,'pages/leaderboard/leaderboard.wxml'),'utf8');
-  assert.match(template,/aria-pressed/);assert.match(template,/item.wins/);assert.match(template,/item.total/);
+  assert.match(template,/aria-pressed/);assert.match(template,/item.secondaryLabel/);
   const footer=template.slice(template.indexOf('<view class="rank-mine"'));
-  assert.match(footer,/我的名次/);assert.match(footer,/总局数/);assert.match(footer,/board.me.rank/);
+  assert.match(footer,/我的排名/);assert.match(footer,/board.valueHeading/);assert.match(footer,/board.me.rank/);
   assert.doesNotMatch(footer,/board.me.wins|board.me.total/);
   assert.match(tree,/未上榜/);
 });
@@ -1269,7 +1296,9 @@ test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠�
   await p.onLoad(); assert.equal(p.data.tab, 'records'); assert.equal(reads.length, 1);
   p.rememberScroll({ currentTarget: { dataset: { tab: 'records' } }, detail: { scrollTop: 180 } });
   await p.switchPanel('matches');
+  p.historyToggleFilters();
   await p.historyChooseFilter({ currentTarget: { dataset: { key: 'matchRole' } }, detail: { value: 1 } });
+  await p.historyConfirmFilters();
   p.historyToggleRecord({ currentTarget: { dataset: { id: legacy.match.id } } });
   p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 350 } });
   p.shareStats(); assert.equal(navigations.length, 0);
@@ -1283,6 +1312,10 @@ test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠�
   assert.equal(reads.filter(url => url.includes('/stats')).length, 1); assert.equal(reads.length, 3);
   assert.equal(navigations.length, 0);
   p.shareStats(); assert.equal(navigations[0], '/pages/share/share?kind=funSummary');
+  await p.switchPanel('matches'); p.historyToggleFilters(); p.back();
+  assert.equal(p.data.tab, 'matches'); assert.equal(p.data.history.filtersExpanded, false);
+  p.historyToggleFilters(); await p.switchPanel('records');
+  assert.equal(p.data.history.filtersExpanded, false);
 });
 
 test('旧对局入口直接选中记录页签；统计失败不阻塞记录，返回统计仍可重试', async () => {
@@ -1529,4 +1562,20 @@ test('首页表单打开立即收起底栏，关闭、成功进入房间和切�
   await p.switchMainTab(0);
   assert.equal(bar.data.entrySheetVisible, true);
   p.onUnload();
+});
+
+test('趣味指标弹层取消不换榜，确认才请求，切分类保留草稿并关闭其他弹层',async()=>{
+  const defs=require('../server/fun').publicMetrics(),urls=[];
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);return rankResult(new URL('http://test'+url).searchParams.get('metric'),{fun:true,sort:'count',unit:'次',availableFunMetrics:defs,rows:[],me:{rank:null,status:'no_records',knownGames:0}});}});
+  await p.load(false,{metric:'fun_good_shield'});
+  const pick=(fn,id)=>p[fn]({currentTarget:{dataset:{id}}});
+  p.toggleMine();p.toggleMetrics();assert.equal(p.data.mineExpanded,false);
+  pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');
+  assert.equal(p.data.metric,'fun_good_shield');assert.equal(urls.length,1);
+  p.toggleMetrics();assert.equal(urls.length,1);
+  p.toggleMetrics();assert.equal(p.data.pendingFunMetric,'fun_good_shield');
+  pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');pick('chooseFunCategory','more');
+  assert.equal(p.data.pendingFunMetric,'fun_assassin_miss');
+  await p.confirmFunMetric();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(p.data.metricsExpanded,false);
+  p.toggleRules();p.toggleMine();assert.equal(p.data.rulesExpanded,false);
 });

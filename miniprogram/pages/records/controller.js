@@ -45,6 +45,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
     chooseTab(event) { return this.switchPanel(event.currentTarget.dataset.id); },
     switchPanel(tab) {
       if (!this.alive || !["records", "matches", "fun"].includes(tab) || tab === this.data.tab) return;
+      if (this.data.history.filtersExpanded) this.historyController.closeFilters();
       this.setData({ tab, ["scrollTops." + tab]: this.scrollPositions[tab] });
       return this.ensurePanel(tab);
     },
@@ -89,6 +90,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
       return this.historyController.clearFunFilter();
     },
     back() {
+      if (this.data.history.filtersExpanded) return this.historyController.closeFilters();
       if (this.data.tab === "matches" && this.data.historyFromFun) return this.switchPanel("fun");
       return backToMe();
     },

@@ -1,10 +1,11 @@
 const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
+const rankPresentation = require("../../leaderboard-presentation");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "good", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
@@ -12,7 +13,7 @@ Page({
   openRankPlayerCard(e) {
     const id = e.currentTarget.dataset.id, row = this.data.board?.rows.find(row => row.publicId === id);
     if (!row || this.foreground === false || this.data.loading || this.data.loadingMore || this.data.visibilitySaving) return;
-    this.setData({ mineExpanded: false });
+    this.setData({ mineExpanded: false, metricsExpanded: false, rulesExpanded: false });
     return this.loadPlayerCard({ scope: "leaderboard", id, name: row.nickname, avatarUrl: row.avatarUrl,
       initial: row.initial, avatarFailed: !!row.avatarFailed }, `/api/leaderboard/players/${encodeURIComponent(id)}/stats`);
   },
@@ -47,7 +48,7 @@ Page({
     let append = more, pointsUnavailable = false, funUnavailable = false;
     this.failedSelection = null;
     // Keep the rendered snapshot mounted until the replacement is ready.
-    this.setData({ ...selection, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "", shareNotice: "" });
+    this.setData({ ...selection, metricsExpanded: false, rulesExpanded: false, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "", shareNotice: "" });
     try {
       await api.login();
       const query = "?metric=" + metric + "&period=" + period + (metric.startsWith("fun_") ? "&mode=" + funMode + "&sort=" + funSort + (funRole ? "&role=" + funRole : "") : "") + (more ? "&offset=" + board.nextOffset + "&version=" + board.version : "");
@@ -63,17 +64,16 @@ Page({
       }
       const result = presentLeaderboard(response);
       if (!this.alive || sequence !== this.sequence) return;
-      if (append) result.rows = board.rows.concat(result.rows);
+      if (append) Object.assign(result, rankPresentation.presentBoard({ ...result, rows: board.rows.concat(result.rows) }));
       const pointsAvailable = Array.isArray(result.availableMetrics) ? result.availableMetrics.includes("points") : !pointsUnavailable && this.data.pointsAvailable;
       const funMetrics = (result.availableFunMetrics || []).filter(item => item.key !== "fun_final_hit");
       const resolvedMode = result.mode || funMode;
-      const funOptions = funMetrics.map(item => {
-        const title = item.key === "fun_good_shield" ? "好人" : item.title;
-        return { ...item, title, tabLabel: title + " · " + item.label };
-      });
+      const funOptions = rankPresentation.funOptions(funMetrics);
+      const pendingFunOption = funOptions.find(item => item.key === result.metric) || funOptions[0] || null;
+      const funCategory = pendingFunOption?.category || "good";
       const funRoleOptions = [{ id:"", label:"全部角色" }, ...(result.roleOptions || [])];
       this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, loading: false, loadingMore: false,
-        funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
+        funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funCategory, pendingFunOption, pendingFunMetric: pendingFunOption?.key || "", filteredFunOptions: funOptions.filter(item => item.category === funCategory), funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
         notice: funUnavailable ? "当前服务尚未开放趣味榜，已显示局数榜。" : pointsAvailable ? "" : pointsUnavailable ? "当前服务尚未开放积分榜，已显示局数榜。" : "当前服务尚未开放积分榜。",
         ...(!this.visibilityPending ? { visible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
     } catch (e) {
@@ -116,8 +116,29 @@ Page({
     if (!["all", "month"].includes(period) || period === this.data.period) return;
     return this.load(false, { period });
   },
-  toggleMine() { this.closePlayerCard(); this.setData({ mineExpanded: !this.data.mineExpanded }); },
-  toggleMetrics() { this.setData({ metricsExpanded: !this.data.metricsExpanded }); },
+  toggleMine() { this.closePlayerCard(); this.setData({ mineExpanded: !this.data.mineExpanded, metricsExpanded: false, rulesExpanded: false }); },
+  toggleRules() { this.closePlayerCard(); this.setData({ rulesExpanded: !this.data.rulesExpanded, mineExpanded: false, metricsExpanded: false }); },
+  toggleMetrics() {
+    if (this.data.metricsExpanded) { this.setData({ metricsExpanded: false }); return; }
+    if (this.data.loading || !this.data.funOptions.length) return;
+    this.closePlayerCard();
+    const option = this.data.funOptions.find(item => item.key === this.data.metric) || this.data.funOptions[0];
+    this.setData({ metricsExpanded: true, mineExpanded: false, rulesExpanded: false, pendingFunMetric: option.key,
+      pendingFunOption: option, funCategory: option.category, filteredFunOptions: this.data.funOptions.filter(item => item.category === option.category) });
+  },
+  chooseFunCategory(e) {
+    const category = e.currentTarget.dataset.id;
+    if (!rankPresentation.categories.some(item => item.id === category)) return;
+    this.setData({ funCategory: category, filteredFunOptions: this.data.funOptions.filter(item => item.category === category) });
+  },
+  previewFunMetric(e) {
+    const option = this.data.filteredFunOptions.find(item => item.key === e.currentTarget.dataset.id);
+    if (option) this.setData({ pendingFunMetric: option.key, pendingFunOption: option });
+  },
+  confirmFunMetric() {
+    if (this.data.loading || !this.data.metricsExpanded) return;
+    return this.chooseFunMetric({ currentTarget: { dataset: { id: this.data.pendingFunMetric } } });
+  },
   blockScroll() {},
   loadMore() { return this.load(true); },
   retry() { return this.load(this.data.moreError, this.failedSelection || {}); },

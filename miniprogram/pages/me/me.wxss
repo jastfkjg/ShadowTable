@@ -42,8 +42,6 @@
 }
 .me-results-detail { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--muted); font-size: 24rpx; font-weight: 400; }
 .me-points-link { display: block; padding: 8rpx 0 16rpx; color: var(--text); line-height: 1.5; }
-.me-rules-trigger { position: absolute; z-index: 1; left: 76rpx; top: 8rpx; display: flex; align-items: center; justify-content: flex-start; width: 44px; min-height: 44px; }
-.me-rules-icon { width: 40rpx; height: 40rpx; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9' fill='%23b1bfc6' fill-opacity='.08'/%3E%3Cpath d='M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.6-2.5 2-2.5 3.7M12 16h.01'/%3E%3C/svg%3E"); }
 .me-stats-panel { padding: 32rpx 0 0; }
 
 .me-links { margin-top: 24rpx; border-top: 0; }

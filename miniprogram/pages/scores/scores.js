@@ -1,6 +1,6 @@
 const api = require("../../api");
 const { backToMe } = require("../../profile");
-const { presentEntries, signed } = require("./presentation");
+const { presentEntries } = require("./presentation");
 Page({
   data: { loading: true, loadingMore: false, loaded: false, error: "", moreError: "", notice: "", records: [], summary: null, total: 0, hasMore: false },
   onLoad() { this.alive = true; return this.load(); },
@@ -19,7 +19,7 @@ Page({
   applyResult(result, append) {
     this.revision = result.revision;
     this.setData({ records: (append ? this.data.records : []).concat(presentEntries(result.records)),
-      summary: { ...result.summary, adjustmentLabel: signed(result.summary.adjustmentPoints) },
+      summary: result.summary,
       total: result.total, hasMore: result.hasMore, loaded: true });
   },
   async loadMore() {
@@ -57,8 +57,8 @@ Page({
       fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
       complete: () => { this.opening = false; } });
   },
-  showExplanation() {
-    wx.showModal({ title: "积分说明", content: "当前总积分 = 对局积分 + 积分调整。\n\n对局积分按最新结算结果展示；更正或移除对局后会同步更新。积分调整保留操作时的总积分。\n\n日期和时间均为北京时间。", showCancel: false, confirmText: "知道了" });
+  openScoringRules() {
+    wx.navigateTo({ url: "/pages/help/help?section=scoring" });
   },
   back: backToMe,
 });

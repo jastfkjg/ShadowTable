@@ -18,13 +18,25 @@ function filterState(filters, options = {}, previousGroups = []) {
   const selected = groups.filter(group => group.active);
   return { filters, filterGroups: groups, filterCount: selected.length, filterSummary: selected.map(group => group.valueLabel).join(" · ") };
 }
+function draftState(filters, options, previousGroups) {
+  const state = filterState({ ...filters }, options, previousGroups);
+  return { draftFilters: state.filters, draftFilterGroups: state.filterGroups };
+}
+function completeOutcomeSummary(records, total, hasMore) {
+  // Never present a loaded page's wins/losses as the whole filtered result.
+  if (hasMore || !total || records.length !== total) return "";
+  const wins = records.filter(row => row.outcome === "win").length;
+  const losses = records.filter(row => row.outcome === "loss").length;
+  const excluded = total - wins - losses;
+  return `${wins} 胜 · ${losses} 负${excluded ? ` · ${excluded} 场不计入` : ""}`;
+}
 module.exports = function createController() { return {
-  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters) },
+  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, outcomeSummary: "", scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters), ...draftState(defaultFilters) },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ scoredOnly: options.scored === "1", funFilter: options.fun ? { metric: options.fun, mode: options.mode || "classic", role: options.role || "" } : null });
     const preview = !this.data.scoredOnly && !this.data.funFilter && personalPreview("matches");
-    if (preview) this.setData({ records: presentMatches(preview.records), total: preview.total, hasMore: preview.hasMore, loaded: true });
+    if (preview) this.setData({ records: presentMatches(preview.records), total: preview.total, hasMore: preview.hasMore, outcomeSummary: completeOutcomeSummary(preview.records, preview.total, preview.hasMore), loaded: true });
     return this.load();
   },
   onUnload() { this.alive = false; },
@@ -38,7 +50,7 @@ module.exports = function createController() { return {
       if (this.alive) this.setData({ records: presentMatches(result.records).map(row => {
         const previous = this.data.records.find(old => old.id === row.id);
         return { ...row, expanded: !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
-      }), total: result.total, hasMore: result.hasMore, loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
+      }), total: result.total, hasMore: result.hasMore, outcomeSummary: completeOutcomeSummary(result.records, result.total, result.hasMore), loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
@@ -47,7 +59,10 @@ module.exports = function createController() { return {
     this.fetching = true; this.setData({ loadingMore: true, error: "", loadMoreError: true });
     try {
       const result = await api.request(this.query(this.data.records.length));
-      if (this.alive) this.setData({ records: this.data.records.concat(presentMatches(result.records)), total: result.total, hasMore: result.hasMore });
+      if (this.alive) {
+        const records = this.data.records.concat(presentMatches(result.records));
+        this.setData({ records, total: result.total, hasMore: result.hasMore, outcomeSummary: completeOutcomeSummary(records, result.total, result.hasMore) });
+      }
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loadingMore: false }); }
   },
@@ -59,13 +74,30 @@ module.exports = function createController() { return {
     return "/api/me/matches?offset=" + offset + (this.data.scoredOnly ? "&scored=1" : "")
       + (f ? "&fun=" + encodeURIComponent(f.metric) + "&mode=" + encodeURIComponent(f.mode) + (f.role ? "&role=" + encodeURIComponent(f.role) : "") : "") + filters;
   },
-  toggleFilters() { this.setData({ filtersExpanded: !this.data.filtersExpanded }); },
-  chooseFilter(e) {
+  toggleFilters() {
+    if (this.data.filtersExpanded) return this.closeFilters();
     if (this.fetching || !this.data.filtersAvailable) return;
-    const group = this.data.filterGroups.find(item => item.key === e.currentTarget.dataset.key);
+    this.setData({ filtersExpanded: true, ...draftState(this.data.filters, this.filterOptions, this.data.filterGroups) });
+  },
+  closeFilters() { this.setData({ filtersExpanded: false }); },
+  blockScroll() {},
+  chooseFilter(e) {
+    if (this.fetching || !this.data.filtersAvailable || !this.data.filtersExpanded) return;
+    const group = this.data.draftFilterGroups.find(item => item.key === e.currentTarget.dataset.key);
     const option = group?.options[Number(e.detail.value)];
-    if (!option || option.id === this.data.filters[group.key]) return;
-    return this.applyFilters({ ...this.data.filters, [group.key]: option.id });
+    if (!option || option.id === this.data.draftFilters[group.key]) return;
+    this.setData(draftState({ ...this.data.draftFilters, [group.key]: option.id }, this.filterOptions, this.data.draftFilterGroups));
+  },
+  resetDraftFilters() {
+    if (this.fetching || !this.data.filtersExpanded) return;
+    this.setData(draftState(defaultFilters, this.filterOptions));
+  },
+  confirmFilters() {
+    if (this.fetching || !this.data.filtersExpanded) return;
+    const filters = { ...this.data.draftFilters };
+    this.closeFilters();
+    if (Object.keys(defaultFilters).every(key => filters[key] === this.data.filters[key])) return;
+    return this.applyFilters(filters);
   },
   clearFilters() {
     if (this.fetching) return;

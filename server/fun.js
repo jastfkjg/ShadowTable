@@ -10,21 +10,21 @@ const modeFor = (board) =>
       ? "classic"
       : "other";
 const extraRankings = {
-  percival_bust: { rateThreshold: 5 },
-  merlin_hit: { label: "被刺", rateThreshold: 5 },
-  assassin_miss: { label: "歪刀", rateThreshold: 5 },
-  knife_ally: { rateThreshold: 10 },
-  duel_ally: { rateThreshold: 10 },
+  percival_bust: { rateThreshold: 1 },
+  merlin_hit: { label: "被刺", rateThreshold: 1 },
+  assassin_miss: { label: "歪刀", rateThreshold: 1 },
+  knife_ally: { rateThreshold: 1 },
+  duel_ally: { rateThreshold: 1 },
 };
 const definitions = [
-  ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 5],
+  ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 1],
   ["percival_bust", labels.percival_bust, "percival", titles.percival, "局", false],
-  ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 5],
+  ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 1],
   ["merlin_hit", "被最终刺中", "merlin", "梅林", "次", false],
-  ["good_shield", "成功挡刀", "shield", "好人", "次", true, 5],
-  ["assassin_hit", "刺中梅林", "assassin", "刺客", "次", true, 5],
+  ["good_shield", "成功挡刀", "shield", "好人", "次", true, 1],
+  ["assassin_hit", "刺中梅林", "assassin", "刺客", "次", true, 1],
   ["assassin_miss", "歪刀", "assassin", "刺客", "次", false],
-  ["final_hit", "最终刺中梅林", "final", "最终带刀", "次", true, 5],
+  ["final_hit", "最终刺中梅林", "final", "最终带刀", "次", true, 1],
   ["final_miss", "最终歪刀", "final", "最终带刀", "次", false],
   ["final_empty_win", "空刀获胜", "final", "最终带刀", "次", false],
   ["final_empty_loss", "空刀失利", "final", "最终带刀", "次", false],
@@ -36,7 +36,7 @@ const definitions = [
       titles[type] || "猎人枪法",
       "次",
       true,
-      10,
+      1,
     ],
     [
       type + "_ally",

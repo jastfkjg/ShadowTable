@@ -23,6 +23,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     URL, URLSearchParams, console,
     ...runtime,
   };
+  context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
@@ -1158,17 +1159,17 @@ test('网页排行榜可深链，私密资料不公开，输出转义昵称并�
   const c=client(async()=>response(webRanks()));
   await c.applyRoute('#/leaderboard');
   assert.equal(c.state.page,'leaderboard');assert.equal(c.viewNavigation(),'');
-  const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10胜 · 20局/);assert.match(html,/第<\/span>1<span/);
-  for (const [metric,label] of [['games','总局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']]) {
+  const html=c.viewLeaderboard();assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/10 胜 · 胜率 50%/);assert.match(html,/第 1 名/);
+  for (const [metric,label] of [['games','有效局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']]) {
     c.state.rankBoard=webRanks(metric);c.state.rankMineExpanded=true;
     const footer=c.viewLeaderboard().split('<aside class="rank-mine"')[1];
-    assert.match(footer,/我的名次/);assert.ok(footer.includes(label));
+    assert.match(footer,/我的排名/);assert.ok(footer.includes(label));
     assert.match(footer,/rank-mine-place/);assert.doesNotMatch(footer,/胜 ·/);
     assert.ok(footer.includes(metric==='games'?'20<span':'50.0<span'));
   }
   c.state.rankBoard=webRanks('games',{rows:[],me:{status:'hidden',rank:null,total:20,wins:10,winRate:50}});
-  assert.match(c.viewLeaderboard(),/在排行榜公开展示/);assert.match(c.viewLeaderboard(),/暂无战绩/);
-  assert.doesNotMatch(c.viewLeaderboard(),/同桌相聚|规则|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
+  assert.match(c.viewLeaderboard(),/在排行榜公开展示/);assert.match(c.viewLeaderboard(),/暂无公开排名/);
+  assert.doesNotMatch(c.viewLeaderboard(),/同桌相聚|仅展示|仅微信|满10局|满20局|尚未开启|更新于/);
   c.state.rankBoard.me.status='unsupported';
   assert.doesNotMatch(c.viewLeaderboard(),/仅微信账号|参与排行/);
 });
@@ -1260,15 +1261,25 @@ test('网页趣味回查深链与分页保留过滤，清除回到全部，不�
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);assert.doesNotMatch(c.viewMatches(),/管理员积分调整/);
   await c.applyRoute('#/matches');assert.equal(urls.at(-1),'/api/me/matches?offset=0');assert.match(c.viewMatches(),/管理员积分调整/);
 });
-test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应隔离，未达门槛展示本人分母',async()=>{
+test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应隔离，未达门槛展示本人分母',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
   const result=metric=>webRanks(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',metricLabel:'刀中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
   const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})});});
   const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
   await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
   c.ACTIONS.rankToggleMine();
-  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
-  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 刀中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
+  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/成功 3 次 · 共 4 次机会/);
+  c.ACTIONS.rankToggleMetrics();
+  const options=require('../miniprogram/leaderboard-presentation').funOptions(defs,{includeFinal:true});
+  let html='';
+  for(const category of ['good','evil','more']) {
+    c.ACTIONS.funRankCategory({dataset:{value:category}});
+    const group=c.viewLeaderboard();html+=group;
+    assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,options.filter(item=>item.category===category).length);
+  }
+  assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 刀中敌方/);
+  assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);
+  c.ACTIONS.rankToggleMetrics();
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
   c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
   for (const [key,label] of [['fun_percival_bust','派西维尔 · 三炸车'],['fun_merlin_hit','梅林 · 被刺'],['fun_assassin_miss','刺客 · 歪刀'],['fun_knife_ally','刀客刀法 · 刀中友方'],['fun_duel_ally','骑士 · 决斗友方']]) {
@@ -1276,7 +1287,7 @@ test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应�
     await c.ACTIONS.funRankMetric({dataset:{value:key}});
     assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));
     assert.equal(c.state.rankBoard.metric,key);
-    assert.match(c.viewLeaderboard(),/data-action="funRankSort" data-value="rate"[^>]*>发生率/);
+    assert.match(c.viewLeaderboard(),/data-action="funRankSort" data-value="rate"[^>]*>按发生率/);
   }
 });
 test('网页不计积分的骑士终局必须选实际带刀人，切换带刀人排除自刀目标',async()=>{
@@ -1437,4 +1448,17 @@ test('网页编辑资料移除同房战绩开关，旧设置不影响昵称编�
   assert.doesNotMatch(c.viewProfileEditor(),/允许同房玩家查看战绩|profileRoomStatsVisibility/);
   c.INPUTS.profileName({value:'乙'});assert.equal(c.state.profileDirty,true);
   c.INPUTS.profileName({value:'甲'});assert.equal(c.state.profileDirty,false);
+});
+
+test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背景不可交互',async()=>{
+  const defs=require('../server/fun').publicMetrics(),urls=[];
+  const c=client(async url=>{urls.push(url);return response(webRanks(new URL('http://test'+url).searchParams.get('metric'),{fun:true,sort:'count',unit:'次',availableFunMetrics:defs,rows:[],me:{rank:null,status:'no_records',knownGames:0}}));});
+  c.state.page='leaderboard';await c.loadLeaderboard(false,{rankMetric:'fun_good_shield'});
+  c.ACTIONS.rankToggleMetrics();c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
+  assert.match(c.viewLeaderboard(),/rank-workspace" inert/);assert.equal(urls.length,1);
+  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankMetric,'fun_good_shield');
+  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankPendingMetric,'fun_good_shield');
+  c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
+  await c.ACTIONS.funRankConfirm();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(c.state.rankMetricsExpanded,false);
+  c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
 });

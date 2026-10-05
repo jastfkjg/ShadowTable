@@ -1,6 +1,7 @@
 (function () {
   "use strict";
   const funCopy = window.shadowtableFunCopy;
+  const rankPresentation = window.shadowtableLeaderboard;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -541,7 +542,7 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsTab: "records", funExpanded: false, funRulesExpanded: false, statsLoading: false, statsError: "",
-    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'good', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
@@ -643,7 +644,7 @@
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
-      rankMineExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
+      rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
     const heading = app.querySelector('[data-page-heading]');
     if (heading) heading.focus({ preventScroll: true });
@@ -830,24 +831,7 @@
   }
   const rankGroups = [['points','积分'],['games','局数'],['overall','胜率'],['fun','趣味']];
   const rankMetrics = [['points','积分'],['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
-  var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false, lastFunRankMetric = null;
-  var observedFunTabs = null, observedFunTab = null;
-  const funRankResizeObserver = window.ResizeObserver ? new window.ResizeObserver(() => keepFunRankVisible(true)) : null;
-  function keepFunRankVisible(force = false) {
-    const tabs = app.querySelector('.fun-rank-tabs'), active = tabs?.querySelector('[aria-pressed="true"]');
-    if (active && (force || lastFunRankMetric !== state.rankMetric)) {
-      const bounds = tabs.getBoundingClientRect(), selected = active.getBoundingClientRect();
-      if (selected.left < bounds.left + 4) tabs.scrollLeft += selected.left - bounds.left - 4;
-      else if (selected.right > bounds.right - 4) tabs.scrollLeft += selected.right - bounds.right + 4;
-    }
-    if (funRankResizeObserver && (observedFunTabs !== tabs || observedFunTab !== active)) {
-      funRankResizeObserver.disconnect();
-      if (active) { funRankResizeObserver.observe(tabs); funRankResizeObserver.observe(active); }
-      observedFunTabs = tabs; observedFunTab = active;
-    }
-    lastFunRankMetric = active ? state.rankMetric : null;
-  }
-  window.addEventListener('resize', () => keepFunRankVisible(true));
+  var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
     closePlayerCard(false);
@@ -857,7 +841,7 @@
     const funMode = selection.rankFunMode || state.rankFunMode, funSort = selection.rankFunSort || state.rankFunSort, funRole = selection.rankFunRole ?? state.rankFunRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     rankFailedSelection = null;
-    setState({ ...selection, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
+    setState({ ...selection, rankRulesExpanded: false, rankMetricsExpanded: false, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
     try {
       await login();
       let result;
@@ -872,7 +856,7 @@
       if (sequence !== rankSequence || route !== routeSequence) return;
       if (append) result.rows = board.rows.concat(result.rows);
       const rankPointsAvailable = Array.isArray(result.availableMetrics) ? result.availableMetrics.includes('points') : !pointsUnavailable && state.rankPointsAvailable;
-      setState({ rankMetric: result.metric, rankFunMetrics: funUnavailable ? [] : result.availableFunMetrics || [], rankFunMode: result.mode || funMode, rankFunSort: result.sort || funSort, rankFunRole: result.role || '', rankPointsAvailable, rankPeriod: result.period, rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false,
+      setState({ rankMetric: result.metric, rankFunMetrics: funUnavailable ? [] : rankPresentation.funOptions(result.availableFunMetrics, {includeFinal:true}), rankFunMode: result.mode || funMode, rankFunSort: result.sort || funSort, rankFunRole: result.role || '', rankPointsAvailable, rankPeriod: result.period, rankBoard: result, serverConnected: true, rankLoading: false, rankMoreLoading: false,
         rankNotice: funUnavailable ? '当前服务尚未开放趣味榜，已显示局数榜。' : rankPointsAvailable ? '' : pointsUnavailable ? '当前服务尚未开放积分榜，已显示局数榜。' : '当前服务尚未开放积分榜。',
         ...(!rankVisibilityPending ? { rankVisible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
     } catch (e) {
@@ -904,43 +888,60 @@
       if (route === routeSequence) setState({ rankVisible: !['hidden','unsupported'].includes(state.rankBoard.me.status), rankVisibilityError: e.message, rankMineExpanded: true });
     } finally { setState({ rankVisibilitySaving: false }); }
   }
-  function rankAvatarButton(row) {
-    return '<button type="button" class="rank-avatar-button" data-action="rankPlayerCard" data-id="' + esc(row.publicId) + '" aria-label="' + esc('查看' + row.nickname + '的玩家战绩') + '"' + (state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving ? ' disabled' : '') + '>' +
-      (row.avatarUrl && !row.avatarFailed ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" data-rank-avatar-id="' + esc(row.publicId) + '" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc(Array.from(row.nickname || '友')[0]) + '</span>') + '</button>';
+  function toggleRankSheet(key, opener) {
+    closePlayerCard(false);
+    const open = !state[key];
+    setState({rankMineExpanded:false,rankRulesExpanded:false,rankMetricsExpanded:false,[key]:open});
+    app.querySelector(open ? '.rank-sheet button' : opener)?.focus({preventScroll:true});
   }
-  function viewLeaderboard() {
-    const board = state.rankBoard, metric = state.rankMetric;
-    const displayMetric = board?.metric || metric;
-    const metricLabel = board?.fun ? board.metricLabel : rankMetrics.find(item => item[0] === displayMetric)?.[1] || '趣味记录';
-    let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜">';
-    html += '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
-    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => '<button type="button" class="rank-metric ' + item[0] + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric)) + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>').join('') + '</div>';
-    if (['overall','good','evil'].includes(metric)) html += '<div class="rank-rates" role="group" aria-label="胜率阵营">' + rankMetrics.filter(item => ['overall','good','evil'].includes(item[0])).map(item => '<button type="button" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
-    if (metric.startsWith('fun_')) html += viewFunRankFilters(board);
-    if (state.rankLoading && !board) html += '<div class="status" role="status">正在读取榜单…</div>';
-    if (state.rankNotice) html += '<div role="status" class="small muted">' + esc(state.rankNotice) + '</div>';
-    if (state.rankError) html += '<div class="inline-error" role="alert">' + esc(state.rankError) + btn('secondary','rankRetry','重试',null,state.rankLoading || state.rankMoreLoading) + '</div>';
-    if (!board) return html + '</section>';
-    const value = row => (board.fun ? !row.knownGames ? '—' : board.sort === 'count' ? row.count : row.rate === null ? '—' : row.rate.toFixed(1) : displayMetric === 'points' ? (row.points || 0) : displayMetric === 'games' ? row.total : row.winRate === null ? '—' : row.winRate.toFixed(1)) + '<span class="rank-unit">' + (board.fun ? board.sort === 'count' ? board.unit : row.rate === null ? '' : '%' : displayMetric === 'points' ? '分' : displayMetric === 'games' ? '局' : row.winRate === null ? '' : '%') + '</span>';
-    html += '<div aria-live="polite" aria-atomic="true" class="sr-only">' + metricLabel + '，' + board.eligibleCount + '人上榜</div>';
-    if (board.rows.length) {
-      html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (displayMetric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
-      board.rows.forEach(row => {
-        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + rankAvatarButton(row) + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + (board.fun ? row.count + ' / ' + row.opportunities + ' 次机会' : displayMetric === 'points' ? row.total + '场计分局' : row.wins + '胜 · ' + row.total + '局') + '</div></div><div class="rank-value">' + value(row) + '</div></li>';
-      });
-      html += '</ol>';
-    } else html += '<div class="rank-empty muted">暂无战绩</div>';
-    if (board.hasMore) html += btn('rank-more','rankMore',state.rankMoreLoading ? '正在加载…' : '加载更多',null,state.rankLoading || state.rankMoreLoading);
-    html += btn('text-button rank-refresh','rankRefresh','刷新榜单',null,state.rankLoading || state.rankMoreLoading);
-    const me = board.me;
-    const place = me.rank ? '<span class="rank-mine-prefix">第</span>' + me.rank + '<span class="rank-mine-unit">名</span>' : '未上榜';
-    html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="'+!!state.rankMineExpanded+'" aria-label="我的排名，详情与公开设置"><span class="rank-mine-brief"><span class="small muted">我的名次</span><span class="rank-mine-place">'+place+'</span></span><span class="rank-mine-brief rank-mine-metric"><span class="rank-mine-value">'+value(me)+'</span><span class="small muted">详情与设置 ›</span></span></button></aside>';
-    if (state.rankMineExpanded) html += '<div class="dialog-backdrop rank-details-backdrop"><div class="error-dialog rank-details-dialog" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><div class="rank-details-header"><div class="dialog-title">我的排名</div>'+btn('rank-disclosure','rankToggleMine','关闭')+'</div><div class="rank-details-body"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="rank-mine-label">我的名次</div><div class="rank-mine-place' + (me.rank ? '' : ' is-unranked') + '" aria-label="' + (me.rank ? '第 ' + me.rank + ' 名' : '未上榜') + '">' + place + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + (displayMetric === 'games' ? '总局数' : metricLabel) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (board.fun ? '<div class="small muted fun-mine-sample">' + (me.knownGames ? me.count + ' / ' + me.opportunities + ' 次机会' : '暂无完整样本') + (me.status === 'not_enough' ? ' · 还差 ' + me.remaining + (board.sort === 'rate' ? ' 次机会' : board.unit) + '上榜' : me.status === 'no_records' ? ' · 尚无完整记录' : '') + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (me.status !== 'unsupported' ? '<div class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></div></div>';
-    html += '</section>';
+  function rankAvatar(row) {
+    return row.avatarUrl && !row.avatarFailed ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" data-rank-avatar-id="' + esc(row.publicId) + '" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc(Array.from(row.nickname || '友')[0]) + '</span>';
+  }
+  function rankSheetStart(kind, title, action, label = title) {
+    return '<div class="dialog-backdrop rank-sheet-backdrop" data-rank-dismiss="' + action + '"><section class="rank-sheet ' + kind + '" role="dialog" aria-modal="true" aria-label="' + label + '"><div class="rank-sheet-handle" aria-hidden="true"></div><div class="rank-sheet-header"><h2 class="rank-sheet-title">' + title + '</h2>' + btn('rank-sheet-close', action, '关闭') + '</div>';
+  }
+  function viewRankMetricSheet() {
+    const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
+    const pending = options.find(item => item.key === state.rankPendingMetric);
+    let html = rankSheetStart('rank-metrics-sheet', '选择趣味指标', 'rankToggleMetrics');
+    html += '<div class="fun-categories" role="group" aria-label="角色分类">' + rankPresentation.categories.map(item => '<button type="button" data-action="funRankCategory" data-value="' + item.id + '" class="' + (item.id === state.rankFunCategory ? 'selected' : '') + '" aria-pressed="' + (item.id === state.rankFunCategory) + '">' + item.label + '</button>').join('') + '</div><div class="fun-metric-options">';
+    html += options.filter(item => item.category === state.rankFunCategory).map(item => '<button type="button" class="fun-metric-option ' + (item.key === state.rankPendingMetric ? 'selected' : '') + '" data-action="funRankPreview" data-value="' + esc(item.key) + '" aria-label="' + esc(item.tabLabel) + '" aria-pressed="' + (item.key === state.rankPendingMetric) + '"><span class="fun-option-copy"><span><span class="fun-option-title">' + esc(item.title) + '</span><span class="fun-option-label">' + esc(item.label) + '</span></span></span><span class="fun-option-radio" aria-hidden="true">' + (item.key === state.rankPendingMetric ? '<span class="fun-option-check"></span>' : '') + '</span></button>').join('');
+    if (!options.some(item => item.category === state.rankFunCategory)) html += '<p class="small muted">当前暂无此类指标</p>';
+    html += '</div><div class="rank-sheet-footer">' + (pending ? '<div class="rank-sheet-note">已选：' + esc(pending.tabLabel) + '</div>' : '') + btn('rank-confirm','funRankConfirm','查看榜单',null,!pending || state.rankLoading) + '</div></section></div>';
     return html;
   }
+  function viewLeaderboard() {
+    const board = rankPresentation.presentBoard(state.rankBoard), metric = state.rankMetric;
+    const locked = state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving;
+    const overlay = state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded;
+    let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜"><div class="rank-workspace"' + (overlay ? ' inert' : '') + '>';
+    html += '<div class="rank-toolbar"><div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div><div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
+    html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => {
+      const selected = metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric);
+      return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
+    }).join('') + '</div>';
+    if (['overall','good','evil'].includes(metric)) html += '<div class="rank-rates" role="group" aria-label="胜率阵营">' + rankMetrics.filter(item => ['overall','good','evil'].includes(item[0])).map(item => '<button type="button" class="' + (metric === item[0] ? 'selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
+    if (metric.startsWith('fun_')) html += viewFunRankFilters(board);
+    if (state.rankLoading && !board) html += '<div class="rank-share-status small muted" role="status">正在读取榜单…</div>';
+    if (state.rankNotice) html += '<div role="status" class="rank-notice small muted">' + esc(state.rankNotice) + '</div>';
+    if (state.rankError) html += '<div class="inline-error" role="alert">' + esc(state.rankError) + btn('secondary','rankRetry','重试',null,locked) + '</div>';
+    if (!board) return html + '</div></section>';
+    const value = row => esc(row.value) + '<span class="rank-unit">' + esc(row.unit) + '</span>';
+    html += '<div aria-live="polite" aria-atomic="true" class="sr-only">' + esc(board.valueHeading) + '，' + (board.eligibleCount ?? board.rows.length) + '人上榜</div><div class="rank-list-heading"><span>排名 / 玩家</span><span>' + esc(board.valueHeading) + '</span></div>';
+    if (board.rows.length) {
+      html += '<ol class="rank-list" aria-label="榜单玩家">' + board.rows.map(row => '<li id="rank-' + esc(row.publicId) + '"><button type="button" class="rank-row' + (row.isSelf ? ' is-self' : '') + '" data-action="rankPlayerCard" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + row.unit + '，查看玩家战绩') + '"' + (locked ? ' disabled' : '') + '><span class="rank-number rank-place-' + row.rank + '" aria-hidden="true">' + (row.rank === 1 ? '<svg class="rank-crown" viewBox="0 0 32 24"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13ZM5 21h22v3H5z" fill="currentColor"/></svg>' : '') + '<span>' + row.rank + '</span>' + (row.tied ? '<span class="rank-tie">并列</span>' : '') + '</span>' + rankAvatar(row) + '<span class="rank-identity"><span class="rank-name"><span class="rank-nickname">' + esc(row.nickname) + '</span>' + (row.isSelf ? '<span class="rank-self-label">我</span>' : '') + '</span><span class="rank-secondary">' + esc(row.secondaryLabel) + '</span></span><span class="rank-value' + (row.valueCompact ? ' is-compact' : '') + '">' + value(row) + '</span></button></li>').join('') + '</ol>';
+    } else html += '<div class="rank-empty"><div class="rank-empty-title">' + esc(board.emptyTitle) + '</div><p class="small muted">' + esc(board.emptyHint) + '</p></div>';
+    if (board.hasMore) html += btn('rank-more','rankMore',state.rankMoreLoading ? '正在加载…' : '加载更多',null,locked);
+    else if (board.rows.length && !state.rankLoading) html += '<div class="rank-list-end' + (board.eligibleCount === 1 ? ' is-sparse' : '') + '">' + (board.eligibleCount === 1 ? '当前仅 1 位玩家满足上榜条件<div class="rank-end-hint">有新的有效记录后，榜单会同步更新</div>' : esc(board.endLabel)) + '</div>';
+    const me = board.me;
+    html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="' + !!state.rankMineExpanded + '" aria-label="我的排名，详情与公开设置"><span class="rank-mine-stats"><span class="rank-mine-brief"><span class="rank-mine-label">我的排名</span><span class="rank-mine-place">' + esc(me.placeLabel) + '</span></span><span class="rank-mine-brief"><span class="rank-mine-label">' + esc(board.valueHeading) + '</span><span class="rank-mine-value">' + value(me) + '</span></span></span><span class="rank-mine-entry">我的榜单<span class="rank-chevron" aria-hidden="true"></span></span></button></aside></div>';
+    if (state.rankMetricsExpanded) html += viewRankMetricSheet();
+    if (state.rankRulesExpanded) html += rankSheetStart('rank-rules-sheet','榜单规则','rankToggleRules') + '<div class="rank-rules-body"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + (board.period === 'month' ? '本月' : '全部') + '</div>' + board.ruleLines.map(line => '<p class="rank-rule-line">' + esc(line) + '</p>').join('') + '</div></section></div>';
+    if (state.rankMineExpanded) html += rankSheetStart('rank-details-dialog','我的榜单','rankToggleMine','我的排名与公开设置') + '<div class="rank-details-body"><div class="rank-mine-content"><div><div class="rank-mine-label">我的排名</div><div class="rank-mine-place">' + esc(me.placeLabel) + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + esc(board.valueHeading) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (!me.rank ? '<div class="rank-status-label">' + esc(me.statusLabel) + '</div>' : '') + (board.fun ? '<div class="small muted fun-mine-sample">' + esc(me.sampleLabel) + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label><div class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></section></div>';
+    return html + '</section>';
+  }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1724,15 +1725,11 @@ function roomListItems(rooms) {
     return html;
   }
   function viewFunRankFilters(board) {
-    const metric = state.rankMetric, list = state.rankFunMetrics;
-    const rateLabel = list.find(item => item.key === metric)?.rateLabel || '成功率';
-    const select = (key,label,items,value) => '<label class="fun-select"><span class="sr-only">'+label+'</span><select class="fun-picker" data-change="'+key+'">'+items.map(item=>'<option value="'+esc(item.id)+'"'+(item.id===value ? ' selected' : '')+'>'+esc(item.label)+'</option>').join('')+'</select></label>';
-    let html = '<div class="fun-rank-filters"><div class="rank-filter-heading"><button class="rank-disclosure" data-action="rankToggleMetrics" aria-expanded="'+!!state.rankMetricsExpanded+'">'+(state.rankMetricsExpanded?'收起指标 ⌃':'全部指标 ⌄')+'</button></div><div class="fun-rank-tabs'+(state.rankMetricsExpanded?' is-expanded':'')+'" role="group" aria-label="趣味指标，可左右滑动">'+list.map(item=>'<button type="button" class="fun-rank-tab" data-action="funRankMetric" data-value="'+esc(item.key)+'" aria-pressed="'+(metric===item.key)+'">'+esc(item.title+' · '+item.label)+'</button>').join('')+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button type="button" data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : esc(rateLabel))+'</button>').join('')+'</div>';
-    if (board?.roleOptions?.length) html += select('funRankRole','出刀角色',[{id:'',label:'全部角色'},...board.roleOptions],state.rankFunRole);
-    html += '</div><div class="rank-rule-heading"><span class="small muted">'+(state.rankFunSort==='rate'?'至少 '+(list.find(item=>item.key===metric)?.rateThreshold || 5)+' 次机会':'累计次数 · 同次数并列')+'</span><button class="rank-disclosure" data-action="rankToggleRules" aria-expanded="'+!!state.rankRulesExpanded+'">如何计算 '+(state.rankRulesExpanded?'⌃':'⌄')+'</button></div>';
-    if (state.rankRulesExpanded) html += '<div class="small muted rank-rule-detail">'+(state.rankFunSort==='rate'?'按未舍入比例排名。':'按累计次数排名，同次数并列。')+(metric==='fun_good_shield'?'挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。':'')+'空刀单列，缺失记录不参与。</div>';
-    html += '</div>';
-    return html;
+    const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
+    const rateLabel = option?.rateLabel || board?.rateLabel || '成功率';
+    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-metric-role">' + esc(option?.title || '') + '</span><span class="fun-metric-name">' + esc(option?.label || '选择指标') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + ['count','rate'].map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
+    if (board?.roleOptions?.length) html += '<label class="fun-role-filter"><span class="fun-filter-label">出刀角色</span><select class="fun-picker" data-change="funRankRole" aria-label="出刀角色">' + [{ id: '', label: '全部角色' }, ...board.roleOptions].map(item => '<option value="' + esc(item.id) + '"' + (item.id === state.rankFunRole ? ' selected' : '') + '>' + esc(item.label) + '</option>').join('') + '</select></label>';
+    return html + '</div>';
   }
   function viewMatches() {
     let html = personalTitle('对局记录','') + '<div class="matches-filters" role="group" aria-label="对局筛选">' + [['0','全部对局'],['1','计分局']].map(item => '<button type="button" data-action="filterMatches" data-scored="' + item[0] + '" aria-pressed="' + (state.matchScored === (item[0] === '1')) + '">' + item[1] + '</button>').join('') + '</div>';
@@ -1954,7 +1951,7 @@ function roomListItems(rooms) {
   function openRankPlayerCard(id) {
     const row = state.rankBoard?.rows.find(row => row.publicId === id), route = routeSequence, rank = rankSequence;
     if (!row || state.page !== 'leaderboard' || !foreground || state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving) return;
-    setState({ rankMineExpanded: false });
+    setState({ rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false });
     return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '',
       initial: Array.from(row.nickname || '友')[0], avatarFailed: !!row.avatarFailed }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats',
       () => state.page === 'leaderboard' && route === routeSequence && rank === rankSequence);
@@ -4112,7 +4109,6 @@ function roomListItems(rooms) {
       viewBoardDetails() + viewNavigation();
     enhanceSelects(next);
     patchDOM(app, next);
-    keepFunRankVisible();
     validateOptionDialog();
     showIdentityHintWhenVisible();
   }
@@ -4132,13 +4128,28 @@ function roomListItems(rooms) {
     funRankMetric: el => { if(el.dataset.value!==state.rankMetric && state.rankFunMetrics.some(item=>item.key===el.dataset.value)) return loadLeaderboard(false,{rankMetric:el.dataset.value,rankFunMode:'all',rankFunRole:''}); },
     funRankSort: el => { if(['count','rate'].includes(el.dataset.value)) return loadLeaderboard(false,{rankFunSort:el.dataset.value}); },
     rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:'fun_merlin_evade',rankFunMode:'all',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
-    rankToggleMine: () => {
-      closePlayerCard(false);
-      setState({rankMineExpanded:!state.rankMineExpanded});
-      app.querySelector(state.rankMineExpanded ? '.rank-details-dialog button' : '.rank-mine-toggle')?.focus();
+    rankToggleMine: () => toggleRankSheet('rankMineExpanded', '.rank-mine-toggle'),
+    rankToggleRules: () => toggleRankSheet('rankRulesExpanded', '[data-action="rankToggleRules"]'),
+    rankToggleMetrics: () => {
+      if (!state.rankMetricsExpanded) {
+        const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
+        const option = options.find(item => item.key === state.rankMetric) || options[0];
+        if (!option || state.rankLoading) return;
+        state.rankPendingMetric = option.key; state.rankFunCategory = option.category;
+      }
+      toggleRankSheet('rankMetricsExpanded', '.fun-metric-toggle');
+      app.querySelector('.fun-metric-options .selected')?.scrollIntoView({block:'nearest'});
     },
-    rankToggleRules: () => setState({rankRulesExpanded:!state.rankRulesExpanded}),
-    rankToggleMetrics: () => setState({rankMetricsExpanded:!state.rankMetricsExpanded}),
+    funRankCategory: el => { if (rankPresentation.categories.some(item => item.id === el.dataset.value)) setState({ rankFunCategory: el.dataset.value }); },
+    funRankPreview: el => { if (rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).some(item => item.category === state.rankFunCategory && item.key === el.dataset.value)) setState({ rankPendingMetric: el.dataset.value }); },
+    funRankConfirm: async () => {
+      if (!state.rankMetricsExpanded || state.rankLoading) return;
+      const metric = state.rankPendingMetric;
+      if (!rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).some(item => item.key === metric)) return;
+      toggleRankSheet('rankMetricsExpanded', '.fun-metric-toggle');
+      if (metric !== state.rankMetric) await loadLeaderboard(false, {rankMetric:metric,rankFunMode:'all',rankFunRole:''});
+      app.querySelector('.fun-metric-toggle')?.focus({preventScroll:true});
+    },
     rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
     rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
@@ -4490,6 +4501,7 @@ function roomListItems(rooms) {
     if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
+    if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
     if (e.target?.hasAttribute?.('data-player-card-backdrop')) return closePlayerCard();
     var picker = e.target.closest("[data-option-trigger]");
     if (picker && !picker.disabled) {
@@ -4621,10 +4633,10 @@ function roomListItems(rooms) {
     controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus();
   });
   document.addEventListener("keydown", function (event) {
-    if (!state.rankMineExpanded || state.page !== 'leaderboard' || !modal.hidden) return;
-    if (event.key === "Escape") { event.preventDefault(); ACTIONS.rankToggleMine(); return; }
+    if (!(state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded) || state.page !== 'leaderboard' || !modal.hidden) return;
+    if (event.key === "Escape") { event.preventDefault(); ACTIONS[state.rankMineExpanded ? 'rankToggleMine' : state.rankRulesExpanded ? 'rankToggleRules' : 'rankToggleMetrics'](); return; }
     if (event.key !== "Tab") return;
-    const controls = Array.from(app.querySelectorAll('.rank-details-dialog button:not(:disabled), .rank-details-dialog input:not(:disabled)'));
+    const controls = Array.from(app.querySelectorAll('.rank-sheet button:not(:disabled), .rank-sheet input:not(:disabled)'));
     if (!controls.length) return;
     const index = controls.indexOf(document.activeElement);
     event.preventDefault();

@@ -6,6 +6,9 @@ const { readProfile } = require("./profile");
 const fun = require("./fun");
 const METRICS = { points: 1, games: 1, overall: 1, good: 1, evil: 1 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
+function markTies(rows) {
+  rows.forEach((row, index) => { row.tied = rows[index - 1]?.rank === row.rank || rows[index + 1]?.rank === row.rank; });
+}
 function periodRange(period, now) {
   if (period === "all") return { start: 0, end: null };
   // Shanghai uses UTC+8; do not depend on the server's local timezone.
@@ -85,6 +88,7 @@ class Leaderboard {
       if (!index || compare(eligible[index - 1], row, metric)) rank = index + 1;
       row.rank = rank;
     });
+    markTies(eligible);
     // A cache refresh without data changes must not send a slow reader back to page one.
     const version = old && old.revision === this.store.leaderboardRevision && old.start === range.start ? old.version : randomUUID();
     const snapshot = { ...range, version, revision: this.store.leaderboardRevision, updatedAt: now,
@@ -107,7 +111,7 @@ class Leaderboard {
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     const present = row => ({
       publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
-      rank: row.rank, isSelf: row.uid === uid, ...summary(row),
+      rank: row.rank, tied: row.tied, isSelf: row.uid === uid, ...summary(row),
     });
     return {
       metric, period, availableMetrics: Object.keys(METRICS), periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",
@@ -144,6 +148,7 @@ class Leaderboard {
       eligible.sort((a,b) => comparator(a,b) || a.public_id.localeCompare(b.public_id));
       let rank = 0;
       eligible.forEach((row,i) => { if (!i || comparator(eligible[i-1],row)) rank = i+1; row.rank = rank; });
+      markTies(eligible);
       snapshot = { ...range, revision: this.store.leaderboardRevision, updatedAt: now, eligible, aggregates: new Map(aggregates.map(row => [row.uid,row])),
         version: old && old.revision === this.store.leaderboardRevision && old.start === range.start ? old.version : randomUUID() };
       this.cache.set(key,snapshot);
@@ -159,7 +164,7 @@ class Leaderboard {
     const remaining = Math.max(0,threshold - (sort === "rate" ? stats.opportunities : stats.count));
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
-    const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,isSelf:row.uid===uid,...present(row)});
+    const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,tied:row.tied,isSelf:row.uid===uid,...present(row)});
     return { metric, period, mode, role, sort, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.title, rateLabel: def.rateLabel,
       unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && (def.group === "final" || fun.combatType(role)===def.group)).map(role=>({id:role,label:roleName(role)})),

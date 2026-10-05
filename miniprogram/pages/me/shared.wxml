@@ -24,7 +24,6 @@
         <view class="me-results-heading"><text>积分</text><view class="me-results-detail"><text>明细</text><view class="me-chevron" aria-hidden="true"></view></view></view>
         <view class="personal-metrics score-overview"><view class="me-metric"><view class="metric-value accent">{{stats ? stats.score.total : '—'}}</view><text class="small muted">总积分</text></view><view class="me-metric"><view class="metric-value">{{stats ? stats.score.month : '—'}}</view><text class="small muted">本月积分</text></view></view>
       </navigator>
-      <navigator class="me-rules-trigger" url="/pages/help/help?section=scoring" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看积分规则"><view class="me-rules-icon" aria-hidden="true"></view></navigator>
     </view>
     </view>
     <view class="personal-links me-links me-links-primary">

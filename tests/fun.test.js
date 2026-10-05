@@ -121,9 +121,9 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
       assert.equal(counts.me.unknownGames, 1); assert.equal(counts.me.status, "ranked");
       assert.equal(counts.metricLabel, label + "次数");
       const rates = read("&sort=rate");
-      assert.equal(rates.me.rate, rate); assert.equal(rates.threshold, 5);
+      assert.equal(rates.me.rate, rate); assert.equal(rates.threshold, 1);
       assert.equal(rates.rateLabel, "发生率"); assert.equal(rates.me.status, "ranked");
-      assert.equal(read("&mode=classic&sort=rate").me.status, "not_enough");
+      assert.equal(read("&mode=classic&sort=rate").me.status, "ranked");
       assert.doesNotMatch(JSON.stringify(rates), /wx:|"uid"|target|events/);
       const stats = require("../miniprogram/profile").presentStats(store.statsFor(uid));
       assert.equal(stats.fun.cards.flatMap(card => card.metrics).find(row => row.id === metric).color, "evil");
@@ -165,7 +165,7 @@ test("当前版本的旧文案快照在历史、最近记录和结束页读取�
     assert.equal(store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? AND uid='wx:1'").get(r.matchId).snapshot, oldSnapshot);
   } finally { store.close(); }
 });
-test("刀客和骑士友方命中榜按实际承受者统计，比例需十次出手并可筛选角色", () => {
+test("刀客和骑士友方命中榜按实际承受者统计，一次出手即可参与比例榜并可筛选角色", () => {
   for (const [metric, role] of [["knife_ally", "blueAwakened"], ["duel_ally", "blueKnight"]]) {
     const uid = "wx:" + metric, store = new Store(":memory:");
     try {
@@ -177,15 +177,17 @@ test("刀客和骑士友方命中榜按实际承受者统计，比例需十次�
         skills(r, { [uid]: "target:2", ...(i < 6 ? { "wx:2": "target:3" } : {}) });
         finish(r, { winner: "good" });
         store.transaction(() => store.save(r));
-        if (i === 8) {
-          assert.equal(read("&sort=rate").me.status, "not_enough");
-          assert.equal(read("&sort=rate").me.remaining, 1);
+        if (i === 0 || i === 8) {
+          const rate = read("&sort=rate");
+          assert.equal(rate.me.status, "ranked");
+          assert.equal(rate.me.remaining, 0);
+          assert.equal(rate.me.opportunities, i + 1);
         }
       }
       assert.equal(read("").me.count, 6);
       const rate = read("&sort=rate&role=" + role);
       assert.equal(rate.me.opportunities, 10); assert.equal(rate.me.rate, 60);
-      assert.equal(rate.threshold, 10); assert.equal(rate.me.status, "ranked");
+      assert.equal(rate.threshold, 1); assert.equal(rate.me.status, "ranked");
       assert.equal(rate.rateLabel, "发生率");
       assert.ok(rate.roleOptions.some(item => item.id === role));
       assert.equal(store.matchesFor(uid, 0, 20, false, { metric, mode: "knights", role }).total, 6);
@@ -246,7 +248,7 @@ test("骑士挡刀使用终局当前阵营与存活状态，排除空刀、梅�
   assert.equal(row(empty, "wx:3", "good_shield").count, 0);
   assert.equal(row(empty, "wx:3", "good_shield").opportunities, 0);
 });
-test("挡刀榜跨板子合并次数和原始分母，成功率门槛跨板子累积且旧玩法参数兼容", () => {
+test("挡刀榜跨板子合并次数和原始分母，少量样本可参与成功率榜且旧玩法参数兼容", () => {
   const store = new Store(":memory:");
   try {
     for (let i = 0; i < 5; i++) {
@@ -271,13 +273,13 @@ test("挡刀榜跨板子合并次数和原始分母，成功率门槛跨板子�
     assert.equal(all.me.opportunities, 5);
     assert.equal(all.me.rate, 80);
     assert.equal(all.me.status, "ranked");
-    assert.equal(all.threshold, 5);
+    assert.equal(all.threshold, 1);
     assert.equal(read("metric=fun_good_shield&mode=all").me.count, 4);
     assert.equal(read("metric=fun_good_shield&mode=classic").me.count, 2);
     assert.equal(read("metric=fun_good_shield&mode=knights").me.count, 2);
     assert.equal(
       read("metric=fun_good_shield&mode=classic&sort=rate").me.remaining,
-      2,
+      0,
     );
     assert.ok(all.availableFunMetrics.some((m) => m.key === "fun_good_shield"));
     assert.doesNotMatch(JSON.stringify(all), /wx:|"uid"|target|events/);
@@ -725,7 +727,7 @@ test("管理员更正同时更新终局趣味数据、战绩和榜单，关闭�
     store.close();
   }
 });
-test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐藏开关", () => {
+test("趣味榜一次机会可参与比例排名，保留次数并列、分母排序、模式隔离和隐藏开关", () => {
   const store = new Store(":memory:");
   try {
     for (const [uid, total, hits] of [
@@ -740,13 +742,17 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
         store.transaction(() => store.save(r));
       }
     }
+    const zero = deal(false, "wx:zero"), unknown = deal(false, "wx:unknown");
+    finish(zero, { funReason: "quest_fail" });
+    finish(unknown, { winner: "good" });
+    store.transaction(() => { store.save(zero); store.save(unknown); });
     const board = new Leaderboard(store),
       read = (query) => board.read("wx:c", new URLSearchParams(query));
     const count = read("metric=fun_merlin_evade");
     const nearby = read("metric=fun_merlin_evade&nearby=1");
     assert.deepEqual(nearby.nearby,count.rows);
     assert.equal(nearby.nearby.filter(row=>row.isSelf).length,1);
-    assert.deepEqual(read("metric=fun_merlin_evade&sort=rate&nearby=1").nearby,[]);
+    assert.deepEqual(read("metric=fun_merlin_evade&sort=rate&nearby=1").nearby,read("metric=fun_merlin_evade&sort=rate").rows);
     assert.deepEqual(read("metric=fun_merlin_evade&mode=knights&nearby=1").nearby,[]);
     assert.deepEqual(
       count.rows.map((r) => r.rank),
@@ -755,10 +761,17 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
     const rate = read("metric=fun_merlin_evade&sort=rate");
     assert.deepEqual(
       rate.rows.map((r) => r.rank),
-      [1, 2, 2],
+      [1, 2, 3, 3],
     );
-    assert.equal(rate.rows[0].opportunities, 10);
-    assert.equal(rate.me.remaining, 4);
+    assert.equal(rate.rows[0].opportunities, 1);
+    assert.equal(rate.rows[1].opportunities, 10);
+    assert.equal(rate.me.remaining, 0);
+    assert.equal(rate.me.status, "ranked");
+    assert.equal(rate.me.rank, 1);
+    const noOpportunity = board.read("wx:zero", new URLSearchParams("metric=fun_merlin_evade&sort=rate"));
+    assert.equal(noOpportunity.me.opportunities, 0); assert.equal(noOpportunity.me.rate, null); assert.equal(noOpportunity.me.rank, null);
+    assert.equal(board.read("wx:unknown", new URLSearchParams("metric=fun_merlin_evade&sort=rate")).me.status, "no_records");
+    assert.ok(rate.availableFunMetrics.every(item => item.rateThreshold === 1));
     assert.equal(read("metric=fun_merlin_evade&mode=knights").rows.length, 0);
     store.transaction(() =>
       saveProfile(store, "wx:b", {
@@ -767,7 +780,7 @@ test("趣味榜次数并列、比例门槛与分母排序、模式隔离和隐�
         leaderboardVisible: false,
       }),
     );
-    assert.equal(read("metric=fun_merlin_evade&sort=rate").rows.length, 2);
+    assert.equal(read("metric=fun_merlin_evade&sort=rate").rows.length, 3);
     assert.equal(read("metric=fun_merlin_evade&nearby=1").nearby.length,3);
     assert.deepEqual(board.read("wx:b",new URLSearchParams("metric=fun_merlin_evade&nearby=1")).nearby,[]);
     assert.doesNotMatch(JSON.stringify(rate), /wx:|"uid"|target|events/);

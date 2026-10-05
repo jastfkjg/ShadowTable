@@ -181,7 +181,6 @@ function leaderboardCard(profile, board) {
   if (me.status === "hidden") notes.push("未公开排行榜 · 仅分享本人成绩");
   else if (me.status === "unsupported") notes.push("当前账号不参与排行榜");
   else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? board.sort === "rate" ? " 次有效机会" : " 次" : " 局") : ""));
-  if (board.fun && board.sort === "rate") notes.push("上榜需至少 " + number(board.threshold) + " 次有效机会");
   return { kind: "rank", ...identity(profile), title, context: period,
     scope: board.fun ? [board.metric === "fun_good_shield" ? "" : clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role)].filter(Boolean).join(" · ") : "",
     hero: board.fun ? board.sort === "rate" ? decimal(me.rate) : number(me.count) : points ? number(me.points) : games ? number(me.total) : decimal(me.winRate),

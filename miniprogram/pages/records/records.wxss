@@ -1,24 +1,17 @@
 @import "../../share-entry.wxss";
 @import "../stats/panel.wxss";
 @import "../matches/panel.wxss";
-.records-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.records-shell { --records-line: rgba(177,191,198,.16); --records-selected: #30404a; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .records-shell > app-nav { flex-shrink: 0; }
-.records-tabs { display: flex; flex-shrink: 0; gap: 12rpx; padding: 8rpx 32rpx 0; background: var(--bg); border-bottom: 1rpx solid rgba(177,191,198,.12); }
-.records-tabs button { position: relative; flex: 1; min-width: 0; width: 0; margin: 0; padding: 18rpx 0 22rpx; min-height: 48px; border-radius: 0; font-size: 28rpx; font-weight: 400; color: var(--muted); }
+.records-tabs { display: flex; flex-shrink: 0; gap: 8px; padding: 0 12px; background: var(--bg); border-bottom: 1rpx solid var(--records-line); }
+.records-tabs button { position: relative; flex: 1; min-width: 0; width: 0; margin: 0; padding: 14px 0 16px; min-height: 52px; border-radius: 0; font-size: 15px; font-weight: 400; color: var(--muted); }
 .records-tabs button.selected { color: var(--accent); font-weight: 600; }
-.records-tabs button.selected::before { content: ""; position: absolute; bottom: 0; left: 50%; width: 40rpx; height: 4rpx; border-radius: 4rpx; background: var(--accent); transform: translateX(-50%); }
+.records-tabs button.selected::before { content: ""; position: absolute; bottom: 0; left: 50%; width: 24px; height: 3px; border-radius: 3px; background: var(--accent); transform: translateX(-50%); }
 .records-body { position: relative; flex: 1; min-height: 0; }
 .records-pane { position: absolute; inset: 0; width: 100%; height: 100%; }
 .records-pane[hidden] { display: none; }
-.records-pane .page { max-width: 600px; }
+.records-pane .page { max-width: 600px; padding: 16px 20px calc(32px + env(safe-area-inset-bottom)); }
 @media (min-width: 600px) {
-  .records-tabs { padding: 4px 24px 0; }
-  .records-tabs button { font-size: 16px; padding: 12px 0; }
-  .records-pane .page { padding: 16px 24px calc(24px + env(safe-area-inset-bottom)); }
-  .stats-overview { padding: 16px; }
-  .stats-overview .metric-value { font-size: 26px; }
-  .stats-overview .small, .stats-points .small, .faction-detail, .role-list-heading, .role-record, .score-empty-note { font-size: 13px; }
-  .stats-section-title, .faction-name, .points-title { font-size: 16px; }
-  .faction-rate, .points-total { font-size: 18px; }
-  .role-name, .role-stat { font-size: 14px; }
+  .records-tabs { padding: 0 24px; }
+  .records-pane .page { padding: 16px 24px calc(32px + env(safe-area-inset-bottom)); }
 }

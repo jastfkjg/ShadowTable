@@ -94,7 +94,7 @@ test("缺少完整本人邻近数据时保留个人卡，并列或百分比榜�
   delete board.nearby;assert.deepEqual(build().nearby,[]);assert.equal(build().hero,"62.5");
 });
 test("趣味榜图片完整带上指标、排序、角色、玩法和周期，百分比不混用胜率", () => {
-  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "刀客刀法", metricLabel: "刀中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
+  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "刀客刀法", metricLabel: "刀中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 1,
     me: { status: "ranked", rank: 2, rate: 62.5, count: 10, opportunities: 16, knownGames: 12, unknownGames: 2, winRate: 50 } };
   const selection = cards.boardSelection(board);
   assert.deepEqual(cards.parseSelection(selection), selection);
@@ -104,7 +104,7 @@ test("趣味榜图片完整带上指标、排序、角色、玩法和周期，�
   assert.equal(card.scope, "刀客刀法 · 十二骑士 · 加雷斯");
   assert.equal(card.hero + card.unit, "62.5%");
   assert.deepEqual(card.metrics.map(item=>item.value), ["10","16","12"]);
-  assert.match(card.notes.join(), /至少 10 次有效机会/);
+  assert.deepEqual(card.notes, []);
   const pending = cards.leaderboardCard(fixtures.profile, {...board,me:{...board.me,status:"not_enough",rank:null,opportunities:4,count:2,rate:50,remaining:6}});
   assert.equal(pending.rankLabel,"未上榜");assert.equal(pending.hero,"50");assert.match(pending.notes.join(),/尚未达到上榜条件 · 还差 6 次有效机会/);
   assert.equal(cards.canShareLeaderboard({...board,me:{knownGames:2,opportunities:0,rate:null}}),false);

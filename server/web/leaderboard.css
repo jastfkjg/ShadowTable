@@ -1,0 +1,159 @@
+.leaderboard-page { --rank-line: rgba(177,191,198,.18); --rank-selected: rgba(229,198,139,.12); padding-top: 6px; padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
+.rank-toolbar, .rank-tools, .rank-period { display: flex; align-items: center; }
+.rank-toolbar { justify-content: space-between; gap: 8px; }
+.rank-period { padding: 2px; gap: 2px; background: var(--surface); border-radius: 10px; }
+.rank-period button { width: 62px; min-width: 48px; min-height: 44px; margin: 0; padding: 4px 6px; border-radius: 7px; color: var(--muted); font-size: 13px; }
+.rank-period button.selected { color: var(--text); background: rgba(177,191,198,.10); }
+.rank-tools { gap: 4px; }
+button.rank-tool, button.rank-tool[disabled]:not([type]) { width: auto; min-width: 44px; min-height: 48px; margin: 0; padding: 4px; gap: 4px; color: var(--muted); font-size: 12px; }
+.rank-tool-icon { width: 15px; height: 15px; }
+.rank-info-icon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 11.5px; height: 11.5px; border: 1px solid currentColor; border-radius: 50%; font-size: 9.5px; line-height: 1; font-weight: 500; box-sizing: border-box; }
+.rank-metrics { display: flex; width: 100%; margin: 4px 0 0; border-bottom: 0.5px solid var(--rank-line); }
+button.rank-metric { flex: 1 1 0%; width: 0; min-width: 0; max-width: 25%; min-height: 48px; margin: 0; padding: 0; border: 0; border-radius: 0; font-size: 15px; color: var(--muted); text-align: center; overflow: visible; }
+.rank-metric-label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 9px 0; box-sizing: border-box; white-space: nowrap; }
+.rank-metric-indicator { position: absolute; bottom: -0.5px; left: 50%; margin-left: -11px; width: 22px; height: 2.5px; border-radius: 2px; background: transparent; }
+button.rank-metric.selected { color: var(--accent); }
+.rank-metric.selected .rank-metric-indicator { background: currentColor; }
+.rank-rates { display: flex; gap: 4px; margin: 10px 0 0; padding: 2px; background: var(--surface); border-radius: 8px; }
+.rank-rates button { flex: 1; width: 0; min-width: 0; min-height: 44px; margin: 0; padding: 4px; font-size: 12.5px; color: var(--muted); }
+.rank-rates button.selected { color: var(--accent); background: var(--rank-selected); }
+.rank-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; color: var(--muted); font-size: 12px; }
+.rank-list-heading text:last-child { text-align: right; }
+.rank-notice, .rank-share-status { margin: 8px 0; line-height: 1.6; }
+.rank-list { margin: 0 -6px; }
+button.rank-row, button.rank-row[disabled]:not([type]) { width: 100%; display: flex; justify-content: flex-start; align-items: center; gap: 10px; min-height: 48px; margin: 0; padding: 9px 6px; border-bottom: 0.5px solid var(--rank-line); border-radius: 0; text-align: left; font-weight: 400; }
+button.rank-row[disabled] { opacity: 1; }
+button.rank-row:last-child { border-bottom-color: transparent; }
+button.rank-row.is-self { margin: 0 0 2px; min-height: 72px; background: var(--surface); border-radius: 11px; border-bottom-color: transparent; }
+.rank-number { flex-shrink: 0; width: auto; min-width: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--muted); font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rank-place-1 { color: var(--accent); }
+.rank-crown { width: 16px; height: 12px; margin-bottom: 1px; }
+.rank-tie { font-size: 10px; font-weight: 400; line-height: 1.4; }
+.rank-avatar { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: rgba(177,191,198,.12); box-sizing: border-box; }
+.rank-avatar-fallback { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15px; }
+.is-self .rank-avatar-fallback { background: rgba(229,198,139,.13); color: var(--accent); border: 0.5px solid rgba(229,198,139,.4); }
+.rank-identity { flex: 1; min-width: 0; }
+.rank-name { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.rank-nickname { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.rank-self-label { flex-shrink: 0; padding: 0 4px; border-radius: 3px; color: var(--accent); background: rgba(229,198,139,.13); font-size: 10px; font-weight: 400; }
+.rank-secondary { font-size: 12px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+.rank-value { flex-shrink: 0; max-width: 34%; overflow-wrap: anywhere; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; line-height: 1.3; }
+.is-self .rank-value { color: var(--accent); }
+.rank-unit { margin-left: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.rank-empty { padding: 36px 10px; text-align: center; }
+.rank-empty-title { margin-bottom: 6px; font-size: 14px; }
+.rank-list-end { padding: 14px 0; text-align: center; color: var(--muted); font-size: 12px; }
+.rank-list-end.is-sparse { margin-top: 32px; padding-top: 24px; border-top: 0.5px solid var(--rank-line); }
+.rank-end-hint { margin-top: 6px; }
+button.rank-more { width: 100%; min-height: 48px; margin-top: 12px; color: var(--accent); }
+.rank-mine { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 0.5px solid var(--border); }
+button.rank-mine-toggle { width: 100%; min-height: 56px; margin: 0 auto; padding: 0; max-width: 450px; display: flex; justify-content: space-between; text-align: left; gap: 10px; }
+.rank-mine-stats { display: flex; align-items: stretch; gap: 12px; min-width: 0; }
+.rank-mine-brief { display: flex; flex-direction: column; min-width: 0; }
+.rank-mine-brief + .rank-mine-brief { padding-left: 12px; border-left: 0.5px solid var(--rank-line); }
+.rank-mine-label { color: var(--muted); font-size: 11.5px; font-weight: 400; line-height: 1.5; margin-bottom: 2px; }
+.rank-mine-place, .rank-mine-value { font-size: 18px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rank-mine-place { color: var(--accent); }
+.rank-mine-entry { display: flex; align-items: center; flex-shrink: 0; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.rank-chevron { width: 5px; height: 5px; border-right: 1px solid currentColor; border-top: 1px solid currentColor; transform: rotate(45deg); }
+.fun-rank-filters { padding-top: 12px; }
+button.fun-metric-toggle { width: 100%; min-height: 48px; margin: 0; padding: 8px 12px; justify-content: space-between; gap: 10px; text-align: left; background: var(--surface); border-radius: 9px; }
+.fun-metric-current { min-width: 0; overflow-wrap: anywhere; }
+.fun-metric-role { font-size: 13px; color: var(--muted); font-weight: 400; margin-right: 7px; }
+.fun-metric-name { font-size: 15px; font-weight: 600; }
+.fun-filter-chevron { color: var(--muted); flex-shrink: 0; width: 6px; height: 6px; margin-top: -3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); }
+.fun-sort-row, .fun-role-filter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fun-sort-row { margin-top: 3px; }
+.fun-sort { display: flex; gap: 6px; min-width: 0; }
+.fun-sort button { position: relative; width: auto; min-height: 48px; margin: 0; padding: 6px 6px; font-size: 12.5px; font-weight: 400; color: var(--muted); border-radius: 0; }
+.fun-sort button:first-child { padding-left: 0; }
+.fun-sort button.selected { color: var(--accent); }
+.fun-sort button.selected::before { content: ""; position: absolute; bottom: 3px; left: 6px; right: 6px; height: 2px; border-radius: 2px; background: currentColor; }
+.fun-sort button.selected:first-child::before { left: 0; }
+.fun-sort-direction, .fun-filter-label { flex-shrink: 0; color: var(--muted); font-size: 12px; }
+.fun-role-filter picker { min-width: 0; }
+.fun-picker { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.rank-sheet-backdrop { padding: 0; align-items: flex-end; }
+.rank-sheet { --rank-line: rgba(177,191,198,.18); width: 100%; max-width: 540px; max-height: 90vh; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-top: 0.5px solid var(--border); border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); animation: rank-sheet-enter .2s ease-out; }
+.rank-sheet-handle { flex-shrink: 0; width: 32px; height: 3.5px; background: var(--border); border-radius: 4px; margin: 8px auto 3px; }
+.rank-sheet-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; }
+.rank-sheet-title { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; }
+button.rank-sheet-close { flex-shrink: 0; width: auto; min-width: 48px; min-height: 48px; margin: 0 -6px 0 0; padding: 4px 6px; color: var(--muted); font-size: 12.5px; }
+.fun-categories { flex-shrink: 0; display: flex; gap: 8px; padding: 0 16px 10px; }
+.fun-categories button { min-width: 68px; width: auto; min-height: 44px; margin: 0; padding: 4px 12px; background: rgba(177,191,198,.08); color: var(--muted); font-size: 13px; }
+.fun-categories .selected { color: var(--accent); background: rgba(229,198,139,.12); }
+.fun-metric-options { height: 36vh; min-height: 0; box-sizing: border-box; padding: 0 16px; }
+button.fun-metric-option { width: 100%; min-width: 0; min-height: 48px; margin: 0 0 4px; padding: 8px 10px; gap: 8px; justify-content: space-between; text-align: left; border: 0.5px solid transparent; border-radius: 8px; }
+button.fun-metric-option.selected { border-color: rgba(229,198,139,.5); background: rgba(229,198,139,.08); }
+.fun-option-copy { min-width: 0; overflow-wrap: anywhere; }
+.fun-option-title { color: var(--muted); font-size: 12px; font-weight: 400; margin-right: 7px; }
+.fun-option-label { font-size: 14px; font-weight: 500; }
+.fun-option-radio { flex-shrink: 0; display: flex; justify-content: center; align-items: center; width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; }
+.selected .fun-option-radio { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.fun-option-check { width: 4px; height: 7px; margin-bottom: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
+.rank-sheet-footer { flex-shrink: 0; padding: 10px 16px 12px; border-top: 0.5px solid var(--rank-line); }
+.rank-sheet-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; background: var(--accent); color: var(--bg); font-size: 14px; font-weight: 600; }
+.rank-rules-body, .rank-details-body { box-sizing: border-box; height: 44vh; min-height: 0; padding: 10px 16px 16px; }
+.rank-rules-metric { font-size: 14px; color: var(--accent); margin-bottom: 10px; }
+.rank-rule-line { color: var(--muted); font-size: 13px; line-height: 1.8; margin-bottom: 10px; }
+.rank-mine-content { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.rank-details-body .rank-mine-value, .rank-details-body .rank-mine-place { font-size: 22px; }
+.rank-details-body .rank-mine-metric { text-align: right; }
+.rank-status-label { font-size: 13px; color: var(--accent); margin-bottom: 6px; }
+.rank-visibility { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin-top: 12px; padding: 6px 0; border-top: 0.5px solid var(--rank-line); font-size: 14px; }
+.rank-visibility switch { flex-shrink: 0; }
+.rank-visibility-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--evil); }
+.rank-visibility-error button { flex-shrink: 0; width: auto; margin: 0; min-height: 44px; color: var(--accent); }
+.rank-category-empty { padding: 16px 0; }
+.rank-pressed { opacity: .7; }
+@keyframes rank-sheet-enter { from { opacity: .6; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .rank-sheet { animation: none; } }
+@media (max-height: 500px) {
+  .rank-mine { position: static; margin-top: 24px; padding: 12px 0; }
+  .leaderboard-page { padding-bottom: 24px; }
+  .rank-sheet { max-height: 96vh; border-radius: 16px 16px 0 0; }
+  .rank-sheet-header, .fun-categories, .fun-metric-options, .rank-sheet-footer, .rank-rules-body, .rank-details-body { padding-left: 16px; padding-right: 16px; }
+  .rank-sheet-title { font-size: 20px; }
+  button.rank-sheet-close, .fun-categories button, .fun-option-label, .rank-rule-line, .rank-visibility { font-size: 14px; }
+  .fun-option-title, .rank-sheet-note, .rank-details-body .small { font-size: 12px; }
+  .fun-categories { padding-bottom: 8px; }
+  .fun-categories button { min-width: 72px; padding: 4px 12px; }
+  .fun-metric-options { height: 28vh; }
+  .rank-sheet-footer { padding-top: 8px; padding-bottom: 8px; }
+  .rank-sheet-note { margin-bottom: 8px; }
+  button.rank-confirm { font-size: 14px; padding: 8px; }
+  button.fun-metric-option { padding: 8px 10px; margin-bottom: 4px; font-size: 14px; }
+  .fun-option-radio { width: 16px; height: 16px; border-width: 1px; }
+  .fun-option-check { width: 4px; height: 7px; border-width: 0 1.5px 1.5px 0; margin-bottom: 2px; }
+  .rank-sheet-handle { width: 32px; height: 4px; margin: 8px auto 3px; }
+}
+
+.rank-value.is-compact { font-size: 18px; }
+
+/* Browser-specific primitives and containment. */
+.leaderboard-page { padding-top: 0; }
+.rank-period button { flex: none; }
+.rank-list { list-style: none; padding: 0; }
+.rank-list > li { list-style: none; }
+.rank-list > li:not(:last-child) .rank-row:not(.is-self) { border-bottom-color: var(--rank-line); }
+.rank-metric-label { display: flex; width: 100%; }
+.rank-row.is-self { box-shadow: none; }
+.rank-place-2, .rank-place-3 { color: var(--muted); }
+.rank-avatar { object-fit: cover; }
+.rank-secondary { display: block; }
+.rank-mine { left: 50%; right: auto; width: 100%; max-width: 460px; transform: translateX(-50%); }
+.rank-mine-value { color: var(--text); }
+.rank-mine .rank-mine-value .rank-unit { font-size: 12px; }
+.rank-sheet-title { padding: 0; margin: 0; }
+.rank-sheet { max-height: 90dvh; }
+.rank-sheet-backdrop { z-index: 1100; }
+.fun-metric-options, .rank-rules-body, .rank-details-body { overflow-y: auto; overscroll-behavior: contain; }
+.fun-metric-options { flex: 0 1 auto; }
+.rank-rules-body, .rank-details-body { flex: 0 1 auto; }
+.fun-picker { margin: 0; width: auto; max-width: 70%; }
+.fun-sort { margin: 0; padding: 0; background: transparent; }
+.fun-sort button { flex: none; }
+.rank-sheet button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+html:has(.rank-sheet-backdrop) { overflow: hidden; }
+@media (max-height: 500px) { .rank-mine { left: auto; transform: none; max-width: none; } .rank-sheet { max-height: 96dvh; } }

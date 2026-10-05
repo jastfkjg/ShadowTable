@@ -2,21 +2,22 @@
 <import src="../stats/fun.wxml" />
 <import src="../matches/panel.wxml" />
 <view class="records-shell">
-  <app-nav title="我的战绩" back="{{true}}" backLabel="{{tab==='matches' && historyFromFun ? '返回趣味记录' : '返回'}}" bindback="back" share="{{tab==='fun' ? statistics.stats.fun.shareable : tab==='records' && !!statistics.stats.total}}" shareDisabled="{{statistics.loading || !!statistics.error}}" shareLabel="{{tab==='fun' ? '分享完整趣味记录图片' : '分享战绩图片'}}" bindshare="shareStats" />
-  <view class="records-tabs" aria-label="战绩分类">
+  <app-nav title="我的战绩" back="{{true}}" backLabel="{{tab==='matches' && historyFromFun ? '返回趣味记录' : '返回'}}" bindback="back" />
+  <view class="records-tabs" aria-label="战绩分类" aria-hidden="{{history.filtersExpanded}}">
     <button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}"><text>统计</text></button>
     <button hover-class="none" bindtap="chooseTab" data-id="matches" class="{{tab==='matches'?'selected':''}}" aria-pressed="{{tab==='matches'}}"><text>对局记录</text></button>
     <button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}"><text>趣味记录</text></button>
   </view>
-  <view class="records-body">
+  <view class="records-body" aria-hidden="{{history.filtersExpanded}}">
     <scroll-view class="records-pane" hidden="{{tab!=='records'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.records}}" show-scrollbar="{{false}}" data-tab="records" bindscroll="rememberScroll" aria-label="战绩统计">
       <template is="statisticsPanel" data="{{...statistics}}" />
     </scroll-view>
-    <scroll-view class="records-pane" hidden="{{tab!=='matches'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.matches}}" show-scrollbar="{{false}}" data-tab="matches" bindscroll="rememberScroll" aria-label="对局记录">
+    <scroll-view class="records-pane" hidden="{{tab!=='matches'}}" scroll-y="{{!history.filtersExpanded}}" scroll-top="{{scrollTops.matches}}" show-scrollbar="{{false}}" data-tab="matches" bindscroll="rememberScroll" aria-label="对局记录">
       <template wx:if="{{historyStarted}}" is="historyPanel" data="{{...history}}" />
     </scroll-view>
     <scroll-view class="records-pane" hidden="{{tab!=='fun'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.fun}}" show-scrollbar="{{false}}" data-tab="fun" bindscroll="rememberScroll" aria-label="趣味记录">
       <template is="funPanel" data="{{...statistics}}" />
     </scroll-view>
   </view>
+  <template wx:if="{{tab==='matches' && history.filtersExpanded}}" is="historyFilterSheet" data="{{...history}}" />
 </view>

@@ -288,7 +288,7 @@ test('附近排名基于完整同周期快照，覆盖百名之后、首尾、�
     assert.deepEqual(query(board,'wx:near-51',selection).nearby,tied.nearby);
     assert.equal(query(board,'wx:near-105','metric=points').nearby,undefined);
     assert.doesNotMatch(JSON.stringify(middle),/私人|wx:|"uid"|role|breakdown|match_id/);
-    assert.deepEqual(Object.keys(middle.nearby[0]).sort(),['avatarUrl','isSelf','losses','nickname','points','publicId','rank','total','winRate','wins'].sort());
+    assert.deepEqual(Object.keys(middle.nearby[0]).sort(),['avatarUrl','isSelf','losses','nickname','points','publicId','rank','tied','total','winRate','wins'].sort());
     const hiddenId=query(board,'wx:near-104',selection).nearby.find(row=>row.isSelf).publicId;
     profile(store,'wx:near-104',false);
     assert.ok(query(board,'wx:near-105',selection).nearby.every(row=>row.publicId!==hiddenId));
@@ -398,4 +398,20 @@ test('HTTP鉴权、参数白名单、公开设置类型/身份校验，以及保
     assert.equal((await request(setting,token,{leaderboardVisible:true})).status,200);
     assert.equal((await request('/api/leaderboard',token)).data.rows.length,1);
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
+});
+
+test('并列标记来自完整榜单，分页边界的单条记录也能正确显示并列', () => {
+  const store=new Store(':memory:');
+  try {
+    const board=new Leaderboard(store);
+    for(let i=0;i<21;i++){profile(store,'wx:tie-'+i);games(store,'wx:tie-'+i,1,1);}
+    profile(store,'wx:first');games(store,'wx:first',2,2);
+    for(const metric of ['games','overall','good']) {
+      const first=query(board,'wx:first','metric='+metric);
+      assert.equal(first.rows[0].rank,1);assert.equal(first.rows[0].tied,false);
+      assert.ok(first.rows.slice(1).every(row=>row.rank===2&&row.tied));
+      const last=query(board,'wx:first','metric='+metric+'&offset=20&version='+first.version);
+      assert.equal(last.rows.length,2);assert.ok(last.rows.every(row=>row.rank===2&&row.tied));
+    }
+  } finally {store.close();}
 });
