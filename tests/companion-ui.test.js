@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const flush = () => new Promise(setImmediate);
 
-function panel({ overrides = {}, search = "", saved } = {}) {
+function panel({ overrides = {}, search = "", saved, pathname = "/admin/companion", playerCookie = false } = {}) {
   const elements = new Map();
   const element = (id) => {
     if (!elements.has(id))
@@ -47,9 +47,9 @@ function panel({ overrides = {}, search = "", saved } = {}) {
     me: { seat: Number(token) + 2, ready: false },
     ...overrides,
   });
-  const response = (body) => ({
-    status: 200,
-    ok: true,
+  const response = (body, status = 200) => ({
+    status,
+    ok: status < 400,
     json: async () => body,
   });
   vm.runInNewContext(
@@ -66,7 +66,7 @@ function panel({ overrides = {}, search = "", saved } = {}) {
       },
       URLSearchParams,
       confirm: () => true,
-      location: { pathname: "/admin/companion", search },
+      location: { pathname, search },
       sessionStorage: {
         getItem: () => JSON.stringify(saved || { code: "123456", actors }),
         setItem(key, value) {
@@ -83,9 +83,12 @@ function panel({ overrides = {}, search = "", saved } = {}) {
         calls.push({
           path,
           method: options.method,
+          credentials: options.credentials,
           token,
           data: options.body && JSON.parse(options.body),
         });
+        if (playerCookie && options.credentials !== "omit")
+          return Promise.resolve(response({ error: "浏览器账号已变化，请刷新页面" }, 409));
         const body =
           options.method === "POST" ? { accepted: true } : room(token);
         if (hold)
@@ -119,6 +122,20 @@ function panel({ overrides = {}, search = "", saved } = {}) {
       }),
   };
 }
+
+test("本地陪测隔离网页登录 Cookie，管理陪测保留管理员 Cookie", async () => {
+  const local = panel({ pathname: "/dev", playerCookie: true });
+  await flush();
+  assert.doesNotMatch(local.element("players").innerHTML, /浏览器账号已变化/);
+  await local.element("batch-ready").onclick();
+  assert.equal(local.calls.filter(call => call.method === "POST").length, 11);
+  assert.ok(local.calls.every(call => call.credentials === "omit"));
+  assert.match(local.element("feedback").textContent, /已完成 11/);
+  const managed = panel();
+  await flush();
+  await managed.element("batch-ready").onclick();
+  assert.ok(managed.calls.every(call => call.credentials === "same-origin"));
+});
 
 test("全部准备确认后直接解锁并显示结果，不追加11次状态读取", async () => {
   const p = panel(); await flush();

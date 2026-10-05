@@ -246,9 +246,14 @@ function createApp({
         return send(200, { token });
       }
       const token = (req.headers.authorization || "").replace(/^Bearer /, "");
-      const browserSession = webAuth?.authenticate(req);
+      const bearerSession = /^[a-f0-9]{64}$/.test(token)
+        ? store.session(hash(token)) : null;
+      // Companion actors share the browser's player cookies, but use their own identity.
+      // Their administrator session, ownership and room are still checked below.
+      const browserSession = bearerSession?.uid.startsWith("test:")
+        ? null : webAuth?.authenticate(req);
       check(browserSession || /^[a-f0-9]{64}$/.test(token), "请重新登录", 401);
-      const session = browserSession || store.session(hash(token));
+      const session = browserSession || bearerSession;
       check(session, "登录已过期，请重新登录", 401);
       const uid = session.uid;
       if (uid.startsWith("test:")) {

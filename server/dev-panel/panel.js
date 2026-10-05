@@ -278,6 +278,8 @@ if (typeof document !== "undefined") {
       if (managed && path === "/api/dev-login") path = "/api/admin/actors";
       const response = await fetch(path, {
         method: data ? "POST" : "GET",
+        // Managed actors require the administrator cookie; local actors only use Bearer tokens.
+        credentials: managed ? "same-origin" : "omit",
         signal: AbortSignal.timeout(10000),
         headers: {
           ...(token ? { Authorization: "Bearer " + token } : {}),

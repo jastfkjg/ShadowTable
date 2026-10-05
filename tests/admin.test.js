@@ -226,6 +226,101 @@ test("现有房间开启陪测，绑定房间与管理员，关闭/退出阻止�
   assert.equal(a.app.store.get(code).players.length, 1);
   assert.equal(a.app.store.get(code).players[0].uid.startsWith("wx:"), true);
 });
+test("同域网页登录 Cookie 不干扰陪测入座、恢复重试和操作，管理员与房间校验仍生效", async (t) => {
+  const a = await setup(t, {
+    webOrigin: origin,
+    webWechatLogin: true,
+    wechatCode: async () => ({ mime: "image/png", bytes: Buffer.from("test-qr") }),
+  });
+  const login = await a.raw("/api/admin/login", { key });
+  const adminCookie = login.headers.get("set-cookie").split(";")[0];
+  const { code, token } = await a.room();
+  const other = await a.room();
+  await a.action(code, "test-on");
+  const webPlayer = await a.player("web-player");
+  async function browserLogin(player) {
+    const qr = await a.raw("/api/web-auth/requests", {}, { Cookie: adminCookie });
+    const { id } = await qr.json();
+    const binding = qr.headers.get("set-cookie").split(";")[0];
+    for (const action of ["inspect", "confirm"])
+      await a.api(`/api/web-auth/requests/${id}/${action}`, {}, {
+        ...a.auth(player), Cookie: "",
+      });
+    const claimed = await a.raw(`/api/web-auth/requests/${id}/claim`, {}, { Cookie: binding });
+    assert.equal(claimed.status, 200);
+    return claimed.headers.get("set-cookie").split(";")[0];
+  }
+  let webCookie = await browserLogin(webPlayer);
+  let saved;
+  const request = (path, actorToken, data, id) =>
+    a.api(path === "/api/dev-login" ? "/api/admin/actors" : path, data, {
+      Cookie: `${adminCookie}; ${webCookie}`,
+      ...a.auth(actorToken),
+      ...(id ? { "Idempotency-Key": id } : {}),
+    });
+  const c = new Companion({ request, save: state => { saved = structuredClone(state); } });
+  await c.add(code);
+  await c.fill();
+  assert.equal(c.actors.length, 5);
+  assert.ok(c.actors.every(actor => actor.room?.me.seat && !actor.error));
+  const bot = c.actors[0];
+  c.request = async (...args) => {
+    await request(...args);
+    throw new Error("回执丢失");
+  };
+  await assert.rejects(c.command(bot, "ready", { ready: true }), /回执丢失/);
+  const pendingId = saved.actors[0].pending.id;
+  webCookie = await browserLogin(await a.player("another-web-player"));
+  const restored = new Companion({ state: saved, request });
+  await restored.refresh();
+  assert.equal(restored.actors[0].pending.id, pendingId);
+  await restored.retry(restored.actors[0]);
+  await restored.batch("ready");
+  await restored.refresh();
+  assert.ok(restored.actors.every(actor => actor.room.me.ready && !actor.pending && !actor.error));
+  assert.equal((await a.api("/api/rooms/" + code, undefined, {
+    ...a.auth(token), Cookie: adminCookie,
+  })).me.ready, false);
+  await assert.rejects(request("/api/me/profile", token), e => e.status === 409);
+  const hostCommand = async (type, extra = {}) => a.api(`/api/rooms/${code}/commands`, {
+    type, stage: a.app.store.get(code).stage, ...extra,
+  }, { ...a.auth(token), Cookie: adminCookie });
+  await hostCommand("ready", { ready: true });
+  await hostCommand("start");
+  await restored.refresh();
+  assert.ok(restored.actors.every(actor => actor.secret && !actor.error));
+  await restored.batch("confirm");
+  assert.equal((await a.api("/api/rooms/" + code, undefined, {
+    ...a.auth(token), Cookie: adminCookie,
+  })).me.submitted, false);
+
+  // Expired and unrecognised player cookies must not invalidate administrator-owned actors.
+  a.app.store.db.prepare("UPDATE web_sessions SET expires=?").run(Date.now() - 1);
+  await restored.refresh();
+  assert.ok(restored.actors.every(actor => actor.room && !actor.error));
+  await assert.rejects(request("/api/me/profile", token), e => e.status === 401);
+  webCookie = "__Host-shadowtable_web=" + "f".repeat(64);
+  await restored.refresh();
+  assert.ok(restored.actors.every(actor => actor.room && !actor.error));
+  await assert.rejects(request(`/api/rooms/${other.code}`, bot.token), e => e.status === 403);
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+    ...a.auth(bot.token), Cookie: webCookie,
+  }), e => e.status === 401);
+  for (const extra of [{ Host: "evil.example" }, { "Sec-Fetch-Site": "cross-site" }])
+    await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+      ...a.auth(bot.token), Cookie: `${adminCookie}; ${webCookie}`, ...extra,
+    }), e => e.status === 403);
+  await assert.rejects(a.api(`/api/rooms/${code}/commands`, {
+    type: "submit", stage: a.app.store.get(code).stage, value: "confirm",
+  }, { ...a.auth(bot.token), Cookie: `${adminCookie}; ${webCookie}`, Origin: "https://evil.example" }),
+  e => e.status === 403);
+  const secondAdmin = await a.raw("/api/admin/login", { key }, { Cookie: "" });
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+    ...a.auth(bot.token), Cookie: `${secondAdmin.headers.get("set-cookie").split(";")[0]}; ${webCookie}`,
+  }), e => e.status === 403);
+  await a.api("/api/admin/logout", {}, { Cookie: adminCookie });
+  await assert.rejects(request(`/api/rooms/${code}`, bot.token), e => e.status === 401);
+});
 test("在线陪测不归档个人对局数据，接口仍绑定管理会话与测试房间", async (t) => {
   const a = await setup(t);
   await a.login();

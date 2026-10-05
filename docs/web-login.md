@@ -37,6 +37,8 @@
 
 小程序仍使用原 `sessions` 表和 Bearer token。网页微信身份使用独立 `web_sessions` 表以及 HttpOnly / Secure / SameSite=Strict / `__Host-` Cookie。网页请求附会话摘要 `X-Web-Session`，防止旧标签页在账号变化后将操作提交到新账号。Cookie 会话必须符合 Host、非跨站检查，写入另校验 Origin。无 Cookie 时带旧会话摘要也不会回退到游客认证。
 
+同域管理陪测使用有效 `test:` Bearer 令牌识别测试玩家，不使用浏览器的玩家登录 Cookie；请求仍须通过管理员 Cookie、Host／Origin、管理员会话归属与测试房间范围校验。网页登录切换或过期不会改变陪测身份。本地 `/dev` 面板仅发送独立 Bearer 令牌，不携带浏览器 Cookie。普通玩家和游客请求继续执行上述网页会话校验。
+
 `web_login_requests` 存储短期授权状态。小程序码只携带随机 128 位请求 ID（32 个十六进制字符），领取另需随机浏览器绑定 Cookie。请求和会话哈希持久化至 SQLite，重启后保持；请求已消费后只允许原浏览器重取同一未撤销的会话，不再创建新会话。创建码、扫码确认和轮询均限流，过期请求与会话会清理。原游客 token 从不升级为微信权限。
 
 ## 验证
