@@ -1,0 +1,27 @@
+<template name="matchDetails">
+        <view class="match-details">
+          <view class="match-result"><text>{{item.winner==='good' || item.winner==='evil' || item.winner==='third'?item.winnerLabel+'获胜':'胜方未登记'}}</text><text class="match-source">{{item.sourceLabel}}</text></view>
+          <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
+          <view wx:if="{{item.scoreEndReason}}" class="match-detail-row"><text>结束原因</text><text>{{item.scoreEndReason}}</text></view>
+          <view wx:if="{{item.score.status==='scored'}}" class="score-breakdown">
+            <view wx:for="{{item.score.breakdown}}" wx:for-item="award" wx:key="id" class="match-detail-row"><text>{{award.label}}</text><text>{{award.points>=0?'+':''}}{{award.points}}分</text></view>
+            <view class="match-detail-row score-total"><text>本局积分</text><text class="accent">{{item.score.total>=0?'+':''}}{{item.score.total}}分</text></view>
+            <view wx:if="{{item.score.manualOverride}}" class="match-detail-row"><text>管理员调整原因</text><text>{{item.score.manualOverride.reason}}</text></view>
+          </view>
+          <view wx:elif="{{item.score.reason && item.score.reason!==item.excludedReason}}" class="match-note">{{item.score.reason}}</view>
+          <view wx:if="{{item.hasFunEvents}}" class="match-fun">
+            <view class="match-section-label">我的趣味记录</view>
+            <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
+            <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
+            <view wx:for="{{item.fun.events}}" wx:for-item="event" wx:key="id" class="fun-event"><view><text wx:if="{{event.round}}">第 {{event.round}} 轮 · </text>{{event.role}} · {{event.label}}</view><view class="match-note">{{event.detail}}</view></view>
+          </view>
+          <block wx:else>
+            <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
+            <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
+          </block>
+          <view wx:if="{{item.members.length}}" class="match-members-section">
+            <button hover-class="none" class="disclosure-button match-members-toggle" bindtap="historyToggleMembers" data-id="{{item.id}}" aria-expanded="{{item.membersExpanded}}" aria-label="{{item.membersExpanded?'收起':'展开'}}同桌成员，共{{item.members.length}}人"><text>同桌成员<text class="match-member-count"> · {{item.members.length}}人</text></text><view class="match-arrow {{item.membersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
+            <view wx:if="{{item.membersExpanded}}" class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text class="match-seat">{{member.seat}}号</text><text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text></view></view>
+          </view>
+        </view>
+</template>

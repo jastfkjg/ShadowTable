@@ -400,6 +400,7 @@ test("操作记录按房间分页，保存玩家操作快照，重试不重复�
   assert.ok(audit.entries.every((entry) => entry.code === code));
   assert.ok(audit.rooms.includes(other.code));
   const grouped = await a.api(`/api/admin/audit?grouped=1&code=${code}`);
+  assert.equal(grouped.displayFiltered, true);
   assert.equal(grouped.pageSize, 20);
   assert.equal(grouped.groups[0].entries.length, 2);
   assert.equal(grouped.groups[0].active, true);

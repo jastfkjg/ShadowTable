@@ -1,0 +1,37 @@
+<app-nav title="积分明细" back="{{true}}" bindback="back" />
+<view class="page scores-page">
+  <view wx:if="{{loading && !loaded}}" class="status">正在读取积分明细…</view>
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
+  <view wx:if="{{notice}}" class="ledger-notice" role="status">{{notice}}</view>
+  <block wx:if="{{loaded}}">
+    <view class="score-overview">
+      <view class="score-overview-label">当前总积分</view>
+      <view class="score-balance"><text>{{summary.total}}</text><text class="score-unit">分</text></view>
+      <view class="score-sources">
+        <view><text class="score-source-label">对局积分</text><text class="score-source-value">{{summary.matchPoints}}<text class="score-source-unit"> 分</text></text><text class="score-source-note">{{summary.games}} 场计分对局</text></view>
+        <view><text class="score-source-label">积分调整</text><text class="score-source-value">{{summary.adjustmentLabel}}<text class="score-source-unit"> 分</text></text><text class="score-source-note">{{summary.adjustments}} 条调整</text></view>
+      </view>
+    </view>
+    <view class="ledger-heading"><text>积分记录<text class="ledger-count"> · {{total}} 条</text></text><button class="ledger-explain" bindtap="showExplanation" hover-class="ledger-pressed">积分说明</button></view>
+    <view wx:if="{{!records.length && !error}}" class="ledger-empty"><view class="ledger-empty-title">暂无积分记录</view><view>完成计分对局后，可在这里查看得分。</view></view>
+    <block wx:for="{{records}}" wx:key="id">
+      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="ledger-day">{{item.dayLabel}}</view>
+      <view class="ledger-entry {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'ledger-day-last':''}}">
+        <button wx:if="{{item.isMatch}}" class="ledger-match" bindtap="openMatch" data-id="{{item.id}}" hover-class="ledger-pressed" aria-label="{{item.title+'，'+item.detail+'，'+item.pointsLabel+'分，查看对局详情'}}">
+          <view class="ledger-row"><text class="ledger-title">{{item.title}}</text><text class="ledger-points {{item.negative?'negative':''}}">{{item.pointsLabel}}<text class="ledger-unit"> 分</text></text></view>
+          <view class="ledger-subrow"><text>{{item.detail}}</text><view class="ledger-chevron" aria-hidden="true"></view></view>
+          <view class="ledger-meta">{{item.timeLabel}} · 对局结算</view>
+        </button>
+        <view wx:else class="ledger-adjustment">
+          <view class="ledger-row"><text class="ledger-title">积分调整</text><text class="ledger-points {{item.negative?'negative':''}}">{{item.pointsLabel}}<text class="ledger-unit"> 分</text></text></view>
+          <view class="ledger-meta">{{item.timeLabel}} · 管理员调整</view>
+          <view wx:if="{{item.reason}}" class="ledger-reason">{{item.reason}}</view>
+          <view class="ledger-balance">操作时总积分 <text>{{item.beforePoints}} → {{item.afterPoints}}</text></view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{moreError}}" class="ledger-more-error" role="alert"><view>{{moreError}}</view><button bindtap="retryMore" class="ledger-more" hover-class="ledger-pressed">重新加载</button></view>
+    <button wx:elif="{{hasMore && !error}}" class="ledger-more" bindtap="loadMore" disabled="{{loadingMore || loading}}" loading="{{loadingMore}}" hover-class="ledger-pressed">{{loadingMore?'正在加载…':'加载更多'}}</button>
+    <view wx:elif="{{records.length && !error}}" class="ledger-end">已显示全部积分记录</view>
+  </block>
+</view>

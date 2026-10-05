@@ -525,7 +525,15 @@ function auditGroups(store, code, offset) {
       WHEN json_extract(details, '$.phase') IS NOT NULL THEN code || ':legacy:' || json_extract(details, '$.game') || ':' || json_extract(details, '$.phase') || ':' || coalesce(json_extract(details, '$.round'), '')
       ELSE code || ':event:' || id END AS base_key
     FROM admin_audit WHERE action != 'actor'
-      AND coalesce(json_extract(details, '$.command'), '') NOT IN ('ackIdentity', 'ackFairyResult') ${code === null ? "" : "AND code=?"}
+      AND coalesce(json_extract(details, '$.command'), '') NOT IN ('ackIdentity', 'ackFairyResult')
+      AND NOT (
+        coalesce(json_extract(details, '$.command'), '') = 'beginActivity'
+        AND (
+          coalesce(json_extract(details, '$.phaseKey'), '') IN ('tools', 'ended', 'terminated')
+          OR coalesce(json_extract(details, '$.phase'), '') IN ('等待房主发起操作', '对局结束', '对局已终止')
+        )
+        AND coalesce(json_array_length(details, '$.outcomes'), 0) = 0
+      ) ${code === null ? "" : "AND code=?"}
   ), boundaries AS (
     SELECT *, CASE WHEN base_key = lag(base_key) OVER (ORDER BY id) THEN 0 ELSE 1 END AS boundary FROM source
   ), numbered AS (

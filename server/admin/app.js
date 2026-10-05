@@ -69,9 +69,9 @@ async function currentRoomCodes(page) {
 async function fetchAudit(code, start) {
   const path = "audit?grouped=1&code=" + encodeURIComponent(code || "");
   const result = await api(path + "&offset=" + start);
-  if (result.filtered) return result;
-  // Older running servers may still return account-creation events.
-  // Filter before local pagination so counts and page boundaries stay correct.
+  if (result.displayFiltered) return result;
+  // Older running servers may still return account-creation and standalone
+  // activity-start events. Filter before local pagination so counts stay correct.
   let groups = start === 0 ? [...result.groups] : [];
   for (let cursor = 0; cursor < result.total; cursor += result.pageSize) {
     if (cursor === start) {
@@ -86,12 +86,25 @@ async function fetchAudit(code, start) {
       ...group,
       entries: group.entries.filter((entry) => entry.action !== "actor"),
     }))
-    .filter((group) => group.entries.length);
+    .filter((group) => group.entries.length && !redundantBeginGroup(group));
   return {
     groups: groups.slice(start, start + result.pageSize),
     total: groups.length,
     pageSize: result.pageSize,
   };
+}
+function redundantBeginGroup(group) {
+  return group.entries.every((entry) => {
+    const detail = entry.details || {};
+    return (
+      detail.command === "beginActivity" &&
+      !detail.outcomes?.length &&
+      (["tools", "ended", "terminated"].includes(detail.phaseKey) ||
+        ["等待房主发起操作", "对局结束", "对局已终止"].includes(
+          detail.phase,
+        ))
+    );
+  });
 }
 async function refresh() {
   if (loading) return;
@@ -246,7 +259,8 @@ function renderAudit({ groups, total, pageSize }) {
   $("audit-page").textContent = `第 ${auditOffset / pageSize + 1} 页`;
   $("audit-prev").disabled = auditOffset === 0;
   $("audit-next").disabled = auditOffset + pageSize >= total;
-  if (!groups.length) $("audit").append(el("p", "暂无操作记录"));
+  const visibleGroups = groups.filter((group) => !redundantBeginGroup(group));
+  if (!visibleGroups.length) $("audit").append(el("p", "暂无操作记录"));
   const activityNames = {
     vote: "全员投票",
     quest: "任务出牌",
@@ -261,7 +275,7 @@ function renderAudit({ groups, total, pageSize }) {
     const role = player.role === undefined && game ? "身份未记录" : player.role;
     return `${player.seat == null ? "旁观者" : player.seat + "号"}·${player.name}${role ? "·" + role : ""}`;
   };
-  for (const group of groups) {
+  for (const group of visibleGroups) {
     const entries = [...group.entries].sort(
       (a, b) => (a.id ?? a.created) - (b.id ?? b.created),
     );
@@ -274,7 +288,7 @@ function renderAudit({ groups, total, pageSize }) {
       ["start", "rematch", "finishTools"].includes(d.command);
     const title = event
       ? d.command === "beginActivity"
-        ? "发起" + (activityNames[d.parameters?.kind] || "操作")
+        ? activityNames[d.parameters?.kind] || "操作"
         : d.label || labels[entries[0].action] || "房间操作"
       : d.phaseKey === "skillPrepare"
         ? "放技能阶段"
@@ -303,13 +317,6 @@ function renderAudit({ groups, total, pageSize }) {
     const header = el("div", "", "audit-stage-heading");
     const heading = el("div");
     heading.append(el("h3", title));
-    const context = [
-      d.game ? `第 ${d.game} 局` : "",
-      operation && d.round ? `第 ${d.round} 轮` : "",
-      d.activityNumber ? `操作 #${d.activityNumber}` : "",
-    ].filter(Boolean);
-    if (context.length)
-      heading.append(el("span", context.join(" · "), "audit-context"));
     const startedAt = entries.find((entry) => entry.details.activityStartedAt)
       ?.details.activityStartedAt;
     const timestamp = startedAt || entries[0].created;
@@ -354,10 +361,10 @@ function renderAudit({ groups, total, pageSize }) {
     for (const entry of entries) {
       const detail = entry.details;
       if (["ackIdentity", "ackFairyResult"].includes(detail.command)) continue;
+      if (detail.command === "beginActivity") continue;
       if (
         operation &&
         [
-          "beginActivity",
           "advance",
           "settleTool",
           "closeWaiting",
@@ -511,7 +518,11 @@ function renderAudit({ groups, total, pageSize }) {
             ),
           );
         }
-      if (!entry.details.player && !operation)
+      if (
+        !entry.details.player &&
+        !operation &&
+        entry.details.command !== "beginActivity"
+      )
         block.append(
           el(
             "p",

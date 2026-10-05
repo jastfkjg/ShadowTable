@@ -264,18 +264,6 @@ test('榜单分享打开期间不重复跳转，打开失败可重试，卸载�
   p.onUnload();requests[1].fail();requests[1].complete();
   assert.equal(p.data.shareNotice,'');assert.equal(p.data.shareOpening,true);
 });
-test('小程序本人积分调整独立分页，失败保留记录可重试，读取期间不混合筛选，卸载丢弃旧响应',async()=>{
-  const ledger={id:'a',created:1,delta:-3,beforePoints:5,afterPoints:2,reason:'现场修正'};
-  let reads=0,finish;
-  const {p}=page('matches',{...apiBase,request:async url=>{
-    if(url.includes('/score-adjustments')) {reads++;assert.equal(url,'/api/me/score-adjustments?offset=1');if(reads===1)throw Error('网络中断');return new Promise(resolve=>{finish=resolve;});}
-    return {records:[],total:0,hasMore:false,adjustments:{records:[ledger],total:2,hasMore:true}};
-  }});
-  await p.onLoad();assert.equal(p.data.adjustments[0].pointsLabel,'-3 分');
-  await p.loadAdjustments();assert.equal(p.data.adjustments.length,1);assert.equal(p.data.adjustmentsError,'网络中断');
-  const pending=p.loadAdjustments();await p.loadAdjustments();p.filterScores({currentTarget:{dataset:{scored:'1'}}});assert.equal(reads,2);assert.equal(p.data.scoredOnly,false);
-  p.onUnload();finish({records:[{...ledger,id:'b'}],total:2,hasMore:false});await pending;assert.equal(p.data.adjustments.length,1);
-});
 test('头像按风格筛选，浏览分类保留选择和昵称；新风格可保存并恢复选中', async () => {
   const presets = require('../miniprogram/builtin-avatars');
   const pixel = presets.find(item => item.id === 'pixel-32'), crayon = presets.find(item => item.id === 'crayon-32');
@@ -703,7 +691,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -789,9 +777,9 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/matches/matches?scored=1','/pages/help/help?section=scoring','/pages/matches/matches','/pages/stats/stats?tab=fun',...['leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/help/help?section=scoring','/pages/matches/matches','/pages/stats/stats?tab=fun',...['leaderboard','help'].map(name => `/pages/${name}/${name}`)]);
   const points = nodes(tree).find(n => n.attr?.class === 'me-points');
-  assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/matches/matches?scored=1', '/pages/help/help?section=scoring']);
+  assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores', '/pages/help/help?section=scoring']);
   assert.ok(links.every(n => !nodes(n).slice(1).some(child => child.tag === 'wx-navigator')));
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
     assert.equal(node.attr.hoverClass,'me-pressed');
@@ -1181,7 +1169,7 @@ test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到�
   const fallback=page('leaderboard',{...apiBase,request:async url=>{if(url.includes('metric=fun_'))throw Object.assign(Error('排行榜参数无效'),{status:400});return rankResult('games',{availableMetrics:['points','games']});}}).p;
   await fallback.load(false,{metric:'fun_merlin_evade'});assert.equal(fallback.data.metric,'games');assert.equal(fallback.data.pointsAvailable,true);assert.equal(fallback.data.funAvailable,false);assert.match(fallback.data.notice,/趣味榜/);
 });
-test('积分明细入口不复用全部对局预取，过滤与后续分页持续使用计分局口径',async()=>{
+test('旧计分对局入口不复用全部对局预取，过滤与后续分页持续使用计分局口径',async()=>{
   const urls=[];
   const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[],score:{status:'scored',total:0,breakdown:[]}}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unscored',endedAt:1,members:[]}],total:1}},{}]});
   await p.onLoad({scored:'1'});assert.equal(p.data.records[0].scoreLabel,'+0 分');
@@ -1299,20 +1287,63 @@ test('趣味回查切到记录并可返回原位置，新回查和离开页面�
   slow.resolve(emptyStats); await pending; assert.equal(leaving.data.statistics.stats, null);
 });
 
-test('积分入口打开计分明细并定位调整；角色较多可展开且刷新保留选择', async () => {
+test('积分入口打开独立页面且保留统计位置；角色展开与刷新状态保持', async () => {
   const detail = { ...emptyStats, total: 12, score: { total: 2, games: 0, average: null },
     byFaction: [{ faction: 'good', label: '好人阵营', total: 12, wins: 6, winRate: 50 }],
     byRole: Array.from({ length: 7 }, (_, i) => ({ role: '角色' + i, faction: 'good', total: 1, wins: 0, winRate: 0 })) };
-  const { p } = page('stats', { ...apiBase, request: async url => url.includes('/stats') ? detail
+  const { p, navigations } = page('stats', { ...apiBase, request: async url => url.includes('/stats') ? detail
     : { records: [], total: 0, adjustments: { records: [{ id: 'adjustment', created: 1, delta: 2 }], total: 1 } } }, { home: true });
   await p.onLoad(); assert.equal(p.data.statistics.stats.byFaction[0].expanded, true);
   p.toggleFactionRoles({ currentTarget: { dataset: { faction: 'good' } } }); await p.load();
   assert.equal(p.data.statistics.stats.byFaction[0].rolesExpanded, true);
   p.toggleFaction({ currentTarget: { dataset: { faction: 'good' } } }); await p.load();
   assert.equal(p.data.statistics.stats.byFaction[0].expanded, false);
-  await p.openScoreHistory(); assert.equal(p.data.tab, 'matches'); assert.equal(p.data.history.scoredOnly, true);
-  assert.equal(p.data.historyAnchor, 'score-adjustments'); assert.equal(p.data.historyFromFun, false);
-  p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 300 } });
-  assert.equal(p.data.historyAnchor, '');
-  await p.switchPanel('records'); await p.switchPanel('matches'); assert.equal(p.data.scrollTops.matches, 300);
+  p.rememberScroll({ currentTarget: { dataset: { tab: 'records' } }, detail: { scrollTop: 300 } });
+  await p.openScoreHistory(); assert.equal(p.data.tab, 'records');
+  assert.equal(navigations[0], '/pages/scores/scores'); assert.equal(p.data.historyStarted, false);
+  assert.equal(p.scrollPositions.records, 300);
+});
+
+test('积分明细统一分页，失败保留记录可重试，重复触底和卸载不重复追加', async () => {
+  const first = { id: 'adjustment:a', type: 'adjustment', occurredAt: 1, points: -3, beforePoints: 5, afterPoints: 2, reason: '现场修正' };
+  const result = { records: [first], total: 2, hasMore: true, revision: 7, summary: { total: 2, matchPoints: 5, adjustmentPoints: -3, games: 1, adjustments: 1 } };
+  const later = deferred(); let reads = 0;
+  const { p } = page('scores', { ...apiBase, request: async url => {
+    if (!url.includes('offset=1')) return result;
+    reads++; assert.equal(url, '/api/me/score-ledger?offset=1&revision=7');
+    if (reads === 1) throw Error('网络中断');
+    return later.promise;
+  } });
+  await p.onLoad(); assert.equal(p.data.records[0].pointsLabel, '-3');
+  await p.onReachBottom(); assert.equal(p.data.moreError, '网络中断'); assert.equal(p.data.records.length, 1);
+  await p.onReachBottom(); assert.equal(reads, 1);
+  const pending = p.retryMore(); await p.onReachBottom(); assert.equal(reads, 2);
+  p.onUnload(); later.resolve({ ...result, records: [{ ...first, id: 'b' }], hasMore: false }); await pending;
+  assert.equal(p.data.records.length, 1);
+});
+
+test('积分分页期间分数变化会重新读取，零分与只有调整均保留，点对局进入详情后正常返回', async () => {
+  const match = { id: 'match:m', type: 'match', matchId: 'm', occurredAt: 1, points: 0, boardName: '经典', role: '梅林', outcome: 'loss' };
+  let reads = 0, fail = true, scrolling = 0, stopped = 0;
+  const result = { records: [match], total: 2, hasMore: true, revision: 1, summary: { total: 2, matchPoints: 0, adjustmentPoints: 2, games: 1, adjustments: 1 } };
+  const { p, navigations } = page('scores', { ...apiBase, request: async url => {
+    if (fail) { fail = false; throw Error('暂时离线'); }
+    if (url.includes('offset=1')) throw Object.assign(Error('更新'), { status: 409 });
+    reads++; return reads === 1 ? result : { ...result, revision: 2, total: 1, hasMore: false, records: [{ id: 'adjustment:a', type: 'adjustment', occurredAt: 1, points: 2 }], summary: { ...result.summary, games: 0 } };
+  } }, { wx: { pageScrollTo: () => scrolling++, stopPullDownRefresh: () => stopped++ } });
+  await p.onLoad(); assert.equal(p.data.loaded, false); assert.equal(p.data.error, '暂时离线');
+  await p.load(); assert.equal(p.data.records[0].pointsLabel, '0');
+  p.openMatch({ currentTarget: { dataset: { id: 'match:m' } } });
+  assert.equal(navigations[0], '/pages/match-detail/match-detail?id=m');
+  await p.onReachBottom(); assert.equal(scrolling, 1); assert.equal(p.data.records.length, 1);
+  assert.equal(p.data.records[0].type, 'adjustment'); assert.match(p.data.notice, /有更新/);
+  p.openMatch({ currentTarget: { dataset: { id: 'adjustment:a' } } }); assert.equal(navigations.length, 1);
+  await p.onPullDownRefresh(); assert.equal(stopped, 1); p.back(); assert.equal(navigations.at(-1), 'back');
+  const row = require('./helpers/fun-copy-fixtures').match;
+  const detail = page('match-detail', { ...apiBase, request: async url => { assert.equal(url, '/api/me/matches/m'); return { record: row }; } });
+  await detail.p.onLoad({ id: 'm' }); assert.equal(detail.p.data.record.id, row.id);
+  detail.p.historyToggleMembers(); assert.equal(detail.p.data.record.membersExpanded, true);
+  detail.p.back(); assert.equal(detail.navigations[0], 'back');
+  const removed = page('match-detail', { ...apiBase, request: async () => { throw Error('对局记录不存在或已移除'); } }).p;
+  await removed.onLoad({ id: 'gone' }); assert.equal(removed.data.record, null); assert.match(removed.data.error, /已移除/);
 });

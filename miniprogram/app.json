@@ -6,6 +6,8 @@
     "pages/leaderboard/leaderboard",
     "pages/share/share",
     "pages/matches/matches",
+    "pages/scores/scores",
+    "pages/match-detail/match-detail",
     "pages/table/table",
     "pages/settings/settings",
     "pages/board-details/board-details",

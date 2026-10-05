@@ -61,9 +61,36 @@ test("旧接口的账号创建记录在分页前过滤，数量和后续页保�
   assert.equal(next.groups[0].key, "42");
 });
 
+test("旧接口分页前隐藏独立发起组，保留带结算结果的发起事件", async () => {
+  const groups = Array.from({ length: 21 }, (_, i) => [
+    {
+      key: `begin-${i}`,
+      entries: [{ details: { command: "beginActivity", phaseKey: "tools", outcomes: [] } }],
+    },
+    {
+      key: `quest-${i}`,
+      entries: [{ details: { command: "submit", phaseKey: "quest" } }],
+    },
+  ]).flat();
+  groups.push({
+    key: "conversion",
+    entries: [{ details: { command: "beginActivity", phaseKey: "tools", outcomes: [{ kind: "conversion" }] } }],
+  });
+  const c = client(async (path) => {
+    const start = Number(new URL(path, "http://localhost").searchParams.get("offset"));
+    return { filtered: true, groups: groups.slice(start, start + 20), total: groups.length, pageSize: 20 };
+  });
+  const first = await c.fetchAudit("123456", 0);
+  assert.equal(first.total, 22);
+  assert.equal(first.groups.length, 20);
+  assert.ok(first.groups.every((group) => group.key.startsWith("quest-")));
+  const next = await c.fetchAudit("123456", 20);
+  assert.deepEqual(Array.from(next.groups, (group) => group.key), ["quest-20", "conversion"]);
+});
+
 test("新版接口保留服务端分页，不额外读取全部日志", async () => {
   let calls = 0;
-  const result = { filtered: true, groups: [], total: 100, pageSize: 20 };
+  const result = { filtered: true, displayFiltered: true, groups: [], total: 100, pageSize: 20 };
   const c = client(async () => {
     calls++;
     return result;
@@ -104,6 +131,9 @@ function auditRenderer() {
   );
   vm.runInNewContext(
     source.slice(
+      source.indexOf("function redundantBeginGroup("),
+      source.indexOf("async function refresh()"),
+    ) + source.slice(
       source.indexOf("function renderAudit("),
       source.indexOf("function renderRoomOptions("),
     ) + ";this.render = renderAudit;",
@@ -116,7 +146,7 @@ function auditRenderer() {
   };
 }
 
-test("操作记录显示行动当时身份、局轮和发起时间，合并技能跳过", () => {
+test("操作记录显示行动当时身份和发起时间，不重复显示局轮，合并技能跳过", () => {
   const c = auditRenderer();
   const startedAt = new Date("2026-09-19T02:44:00Z").getTime();
   const actor = { seat: 1, name: "zzz", role: "魔术师", required: true };
@@ -165,7 +195,7 @@ test("操作记录显示行动当时身份、局轮和发起时间，合并技�
   const text = nodes.map((n) => n.text).join(" ");
   assert.match(text, /1号·zzz·魔术师/);
   assert.doesNotMatch(text, /zzz·红猎人|2号·other|明细/);
-  assert.match(text, /第 1 局 · 第 2 轮/);
+  assert.doesNotMatch(text, /第\s*\d+\s*[局轮]|操作 #/);
   assert.match(text, /未使用技能／确认：2号/);
   assert.equal(
     nodes.find((n) => n.tag === "time").text,
@@ -550,7 +580,7 @@ test("任务复盘只显示任务队员及未提交者，并突出保存的票�
   );
 });
 
-test("入座和重开只显示行动者，等待阶段用实际动作命名，重复准备保留时间顺序", () => {
+test("入座和重开只显示行动者，隐藏单独发起记录，重复准备保留时间顺序", () => {
   const c = auditRenderer();
   const actor = { seat: 1, name: "房主" };
   const participants = [actor, { seat: 2, name: "其他玩家", required: false }];
@@ -634,16 +664,42 @@ test("入座和重开只显示行动者，等待阶段用实际动作命名，�
   const nodes = c.nodes();
   assert.deepEqual(
     nodes.filter((node) => node.tag === "h3").map((node) => node.text),
-    ["入座与准备", "同房重开", "发起任务出牌"],
+    ["入座与准备", "同房重开"],
   );
   assert.doesNotMatch(
     nodes.map((node) => node.text).join(" "),
-    /其他玩家|无需操作|等待房主发起操作|对局结束/,
+    /其他玩家|无需操作|等待房主发起操作|对局结束|发起任务出牌/,
   );
   const actions = nodes
     .filter((node) => node.tag === "text")
     .map((node) => node.text.trim());
   assert.deepEqual(actions.slice(0, 3), ["已准备", "取消准备", "已准备"]);
+});
+
+test("发起时已有结算结果仍显示结果，不重复显示发起动作", () => {
+  const c = auditRenderer();
+  c.render({
+    groups: [{
+      entries: [{
+        created: 1000,
+        details: {
+          command: "beginActivity",
+          phaseKey: "tools",
+          phase: "等待房主发起操作",
+          parameters: { kind: "conversion" },
+          label: "发起阵营转换",
+          outcomes: [{ kind: "conversion", text: "本轮阵营转换", lines: ["2号·乙 → 坏人"] }],
+        },
+      }],
+    }],
+    total: 1,
+    pageSize: 20,
+  });
+  const nodes = c.nodes();
+  assert.deepEqual(nodes.filter((node) => node.tag === "h3").map((node) => node.text), ["阵营转换"]);
+  const text = nodes.map((node) => node.text).join(" ");
+  assert.match(text, /本轮阵营转换.*2号·乙 → 坏人/);
+  assert.doesNotMatch(text, /发起阵营转换|第\s*\d+\s*[局轮]/);
 });
 
 test("提前截止保留缺交玩家和处理方式，作废操作不冒充任务结果", () => {

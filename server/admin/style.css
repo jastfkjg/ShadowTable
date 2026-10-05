@@ -362,10 +362,6 @@ summary:focus-visible {
   font-size: 13px;
   margin: 8px 0 0;
 }
-.audit-context {
-  color: var(--muted);
-  font-size: 13px;
-}
 .audit-action-time {
   margin-left: 12px;
   font-size: 13px;

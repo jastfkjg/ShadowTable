@@ -92,6 +92,31 @@ test("旧记录只合并连续同阶段，不将跨阶段的同名操作合并",
   assert.ok(result.groups.every((group) => !group.active));
 });
 
+test("操作记录分页不计入独立发起组，保留发起时产生的结算和未提交阶段", (t) => {
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const insert = store.db.prepare(
+    "INSERT INTO admin_audit(action,code,reason,created,details) VALUES('player','123456','',1,?)",
+  );
+  for (let i = 0; i < 21; i++) {
+    insert.run(JSON.stringify({ command: "beginActivity", phaseKey: "tools", phase: "等待房主发起操作", stage: `old-${i}`, outcomes: [] }));
+    insert.run(JSON.stringify({ command: "submit", phaseKey: "quest", phase: "任务出牌", stage: `quest-${i}` }));
+  }
+  insert.run(JSON.stringify({ command: "beginActivity", phaseKey: "tools", stage: "conversion", outcomes: [{ kind: "conversion" }] }));
+  insert.run(JSON.stringify({ command: "beginActivity", phaseKey: "quest", phase: "任务出牌", stage: "active-quest", outcomes: [] }));
+  const first = auditGroups(store, "123456", 0);
+  assert.equal(first.total, 23);
+  assert.equal(first.groups.length, 20);
+  assert.ok(first.groups.every((group) =>
+    group.entries[0].details.phaseKey !== "tools" || group.entries[0].details.outcomes?.length,
+  ));
+  const next = auditGroups(store, "123456", 20);
+  assert.equal(next.groups.length, 3);
+  assert.equal(first.groups[0].entries[0].details.stage, "active-quest");
+  assert.ok(first.groups.some((group) => group.entries[0].details.outcomes?.[0]?.kind === "conversion"));
+  assert.equal(store.db.prepare("SELECT count(*) AS n FROM admin_audit").get().n, 44);
+});
+
 test("猎人预选技能记录保存发起时间，整轮自动结算记录沿用同次时间", () => {
   const { enter, command } = require("../server/engine");
   const room = newRoom("123456", "p1", "房主", "knights", 12);

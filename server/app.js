@@ -256,10 +256,10 @@ function createApp({
         const adminSession = admin.authenticate(req);
         const [, code, owner] = uid.split(":");
         check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
-        const ownDataRead = req.method === "GET" && [
+        const ownDataRead = req.method === "GET" && ([
           "/api/me/profile", "/api/me/stats", "/api/me/matches",
-          "/api/me/score-adjustments", "/api/me/rooms", "/api/leaderboard",
-        ].includes(path);
+          "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard",
+        ].includes(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
         const ownProfileWrite = req.method === "POST" && [
           "/api/me/profile", "/api/me/leaderboard-visibility",
         ].includes(path);
@@ -307,6 +307,16 @@ function createApp({
       }
       if (req.method === "GET" && path === "/api/me/stats")
         return send(200, store.statsFor(uid));
+      if (req.method === "GET" && path === "/api/me/score-ledger") {
+        for (const key of requestUrl.searchParams.keys()) check(["offset", "revision"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "积分明细参数无效");
+        const offset = requestUrl.searchParams.get("offset") || "0", revision = requestUrl.searchParams.get("revision");
+        check(/^(0|[1-9]\d{0,6})$/.test(offset), "积分明细页码无效");
+        check(revision === null || /^(0|[1-9]\d{0,14})$/.test(revision), "积分明细版本无效");
+        return send(200, store.scoreLedger(uid, Number(offset), 20, revision === null ? null : Number(revision)));
+      }
+      const personalMatch = path.match(/^\/api\/me\/matches\/([^/]+)$/);
+      if (req.method === "GET" && personalMatch)
+        return send(200, { record: store.matchFor(uid, personalMatch[1]) });
       if (req.method === "GET" && path === "/api/me/score-adjustments") {
         const offset=requestUrl.searchParams.get("offset") || "0";
         check(/^(0|[1-9]\d{0,6})$/.test(offset),"积分调整页码无效");
@@ -325,6 +335,7 @@ function createApp({
         const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null, filters);
         if (rawOffset==="0") {
           result.filterOptions=store.matchFilterOptions(uid);
+          // Keep adjustment payloads for older clients; the current UI uses score-ledger.
           if (!metric && filters.period === "all" && !filters.board && !filters.role && !filters.outcome)
             result.adjustments=store.scoreAdjustments(uid);
         }

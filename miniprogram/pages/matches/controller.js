@@ -1,5 +1,5 @@
 const api = require("../../api");
-const { presentMatches, presentAdjustments, backToMe, personalPreview } = require("../../profile");
+const { presentMatches, backToMe, personalPreview } = require("../../profile");
 const defaultFilters = { period: "all", board: "", matchRole: "", outcome: "" };
 function filterState(filters, options = {}, previousGroups = []) {
   const groups = [
@@ -19,7 +19,7 @@ function filterState(filters, options = {}, previousGroups = []) {
   return { filters, filterGroups: groups, filterCount: selected.length, filterSummary: selected.map(group => group.valueLabel).join(" · ") };
 }
 module.exports = function createController() { return {
-  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, scoredOnly: false, funFilter: null, adjustments: [], adjustmentsTotal: 0, adjustmentsMore: false, adjustmentsLoading: false, adjustmentsError: "", filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters) },
+  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters) },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ scoredOnly: options.scored === "1", funFilter: options.fun ? { metric: options.fun, mode: options.mode || "classic", role: options.role || "" } : null });
@@ -29,7 +29,7 @@ module.exports = function createController() { return {
   },
   onUnload() { this.alive = false; },
   async load() {
-    if (this.fetching || this.data.adjustmentsLoading) return;
+    if (this.fetching) return;
     this.fetching = true; this.setData({ loading: true, error: "", loadMoreError: false });
     try {
       await api.login();
@@ -38,12 +38,12 @@ module.exports = function createController() { return {
       if (this.alive) this.setData({ records: presentMatches(result.records).map(row => {
         const previous = this.data.records.find(old => old.id === row.id);
         return { ...row, expanded: !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
-      }), total: result.total, hasMore: result.hasMore, loaded: true, adjustments: presentAdjustments(result.adjustments?.records || []), adjustmentsTotal: result.adjustments?.total || 0, adjustmentsMore: !!result.adjustments?.hasMore, adjustmentsError: "", filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
+      }), total: result.total, hasMore: result.hasMore, loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
   async loadMore() {
-    if (this.fetching || this.data.adjustmentsLoading || !this.data.hasMore) return;
+    if (this.fetching || !this.data.hasMore) return;
     this.fetching = true; this.setData({ loadingMore: true, error: "", loadMoreError: true });
     try {
       const result = await api.request(this.query(this.data.records.length));
@@ -61,34 +61,24 @@ module.exports = function createController() { return {
   },
   toggleFilters() { this.setData({ filtersExpanded: !this.data.filtersExpanded }); },
   chooseFilter(e) {
-    if (this.fetching || this.data.adjustmentsLoading || !this.data.filtersAvailable) return;
+    if (this.fetching || !this.data.filtersAvailable) return;
     const group = this.data.filterGroups.find(item => item.key === e.currentTarget.dataset.key);
     const option = group?.options[Number(e.detail.value)];
     if (!option || option.id === this.data.filters[group.key]) return;
     return this.applyFilters({ ...this.data.filters, [group.key]: option.id });
   },
   clearFilters() {
-    if (this.fetching || this.data.adjustmentsLoading) return;
+    if (this.fetching) return;
     return this.applyFilters({ ...defaultFilters });
   },
   applyFilters(filters) {
-    this.setData({ ...filterState(filters, this.filterOptions, this.data.filterGroups), records: [], loaded: false, total: 0, hasMore: false,
-      adjustments: [], adjustmentsTotal: 0, adjustmentsMore: false, adjustmentsError: "" });
+    this.setData({ ...filterState(filters, this.filterOptions, this.data.filterGroups), records: [], loaded: false, total: 0, hasMore: false });
     return this.load();
   },
-  clearFunFilter() { if (this.fetching || this.data.adjustmentsLoading) return; this.setData({ funFilter: null, records: [], loaded: false, total: 0, hasMore: false }); return this.load(); },
-  async loadAdjustments() {
-    if(this.fetching || this.data.adjustmentsLoading)return;
-    this.setData({adjustmentsLoading:true,adjustmentsError:""});
-    try {
-      const result=await api.request("/api/me/score-adjustments?offset="+this.data.adjustments.length);
-      if(this.alive)this.setData({adjustments:this.data.adjustments.concat(presentAdjustments(result.records)),adjustmentsTotal:result.total,adjustmentsMore:result.hasMore});
-    }catch(error){if(this.alive)this.setData({adjustmentsError:error.message});}
-    finally{if(this.alive)this.setData({adjustmentsLoading:false});}
-  },
+  clearFunFilter() { if (this.fetching) return; this.setData({ funFilter: null, records: [], loaded: false, total: 0, hasMore: false }); return this.load(); },
   filterScores(e) {
     const scoredOnly = String(e.currentTarget.dataset.scored) === "1";
-    if (this.fetching || this.data.adjustmentsLoading || scoredOnly === this.data.scoredOnly) return;
+    if (this.fetching || scoredOnly === this.data.scoredOnly) return;
     this.setData({ scoredOnly, records: [], loaded: false, total: 0, hasMore: false });
     return this.load();
   },

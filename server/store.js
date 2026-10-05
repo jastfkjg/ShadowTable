@@ -449,6 +449,26 @@ class Store {
     const records = this.db.prepare("SELECT id,delta,mode,before_points AS beforePoints,after_points AS afterPoints,reason,created FROM score_adjustments WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT ? OFFSET ?").all(uid,limit,offset);
     return {records,total,hasMore:offset+records.length<total};
   }
+  scoreLedger(uid, offset = 0, limit = 20, revision = null) {
+    const score = this.playerScore(uid);
+    if (revision !== null && revision !== score.revision) throw new RuleError("积分明细已更新，请刷新查看", 409);
+    const adjustments = this.db.prepare("SELECT count(*) AS n FROM score_adjustments WHERE uid=?").get(uid).n;
+    // Merge before pagination; never combine independently paged source lists.
+    const rows = this.db.prepare(`WITH entries AS (
+      SELECT 'match:'||s.match_id AS id,'match' AS type,s.match_id AS matchId,s.ended AS occurredAt,s.points,
+        json_extract(m.snapshot,'$.boardName') AS boardName,json_extract(p.snapshot,'$.role') AS role,p.outcome,
+        NULL AS reason,NULL AS beforePoints,NULL AS afterPoints,NULL AS mode,s.rowid AS sequence
+      FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
+      JOIN matches m ON m.id=s.match_id WHERE s.uid=? AND s.status='scored'
+      UNION ALL
+      SELECT 'adjustment:'||id,'adjustment',NULL,created,delta,NULL,NULL,NULL,reason,before_points,after_points,mode,rowid
+      FROM score_adjustments WHERE uid=?
+    ) SELECT * FROM entries ORDER BY occurredAt DESC,type DESC,sequence DESC,id DESC LIMIT ? OFFSET ?`).all(uid, uid, limit, offset);
+    const records = rows.map(({ sequence, ...row }) => row);
+    const total = score.games + adjustments;
+    return { records, total, hasMore: offset + records.length < total, revision: score.revision,
+      summary: { total: score.points, matchPoints: score.matchPoints, adjustmentPoints: score.manualPoints, games: score.games, adjustments } };
+  }
   searchScorePlayers(query, offset = 0) {
     const sql = `WITH known AS (SELECT uid FROM profiles UNION SELECT uid FROM match_players UNION SELECT json_extract(p.value,'$.uid') FROM rooms r,json_each(r.state,'$.players') p),
       players AS (SELECT k.uid,f.public_id AS publicId,coalesce(nullif(f.nickname,''),
@@ -535,22 +555,30 @@ class Store {
     const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
       FROM visible_match_players p JOIN matches m ON m.id=p.match_id
       WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
-    const records = rows.map(row => {
-      const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
-      return {
-        id: row.match_id, boardName: game.boardName, capacity: game.capacity,
-        startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
-        source: game.source, excludedReason: game.excludedReason,
-        name: player.name, seat: player.seat, role: player.role,
-        faction: player.faction, outcome: player.outcome,
-        fun: funCopy.story(player.fun) || null,
-        score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
-        scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
-        members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),
-      };
-    });
+    const records = rows.map(row => this.presentMatch(row));
     return { records, total, hasMore: offset + records.length < total };
   }
+  matchFor(uid, id) {
+    const row = this.db.prepare(`SELECT p.match_id,m.snapshot AS game,p.snapshot AS player
+      FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? AND p.match_id=?`).get(uid, id);
+    if (!row) throw new RuleError("对局记录不存在或已移除", 404);
+    return this.presentMatch(row);
+  }
+  presentMatch(row) {
+    const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
+    return {
+      id: row.match_id, boardName: game.boardName, capacity: game.capacity,
+      startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
+      source: game.source, excludedReason: game.excludedReason,
+      name: player.name, seat: player.seat, role: player.role,
+      faction: player.faction, outcome: player.outcome,
+      fun: funCopy.story(player.fun) || null,
+      score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
+      scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
+      members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),
+    };
+  }
+
   session(hash) {
     return this.db
       .prepare("SELECT uid FROM sessions WHERE hash=? AND expires>?")

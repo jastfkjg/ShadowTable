@@ -28,10 +28,10 @@ test('小程序网页登录确认页显示真实网站与账号，加载、过�
   const done = renderLogin({ ...ready, status: 'confirmed' });
   assert.ok(!byHandler(done, 'confirm')); assert.ok(byHandler(done, 'back'));
 });
-test('积分调整记录与单局手动原因在个人记录中可见，恢复自动后不显示手动原因',()=>{
+test('对局记录保留单局调整原因，不再混入独立积分调整',()=>{
   const renderMatches=renderHistoryShell,record={id:'m',members:[],expanded:true,score:{status:'scored',total:8,breakdown:[{id:'admin',label:'管理员调整',points:4}],manualOverride:{reason:'挡刀核对'} }};
   const data={records:[record],adjustments:[{id:'a',dateLabel:'今天',pointsLabel:'+2 分',beforePoints:8,afterPoints:10,reason:'额外奖励'}],adjustmentsTotal:1};
-  const html=JSON.stringify(renderMatches(data));assert.match(html,/挡刀核对/);assert.match(html,/额外奖励/);assert.match(html,/管理员积分调整/);
+  const html=JSON.stringify(renderMatches(data));assert.match(html,/挡刀核对/);assert.doesNotMatch(html,/额外奖励|管理员积分调整/);
   delete record.score.manualOverride;assert.doesNotMatch(JSON.stringify(renderMatches(data)),/挡刀核对/);
 });
 const base = {
@@ -992,4 +992,26 @@ test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐�
   assert.ok(byHandler(ready,'shareFun'));
   const empty=renderStats({...data,stats:{...data.stats,fun:{...data.stats.fun,shareable:false}}});
   assert.equal(nodes(empty).find(node=>node.tag==='wx-app-nav').attr.share,false);
+});
+
+test('积分页只有真实空数据才显示空态，按北京日期分组，调整不可点，对局可点且零分不遗漏', () => {
+  const { presentEntries } = require('../miniprogram/pages/scores/presentation');
+  const time = Date.parse('2026-10-02T16:05:00Z');
+  const records = presentEntries([
+    { id: 'a', type: 'adjustment', occurredAt: time, points: -2, beforePoints: 4, afterPoints: 2, reason: '现场核对' },
+    { id: 'm', type: 'match', matchId: 'm', occurredAt: time - 600000, points: 0, boardName: '经典', role: '梅林', outcome: 'loss' },
+  ]);
+  assert.equal(records[0].dayLabel, '2026年10月3日'); assert.equal(records[1].dayLabel, '2026年10月2日');
+  const render = factory('pages/scores/scores.wxml');
+  const ready = { loaded: true, records, total: 2, summary: { total: 2, matchPoints: 4, adjustmentLabel: '-2', games: 1, adjustments: 1 } };
+  const tree = render(ready), content = JSON.stringify(tree);
+  assert.match(content, /操作时总积分|现场核对/); assert.doesNotMatch(content, /暂无计分对局|暂无积分记录/);
+  assert.equal(nodes(tree).filter(n => n.attr?.bindtap === 'openMatch').length, 1);
+  assert.equal(byHandler(tree, 'openMatch').attr['data-id'], 'm');
+  assert.match(JSON.stringify(render({ ...ready, records: [], total: 0 })), /暂无积分记录/);
+  assert.doesNotMatch(JSON.stringify(render({ loading: true })), /暂无积分记录|当前总积分/);
+  const error = render({ error: '断网', loading: false }); assert.ok(byHandler(error, 'load')); assert.doesNotMatch(JSON.stringify(error), /暂无积分记录/);
+  const record = { ...require('../miniprogram/profile').presentMatches([require('./helpers/fun-copy-fixtures').match])[0], members: [{ seat: 1, name: '甲' }], score: { status: 'scored', total: 8, breakdown: [{ id: 'bonus', label: '挡刀奖励', points: 8 }], manualOverride: { reason: '本局核对' } } };
+  const detail = JSON.stringify(factory('pages/match-detail/match-detail.wxml')({ record }));
+  assert.match(detail, /挡刀奖励/); assert.match(detail, /本局核对/); assert.match(detail, /同桌成员/);
 });

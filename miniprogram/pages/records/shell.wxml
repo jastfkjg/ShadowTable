@@ -12,7 +12,7 @@
     <scroll-view class="records-pane" hidden="{{tab!=='records'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.records}}" show-scrollbar="{{false}}" data-tab="records" bindscroll="rememberScroll" aria-label="战绩统计">
       <template is="statisticsPanel" data="{{...statistics}}" />
     </scroll-view>
-    <scroll-view class="records-pane" hidden="{{tab!=='matches'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.matches}}" scroll-into-view="{{historyAnchor}}" show-scrollbar="{{false}}" data-tab="matches" bindscroll="rememberScroll" aria-label="对局记录">
+    <scroll-view class="records-pane" hidden="{{tab!=='matches'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.matches}}" show-scrollbar="{{false}}" data-tab="matches" bindscroll="rememberScroll" aria-label="对局记录">
       <template wx:if="{{historyStarted}}" is="historyPanel" data="{{...history}}" />
     </scroll-view>
     <scroll-view class="records-pane" hidden="{{tab!=='fun'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.fun}}" show-scrollbar="{{false}}" data-tab="fun" bindscroll="rememberScroll" aria-label="趣味记录">

@@ -213,6 +213,7 @@ function createAdmin({ store, origin, key, body, limit }) {
       const grouped = query.get("grouped") === "1";
       send(200, {
         filtered: true,
+        ...(grouped ? { displayFiltered: true } : {}),
         ...(grouped
           ? auditGroups(store, code, offset)
           : {

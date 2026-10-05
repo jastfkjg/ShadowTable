@@ -119,3 +119,56 @@ test('管理积分无需填写原因，仍检查鉴权来源，跨登录重试�
  const ledger=await a.request('/api/me/matches?offset=0',null,{Authorization:'Bearer '+'c'.repeat(64)});assert.equal(ledger.data.adjustments.total,1);
  assert.doesNotMatch(JSON.stringify(ledger.data),/administrator|wx:1|wx:2/);
 });
+
+test('积分明细在两类来源合并后分页，合计一致，零分、负分、同刻顺序和数据隔离正确', () => {
+ let now = 1000; const store = new Store(':memory:', { clock: () => now });
+ try {
+  const first = game(store, { ended: 1000 });
+  store.transaction(() => store.adjustMatchScores(first.matchId, { revision: 0, reason: '零分结算', scores: [{ uid: 'wx:3', points: 0 }] }));
+  now = 2000; adjust(store, 'wx:3', 2); adjust(store, 'wx:3', -1);
+  store.db.prepare("UPDATE score_adjustments SET created=? WHERE uid='wx:3'").run(now);
+  const second = game(store, { ended: 3000 });
+  store.transaction(() => store.adjustMatchScores(second.matchId, { revision: 0, reason: '扣分', scores: [{ uid: 'wx:3', points: -3 }] }));
+  now = 4000; const recentAdjustment = adjust(store, 'wx:3', 7);
+  store.db.prepare('UPDATE score_adjustments SET created=? WHERE id=?').run(now, recentAdjustment.id);
+  const whole = store.scoreLedger('wx:3', 0, 100), firstPage = store.scoreLedger('wx:3', 0, 2);
+  const secondPage = store.scoreLedger('wx:3', 2, 2, whole.revision), last = store.scoreLedger('wx:3', 4, 2, whole.revision);
+  assert.deepEqual([...firstPage.records, ...secondPage.records, ...last.records], whole.records);
+  assert.deepEqual(whole.records.map(r => r.points), [7, -3, -1, 2, 0]);
+  assert.equal(whole.total, 5); assert.equal(last.hasMore, false);
+  assert.equal(whole.records.reduce((n, r) => n + r.points, 0), whole.summary.total);
+  assert.equal(whole.summary.total, store.statsFor('wx:3').score.total);
+  assert.deepEqual(whole.summary, { total: 5, matchPoints: -3, adjustmentPoints: 8, games: 2, adjustments: 3 });
+  assert.equal(store.scoreLedger('wx:2').records.filter(r => r.type === 'adjustment').length, 0);
+  assert.equal(store.scoreLedger('unknown').total, 0);
+  assert.doesNotMatch(JSON.stringify(whole), /wx:|administrator|sequence/);
+  assert.deepEqual(store.matchFor('wx:3', first.matchId), store.matchesFor('wx:3').records.find(r => r.id === first.matchId));
+  assert.throws(() => store.matchFor('unknown', first.matchId), e => e.status === 404);
+  adjust(store, 'wx:3', 1); assert.throws(() => store.scoreLedger('wx:3', 2, 2, whole.revision), e => e.status === 409);
+  const manage = (action, room) => store.transaction(() => store.manageMatches({ action, matches: [{ id: room.matchId, revision: store.matchScoreData(room.matchId).revision }], reason: '修正记录' }));
+  manage('exclude', first); manage('delete', second);
+  const adjusted = store.scoreLedger('wx:3');
+  assert.equal(adjusted.records.length, 4); assert.equal(adjusted.summary.games, 0); assert.equal(adjusted.summary.total, 9);
+  assert.equal(store.matchFor('wx:3', first.matchId).score.status, 'excluded');
+  assert.throws(() => store.matchFor('wx:3', second.matchId), e => e.status === 404);
+  manage('restore', second); assert.equal(store.scoreLedger('wx:3').summary.total, 6);
+ } finally { store.close(); }
+});
+
+test('积分明细及对局详情接口检查本人权限、分页参数与修订版本，兼容旧客户端读取调整', async t => {
+ const a = await launch(t), room = game(a.store);
+ adjust(a.store, 'wx:3', 2);
+ const token = 'd'.repeat(64), headers = { Authorization: 'Bearer ' + token };
+ a.store.addSession(createHash('sha256').update(token).digest('hex'), 'wx:3');
+ assert.equal((await a.request('/api/me/score-ledger')).status, 401);
+ const first = await a.request('/api/me/score-ledger?offset=0', null, headers);
+ assert.equal(first.status, 200); assert.equal(first.data.total, 2);
+ for (const q of ['offset=-1', 'offset=1.5', 'offset=0&offset=1', 'uid=wx:1', 'revision=abc', 'revision=1&revision=2'])
+   assert.equal((await a.request('/api/me/score-ledger?' + q, null, headers)).status, 400);
+ const detail = await a.request('/api/me/matches/' + room.matchId, null, headers);
+ assert.equal(detail.status, 200); assert.equal(detail.data.record.seat, 3);
+ assert.doesNotMatch(JSON.stringify(detail.data), /wx:|administrator/);
+ assert.equal((await a.request('/api/me/matches/missing', null, headers)).status, 404);
+ adjust(a.store, 'wx:3', 1);
+ assert.equal((await a.request('/api/me/score-ledger?offset=1&revision=' + first.data.revision, null, headers)).status, 409);
+});

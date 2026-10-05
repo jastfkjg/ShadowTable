@@ -1,0 +1,21 @@
+@import "../matches/panel.wxss";
+.match-detail-page { max-width: 600px; padding-top: 20rpx; }
+.match-detail-heading { margin-bottom: 28rpx; }
+.match-detail-heading .match-day { margin-top: 0; margin-bottom: 16rpx; }
+@media (min-width: 600px) { .match-detail-page { padding: 24px 24px calc(32px + env(safe-area-inset-bottom)); } }
+
+@media (min-width: 600px) {
+  .match-detail-heading { margin-bottom: 20px; }
+  .match-detail-heading .match-day { margin-bottom: 12px; }
+  .match-day, .match-meta, .match-source, .match-note, .match-member-count, .match-seat { font-size: 14px; }
+  .match-board { font-size: 20px; }
+  .match-outcome, .match-secondary, .match-details, .match-section-label, .match-member { font-size: 16px; }
+  .match-details { padding: 16px; border-radius: 12px; }
+  .match-top, .match-detail-row { gap: 16px; }
+  .match-detail-row { padding: 4px 0; }
+  .match-fun, .score-breakdown { margin-top: 16px; padding-top: 16px; }
+  .match-members-section { margin: 16px 0 -16px; }
+  button.match-members-toggle { padding: 12px 0; font-size: 16px; }
+  .match-arrow { width: 7px; height: 7px; border-width: 2px; }
+  .match-members { padding-bottom: 16px; gap: 8px 16px; }
+}
