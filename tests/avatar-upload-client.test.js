@@ -240,3 +240,13 @@ test("wx.uploadFile携带会话与幂等编号，解析字符串响应，401只�
   options.success({ statusCode: 401, data: '{"error":"请重新登录"}' });
   await assert.rejects(current); assert.equal(storage.has("session"), false);
 });
+
+test('同房战绩开关参与未保存提示，取消修改恢复干净，保存只提交明确变更', async () => {
+  const client=page();await ready(client);const p=client.p;
+  assert.equal(p.data.roomStatsVisible,false);
+  p.changeRoomStatsVisibility({detail:{value:true}});assert.equal(p.data.dirty,true);
+  p.changeRoomStatsVisibility({detail:{value:false}});assert.equal(p.data.dirty,false);
+  p.changeRoomStatsVisibility({detail:{value:true}});await p.save();
+  assert.equal(client.writes[0].data.roomStatsVisible,true);assert.equal(client.writes[0].data.version,3);
+  assert.equal(client.writes[0].data.leaderboardVisible,undefined);p.onUnload();
+});

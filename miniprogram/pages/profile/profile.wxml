@@ -34,6 +34,7 @@
         <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
       </view>
     </view>
+    <view class="profile-room-visibility"><view><view>允许同房玩家查看战绩</view><text class="small muted">仅展示历史汇总，与排行榜公开设置独立</text></view><switch checked="{{roomStatsVisible}}" bindchange="changeRoomStatsVisibility" disabled="{{busy || pendingSave || loading}}" color="#e5c68b" aria-label="允许同房玩家查看战绩" /></view>
     <view class="avatar-library">
       <view class="field-title">选择头像</view>
       <view class="avatar-styles" role="group" aria-label="头像风格">

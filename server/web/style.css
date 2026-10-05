@@ -2100,3 +2100,38 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 }
 
 .me-icon-spark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z'/%3E%3C/svg%3E"); }
+
+/* Same-room historical player summary; game actions retain their own dialogs. */
+.player-card-backdrop { align-items: flex-end; padding: 0; }
+.player-card-sheet { display: flex; flex-direction: column; max-height: 92vh; width: 100%; max-width: 450px; margin: 0 auto; box-sizing: border-box; background: var(--surface); border: 0.5px solid var(--border); border-bottom: 0; border-radius: 18px 18px 0 0; padding: 8px 16px calc(12px + env(safe-area-inset-bottom)); }
+.player-card-handle { flex-shrink: 0; width: 32px; height: 3px; border-radius: 3px; background: var(--border); margin: 0 auto 4px; }
+.player-card-heading { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+button.player-card-close { margin: 0 -8px 0 0; padding: 0; width: 48px; min-height: 48px; font-size: 24px; font-weight: 400; }
+.player-card-body { flex-shrink: 1; min-height: 0; max-height: 70vh; }
+.player-card-identity { display: flex; align-items: center; gap: 12px; padding: 6px 0 14px; }
+.player-card-avatar { position: relative; flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: var(--bg); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.player-card-avatar-image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.player-card-name { min-width: 0; overflow-wrap: anywhere; }
+.player-card-display-name { display: block; font-size: 19px; font-weight: 600; }
+.player-card-summary { display: flex; padding: 12px 0; border-block: 0.5px solid var(--border); }
+.player-card-stat { flex: 1; min-width: 0; text-align: center; }
+.player-card-number { display: block; font-size: 24px; line-height: 1.4; color: var(--accent); font-weight: 600; }
+.player-card-section-title { padding: 10px 0 4px; font-size: 14px; }
+.player-card-faction { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 7px 0; font-size: 14px; }
+.player-card-faction > span:last-child { min-width: 50px; text-align: right; font-weight: 600; }
+.player-card-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-block: 0.5px solid var(--border); margin-top: 6px; }
+.player-card-score-value { color: var(--accent); font-size: 19px; font-weight: 600; }
+.player-card-note, .player-card-empty { padding-top: 10px; }
+.player-card-message { padding: 24px 0; text-align: center; }
+.proposal-player-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.proposal-player-options button { min-width: 28%; margin: 0; border: 0.5px solid var(--border); }
+.proposal-player-options button.selected { border-color: var(--accent); color: var(--accent); }
+.profile-room-visibility { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-block: 0.5px solid var(--border); margin-bottom: 12px; }
+.profile-room-visibility input { flex-shrink: 0; }
+
+.player-card-body { overflow-y: auto; overscroll-behavior: contain; }
+body:has(.player-card-backdrop) { overflow: hidden; }
+.player-card-sheet button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button.rank-avatar-button { flex: 0 0 48px; width: 48px; min-height: 48px; margin: 0; padding: 0; border-radius: 50%; }
+button.rank-avatar-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

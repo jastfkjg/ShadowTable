@@ -1,6 +1,6 @@
 <view class="app-nav" style="height:{{totalHeight}}px;padding-top:{{statusBarHeight}}px">
   <view class="app-nav-row" style="height:{{navHeight}}px">
-    <button hover-class="none" wx:if="{{back}}" class="app-nav-back" bindtap="goBack" aria-label="{{backLabel}}">‹</button>
+    <button hover-class="none" wx:if="{{back}}" class="app-nav-back" bindtap="goBack" aria-label="{{backLabel}}"><image class="app-nav-back-icon" src="/assets/chevron-left.svg" aria-hidden="true" /><text wx:if="{{backText}}" class="app-nav-back-text">{{backText}}</text></button>
     <view wx:if="{{share}}" class="app-nav-title-group" style="max-width:{{shareTitleWidth}}px;transform:translateX(-{{shareTitleShift}}px)"><text class="app-nav-title">{{title}}</text><button class="share-entry-button" bindtap="shareImage" disabled="{{shareDisabled}}" hover-class="none" aria-label="{{shareLabel}}"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view>
     <text wx:else class="app-nav-title">{{title}}</text>
   </view>

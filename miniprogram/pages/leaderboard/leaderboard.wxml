@@ -44,8 +44,10 @@
     <view wx:if="{{board.rows.length}}" class="rank-list">
       <view wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}">
         <view class="rank-number rank-place-{{item.rank}}" aria-label="第{{item.rank}}名"><image wx:if="{{3 >= item.rank}}" class="rank-crown" src="/assets/rank-{{item.rank}}.svg" aria-hidden="true" /><text>{{item.rank}}</text></view>
-        <image wx:if="{{item.avatarUrl}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true" />
-        <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
+        <button class="rank-avatar-button" hover-class="none" bindtap="openRankPlayerCard" data-id="{{item.publicId}}" disabled="{{loading || loadingMore || visibilitySaving}}" aria-label="{{'查看'+item.nickname+'的玩家战绩'}}">
+          <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" binderror="rankAvatarError" data-id="{{item.publicId}}" data-url="{{item.avatarUrl}}" aria-hidden="true" />
+          <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
+        </button>
         <view class="rank-identity"><view class="rank-name">{{item.nickname}}<text wx:if="{{item.isSelf}}" class="rank-self-label"> · 我</text></view><view class="small muted">{{board.fun?item.sampleLabel:board.metric==='points'?item.total+'场计分局':item.wins+'胜 · '+item.total+'局'}}</view></view>
         <view class="rank-value">{{item.value}}<text class="rank-unit">{{item.unit}}</text></view>
       </view>
@@ -68,10 +70,12 @@
       </view>
       <view wx:if="{{board.fun}}" class="small muted fun-mine-sample">{{board.me.knownGames?board.me.count+" / "+board.me.opportunities+" 次机会":"暂无完整样本"}}<text wx:if="{{board.me.statusLabel}}"> · {{board.me.statusLabel}}</text><text wx:if="{{board.me.unknownGames}}"> · {{board.me.unknownGames}} 局未记录</text></view>
       <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
-      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">公开昵称和成绩可能出现在附近排名分享图中。关闭后仍可分享本人成绩；已发送图片不会撤回。</view>
+      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">公开后，其他玩家可点击头像查看历史战绩汇总；昵称和成绩也可能出现在附近排名分享图中。关闭后仍可分享本人成绩；已发送图片不会撤回。</view>
       <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button hover-class="none" bindtap="retryVisibility" disabled="{{visibilitySaving}}">重试</button></view>
         </scroll-view>
       </view>
     </view>
   </block>
 </view>
+
+<include src="../../player-card.wxml" />

@@ -32,6 +32,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
     {
       module: { exports: {} },
       require: name => {
+        if (name === '../../player-card') return require('../miniprogram/player-card');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -121,7 +122,7 @@ test("座位头像失败回退跨刷新和换座保留，新头像可加载，�
   assert.equal(url, "https://table.example/api/avatars/a");
   assert.equal(p.data.seats[1].avatarInitial, "乙");
   assert.equal(p.data.seats[2].avatarInitial, "+");
-  p.seat({ currentTarget: { dataset: { seat: 2 } } });
+  p.toggleProposalSeat({ currentTarget: { dataset: { seat: 2 } } });
   p.setData({ seatsExpanded: false });
   p.seatAvatarError({ currentTarget: { dataset: { seat: 1, url } } });
   await p.refresh();
@@ -1286,7 +1287,7 @@ test("座位轮询跟随公开昵称并保留选人，阶段变化重置选人�
   const p = page({ request: async (path,method) => { if (method === "POST") writes++; return structuredClone(room); } });
   p.roomCode = room.code;
   await p.refresh();
-  p.seat({ currentTarget: { dataset: { seat: 2 } } });
+  p.toggleProposalSeat({ currentTarget: { dataset: { seat: 2 } } });
   assert.deepEqual(Array.from(p.data.selected), [2]);
   room.players[1].name = "更新后的完整昵称";
   room.players[1].seat = 4;
@@ -1387,7 +1388,7 @@ test("查验与猎人开枪先暂选，单独确认提交，过期草稿不能�
 
 test("小程序点自己的座位确认站起，点空位坐下，点他人不换座", async () => {
   const p = page({});
-  p.data.room = { code: "123456", phase: "lobby", stage: "s", me: { seat: 1 } };
+  p.data.room = { code: "123456", phase: "lobby", stage: "s", me: { seat: 1 }, players: [{seat:1,name:"甲"},{seat:3,name:"乙"}] };
   p.data.seats = [{ seat: 1, occupied: true }, { seat: 2, occupied: false }, { seat: 3, occupied: true }];
   const calls = [];
   p.cmd = (type, extra) => calls.push({ type, extra });
@@ -1448,7 +1449,7 @@ test("行动入口按公开阶段命名，特殊技能不暴露角色", async ()
 test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
   let definition, url;
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8") + "\nPage(module.exports());", {
-    module: { exports: {} }, require: () => ({}), Page: p => definition = p,
+    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : {}, Page: p => definition = p,
     wx: { navigateTo: o => url = o.url },
   });
   const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };
@@ -1868,4 +1869,33 @@ test("小程序胜负登记取消及阶段过期不提交", async () => {
   assert.equal(writes, 0);
   assert.match(p.data.error, /阶段已变化/);
 
+});
+
+test('战绩卡：准备点自己站起，点别人只读，游戏点自己和别人均可查看', async () => {
+  const players = [{seat:1,name:'甲',statsId:'a'.repeat(64)},{seat:2,name:'乙',statsId:'b'.repeat(64)}];
+  let room=dealtRoom({phase:'lobby',players}); const reads=[],writes=[];
+  const p=page({request:async path=>{reads.push(path);return {player:{id:players[1].statsId,seat:2},status:'available',stats:{total:0,wins:0,winRate:null,scoreTotal:0,byFaction:[]}};}});
+  p.data.room=room; p.data.seats=players.map(x=>({...x,occupied:true}));
+  p.confirmCommand=(...args)=>writes.push(args);p.cmd=(...args)=>writes.push(args);
+  await p.seat({currentTarget:{dataset:{seat:1}}}); assert.equal(writes[0][2],'stand');assert.equal(reads.length,0);
+  await p.seat({currentTarget:{dataset:{seat:2}}});assert.equal(reads.length,1);assert.equal(writes.length,1);
+  assert.equal(p.data.playerCard.name,'乙');assert.equal(p.data.playerCardStats.rateLabel,'—');assert.equal(p.data.playerCardLoading,false);
+  const opened=[];p.openPlayerCard=seat=>opened.push(seat);p.data.room.phase='tools';
+  await p.seat({currentTarget:{dataset:{seat:1}}});await p.seat({currentTarget:{dataset:{seat:2}}});
+  assert.deepEqual(opened,[1,2]);assert.equal(writes.length,1);
+});
+test('战绩卡：关闭、切后台及阶段变化丢弃迟到响应，重试与换座不会串人', async () => {
+  let resolveStats, fail=false, room=dealtRoom({players:[{seat:1,name:'甲',statsId:'a'.repeat(64)}]});
+  const p=page({request:async path=>{
+    if (!path.endsWith('/stats')) return structuredClone(room);
+    if (fail) throw new Error('网络暂不可用');
+    return new Promise(resolve=>resolveStats=resolve);
+  }});p.roomCode=room.code;await p.refresh();p.closeDealtIdentity();
+  const result={player:{id:room.players[0].statsId,seat:1},status:'hidden'};
+  let opening=p.openPlayerCard(1);p.closePlayerCard();resolveStats(result);await opening;assert.equal(p.data.playerCard,null);
+  opening=p.openPlayerCard(1);p.onHide();resolveStats(result);await opening;assert.equal(p.data.playerCard,null);
+  p.foreground=true;opening=p.openPlayerCard(1);room.stage='new-stage';await p.refresh();resolveStats(result);await opening;assert.equal(p.data.playerCard,null);
+  fail=true;await p.openPlayerCard(1);assert.equal(p.data.playerCardError,'网络暂不可用');assert.equal(p.data.error,'');
+  fail=false;opening=p.retryPlayerCard();resolveStats(result);await opening;assert.equal(p.data.playerCardStatus,'hidden');assert.equal(p.data.playerCardError,'');
+  room.players[0]={seat:1,name:'甲',statsId:'b'.repeat(64)};await p.refresh();assert.equal(p.data.playerCard,null);
 });

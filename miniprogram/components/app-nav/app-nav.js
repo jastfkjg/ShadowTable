@@ -13,6 +13,7 @@ Component({
     title: { type: String, value: "" },
     back: { type: Boolean, value: false },
     backLabel: { type: String, value: "返回" },
+    backText: { type: String, value: "" },
     share: { type: Boolean, value: false },
     shareDisabled: { type: Boolean, value: false },
     shareLabel: { type: String, value: "分享成绩图片" },

@@ -22,6 +22,7 @@
       </view>
     </view>
 </template>
+<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult}}"><include src="../../player-card.wxml" /></block>
 <template name="tableResult">
     <view wx:if="{{latestResult && (room.phase==='tools' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
       <view class="result-summary-heading"><text class="small muted">最近结果</text><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
@@ -85,7 +86,7 @@
   </view>
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
-<app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backLabel="返回对局" bindback="returnHome" />
+<app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
 <view class="page {{isLobby ? 'tab-page' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view wx:if="{{!room || room.phase!=='lobby'}}" class="brand">
     <view class="brand-identity">
@@ -96,7 +97,6 @@
       </button>
     </view>
     <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry" bindtap="openHelp" aria-label="打开使用帮助"><text class="help-entry-icon" aria-hidden="true">?</text><text>帮助</text></button>
-    <button hover-class="none" wx:if="{{room}}" class="switch-table home-entry" bindtap="returnHome" disabled="{{busy}}" aria-label="返回对局，保留当前座位"><view class="home-icon" aria-hidden="true"></view><text>对局</text></button>
   </view>
   <button hover-class="none" wx:if="{{!isLobby && !room && !loading}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
   <view wx:if="{{loading}}" class="status" role="status">正在连接牌桌…</view>
@@ -317,7 +317,6 @@
     <view wx:if="{{room.phase==='lobby'}}" class="lobby-room-header">
       <view class="lobby-room-row">
         <button hover-class="none" class="copy-room lobby-room-code" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}"><text>房间 {{room.code}}</text><view class="lobby-copy-icon" aria-hidden="true" /></button>
-        <button hover-class="none" class="lobby-header-link" bindtap="returnHome" disabled="{{busy}}" aria-label="返回对局，保留当前座位">对局 <text aria-hidden="true">›</text></button>
       </view>
       <view class="lobby-room-row lobby-board-row">
         <text class="lobby-board-name">{{room.boardName}}</text>
@@ -426,18 +425,21 @@
         wx:key="seat"
         class="seat {{item.occupied?'':'seat-empty'}} {{item.mine?'mine':''}} {{item.inTeam?'team':''}} {{item.selected?'selected':''}}"
         data-seat="{{item.seat}}"
-        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.host?'，房主':'')+(item.alive===false?'，已出局':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.fairyHolder===item.seat?'，湖仙':'')+(room.phase==='lobby'?'，'+(item.occupied?(item.ready?'已准备':'未准备'):'可入座')+(item.mine?'，点击站起围观':''):'')}}"
+        aria-label="{{item.seat+'号，'+item.name+(item.mine?'，你的座位':'')+(item.host?'，房主':'')+(item.alive===false?'，已出局':'')+(item.selected?'，已选入队':item.inTeam?'，任务队员':'')+(room.phase!=='lobby' && item.occupied && room.fairyHolder===item.seat?'，湖中仙女持有者':'')+(room.phase==='lobby'?'，'+(item.occupied?(item.ready?'已准备':'未准备'):'可入座')+(item.mine?'，点击站起围观':item.occupied?'，点击查看战绩':''):item.occupied?'，点击查看战绩':'')}}"
         bindtap="seat"
-        disabled="{{hasPendingRequest || busy || !network || (room.phase==='lobby'?(item.occupied && !item.mine):!(room.phase==='proposal' && !room.flexible && room.leader===room.me.seat))}}"
+        disabled="{{hasPendingRequest || busy || !network || (room.phase!=='lobby' && !item.occupied)}}"
       >
         <view class="seat-head">
           <text class="seat-number">{{item.seat}}号</text>
           <view class="seat-head-tags"><text wx:if="{{room.phase==='lobby' && item.host}}" class="seat-flag">房主</text><text wx:if="{{item.mine}}" class="seat-self">你</text></view>
         </view>
         <view wx:if="{{item.occupied}}" class="seat-player">
-          <view class="seat-avatar" aria-hidden="{{true}}">
-            <text class="seat-avatar-fallback">{{item.avatarInitial}}</text>
-            <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="seat-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="{{true}}" />
+          <view class="seat-avatar-wrap" aria-hidden="{{true}}">
+            <view class="seat-avatar">
+              <text class="seat-avatar-fallback">{{item.avatarInitial}}</text>
+              <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="seat-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="{{true}}" />
+            </view>
+            <view wx:if="{{room.phase!=='lobby' && room.fairyHolder===item.seat}}" class="seat-fairy" aria-hidden="{{true}}"><image class="seat-fairy-icon" src="/assets/lake-fairy.svg" mode="aspectFit" aria-hidden="{{true}}" /></view>
           </view>
           <view class="seat-name">{{item.name}}</view>
         </view>
@@ -445,12 +447,12 @@
           <text class="seat-empty-mark" aria-hidden="{{true}}">+</text>
           <text class="seat-empty-label">{{room.phase==='lobby'?'入座':'空位'}}</text>
         </view>
-        <view wx:if="{{item.occupied && (room.phase!=='lobby' || item.ready)}}" class="seat-meta">
-          <text wx:if="{{room.phase==='lobby' ? item.ready : item.selected || item.inTeam}}" class="seat-status {{room.phase==='lobby' && item.ready?'seat-ready':''}}">{{room.phase==='lobby'?'✓ 已准备':(item.selected?'已选入队':'任务队员')}}</text>
-          <view wx:if="{{room.phase!=='lobby' && (item.host || item.alive===false || room.fairyHolder===item.seat)}}" class="seat-tags">
+        <view wx:if="{{room.phase==='lobby' && item.occupied && item.ready}}" class="seat-ready-badge" aria-hidden="{{true}}"><view class="seat-ready-check" /></view>
+        <view wx:if="{{item.occupied && room.phase!=='lobby'}}" class="seat-meta">
+          <text wx:if="{{item.selected || item.inTeam}}" class="seat-status">{{item.selected?'已选入队':'任务队员'}}</text>
+          <view wx:if="{{item.host || item.alive===false}}" class="seat-tags">
             <text wx:if="{{item.host}}" class="seat-flag">房主</text>
             <text wx:if="{{item.alive===false}}" class="seat-out">已出局</text>
-            <text wx:if="{{room.fairyHolder===item.seat}}" class="seat-fairy">湖仙</text>
           </view>
         </view>
       </button></view
@@ -475,9 +477,9 @@
       <view wx:if="{{room.phase==='proposal' && !room.canUseTools && !room.flexible}}" class="panel"
         ><view class="label">本轮需要 {{room.teamSize}} 人</view
         ><text class="muted"
-          >{{room.leader===room.me.seat?'点座位选人，再提交队伍':'等待队长选人'}}</text
+          >{{room.leader===room.me.seat?'在下方选择队员，再提交队伍':'等待队长选人'}}</text
         ><view class="team-line">当前队伍：{{teamText}}</view
-        ><button hover-class="none"
+        ><view wx:if="{{room.leader===room.me.seat}}" class="proposal-player-options"><button wx:for="{{seats}}" wx:key="seat" wx:if="{{item.occupied}}" hover-class="none" class="{{item.selected?'selected':''}}" bindtap="toggleProposalSeat" data-seat="{{item.seat}}" aria-pressed="{{item.selected}}" disabled="{{hasPendingRequest || busy || !network}}">{{item.seat}}号 · {{item.name}}{{item.selected?' ✓':''}}</button></view><button hover-class="none"
           wx:if="{{room.leader===room.me.seat}}"
           class="primary"
           bindtap="propose"

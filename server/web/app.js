@@ -505,6 +505,7 @@
     hasPendingRequest: false,
     notice: "",
     room: null,
+    playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "",
     boards: [],
     availableBoards: [],
     entryMode: "join",
@@ -670,7 +671,7 @@
     } catch (e) { if (sequence === routeSequence) handleError(e); }
   }
   function profileDraft(profile) {
-    return { nickname: profile.nickname, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
+    return { nickname: profile.nickname, roomStatsVisible: !!profile.roomStatsVisible, avatarPreview: profile.avatarUrl, version: profile.version, avatarStyle: profilePreset(profile.avatarUrl)?.style || 'classic' };
   }
   function needsNicknameSetup() {
     return !(state.profile?.nicknameConfirmed ?? !!(state.profile?.nickname && state.profile.nickname !== '新朋友'));
@@ -700,7 +701,7 @@
     } finally { if (sequence === profileSequence && route === routeSequence) setState({ profileLoading: false }); }
   }
   function profileDirty() {
-    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined) });
+    setState({ profileDirty: !!state.profileDraft && (state.profileDraft.nickname.trim() !== (state.profile?.nickname || '') || state.profileDraft.avatar !== undefined || state.profileDraft.roomStatsVisible !== !!state.profile?.roomStatsVisible) });
   }
   const builtinAvatars = window.shadowtableBuiltinAvatars || [];
   const avatarStyles = window.shadowtableAvatarStyles || [];
@@ -751,7 +752,7 @@
         app.querySelector('#profile-nickname')?.focus();
         return;
       }
-      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version,
+      profilePending = { id: requestId(), data: { nickname, version: state.profileDraft.version, ...(state.profileDraft.roomStatsVisible !== !!state.profile?.roomStatsVisible ? { roomStatsVisible: state.profileDraft.roomStatsVisible } : {}),
         ...(state.profileDraft.avatar !== undefined ? { avatar: state.profileDraft.avatar } : {}) } };
     }
     setState({ profileSaving: true, profileError: '', profileEditingNickname: false, profileNicknameError: '' });
@@ -813,7 +814,7 @@
       html += '<button type="button" class="nickname-display" data-action="editProfileNickname" aria-label="修改个人昵称，当前昵称：' + esc(draft.nickname || '新朋友') + '"' + (locked ? ' disabled' : '') + '><span class="nickname-text">' + esc(draft.nickname || '新朋友') + '</span><svg class="nickname-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1L20 7.5a2.8 2.8 0 0 0-4-4L4.5 15Z"/></svg></button>';
     }
     if (state.profileNicknameError) html += '<div id="profile-nickname-error" class="nickname-error" role="alert">' + esc(state.profileNicknameError) + '</div>';
-    html += '</div></div>';
+    html += '</div></div><label class="profile-room-visibility"><span>允许同房玩家查看战绩<span class="small muted">仅展示历史汇总，与排行榜公开设置独立</span></span><input type="checkbox" role="switch" aria-label="允许同房玩家查看战绩" data-change="profileRoomStatsVisibility"' + (draft.roomStatsVisible ? ' checked' : '') + (locked || state.profileLoading ? ' disabled' : '') + ' /></label>';
     const selected = profilePreset(draft.avatarPreview)?.id;
     const style = draft.avatarStyle || 'classic';
     const visibleAvatars = builtinAvatars.filter(item => item.style === style);
@@ -849,6 +850,7 @@
   window.addEventListener('resize', () => keepFunRankVisible(true));
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
+    closePlayerCard(false);
     const sequence = ++rankSequence, route = routeSequence;
     let metric = selection.rankMetric || state.rankMetric;
     const period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
@@ -902,6 +904,10 @@
       if (route === routeSequence) setState({ rankVisible: !['hidden','unsupported'].includes(state.rankBoard.me.status), rankVisibilityError: e.message, rankMineExpanded: true });
     } finally { setState({ rankVisibilitySaving: false }); }
   }
+  function rankAvatarButton(row) {
+    return '<button type="button" class="rank-avatar-button" data-action="rankPlayerCard" data-id="' + esc(row.publicId) + '" aria-label="' + esc('查看' + row.nickname + '的玩家战绩') + '"' + (state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving ? ' disabled' : '') + '>' +
+      (row.avatarUrl && !row.avatarFailed ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" data-rank-avatar-id="' + esc(row.publicId) + '" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc(Array.from(row.nickname || '友')[0]) + '</span>') + '</button>';
+  }
   function viewLeaderboard() {
     const board = state.rankBoard, metric = state.rankMetric;
     const displayMetric = board?.metric || metric;
@@ -920,7 +926,7 @@
     if (board.rows.length) {
       html += '<div class="rank-list-heading small muted"><span>排名 / 玩家</span><span>' + (displayMetric === 'games' ? '有效局数' : metricLabel) + '</span></div><ol class="rank-list" aria-label="榜单玩家">';
       board.rows.forEach(row => {
-        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + (row.avatarUrl ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc((row.nickname || '友').slice(0,1)) + '</span>') + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + (board.fun ? row.count + ' / ' + row.opportunities + ' 次机会' : displayMetric === 'points' ? row.total + '场计分局' : row.wins + '胜 · ' + row.total + '局') + '</div></div><div class="rank-value">' + value(row) + '</div></li>';
+        html += '<li id="rank-' + esc(row.publicId) + '" class="rank-row' + (row.isSelf ? ' is-self' : '') + '"><span class="rank-number rank-place-' + row.rank + '" aria-label="第' + row.rank + '名">' + (row.rank <= 3 ? '<svg class="rank-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M4 18 2 5l8 5 6-9 6 9 8-5-2 13Z" fill="currentColor"/><path d="M5 22h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' : '') + row.rank + '</span>' + rankAvatarButton(row) + '<div class="rank-identity"><div class="rank-name">' + esc(row.nickname) + (row.isSelf ? '<span class="accent"> · 我</span>' : '') + '</div><div class="small muted">' + (board.fun ? row.count + ' / ' + row.opportunities + ' 次机会' : displayMetric === 'points' ? row.total + '场计分局' : row.wins + '胜 · ' + row.total + '局') + '</div></div><div class="rank-value">' + value(row) + '</div></li>';
       });
       html += '</ol>';
     } else html += '<div class="rank-empty muted">暂无战绩</div>';
@@ -929,7 +935,7 @@
     const me = board.me;
     const place = me.rank ? '<span class="rank-mine-prefix">第</span>' + me.rank + '<span class="rank-mine-unit">名</span>' : '未上榜';
     html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="'+!!state.rankMineExpanded+'" aria-label="我的排名，详情与公开设置"><span class="rank-mine-brief"><span class="small muted">我的名次</span><span class="rank-mine-place">'+place+'</span></span><span class="rank-mine-brief rank-mine-metric"><span class="rank-mine-value">'+value(me)+'</span><span class="small muted">详情与设置 ›</span></span></button></aside>';
-    if (state.rankMineExpanded) html += '<div class="dialog-backdrop rank-details-backdrop"><div class="error-dialog rank-details-dialog" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><div class="rank-details-header"><div class="dialog-title">我的排名</div>'+btn('rank-disclosure','rankToggleMine','关闭')+'</div><div class="rank-details-body"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="rank-mine-label">我的名次</div><div class="rank-mine-place' + (me.rank ? '' : ' is-unranked') + '" aria-label="' + (me.rank ? '第 ' + me.rank + ' 名' : '未上榜') + '">' + place + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + (displayMetric === 'games' ? '总局数' : metricLabel) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (board.fun ? '<div class="small muted fun-mine-sample">' + (me.knownGames ? me.count + ' / ' + me.opportunities + ' 次机会' : '暂无完整样本') + (me.status === 'not_enough' ? ' · 还差 ' + me.remaining + (board.sort === 'rate' ? ' 次机会' : board.unit) + '上榜' : me.status === 'no_records' ? ' · 尚无完整记录' : '') + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></div></div>';
+    if (state.rankMineExpanded) html += '<div class="dialog-backdrop rank-details-backdrop"><div class="error-dialog rank-details-dialog" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><div class="rank-details-header"><div class="dialog-title">我的排名</div>'+btn('rank-disclosure','rankToggleMine','关闭')+'</div><div class="rank-details-body"><div class="rank-mine-content"><div class="rank-mine-copy"><div class="rank-mine-label">我的名次</div><div class="rank-mine-place' + (me.rank ? '' : ' is-unranked') + '" aria-label="' + (me.rank ? '第 ' + me.rank + ' 名' : '未上榜') + '">' + place + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + (displayMetric === 'games' ? '总局数' : metricLabel) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (board.fun ? '<div class="small muted fun-mine-sample">' + (me.knownGames ? me.count + ' / ' + me.opportunities + ' 次机会' : '暂无完整样本') + (me.status === 'not_enough' ? ' · 还差 ' + me.remaining + (board.sort === 'rate' ? ' 次机会' : board.unit) + '上榜' : me.status === 'no_records' ? ' · 尚无完整记录' : '') + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label>' : '') + (me.status !== 'unsupported' ? '<div class="small muted">公开后，其他玩家可点击头像查看历史战绩汇总。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></div></div>';
     html += '</section>';
     return html;
   }
@@ -991,6 +997,7 @@
     } catch (e) {}
   }
   function mask() {
+    closePlayerCard(false);
     generation++;
     actionGeneration++;
     setState({
@@ -1238,6 +1245,10 @@ function roomListItems(rooms) {
     lastRoomSnapshot = snapshot;
     var stageChanged = state.room && state.room.stage !== room.stage;
     var privacyChanged = stageChanged || (state.room && state.room.me.identityRevision !== room.me.identityRevision);
+    if (state.playerCard) {
+      const target = room.players.find(p => p.statsId === state.playerCard.id);
+      if (privacyChanged || room.code !== state.room?.code || !target || target.seat !== state.playerCard.seat || target.name !== state.playerCard.name || target.avatarUrl !== state.playerCard.sourceAvatarUrl) closePlayerCard(false);
+    }
     if (stageChanged)
       buzz(room.needsSubmission && !room.me.submitted ? [50, 40, 50] : [25]);
     var selected = stageChanged ? [] : state.selected;
@@ -1924,24 +1935,65 @@ function roomListItems(rooms) {
     seatAvatarFailures.add(url);
     setState({ seats: state.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s) });
   }
-  function seat(seatNum) {
-    var r = state.room;
-    if (r.phase === "lobby") {
-      var s = state.seats.filter(function (x) {
-        return x.seat === seatNum;
-      })[0];
-      if (s && s.mine) {
-        confirmCommand("站起围观？", "站起后释放座位并取消准备，你仍留在房间，可点击空位重新坐下。", "stand");
-      } else if (s && !s.occupied) cmd("seat", { seat: seatNum });
-    } else if (r.phase === "proposal" && r.leader === r.me.seat) {
-      var selected =
-        state.selected.indexOf(seatNum) !== -1
-          ? state.selected.filter(function (x) {
-              return x !== seatNum;
-            })
-          : state.selected.concat([seatNum]);
-      setState({ selected: selected });
+  let playerCardSequence = 0;
+  function closePlayerCard(restoreFocus = true) {
+    const card = state.playerCard, seatNum = card?.seat;
+    playerCardSequence++;
+    setState({ playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "" });
+    if (restoreFocus && card?.scope === 'leaderboard') app.querySelector('[data-action="rankPlayerCard"][data-id="' + card.id + '"]')?.focus({ preventScroll: true });
+    if (restoreFocus && seatNum != null) app.querySelector('[data-action="seat"][data-seat="' + seatNum + '"]')?.focus({ preventScroll: true });
+  }
+  async function openPlayerCard(seatNum) {
+    const room = state.room, player = room?.players.find(p => p.seat === seatNum);
+    if (!player || !foreground || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult) return;
+    const card = { id: player.statsId, seat: seatNum, name: player.name, isHost: player.isHost, sourceAvatarUrl: player.avatarUrl,
+      avatarUrl: player.avatarUrl || "", initial: Array.from(player.name || "友")[0], avatarFailed: false };
+    return loadPlayerCard(card, '/api/rooms/' + room.code + '/players/' + player.statsId + '/stats',
+      () => state.room?.code === room.code && state.room?.stage === room.stage);
+  }
+  function openRankPlayerCard(id) {
+    const row = state.rankBoard?.rows.find(row => row.publicId === id), route = routeSequence, rank = rankSequence;
+    if (!row || state.page !== 'leaderboard' || !foreground || state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving) return;
+    setState({ rankMineExpanded: false });
+    return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '',
+      initial: Array.from(row.nickname || '友')[0], avatarFailed: !!row.avatarFailed }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats',
+      () => state.page === 'leaderboard' && route === routeSequence && rank === rankSequence);
+  }
+  async function loadPlayerCard(card, path, current) {
+    const sequence = ++playerCardSequence;
+    const active = () => alive && foreground && sequence === playerCardSequence && current();
+    setState({ playerCard: card, playerCardStats: null, playerCardLoading: true, playerCardError: "", playerCardStatus: "" });
+    app.querySelector('.player-card-close')?.focus({ preventScroll: true });
+    try {
+      if (!card.id) throw new Error("当前服务暂不支持查看玩家战绩，请更新服务端后重试");
+      const result = await request(path);
+      if (!active()) return;
+      if (result.player.id !== card.id || card.seat != null && result.player.seat !== card.seat) return closePlayerCard(false);
+      const rateLabel = value => value == null ? "—" : value.toFixed(1) + "%";
+      const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
+        byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
+      const playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
+      setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
+    } catch (e) {
+      if (active()) setState({ playerCardError: e.message || "战绩读取失败，请重试" });
+    } finally {
+      if (active()) setState({ playerCardLoading: false });
     }
+  }
+  function seat(seatNum) {
+    const r = state.room, s = state.seats.find(x => x.seat === seatNum);
+    if (!r || !s || seatDisabled(s)) return;
+    if (r.phase === "lobby") {
+      if (s.mine) return confirmCommand("站起围观？", "站起后释放座位并取消准备，你仍留在房间，可点击空位重新坐下。", "stand");
+      if (!s.occupied) return cmd("seat", { seat: seatNum });
+    }
+    return openPlayerCard(seatNum);
+  }
+  function toggleProposalSeat(seatNum) {
+    const r = state.room;
+    if (r?.phase !== "proposal" || r.flexible || r.leader !== r.me.seat || state.busy || state.hasPendingRequest || !state.network || !r.players.some(p => p.seat === seatNum)) return;
+    const selected = state.selected.includes(seatNum) ? state.selected.filter(n => n !== seatNum) : [...state.selected, seatNum];
+    setState({ selected, seats: state.seats.map(s => ({ ...s, selected: selected.includes(s.seat) })) });
   }
   function ready() {
     cmd("ready", { ready: !state.room.me.ready });
@@ -2882,14 +2934,22 @@ function roomListItems(rooms) {
       '</span><span class="room-menu-chevron" aria-hidden="true">›</span></button>';
   }
   function seatDisabled(s) {
-    var r = state.room;
-    if (state.busy) return true;
-    if (r.phase === "lobby") return s.occupied && !s.mine;
-    return !(
-      r.phase === "proposal" &&
-      !r.flexible &&
-      r.leader === r.me.seat
-    );
+    return state.busy || state.hasPendingRequest || !state.network || (state.room.phase !== "lobby" && !s.occupied);
+  }
+  function viewPlayerCard() {
+    const p = state.playerCard, stats = state.playerCardStats;
+    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult) return "";
+    let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span><span class="small muted">' + (p.scope === 'leaderboard' ? '全部历史战绩' : p.seat + '号位' + (p.isHost ? ' · 房主' : '')) + '</span></div></div>';
+    if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
+    else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
+    else if (state.playerCardStatus === 'hidden') html += '<div class="player-card-message muted">该玩家未开放战绩</div>';
+    else if (state.playerCardStatus === 'untracked') html += '<div class="player-card-message muted">陪测玩家不记录个人战绩</div>';
+    else if (stats) {
+      html += '<div class="player-card-summary">' + [[stats.total,'有效局数'],[stats.wins,'胜场'],[stats.rateLabel,'总胜率']].map(row => '<div class="player-card-stat"><span class="player-card-number">' + esc(row[0]) + '</span><span class="small muted">' + row[1] + '</span></div>').join('') + '</div>';
+      html += stats.total ? '<div class="player-card-factions"><div class="player-card-section-title">阵营表现</div>' + stats.byFaction.map(row => '<div class="player-card-faction"><span class="faction-' + esc(row.faction) + '">' + esc(row.label) + '</span><span class="small muted">' + row.wins + '胜 / ' + row.total + '局</span><span>' + esc(row.rateLabel) + '</span></div>').join('') + '</div>' : '<div class="player-card-empty small muted">暂无有效战绩</div>';
+      html += '<div class="player-card-score"><span>总积分</span><span class="player-card-score-value">' + stats.scoreTotal + '</span></div><div class="player-card-note small muted">' + (p.scope === 'leaderboard' ? '全部历史有效对局 · 不含进行中的对局' : '历史有效对局 · 不含正在进行的本局') + '</div>';
+    }
+    return html + '</div></section></div>';
   }
   function viewFairyResult() {
     if (!state.fairyResult || state.identityChange || state.error) return "";
@@ -3510,6 +3570,7 @@ function roomListItems(rooms) {
         s.seat +
         '"' +
         ' aria-label="' + esc(s.seat + '号，' + s.name + (s.mine ? '，你的座位' : '') + (s.host ? '，房主' : '') + (s.alive === false ? '，已出局' : '') + (s.selected ? '，已选入队' : s.inTeam ? '，任务队员' : '') + (r.fairyHolder === s.seat ? '，湖仙' : '') + (r.phase === 'lobby' ? '，' + seatMeta(s) : '')) + '"' +
+        ' aria-description="' + (r.phase === 'lobby' && s.mine ? '点击站起围观' : s.occupied ? '点击查看战绩' : r.phase === 'lobby' ? '点击入座' : '空位') + '"' +
         (seatDisabled(s) ? " disabled" : "") +
         '><span class="seat-head"><span class="seat-number">' +
         s.seat +
@@ -3541,12 +3602,12 @@ function roomListItems(rooms) {
           '<div class="panel"><div class="label">本轮需要 ' +
           r.teamSize +
           ' 人</div><span class="muted">' +
-          (r.leader === r.me.seat ? "点座位选人，再提交队伍" : "等待队长选人") +
+          (r.leader === r.me.seat ? "在下方选择队员，再提交队伍" : "等待队长选人") +
           '</span><div class="team-line">当前队伍：' +
           esc(state.teamText) +
           "</div>" +
           (r.leader === r.me.seat
-            ? btn(
+            ? '<div class="proposal-player-options">' + r.players.map(p => btn(state.selected.includes(p.seat) ? 'selected' : '', 'toggleProposalSeat', p.seat + '号 · ' + p.name + (state.selected.includes(p.seat) ? ' ✓' : ''), { seat: p.seat }, state.busy || state.hasPendingRequest || !state.network)).join('') + '</div>' + btn(
                 "primary",
                 "propose",
                 "提交队伍（已选 " + state.selected.length + " / " + r.teamSize + "）",
@@ -4045,7 +4106,7 @@ function roomListItems(rooms) {
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
-      viewSettingsDialog() +
+      viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
     enhanceSelects(next);
     patchDOM(app, next);
@@ -4057,6 +4118,10 @@ function roomListItems(rooms) {
   // ===== event delegation =====
   var ACTIONS = {
     startWebLogin, continueAsGuest,
+    closePlayerCard: () => closePlayerCard(),
+    rankPlayerCard: el => openRankPlayerCard(el.dataset.id),
+    retryPlayerCard: () => state.playerCard && !state.playerCardLoading && (state.playerCard.scope === 'leaderboard' ? openRankPlayerCard(state.playerCard.id) : openPlayerCard(state.playerCard.seat)),
+    toggleProposalSeat: el => toggleProposalSeat(Number(el.dataset.seat)),
     recoverConnection: recoverConnection,
     toggleFunCards: () => setState({funExpanded:!state.funExpanded}),
     toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
@@ -4066,6 +4131,7 @@ function roomListItems(rooms) {
     funRankSort: el => { if(['count','rate'].includes(el.dataset.value)) return loadLeaderboard(false,{rankFunSort:el.dataset.value}); },
     rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:'fun_merlin_evade',rankFunMode:'all',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
     rankToggleMine: () => {
+      closePlayerCard(false);
       setState({rankMineExpanded:!state.rankMineExpanded});
       app.querySelector(state.rankMineExpanded ? '.rank-details-dialog button' : '.rank-mine-toggle')?.focus();
     },
@@ -4342,6 +4408,7 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
+    profileRoomStatsVisibility: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.roomStatsVisible = el.checked; profileDirty(); } },
     funRankRole: el => loadLeaderboard(false,{rankFunRole:el.value}),
     rankVisibility: el => changeRankVisibility(el.checked),
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
@@ -4415,8 +4482,14 @@ function roomListItems(rooms) {
   // Image errors do not bubble; capture them without changing seat click handling.
   app.addEventListener("error", function (e) {
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
+    if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
+      const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
+      setState({ rankBoard: { ...state.rankBoard, rows: state.rankBoard.rows.map(row => row.publicId === id && row.avatarUrl === src ? { ...row, avatarFailed: true } : row) } });
+    }
+    if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
+    if (e.target?.hasAttribute?.('data-player-card-backdrop')) return closePlayerCard();
     var picker = e.target.closest("[data-option-trigger]");
     if (picker && !picker.disabled) {
       var key = picker.dataset.optionTrigger;
@@ -4458,6 +4531,17 @@ function roomListItems(rooms) {
   window.addEventListener("scroll", showIdentityHintWhenVisible, { passive: true });
   window.addEventListener("resize", showIdentityHintWhenVisible);
   document.addEventListener("keydown", function (event) {
+    if (state.playerCard && !state.error) {
+      if (event.key === "Escape") { event.preventDefault(); closePlayerCard(); }
+      else if (event.key === "Tab") {
+        const buttons = app.querySelectorAll('.player-card-sheet button:not(:disabled)');
+        if (buttons.length) {
+          const index = Array.prototype.indexOf.call(buttons, document.activeElement);
+          event.preventDefault(); buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+        }
+      }
+      return;
+    }
     if (!state.dealtIdentityDialog || state.error) return;
     if (event.key === "Escape") {
       event.preventDefault();

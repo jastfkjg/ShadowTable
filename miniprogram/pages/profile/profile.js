@@ -6,7 +6,7 @@ function presetId(url) {
   return avatarPreset(url)?.id || "";
 }
 Page({
-  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", canUpload: false, uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0, ...avatarLibrary(), initial: "友", profile: null },
+  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, roomStatsVisible: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", canUpload: false, uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0, ...avatarLibrary(), initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -14,7 +14,7 @@ Page({
     const preview = personalPreview("profile");
     if (preview) {
       this.original = preview;
-      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
+      this.setData({ profile: preview, roomStatsVisible: !!preview.roomStatsVisible, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
     }
     const loading = this.load({ preserveEdits: true });
     this.loadUploadCapability();
@@ -118,16 +118,20 @@ Page({
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
       const style = preserveEdits && this.avatarStyleTouched ? this.data.avatarStyle : avatarPreset(profile.avatarUrl)?.style;
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), ...avatarLibrary(style), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
+      this.setData({ profile: shown, roomStatsVisible: !!profile.roomStatsVisible, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), ...avatarLibrary(style), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
   },
   markDirty() {
-    const dirty = this.data.nickname.trim() !== (this.original?.nickname || "") || this.avatar !== undefined;
+    const dirty = this.data.nickname.trim() !== (this.original?.nickname || "") || this.avatar !== undefined || this.data.roomStatsVisible !== !!this.original?.roomStatsVisible;
     this.setData({ dirty });
     if (dirty) wx.enableAlertBeforeUnload?.({ message: "资料尚未保存，离开会丢失修改" });
     else wx.disableAlertBeforeUnload?.();
+  },
+  changeRoomStatsVisibility(e) {
+    if (this.pending || this.data.busy) return;
+    this.setData({ roomStatsVisible: !!e.detail.value }); this.markDirty();
   },
   inputName(e) {
     if (this.pending || this.data.busy) return;
@@ -184,7 +188,7 @@ Page({
         this.editNickname();
         return this.setData({ nicknameError: "请输入1–16个字符的昵称" });
       }
-      this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
+      this.pending = { id: api.requestId(), data: { nickname, version: this.original.version, ...(this.data.roomStatsVisible !== !!this.original.roomStatsVisible ? { roomStatsVisible: this.data.roomStatsVisible } : {}), ...(this.avatar !== undefined ? { avatar: this.avatar } : {}) } };
     }
     this.setData({ busy: true, error: "", pendingSave: true, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
     try {

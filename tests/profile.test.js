@@ -97,7 +97,7 @@ test('牌桌展示当前头像且不泄露资料字段；改头像不改游戏�
     const peer = (await app.req(path, player)).data;
     assert.equal(peer.players[0].avatarUrl, before.players[0].avatarUrl);
     for (const p of peer.players) {
-      assert.deepEqual(Object.keys(p).sort(), ['alive', 'avatarUrl', 'isHost', 'name', 'ready', 'seat'].sort());
+      assert.deepEqual(Object.keys(p).sort(), ['alive', 'avatarUrl', 'isHost', 'name', 'ready', 'seat', 'statsId'].sort());
     }
     await app.req('/api/me/profile', host, { nickname: '改后个人昵称', avatar: 'builtin:' + next.id, version: 1 });
     const updated = (await app.req(path, host)).data;

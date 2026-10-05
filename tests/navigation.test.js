@@ -799,6 +799,46 @@ function rankResult(metric='games', extra={}) {
     rows:[{publicId:'player',nickname:'甲',avatarUrl:null,rank:1,total:20,wins:12,losses:8,winRate:60,isSelf:true}],
     me:{rank:1,status:'ranked',total:20,wins:12,losses:8,winRate:60,remaining:0},...extra};
 }
+test('小程序排行榜头像复用战绩卡，显示最新公开资料，失败可重试且支持头像占位', async () => {
+  let fail=true;const urls=[];
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{
+    urls.push(url);
+    if(!url.endsWith('/stats'))return rankResult();
+    if(fail)throw Error('读取失败');
+    return {player:{id:'player',name:'新昵称',avatarUrl:'/assets/avatar.svg'},status:'available',stats:{total:40,wins:25,winRate:62.5,scoreTotal:80,byFaction:[]}};
+  }});
+  await p.onShow();p.data.mineExpanded=true;
+  await p.openRankPlayerCard({currentTarget:{dataset:{id:'player'}}});
+  assert.equal(p.data.mineExpanded,false);assert.equal(p.data.playerCardError,'读取失败');
+  fail=false;await p.retryPlayerCard();
+  assert.equal(urls.at(-1),'/api/leaderboard/players/player/stats');
+  assert.equal(p.data.playerCard.scope,'leaderboard');assert.equal(p.data.playerCard.name,'新昵称');
+  assert.equal(p.data.playerCard.avatarUrl,'https://test.invalid/assets/avatar.svg');
+  assert.equal(p.data.playerCardStats.rateLabel,'62.5%');assert.equal(p.data.playerCardStats.total,40);
+  p.data.board.rows[0].avatarUrl='/old.svg';
+  p.rankAvatarError({currentTarget:{dataset:{id:'player',url:'/old.svg'}}});
+  assert.equal(p.data.board.rows[0].avatarFailed,true);
+  await p.openRankPlayerCard({currentTarget:{dataset:{id:'player'}}});
+  assert.equal(p.data.playerCardStats.total,40);
+});
+test('小程序排行榜关闭、隐藏、卸载或切换筛选后忽略旧卡片响应，快速换人不串数据', async () => {
+  for(const leave of ['closePlayerCard','onHide','onUnload','filter']) {
+    const pending=deferred();
+    const {p}=page('leaderboard',{...apiBase,request:url=>url.endsWith('/stats')?pending.promise:Promise.resolve(rankResult())});
+    await p.onShow();const opening=p.openRankPlayerCard({currentTarget:{dataset:{id:'player'}}});
+    if(leave==='filter')await p.load(false,{period:'month'});else p[leave]();
+    pending.resolve({player:{id:'player',name:'旧昵称'},status:'available',stats:{total:0,wins:0,winRate:null,scoreTotal:0,byFaction:[]}});
+    await opening;assert.equal(p.data.playerCard,null,leave);assert.equal(p.data.playerCardStats,null,leave);
+  }
+  const calls=[];
+  const {p}=page('leaderboard',{...apiBase,request:()=>{const pending=deferred();calls.push(pending);return pending.promise;}});
+  p.data.loading=false;p.data.board={rows:[{publicId:'a',nickname:'甲'},{publicId:'b',nickname:'乙'}]};
+  const first=p.openRankPlayerCard({currentTarget:{dataset:{id:'a'}}});
+  const second=p.openRankPlayerCard({currentTarget:{dataset:{id:'b'}}});
+  calls[1].resolve({player:{id:'b',name:'乙'},status:'available',stats:{total:0,wins:0,winRate:null,scoreTotal:0,byFaction:[]}});await second;
+  calls[0].reject(Error('旧请求失败'));await first;
+  assert.equal(p.data.playerCard.id,'b');assert.equal(p.data.playerCardError,'');assert.equal(p.data.playerCardStats.rateLabel,'—');
+});
 test('新小程序连接旧服务时自动显示局数榜，周期和胜率可用，升级后恢复积分入口', async () => {
   const urls=[];let upgraded=false;
   const {p}=page('leaderboard',{...apiBase,request:async url=>{

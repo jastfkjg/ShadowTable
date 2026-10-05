@@ -21,6 +21,47 @@ function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
+test('排行榜战绩卡鉴权、汇总全部历史、仅按最新排行榜公开设置授权', async () => {
+  const app=createApp({database:':memory:',clock:()=>NOW});
+  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
+  const base='http://127.0.0.1:'+app.server.address().port;
+  const owner='wx:rank-card-owner', viewer='guest:rank-card-viewer';
+  const tokens=new Map([[owner,'c'.repeat(64)],[viewer,'d'.repeat(64)]]);
+  const get=async(path,uid)=>{
+    const res=await fetch(base+path,{headers:uid?{Authorization:'Bearer '+tokens.get(uid)}:{}});
+    return {status:res.status,cache:res.headers.get('cache-control'),data:await res.json()};
+  };
+  try {
+    for(const [uid,token] of tokens)app.store.addSession(createHash('sha256').update(token).digest('hex'),uid);
+    profile(app.store,owner,true,'公开昵称');
+    games(app.store,owner,2,1);
+    games(app.store,owner,3,2,{faction:'evil',endedAt:Date.parse('2026-08-01T00:00:00Z')});
+    games(app.store,owner,1,0,{excluded:true});
+    assert.equal(readProfile(app.store,owner).roomStatsVisible,false);
+    const month=(await get('/api/leaderboard?metric=games&period=month',viewer)).data;
+    assert.equal(month.rows[0].total,2);
+    const id=month.rows[0].publicId, path='/api/leaderboard/players/'+id+'/stats';
+    assert.equal((await get(path)).status,401);
+    const card=await get(path,viewer);
+    assert.equal(card.status,200);assert.equal(card.cache,'no-store');
+    assert.deepEqual(card.data.player,{id,name:'公开昵称',avatarUrl:null});
+    assert.equal(card.data.stats.total,5);assert.equal(card.data.stats.wins,3);assert.equal(card.data.stats.winRate,60);
+    assert.equal(card.data.stats.byFaction.length,2);
+    assert.deepEqual(Object.keys(card.data.stats).sort(),['byFaction','scoreTotal','total','winRate','wins']);
+    assert.doesNotMatch(JSON.stringify(card.data),/wx:|guest:|本人角色|历史昵称|records|recent|excluded|membership/);
+    app.store.transaction(()=>saveProfile(app.store,owner,{nickname:'公开昵称',version:readProfile(app.store,owner).version,leaderboardVisible:false,roomStatsVisible:true}));
+    const hidden=await get(path,viewer);
+    assert.equal(hidden.status,404);assert.equal(hidden.cache,'no-store');assert.equal(hidden.data.player,undefined);
+    assert.equal((await get(path,owner)).status,200);
+    const missing=await get('/api/leaderboard/players/'+randomUUID()+'/stats',viewer);
+    assert.deepEqual(missing.data,hidden.data);
+    for(const uid of ['guest:hidden-target','test:hidden-target']) {
+      profile(app.store,uid,false);
+      const publicId=app.store.db.prepare('SELECT public_id FROM profiles WHERE uid=?').get(uid).public_id;
+      assert.equal((await get('/api/leaderboard/players/'+publicId+'/stats',viewer)).status,404);
+    }
+  } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
+});
 test('微信、开发账号首局自动上榜，陪测和游客不参与五榜且不公开牌桌昵称', () => {
   const store=new Store(':memory:');
   try {

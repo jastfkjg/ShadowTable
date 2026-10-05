@@ -4,6 +4,7 @@ const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails, completeActionDetails } = require("./audit");
 const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
+const { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats } = require("./player-stats");
 const { Leaderboard } = require("./leaderboard");
 const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
@@ -284,6 +285,11 @@ function createApp({
       }
       const uploadStatus = path.match(/^\/api\/me\/avatar-uploads\/([a-f0-9-]{36})$/);
       if (req.method === "GET" && uploadStatus) return send(200, require("./avatar-uploads").readUpload(store, uid, uploadStatus[1]));
+      const rankedPlayerStats = path.match(/^\/api\/leaderboard\/players\/([a-f0-9-]{36})\/stats$/);
+      if (req.method === "GET" && rankedPlayerStats) {
+        res.setHeader("Cache-Control", "no-store");
+        return send(200, readLeaderboardPlayerStats(store, uid, rankedPlayerStats[1]));
+      }
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
       if (path === "/api/me/profile" || path === "/api/me/leaderboard-visibility") {
@@ -350,6 +356,13 @@ function createApp({
         const rooms = store.personalRooms(uid);
         return send(200, { rooms });
       }
+      const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/stats$/);
+      if (req.method === "GET" && playerStats) {
+        const room = store.get(playerStats[1]);
+        check(room, "房间不存在", 404);
+        res.setHeader("Cache-Control", "no-store");
+        return send(200, readRoomPlayerStats(store, room, uid, playerStats[2]));
+      }
       const personal = path.match(/^\/api\/me\/rooms\/(\d{6})$/);
       const match = path.match(
         /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management))?$/,
@@ -367,7 +380,7 @@ function createApp({
         const view = publicView(room, uid);
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
-        view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat) }));
+        view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat), statsId: playerStatsId(room, room.players.find(player => player.seat === p.seat)) }));
         store.touchRoom(room.code);
         const encoded = JSON.stringify(view), etag = '"' + hash(uid + "\n" + encoded) + '"';
         res.setHeader("ETag", etag);

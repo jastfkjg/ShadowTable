@@ -1,11 +1,27 @@
 const api = require("../../api");
+const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { mineExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
-  onLoad() { this.alive = true; },
-  onShow() { return this.load(); },
+  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  ...playerCardMethods(api),
+  onLoad() { this.alive = true; this.foreground = true; },
+  onShow() { this.foreground = true; return this.load(); },
+  onHide() { this.foreground = false; this.closePlayerCard(); },
+  openRankPlayerCard(e) {
+    const id = e.currentTarget.dataset.id, row = this.data.board?.rows.find(row => row.publicId === id);
+    if (!row || this.foreground === false || this.data.loading || this.data.loadingMore || this.data.visibilitySaving) return;
+    this.setData({ mineExpanded: false });
+    return this.loadPlayerCard({ scope: "leaderboard", id, name: row.nickname, avatarUrl: row.avatarUrl,
+      initial: row.initial, avatarFailed: !!row.avatarFailed }, `/api/leaderboard/players/${encodeURIComponent(id)}/stats`);
+  },
+  retryPlayerCard() { if (this.data.playerCard && !this.data.playerCardLoading) return this.openRankPlayerCard({ currentTarget: { dataset: { id: this.data.playerCard.id } } }); },
+  rankAvatarError(e) {
+    const { id, url } = e.currentTarget.dataset, board = this.data.board;
+    if (board?.rows.some(row => row.publicId === id && row.avatarUrl === url))
+      this.setData({ board: { ...board, rows: board.rows.map(row => row.publicId === id ? { ...row, avatarFailed: true } : row) } });
+  },
   shareLeaderboard() {
     if (this.data.loading || this.data.loadingMore || this.data.visibilitySaving || this.data.shareOpening) return;
     const error = this.data.error ? "请先重试读取榜单，再分享成绩。" : leaderboardShareError(this.data.board);
@@ -20,10 +36,11 @@ Page({
     this.setData({ shareNotice: message });
     wx.showToast({ title: message, icon: "none", duration: 3000 });
   },
-  onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; },
+  onUnload() { this.closePlayerCard(); this.alive = false; this.sequence = (this.sequence || 0) + 1; },
   async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },
   async load(more = false, selection = {}) {
     if (more && (this.data.loading || this.data.loadingMore || !this.data.board?.hasMore)) return;
+    this.closePlayerCard();
     const sequence = this.sequence = (this.sequence || 0) + 1;
     let { metric } = { ...this.data, ...selection };
     const { period, board, funMode, funSort, funRole } = { ...this.data, ...selection };
@@ -99,7 +116,7 @@ Page({
     if (!["all", "month"].includes(period) || period === this.data.period) return;
     return this.load(false, { period });
   },
-  toggleMine() { this.setData({ mineExpanded: !this.data.mineExpanded }); },
+  toggleMine() { this.closePlayerCard(); this.setData({ mineExpanded: !this.data.mineExpanded }); },
   toggleMetrics() { this.setData({ metricsExpanded: !this.data.metricsExpanded }); },
   blockScroll() {},
   loadMore() { return this.load(true); },

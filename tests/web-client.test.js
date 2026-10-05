@@ -27,7 +27,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
+      viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       getWebSessionTag() { return webSessionTag; },
@@ -485,7 +485,7 @@ test("网页座位头像失败回退且轮询不重试，换座跟随玩家，�
   assert.match(c.viewRoom(), /aria-label="1号，甲，你的座位，房主"/);
   assert.match(c.viewRoom(), /seat-empty/);
   assert.doesNotMatch(c.viewRoom(), /点击入座/);
-  c.ACTIONS.seat({ dataset: { seat: "2" } });
+  c.ACTIONS.toggleProposalSeat({ dataset: { seat: "2" } });
   c.ACTIONS.toggleSeats();
   c.seatAvatarError({ dataset: { seat: "1", seatAvatarUrl: "/api/avatars/a" } });
   await c.refresh();
@@ -764,7 +764,7 @@ test("网页围观不显示准备或私密身份，自己的座位可点击站�
   c.state.seats = [{ seat: 1, name: "房主", mine: true, occupied: true }];
   let html = c.viewRoom();
   assert.match(html, /点自己站起/);
-  assert.match(html, /data-action="seat" data-seat="1" aria-label="[^"]*">/);
+  assert.match(html, /data-action="seat" data-seat="1" aria-label="[^"]*" aria-description="点击站起围观">/);
   command(r, "host", { type: "stand", stage: r.stage });
   c.state.room = publicView(r, "host");
   html = c.viewRoom();
@@ -1351,4 +1351,75 @@ test('网页按服务端刺客状态跳过带刀人，计分和不计分均可�
     c.ACTIONS.pickFunActor({dataset:{seat:1}});c.ACTIONS.nextResult();c.ACTIONS.pickScoreTarget({dataset:{seat:1}});
     assert.equal(c.state.resultTarget,null);
   }
+});
+
+test('网页主座位在准备时看他人战绩、游戏时看自己；关闭和阶段变化丢弃响应', async () => {
+  let resolveStats;
+  const players=[{seat:1,name:'甲',statsId:'a'.repeat(64)},{seat:2,name:'<乙>',statsId:'b'.repeat(64)}];
+  let room=dealtWebRoom({phase:'lobby',players});
+  const c=client(async url=>url.endsWith('/stats')?new Promise(resolve=>resolveStats=resolve):response(structuredClone(room)));
+  await c.refresh();
+  let opening=c.ACTIONS.seat({dataset:{seat:'2'}});
+  assert.equal(c.state.playerCard.name,'<乙>');assert.match(c.viewPlayerCard(),/&lt;乙&gt;/);
+  resolveStats(response({player:{id:players[1].statsId,seat:2},status:'available',stats:{total:0,wins:0,winRate:null,scoreTotal:0,byFaction:[]}}));
+  await opening;
+  // The action delegate may not return a promise; allow the read to finish.
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(c.viewPlayerCard(),/暂无有效战绩/);assert.equal(c.state.playerCardStats.rateLabel,'—');
+  c.ACTIONS.closePlayerCard();assert.equal(c.state.playerCard,null);
+  room.phase='tools';room.stage='game';await c.refresh();c.ACTIONS.closeDealtIdentity();
+  opening=c.openPlayerCard(1);assert.equal(c.state.playerCard.name,'甲');c.closePlayerCard();
+  resolveStats(response({player:{id:players[0].statsId,seat:1},status:'hidden'}));await opening;assert.equal(c.state.playerCard,null);
+  opening=c.openPlayerCard(1);room.stage='next';await c.refresh();resolveStats(response({player:{id:players[0].statsId,seat:1},status:'hidden'}));await opening;
+  assert.equal(c.state.playerCard,null);
+});
+
+test('网页排行榜头像与占位头像打开同一战绩卡，支持错误重试并转义最新昵称', async () => {
+  const calls=[];let fail=true;
+  const c=client(async url=>{
+    calls.push(url);
+    if(!url.endsWith('/stats'))return response(webRanks());
+    if(fail)return {status:404,json:async()=>({error:'该玩家已关闭排行榜公开展示或暂不可查看'})};
+    return response({player:{id:'public-player',name:'<新昵称>',avatarUrl:null},status:'available',stats:{total:40,wins:25,winRate:62.5,scoreTotal:80,byFaction:[]}});
+  });
+  await c.applyRoute('#/leaderboard');
+  assert.match(c.viewLeaderboard(),/data-action="rankPlayerCard" data-id="public-player"/);
+  assert.match(c.viewLeaderboard(),/rank-avatar-fallback/);
+  c.state.rankMineExpanded=true;await c.ACTIONS.rankPlayerCard({dataset:{id:'public-player'}});
+  assert.equal(c.state.rankMineExpanded,false);assert.match(c.viewPlayerCard(),/暂不可查看/);
+  fail=false;await c.ACTIONS.retryPlayerCard();
+  assert.equal(calls.at(-1),'/api/leaderboard/players/public-player/stats');
+  assert.equal(c.state.playerCardStats.rateLabel,'62.5%');
+  assert.match(c.viewPlayerCard(),/&lt;新昵称&gt;/);assert.match(c.viewPlayerCard(),/全部历史战绩/);
+  assert.doesNotMatch(c.viewPlayerCard(),/号位|<新昵称>/);
+});
+test('网页排行榜离开、关闭与换榜丢弃迟到响应，快速点击只显示最后一人', async () => {
+  for(const leave of ['close','route','filter']) {
+    let resolveStats;
+    const c=client(url=>url.endsWith('/stats')?new Promise(resolve=>resolveStats=resolve):Promise.resolve(response(webRanks())));
+    await c.applyRoute('#/leaderboard');
+    const opening=c.ACTIONS.rankPlayerCard({dataset:{id:'public-player'}});
+    if(leave==='close')c.closePlayerCard();
+    else if(leave==='route')await c.applyRoute('#/help');
+    else await c.loadLeaderboard(false,{rankPeriod:'month'});
+    resolveStats(response({player:{id:'public-player',name:'迟到昵称'},status:'hidden'}));await opening;
+    assert.equal(c.state.playerCard,null,leave);assert.equal(c.state.playerCardStats,null,leave);
+  }
+  const calls=[];
+  const c=client(()=>new Promise((resolve,reject)=>calls.push({resolve,reject})));
+  c.state.page='leaderboard';c.state.rankBoard=webRanks('games',{rows:[{publicId:'a',nickname:'甲'},{publicId:'b',nickname:'乙'}]});
+  const first=c.ACTIONS.rankPlayerCard({dataset:{id:'a'}}),second=c.ACTIONS.rankPlayerCard({dataset:{id:'b'}});
+  calls[1].resolve(response({player:{id:'b',name:'乙'},status:'available',stats:{total:0,wins:0,winRate:null,scoreTotal:0,byFaction:[]}}));await second;
+  calls[0].reject(Error('过期请求'));await first;
+  assert.equal(c.state.playerCard.id,'b');assert.equal(c.state.playerCardError,'');assert.match(c.viewPlayerCard(),/暂无有效战绩/);
+});
+
+test('网页编辑资料独立切换同房战绩公开，草稿标脏且不修改排行榜设置', async () => {
+  const c=client(async()=>response({nickname:'甲',version:2,roomStatsVisible:false,leaderboardVisible:true}));
+  c.state.page='profile';await c.loadProfile(true);
+  c.CHANGES.profileRoomStatsVisibility({checked:true});
+  assert.equal(c.state.profileDirty,true);assert.equal(c.state.profileDraft.roomStatsVisible,true);
+  assert.equal(c.state.profile.leaderboardVisible,true);
+  assert.match(c.viewProfileEditor(),/允许同房玩家查看战绩/);
+  c.CHANGES.profileRoomStatsVisibility({checked:false});assert.equal(c.state.profileDirty,false);
 });

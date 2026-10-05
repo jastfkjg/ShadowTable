@@ -59,7 +59,7 @@ function html(n) {
         ? v
           ? k
           : ""
-        : `${k}="${escape(k === "style" ? String(v).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)") : v)}"`,
+        : `${k}="${escape(k === "style" ? String(v).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)") : k === "src" && /^\/(?:assets|pages)\//.test(v) ? "/miniprogram" + v : v)}"`,
     )
     .join(" ");
   return `<${tag} ${attrs}>${(n.children || []).map(html).join("")}${tag === "input" ? "" : `</${tag}>`}`;
@@ -148,6 +148,12 @@ const scenes = {
   },
   lobby: roomData(),
 };
+const playerCard = { id: "preview", seat: 3, name: "小林", initial: "小", isHost: true, avatarUrl: "/pages/profile/assets/avatars/avatar-03.jpg" };
+scenes.playerStats = { ...scenes.lobby, playerCard, playerCardStatus: "available", playerCardStats: { total: 48, wins: 29, rateLabel: "60.4%", scoreTotal: 126,
+  byFaction: [{faction:"good",label:"好人阵营",wins:21,total:32,rateLabel:"65.6%"},{faction:"evil",label:"坏人阵营",wins:8,total:16,rateLabel:"50.0%"}] } };
+scenes.playerStatsHidden = { ...scenes.lobby, playerCard, playerCardStatus: "hidden" };
+scenes.playerStatsEmpty = { ...scenes.playerStats, playerCardStats: {total:0,wins:0,rateLabel:"—",scoreTotal:0,byFaction:[]} };
+scenes.playerStatsError = { ...scenes.lobby, playerCard, playerCardError:"暂时无法读取战绩，请重试" };
 const avatarRoom = newRoom("628420", "p1", "zz", BOARDS.find(b => b.available && b.counts.includes(13)).id, 13);
 for (let i = 2; i <= 12; i++) enter(avatarRoom, "p" + i, i === 4 ? "这是一个很长的玩家昵称测试" : "陪测" + (i - 1));
 const avatarScene = roomData(avatarRoom);
@@ -187,6 +193,14 @@ r.players.forEach((p) =>
 command(r, "p1", { type: "start", stage: r.stage });
 scenes.identity = roomData();
 const taskSeats = roomData();
+scenes.lakeFairyHolder = { ...taskSeats,
+  room: { ...taskSeats.room, phase: "tools", phaseName: "等待房主发起操作", canUseTools: false, needsSubmission: false,
+    fairyEnabled: true, fairyHolder: 2, me: { ...taskSeats.room.me, seat: 2, isHost: false } },
+  seats: taskSeats.seats.map(p => ({ ...p, mine: p.seat === 2,
+    avatarUrl: p.seat === 2 ? "/pages/profile/assets/avatars/avatar-02.jpg" : "" })) };
+scenes.lakeFairyTransferred = { ...scenes.lakeFairyHolder, room: { ...scenes.lakeFairyHolder.room, fairyHolder: 3 } };
+scenes.lakeFairyAvatarFailed = { ...scenes.lakeFairyHolder,
+  seats: scenes.lakeFairyHolder.seats.map(p => ({ ...p, avatarFailed: p.mine, name: p.mine ? "这是一个很长的玩家昵称" : p.name })) };
 scenes.taskSeats = {
   ...taskSeats,
   room: {
@@ -370,7 +384,7 @@ const css = fs
 const navCss = fs.readFileSync(path.join(root, "components/app-nav/app-nav.wxss"), "utf8")
   .replace(/^@import.*$/m, "")
   .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)")
-  + ".app-nav-back{width:44px;min-height:44px}";
+  + ".app-nav-back{min-height:44px}";
 fs.mkdirSync("output/playwright", { recursive: true });
 for (const [name, data] of Object.entries(scenes)) {
   fs.writeFileSync(

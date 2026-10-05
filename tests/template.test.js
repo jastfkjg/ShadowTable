@@ -207,7 +207,7 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   const button = byHandler(tree, "seat");
   assert.equal(button.attr.disabled, false);
   assert.equal(button.attr["data-seat"], 1);
-  assert.equal(button.attr.ariaLabel, "1号，甲，你的座位，房主，已出局，已选入队，湖仙");
+  assert.equal(button.attr.ariaLabel, "1号，甲，你的座位，房主，已出局，已选入队，湖中仙女持有者，点击查看战绩");
   const image = nodes(button).find(n => n.tag === "wx-image");
   assert.equal(image.attr.src, seat.avatarUrl);
   assert.equal(image.attr.binderror, "seatAvatarError");
@@ -215,13 +215,14 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-self").children), ["你"]);
   assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-flag").children), ["房主"]);
   assert.match(JSON.stringify(button), /已出局/);
-  assert.match(JSON.stringify(button), /湖仙/);
+  assert.match(button.attr.ariaLabel, /湖中仙女持有者/);
   assert.match(JSON.stringify(button), /已选入队/);
   assert.ok(nodes(button).find(n => n.attr?.class?.startsWith("seat-status")).children.includes("已选入队"));
   assert.ok(nodes(button).find(n => n.attr?.class === "seat-tags"));
   const failed = byHandler(render({ ...base, room, seats: [{ ...seat, avatarFailed: true }] }), "seat");
-  assert.ok(!nodes(failed).some(n => n.tag === "wx-image"));
+  assert.ok(!nodes(failed).some(n => n.attr?.class === "seat-avatar-image"));
   assert.ok(nodes(failed).some(n => n.attr?.class === "seat-avatar-fallback"));
+  assert.ok(nodes(failed).some(n => n.attr?.class === "seat-fairy-icon"));
   const lobby = { ...room, phase: "lobby" };
   const empty = byHandler(render({ ...base, room: lobby, seats: [{ seat: 2, name: "空位", occupied: false, mine: false, avatarInitial: "+" }] }), "seat");
   assert.equal(empty.attr.disabled, false);
@@ -232,12 +233,15 @@ test("座位头像固定占位且失败回退，保留座位按钮和全部公�
   const gameEmpty = byHandler(render({ ...base, room, seats: [{ seat: 2, name: "空位", occupied: false }] }), "seat");
   assert.doesNotMatch(JSON.stringify(gameEmpty), /点击入座/);
   const occupied = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, mine: false }] }), "seat");
-  assert.equal(occupied.attr.disabled, true);
+  assert.equal(occupied.attr.disabled, false);
   assert.equal(nodes(occupied).find(n => n.attr?.class === "seat-self"), undefined);
   assert.match(occupied.attr.ariaLabel, /未准备/);
   assert.ok(!nodes(occupied).some(n => n.attr?.class?.startsWith("seat-status")));
+  assert.ok(!nodes(occupied).some(n => n.attr?.class === "seat-ready-badge"));
   const ready = byHandler(render({ ...base, room: lobby, seats: [{ ...seat, ready: true }] }), "seat");
-  assert.match(JSON.stringify(ready), /已准备/);
+  assert.match(ready.attr.ariaLabel, /已准备/);
+  assert.ok(nodes(ready).some(n => n.attr?.class === "seat-ready-badge"));
+  assert.ok(!nodes(ready).some(n => n.attr?.class === "seat-meta" || n.attr?.class === "seat-fairy"));
   assert.doesNotMatch(JSON.stringify(ready), /未准备/);
 });
 test("座位区保留人数和准备统计，长昵称保留在原卡片且不显示名单入口", () => {
@@ -842,6 +846,13 @@ test("普通玩家座位公开湖仙标记且随传递移动；关闭后无标�
     const tree = render({ ...base, room: { ...room, fairyHolder: holder }, seats });
     const marked = nodes(tree).filter(n => n.attr?.bindtap === "seat" && JSON.stringify(n).includes('seat-fairy'));
     assert.deepEqual(marked.map(n => n.attr["data-seat"]), holder ? [holder] : []);
+    if (holder) {
+      const icon = nodes(marked[0]).find(n => n.attr?.class === "seat-fairy-icon");
+      assert.equal(icon.attr.src, "/assets/lake-fairy.svg");
+      assert.ok(require("node:fs").existsSync(path.join(root, icon.attr.src)));
+      assert.match(marked[0].attr.ariaLabel, /湖中仙女持有者/);
+      assert.ok(!nodes(marked[0]).some(n => n.tag === "wx-text" && n.children.includes("湖仙")));
+    }
   }
   const host = { ...room, canUseTools: true, me: { isHost: true }, fairyEnabled: false, fairyHolder: null };
   const disabled = render({ ...base, room: host, seats });
@@ -1026,4 +1037,29 @@ test('积分页只有真实空数据才显示空态，按北京日期分组，�
   const record = { ...require('../miniprogram/profile').presentMatches([require('./helpers/fun-copy-fixtures').match])[0], members: [{ seat: 1, name: '甲' }], score: { status: 'scored', total: 8, breakdown: [{ id: 'bonus', label: '挡刀奖励', points: 8 }], manualOverride: { reason: '本局核对' } } };
   const detail = JSON.stringify(factory('pages/match-detail/match-detail.wxml')({ record }));
   assert.match(detail, /挡刀奖励/); assert.match(detail, /本局核对/); assert.match(detail, /同桌成员/);
+});
+
+test('排行榜有图与无图头像均为可点击入口，并复用无座位标记的战绩卡', () => {
+  const rank=factory('pages/leaderboard/leaderboard.wxml');
+  const data={loading:false,board:{rows:[{publicId:'a',nickname:'甲',initial:'甲',avatarUrl:'/a.svg'},{publicId:'b',nickname:'乙',initial:'乙'}],me:{status:'ranked'}},playerCard:{scope:'leaderboard',id:'b',name:'乙',initial:'乙'},playerCardStats:{total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]}};
+  const tree=rank(data),buttons=nodes(tree).filter(n=>n.attr?.bindtap==='openRankPlayerCard');
+  assert.equal(buttons.length,2);assert.equal(buttons[0].tag,'wx-button');assert.equal(buttons[1].attr['data-id'],'b');
+  assert.equal(buttons[0].attr.ariaLabel,'查看甲的玩家战绩');
+  assert.match(JSON.stringify(tree),/全部历史战绩|暂无有效战绩/);assert.doesNotMatch(JSON.stringify(tree),/号位/);
+  assert.ok(byHandler(tree,'closePlayerCard'));
+  assert.equal(byHandler(rank({...data,loading:true}),'openRankPlayerCard').attr.disabled,true);
+});
+
+test('玩家战绩卡呈现加载、隐私、空数据、阵营及积分，空座位不可在游戏中触发', () => {
+  const room={phase:'tools',capacity:6,me:{seat:1},team:[]};
+  const card={id:'a',seat:2,name:'乙',initial:'乙',isHost:true};
+  const data={...base,room,playerCard:card};
+  assert.match(JSON.stringify(render({...data,playerCardLoading:true})),/正在读取战绩/);
+  assert.match(JSON.stringify(render({...data,playerCardStatus:'hidden'})),/该玩家未开放战绩/);
+  assert.match(JSON.stringify(render({...data,playerCardError:'网络中断'})),/retryPlayerCard/);
+  const stats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
+  assert.match(JSON.stringify(render({...data,playerCardStats:stats})),/暂无有效战绩/);
+  assert.match(JSON.stringify(render({...data,playerCardStats:{...stats,total:2,wins:1,rateLabel:'50.0%',scoreTotal:3,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50.0%'}]}})),/好人阵营/);
+  assert.ok(!byHandler(render({...data,actionDialog:true}),'closePlayerCard'));
+  assert.equal(byHandler(render({...base,room,seats:[{seat:2,occupied:false}]}),'seat').attr.disabled,true);
 });

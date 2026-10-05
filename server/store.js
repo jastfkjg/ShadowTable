@@ -53,6 +53,8 @@ class Store {
     require("./avatar-uploads").initialize(this.db);
     management.initialize(this);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
+    if (!profileColumns.some(column => column.name === "room_stats_visible"))
+      this.db.exec("ALTER TABLE profiles ADD COLUMN room_stats_visible INTEGER NOT NULL DEFAULT 0");
     if (!profileColumns.some(column => column.name === "leaderboard_visible"))
       this.db.exec("ALTER TABLE profiles ADD COLUMN leaderboard_visible INTEGER NOT NULL DEFAULT 1");
     if (!profileColumns.some(column => column.name === "public_id"))
@@ -288,7 +290,7 @@ class Store {
   managedMatches(query) { return management.list(this,query); }
   previewMatches(input) { return management.preview(this,input); }
   manageMatches(input) { return management.change(this,input); }
-  statsFor(uid) {
+  statsSummaryFor(uid) {
     const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;
     const summary = row => {
       const wins = Number(row.wins || 0), losses = Number(row.losses || 0), total = wins + losses;
@@ -297,6 +299,18 @@ class Store {
     const total = this.db.prepare(`SELECT ${counts} FROM visible_match_players WHERE uid=?`).get(uid);
     const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM visible_match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
       .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
+    const score = this.db.prepare("SELECT coalesce(sum(points),0) AS total FROM active_match_scores WHERE uid=? AND status='scored'").get(uid);
+    const adjustment = this.db.prepare("SELECT coalesce(sum(delta),0) AS total FROM score_adjustments WHERE uid=?").get(uid);
+    return { ...summary(total), byFaction, scoreTotal: score.total + adjustment.total };
+  }
+  statsFor(uid) {
+    const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;
+    const summary = row => {
+      const wins = Number(row.wins || 0), losses = Number(row.losses || 0), total = wins + losses;
+      return { total, wins, losses, excluded: Number(row.excluded || 0), winRate: total ? Math.round(wins / total * 1000) / 10 : null };
+    };
+    const { scoreTotal, ...overview } = this.statsSummaryFor(uid);
+    const { byFaction } = overview;
     const byRole = this.db.prepare(`SELECT faction, json_extract(snapshot,'$.role') AS role, ${counts}
       FROM visible_match_players WHERE uid=? AND outcome IN ('win','loss')
       GROUP BY faction,role ORDER BY faction,wins + losses DESC,role`).all(uid)
@@ -324,7 +338,7 @@ class Store {
     for (const row of byFaction) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction));
     for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
     const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(CASE WHEN created>=? AND created<? THEN delta ELSE 0 END),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=?").get(monthStart,monthEnd,uid);
-    return { identityType: uid.split(":")[0], ...summary(total), byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
+    return { identityType: uid.split(":")[0], ...overview, byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
       score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual, ...this.streakFor(uid) } };
   }
   streakFor(uid) {

@@ -51,10 +51,10 @@ function resolveAvatar(value) {
   return builtinCache.get(preset.id);
 }
 function readProfile(store, uid) {
-  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
+  const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, room_stats_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
     identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
-    leaderboardVisible: /^(wx|dev|test):/.test(uid) && (row ? !!row.leaderboard_visible : true), nicknameConfirmed: !!row?.nickname_confirmed };
+    leaderboardVisible: /^(wx|dev|test):/.test(uid) && (row ? !!row.leaderboard_visible : true), roomStatsVisible: !!row?.room_stats_visible, nicknameConfirmed: !!row?.nickname_confirmed };
 }
 // Room presentation uses current avatars without copying profile data into game state.
 function readAvatarUrls(store, uids) {
@@ -69,6 +69,8 @@ function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
   if (old.version !== input.version) throw new RuleError("资料已在其他设备更新，请重新载入后编辑", 409);
   fail(input.leaderboardVisible === undefined || typeof input.leaderboardVisible === "boolean", "排行榜展示设置无效");
   const visible = input.leaderboardVisible ?? old.leaderboardVisible;
+  fail(input.roomStatsVisible === undefined || typeof input.roomStatsVisible === "boolean", "同房战绩展示设置无效");
+  const roomStatsVisible = input.roomStatsVisible ?? old.roomStatsVisible;
   fail(!visible || /^(wx|dev|test):/.test(uid), "微信、开发或陪测账号可参与公开排行榜");
   let avatarHash = old.avatarUrl?.split("/").at(-1) || null;
   const oldHash = avatarHash;
@@ -79,10 +81,10 @@ function saveProfile(store, uid, input, { confirmNickname = true } = {}) {
     store.db.prepare("INSERT OR IGNORE INTO avatars VALUES(?,?,?)").run(avatar.hash, avatar.mime, avatar.data);
     avatarHash = avatar.hash;
   }
-  store.db.prepare(`INSERT INTO profiles(uid,nickname,avatar_hash,version,updated,leaderboard_visible,public_id,nickname_confirmed) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
+  store.db.prepare(`INSERT INTO profiles(uid,nickname,avatar_hash,version,updated,leaderboard_visible,public_id,nickname_confirmed,room_stats_visible) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
     nickname=excluded.nickname, avatar_hash=excluded.avatar_hash, version=excluded.version, updated=excluded.updated,
-    leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id), nickname_confirmed=excluded.nickname_confirmed`)
-    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID(), confirmNickname || old.nicknameConfirmed ? 1 : 0);
+    leaderboard_visible=excluded.leaderboard_visible, public_id=COALESCE(profiles.public_id,excluded.public_id), nickname_confirmed=excluded.nickname_confirmed, room_stats_visible=excluded.room_stats_visible`)
+    .run(uid, input.nickname.trim(), avatarHash, old.version + 1, Date.now(), visible ? 1 : 0, randomUUID(), confirmNickname || old.nicknameConfirmed ? 1 : 0, roomStatsVisible ? 1 : 0);
   uploads.trackReferences(store, oldHash, avatarHash);
   store.invalidateLeaderboard();
   return readProfile(store, uid);

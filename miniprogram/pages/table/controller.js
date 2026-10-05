@@ -1,4 +1,5 @@
 const api = require("../../api");
+const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const funCopy = require("../../fun-copy");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 function resultFlow(data) {
@@ -183,6 +184,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     hasPendingRequest: false,
     notice: "",
     room: null,
+    ...initialPlayerCardData,
     latestResult: null,
     historyExpanded: false,
     focusedHistoryKey: null,
@@ -311,6 +313,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (Object.keys(changed).length) this.setData(changed);
   },
   mask() {
+    this.closePlayerCard();
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
@@ -550,6 +553,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.lastRoomSnapshot = snapshot;
     const stageChanged = this.data.room?.stage !== room.stage;
     const privacyChanged = stageChanged || this.data.room?.me.identityRevision !== room.me.identityRevision;
+    if (this.data.playerCard) {
+      const target = room.players.find(p => p.statsId === this.data.playerCard.id);
+      if (privacyChanged || room.code !== this.data.room?.code || !target || target.seat !== this.data.playerCard.seat || target.name !== this.data.playerCard.name || target.avatarUrl !== this.data.playerCard.sourceAvatarUrl)
+        this.closePlayerCard();
+    }
     // Haptic nudge on game-stage transitions; stronger when it is now our turn.
     if (stageChanged && this.data.room)
       this.buzz(room.needsSubmission && !room.me.submitted ? "medium" : "light");
@@ -600,6 +608,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const avatarUrl = p?.avatarUrl ? api.assetUrl(p.avatarUrl) : "";
       return {
         seat,
+        statsId: p?.statsId || "",
         name: p ? p.name : "空位",
         avatarUrl,
         avatarInitial: p ? Array.from(p.name || "友")[0] : "+",
@@ -1217,13 +1226,19 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   async seat(e) {
     const seat = Number(e.currentTarget.dataset.seat),
       r = this.data.room;
+    if (!r || this.data.busy || this.data.hasPendingRequest || !this.data.network) return;
     if (r.phase === "lobby") {
       if (seat === r.me.seat) {
         return this.confirmCommand("站起围观？", "站起后释放座位并取消准备，你仍留在房间，可点击空位重新坐下。", "stand");
       }
-      if (!this.data.seats.find((s) => s.seat === seat).occupied)
-        this.cmd("seat", { seat });
-    } else if (r.phase === "proposal" && r.leader === r.me.seat) {
+      if (!this.data.seats.find((s) => s.seat === seat)?.occupied)
+        return this.cmd("seat", { seat });
+    }
+    return this.openPlayerCard(seat);
+  },
+  toggleProposalSeat(e) {
+    const seat = Number(e.currentTarget.dataset.seat), r = this.data.room;
+    if (r?.phase === "proposal" && !r.flexible && r.leader === r.me.seat && r.players.some(p => p.seat === seat) && !this.data.busy && !this.data.hasPendingRequest && this.data.network) {
       const selected = this.data.selected.includes(seat)
         ? this.data.selected.filter((s) => s !== seat)
         : [...this.data.selected, seat];
@@ -1236,6 +1251,17 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       });
     }
   },
+  ...playerCardMethods(api),
+  async openPlayerCard(seat) {
+    const room = this.data.room, player = room?.players.find(p => p.seat === seat);
+    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult) return;
+    const sourceAvatarUrl = player.avatarUrl;
+    const card = { id: player.statsId, seat, name: player.name, isHost: player.isHost, sourceAvatarUrl,
+      avatarUrl: sourceAvatarUrl ? api.assetUrl(sourceAvatarUrl) : "", initial: Array.from(player.name || "友")[0], avatarFailed: false };
+    return this.loadPlayerCard(card, `/api/rooms/${room.code}/players/${player.statsId}/stats`,
+      () => this.data.room?.code === room.code && this.data.room?.stage === room.stage);
+  },
+  retryPlayerCard() { if (this.data.playerCard && !this.data.playerCardLoading) return this.openPlayerCard(this.data.playerCard.seat); },
   configureBoard(e) {
     const b = this.data.roomBoards[Number(e.detail.value)];
     if (b)
