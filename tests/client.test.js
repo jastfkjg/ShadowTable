@@ -32,6 +32,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
     {
       module: { exports: {} },
       require: name => {
+        if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
         vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/tab-navigation.js'), 'utf8'), { module, wx });

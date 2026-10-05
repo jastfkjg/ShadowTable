@@ -14,7 +14,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   const context = {
     document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
-    window: { location: { replace: url => navigations.push(url), reload: () => navigations.push('reload') }, history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles },
+    window: { location: { replace: url => navigations.push(url), reload: () => navigations.push('reload') }, history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles, shadowtableFunCopy: require('../miniprogram/fun-copy') },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     navigator: {},
     fetch,
@@ -39,6 +39,23 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页读取旧趣味响应时同步转换统计、比例、历史摘要和事件文案', async () => {
+  const legacy = require('./helpers/fun-copy-fixtures');
+  const before = JSON.stringify(legacy);
+  const c = client(async url => response(url.includes('/stats') ? legacy.stats
+    : { records: [legacy.match], total: 1, hasMore: false }));
+  await c.applyRoute('#/stats?tab=fun');
+  const stats = c.viewStats();
+  assert.match(stats, /刀中敌方率 0\.0%/);
+  assert.match(stats, /刀中友方/);
+  assert.doesNotMatch(stats, /命中同伴|命中敌方/);
+  await c.applyRoute('#/matches');
+  const matches = c.viewMatches();
+  assert.match(matches, /成功挡刀 · 刀中友方/);
+  assert.match(matches, /最终刀落到本人（1号） · 房主登记/);
+  assert.doesNotMatch(matches, /命中同伴|非梅林好人/);
+  assert.equal(JSON.stringify(legacy), before);
+});
 test('网页恢复 Cookie 身份并保留原游客；正式会话过期不会自动新建游客', async () => {
   const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'guest-command'], ['roomCode', '123456']]), calls = [];
   let expired = false;
@@ -1235,7 +1252,7 @@ test('网页趣味卡片用可点击数字和CSP兼容比例条，未知角色�
   const c=client(async()=>response({total:2,wins:1,winRate:50,byFaction:[],byRole:[],byBoard:[],recent:[],fun:aggregate([...rows,...unknown],1)}));
   await c.applyRoute('#/stats?tab=fun');assert.equal(c.state.statsTab,'fun');const html=c.viewStats();
   assert.match(html,/<button[^>]+data-metric="knife_enemy"[^>]*><span class="fun-number good">2/);assert.doesNotMatch(html,/&lt;span|style="width:/);assert.match(html,/<svg class="fun-bar"/);
-  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/命中敌方 —/);assert.match(html,/&lt;坏标签&gt;/);
+  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/刀中敌方 —/);assert.match(html,/&lt;坏标签&gt;/);
 });
 test('网页趣味回查深链与分页保留过滤，清除回到全部，不混入管理员积分调整',async()=>{
   const urls=[];const c=client(async url=>{urls.push(url);return response({records:[{id:String(urls.length),endedAt:1,members:[],role:'梅林',outcome:'win',fun:{events:[],highlights:[],reason:'旧数据'}}],total:2,hasMore:urls.length===1,adjustments:{records:[{id:'a',delta:2,reason:'积分调整'}],total:1,hasMore:false}});});
@@ -1245,16 +1262,16 @@ test('网页趣味回查深链与分页保留过滤，清除回到全部，不�
 });
 test('网页趣味榜横栏呈现全部指标、跨板子汇总与迟到响应隔离，未达门槛展示本人分母',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=metric=>webRanks(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',metricLabel:'命中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
+  const result=metric=>webRanks(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',metricLabel:'刀中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
   const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})});});
   const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
   await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
   c.ACTIONS.rankToggleMine();
   assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/3 \/ 4 次机会/);
-  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 命中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
+  const html=c.viewLeaderboard();assert.equal((html.match(/data-action="funRankMetric"/g)||[]).length,defs.length);assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 刀中敌方/);assert.doesNotMatch(html,/data-change="funRankMode"|data-change="funRankMetric"/);
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
   c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
-  for (const [key,label] of [['fun_percival_bust','派西维尔 · 三炸车'],['fun_merlin_hit','梅林 · 被刺'],['fun_assassin_miss','刺客 · 歪刀'],['fun_knife_ally','刀客刀法 · 刀中友方'],['fun_duel_ally','骑士决斗 · 命中友方']]) {
+  for (const [key,label] of [['fun_percival_bust','派西维尔 · 三炸车'],['fun_merlin_hit','梅林 · 被刺'],['fun_assassin_miss','刺客 · 歪刀'],['fun_knife_ally','刀客刀法 · 刀中友方'],['fun_duel_ally','骑士 · 决斗友方']]) {
     assert.ok(html.includes(label));
     await c.ACTIONS.funRankMetric({dataset:{value:key}});
     assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));

@@ -11,6 +11,7 @@ const assets = {
   "/style.css": ["style.css", "text/css; charset=utf-8"],
   "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/builtin-avatars.js": [null, "text/javascript; charset=utf-8"],
+  "/fun-copy.js": ["../../miniprogram/fun-copy.js", "text/javascript; charset=utf-8"],
 };
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];

@@ -1,4 +1,5 @@
 const api = require("../../api");
+const funCopy = require("../../fun-copy");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 function resultFlow(data) {
   const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
@@ -518,7 +519,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       sequence = (this.refreshSequence = (this.refreshSequence || 0) + 1);
     let room;
     try {
-      room = await api.request("/api/rooms/" + code);
+      room = funCopy.response(await api.request("/api/rooms/" + code));
     } catch (e) {
       if (
         !this.alive ||

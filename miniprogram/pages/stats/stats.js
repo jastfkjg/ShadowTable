@@ -1,5 +1,5 @@
 const api = require("../../api");
-const { presentStats, backToMe, personalPreview } = require("../../profile");
+const { presentStats, presentFun, backToMe, personalPreview } = require("../../profile");
 const { queryString } = require("../../share-card");
 Page({
   data: { loading: true, error: "", stats: null, funExpanded: false, funRulesExpanded: false, tab: "records", funRoles: {} },
@@ -7,7 +7,7 @@ Page({
     this.alive = true;
     this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
     const preview = personalPreview("stats");
-    if (preview) this.setData({ stats: preview });
+    if (preview) this.setData({ stats: { ...preview, fun: preview.fun?.available === false ? preview.fun : presentFun(preview.fun) } });
     return this.load();
   },
   onUnload() { this.alive = false; },

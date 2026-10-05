@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  const funCopy = window.shadowtableFunCopy;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -418,14 +419,14 @@
     })
       .then(function (response) {
         if (tag !== webSessionTag) throw Object.assign(new Error('浏览器账号已变化，请刷新页面'), { status: 409 });
-        if (response.status === 304 && cached) return copyResponse(cached.data);
+        if (response.status === 304 && cached) return funCopy.response(copyResponse(cached.data));
         if (response.status >= 200 && response.status < 300) return response.json().then(payload => {
           const etag = response.headers?.get("ETag");
           if (cacheable && etag && epoch === cacheEpoch && (tag || token) === (webSessionTag || storage.get("session") || "")) {
             roomCache.set(cacheKey, { etag, data: copyResponse(payload) });
             if (roomCache.size > 4) roomCache.delete(roomCache.keys().next().value);
           }
-          return payload;
+          return funCopy.response(payload);
         });
         return response
           .json()
@@ -933,7 +934,7 @@
     return html;
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。非梅林好人挡刀会记录次数及成功率，分母是作为在场非梅林好人面对最终非空刀的局数。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀和刀客／骑士命中友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
+    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜需5次终局机会或10次轮内攻击，沿用公开展示开关。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1695,8 +1696,8 @@ function roomListItems(rooms) {
           return '<rect class="fun-bar-' + ((row.positive ?? row.ranked) ? 'good' : row.id.endsWith('ally') ? 'evil' : 'muted') + '" x="'+start+'" y="0" width="'+width+'" height="1" />';
         }).join('') + '</svg>';
       }
-      html += '<p class="fun-caption small muted">' + (combat ? '有效敌方命中率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
-      if (state.funRulesExpanded && card.id.endsWith(':shield')) html += '<p class="small muted">挡刀率以终局时作为在场非梅林好人、面对最终非空刀的局数为分母。</p>';
+      html += '<p class="fun-caption small muted">' + (combat ? esc(primary.label) + '率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
+      if (state.funRulesExpanded && card.id.endsWith(':shield')) html += '<p class="small muted">挡刀率按终局面对最终非空刀的有效机会计算。</p>';
       const aim = card.metrics.find(row=>row.id.endsWith('aim_enemy'));
       if (state.funRulesExpanded && aim?.rate!==null && aim) html += '<p class="small muted">选敌率 '+aim.rate.toFixed(1)+'%；选中敌方但被挡下仍计未生效。</p>';
       if (combat && primary.byRole.length) {
@@ -1708,7 +1709,7 @@ function roomListItems(rooms) {
     }
     if (data.cards.length > 3) html += '<button class="secondary fun-more" data-action="toggleFunCards" aria-expanded="'+!!state.funExpanded+'">'+(state.funExpanded?'收起更多记录':'查看其余 '+(data.cards.length-3)+' 项趣味记录')+'</button>';
     html += '<button class="disclosure-button fun-role-toggle" data-action="toggleFunRules" aria-expanded="'+!!state.funRulesExpanded+'">统计说明 '+(state.funRulesExpanded?'⌃':'⌄')+'</button>';
-    if (state.funRulesExpanded) html += '<p class="small muted fun-note">派西按初始身份记三绿／三炸；梅林只统计最终刺杀机会。刀、枪、决斗与最终刀分别记录，空刀单列；未使用和作废不计失败。</p>';
+    if (state.funRulesExpanded) html += '<p class="small muted fun-note">派西维尔按初始身份记三绿车／三炸车；梅林只统计最终刺杀机会。刀、枪、决斗与最终刀分别记录，空刀单列；未使用和作废不计失败。</p>';
     return html;
   }
   function viewFunRankFilters(board) {
@@ -1718,7 +1719,7 @@ function roomListItems(rooms) {
     let html = '<div class="fun-rank-filters"><div class="rank-filter-heading"><button class="rank-disclosure" data-action="rankToggleMetrics" aria-expanded="'+!!state.rankMetricsExpanded+'">'+(state.rankMetricsExpanded?'收起指标 ⌃':'全部指标 ⌄')+'</button></div><div class="fun-rank-tabs'+(state.rankMetricsExpanded?' is-expanded':'')+'" role="group" aria-label="趣味指标，可左右滑动">'+list.map(item=>'<button type="button" class="fun-rank-tab" data-action="funRankMetric" data-value="'+esc(item.key)+'" aria-pressed="'+(metric===item.key)+'">'+esc(item.title+' · '+item.label)+'</button>').join('')+'</div><div class="fun-rank-selects"><div class="fun-sort">'+['count','rate'].map(sort=>'<button type="button" data-action="funRankSort" data-value="'+sort+'" aria-pressed="'+(state.rankFunSort===sort)+'">'+(sort==='count' ? '次数' : esc(rateLabel))+'</button>').join('')+'</div>';
     if (board?.roleOptions?.length) html += select('funRankRole','出刀角色',[{id:'',label:'全部角色'},...board.roleOptions],state.rankFunRole);
     html += '</div><div class="rank-rule-heading"><span class="small muted">'+(state.rankFunSort==='rate'?'至少 '+(list.find(item=>item.key===metric)?.rateThreshold || 5)+' 次机会':'累计次数 · 同次数并列')+'</span><button class="rank-disclosure" data-action="rankToggleRules" aria-expanded="'+!!state.rankRulesExpanded+'">如何计算 '+(state.rankRulesExpanded?'⌃':'⌄')+'</button></div>';
-    if (state.rankRulesExpanded) html += '<div class="small muted rank-rule-detail">'+(state.rankFunSort==='rate'?'按未舍入比例排名。':'按累计次数排名，同次数并列。')+(metric==='fun_good_shield'?'挡刀率 = 挡刀次数 / 作为非梅林好人面对最终非空刀的局数。':'')+'空刀单列，缺失记录不参与。</div>';
+    if (state.rankRulesExpanded) html += '<div class="small muted rank-rule-detail">'+(state.rankFunSort==='rate'?'按未舍入比例排名。':'按累计次数排名，同次数并列。')+(metric==='fun_good_shield'?'挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。':'')+'空刀单列，缺失记录不参与。</div>';
     html += '</div>';
     return html;
   }

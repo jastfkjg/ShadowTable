@@ -44,6 +44,23 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+test('旧接口的趣味统计、历史摘要和详情统一文案，保留计数和原始响应', async () => {
+  const legacy = require('./helpers/fun-copy-fixtures');
+  const before = JSON.stringify(legacy);
+  const api = { ...apiBase, request: async url => url.includes('/stats') ? legacy.stats
+    : { records: [legacy.match], total: 1, hasMore: false } };
+  const { p: stats } = page('stats', api);
+  await stats.onLoad({ tab: 'fun' });
+  assert.equal(stats.data.stats.fun.cards[0].enemyLabel, '刀中敌方');
+  assert.equal(stats.data.stats.fun.cards[0].allyLabel, '刀中友方');
+  assert.equal(stats.data.stats.fun.cards[0].metrics[1].count, 1);
+  const { p: matches } = page('matches', api);
+  await matches.onLoad({});
+  assert.equal(matches.data.records[0].funLabel, '成功挡刀 · 刀中友方');
+  assert.equal(matches.data.records[0].fun.events[1].label, '刀中友方');
+  assert.equal(matches.data.records[0].fun.events[0].detail, '最终刀落到本人（1号） · 房主登记');
+  assert.equal(JSON.stringify(legacy), before);
+});
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
   const find = node => typeof node === 'object' &&
@@ -1106,7 +1123,7 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
 });
 test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到响应隔离，旧服务回退独立于积分',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'命中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
+  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'刀中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
   const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return {...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})};}});
   const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
   await p.load(false,{metric:'fun_knife_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;

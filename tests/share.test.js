@@ -94,13 +94,13 @@ test("缺少完整本人邻近数据时保留个人卡，并列或百分比榜�
   delete board.nearby;assert.deepEqual(build().nearby,[]);assert.equal(build().hero,"62.5");
 });
 test("趣味榜图片完整带上指标、排序、角色、玩法和周期，百分比不混用胜率", () => {
-  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "刀客刀法", metricLabel: "命中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
+  const board = { ...fixtures.board, fun: true, metric: "fun_knife_enemy", title: "刀客刀法", metricLabel: "刀中敌方率", mode: "knights", role: "gareth", roleOptions: [{ id: "gareth", label: "加雷斯" }], sort: "rate", unit: "%", threshold: 10,
     me: { status: "ranked", rank: 2, rate: 62.5, count: 10, opportunities: 16, knownGames: 12, unknownGames: 2, winRate: 50 } };
   const selection = cards.boardSelection(board);
   assert.deepEqual(cards.parseSelection(selection), selection);
   assert.deepEqual(selection, { kind: "leaderboard", metric: "fun_knife_enemy", period: "month", mode: "knights", sort: "rate", role: "gareth" });
   const card = cards.leaderboardCard(fixtures.profile, board);
-  assert.match(card.title, /命中敌方率榜/);
+  assert.match(card.title, /刀中敌方率榜/);
   assert.equal(card.scope, "刀客刀法 · 十二骑士 · 加雷斯");
   assert.equal(card.hero + card.unit, "62.5%");
   assert.deepEqual(card.metrics.map(item=>item.value), ["10","16","12"]);
@@ -331,11 +331,28 @@ test("刀客分享同时展示出刀与三种结果，旧标题不影响新卡�
   const failed=stats.fun.cards.at(-1).metrics.find(row=>row.id==='knife_failed');failed.value=null;failed.knownGames=0;
   assert.equal(cards.funCard(fixtures.profile,stats,'knights:knife','knife_enemy',fixtures.now).metrics[1].value,'—');
 });
+test("旧接口生成趣味及排名分享时使用统一名称并保留计数", () => {
+  const legacy = require('./helpers/fun-copy-fixtures');
+  const before = JSON.stringify(legacy);
+  const single = cards.funCard(fixtures.profile, legacy.stats, 'knights:knife', 'knife_enemy', fixtures.now);
+  const summary = cards.funSummaryCard(fixtures.profile, legacy.stats, fixtures.now);
+  assert.match(cards.describe(single), /刀中友方次数 1/);
+  assert.match(cards.describe(summary), /刀中敌方次数 0/);
+  assert.doesNotMatch(cards.describe(summary), /命中同伴|命中敌方/);
+  const ranking = cards.leaderboardCard(fixtures.profile, { ...fixtures.board, fun: true,
+    metric: 'fun_duel_enemy', title: '骑士决斗', metricLabel: '命中敌方率', sort: 'rate',
+    mode: 'knights', roleOptions: [], unit: '%', threshold: 10, rows: [],
+    me: { count: 1, opportunities: 2, knownGames: 1, rate: 50, status: 'not_enough' } });
+  assert.match(ranking.title, /决斗敌方率/);
+  assert.match(ranking.scope, /骑士/);
+  assert.doesNotMatch(cards.describe(ranking), /命中敌方|骑士决斗/);
+  assert.equal(JSON.stringify(legacy), before);
+});
 
 test("完整趣味分享汇总全部项目且跨玩法合并，未知数据不冒充零，不导出个人明细", async () => {
   const stats=copy(fixtures.fullFunStats);
   stats.fun.cards.push({id:'knights:merlin',title:'梅林',metrics:[{...fixtures.metric,count:2,value:2,opportunities:4,knownGames:3}]});
-  stats.fun.cards.push({id:'knights:duel',title:'骑士决斗',metrics:[{id:'duel_enemy',label:'命中敌方',value:null,count:0,knownGames:0}]});
+  stats.fun.cards.push({id:'knights:duel',title:'骑士',metrics:[{id:'duel_enemy',label:'决斗敌方',value:null,count:0,knownGames:0}]});
   stats.fun.cards[0].privateStory='must-not-export';
   const card=cards.funSummaryCard(fixtures.profile,stats,fixtures.now);
   assert.equal(card.sections.length,3);assert.equal(card.sections[0].metrics[0].value,'10');

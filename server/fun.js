@@ -1,6 +1,7 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
 const VERSION = "fun-2026-10-v2";
+const { labels, titles } = require("../miniprogram/fun-copy");
 const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
 const modeFor = (board) =>
   /^knights(?:-|$)/.test(board)
@@ -9,15 +10,15 @@ const modeFor = (board) =>
       ? "classic"
       : "other";
 const extraRankings = {
-  percival_bust: { label: "三炸车", rateThreshold: 5 },
+  percival_bust: { rateThreshold: 5 },
   merlin_hit: { label: "被刺", rateThreshold: 5 },
   assassin_miss: { label: "歪刀", rateThreshold: 5 },
-  knife_ally: { label: "刀中友方", rateThreshold: 10 },
-  duel_ally: { label: "命中友方", rateThreshold: 10 },
+  knife_ally: { rateThreshold: 10 },
+  duel_ally: { rateThreshold: 10 },
 };
 const definitions = [
-  ["percival_green", "三绿达成", "percival", "派西维尔", "局", true, 5],
-  ["percival_bust", "三炸收场", "percival", "派西维尔", "局", false],
+  ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 5],
+  ["percival_bust", labels.percival_bust, "percival", titles.percival, "局", false],
   ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 5],
   ["merlin_hit", "被最终刺中", "merlin", "梅林", "次", false],
   ["good_shield", "成功挡刀", "shield", "好人", "次", true, 5],
@@ -30,18 +31,18 @@ const definitions = [
   ...["knife", "gun", "duel"].flatMap((type) => [
     [
       type + "_enemy",
-      "命中敌方",
+      labels[type + "_enemy"] || "命中敌方",
       type,
-      { knife: "刀客刀法", gun: "猎人枪法", duel: "骑士决斗" }[type],
+      titles[type] || "猎人枪法",
       "次",
       true,
       10,
     ],
     [
       type + "_ally",
-      "命中同伴",
+      labels[type + "_ally"] || "命中同伴",
       type,
-      { knife: "刀客刀法", gun: "猎人枪法", duel: "骑士决斗" }[type],
+      titles[type] || "猎人枪法",
       "次",
       false,
     ],
@@ -49,7 +50,7 @@ const definitions = [
       type + "_failed",
       "未生效",
       type,
-      { knife: "刀客刀法", gun: "猎人枪法", duel: "骑士决斗" }[type],
+      titles[type] || "猎人枪法",
       "次",
       false,
     ],
@@ -57,7 +58,7 @@ const definitions = [
       type + "_aim_enemy",
       "刀口选敌",
       type,
-      { knife: "刀客刀法", gun: "猎人枪法", duel: "骑士决斗" }[type],
+      titles[type] || "猎人枪法",
       "次",
       false,
     ],
@@ -257,7 +258,7 @@ function project(record, players, roles) {
           id: "final-shield",
           role: labelRole(player.roleId),
           label: "成功挡刀",
-          detail: `最终刀落到本人（${player.seat}号非梅林好人） · ${t.source === "system" ? "系统结算" : "房主登记"}`,
+          detail: `最终刀落到本人（${player.seat}号） · ${t.source === "system" ? "系统结算" : "房主登记"}`,
         });
     }
     if (
@@ -331,9 +332,7 @@ function project(record, players, roles) {
           round: e.round,
           role: labelRole(e.actor.role),
           kind: e.type,
-          label: { enemy: "命中敌方", ally: "命中同伴", failed: "未生效" }[
-            e.outcome
-          ],
+          label: metrics[e.type + "_" + e.outcome].label,
           detail: `${e.selected.seat}号${e.selected.faction === e.actor.faction ? "同阵营" : "对方阵营"} · ${effects[e.effect] || e.effect}${e.recipient && e.recipient.seat !== e.selected.seat ? ` · 实际承受者${e.recipient.seat}号` : ""}`,
         });
     }
@@ -343,8 +342,8 @@ function project(record, players, roles) {
         role: labelRole(initial),
         label:
           {
-            assassination: "三绿达成",
-            quest_fail: "三炸收场",
+            assassination: metrics.percival_green.label,
+            quest_fail: metrics.percival_bust.label,
             five_rejections: "五次否决结束",
             early_assassination: "提前盘刀",
           }[t.reason] || "任务阶段已登记",

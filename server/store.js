@@ -6,6 +6,7 @@ const { randomUUID, createHash } = require("node:crypto");
 const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
 const fun = require("./fun");
+const funCopy = require("../miniprogram/fun-copy");
 const management = require("./match-management");
 const { migrate: migrateKnights } = require("./knights");
 const companion = player => player.uid.startsWith("test:");
@@ -311,7 +312,7 @@ class Store {
         const shown = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
         const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, companions, ...game } = shown.game;
         const { roleId, ...player } = shown.player;
-        return { ...game, ...player };
+        return { ...game, ...player, fun: funCopy.story(player.fun) };
       });
     const scoreRows = this.db.prepare(`SELECT p.faction,json_extract(p.snapshot,'$.role') AS role,s.points,s.ended
       FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored'`).all(uid);
@@ -531,7 +532,7 @@ class Store {
         source: game.source, excludedReason: game.excludedReason,
         name: player.name, seat: player.seat, role: player.role,
         faction: player.faction, outcome: player.outcome,
-        fun: player.fun || null,
+        fun: funCopy.story(player.fun) || null,
         score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
         scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
         members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),

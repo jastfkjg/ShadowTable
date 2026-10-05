@@ -5,6 +5,7 @@ const knights = require("./knights");
 const fairy = require("./fairy");
 const scoring = require("./scoring");
 const fun = require("./fun");
+const funCopy = require("../miniprogram/fun-copy");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
 const assisted = (room) => ["shadow-assist", "chaos"].includes(room.board);
@@ -1206,7 +1207,7 @@ function publicView(room, uid) {
     scoreSettings: scoring.settings(room),
     scoreNotice: excludedRecord || room.recordPurpose === "test" && managedState !== "active" ? "本局不计积分" : room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
-    myFun: excludedRecord ? null : room.matchRecord?.players.find(player => player.uid === uid)?.fun || null,
+    myFun: excludedRecord ? null : funCopy.story(room.matchRecord?.players.find(player => player.uid === uid)?.fun) || null,
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),

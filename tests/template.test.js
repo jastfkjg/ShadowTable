@@ -87,10 +87,10 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   assert.match(text(render()), /（我）/);
 
   records[0] = { ...presentMatches([{ ...record, id: 'one', endedAt: 1,
-    fun: { status: 'partial', initialRole: '梅林', reason: '最终结果未记录；已完成的技能仍可查看', events: [{ id: 'knife', round: 2, role: '派西维尔', label: '命中敌方', detail: '目标：3号' }], highlights: [] } }])[0], expanded: true };
+    fun: { status: 'partial', initialRole: '梅林', reason: '最终结果未记录；已完成的技能仍可查看', events: [{ id: 'knife', round: 2, role: '派西维尔', label: '刀中敌方', detail: '目标：3号' }], highlights: [] } }])[0], expanded: true };
   assert.match(text(render()), /我的趣味记录/);
   assert.match(text(render()), /初始身份：梅林/);
-  assert.match(text(render()), /命中敌方/);
+  assert.match(text(render()), /刀中敌方/);
   assert.match(text(render()), /最终结果未记录/);
 });
 test('战绩区分未计分与零分计分局，没有计分局也保留独立调分', () => {
@@ -181,7 +181,7 @@ test('趣味榜显示当前指标，展开后可选全部指标，排序独立�
   assert.equal(tabs.length,defs.length);assert.ok(tabs.every(n=>n.tag==='wx-button'));
   assert.equal(byHandler(tree,'toggleMetrics').attr.ariaExpanded,true);
   assert.ok(tabs.find(n=>n.attr['data-id']==='fun_good_shield').attr.ariaPressed);
-  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'刀客刀法 · 命中敌方');
+  assert.equal(tabs.find(n=>n.attr['data-id']==='fun_knife_enemy').attr.ariaLabel,'刀客刀法 · 刀中敌方');
   for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally']) {
     assert.ok(tabs.some(n=>n.attr['data-id']===key));
   }
@@ -984,7 +984,7 @@ test("结算需要主动选择胜方，支持第三阵营；零有效局不显�
 
 test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐藏，单项分享仍可使用',()=>{
   const renderStats=factory('pages/stats/stats.wxml');
-  const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'命中敌方'}]}}};
+  const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};
   const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
   assert.equal(nav.attr.share,true);assert.equal(nav.attr.shareLabel,'分享完整趣味记录图片');
   assert.ok(byHandler(ready,'shareFun'));

@@ -162,6 +162,11 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   const a = await setup(t, { webOrigin: origin });
   const home = await a.raw('/');
   assert.ok(home.text.indexOf('/builtin-avatars.js') < home.text.indexOf('/app.js'));
+  assert.ok(home.text.indexOf('/fun-copy.js') < home.text.indexOf('/app.js'));
+  const copy = await a.raw('/fun-copy.js'), copyContext = { window: {} };
+  assert.equal(copy.status, 200);
+  vm.runInNewContext(copy.text, copyContext);
+  assert.equal(copyContext.window.shadowtableFunCopy.labels.knife_ally, '刀中友方');
   const catalog = await a.raw('/builtin-avatars.js'), context = { window: {} };
   assert.equal(catalog.status, 200);
   assert.match(catalog.headers['content-type'], /javascript/);
@@ -178,6 +183,7 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
     assert.equal((await a.raw(path)).status, 401);
   assert.equal((await a.raw(builtinAvatars[0].path, {})).status, 401);
   const disabled = await setup(t);
+  assert.equal((await disabled.raw('/fun-copy.js')).status, 401);
   assert.equal((await disabled.raw('/builtin-avatars.js')).status, 401);
   assert.equal((await disabled.raw(builtinAvatars[0].path)).status, 401);
 });

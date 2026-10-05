@@ -1,4 +1,5 @@
 const api = require("./api");
+const funCopy = require("./fun-copy");
 const { canShareFun } = require("./share-card");
 const { switchHomeTab } = require("./tab-navigation");
 // Only reuse the immediately preceding personal page; never persist account data.
@@ -19,6 +20,7 @@ function presentProfile(profile) {
     identityLabel: ({ wx: "微信账号", guest: "游客账号", dev: "开发账号", test: "陪测账号" })[profile.identityType] || "玩家账号" };
 }
 function presentStats(stats) {
+  stats = funCopy.response(stats);
   const rate = row => ({ ...row, rateLabel: row.winRate === null ? "—" : row.winRate + "%",
     scoreAverageLabel: row.score?.average == null ? "—" : row.score.average.toFixed(2) });
   const byRole = (stats.byRole || []).map(rate);
@@ -36,6 +38,7 @@ function presentStats(stats) {
 }
 function presentFun(value) {
   if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "" };
+  value = funCopy.summary(value);
   const cards = value.cards.map(card => {
     const metrics = card.metrics.filter(row => !row.id.endsWith("aim_enemy")).map(row => ({ ...row,
       valueLabel: row.value === null ? "—" : String(row.count), rateLabel: row.rate === null ? "暂无机会" : row.rate.toFixed(1) + "%",
@@ -50,6 +53,7 @@ function presentFun(value) {
       failed: metrics.find(row => row.id.endsWith("failed"))?.byRole.find(row => row.role === role.role)?.count || 0,
       url: primary ? primary.url + "&role=" + role.role : "" }));
     return { ...card, metrics, roles, shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat: ["knife","gun","duel"].some(group => card.id.endsWith(":"+group)),
+      enemyLabel: metrics.find(row => row.id.endsWith("enemy"))?.label || "敌方", allyLabel: metrics.find(row => row.id.endsWith("ally"))?.label || "友方",
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
   });
@@ -57,6 +61,7 @@ function presentFun(value) {
 }
 function presentMatches(records) {
   return records.map(record => {
+    record = { ...record, fun: funCopy.story(record.fun) };
     const date = new Date(record.endedAt);
     const validDate = !Number.isNaN(date.getTime());
     const pad = value => String(value).padStart(2, "0");

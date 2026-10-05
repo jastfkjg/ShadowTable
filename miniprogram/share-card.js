@@ -1,4 +1,5 @@
 // Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
+const funCopy = require("./fun-copy");
 const SIZE = 1080;
 const COLORS = { background: "#101c24", surface: "#192c36", text: "#f2eee5", muted: "#b1bfc6", accent: "#e5c68b", border: "#3d515d", good: "#80b4d7", evil: "#d88f91", self: "#30352f" };
 const metricNames = { points: "积分榜", games: "局数榜", overall: "总胜率榜", good: "好人胜率榜", evil: "坏人胜率榜" };
@@ -75,6 +76,7 @@ function knifeMetrics(group) {
   ];
 }
 function funCard(profile, stats, cardId, metricId, now) {
+  stats = { ...stats, fun: funCopy.summary(stats.fun) };
   const group = stats.fun?.cards?.find(card => card.id === cardId);
   const metric = group?.metrics?.find(row => row.id === metricId && row.ranked);
   if (!metric || metric.value == null || !metric.knownGames) throw new Error("这项成绩还没有完整记录，暂时无法生成图片。");
@@ -86,6 +88,7 @@ function funCard(profile, stats, cardId, metricId, now) {
     notes: !metric.opportunities ? ["暂无有效机会，" + (metric.rateLabel || "成功率") + "暂不计算"] : [], asOf: now };
 }
 function funSummaryCard(profile, stats, now) {
+  stats = { ...stats, fun: funCopy.summary(stats.fun) };
   if (!canShareFun(stats.fun)) throw new Error("还没有完整的趣味记录，完成相关对局后再来分享。");
   const groups = new Map();
   for (const group of stats.fun.cards) {
@@ -165,6 +168,7 @@ function nearbyProjection(profile, board, rank) {
     gap: distance > 0 ? "距上一位 " + decimal(distance) + " " + unit : "" };
 }
 function leaderboardCard(profile, board) {
+  board = funCopy.leaderboard(board);
   const error = leaderboardShareError(board);
   if (error) throw new Error(error);
   const me = board.me, points = board.metric === "points", games = board.metric === "games";

@@ -140,6 +140,31 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
     assert.equal(adverse.teaser, "");
   } finally { store.close(); }
 });
+test("当前版本的旧文案快照在历史、最近记录和结束页读取时统一，不重写快照与次数", () => {
+  const store = new Store(":memory:");
+  try {
+    const r = deal(true);
+    configure(r, { "wx:1": "blueAwakened", "wx:2": "witch", "wx:6": "assassin" });
+    skills(r, { "wx:1": "target:2", "wx:2": "target:3" });
+    finish(r, { funReason: "assassination", funTarget: 1, funActor: 6 });
+    store.transaction(() => store.save(r));
+    const archived = store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? AND uid='wx:1'").get(r.matchId);
+    const player = JSON.parse(archived.snapshot);
+    player.fun.highlights.find(metric => metric.id === "knife_ally").label = "命中同伴";
+    player.fun.events.find(event => event.kind === "knife").label = "命中同伴";
+    player.fun.events.find(event => event.id === "final-shield").detail = "最终刀落到本人（1号非梅林好人） · 房主登记";
+    const oldSnapshot = JSON.stringify(player);
+    store.db.prepare("UPDATE match_players SET snapshot=? WHERE match_id=? AND uid='wx:1'").run(oldSnapshot, r.matchId);
+    r.matchRecord.players.find(player => player.uid === "wx:1").fun = player.fun;
+    for (const shown of [store.matchesFor("wx:1").records[0].fun, store.statsFor("wx:1").recent[0].fun, publicView(r, "wx:1").myFun]) {
+      assert.equal(shown.highlights.find(metric => metric.id === "knife_ally").label, "刀中友方");
+      assert.equal(shown.events.find(event => event.kind === "knife").label, "刀中友方");
+      assert.equal(shown.events.find(event => event.id === "final-shield").detail, "最终刀落到本人（1号） · 房主登记");
+    }
+    assert.equal(store.funFor("wx:1").metrics.find(metric => metric.id === "knife_ally").count, 1);
+    assert.equal(store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=? AND uid='wx:1'").get(r.matchId).snapshot, oldSnapshot);
+  } finally { store.close(); }
+});
 test("刀客和骑士友方命中榜按实际承受者统计，比例需十次出手并可筛选角色", () => {
   for (const [metric, role] of [["knife_ally", "blueAwakened"], ["duel_ally", "blueKnight"]]) {
     const uid = "wx:" + metric, store = new Store(":memory:");
@@ -325,7 +350,7 @@ test("管理员更正刀口同步挡刀记录与对局回查，重复归档不�
     store.close();
   }
 });
-test("v1对局启动时从已保存终局事实补算挡刀，未知不补零，结束牌桌同步且重启幂等", () => {
+test("旧投影启动时补算挡刀并统一历史文案，未知不补零，结束牌桌同步且重启幂等", () => {
   const dir = mkdtempSync(join(tmpdir(), "shadow-shield-migrate-")),
     path = join(dir, "data.sqlite");
   let store = new Store(path);
@@ -340,6 +365,7 @@ test("v1对局启动时从已保存终局事实补算挡刀，未知不补零，
     store.db.exec(
       "DELETE FROM match_fun_stats WHERE metric='good_shield'; UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.version','fun-2026-10-v1')",
     );
+    store.db.prepare("UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.highlights[0].label','三绿达成','$.fun.events[0].label','三绿达成') WHERE match_id=? AND uid='wx:2'").run(known.matchId);
     store.close();
     store = new Store(path);
     const shield = store
@@ -354,6 +380,10 @@ test("v1对局启动时从已保存终局事实补算挡刀，未知不补零，
         (m) => m.id === "good_shield",
       ),
     );
+    const percival = store.matchesFor("wx:2").records.find(record => record.id === known.matchId).fun;
+    assert.equal(percival.highlights.find(metric => metric.id === "percival_green").label, "三绿车");
+    assert.equal(percival.events.find(event => event.id === "task-outcome").label, "三绿车");
+    assert.equal(publicView(store.get(known.code), "wx:2").myFun.events.find(event => event.id === "task-outcome").label, "三绿车");
     const before = JSON.stringify(store.funFor("wx:3"));
     store.close();
     store = new Store(path);
@@ -465,7 +495,8 @@ test("开发账号完整归档，陪测技能保留真实玩家趣味结果但�
       assert.equal(stats.fun.metrics.find(row=>row.id===metric).count,1);
       assert.equal(store.funFor(finalActor).metrics.find(row=>row.id==='final_hit').count,1);
       assert.equal(history.records[0].fun.status,'recorded');
-      assert.ok(history.records[0].fun.events.some(event=>event.label==='命中敌方'));
+      const attackLabel = { knife_enemy: '刀中敌方', duel_enemy: '决斗敌方', gun_enemy: '命中敌方' }[metric];
+      assert.ok(history.records[0].fun.events.some(event=>event.label===attackLabel));
       assert.ok(store.matchesFor(finalActor).records[0].fun.events.some(event=>event.label==='刺中梅林'));
       assert.ok(publicView(store.get(r.code),uid).myFun.events.length);
       assert.ok(presentStats(stats).fun.cards.length);
