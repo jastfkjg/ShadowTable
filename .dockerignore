@@ -7,6 +7,7 @@
 !miniprogram/
 !miniprogram/builtin-avatars.js
 !miniprogram/avatar-library.js
+!miniprogram/fun-copy.js
 !miniprogram/pages/
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/

@@ -6,6 +6,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node server ./server
 COPY --chown=node:node miniprogram/builtin-avatars.js ./miniprogram/builtin-avatars.js
 COPY --chown=node:node miniprogram/avatar-library.js ./miniprogram/avatar-library.js
+COPY --chown=node:node miniprogram/fun-copy.js ./miniprogram/fun-copy.js
 COPY --chown=node:node miniprogram/pages/profile/assets/avatars ./miniprogram/pages/profile/assets/avatars
 RUN mkdir /data && chown node:node /data
 USER node
