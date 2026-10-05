@@ -513,9 +513,20 @@ class Store {
     const after=this.matchScoreData(id);
     return {id,code:data.code,revision:after.revision,before,after:after.players.filter(player=>input.scores.some(row=>row.uid===player.uid)).map(player=>({uid:player.uid,seat:player.seat,name:player.name,points:player.score.total,override:player.score.manualOverride || null}))};
   }
-  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null) {
+  matchFilterOptions(uid) {
+    const boards = this.db.prepare(`SELECT p.board AS id, max(json_extract(m.snapshot,'$.boardName')) AS label
+      FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? GROUP BY p.board ORDER BY label,p.board`).all(uid);
+    const roles = this.db.prepare(`SELECT DISTINCT json_extract(p.snapshot,'$.role') AS label
+      FROM visible_match_players p WHERE p.uid=? AND json_extract(p.snapshot,'$.role') IS NOT NULL ORDER BY label`).all(uid);
+    return { boards: boards.map(row => ({ id: row.id, label: row.label || row.id })), roles: roles.map(row => ({ id: row.label, label: row.label })) };
+  }
+  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null, filters = {}) {
     let filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM active_match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
     const args = [uid];
+    if (filters.from !== undefined) { filter += " AND p.ended>=? AND p.ended<?"; args.push(filters.from, filters.to); }
+    if (filters.board) { filter += " AND p.board=?"; args.push(filters.board); }
+    if (filters.role) { filter += " AND json_extract(p.snapshot,'$.role')=?"; args.push(filters.role); }
+    if (filters.outcome) { filter += " AND p.outcome=?"; args.push(filters.outcome); }
     if (funFilter) {
       filter += " AND p.outcome IN ('win','loss') AND EXISTS (SELECT 1 FROM match_fun_stats f WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.mode=? AND f.status='known' AND f.count>0" + (funFilter.role ? " AND f.role=?" : "") + ")";
       args.push(funFilter.metric, funFilter.mode, ...(funFilter.role ? [funFilter.role] : []));

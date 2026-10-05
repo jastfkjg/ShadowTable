@@ -6,11 +6,21 @@
       <button hover-class="none" class="{{scoredOnly?'':'selected'}}" bindtap="filterScores" data-scored="0" aria-pressed="{{!scoredOnly}}" disabled="{{loading || loadingMore || adjustmentsLoading}}"><text>全部对局</text></button>
       <button hover-class="none" class="{{scoredOnly?'selected':''}}" bindtap="filterScores" data-scored="1" aria-pressed="{{scoredOnly}}" disabled="{{loading || loadingMore || adjustmentsLoading}}"><text>计分对局</text></button>
     </view>
-    <text wx:if="{{loaded}}" class="matches-count">共 {{total}} 场</text>
+    <button wx:if="{{filtersAvailable}}" class="disclosure-button matches-filter-toggle {{filterCount?'active':''}}" bindtap="toggleFilters" aria-expanded="{{filtersExpanded}}" hover-class="none"><text>筛选{{filterCount?' · '+filterCount:''}}</text><view class="match-arrow {{filtersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
+  </view>
+  <view wx:if="{{filtersExpanded && filtersAvailable}}" class="matches-filter-panel">
+    <picker wx:for="{{filterGroups}}" wx:key="key" range="{{item.options}}" range-key="label" value="{{item.index}}" data-key="{{item.key}}" bindchange="chooseFilter" disabled="{{loading || loadingMore || adjustmentsLoading}}" aria-label="{{item.label+'筛选，'+item.valueLabel}}">
+      <view class="match-filter-field {{item.active?'active':''}}"><text class="match-filter-label">{{item.label}}</text><view class="match-filter-value"><text>{{item.valueLabel}}</text><view class="match-filter-chevron" aria-hidden="true"></view></view></view>
+    </picker>
+    <view class="match-filter-note">时间按北京时间计算；角色为结算时的身份。</view>
+  </view>
+  <view class="matches-result-summary" wx:if="{{loaded || filterCount}}">
+    <view class="matches-result-copy"><text wx:if="{{loaded}}" class="matches-count">{{filterCount?'筛选结果':'共'}} {{total}} 场</text><view wx:if="{{filterCount}}" class="match-filter-summary">{{filterSummary}}</view></view>
+    <button wx:if="{{filterCount}}" class="matches-filter-clear" bindtap="clearFilters" disabled="{{loading || loadingMore || adjustmentsLoading}}" hover-class="none">清空筛选</button>
   </view>
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}">重新加载</button></view>
-  <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted">{{funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view>
+  <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>
   <block wx:if="{{records.length}}">
     <block wx:for="{{records}}" wx:key="id">
       <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day">{{item.dayLabel}}</view>
@@ -50,7 +60,7 @@
     </block>
     <button hover-class="none" wx:if="{{hasMore && !error}}" class="matches-more" bindtap="loadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
   </block>
-  <view wx:if="{{adjustments.length && !funFilter}}" class="adjustment-history">
+  <view wx:if="{{adjustments.length && !funFilter && !filterCount}}" class="adjustment-history">
     <view class="section-title">管理员积分调整 · {{adjustmentsTotal}} 条</view>
     <view wx:for="{{adjustments}}" wx:key="id" class="match-entry adjustment-entry">
       <view class="match-top"><text class="match-date">{{item.dateLabel}}</text><text class="accent">{{item.pointsLabel}}</text></view>

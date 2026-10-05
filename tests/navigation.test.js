@@ -61,6 +61,37 @@ test('旧接口的趣味统计、历史摘要和详情统一文案，保留计�
   assert.equal(matches.data.records[0].fun.events[0].detail, '最终刀落到本人（1号） · 房主登记');
   assert.equal(JSON.stringify(legacy), before);
 });
+test('对局筛选重置分页、保留趣味回查条件，失败可重试并清空筛选', async () => {
+  const urls = [];
+  let fail = false;
+  const record = { id: 'one', endedAt: 1, members: [], role: '魔术师', outcome: 'win' };
+  const filterOptions = { boards: [{ id: 'knights', label: '十二骑士' }], roles: [{ id: '魔术师', label: '魔术师' }] };
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    urls.push(url);
+    if (fail) { fail = false; throw Error('网络中断'); }
+    const more = url.includes('offset=1');
+    return { records: [{ ...record, id: more ? 'two' : 'one' }], total: 2, hasMore: !more, ...(!more ? { filterOptions } : {}) };
+  } });
+  await p.onLoad({ scored: '1', fun: 'knife_enemy', mode: 'knights', role: 'gaheris' });
+  p.toggleFilters(); assert.equal(p.data.filtersExpanded, true);
+  const choose = (key, value) => p.chooseFilter({ currentTarget: { dataset: { key } }, detail: { value } });
+  await choose('period', 1); await choose('board', 1); await choose('matchRole', 1); await choose('outcome', 1);
+  assert.equal(p.data.filterCount, 4); assert.match(p.data.filterSummary, /本月.*十二骑士.*魔术师.*胜利/);
+  const query = new URL('http://test' + urls.at(-1)).searchParams;
+  for (const [key, value] of Object.entries({ scored: '1', fun: 'knife_enemy', role: 'gaheris', matchRole: '魔术师', board: 'knights', outcome: 'win', period: 'month', offset: '0' }))
+    assert.equal(query.get(key), value);
+  await p.loadMore(); assert.equal(p.data.records.length, 2); assert.equal(new URL('http://test' + urls.at(-1)).searchParams.get('offset'), '1');
+  fail = true; await choose('outcome', 2);
+  assert.equal(p.data.records.length, 0); assert.equal(p.data.error, '网络中断'); assert.equal(p.data.filters.outcome, 'loss');
+  const failedUrl = urls.at(-1); await p.retry(); assert.equal(urls.at(-1), failedUrl); assert.equal(p.data.error, '');
+  filterOptions.boards = []; filterOptions.roles = [];
+  await p.load(); assert.match(p.data.filterSummary, /十二骑士.*魔术师.*失利/);
+  assert.equal(p.data.filterGroups.find(group => group.key === 'board').valueLabel, '十二骑士');
+  await p.clearFilters(); assert.equal(p.data.filterCount, 0); assert.equal(p.data.records.length, 1);
+  assert.equal(urls.at(-1), '/api/me/matches?offset=0&scored=1&fun=knife_enemy&mode=knights&role=gaheris');
+  const old = page('matches', { ...apiBase, request: async () => ({ records: [], total: 0 }) }).p;
+  await old.onLoad({}); assert.equal(old.data.filtersAvailable, false);
+});
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
   const find = node => typeof node === 'object' &&

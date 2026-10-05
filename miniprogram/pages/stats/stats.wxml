@@ -1,6 +1,6 @@
-<app-nav title="我的战绩" back="{{true}}" backLabel="返回我的" bindback="back" share="{{tab==='fun' ? stats.fun.shareable : !!stats.total}}" shareDisabled="{{loading || !!error}}" shareLabel="{{tab==='fun' ? '分享完整趣味记录图片' : '分享战绩图片'}}" bindshare="shareStats" />
+<app-nav title="{{tab==='fun' ? '趣味记录' : '我的战绩'}}" back="{{true}}" backLabel="返回我的" bindback="back" share="{{tab==='fun' ? stats.fun.shareable : !!stats.total}}" shareDisabled="{{loading || !!error}}" shareLabel="{{tab==='fun' ? '分享完整趣味记录图片' : '分享战绩图片'}}" bindshare="shareStats" />
 <view class="page personal-page stats-page">
-  <view wx:if="{{loading && !stats}}" class="status">正在读取战绩…</view>
+  <view wx:if="{{loading && !stats}}" class="status">{{tab==='fun' ? '正在读取趣味记录…' : '正在读取战绩…'}}</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
     <view wx:if="{{tab!=='fun'}}" class="stats-overview" aria-label="总战绩">
@@ -36,20 +36,24 @@
     <view wx:if="{{tab==='fun'}}" class="fun-content">
       <view wx:if="{{!stats.fun.available}}" class="muted">趣味记录将在服务更新后开放</view>
       <view wx:elif="{{!stats.fun.cards.length}}" class="fun-empty muted">暂无趣味记录</view>
-      <view wx:if="{{stats.fun.legacyGames}}" class="fun-note small muted">{{stats.fun.legacyGames}} 局旧对局未记录完整过程，缺失数据不按零次计算。</view>
       <view wx:for="{{stats.fun.cards}}" wx:for-item="card" wx:key="id" wx:if="{{funExpanded || 3 > index}}" class="fun-card">
         <view class="fun-heading"><text>{{card.title}}</text><view class="fun-heading-actions"><button wx:if="{{card.shareMetric}}" class="share-entry-button" bindtap="shareFun" data-card="{{card.id}}" disabled="{{loading || error}}" hover-class="none" aria-label="分享{{card.title}}的{{card.shareLabel}}图片"><image class="share-entry-icon" src="/assets/share.svg" aria-hidden="true" /></button></view></view>
-        <view class="fun-metrics {{card.isCombat?'three':''}}"><navigator wx:for="{{card.metrics}}" wx:for-item="metric" wx:key="id" url="{{metric.url}}" class="fun-metric" hover-class="fun-pressed" aria-label="{{metric.label}} {{metric.valueLabel}}{{metric.unit}}，查看相关对局"><view class="fun-number {{metric.color}}">{{metric.valueLabel}}<text class="small muted"> {{metric.unit}}</text></view><view class="small">{{metric.label}} ›</view></navigator></view>
+        <view class="fun-metrics {{card.metrics.length===1?'single':card.metrics.length===3?'three':''}}"><navigator wx:for="{{card.metrics}}" wx:for-item="metric" wx:key="id" url="{{metric.url}}" class="fun-metric" hover-class="fun-pressed" aria-label="{{metric.label}} {{metric.valueLabel}}{{metric.unit}}，查看相关对局"><view class="fun-number {{metric.color}}"><text>{{metric.valueLabel}}</text><text class="fun-unit">{{metric.unit}}</text></view><view class="fun-metric-label">{{metric.label}} <text aria-hidden="true">›</text></view></navigator></view>
         <view wx:if="{{card.isCombat && card.opportunities}}" class="fun-bar" aria-hidden="true"><view wx:for="{{card.metrics}}" wx:for-item="metric" wx:key="id" class="fun-bar-{{metric.color}}" style="width:{{metric.percent}}%"></view></view>
-        <view class="fun-caption small muted">{{card.isCombat?card.enemyLabel+'率':'成功率'}} {{card.rateLabel}} · {{card.opportunities}} {{card.isCombat?'次出手':'次机会'}}</view>
-        <view wx:if="{{funRulesExpanded && (card.id==='classic:shield' || card.id==='knights:shield' || card.id==='other:shield')}}" class="small muted">挡刀率按终局面对最终非空刀的有效机会计算。</view>
-        <view wx:if="{{funRulesExpanded && card.aimLabel}}" class="small muted">{{card.aimLabel}}；选中敌方但被挡下仍计未生效。</view>
-        <view class="small muted">{{card.coverage}}</view>
+        <view class="fun-caption small muted">{{card.sampleLabel}}<text wx:if="{{card.opportunities && card.rateLabel!=='暂无机会'}}"> · {{card.isCombat?card.enemyLabel+'率':'成功率'}} {{card.rateLabel}}</text></view>
         <block wx:if="{{card.isCombat && card.roles.length}}"><button hover-class="none" class="disclosure-button fun-role-toggle" bindtap="toggleFunRoles" data-id="{{card.id}}" aria-expanded="{{funRoles[card.id]}}">按出刀角色查看 {{funRoles[card.id]?'⌄':'›'}}</button><view wx:if="{{funRoles[card.id]}}" class="fun-roles"><navigator wx:for="{{card.roles}}" wx:for-item="role" wx:key="role" url="{{role.url}}" class="fun-role" hover-class="fun-pressed"><view>{{role.label}} ›</view><view class="small muted">{{role.value===null?"尚无完整记录":card.enemyLabel+" "+role.countLabel+" · "+card.allyLabel+" "+role.ally+" · 未生效 "+role.failed+" / "+role.opportunities+" 次"}}</view></navigator></view></block>
       </view>
       <button wx:if="{{stats.fun.cards.length > 3}}" class="disclosure-button secondary fun-more" bindtap="toggleFunCards" aria-expanded="{{funExpanded}}" hover-class="none">{{funExpanded?'收起更多记录':'查看其余 '+(stats.fun.cards.length-3)+' 项趣味记录'}}</button>
-      <button wx:if="{{stats.fun.cards.length}}" class="disclosure-button fun-role-toggle" bindtap="toggleFunRules" aria-expanded="{{funRulesExpanded}}" hover-class="none">统计说明 {{funRulesExpanded?'⌃':'⌄'}}</button>
-      <view wx:if="{{stats.fun.cards.length && funRulesExpanded}}" class="fun-note small muted">派西维尔按初始身份记三绿车／三炸车；梅林只统计最终刺杀机会。轮内刀、枪、决斗与最终刀分别记录；空刀单列。未使用和作废不计失败。</view>
+      <button wx:if="{{stats.fun.cards.length || stats.fun.legacyGames}}" class="disclosure-button fun-role-toggle" bindtap="toggleFunRules" aria-expanded="{{funRulesExpanded}}" hover-class="none">统计说明与数据范围 {{funRulesExpanded?'⌃':'⌄'}}</button>
+      <view wx:if="{{funRulesExpanded}}" class="fun-rules small muted">
+        <view wx:if="{{stats.fun.legacyGames}}">{{stats.fun.legacyGames}} 局旧对局未记录完整过程，缺失数据不按零次计算。</view>
+        <view wx:for="{{stats.fun.cards}}" wx:for-item="card" wx:key="id" class="fun-rule-item">
+          <view class="fun-rule-title">{{card.title}} · {{card.coverage}}</view>
+          <view wx:if="{{card.id==='classic:shield' || card.id==='knights:shield' || card.id==='other:shield'}}">挡刀率按终局面对最终非空刀的有效机会计算。</view>
+          <view wx:if="{{card.aimLabel}}">{{card.aimLabel}}；选中敌方但被挡下仍计未生效。</view>
+        </view>
+        <view wx:if="{{stats.fun.cards.length}}" class="fun-rule-item">派西维尔按初始身份记三绿车／三炸车；梅林只统计最终刺杀机会。轮内刀、枪、决斗与最终刀分别记录；空刀单列。未使用和作废不计失败。</view>
+      </view>
     </view>
   </block>
 </view>

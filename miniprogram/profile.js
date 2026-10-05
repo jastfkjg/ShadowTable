@@ -55,6 +55,7 @@ function presentFun(value) {
     return { ...card, metrics, roles, shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat: ["knife","gun","duel"].some(group => card.id.endsWith(":"+group)),
       enemyLabel: metrics.find(row => row.id.endsWith("enemy"))?.label || "敌方", allyLabel: metrics.find(row => row.id.endsWith("ally"))?.label || "友方",
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
+      sampleLabel: !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `共 ${primary.opportunities} ${["knife","gun","duel"].some(group => card.id.endsWith(":"+group)) ? "次出手" : "次机会"}`,
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
   });
   return { ...value, available: true, cards, shareable: canShareFun(value) };

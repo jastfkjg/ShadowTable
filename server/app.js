@@ -313,7 +313,7 @@ function createApp({
         return send(200,store.scoreAdjustments(uid,Number(offset)));
       }
       if (req.method === "GET" && path === "/api/me/matches") {
-        for (const key of requestUrl.searchParams.keys()) check(["offset","scored","fun","mode","role"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "对局记录筛选无效");
+        for (const key of requestUrl.searchParams.keys()) check(["offset","scored","fun","mode","role","period","board","matchRole","outcome"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "对局记录筛选无效");
         const rawOffset = requestUrl.searchParams.get("offset") || "0";
         check(/^(0|[1-9]\d{0,6})$/.test(rawOffset), "对局记录页码无效");
         const scored = requestUrl.searchParams.get("scored") || "0";
@@ -321,8 +321,13 @@ function createApp({
         const metric = requestUrl.searchParams.get("fun"), mode = requestUrl.searchParams.get("mode") || "classic", role = requestUrl.searchParams.get("role") || null;
         check(!metric || Object.hasOwn(fun.metrics,metric) && Object.hasOwn(fun.modes,mode) && (!role || /^[A-Za-z]{1,32}$/.test(role)), "趣味记录筛选无效");
         check(metric || !requestUrl.searchParams.has("mode") && !role, "趣味记录筛选无效");
-        const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null);
-        if (rawOffset==="0") result.adjustments=store.scoreAdjustments(uid);
+        const filters = require("./match-filters").parseMatchFilters(requestUrl.searchParams, store.clock());
+        const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null, filters);
+        if (rawOffset==="0") {
+          result.filterOptions=store.matchFilterOptions(uid);
+          if (!metric && filters.period === "all" && !filters.board && !filters.role && !filters.outcome)
+            result.adjustments=store.scoreAdjustments(uid);
+        }
         return send(200, result);
       }
       if (req.method === "GET" && path === "/api/me/rooms") {
