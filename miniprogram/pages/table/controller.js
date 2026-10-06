@@ -1664,7 +1664,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.data.room?.players?.some(player => player.seat === seat && player.alive !== false)) return;
     this.setResultDraft({ resultActor: seat, ...(seat === this.data.resultTarget ? { resultTarget: null } : {}) });
   },
-  viewScoreRecord() { wx.navigateTo({ url: "/pages/matches/matches?scored=1" }); },
+  viewScoreRecord() { wx.navigateTo({ url: "/pages/scores/scores" }); },
   viewFunRecord() { wx.navigateTo({ url: "/pages/stats/stats?tab=fun" }); },
   async saveResult() {
     const room = this.data.room, choice = this.data.resultChoice;

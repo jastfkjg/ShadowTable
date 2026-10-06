@@ -105,7 +105,7 @@ button:hover {
 }
 button:disabled {
   opacity: 0.45;
-  cursor: wait;
+  cursor: not-allowed;
 }
 button:focus-visible,
 input:focus-visible,
@@ -306,6 +306,95 @@ summary {
 }
 .actions select {
   max-width: 100%;
+}
+.host-controls {
+  flex-basis: 100%;
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.host-heading {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.host-primary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.host-primary:empty {
+  display: none;
+}
+.host-primary button[data-action="start"],
+.host-primary button[data-action="finishTools"],
+.host-primary button[data-action="rematch"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.host-transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.host-transfer label {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.host-transfer select {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.host-transfer button {
+  min-height: 46px;
+  padding-inline: 12px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.host-secondary {
+  margin-top: 12px;
+}
+.host-secondary button {
+  color: #f2b6ae;
+  font-size: 14px;
+}
+#match-result {
+  width: min(90vw, 480px);
+  max-height: 85vh;
+  overflow: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+}
+#match-result::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.result-fields {
+  display: grid;
+  gap: 16px;
+}
+.result-fields select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.result-warning {
+  color: #f2b6ae;
+}
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.result-actions button {
+  flex: 1 1 160px;
 }
 #switch-room {
   margin-top: 12px;

@@ -42,6 +42,8 @@
     const types = [...new Set((value.metrics || []).map(row => row.id.split("_")[0])
       .filter(type => ["knife", "gun", "duel"].includes(type)))];
     return { ...value,
+      hasEffectiveHighlights: (value.highlights || []).some(row =>
+        row.count > 0 && !row.id.endsWith("_failed") && !row.id.endsWith("_aim_enemy")),
       ...(value.metrics ? { metrics: value.metrics.map(metric) } : {}),
       ...(value.highlights ? { highlights: value.highlights.map(metric) } : {}),
       ...(value.events ? { events: value.events.map(event => ({ ...event,

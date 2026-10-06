@@ -1531,6 +1531,12 @@ test('趣味回查切到记录并可返回原位置，新回查和离开页面�
   slow.resolve(emptyStats); await pending; assert.equal(leaving.data.statistics.stats, null);
 });
 
+test('牌桌最终结果的积分入口打开积分明细页面', () => {
+  const { p, navigations } = page('table', apiBase);
+  p.viewScoreRecord();
+  assert.deepEqual(navigations, ['/pages/scores/scores']);
+});
+
 test('积分入口打开独立页面且保留统计位置；角色展开与刷新状态保持', async () => {
   const detail = { ...emptyStats, total: 12, score: { total: 2, games: 0, average: null },
     byFaction: [{ faction: 'good', label: '好人阵营', total: 12, wins: 6, winRate: 50 }],

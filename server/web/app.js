@@ -3646,7 +3646,7 @@ function roomListItems(rooms) {
           esc(r.result.reason || "") +
           "</span>" +
           '<div class="small muted">' + (r.result.source === "manual" ? "房主登记" : r.result.source === "system" ? "系统判定" : "") + "</div>" +
-          (r.myFun && r.phase === "ended" ? viewFunStory(r.myFun) + btn("text-button","navigate","查看趣味统计 ›",{page:"stats?tab=fun"}) : "") +
+          (r.myFun?.hasEffectiveHighlights && r.phase === "ended" ? viewFunStory(r.myFun) + btn("text-button","navigate","查看趣味统计 ›",{page:"stats?tab=fun"}) : "") +
           (r.myScore ? viewScoreBreakdown(r.myScore) + btn("text-button", "scoreRecords", "查看积分明细 ›") : "") +
           (r.me.isHost
             ? btn("primary", "rematch", "同房再开一局", null, state.busy)

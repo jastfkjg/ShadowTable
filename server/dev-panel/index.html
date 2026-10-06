@@ -93,5 +93,21 @@
       <p id="identity-change-info"></p>
       <button id="identity-change-confirm">记住了，关闭</button>
     </dialog>
+    <dialog id="match-result" aria-labelledby="match-result-title" aria-describedby="match-result-context">
+      <h2 id="match-result-title">结束本局 · 登记结果</h2>
+      <p id="match-result-context"></p>
+      <div class="result-fields">
+        <label>对局结果<select id="result-choice"></select></label>
+        <label id="result-actor-field" hidden>实际带刀人<select id="result-actor"></select></label>
+        <label id="result-target-field" hidden>实际刺杀目标<select id="result-target"></select></label>
+      </div>
+      <p id="result-notice" role="status" aria-live="polite"></p>
+      <p id="result-active-notice" class="result-warning" hidden>当前未结算的操作将作废。</p>
+      <p>确认后本局将结束，结果归档后不能直接修改。</p>
+      <div class="result-actions">
+        <button id="result-cancel" type="button">返回继续对局</button>
+        <button id="result-save" type="button" class="primary" disabled>确认结束并归档</button>
+      </div>
+    </dialog>
   </body>
 </html>

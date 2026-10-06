@@ -271,6 +271,42 @@ scenes.toolDialog = {
     selected: [2, 4].includes(p.seat),
   })),
 };
+scenes.resultRegistration = {
+  ...scenes.tools,
+  room: { ...scenes.tools.room, scoreSettlement: [
+    { id: 'assassination', label: '三绿，已完成最终刺杀' },
+    { id: 'quest_fail', label: '三次任务失败' },
+  ] },
+  resultDialog: true, resultStep: 'reason', resultStepIndex: 0,
+  resultSteps: ['reason', 'review'], resultStepTitle: '结束原因', resultNextEnabled: false,
+};
+scenes.resultRegistrationSelected = { ...scenes.resultRegistration, resultReason: 'quest_fail', resultNextEnabled: true };
+scenes.finalResultScored = {
+  ...scenes.tools,
+  room: { ...scenes.tools.room, phase: 'ended', phaseName: '对局结束', canUseTools: false,
+    result: { winner: 'good', reason: '房主已登记线下结果，战绩已归档。', source: 'manual' },
+    scoreSettings: { enabled: true },
+    myScore: { status: 'scored', total: 5, breakdown: [{ id: 'win', label: '好人获胜', points: 5 }] } },
+  latestResult: { text: '本轮不转换' },
+};
+scenes.finalResultZero = { ...scenes.finalResultScored,
+  room: { ...scenes.finalResultScored.room, myScore: { status: 'scored', total: 0, breakdown: [] } } };
+scenes.finalResultWithFun = { ...scenes.finalResultScored,
+  room: { ...scenes.finalResultScored.room, myFun: require('../miniprogram/fun-copy').story({ status: 'recorded', highlights: [
+    { id: 'good_shield', label: '成功挡刀', count: 1, unit: '次' },
+    { id: 'percival_green', label: '三绿车', count: 1, unit: '次' },
+  ] }) } };
+scenes.finalResultWithoutFun = { ...scenes.finalResultScored,
+  room: { ...scenes.finalResultScored.room, myFun: require('../miniprogram/fun-copy').story({ status: 'recorded', highlights: [
+    { id: 'knife_failed', label: '刀落空', count: 1, unit: '次' },
+  ] }) } };
+scenes.finalResultExcluded = { ...scenes.finalResultScored,
+  room: { ...scenes.finalResultScored.room, result: { winner: 'evil', reason: '三次任务失败。', source: 'system' },
+    myScore: { status: 'excluded', reason: '本局未开启计分' } } };
+scenes.finalResultGuest = { ...scenes.finalResultZero,
+  room: { ...scenes.finalResultZero.room, me: { seat: 2, isHost: false } } };
+scenes.finalResultTerminated = { ...scenes.finalResultExcluded,
+  room: { ...scenes.finalResultExcluded.room, phase: 'terminated', result: { winner: null, reason: '房主终止了对局，本局不判胜负' } } };
 command(toolRoom, "p1", {
   type: "beginActivity",
   kind: "vote",
@@ -322,6 +358,20 @@ command(knightRoom, "p1", {
   stage: knightRoom.stage,
 });
 scenes.knightTools = roomData(knightRoom);
+scenes.tablePlayingHost = {
+  ...scenes.knightTools,
+  room: { ...scenes.knightTools.room, testRoom: true, fairyHolder: 11 },
+};
+scenes.tablePlayingGuest = {
+  ...scenes.tablePlayingHost,
+  room: { ...scenes.tablePlayingHost.room, canUseTools: false, me: { ...scenes.tablePlayingHost.room.me, seat: 2, isHost: false } },
+  seats: scenes.tablePlayingHost.seats.map(p => ({ ...p, mine: p.seat === 2 })),
+};
+scenes.tablePlayingStates = {
+  ...scenes.tablePlayingHost, busy: true,
+  seats: scenes.tablePlayingHost.seats.map(p => p.seat === 11
+    ? { ...p, name: '这是一个很长的玩家昵称', inTeam: true, alive: false } : p),
+};
 knightRoom.roles.p1 = "magician";
 command(knightRoom, "p1", {
   type: "beginActivity",

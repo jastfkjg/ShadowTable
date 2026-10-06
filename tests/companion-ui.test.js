@@ -18,7 +18,8 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
         addEventListener(event, fn) {
           this.handlers[event] = fn;
         },
-        close() {},
+        close() { this.open = false; },
+        showModal() { this.open = true; },
         closest() {
           return null;
         },
@@ -120,8 +121,126 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
               : { dataset: { actor: id } },
         },
       }),
+    change: (id, value) => element(id).handlers.change({ target: { value } }),
   };
 }
+
+test("陪测房主先选择胜方再归档，空选、取消和重复点击不提交结束请求", async () => {
+  const p = panel({ overrides: { phase: "tools", canUseTools: true, flexible: true,
+    me: { seat: 2, isHost: true }, players: [{ seat: 2, name: "陪测0" }, { seat: 3, name: "真人" }],
+    winnerOptions: [{ value: "good", label: "好人胜" }, { value: "evil", label: "坏人胜" }, { value: "third", label: "盗贼阵营胜" }] } });
+  await flush();
+  p.click("0", "finishTools");
+  assert.match(p.element("result-choice").innerHTML, /好人胜|坏人胜|盗贼阵营胜|不计战绩/);
+  assert.equal(p.element("result-save").disabled, true);
+  await p.element("result-save").onclick();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+  p.change("result-choice", "winner:good");
+  await p.poll();
+  assert.equal(p.element("result-choice").value, "winner:good", "刷新保留登记草稿");
+  p.element("result-cancel").onclick();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+  p.click("0", "finishTools");
+  p.change("result-choice", "winner:third");
+  const saving = p.element("result-save").onclick();
+  p.element("result-save").onclick();
+  await saving;
+  const writes = p.calls.filter(c => c.method === "POST");
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].data.type, "finishTools");
+  assert.equal(writes[0].data.winner, "third");
+  assert.equal(writes[0].data.stage, "s1");
+});
+
+test("陪测房主登记刺杀按计分开关提交事实，排除出局和自刀；空刀仍可选择", async () => {
+  for (const scoring of [false, true]) {
+    const p = panel({ overrides: { phase: "tools", canUseTools: true, flexible: true,
+      me: { seat: 2, isHost: true }, settlementRequiresActor: true, hasActiveOperation: true,
+      players: [{ seat: 2, name: "带刀人" }, { seat: 3, name: '<目标>' }, { seat: 4, name: "已出局", alive: false }],
+      [scoring ? "scoreSettlement" : "funSettlement"]: [{ id: "assassination", label: "三绿，已完成最终刺杀", requiresTarget: true }],
+      winnerOptions: [{ value: "good", label: "好人胜" }, { value: "evil", label: "坏人胜" }] } });
+    await flush();
+    p.click("0", "finishTools");
+    p.change("result-choice", "reason:assassination");
+    assert.equal(p.element("result-actor-field").hidden, false);
+    assert.equal(p.element("result-save").disabled, true);
+    assert.doesNotMatch(p.element("result-actor").innerHTML, /已出局/);
+    p.change("result-actor", "2");
+    assert.doesNotMatch(p.element("result-target").innerHTML, /value="2"|已出局/);
+    assert.match(p.element("result-target").innerHTML, /&lt;目标&gt;/);
+    p.change("result-target", "2");
+    assert.equal(p.element("result-save").disabled, true);
+    p.change("result-target", "0");
+    assert.equal(p.element("result-save").disabled, false);
+    p.change("result-target", "3");
+    p.change("result-actor", "3");
+    assert.equal(p.element("result-target").value, "");
+    assert.equal(p.element("result-save").disabled, true);
+    p.change("result-actor", "2");
+    p.change("result-target", "3");
+    await p.element("result-save").onclick();
+    const write = p.calls.find(c => c.method === "POST").data;
+    assert.equal(write[scoring ? "scoreReason" : "funReason"], "assassination");
+    assert.equal(write[scoring ? "scoreTarget" : "funTarget"], 3);
+    assert.equal(write.funActor, 2);
+    assert.equal(write.replace, true);
+    assert.equal(write.winner, undefined, "胜方由服务端根据真实身份结算");
+  }
+});
+
+test("场上有刺客跳过带刀人，未登记胜负必须显式选择，旧阶段不能结束新对局", async () => {
+  const overrides = { phase: "tools", canUseTools: true, flexible: true, me: { seat: 2, isHost: true },
+    settlementRequiresActor: false, players: [{ seat: 2, name: "刺客" }, { seat: 3, name: "目标" }],
+    funSettlement: [{ id: "assassination", label: "最终刺杀", requiresTarget: true }] };
+  const p = panel({ overrides });
+  await flush();
+  p.click("0", "finishTools");
+  p.change("result-choice", "reason:assassination");
+  assert.equal(p.element("result-actor-field").hidden, true);
+  p.change("result-target", "3");
+  await p.element("result-save").onclick();
+  assert.equal(p.calls.find(c => c.method === "POST").data.funActor, undefined);
+  p.click("0", "finishTools");
+  p.change("result-choice", "none");
+  await p.element("result-save").onclick();
+  assert.equal(p.calls.filter(c => c.method === "POST")[1].data.winner, null);
+  p.click("0", "finishTools");
+  p.change("result-choice", "none");
+  overrides.stage = "next-game";
+  await p.poll();
+  await p.element("result-save").onclick();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 2);
+  assert.match(p.element("feedback").textContent, /阶段已变化/);
+});
+
+test("陪测线下结算可登记胜方，自由操作时仅结束线下操作并继续本局", async () => {
+  for (const flexible of [false, true]) {
+    const p = panel({ overrides: { phase: "offlineFinal", flexible, canUseTools: true,
+      me: { seat: 2, isHost: true }, winnerOptions: [{ value: "evil", label: "坏人胜" }] } });
+    await flush();
+    p.click("0", "closeOffline");
+    if (!flexible) {
+      assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+      p.change("result-choice", "winner:evil");
+      await p.element("result-save").onclick();
+    } else await flush();
+    const write = p.calls.find(c => c.method === "POST").data;
+    assert.equal(write.type, "closeOffline");
+    assert.equal(write.winner, flexible ? undefined : "evil");
+    assert.equal(write.keepPlaying, flexible ? true : undefined);
+  }
+});
+
+test("结束后的陪测房主显示结果与重开，管理区独立布局且无接任人时不可转交", async () => {
+  const p = panel({ overrides: { phase: "ended", me: { seat: 2, isHost: true },
+    players: [{ seat: 2, name: "房主" }], result: { winner: "good" }, winnerOptions: [{ value: "good", label: "好人胜" }] } });
+  await flush();
+  const html = p.element("players").innerHTML;
+  assert.match(html, /房主 · 好人胜/);
+  assert.doesNotMatch(html, /等待下一阶段|data-action="finishTools"|data-action="terminate"/);
+  assert.match(html, /class="host-primary"[\s\S]*data-action="rematch"/);
+  assert.match(html, /class="host-transfer"[\s\S]*data-action="transfer" disabled/);
+});
 
 test("本地陪测隔离网页登录 Cookie，管理陪测保留管理员 Cookie", async () => {
   const local = panel({ pathname: "/dev", playerCookie: true });

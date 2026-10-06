@@ -15,16 +15,25 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
-test('房间邀请在房间号旁，成员均可分享；首次昵称与失效提示保留在目标页面', () => {
-  for (const phase of ['lobby', 'identity']) {
+test('准备阶段显示房间邀请，开局后只保留身份入口；首次昵称与失效提示保留在目标页面', () => {
+  for (const phase of ['lobby', 'identity', 'proposal', 'quest', 'tools', 'offlineFinal', 'ended']) {
     const room = { code: '372338', phase, capacity: 6, boardName: '阿瓦隆', players: [], team: [], me: { seat: 2, isHost: false } };
     const tree = renderTable({ ...base, room, isLobby: false, loading: false });
     const button = nodes(tree).find(node => node.attr?.openType === 'share');
-    assert.ok(button);
-    assert.equal(button.attr.disabled, false);
-    assert.match(button.attr.ariaLabel, /372338/);
-    const loading = renderTable({ ...base, room, isLobby: false, loading: true });
-    assert.equal(nodes(loading).find(node => node.attr?.openType === 'share').attr.disabled, true);
+    if (phase === 'lobby') {
+      assert.ok(button);
+      assert.equal(button.attr.disabled, false);
+      assert.match(button.attr.ariaLabel, /372338/);
+      assert.equal(byHandler(tree, 'reveal'), undefined);
+      const loading = renderTable({ ...base, room, isLobby: false, loading: true });
+      assert.equal(nodes(loading).find(node => node.attr?.openType === 'share').attr.disabled, true);
+    } else {
+      assert.equal(button, undefined);
+      const summary = nodes(tree).find(node => node.attr?.class === 'room-summary');
+      assert.ok(byHandler(summary, 'copyRoomCode'));
+      assert.ok(byHandler(summary, 'reveal'));
+      assert.match(JSON.stringify(byHandler(summary, 'reveal')), /2号 · 我的身份/);
+    }
   }
   const data = { ...base, isLobby: false, loading: false, invitation: { code: '372338', boardName: '阿瓦隆 · 十二骑士', capacity: 12, occupied: 12 }, invitationNeedsName: true };
   const tree = renderTable(data);
@@ -215,10 +224,61 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
 });
 
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{
-  const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
+  const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],result:{winner:'good',reason:'对局已归档',source:'system'},myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
   const ended=render({...base,room});assert.match(JSON.stringify(ended),/本局 \+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);
   room.myScore={status:'excluded',reason:'本局未开启计分'};assert.match(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
   room.phase='lobby';assert.doesNotMatch(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
+});
+test('最终结果替换顶部最近操作，积分和再开一局在同一卡片，覆盖零分、排除及终止', () => {
+  const room = { phase:'ended', phaseName:'对局结束', flexible:true, capacity:6, team:[], me:{seat:1,isHost:true}, scoreSettings:{enabled:true} };
+  for (const [winner, title] of [['good','好人获胜'],['evil','坏人获胜'],['third','盗贼阵营获胜'],[null,'以线下结算为准']]) {
+    for (const total of [0, 7, -2]) {
+      const data = { ...base, room:{...room,result:{winner,reason:'房主已登记',source:'manual'},myScore:{status:'scored',total,breakdown:[{id:'win',label:'本局奖励',points:total}]}}, latestResult:{text:'本轮不转换'} };
+      const tree = render(data), flat = nodes(tree);
+      const dynamic = flat.find(n => n.attr?.class?.startsWith('table-dynamics '));
+      const final = nodes(dynamic).find(n => n.attr?.class === 'final-result');
+      assert.ok(final);
+      assert.match(JSON.stringify(final), new RegExp(title));
+      assert.ok(JSON.stringify(final).includes(`本局 ${total>=0?'+':''}${total} 分`));
+      const scoreHeading = nodes(final).find(n => n.attr?.class === 'final-result-score-heading');
+      assert.ok(JSON.stringify(scoreHeading).includes(`本局 ${total>=0?'+':''}${total} 分`));
+      assert.ok(byHandler(scoreHeading, 'viewScoreRecord'));
+      assert.equal(nodes(final).filter(n => n.attr?.bindtap === 'viewScoreRecord').length, 1);
+      assert.ok(byHandler(final, 'rematch'));
+      assert.equal(flat.filter(n => n.attr?.class === 'final-result').length, 1);
+      assert.ok(!flat.some(n => n.attr?.class === 'latest-result' || n.attr?.class === 'phase-strip' || n.attr?.class === 'score-result'));
+      assert.doesNotMatch(JSON.stringify(dynamic), /本轮不转换|最近结果/);
+      assert.ok(flat.indexOf(final) < flat.findIndex(n => n.attr?.class === 'seats'));
+      assert.equal(byHandler(render({...data,hasPendingRequest:true}), 'rematch').attr.disabled, true);
+      const guest = render({...data,room:{...data.room,me:{seat:null,isHost:false},myScore:null}});
+      assert.ok(!byHandler(guest, 'rematch'));
+      assert.match(JSON.stringify(guest), /等待房主开启下一局/);
+    }
+  }
+  for (const phase of ['ended', 'terminated']) {
+    const tree = render({...base,room:{...room,phase,result:{winner:null,reason:'本局不判胜负'},myScore:{status:'excluded',reason:'本局未开启计分'}}});
+    const final = nodes(tree).find(n => n.attr?.class === 'final-result');
+    assert.match(JSON.stringify(final), /不计积分 · 本局未开启计分/);
+    assert.ok(!byHandler(final, 'viewScoreRecord'));
+  }
+});
+test('房主始终位于座位右上角，湖仙徽章独立于头像并保留任务和出局状态', () => {
+  const seat = {seat:1,name:'甲',occupied:true,mine:true,host:true,alive:false,inTeam:true};
+  for (const phase of ['lobby','tools','quest','ended']) {
+    const room = {phase,capacity:6,team:[1],me:{seat:1},fairyHolder:1};
+    const button = byHandler(render({...base,room,seats:[seat]}), 'seat');
+    const head = nodes(button).find(n => n.attr?.class === 'seat-head-tags');
+    assert.deepEqual(Array.from(nodes(head).find(n => n.attr?.class === 'seat-flag').children), ['房主']);
+    assert.equal(nodes(button).filter(n => n.attr?.class === 'seat-flag').length, 1);
+    const avatar = nodes(button).find(n => n.attr?.class === 'seat-avatar-wrap');
+    assert.ok(!nodes(avatar).some(n => n.attr?.class === 'seat-fairy'));
+    const fairy = (button.children || []).find(n => n.attr?.class === 'seat-fairy');
+    assert.equal(!!fairy, phase !== 'lobby');
+    if (phase !== 'lobby') {
+      assert.match(button.attr.class, /has-fairy/);
+      assert.match(JSON.stringify(button), /任务队员|已出局/);
+    }
+  }
 });
 test("座位头像固定占位且失败回退，保留座位按钮和全部公开状态", () => {
   const room = { phase: "proposal", flexible: false, leader: 1, fairyHolder: 1, capacity: 6, me: { seat: 1 } };

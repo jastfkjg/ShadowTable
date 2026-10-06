@@ -348,9 +348,101 @@ if (typeof document !== "undefined") {
   const button = (action, label, disabled = false) =>
     `<button data-action="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
   let changedActor = null;
+  let resultDraft = null;
+  function resultSelection() {
+    const actor = companion.actors.find(a => a.id === resultDraft?.actorId);
+    const room = actor?.room;
+    const current = !!room?.me.isHost && !actor.pending && room.stage === resultDraft?.stage &&
+      !["lobby", "ended", "terminated"].includes(room.phase);
+    const scoring = !!room?.scoreSettlement?.length;
+    const reasons = resultDraft?.command === "closeOffline" ? []
+      : scoring ? room.scoreSettlement : room?.funSettlement || [];
+    const reason = reasons.find(item => "reason:" + item.id === resultDraft?.choice);
+    const winner = (room?.winnerOptions || []).find(item => "winner:" + item.value === resultDraft?.choice);
+    const players = (room?.players || []).filter(player => player.alive !== false);
+    const needsActor = !!(reason?.requiresTarget && room.settlementRequiresActor);
+    const actorValid = !needsActor || players.some(player => player.seat === resultDraft?.actor);
+    const targetValid = !reason?.requiresTarget || resultDraft?.target === 0 ||
+      players.some(player => player.seat === resultDraft?.target && (!needsActor || player.seat !== resultDraft?.actor));
+    return { actor, room, current, scoring, reasons, reason, winner, players, needsActor,
+      ready: current && (!!reason || !!winner || resultDraft?.choice === "none") && actorValid && targetValid };
+  }
+  function renderResult() {
+    if (!resultDraft) return;
+    const selection = resultSelection(), { room, reasons, reason, winner, players, needsActor } = selection;
+    if (!selection.current) {
+      $("match-result").close();
+      resultDraft = null;
+      $("feedback").className = "error";
+      $("feedback").textContent = "房主或阶段已变化，请重新登记结果。";
+      return;
+    }
+    const setOptions = (id, html, value) => {
+      if ($(id).innerHTML !== html) $(id).innerHTML = html;
+      $(id).value = value == null ? "" : String(value);
+    };
+    $("match-result-context").textContent = `${room.me.seat}号 · ${selection.actor.name} · ${room.boardName}`;
+    setOptions("result-choice", '<option value="">请选择结束原因或胜方</option>' +
+      (reasons.length ? '<optgroup label="登记结束原因">' + reasons.map(item => `<option value="reason:${escape(item.id)}">${escape(item.label)}</option>`).join("") + '</optgroup>' : "") +
+      '<optgroup label="仅登记胜方">' + (room.winnerOptions || []).map(item => `<option value="winner:${escape(item.value)}">${escape(item.label)}</option>`).join("") + '</optgroup><option value="none">不计战绩</option>', resultDraft.choice);
+    $("result-actor-field").hidden = !needsActor;
+    setOptions("result-actor", '<option value="">选择实际带刀人</option>' + players.map(player => `<option value="${player.seat}">${player.seat}号 · ${escape(player.name)}</option>`).join(""), resultDraft.actor);
+    $("result-target-field").hidden = !reason?.requiresTarget;
+    setOptions("result-target", '<option value="">选择实际刺杀目标</option><option value="0">空刀</option>' +
+      players.filter(player => !needsActor || player.seat !== resultDraft.actor).map(player => `<option value="${player.seat}">${player.seat}号 · ${escape(player.name)}</option>`).join(""), resultDraft.target);
+    $("result-notice").textContent = resultDraft.choice === "none" ? "本局不计战绩、积分和趣味统计。"
+      : reason ? selection.scoring ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。"
+      : winner ? "仅保存胜负，不计积分；缺失的趣味结果保留未知。" : "选择后核对结果，再确认结束本局。";
+    $("result-active-notice").hidden = !room.hasActiveOperation;
+    $("result-save").disabled = busy || !selection.ready;
+    ["result-choice", "result-actor", "result-target", "result-cancel"].forEach(id => $(id).disabled = busy);
+  }
+  function openResult(actor, command = "finishTools") {
+    resultDraft = { actorId: actor.id, stage: actor.room.stage, command, choice: "", actor: null, target: null };
+    renderResult();
+    if (resultDraft) $("match-result").showModal();
+  }
+  function closeResult() {
+    if (busy) return;
+    resultDraft = null;
+    $("match-result").close();
+  }
+  $("result-cancel").onclick = closeResult;
+  $("match-result").addEventListener("cancel", e => {
+    e.preventDefault();
+    closeResult();
+  });
+  $("result-choice").addEventListener("change", e => {
+    if (!resultDraft || busy) return;
+    Object.assign(resultDraft, { choice: e.target.value, actor: null, target: null });
+    renderResult();
+  });
+  $("result-actor").addEventListener("change", e => {
+    if (!resultDraft || busy) return;
+    resultDraft.actor = e.target.value === "" ? null : Number(e.target.value);
+    if (resultDraft.target === resultDraft.actor) resultDraft.target = null;
+    renderResult();
+  });
+  $("result-target").addEventListener("change", e => {
+    if (!resultDraft || busy) return;
+    resultDraft.target = e.target.value === "" ? null : Number(e.target.value);
+    renderResult();
+  });
+  $("result-save").onclick = () => {
+    if (!resultDraft || busy || acting.size) return;
+    const selection = resultSelection();
+    if (!selection.ready) { renderResult(); return; }
+    const { actor, reason, winner, scoring, needsActor } = selection, draft = resultDraft;
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id,
+      ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: draft.target,
+        ...(needsActor ? { funActor: draft.actor } : {}) } : {}) }
+      : { winner: winner?.value || null };
+    closeResult();
+    return run(() => companion.command(actor, draft.command, { replace: !!actor.room.hasActiveOperation, ...details }), "本局结果已登记");
+  };
   function showChangedIdentity() {
     const dialog = $("identity-change");
-    if (busy || acting.size || document.hidden || dialog.open) return;
+    if (busy || acting.size || resultDraft || document.hidden || dialog.open) return;
     const actor = companion.actors.find(
       (a) => a.room?.me.identityChanged && a.secret && !a.pending,
     );
@@ -379,6 +471,7 @@ if (typeof document !== "undefined") {
   $("identity-change").addEventListener("cancel", (e) => e.preventDefault());
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
+      closeResult();
       $("identity-change").close();
       $("identity-change-role").textContent = "";
       $("identity-change-info").textContent = "";
@@ -386,6 +479,7 @@ if (typeof document !== "undefined") {
   });
   let lastPlayersHtml, lastLocks;
   function render() {
+    renderResult();
     showChangedIdentity();
     $("identity-change-confirm").disabled = busy;
     $("workspace").hidden = !companion.actors.length;
@@ -469,23 +563,16 @@ if (typeof document !== "undefined") {
           actions += `<div><p>选择 ${r.teamSize} 名队员</p><div class="team">${r.players.map((p) => `<label><input type="checkbox" data-seat="${p.seat}" ${team.includes(p.seat) ? "checked" : ""}>${p.seat}号</label>`).join("")}</div>${button("propose", "提交队伍", team.length !== r.teamSize)}</div>`;
         }
         if (r?.me.isHost && !actor.pending) {
-          if (r.phase === "lobby") actions += button("start", "开始游戏");
-          actions +=
-            `<label>转交房主<select data-transfer><option value="">选择接任玩家</option>${r.players
-              .filter((p) => p.seat !== r.me.seat)
-              .map(
-                (p) =>
-                  `<option value="${p.seat}" ${String(transfers[actor.id]) === String(p.seat) ? "selected" : ""}>${p.seat}号 · ${escape(p.name)}</option>`,
-              )
-              .join("")}</select></label>` + button("transfer", "确认转交");
+          let hostActions = '<section class="host-controls" aria-label="房主管理"><div class="host-heading">房主管理</div><div class="host-primary">';
+          if (r.phase === "lobby") hostActions += button("start", "开始游戏");
           if (r.canAdvance && !r.flexible)
-            actions += button("advance", "推进阶段");
-          if (!["lobby", "ended", "terminated"].includes(r.phase))
-            actions += button("terminate", "终止本局");
+            hostActions += button("advance", "推进阶段");
           if (["ended", "terminated"].includes(r.phase))
-            actions += button("rematch", "同房重开");
+            hostActions += button("rematch", "同房重开");
           if (r.phase === "offlineFinal")
-            actions += button("closeOffline", "结束线下结算");
+            hostActions += button("closeOffline", r.flexible ? "线下操作完成" : "登记线下结果");
+          if (r.canUseTools) hostActions += button("finishTools", "结束本局 · 登记结果");
+          hostActions += '</div>';
           if (r.canUseTools) {
             if (hostDrafts[actor.id]?.stage !== r.stage)
               hostDrafts[actor.id] = {
@@ -495,7 +582,7 @@ if (typeof document !== "undefined") {
               };
             const draft = hostDrafts[actor.id];
             if (!r.hasActiveOperation) {
-              actions += `<fieldset><legend>房主操作台</legend><p>投票、任务选择队员；十二骑士刀人仅选一位带刀人。</p><div class="team">${r.players
+              hostActions += `<fieldset><legend>房主操作台</legend><p>投票、任务选择队员；十二骑士刀人仅选一位带刀人。</p><div class="team">${r.players
                 .filter((p) => p.alive !== false)
                 .map(
                   (p) =>
@@ -516,24 +603,33 @@ if (typeof document !== "undefined") {
                 kinds.push(["reverseStrike", "发起逆仆反刺"]);
               if (r.knifeOffline || r.knights)
                 kinds.push(["offline", "线下结算"]);
-              actions +=
+              hostActions +=
                 kinds
                   .map(([kind, label]) => button("begin:" + kind, label))
                   .join("") + "</fieldset>";
             } else {
               if (r.phase !== "offlineFinal")
-                actions += button("settleTool", "结算当前操作");
-              if (r.closeWaiting) actions += button("closeWaiting", "结束等待");
-              actions += button("cancelActivity", "作废当前操作");
+                hostActions += button("settleTool", "结算当前操作");
+              if (r.closeWaiting) hostActions += button("closeWaiting", "结束等待");
+              hostActions += button("cancelActivity", "作废当前操作");
             }
-            actions += button("finishTools", "结束本局");
           }
+          hostActions += `<div class="host-transfer"><label>转交房主<select data-transfer><option value="">选择接任玩家</option>${r.players
+            .filter(p => p.seat !== r.me.seat)
+            .map(p => `<option value="${p.seat}" ${String(transfers[actor.id]) === String(p.seat) ? "selected" : ""}>${p.seat}号 · ${escape(p.name)}</option>`).join("")}</select></label>` +
+            button("transfer", "确认转交", !r.players.some(p => p.seat !== r.me.seat && p.seat === transfers[actor.id])) + '</div>';
+          if (!["lobby", "ended", "terminated"].includes(r.phase))
+            hostActions += '<div class="host-secondary">' + button("terminate", "终止本局（不判胜负）") + '</div>';
+          actions += hostActions + '</section>';
         }
         const role =
           $("reveal").checked && actor.secret
             ? `<p class="role">${escape(actor.secret.role)} · ${escape(actor.secret.faction)}</p><p class="private-information">${escape(actor.secret.information)}</p>`
             : "";
-        return `<article class="player" data-actor="${actor.id}" aria-busy="${acting.has(actor.id)}"><h3>${r ? r.me.seat + "号 · " : ""}${escape(actor.name)}</h3><p>${r?.me.isHost ? "房主 · " : ""}${escape(spec?.label || (r?.phase === "lobby" ? (r.me.ready ? "已准备" : "等待准备") : "等待下一阶段"))}</p>${role}${actor.error ? `<p class="error">${escape(actor.error)}</p>` : ""}<div class="actions">${actions}</div></article>`;
+        const status = r?.phase === "ended" ? (r.winnerOptions || []).find(option => option.value === r.result?.winner)?.label || "本局已结束 · 不计战绩"
+          : r?.phase === "terminated" ? "本局已终止 · 不判胜负"
+          : spec?.label || (r?.phase === "lobby" ? (r.me.ready ? "已准备" : "等待准备") : r?.me.isHost ? "可管理本局流程" : "等待下一阶段");
+        return `<article class="player" data-actor="${actor.id}" aria-busy="${acting.has(actor.id)}"><h3>${r ? r.me.seat + "号 · " : ""}${escape(actor.name)}</h3><p>${r?.me.isHost ? "房主 · " : ""}${escape(status)}</p>${role}${actor.error ? `<p class="error">${escape(actor.error)}</p>` : ""}<div class="actions">${actions}</div></article>`;
       })
       .join("");
     const locks = `${busy}:${[...acting].join(",")}`;
@@ -679,8 +775,10 @@ if (typeof document !== "undefined") {
     }
     if (e.target.hasAttribute("data-threshold"))
       hostDrafts[actor.id].threshold = Number(e.target.value);
-    if (e.target.hasAttribute("data-transfer"))
+    if (e.target.hasAttribute("data-transfer")) {
       transfers[actor.id] = Number(e.target.value);
+      render();
+    }
     if (e.target.hasAttribute("data-target"))
       targets[actor.id] = e.target.value;
     if (e.target.hasAttribute("data-seat")) {
@@ -699,6 +797,11 @@ if (typeof document !== "undefined") {
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
     if (!action || !actor || busy || acting.has(actor.id)) return;
+    if (action === "finishTools" || action === "closeOffline" && !actor.room?.flexible) {
+      if (actor.pending || !actor.room?.me.isHost) return;
+      openResult(actor, action);
+      return;
+    }
     if (action === "ready") {
       run(
         () =>
@@ -764,7 +867,6 @@ if (typeof document !== "undefined") {
         [
           "terminate",
           "cancelActivity",
-          "finishTools",
           "closeWaiting",
           "rematch",
         ].includes(action)
@@ -776,9 +878,6 @@ if (typeof document !== "undefined") {
         if (!confirm(detail + " 确认继续？")) return;
         return companion.command(actor, action, {
           confirm: true,
-          ...(action === "finishTools"
-            ? { replace: !!actor.room.hasActiveOperation }
-            : {}),
         });
       }
       if (action === "confirmSwap") {
@@ -823,6 +922,7 @@ if (typeof document !== "undefined") {
         return companion.command(actor, "submit", {
           value: Number(targets[actor.id]),
         });
+      if (action === "closeOffline") return companion.command(actor, action, { keepPlaying: true });
       if (actor.secret?.action?.choices?.includes(action))
         return companion.command(actor, "submit", { value: action });
       return companion.command(actor, action);
