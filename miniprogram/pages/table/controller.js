@@ -265,6 +265,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     selected: [],
     revealed: false,
     secret: null,
+    identityHistoryOpen: false,
+    identityHistoryExpandedId: null,
     choiceButtons: [],
     targetButtons: [],
     network: true,
@@ -373,6 +375,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       swapPlayers: [],
       revealed: false,
       secret: null,
+      identityHistoryOpen: false,
+      identityHistoryExpandedId: null,
       choiceButtons: [],
       targetButtons: [],
     });
@@ -682,6 +686,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHistoryOpen: false,
+          identityHistoryExpandedId: null,
           choiceButtons: [],
           targetButtons: [],
           selected,
@@ -1461,7 +1467,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   ...playerCardMethods(api),
   async openPlayerCard(seat) {
     const room = this.data.room, player = room?.players.find(p => p.seat === seat);
-    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult) return;
+    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult || this.data.identityHistoryOpen) return;
     const sourceAvatarUrl = player.avatarUrl;
     const card = { id: player.statsId, seat, name: player.name, isHost: player.isHost, sourceAvatarUrl,
       avatarUrl: sourceAvatarUrl ? api.assetUrl(sourceAvatarUrl) : "", initial: Array.from(player.name || "友")[0], avatarFailed: false };
@@ -1935,7 +1941,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   identityOverlayBlocked() {
     return !this.alive || !this.foreground || !this.data.room || this.data.error ||
       this.data.actionDialog || this.data.actionLoading || this.data.identityChange ||
-      this.data.fairyResult || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
+      this.data.fairyResult || this.data.identityHistoryOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
   },
   showDealtIdentity() {
     const key = this.identityDealKey();
@@ -2016,6 +2022,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.room.stage === stage
       ) {
         secret.factionTone = factionTone(secret.faction);
+        secret.identityHistory = (secret.identityHistory || []).map(record => ({
+          ...record, factionTone: factionTone(record.faction),
+        }));
         this.rememberDealtIdentity();
         this.setData({
           revealed: true,
@@ -2035,6 +2044,23 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     } finally {
       this.setData({ busy: false, busyAction: "" });
     }
+  },
+  openIdentityHistory() {
+    const history = this.data.secret?.identityHistory || [];
+    if (!this.data.revealed || history.length < 2 || this.identityOverlayBlocked()) return;
+    this.closePlayerCard();
+    this.setData({ identityHistoryOpen: true, identityHistoryExpandedId: history.find(record => !record.current)?.id ?? null });
+  },
+  closeIdentityHistory() {
+    this.setData({ identityHistoryOpen: false, identityHistoryExpandedId: null });
+  },
+  toggleIdentityHistory(event) {
+    const id = Number(event.currentTarget.dataset.id);
+    if (!this.data.identityHistoryOpen || !this.data.secret?.identityHistory?.some(record => record.id === id && !record.current)) return;
+    this.setData({ identityHistoryExpandedId: this.data.identityHistoryExpandedId === id ? null : id });
+  },
+  hideIdentityHistory() {
+    this.mask();
   },
   async showFairyResult() {
     const room = this.data.room;
@@ -2059,6 +2085,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           fairyResultRevealed: false,
           revealed: false,
           secret: null,
+          identityHistoryOpen: false,
+          identityHistoryExpandedId: null,
         });
       }
     } catch (e) {
@@ -2115,6 +2143,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHistoryOpen: false,
+          identityHistoryExpandedId: null,
         });
       }
     } catch (e) {

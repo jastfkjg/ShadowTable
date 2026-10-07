@@ -28,7 +28,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
+      viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       getWebSessionTag() { return webSessionTag; },
@@ -475,6 +475,37 @@ function dealtWebRoom(overrides = {}) {
     capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
     team: [], history: [], ...overrides };
 }
+test("网页身份历程只读且转义旧视野，关闭返回当前身份，遮盖后台与阶段变化清空", async () => {
+  const room = dealtWebRoom({ me: { seat: 1, identityRevision: 1 } });
+  const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营", sinceLabel: "第1轮 · 换牌" },
+    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野<script>", detailAvailable: true, sinceLabel: "开局 · A牌" }];
+  const storage = new Map([["session", "session"]]);
+  const c = client(async url => response(structuredClone(url.endsWith('/private') ? { stage: room.stage, faction: "坏人阵营", identityHistory: history } : room)), storage);
+  c.state.room = room;
+  await c.ACTIONS.reveal();
+  assert.match(c.viewRoom(), /data-action="openIdentityHistory"/);
+  c.ACTIONS.openIdentityHistory();
+  assert.equal(c.state.identityHistoryExpandedId, 0);
+  assert.match(c.viewIdentityHistory(), /旧视野&lt;script&gt;|初始|当前/);
+  assert.doesNotMatch(c.viewIdentityHistory(), /data-action="submit|<script>/);
+  c.ACTIONS.toggleIdentityHistory({ dataset: { id: "0" } });
+  assert.match(c.viewIdentityHistory(), /class="identity-history-detail" hidden/);
+  c.ACTIONS.closeIdentityHistory(); assert.equal(c.state.revealed, true);
+  c.ACTIONS.openIdentityHistory(); c.state.busy = true; c.state.network = false;
+  c.ACTIONS.hideIdentityHistory();
+  assert.equal(c.state.secret, null); assert.equal(c.viewIdentityHistory(), "");
+  c.state.busy = false; c.state.network = true;
+  await c.ACTIONS.reveal(); c.ACTIONS.openIdentityHistory();
+  c.document.hidden = true; c.events.visibilitychange();
+  assert.equal(c.state.identityHistoryOpen, false); assert.equal(c.state.secret, null);
+  assert.doesNotMatch(JSON.stringify([...storage]), /红兰斯洛特|旧视野/);
+  c.document.hidden = false; c.events.visibilitychange();
+  await c.ACTIONS.reveal(); c.ACTIONS.openIdentityHistory();
+  room.stage = "new-stage"; await c.refresh();
+  assert.equal(c.state.identityHistoryOpen, false); assert.equal(c.state.secret, null);
+  Object.assign(c.state, { revealed: true, secret: { identityHistory: [history[0]] } });
+  assert.doesNotMatch(c.viewRoom(), /data-action="openIdentityHistory"/);
+});
 test("网页座位头像失败回退且轮询不重试，换座跟随玩家，新头像不清空选人", async () => {
   const room = dealtWebRoom({ phase: "proposal", flexible: false, leader: 1,
     players: [{ seat: 1, name: "甲", isHost: true, avatarUrl: "/api/avatars/a" }, { seat: 2, name: "乙" }] });

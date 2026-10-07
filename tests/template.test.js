@@ -15,6 +15,24 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
+  const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌' },
+    { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌' }];
+  const data = { ...base, room: { code: '123456', phase: 'tools', capacity: 12, me: { seat: 1 }, players: [], team: [], history: [] }, revealed: true, identityHistoryOpen: true, identityHistoryExpandedId: 0,
+    secret: { role: '觉醒红刀客', faction: '坏人阵营', identityHistory: history } };
+  let tree = renderTable(data), text = JSON.stringify(tree);
+  assert.ok(byHandler(tree, 'openIdentityHistory'));
+  assert.ok(byHandler(tree, 'closeIdentityHistory'));
+  assert.ok(byHandler(tree, 'hideIdentityHistory'));
+  assert.match(text, /旧视野|初始|当前/);
+  assert.equal(byHandler(tree, 'toggleIdentityHistory').attr.ariaExpanded, true);
+  tree = renderTable({ ...data, revealed: false });
+  assert.doesNotMatch(JSON.stringify(tree), /红兰斯洛特|旧视野/);
+  tree = renderTable({ ...data, identityHistoryOpen: false, secret: { identityHistory: [history[0]] } });
+  assert.equal(byHandler(tree, 'openIdentityHistory'), undefined);
+  history[1].detailAvailable = false;
+  assert.match(JSON.stringify(renderTable(data)), /旧对局未记录当时视野/);
+});
 test('准备阶段显示房间邀请，开局后只保留身份入口；首次昵称与失效提示保留在目标页面', () => {
   for (const phase of ['lobby', 'identity', 'proposal', 'quest', 'tools', 'offlineFinal', 'ended']) {
     const room = { code: '372338', phase, capacity: 6, boardName: '阿瓦隆', players: [], team: [], me: { seat: 2, isHost: false } };

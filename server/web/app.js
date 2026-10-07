@@ -561,6 +561,8 @@
     selected: [],
     revealed: false,
     secret: null,
+    identityHistoryOpen: false,
+    identityHistoryExpandedId: null,
     fairyResult: null,
     fairyResultRevealed: false,
     identityChange: null,
@@ -1027,6 +1029,8 @@
       swapPlayers: [],
       revealed: false,
       secret: null,
+      identityHistoryOpen: false,
+      identityHistoryExpandedId: null,
     });
   }
   function handleError(e) {
@@ -1276,6 +1280,8 @@ function roomListItems(rooms) {
       patch.identityHintVisible = false;
       patch.revealed = false;
       patch.secret = null;
+      patch.identityHistoryOpen = false;
+      patch.identityHistoryExpandedId = null;
       patch.actionDialog = false;
       patch.actionSecret = null;
       patch.actionLoading = false;
@@ -2049,7 +2055,7 @@ function roomListItems(rooms) {
   function identityOverlayBlocked() {
     return !alive || !foreground || !state.room || state.error || !modal.hidden ||
       state.actionDialog || state.actionLoading || state.identityChange || state.fairyResult ||
-      state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
+      state.identityHistoryOpen || state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
   }
   function showDealtIdentity() {
     var key = identityDealKey();
@@ -2137,6 +2143,26 @@ function roomListItems(rooms) {
     } finally {
       setState({ busy: false });
     }
+  }
+  function openIdentityHistory() {
+    var history = state.secret?.identityHistory || [];
+    if (!state.revealed || history.length < 2 || identityOverlayBlocked()) return;
+    closePlayerCard(false);
+    setState({ identityHistoryOpen: true, identityHistoryExpandedId: history.find(record => !record.current)?.id ?? null });
+    app.querySelector('.identity-history-close')?.focus({ preventScroll: true });
+  }
+  function closeIdentityHistory() {
+    setState({ identityHistoryOpen: false, identityHistoryExpandedId: null });
+    app.querySelector('[data-action="openIdentityHistory"]')?.focus({ preventScroll: true });
+  }
+  function toggleIdentityHistory(el) {
+    var id = Number(el.dataset.id);
+    if (!state.identityHistoryOpen || !state.secret?.identityHistory?.some(record => record.id === id && !record.current)) return;
+    setState({ identityHistoryExpandedId: state.identityHistoryExpandedId === id ? null : id });
+  }
+  function hideIdentityHistory() {
+    mask();
+    app.querySelector('[data-action="reveal"]')?.focus({ preventScroll: true });
   }
   function closeAction() {
     actionGeneration++;
@@ -2447,6 +2473,8 @@ function roomListItems(rooms) {
           fairyResultRevealed: false,
           revealed: false,
           secret: null,
+          identityHistoryOpen: false,
+          identityHistoryExpandedId: null,
         });
       }
     } catch (e) {
@@ -2491,6 +2519,8 @@ function roomListItems(rooms) {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHistoryOpen: false,
+          identityHistoryExpandedId: null,
         });
       }
     } catch (e) {
@@ -2938,7 +2968,7 @@ function roomListItems(rooms) {
   }
   function viewPlayerCard() {
     const p = state.playerCard, stats = state.playerCardStats;
-    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult) return "";
+    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen) return "";
     let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div></div>';
     if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
@@ -3062,6 +3092,22 @@ function roomListItems(rooms) {
     if (!secret || !secret.skillStatus) return "";
     return '<div class="private-info"><div class="label">技能状态 · ' +
       esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>';
+  }
+  function viewIdentityHistory() {
+    var history = state.secret?.identityHistory || [];
+    if (!state.identityHistoryOpen || !state.revealed || history.length < 2 || state.error) return "";
+    var html = '<div class="dialog-backdrop identity-history-backdrop" data-identity-history-backdrop><section class="identity-history-sheet" role="dialog" aria-modal="true" aria-label="本局身份历程"><div class="identity-history-handle" aria-hidden="true"></div><div class="identity-history-heading"><div><div class="identity-history-title">身份历程</div><div class="small muted">本局 · ' + esc(state.room.me.seat) + '号</div></div><button type="button" class="identity-history-close" data-action="closeIdentityHistory" aria-label="关闭身份历程">×</button></div><div class="identity-history-body"><div class="identity-history-timeline">';
+    history.forEach(record => {
+      var expanded = state.identityHistoryExpandedId === record.id;
+      var heading = '<span class="identity-history-role faction-' + factionTone(record.faction) + '">' + esc(record.role) + '</span><span class="identity-history-badge' + (record.current ? ' is-current' : '') + '">' + (record.current ? '当前' : record.initial ? '初始' : '曾用') + '</span>';
+      html += '<div class="identity-history-event"><span class="identity-history-dot' + (record.current ? ' is-current' : '') + '" aria-hidden="true"></span>' +
+        (record.current ? '<div class="identity-history-record-heading">' + heading + '</div>' : '<button type="button" class="identity-history-toggle" data-action="toggleIdentityHistory" data-id="' + record.id + '" aria-expanded="' + expanded + '" aria-controls="identity-history-detail-' + record.id + '">' + heading + '<span class="identity-history-chevron' + (expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>') +
+        '<div class="identity-history-meta small muted">' + esc(record.sinceLabel) + '</div>';
+      if (record.current) html += '<div class="identity-history-summary small muted">' + esc(record.faction) + (record.skillStatus ? ' · ' + esc(record.skillStatus.title) : '') + '</div>';
+      else html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + esc(record.detailAvailable ? record.information : '旧对局未记录当时视野，仅保留初始身份。') + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
+      html += '</div>';
+    });
+    return html + '</div></div><div class="identity-history-footer"><div class="small muted">本局记录 · 仅你可见</div>' + btn('secondary', 'hideIdentityHistory', '立即遮盖') + '</div></section></div>';
   }
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
@@ -3425,7 +3471,9 @@ function roomListItems(rooms) {
     if (r.phase !== "lobby" && r.me.seat !== null) {
       if (state.revealed && state.secret)
         html +=
-          '<div class="identity open"><div class="identity-title faction-' +
+          '<div class="identity open">' +
+          (state.secret.identityHistory?.length > 1 ? '<div class="identity-card-topline"><span class="small muted">当前身份</span><button type="button" class="identity-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button></div>' : '') +
+          '<div class="identity-title faction-' +
           (state.secret.factionTone || "") +
           '">' +
           esc(state.secret.role) +
@@ -4092,9 +4140,10 @@ function roomListItems(rooms) {
       viewFairyResult() +
       viewIdentityChange() +
       viewDealtIdentity() +
+      viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '">' +
+      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen ? ' inert' : '') + '>' +
       (state.page === 'profile' ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4115,6 +4164,7 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     closePlayerCard: () => closePlayerCard(),
     rankPlayerCard: el => openRankPlayerCard(el.dataset.id),
@@ -4501,6 +4551,7 @@ function roomListItems(rooms) {
     if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
+    if (e.target?.hasAttribute?.('data-identity-history-backdrop')) return closeIdentityHistory();
     if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
     if (e.target?.hasAttribute?.('data-player-card-backdrop')) return closePlayerCard();
     var picker = e.target.closest("[data-option-trigger]");
@@ -4544,6 +4595,18 @@ function roomListItems(rooms) {
   window.addEventListener("scroll", showIdentityHintWhenVisible, { passive: true });
   window.addEventListener("resize", showIdentityHintWhenVisible);
   document.addEventListener("keydown", function (event) {
+    if (state.identityHistoryOpen && !state.error) {
+      if (event.key === "Escape") { event.preventDefault(); closeIdentityHistory(); }
+      else if (event.key === "Tab") {
+        var historyButtons = app.querySelectorAll('.identity-history-sheet button:not(:disabled)');
+        if (historyButtons.length) {
+          var historyIndex = Array.prototype.indexOf.call(historyButtons, document.activeElement);
+          event.preventDefault();
+          historyButtons[(historyIndex + (event.shiftKey ? historyButtons.length - 1 : 1)) % historyButtons.length].focus();
+        }
+      }
+      return;
+    }
     if (state.playerCard && !state.error) {
       if (event.key === "Escape") { event.preventDefault(); closePlayerCard(); }
       else if (event.key === "Tab") {

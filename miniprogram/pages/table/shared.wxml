@@ -22,7 +22,29 @@
       </view>
     </view>
 </template>
-<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult}}"><include src="../../player-card.wxml" /></block>
+<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen}}"><include src="../../player-card.wxml" /></block>
+<view wx:if="{{identityHistoryOpen && revealed && secret.identityHistory.length > 1 && !error}}" class="dialog-backdrop identity-history-backdrop" catchtap="closeIdentityHistory" catchtouchmove="blockScroll">
+  <view class="identity-history-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局身份历程">
+    <view class="identity-history-handle" aria-hidden="{{true}}" />
+    <view class="identity-history-heading">
+      <view><view class="identity-history-title">身份历程</view><view class="small muted">本局 · {{room.me.seat}}号</view></view>
+      <button hover-class="none" class="identity-history-close" bindtap="closeIdentityHistory" aria-label="关闭身份历程">×</button>
+    </view>
+    <scroll-view scroll-y="{{true}}" class="identity-history-body">
+      <view class="identity-history-timeline">
+        <view wx:for="{{secret.identityHistory}}" wx:key="id" class="identity-history-event">
+          <view class="identity-history-dot {{item.current?'is-current':''}}" aria-hidden="{{true}}" />
+          <view wx:if="{{item.current}}" class="identity-history-record-heading"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge is-current">当前</text></view>
+          <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
+          <view class="identity-history-meta small muted">{{item.sinceLabel}}</view>
+          <view wx:if="{{item.current}}" class="identity-history-summary small muted">{{item.faction}}{{item.skillStatus?' · '+item.skillStatus.title:''}}</view>
+          <view wx:elif="{{identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="small muted">{{item.faction}}</view><view class="identity-history-information">{{item.detailAvailable?item.information:'旧对局未记录当时视野，仅保留初始身份。'}}</view><view class="identity-history-readonly small muted">曾用身份 · 仅供回看</view></view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="identity-history-footer"><view class="small muted">本局记录 · 仅你可见</view><button hover-class="none" class="secondary" bindtap="hideIdentityHistory">立即遮盖</button></view>
+  </view>
+</view>
 <template name="tableResult">
     <view wx:if="{{latestResult && (room.phase==='tools' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
       <view class="result-summary-heading"><text class="small muted">最近结果</text><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
@@ -378,6 +400,7 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open">
+        <view wx:if="{{secret.identityHistory.length > 1}}" class="identity-card-topline"><text class="small muted">当前身份</text><button hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
         <view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view>
         <text class="muted">{{secret.faction}}</text>
         <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>

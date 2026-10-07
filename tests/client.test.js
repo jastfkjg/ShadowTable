@@ -113,6 +113,35 @@ function dealtRoom(overrides = {}) {
     capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
     team: [], history: [], ...overrides };
 }
+test("身份历程默认展开最近旧身份，关闭保留当前卡，遮盖和后台清空历程", async () => {
+  const room = dealtRoom({ me: { seat: 1, identityRevision: 1 } });
+  const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营" },
+    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野" }];
+  const storage = new Map();
+  const p = page({ request: async path => structuredClone(path.endsWith('/private') ? { stage: room.stage, faction: "坏人阵营", identityHistory: history } : room) }, storage);
+  p.roomCode = room.code; p.data.room = structuredClone(room);
+  await p.reveal(); p.openIdentityHistory();
+  assert.equal(p.data.identityHistoryOpen, true);
+  assert.equal(p.data.identityHistoryExpandedId, 0);
+  assert.equal(p.data.secret.identityHistory[1].factionTone, "evil");
+  p.toggleIdentityHistory({ currentTarget: { dataset: { id: "0" } } });
+  assert.equal(p.data.identityHistoryExpandedId, null);
+  p.closeIdentityHistory();
+  assert.equal(p.data.revealed, true);
+  p.openIdentityHistory(); p.data.busy = true; p.data.network = false;
+  p.hideIdentityHistory();
+  assert.equal(p.data.identityHistoryOpen, false);
+  assert.equal(p.data.secret, null);
+  p.data.busy = false; p.data.network = true;
+  await p.reveal(); p.openIdentityHistory(); p.onHide();
+  assert.equal(p.data.identityHistoryOpen, false);
+  assert.equal(p.data.secret, null);
+  assert.doesNotMatch(JSON.stringify([...storage]), /红兰斯洛特|旧视野/);
+  p.foreground = true; await p.reveal(); p.openIdentityHistory();
+  room.stage = "new-stage"; await p.refresh();
+  assert.equal(p.data.identityHistoryOpen, false);
+  assert.equal(p.data.secret, null);
+});
 test("座位头像失败回退跨刷新和换座保留，新头像可加载，选人及展开状态保持", async () => {
   let room = dealtRoom({ phase: "proposal", flexible: false, leader: 1,
     players: [{ seat: 1, name: "甲", isHost: true, avatarUrl: "/api/avatars/a" }, { seat: 2, name: "乙" }] });

@@ -310,6 +310,39 @@ button.disclosure-button:not([disabled]):active {
     #1b2b35 20rpx
   );
 }
+.identity-card-topline { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: -20rpx 0 0; }
+button.identity-history-entry { width: auto; min-height: 88rpx; margin: 0; padding: 0 4rpx; border: 0; background: transparent; color: var(--accent); font-size: 28rpx; gap: 12rpx; }
+.identity-history-icon { width: 32rpx; height: 32rpx; flex-shrink: 0; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5c68b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4v5h5M3 9a9 9 0 1 1 0 6M12 7v5l3 2'/%3E%3C/svg%3E"); }
+.dialog-backdrop.identity-history-backdrop { align-items: flex-end; padding: 0; }
+.identity-history-sheet { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 900rpx; max-height: 92vh; padding: 24rpx 40rpx calc(36rpx + env(safe-area-inset-bottom)); background: var(--surface); border: 1rpx solid var(--border); border-bottom: 0; border-radius: 40rpx 40rpx 0 0; animation: identity-history-enter 200ms ease-out; }
+.identity-history-handle { flex-shrink: 0; width: 64rpx; height: 8rpx; margin: 0 auto 28rpx; border-radius: 8rpx; background: var(--border); }
+.identity-history-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; margin-bottom: 44rpx; text-align: left; }
+.identity-history-title { font-size: 46rpx; font-weight: 600; margin-bottom: 8rpx; }
+button.identity-history-close { flex-shrink: 0; width: 88rpx; min-height: 88rpx; margin: -8rpx -16rpx 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 52rpx; font-weight: 400; }
+.identity-history-body { height: 52vh; flex-shrink: 1; min-height: 0; }
+.identity-history-timeline { position: relative; padding: 0 0 0 44rpx; text-align: left; }
+.identity-history-timeline::before { content: ''; position: absolute; left: 10rpx; top: 26rpx; bottom: 48rpx; width: 2rpx; background: var(--border); }
+.identity-history-event { position: relative; padding-bottom: 52rpx; }
+.identity-history-event:last-child { padding-bottom: 0; }
+.identity-history-dot { position: absolute; box-sizing: border-box; left: -42rpx; top: 20rpx; width: 18rpx; height: 18rpx; border: 2rpx solid var(--muted); border-radius: 50%; background: var(--surface); }
+.identity-history-dot.is-current { border-color: var(--accent); background: var(--accent); }
+.identity-history-record-heading, button.identity-history-toggle { display: flex; align-items: center; gap: 18rpx; min-height: 56rpx; }
+button.identity-history-toggle { width: 100%; min-height: 88rpx; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; justify-content: flex-start; }
+.identity-history-role { font-size: 38rpx; font-weight: 600; overflow-wrap: anywhere; }
+.identity-history-badge { flex-shrink: 0; border: 1rpx solid var(--border); border-radius: 8rpx; padding: 6rpx 12rpx; font-size: 24rpx; line-height: 1.1; color: var(--muted); font-weight: 400; }
+.identity-history-badge.is-current { color: var(--accent); border-color: var(--accent); }
+.identity-history-chevron { margin-left: auto; margin-right: 8rpx; flex-shrink: 0; width: 14rpx; height: 14rpx; border-right: 3rpx solid var(--muted); border-bottom: 3rpx solid var(--muted); transform: rotate(45deg); }
+.identity-history-chevron.is-expanded { transform: rotate(225deg); }
+.identity-history-meta { margin-top: 14rpx; }
+.identity-history-summary { margin-top: 22rpx; }
+.identity-history-detail { margin-top: 26rpx; padding: 28rpx; border-radius: 16rpx; background: var(--bg); }
+.identity-history-information { margin-top: 18rpx; white-space: pre-line; overflow-wrap: anywhere; font-size: 30rpx; line-height: 1.85; }
+.identity-history-readonly { margin-top: 24rpx; }
+.identity-history-footer { flex-shrink: 0; padding-top: 44rpx; text-align: center; }
+.identity-history-footer button { margin-top: 24rpx; }
+@keyframes identity-history-enter { from { transform: translateY(36rpx); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .identity-history-sheet { animation: none; } }
+@media (max-height: 500px) { .identity-history-heading { margin-bottom: 20rpx; } .identity-history-footer { padding-top: 20rpx; } }
 .identity.open {
   background: var(--surface);
 }

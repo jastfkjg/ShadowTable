@@ -545,7 +545,7 @@ function actionSpec(room, uid) {
       return null;
   }
 }
-function privateView(room, uid) {
+function privateIdentity(room, uid) {
   requireRule(member(room, uid).seat !== null, "围观玩家没有身份", 403);
   requireRule(room.roles && room.phase !== "lobby", "身份尚未分配");
   const role = room.roles[uid],
@@ -704,8 +704,58 @@ function privateView(room, uid) {
         ? "本局你获胜"
         : "本局你失败"
       : null,
-    action: actionSpec(room, uid),
   };
+}
+function previousKnightIdentities(room, uid) {
+  const state = room.knights.players[uid];
+  if (state.identityHistory) return state.identityHistory;
+  const initialRole = room.knights.initialRoles?.[uid];
+  if (!initialRole || (initialRole === room.roles[uid] && ROLES[initialRole][1] === faction(room, uid))) return [];
+  // Older saves only retain the initial role; never reconstruct a lost vision
+  // using today's seats, roles, or inspection results.
+  return [{
+    id: 0, role: ROLES[initialRole][0],
+    faction: ROLES[initialRole][1] === "good" ? "好人阵营" : "坏人阵营",
+    information: null, detailAvailable: false, round: 1, reason: "initial",
+  }];
+}
+function knightIdentitySince(room, uid) {
+  const state = room.knights.players[uid];
+  if (state.identitySince) return state.identitySince;
+  const initialRole = room.knights.initialRoles?.[uid];
+  return initialRole === room.roles[uid] && !state.b && ROLES[initialRole][1] === faction(room, uid)
+    ? { round: 1, reason: "initial" }
+    : { round: null, reason: "legacy" };
+}
+function rememberKnightIdentity(room, uid, reason = "redraw") {
+  const state = room.knights.players[uid];
+  const history = previousKnightIdentities(room, uid);
+  const view = privateIdentity(room, uid);
+  state.identityHistory = [...history, {
+    id: history.length, role: view.role, faction: view.faction,
+    information: view.information, detailAvailable: true,
+    ...knightIdentitySince(room, uid),
+  }];
+  state.identitySince = { round: room.knights.round, reason };
+}
+function privateView(room, uid) {
+  const view = privateIdentity(room, uid);
+  view.action = actionSpec(room, uid);
+  if (!room.knights) return view;
+  const history = previousKnightIdentities(room, uid);
+  const records = [{
+    id: history.length, role: view.role, faction: view.faction,
+    information: view.information, skillStatus: view.skillStatus,
+    detailAvailable: true, current: true, ...knightIdentitySince(room, uid),
+  }, ...history.slice().reverse().map(record => ({ ...record, current: false }))];
+  view.identityHistory = records.map(record => ({
+    ...record,
+    initial: record.reason === "initial",
+    sinceLabel: record.reason === "initial" ? "开局 · A牌"
+      : record.round == null ? "此前身份 · 具体轮次未记录"
+        : `第${record.round}轮 · ${record.reason === "conversion" ? "阵营转换" : "换牌"}`,
+  }));
+  return view;
 }
 function offlineAssassination(room) {
   return (
@@ -745,9 +795,11 @@ function convertKnights(room) {
   const change = k.conversions.shift();
   if (change)
     for (const p of room.players) {
-      if (["blueLancelot", "redLancelot"].includes(room.roles[p.uid]))
+      if (["blueLancelot", "redLancelot"].includes(room.roles[p.uid])) {
+        rememberKnightIdentity(room, p.uid, "conversion");
         k.players[p.uid].faction =
           faction(room, p.uid) === "good" ? "evil" : "good";
+      }
     }
   k.convertedRound = k.round;
   room.history.push({
@@ -912,7 +964,7 @@ function settleActivity(room) {
     return;
   }
   if (KNIGHT_PHASES.includes(room.phase)) {
-    if (!knights.settle(room, requireRule, ROLES)) return;
+    if (!knights.settle(room, requireRule, ROLES, rememberKnightIdentity)) return;
     if (room.activity.kind === "skills") knights.updateNight(room, ROLES);
     if (room.activity.kind === "skills")
       for (const text of room.knights.events || [])

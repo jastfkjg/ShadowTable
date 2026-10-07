@@ -46,6 +46,8 @@ function init(room, shuffle) {
           availableRound: 1,
           faction: null,
           b: false,
+          identityHistory: [],
+          identitySince: { round: 1, reason: "initial" },
         },
       ]),
     ),
@@ -328,7 +330,7 @@ function cancel(room) {
   delete k.funEvents;
   delete k.snapshot;
 }
-function settle(room, check, allRoles) {
+function settle(room, check, allRoles, rememberIdentity) {
   const k = room.knights;
   const entity = uid => {
     if (!uid) return null;
@@ -493,7 +495,7 @@ function settle(room, check, allRoles) {
         k.players[p.uid].used = true;
     room.phase = "skillTurn";
     room.submissions = k.planned;
-    return settle(room, check, allRoles);
+    return settle(room, check, allRoles, rememberIdentity);
   }
   const hunter = room.phase === "hunterTurn";
   const actor = hunter ? k.hunters.shift() : k.order[k.cursor++];
@@ -561,14 +563,14 @@ function settle(room, check, allRoles) {
   if (k.cursor < k.order.length) {
     room.phase = "skillTurn";
     room.submissions = k.planned;
-    return settle(room, check, allRoles);
+    return settle(room, check, allRoles, rememberIdentity);
   }
   k.hunters = k.hunters.filter(
     (uid) => !k.players[uid].alive && !k.players[uid].used,
   );
   if (k.hunters.length) {
     room.phase = "hunterTurn";
-    return settle(room, check, allRoles);
+    return settle(room, check, allRoles, rememberIdentity);
   }
   for (const uid of k.reflected) k.players[uid].used = true;
   for (const uid of k.forcedPaladins) kill(uid, true, new Set(), true);
@@ -583,6 +585,7 @@ function settle(room, check, allRoles) {
       p.armor = false;
       p.used = true;
     } else {
+      rememberIdentity?.(room, death.uid);
       room.roles[death.uid] = card;
       p.used = false;
       p.faction = null;
