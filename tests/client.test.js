@@ -35,6 +35,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../player-card') return require('../miniprogram/player-card');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name === '../../room-share') return require('../miniprogram/room-share');
+        if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
         vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/tab-navigation.js'), 'utf8'), { module, wx });

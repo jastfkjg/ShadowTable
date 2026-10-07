@@ -1107,6 +1107,37 @@ test("结算需要主动选择胜方，支持第三阵营；零有效局不显�
   assert.doesNotMatch(JSON.stringify(stats), /0%/);
 });
 
+test('登记首页显示不计战绩，其他方式仅登记胜方，删去重复说明', () => {
+  const registration = require('../miniprogram/result-registration');
+  const data = { ...base, resultDialog: true, resultStep: 'reason', resultOther: false, resultReason: 'quest_fail',
+    room: { canUseTools: true, scoreSettlement: [{ id: 'quest_fail', label: '三次任务失败', winner: 'evil' },
+      { id: 'five_rejections', label: '连续五次组队被否决' }], winnerOptions: [{ value: 'good', label: '好人胜' }, { value: 'evil', label: '坏人胜' }] } };
+  const normal = render({ ...data, ...registration.flow(data) });
+  assert.equal(byHandler(normal, 'pickResult').attr['data-value'], 'none');
+  assert.match(JSON.stringify(normal), /score-choice-mark/);
+  assert.match(JSON.stringify(normal), /score-footer/);
+  const body = nodes(normal).find(node => node.attr?.class?.split(' ').includes('score-body'));
+  const footer = nodes(normal).find(node => node.attr?.class?.split(' ').includes('score-footer'));
+  assert.equal(byHandler(body, 'toggleResultOther'), undefined);
+  assert.ok(byHandler(footer, 'toggleResultOther'));
+  assert.doesNotMatch(JSON.stringify(normal), /其他登记方式/);
+  const scroll = nodes(body).find(node => node.tag === 'wx-scroll-view');
+  assert.equal(scroll.attr.class, 'score-scroll');
+  assert.ok(nodes(scroll).some(node => node.attr?.class?.split(' ').includes('score-content')));
+  assert.doesNotMatch(JSON.stringify(normal), /连续五次组队被否决|下一步核对结果|score-helper|score-next-hint/);
+  const draft = { ...data, ...registration.switchMode(data), resultChoice: 'good' };
+  const other = render({ ...draft, ...registration.flow(draft) });
+  assert.equal(byHandler(other, 'pickScoreReason'), undefined);
+  assert.match(JSON.stringify(other), /仅登记胜方/);
+  assert.match(JSON.stringify(other), /不计积分/);
+  assert.doesNotMatch(JSON.stringify(other), /不计战绩|信息不完整|保留未知|score-helper|score-next-hint/);
+  assert.equal(byHandler(other, 'nextResult').attr.disabled, false);
+  const otherBody = nodes(other).find(node => node.attr?.class?.split(' ').includes('score-body'));
+  const otherFooter = nodes(other).find(node => node.attr?.class?.split(' ').includes('score-footer'));
+  assert.equal(byHandler(otherBody, 'toggleResultOther'), undefined);
+  assert.ok(byHandler(otherFooter, 'toggleResultOther'));
+});
+
 test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐藏，单项分享仍可使用',()=>{
   const renderStats=renderStatsShell;
   const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};

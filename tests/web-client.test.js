@@ -24,6 +24,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     ...runtime,
   };
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
+  context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
@@ -1372,6 +1373,44 @@ test('网页分步结算保留返回草稿，取消终确认不提交，重复�
   const first=c.ACTIONS.saveResult();await c.ACTIONS.saveResult();release(true);await first;
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(writes.length,1);assert.equal(writes[0].scoreReason,'early');assert.equal(writes[0].funActor,1);assert.equal(writes[0].scoreTarget,2);
+});
+
+test('网页登记方式独立切换并保留两边草稿，旧响应中的五次否决不显示也不能选择', () => {
+  const c = client(async () => response({}));
+  c.state.room = { code: '123456', stage: 'flow', canUseTools: true, settlementRequiresActor: false,
+    scoreSettlement: [{ id: 'assassination', label: '三绿，已完成最终刺杀', requiresTarget: true },
+      { id: 'quest_fail', label: '三次任务失败', winner: 'evil' }, { id: 'five_rejections', label: '连续五次组队被否决' }],
+    players: [{ seat: 1, name: '甲' }], winnerOptions: [{ value: 'good', label: '好人胜' }, { value: 'evil', label: '坏人胜' }] };
+  c.ACTIONS.finishTools();
+  assert.doesNotMatch(c.viewResultDialog(), /five_rejections|连续五次|data-value="good"/);
+  c.ACTIONS.pickScoreReason({ dataset: { id: 'five_rejections' } });
+  assert.equal(c.state.resultNextEnabled, false);
+  c.ACTIONS.pickScoreReason({ dataset: { id: 'assassination' } });
+  c.ACTIONS.nextResult(); c.ACTIONS.pickScoreTarget({ dataset: { seat: 1 } }); c.ACTIONS.backResult();
+  assert.match(c.viewResultDialog(), /data-value="none"/);
+  assert.doesNotMatch(c.viewResultDialog(), /接下来：|下一步选择|请选择结束原因|score-helper/);
+  c.ACTIONS.toggleResultOther();
+  assert.equal(c.state.resultNextEnabled, false);
+  assert.equal(c.state.resultReason, '');
+  assert.doesNotMatch(c.viewResultDialog(), /data-action="pickScoreReason"/);
+  assert.doesNotMatch(c.viewResultDialog(), /data-value="none"|信息不完整|保留未知/);
+  c.ACTIONS.pickResult({ dataset: { value: 'good' } });
+  assert.equal(c.state.resultSteps.length, 2);
+  c.ACTIONS.toggleResultOther();
+  assert.equal(c.state.resultReason, 'assassination'); assert.equal(c.state.resultTarget, 1); assert.equal(c.state.resultChoice, '');
+  c.ACTIONS.toggleResultOther();
+  assert.equal(c.state.resultChoice, 'good'); assert.equal(c.state.resultReason, '');
+  c.ACTIONS.nextResult(); assert.equal(c.state.resultStep, 'review');
+  assert.match(c.viewResultDialog(), /仅登记胜方 · 好人胜/);
+  assert.doesNotMatch(c.viewResultDialog(), /实际刺杀目标|三绿，已完成最终刺杀/);
+  c.ACTIONS.backResult(); c.ACTIONS.toggleResultOther();
+  c.ACTIONS.pickResult({ dataset: { value: 'none' } });
+  assert.equal(c.state.resultOther, false); assert.equal(c.state.resultSteps.length, 2);
+  assert.equal(c.state.resultTarget, null); assert.equal(c.state.resultActor, null);
+  c.ACTIONS.toggleResultOther(); assert.equal(c.state.resultChoice, 'good');
+  c.ACTIONS.toggleResultOther(); assert.equal(c.state.resultChoice, 'none');
+  c.ACTIONS.nextResult(); assert.equal(c.state.resultStep, 'review');
+  assert.match(c.viewResultDialog(), /本局不计战绩及积分/);
 });
 
 test('网页按服务端刺客状态跳过带刀人，计分和不计分均可直接提交目标', async () => {

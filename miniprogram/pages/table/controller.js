@@ -2,33 +2,9 @@ const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const funCopy = require("../../fun-copy");
 const roomShare = require("../../room-share");
+const resultRegistration = require("../../result-registration");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
-function resultFlow(data) {
-  const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
-  const reason = reasons.find(item => item.id === data.resultReason);
-  const option = (room.winnerOptions || []).find(item => item.value === data.resultChoice);
-  const players = (room.players || []).filter(player => player.alive !== false);
-  const actor = players.find(player => player.seat === data.resultActor);
-  const target = players.find(player => player.seat === data.resultTarget);
-  const needsActor = !!(reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)));
-  const steps = [{ id: "reason", label: "结束原因" }];
-  if (needsActor) steps.push({ id: "actor", label: "实际带刀人" });
-  if (reason?.requiresTarget) steps.push({ id: "target", label: "实际刺杀目标" });
-  steps.push({ id: "review", label: "核对结果" });
-  const step = steps.findIndex(item => item.id === data.resultStep);
-  const index = Math.max(0, step), current = steps[index];
-  const selected = !!reason || !!option || data.resultChoice === "none";
-  const actorValid = !needsActor || !!actor;
-  const targetValid = !reason?.requiresTarget || data.resultTarget === 0 || !!target && (!needsActor || target.seat !== actor?.seat);
-  const ready = selected && actorValid && targetValid;
-  const summary = [{ label: reason ? "结束原因" : "登记方式", value: reason?.label || (option ? "仅登记胜方 · " + option.label : "不计战绩") }];
-  if (needsActor) summary.push({ label: "实际带刀人", value: actor ? actor.seat + "号 · " + actor.name : "尚未选择" });
-  if (reason?.requiresTarget) summary.push({ label: "实际刺杀目标", value: data.resultTarget === 0 ? "空刀" : target ? target.seat + "号 · " + target.name : "尚未选择" });
-  const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。" : "仅保存胜负，不计积分；缺失的趣味结果保留未知。";
-  return { resultSteps: steps, resultStep: current.id, resultStepIndex: index, resultStepTitle: current.label,
-    resultNextEnabled: current.id === "reason" ? selected : current.id === "actor" ? actorValid : current.id === "target" ? targetValid : ready,
-    resultNeedsActor: needsActor, resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
-}
+const resultFlow = resultRegistration.flow;
 function roomListItems(rooms) {
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
@@ -785,6 +761,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.updateChangedData({
       ...privacyUpdate,
       ...(stageChanged ? { resultDialog: false } : {}),
+      ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
       actionEntryLabel,
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       seatOccupiedCount: seats.filter(s => s.occupied).length,
@@ -1632,11 +1609,18 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   finishTools() {
     if (!this.data.room?.canUseTools || this.data.busy || this.pending) return;
     this.resultStage = this.data.room.stage;
-    this.setResultDraft({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false });
+    this.setResultDraft({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "", resultScrollTop: 0 });
   },
   closeResult() { if (!this.data.busy) this.setData({ resultDialog: false }); },
-  setResultDraft(patch = {}) { this.setData({ ...patch, ...resultFlow({ ...this.data, ...patch }) }); },
-  toggleResultOther() { this.setData({ resultOther: !this.data.resultOther }); },
+  setResultDraft(patch = {}) {
+    const flow = resultFlow({ ...this.data, ...patch });
+    const moved = flow.resultStep !== this.data.resultStep || flow.resultOther !== this.data.resultOther;
+    this.setData({ ...patch, ...flow, ...(moved ? { resultScrollTop: this.data.resultScrollTop ? 0 : 1 } : {}) });
+  },
+  toggleResultOther() {
+    if (this.data.busy || this.pending || !this.data.resultDialog) return;
+    this.setResultDraft(resultRegistration.switchMode(this.data));
+  },
   nextResult() {
     if (this.data.busy || this.pending || !this.data.resultDialog) return;
     if (this.data.room?.stage !== this.resultStage) { this.setData({ resultDialog: false, error: "阶段已变化，请重新登记胜负" }); return; }
@@ -1652,12 +1636,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   pickResult(e) {
     const value = e.currentTarget.dataset.value;
     if (value !== "none" && !this.data.room?.winnerOptions?.some(item => item.value === value)) return;
-    this.setResultDraft({ resultChoice: value, resultReason: "", resultRequiresTarget: false, resultTarget: null, resultActor: null });
+    this.setResultDraft({ resultOther: value !== "none", resultChoice: value, resultReason: "", resultRequiresTarget: false, resultTarget: null, resultActor: null });
   },
   pickScoreReason(e) {
     const room = this.data.room;
-    const reason = (room?.scoreSettlement?.length ? room.scoreSettlement : room?.funSettlement)?.find(item => item.id === e.currentTarget.dataset.id);
-    if (reason) this.setResultDraft({ resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
+    const reason = resultRegistration.reasons(room).find(item => item.id === e.currentTarget.dataset.id);
+    if (reason && reason.id !== this.data.resultReason) this.setResultDraft({ resultOther: false, resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
   },
   pickScoreTarget(e) {
     const seat = Number(e.currentTarget.dataset.seat), room = this.data.room;

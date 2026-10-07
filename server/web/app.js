@@ -2,6 +2,8 @@
   "use strict";
   const funCopy = window.shadowtableFunCopy;
   const rankPresentation = window.shadowtableLeaderboard;
+  const resultRegistration = window.shadowtableResultRegistration;
+  const resultFlow = resultRegistration.flow;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -1569,37 +1571,13 @@ function roomListItems(rooms) {
     }
     cmd(type, extra || {});
   }
-  function resultFlow(data) {
-    const room = data.room || {}, reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
-    const reason = reasons.find(item => item.id === data.resultReason);
-    const option = (room.winnerOptions || []).find(item => item.value === data.resultChoice);
-    const players = (room.players || []).filter(player => player.alive !== false);
-    const actor = players.find(player => player.seat === data.resultActor);
-    const target = players.find(player => player.seat === data.resultTarget);
-    const needsActor = !!(reason?.requiresTarget && (room.settlementRequiresActor ?? (room.knights && room.funSettlement)));
-    const steps = [{ id: "reason", label: "结束原因" }];
-    if (needsActor) steps.push({ id: "actor", label: "实际带刀人" });
-    if (reason?.requiresTarget) steps.push({ id: "target", label: "实际刺杀目标" });
-    steps.push({ id: "review", label: "核对结果" });
-    const step = steps.findIndex(item => item.id === data.resultStep);
-    const index = Math.max(0, step), current = steps[index];
-    const selected = !!reason || !!option || data.resultChoice === "none";
-    const actorValid = !needsActor || !!actor;
-    const targetValid = !reason?.requiresTarget || data.resultTarget === 0 || !!target && (!needsActor || target.seat !== actor?.seat);
-    const ready = selected && actorValid && targetValid;
-    const summary = [{ label: reason ? "结束原因" : "登记方式", value: reason?.label || (option ? "仅登记胜方 · " + option.label : "不计战绩") }];
-    if (needsActor) summary.push({ label: "实际带刀人", value: actor ? actor.seat + "号 · " + actor.name : "尚未选择" });
-    if (reason?.requiresTarget) summary.push({ label: "实际刺杀目标", value: data.resultTarget === 0 ? "空刀" : target ? target.seat + "号 · " + target.name : "尚未选择" });
-    const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。" : "仅保存胜负，不计积分；缺失的趣味结果保留未知。";
-    return { resultSteps: steps, resultStep: current.id, resultStepIndex: index, resultStepTitle: current.label,
-      resultNextEnabled: current.id === "reason" ? selected : current.id === "actor" ? actorValid : current.id === "target" ? targetValid : ready,
-      resultNeedsActor: needsActor, resultReady: ready, resultSummary: summary, resultNotice: notice, resultPlayers: players };
-  }
-
   function updateResult(patch) {
-    const previousStep = state.resultStep;
+    const previousStep = state.resultStep, previousMode = state.resultOther;
+    const focused = document.activeElement?.closest?.('.result-dialog') && document.activeElement.dataset;
     setState({ ...patch, ...resultFlow({ ...state, ...patch }) });
-    if (state.resultStep !== previousStep) app.querySelector('.score-step-label')?.focus();
+    if (state.resultStep !== previousStep || state.resultOther !== previousMode) app.querySelector('.score-step-label')?.focus();
+    else if (focused) Array.from(app.querySelectorAll('.result-dialog button')).find(button =>
+      button.dataset.action === focused.action && button.dataset.id === focused.id && button.dataset.value === focused.value && button.dataset.seat === focused.seat)?.focus({ preventScroll: true });
   }
   function closeResult() {
     setState({ resultDialog: false });
@@ -1649,18 +1627,26 @@ function roomListItems(rooms) {
     const room = state.room;
     if (!state.resultDialog || !room?.canUseTools || state.error) return "";
     const flow = resultFlow(state), step = flow.resultStep;
-    const reasons = room.scoreSettlement?.length ? room.scoreSettlement : room.funSettlement || [];
-    let html = '<div class="dialog-backdrop"><div class="error-dialog result-dialog score-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="score-header"><div class="dialog-title" id="result-dialog-title">登记本局结果</div><div class="score-step-label" tabindex="-1" role="status">' + (flow.resultStepIndex + 1) + ' / ' + flow.resultSteps.length + ' · ' + flow.resultStepTitle + '</div></div><div class="score-body">';
+    const reasons = flow.resultReasonOptions;
+    const mark = '<span class="score-choice-mark" aria-hidden="true"></span>';
+    const excluded = '<button type="button" class="secondary score-choice score-excluded '+(state.resultChoice==='none'?'is-selected':'')+'" data-action="pickResult" data-value="none" aria-pressed="'+(state.resultChoice==='none')+'">'+mark+'<span class="score-choice-title">不计战绩</span></button>';
+    const otherEntry = step === 'reason' && !flow.resultOther ? '<button type="button" class="score-other-entry" data-action="toggleResultOther"><strong>仅登记胜方</strong><span class="score-chevron" aria-hidden="true"></span></button>' : '';
+    const modeBack = step === 'reason' && flow.resultOther && reasons.length;
+    const progress = flow.resultSteps.map((item, index) => (index ? '<li class="score-step-connector" aria-hidden="true"></li>' : '') +
+      '<li class="score-step '+(index===flow.resultStepIndex?'is-current':index<flow.resultStepIndex?'is-complete':'')+'"'+(index===flow.resultStepIndex?' aria-current="step"':'')+'><span class="score-step-number">'+(index+1)+'</span><span>'+esc(item.shortLabel)+'</span></li>').join('');
+    let html = '<div class="dialog-backdrop score-backdrop"><div class="error-dialog result-dialog score-dialog" role="dialog" aria-modal="true" aria-labelledby="result-dialog-title"><div class="score-header"><div class="dialog-title" id="result-dialog-title">登记本局结果</div><div class="score-step-label" tabindex="-1" role="group" aria-label="第'+(flow.resultStepIndex+1)+'步：'+esc(flow.resultStepTitle)+'"><ol class="score-steps '+(flow.resultSteps.length>3?'has-extra-step':'')+'">'+progress+'</ol></div></div><div class="score-body '+(step==='reason'?'score-registration-body':'')+'">';
     if (step === 'reason') {
-      html += '<p class="small muted">按实际发生的情况登记，请先与同桌玩家确认。</p><div class="score-reasons">' + reasons.map(reason => '<button type="button" class="secondary ' + (state.resultReason === reason.id ? 'is-selected' : '') + '" data-action="pickScoreReason" data-id="' + esc(reason.id) + '" aria-pressed="' + (state.resultReason === reason.id) + '">' + esc(reason.label) + (state.resultReason === reason.id ? ' ✓' : '') + '</button>').join('') + '</div>';
-      if (reasons.length) html += '<button class="disclosure-button score-other-toggle" data-action="toggleResultOther" aria-expanded="' + !!state.resultOther + '">其他登记方式 <span>' + (state.resultOther ? '收起' : '展开') + '</span></button>';
-      if (state.resultOther || !reasons.length) html += '<div class="result-options"><p class="small muted">信息不完整时可仅登记胜方；不确定胜负时选“不计战绩”。以下选项不计积分。</p>' + (room.winnerOptions || []).concat([{value:'none',label:'不计战绩'}]).map(option => '<button class="secondary '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+(option.value==='none'?'':'仅登记胜方 · ')+esc(option.label)+'</button>').join('')+'</div>';
+      if (!flow.resultOther) {
+        html += '<div class="score-reasons" role="group" aria-label="登记方式">' + reasons.map(reason => '<button type="button" class="secondary score-choice '+(state.resultReason===reason.id?'is-selected':'')+'" data-action="pickScoreReason" data-id="'+esc(reason.id)+'" aria-pressed="'+(state.resultReason===reason.id)+'">'+mark+'<span class="score-choice-title">'+esc(reason.label)+'</span></button>').join('')+excluded+'</div>';
+      } else {
+        html += '<div class="score-option-heading"><strong>仅登记胜方</strong><span>不计积分</span></div><div class="score-winners" role="group" aria-label="仅登记胜方">'+(room.winnerOptions || []).map(option => '<button type="button" class="secondary score-choice '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>').join('')+'</div>'+(reasons.length?'':excluded);
+      }
     } else if (step === 'actor' || step === 'target') {
-      html += '<p class="small muted">' + (step === 'actor' ? '选择线下实际执行最终刺杀的玩家。' : '选择线下实际刺杀的目标；未指定目标请选择空刀。') + '</p><div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && (room.settlementRequiresActor ?? room.knights) && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
+      html += '<h3 class="score-section-title">'+(step==='actor'?'选择带刀人':'选择刺杀目标')+'</h3>'+(step==='target'?'<p class="score-helper">未指定目标可选空刀。</p>':'')+'<div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && flow.resultNeedsActor && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary score-empty-target '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
     } else {
       html += '<div class="result-review">' + flow.resultSummary.map(row => '<div class="result-review-row"><span class="small muted">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('') + '</div><p class="result-review-note">'+esc(flow.resultNotice)+'</p>' + (room.hasActiveOperation ? '<p class="result-warning">当前未结算的操作将作废。</p>' : '');
     }
-    return html + '</div><div class="dialog-actions">' + btn('secondary','backResult',step==='reason'?'取消':'上一步',null,state.busy || !!pending) + (step==='review' ? btn('primary','saveResult','确认并结束',null,!flow.resultReady || state.busy || !!pending) : btn('primary','nextResult','下一步',null,!flow.resultNextEnabled || state.busy || !!pending)) + '</div></div></div>';
+    return html + '</div><div class="score-footer '+(otherEntry?'has-other-entry':'')+'">'+otherEntry+(flow.resultNextHint?'<p class="score-next-hint" role="status" aria-live="polite">'+esc(flow.resultNextHint)+'</p>':'')+'<div class="dialog-actions">' + btn('secondary score-back-button',modeBack?'toggleResultOther':'backResult',modeBack?'返回':step==='reason'?'取消':'上一步',null,state.busy || !!pending) + (step==='review' ? btn('primary','saveResult','确认并结束',null,!flow.resultReady || state.busy || !!pending) : '<button type="button" class="primary" data-action="nextResult"'+(!flow.resultNextEnabled || state.busy || pending?' disabled':'')+'>下一步<span class="score-forward" aria-hidden="true"></span></button>') + '</div></div></div></div>';
   }
 
   function viewScoreOverview(score) {
@@ -4389,12 +4375,14 @@ function roomListItems(rooms) {
     finishTools: function () {
       if (!state.room?.canUseTools || state.busy || pending) return;
       resultStage = state.room.stage;
-      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false });
+      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
       var first = app.querySelector('.result-dialog button');
       if (first) first.focus();
     },
     closeResult: closeResult,
-    toggleResultOther: () => setState({ resultOther: !state.resultOther }),
+    toggleResultOther: () => {
+      if (!state.busy && !pending && state.resultDialog) updateResult(resultRegistration.switchMode(state));
+    },
     nextResult: () => {
       if (state.busy || pending || !state.resultDialog) return;
       if (state.room?.stage !== resultStage) { setState({resultDialog:false,error:"阶段已变化，请重新登记胜负"}); return; }
@@ -4409,11 +4397,11 @@ function roomListItems(rooms) {
     },
     pickResult: el => {
       if (el.dataset.value !== 'none' && !state.room?.winnerOptions?.some(item=>item.value===el.dataset.value)) return;
-      updateResult({resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultActor:null});
+      updateResult({resultOther:el.dataset.value!=='none',resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultActor:null});
     },
     pickScoreReason: el => {
-      const room=state.room, reason=(room?.scoreSettlement?.length ? room.scoreSettlement : room?.funSettlement)?.find(item=>item.id===el.dataset.id);
-      if (reason) updateResult({resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultActor:null});
+      const reason=resultRegistration.reasons(state.room).find(item=>item.id===el.dataset.id);
+      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultActor:null});
     },
     pickFunActor: el => {
       const seat=Number(el.dataset.seat);

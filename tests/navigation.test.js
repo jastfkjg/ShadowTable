@@ -1432,6 +1432,33 @@ test('小程序分步结算取消终确认保留摘要，改原因清除旧目�
   await p.saveResult();assert.equal(writes.length,1);assert.equal(writes[0].body.winner,null);
 });
 
+test('小程序其他登记方式保留独立草稿，隐藏原因不进入下一步，返回恢复目标', () => {
+  const { p } = page('table', apiBase);
+  p.data.room = { code: '123456', stage: 'flow', canUseTools: true, settlementRequiresActor: false,
+    funSettlement: [{ id: 'assassination', label: '三绿，已完成最终刺杀', requiresTarget: true },
+      { id: 'five_rejections', label: '连续五次组队被否决' }],
+    players: [{ seat: 1, name: '甲' }], winnerOptions: [{ value: 'good', label: '好人胜' }] };
+  const choose = (handler, dataset) => p[handler]({ currentTarget: { dataset } });
+  p.finishTools();
+  assert.deepEqual(p.data.resultReasonOptions.map(item => item.id), ['assassination']);
+  choose('pickScoreReason', { id: 'five_rejections' }); assert.equal(p.data.resultNextEnabled, false);
+  choose('pickScoreReason', { id: 'assassination' }); p.nextResult();
+  choose('pickScoreTarget', { seat: 1 }); p.backResult();
+  p.toggleResultOther(); assert.equal(p.data.resultNextEnabled, false); assert.equal(p.data.resultReason, '');
+  choose('pickResult', { value: 'good' });
+  assert.equal(p.data.resultSteps.length, 2); assert.equal(p.data.resultNextHint, '');
+  p.toggleResultOther(); assert.equal(p.data.resultReason, 'assassination'); assert.equal(p.data.resultTarget, 1);
+  p.toggleResultOther(); assert.equal(p.data.resultChoice, 'good'); assert.equal(p.data.resultReason, '');
+  p.toggleResultOther(); choose('pickResult', { value: 'none' });
+  assert.equal(p.data.resultOther, false); assert.equal(p.data.resultTarget, null); assert.equal(p.data.resultActor, null);
+  p.toggleResultOther(); assert.equal(p.data.resultChoice, 'good');
+  p.toggleResultOther(); assert.equal(p.data.resultChoice, 'none'); assert.equal(p.data.resultReason, '');
+  p.nextResult(); assert.equal(p.data.resultStep, 'review');
+  assert.deepEqual(Array.from(p.data.resultSummary, item => item.value), ['不计战绩']);
+  assert.match(p.data.resultNotice, /不计战绩及积分/);
+  p.closeResult(); p.finishTools(); assert.equal(p.data.resultChoiceDraft, ''); assert.equal(p.data.resultReasonDraft, null);
+});
+
 test('小程序按刺客状态跳过带刀步骤，无刺客板子仍要求选人且禁止自刀',async()=>{
   for(const scoring of [false,true]){
     const {p}=page('table',apiBase);const writes=[];p.cmd=(type,body)=>writes.push(body);p.confirm=async()=>true;

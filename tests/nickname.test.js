@@ -223,7 +223,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   const fields = { nickname: { value: '' }, code: { value: '123456' } };
   const element = { querySelector() { return null; }, addEventListener() {}, hidden: true };
   const context = { document: { getElementById: id => fields[id] || element, addEventListener() {} },
-    window: { history: { pushState() {}, replaceState() {} }, scrollTo() {}, addEventListener() {}, shadowtableFunCopy: require('../miniprogram/fun-copy') },
+    window: { history: { pushState() {}, replaceState() {} }, scrollTo() {}, addEventListener() {}, shadowtableFunCopy: require('../miniprogram/fun-copy'), shadowtableResultRegistration: require('../miniprogram/result-registration') },
     location: { hash: '#/lobby' }, navigator: {}, URL, URLSearchParams, fetch,
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     setTimeout() { return 1; }, clearTimeout() {}, console };
