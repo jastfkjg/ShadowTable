@@ -23,14 +23,16 @@ for (const avatar of builtinAvatars)
 function serve(req, res, path) {
   const asset = Object.hasOwn(assets, path) ? assets[path] : null;
   if (!asset || req.method !== "GET") return false;
+  // Read before committing headers so a missing asset can return a normal 500.
+  const content = asset[0] === null
+    ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
+    : readFileSync(join(__dirname, asset[0]));
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Cache-Control", "no-store");
   res.writeHead(200);
-  res.end(asset[0] === null
-    ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
-    : readFileSync(join(__dirname, asset[0])));
+  res.end(content);
   return true;
 }
 module.exports = { serve };

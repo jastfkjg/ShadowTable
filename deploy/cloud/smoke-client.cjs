@@ -36,6 +36,16 @@ async function main() {
   if (process.argv[2] === "login") {
     const html = await request("/");
     if (!html.includes("<html")) throw new Error("Web entry did not return HTML");
+    // Fetch the dependencies from the actual image, not the source checkout.
+    const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
+    if (!assets.size) throw new Error("Web entry has no assets");
+    for (const asset of assets) {
+      const url = new URL(asset, origin);
+      if (url.origin !== origin) throw new Error(`Unexpected external web asset: ${asset}`);
+      const content = await request(url.pathname + url.search);
+      if (!content.trim()) throw new Error(`Empty web asset: ${asset}`);
+      if (url.pathname.endsWith(".js")) new (require("node:vm").Script)(content, { filename: asset });
+    }
     const data = JSON.parse(await request("/api/guest-login", {
       method: "POST",
       headers: { Origin: origin, "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json" },

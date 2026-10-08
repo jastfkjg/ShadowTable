@@ -8,6 +8,9 @@
 !miniprogram/builtin-avatars.js
 !miniprogram/avatar-library.js
 !miniprogram/fun-copy.js
+!miniprogram/result-registration.js
+!miniprogram/leaderboard-presentation.js
+!miniprogram/public-history.js
 !miniprogram/pages/
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/

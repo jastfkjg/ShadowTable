@@ -53,3 +53,21 @@ test("container smoke client reports HTTP status and server error for origin rej
     await stop(app);
   }
 });
+
+test("container smoke rejects a missing HTML dependency before attempting login", async (t) => {
+  const paths = [];
+  const server = require("node:http").createServer((req, res) => {
+    paths.push(req.url);
+    res.writeHead(req.url === "/" ? 200 : 404);
+    res.end(req.url === "/" ? '<html><script src="/missing.js" defer></script></html>' : "missing");
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  await assert.rejects(run(process.execPath, [client, "login"], {
+    env: { ...process.env, SMOKE_BASE_URL: `http://127.0.0.1:${server.address().port}` },
+  }), error => {
+    assert.match(error.stderr, /GET \/missing\.js: HTTP 404/);
+    return true;
+  });
+  assert.deepEqual(paths, ["/", "/missing.js"]);
+});

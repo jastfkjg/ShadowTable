@@ -142,6 +142,31 @@ test("静态资源同源托管：HTML 与 CSP、Content-Type、未知路径落�
   assert.equal((await a.raw("/style.css", {})).status, 401);
 });
 
+test("静态资源缺失返回 500，后续健康检查和首页仍然可用", async (t) => {
+  const filename = require.resolve("../server/web");
+  const localRequire = require("node:module").createRequire(filename);
+  const context = { module: { exports: {} }, __dirname: require("node:path").dirname(filename),
+    require(id) {
+      if (id !== "node:fs") return localRequire(id);
+      return { readFileSync(path) {
+        if (path.endsWith("result-registration.js"))
+          throw Object.assign(new Error("missing test asset"), { code: "ENOENT" });
+        return readFileSync(path);
+      } };
+    } };
+  vm.runInNewContext(readFileSync(filename, "utf8"), context, { filename });
+  t.mock.method(require("../server/web"), "serve", context.module.exports.serve);
+  const a = await setup(t, { webOrigin: origin });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const missing = await a.raw("/result-registration.js");
+    assert.equal(missing.status, 500);
+    assert.match(missing.headers["content-type"], /application\/json/);
+    assert.equal((await missing.json()).error, "服务器处理失败，请稍后重试");
+    assert.equal((await a.raw("/health")).status, 200);
+    assert.equal((await a.raw("/")).status, 200);
+  }
+});
+
 test("回归锚点：微信登录与开发登录不受网页版影响", async (t) => {
   const a = await setup(t, { webOrigin: origin, exchangeCode: (c) => c });
   const wx = await a.api("/api/login", { code: "wx-code" });
