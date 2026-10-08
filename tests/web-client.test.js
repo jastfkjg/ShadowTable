@@ -24,12 +24,13 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     ...runtime,
   };
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
+  context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
+      viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       getWebSessionTag() { return webSessionTag; },
@@ -703,8 +704,10 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   assert.match(c.state.latestResult.text, /提前截止/);
   const html = c.viewRoom();
   assert.doesNotMatch(html, /最近操作结果|上次结果/);
-  assert.match(html, /id="history-record-0"/);
-  assert.match(html, /票弃权/);
+  c.state.dealtIdentityDialog = false;
+  c.ACTIONS.openHistory();
+  assert.match(c.viewHistorySheet(), /id="history-record-0"/);
+  assert.match(c.viewHistorySheet(), /5票弃权/);
   assert.match(html, /本次你无需操作/);
   assert.match(c.viewHostBar(), /作废本次任务/);
   assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
@@ -918,7 +921,7 @@ test("网页自动保存失败保留原请求重试，未确认时禁止再次�
   assert.equal(c.state.settings.error, "");
 });
 
-test("结果图标、记录时间与最近转换可见；座位可收起，记录从三条展开", async () => {
+test("结果图标、记录时间与最近转换可见；座位可收起，记录从底部抽屉打开", async () => {
   const r = newRoom("123456", "host", "房主", "classic", 8);
   r.phase = "tools";
   r.history = [
@@ -935,13 +938,13 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   assert.equal(c.state.history[2].timeLabel, "23:38");
   assert.equal(c.state.history[0].timeLabel, "");
   let html = c.viewRoom();
-  assert.match(html, /公开记录 · 共4条/);
+  assert.match(html, /查看公开记录，共4条/);
   assert.match(html, /第1次 · × 失败/);
-  assert.equal((html.match(/class="history-row"/g) || []).length, 3);
-  assert.match(html, /展开更早的 1 条记录/);
-  c.ACTIONS.toggleHistory();
-  html = c.viewRoom();
-  assert.equal((html.match(/class="history-row"/g) || []).length, 4);
+  assert.doesNotMatch(html, /id="history-record-/);
+  assert.match(html, /data-action="openHistory"/);
+  c.ACTIONS.openHistory();
+  html = c.viewHistorySheet();
+  assert.equal((html.match(/id="history-record-/g) || []).length, 4);
   assert.ok(html.indexOf("#4") < html.indexOf("#1"));
   c.ACTIONS.toggleSeats();
   assert.doesNotMatch(c.viewRoom(), /class="seats"/);
@@ -982,13 +985,13 @@ test("网页阶段集中待办，房主工具与任务进度优先，最近结�
   assert.ok(html.indexOf("任务进度") < html.indexOf('data-action="toggleSeats"'));
   c.ACTIONS.showLatestRecord();
   assert.equal(c.lookups.at(-1), "history-record-" + c.state.latestResult.key);
-  assert.equal(c.scrolls.length, 1);
+  assert.equal(c.scrolls.length, 0);
   assert.equal(c.state.focusedHistoryKey, c.state.latestResult.key);
   run("p1", "beginActivity", { kind: "vote" });
   await c.refresh();
   html = c.viewRoom();
   assert.doesNotMatch(html, /class="latest-result"|上次结果/);
-  assert.match(html, /id="history-record-0"/);
+  assert.equal(c.state.history[0].key, 0);
   assert.match(html, /class="primary" data-action="openAction"/);
   for (const phase of ["quest", "skillPrepare", "fairy", "identity"]) {
     c.state.room.phase = phase;
@@ -1015,10 +1018,11 @@ test("查看结果定位更早的公开记录，并展开被折叠的目标", ()
   c.state.history = [0, 1, 2, 3, 4].map(key => ({ key, text: "公开记录" }));
   c.state.latestResult = c.state.history[0];
   c.ACTIONS.showLatestRecord();
-  assert.equal(c.state.historyExpanded, true);
+  assert.equal(c.state.historyOpen, true);
   assert.equal(c.state.focusedHistoryKey, 0);
   assert.equal(c.lookups.at(-1), "history-record-0");
-  assert.equal(c.scrolls[0].block, "start");
+  assert.equal(c.scrolls.length, 0);
+  assert.equal(c.state.visibleHistory.find(h => h.key === 0).expanded, true);
 });
 
 test("网页猎人技能三选一后只显示该模式号码，返回及阶段变化清除草稿", async () => {
@@ -1192,7 +1196,7 @@ test("网页仙女只确认合法当前目标，提示传递关系并阻止过�
   assert.equal(writes.length, 1);
 });
 
-test("网页隐藏轮次推进，时间在标题右侧，记录定位和最新结果保持对应", async () => {
+test("网页隐藏轮次推进，时间和序号清晰展示，记录定位和最新结果保持对应", async () => {
   const room = dealtWebRoom({ history: [
     { kind: "variant", text: "进入第2轮" },
     { kind: "variant", text: "本轮不转换", resultType: "conversion" },
@@ -1203,10 +1207,12 @@ test("网页隐藏轮次推进，时间在标题右侧，记录定位和最新�
   await c.refresh();
   assert.deepEqual(Array.from(c.state.history, h => h.key), [1, 2]);
   assert.equal(c.state.latestResult.key, 2);
-  const html = c.viewRoom();
+  c.state.dealtIdentityDialog = false;
+  c.ACTIONS.openHistory();
+  const html = c.viewHistorySheet();
   assert.ok(!html.includes("进入第"));
-  assert.match(html, /history-title"><span>技能最终结果<\/span><span class="history-time">\d{2}:\d{2}<\/span><\/div><span class="history-number">#3/);
-  assert.ok(!html.includes('history-subtitle'));
+  assert.match(html, /public-history-meta"><span>\d{2}:\d{2}<\/span><span>#3/);
+  assert.ok(!html.includes('class="history-subtitle"'));
 });
 
 test("网页战绩空态、错误重试与第三阵营结算选择", async () => {

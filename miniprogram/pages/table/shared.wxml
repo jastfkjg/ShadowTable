@@ -1,3 +1,5 @@
+<import src="./public-history.wxml" />
+<include src="./public-history.wxml" />
 <template name="tablePhase">
     <view class="phase-strip">
       <view class="phase-heading">
@@ -22,7 +24,7 @@
       </view>
     </view>
 </template>
-<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen}}"><include src="../../player-card.wxml" /></block>
+<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !historyOpen}}"><include src="../../player-card.wxml" /></block>
 <view wx:if="{{identityHistoryOpen && revealed && secret.identityHistory.length > 1 && !error}}" class="dialog-backdrop identity-history-backdrop" catchtap="closeIdentityHistory" catchtouchmove="blockScroll">
   <view class="identity-history-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局身份历程">
     <view class="identity-history-handle" aria-hidden="{{true}}" />
@@ -143,7 +145,7 @@
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
 <app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
-<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
+<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}">
   <view wx:if="{{!invitation && !room}}" class="brand">
     <view class="brand-identity">
       <text class="brand-mark">桌边助手</text>
@@ -532,39 +534,21 @@
         <text class="label">{{room.offlineAssassination?'请莫德雷德线下刺梅林':'请线下完成特殊结算'}}</text><text class="muted">{{room.offlineAssassination?'三次任务已成功，请在线下完成刺梅林并确认胜负。':'任务记录已保留。起刀、内奸及最终胜负在线下完成，小程序不自动判定。'}}</text>
         <button hover-class="none" wx:if="{{room.me.isHost}}" class="primary" bindtap="closeOffline" disabled="{{hasPendingRequest || busy}}">线下已完成，记录结果</button>
       </view>
-      <view wx:if="{{history.length}}" class="section-title history-heading"><text>公开记录 · 共{{history.length}}条</text></view>
-      <view wx:if="{{historyExpanded}}" class="history-filters">
-        <button hover-class="none" wx:for="{{['all','vote','quest','skill','other']}}" wx:key="*this" class="history-filter {{historyFilter===item?'active':''}}" bindtap="filterHistory" data-filter="{{item}}">{{item==='all'?'全部':item==='vote'?'投票':item==='quest'?'任务':item==='skill'?'技能':'其他'}}</button>
-      </view>
-      <view wx:if="{{historyExpanded && !visibleHistory.length}}" class="small muted">暂无此类公开记录</view>
-      <view wx:for="{{visibleHistory}}" wx:key="key" id="history-record-{{item.key}}" class="{{focusedHistoryKey===item.key?'history-row history-row-focused':'history-row'}}"
-        > <view class="history-heading-line"><view class="history-title"><text wx:if="{{item.resultTone || item.questResult}}" class="quest-result-icon {{item.resultTone || item.questResult}}" aria-hidden="true">{{(item.resultTone || item.questResult)==='success'?'✓':'×'}}</text><text>{{item.historyText || item.text}}</text><text wx:if="{{item.timeLabel}}" class="history-time">{{item.timeLabel}}</text></view><text class="history-number">#{{item.key+1}}</text></view>
-        <view wx:if="{{item.historyNote}}" class="small muted history-subtitle">{{item.historyNote}}</view>
-        <view wx:if="{{item.teamLabel}}" class="result-team">队伍 {{item.teamLabel}}</view>
-        <view wx:if="{{item.resultRows}}" class="history-result-rows"><view wx:for="{{item.resultRows}}" wx:for-item="row" wx:key="label" class="history-result-line {{row.final?'is-final':''}}"><text class="history-result-label">{{row.label}}</text><text class="history-result-value">{{row.value}}</text></view></view>
-        <block wx:if="{{item.voteGroups}}">
-          <view wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="history-vote-line">
-            <view class="history-vote-count {{group.tone}}"><text class="history-count">{{group.count}}</text><text>票{{group.label}}</text></view>
-            <view class="history-vote-seats">{{group.seats}}</view>
-          </view>
-        </block>
-        <block wx:elif="{{item.cards}}">
-          <view class="history-cards"><view wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="history-card-count"><text>{{card.label}}</text><text class="history-count {{card.tone}}">{{card.count}}</text><text>张</text></view></view>
-        </block>
-        <view wx:elif="{{item.detail && !item.resultRows}}" class="muted small history-detail">{{item.detail}}</view></view
-      >
-      <button hover-class="none" wx:if="{{history.length > 3}}" class="disclosure-button history-more" bindtap="toggleHistory" aria-expanded="{{historyExpanded}}" aria-label="{{historyExpanded?'收起记录':'展开更早的 '+(history.length-3)+' 条记录'}}"><text class="history-more-label">{{historyExpanded?'收起记录':'更早记录'}}</text><view class="history-more-chevron {{historyExpanded?'is-expanded':''}}" aria-hidden="true"></view></button>
+
     </block>
     <view wx:if="{{room.canUseTools}}" class="finish-game-footer">
       <button hover-class="none" class="finish-game-button" bindtap="finishTools" disabled="{{hasPendingRequest || busy}}">结束本局</button>
     </view>
-    <view wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}" class="host-action-bar">
+    <view wx:if="{{room.phase!=='lobby'}}" class="public-history-dock {{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'?'with-host-actions':''}}">
+      <template is="publicHistoryEntry" data="{{history, historyLatest, historyUnreadCount}}" />
+      <block wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}">
       <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}}">
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
         <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
         <button hover-class="none" wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
         <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
       </view>
+      </block>
     </view>
   </block>
 </view>

@@ -510,6 +510,20 @@ for (const [suffix, extra] of Object.entries({
   personalTemplates[name] = "profile";
 }
 scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:0,byFaction:[],byBoard:[],recent:[]},loading:false};
+// Public records: use the shared drawer model with the existing result card intact.
+const publicHistory = require('../miniprogram/public-history');
+const historyRows = Array.from({length: 9}, (_, key) => key % 3 === 0
+  ? {key, category: 'skill', text: '仙女查验已完成', timeLabel: '15:33'}
+  : key % 3 === 1
+    ? {key, category: 'vote', text: '投票通过', resultTone: 'success', teamLabel: '1、2、4 号', timeLabel: '16:32', voteGroups: [{label:'赞成',count:12,tone:'approve',seats:'1、2、3、4、5、6、7、8、9、10、11、12 号'},{label:'反对',count:0,tone:'reject',seats:'无'}]}
+    : {key, category: 'quest', text: '任务成功', resultTone: 'success', teamLabel: '1、3、6 号', timeLabel: '16:34', cards:[{label:'成功',count:3,tone:'success'}],detail:'成功 3 张'});
+const historyBase = { ...roomData(), ...publicHistory.initialData(), history: historyRows, latestResult: historyRows[8], historyLatest: historyRows[8], historyUnreadCount: 2, historySeenKey: 6 };
+historyBase.room = {...historyBase.room,phase:'tools',phaseName:'自由操作',canUseTools:true,hasActiveOperation:false,needsSubmission:false};
+scenes.publicHistoryClosed = historyBase;
+scenes.publicHistoryOpen = { ...historyBase, ...publicHistory.open(historyBase) };
+scenes.publicHistoryFull = { ...scenes.publicHistoryOpen, historyFullscreen: true };
+scenes.publicHistoryHost = { ...historyBase,room: {...historyBase.room,phase:'teamVote',hasActiveOperation:true,closeWaiting:{mode:'settle',label:'结束等待'}},settleHint:'还差 2 人提交' };
+
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")
   .replace('@import "pages/home/home.wxss";', fs.readFileSync(path.join(root, "pages/home/home.wxss"), "utf8"))

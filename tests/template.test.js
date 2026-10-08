@@ -662,7 +662,7 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   const all = nodes(tree);
   const footerIndex = all.findIndex((n) => n.attr?.bindtap === "finishTools");
   assert.ok(
-    footerIndex > all.findIndex((n) => n.attr?.class === "history-row"),
+    footerIndex > all.findIndex((n) => n.attr?.class === "table-dynamics operation-first"),
   );
   const guest = render({
     ...base,
@@ -997,20 +997,19 @@ test("湖仙设置所有板子可见，5/6人及查验进行中禁用开关", ()
   }
 });
 
-test("结果卡和表决展示队伍，座位可折叠，公开记录底部展开且没有冗余说明", () => {
+test("结果卡和表决展示队伍，座位可折叠，公开记录入口固定且不会挤掉待办", () => {
   const entry = { key: 3, text: "投票通过", resultTone: "success", resultTeam: "1、4号", latestDetail: "2票赞成", timeLabel: "23:38", recordLabel: "记录 4" };
   const data = { ...base, room: { phase: "teamVote", team: [1, 4], me: { submitted: false }, needsSubmission: true }, teamText: "1、4", actionDialog: true, seatsExpanded: false, latestResult: entry, history: [entry, entry, entry, entry], visibleHistory: [entry], questTimeline: [{ key: 1, number: 2, text: "任务成功", questResult: "success" }] };
   const tree = render(data);
   const text = JSON.stringify(tree);
   assert.ok(text.includes("任务队伍：1、4号"));
-  assert.ok(text.includes("共4条"));
-  assert.ok(text.includes("23:38"));
+  assert.match(JSON.stringify(byHandler(tree, "openHistory")), /共4条/);
   assert.ok(text.includes("第2次"));
   assert.ok(!text.includes("最近三条"));
   assert.ok(!nodes(tree).some(n => n.attr?.class === "seats"));
   assert.ok(byHandler(tree, "toggleSeats"));
-  assert.ok(byHandler(tree, "toggleHistory"));
-  assert.ok(nodes(tree).some(n => n.attr?.class?.includes("quest-result-icon success")));
+  assert.ok(byHandler(tree, "openHistory"));
+  assert.equal(nodes(tree).filter(n => n.attr?.id?.startsWith("history-record-")).length, 0);
 });
 
 test("查验结果突出座位阵营，可临时遮盖且仅有一个永久关闭入口", () => {
@@ -1035,13 +1034,37 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
   assert.ok(byHandler(progress, "showQuestRecord"));
   assert.ok(!text.includes("我在1号"));
   assert.ok(!text.includes("本阶段你无需操作"));
-  const located = render({ ...data, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
+  const located = render({ ...data, historyOpen: true, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
   const record = nodes(located).find(n => n.attr?.id === "history-record-0");
-  assert.equal(record.attr.class, "history-row history-row-focused");
+  assert.equal(record.attr.class, "public-history-row is-focused");
   const pending = render({ ...data, room: { ...room, phase: "quest", needsSubmission: true }, actionEntryLabel: "提交任务牌" });
   const phase = nodes(pending).find(n => n.attr?.class === "phase-strip");
   assert.ok(byHandler(phase, "openAction"));
   assert.equal(byHandler(phase, "openAction").attr.class, "primary");
+});
+
+test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，私密弹窗优先', () => {
+  const historyUI = require('../miniprogram/public-history');
+  const record = { key: 0, category: 'vote', text: '投票通过', resultTone: 'success', timeLabel: '16:32',
+    latestDetail: '2票赞成', teamLabel: '1、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '1、12 号' }] };
+  const data = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 }, canUseTools: true },
+    history: [record], historyLatest: record, latestResult: record };
+  const closed = render(data), openedData = { ...data, ...historyUI.open(data) }, opened = render(openedData);
+  const result = tree => nodes(tree).find(n => n.attr?.class === 'latest-result');
+  assert.deepEqual(result(opened), result(closed));
+  assert.ok(byHandler(opened, 'showLatestRecord'));
+  assert.ok(byHandler(opened, 'finishTools'));
+  assert.ok(byHandler(opened, 'closeHistory'));
+  assert.ok(byHandler(opened, 'toggleHistoryFullscreen'));
+  assert.equal(nodes(opened).filter(n => n.attr?.bindtap === 'openHistory').length, 1);
+  assert.ok(nodes(opened).find(n => n.tag === 'wx-scroll-view' && n.attr?.class === 'public-history-body'));
+  assert.equal(nodes(opened).filter(n => n.attr?.class === 'public-history-seat').length, 2);
+  assert.ok(!byHandler(render({ ...openedData, dealtIdentityDialog: true }), 'closeHistory'));
+  const host = render({ ...data, room: { ...data.room, phase: 'teamVote', hasActiveOperation: true } });
+  const dock = nodes(host).find(n => n.attr?.class?.includes('public-history-dock'));
+  assert.ok(byHandler(dock, 'openHistory'));
+  assert.ok(byHandler(dock, 'settleTool'));
+  assert.ok(byHandler(dock, 'cancelTool'));
 });
 
 

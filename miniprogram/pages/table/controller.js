@@ -3,6 +3,7 @@ const { initialPlayerCardData, playerCardMethods } = require("../../player-card"
 const funCopy = require("../../fun-copy");
 const roomShare = require("../../room-share");
 const resultRegistration = require("../../result-registration");
+const publicHistory = require("../../public-history");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
 function roomListItems(rooms) {
@@ -238,14 +239,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     room: null,
     ...initialPlayerCardData,
     latestResult: null,
-    historyExpanded: false,
-    focusedHistoryKey: null,
+    ...publicHistory.initialData(),
     seatsExpanded: true,
     seatOccupiedCount: 0,
     seatReadyCount: 0,
     operationProgressExpanded: false,
-    historyFilter: "all",
-    visibleHistory: [],
     questTimeline: [],
     boards: [],
     availableBoards: [],
@@ -396,6 +394,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
     this.updateChangedData({
+      historyOpen: false,
       dealtIdentityDialog: false,
       dealtIdentitySecret: null,
       identityHintVisible: false,
@@ -807,9 +806,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     );
     history.forEach((entry, i) => {
       const source = room.history[i];
-      entry.category = ["toolVote", "team"].includes(source.kind) ? "vote"
-        : ["toolQuest", "quest"].includes(source.kind) ? "quest"
-        : ["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind) ? "skill" : "other";
+      entry.category = publicHistory.category(source);
       entry.recordLabel = `记录 ${i + 1}`;
       const time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
@@ -827,8 +824,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
     });
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
-    const historyExpanded = this.data.room?.code === room.code && this.data.room?.phase !== "lobby" && room.phase !== "lobby" ? this.data.historyExpanded : false;
-    const historyFilter = historyExpanded ? this.data.historyFilter : "all";
+    const historyUpdate = publicHistory.sync(this.data, history, room);
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
       ...privacyUpdate,
@@ -839,10 +835,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatOccupiedCount: seats.filter(s => s.occupied).length,
       seatReadyCount: seats.filter(s => s.occupied && s.ready).length,
       operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
-      historyExpanded,
-      focusedHistoryKey: this.data.room?.code === room.code && this.data.room?.game === room.game && room.phase !== "lobby" ? this.data.focusedHistoryKey : null,
-      historyFilter,
-      visibleHistory: this.filteredHistory(history, historyExpanded, historyFilter),
+      ...historyUpdate,
       questTimeline: history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 })),
       notice:
         this.data.notice === "请求较多，冷却后会自动刷新"
@@ -1196,10 +1189,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const code = e.currentTarget.dataset.code;
     if (this.data.memberRooms.some(room => room.code === code)) wx.setClipboardData?.({ data: code });
   },
-  filteredHistory(history, expanded, filter) {
-    const entries = history.filter(h => filter === "all" || h.category === filter);
-    return expanded ? entries.slice().reverse() : entries.slice(-3).reverse();
-  },
   toggleSeats() {
     if (!this.data.room || this.data.room.phase === "lobby") return;
     this.setData({ seatsExpanded: !this.data.seatsExpanded });
@@ -1208,32 +1197,41 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.data.room?.canUseTools || !this.data.room.operationProgress) return;
     this.setData({ operationProgressExpanded: !this.data.operationProgressExpanded });
   },
-  toggleHistory() {
-    const historyExpanded = !this.data.historyExpanded;
-    this.setData({ historyExpanded, historyFilter: "all", visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all") });
+  openHistory() {
+    if (!this.data.room || this.data.room.phase === "lobby") return;
+    this.openHistoryRecord(null);
+  },
+  openHistoryRecord(key) {
+    this.closePlayerCard();
+    const room = this.data.room;
+    this.setData({ ...publicHistory.open(this.data, key), identityHintVisible: false }, () => {
+      if (!this.data.historyOpen || this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
+      this.setData({ historyScrollTarget: key === null ? "public-history-top" : `history-record-${key}` });
+    });
+  },
+  closeHistory() {
+    this.setData({ historyOpen: false, historyFullscreen: false, historyScrollTarget: "", focusedHistoryKey: null, visibleHistory: [] });
+  },
+  toggleHistoryFullscreen() {
+    this.setData({ historyFullscreen: !this.data.historyFullscreen });
+  },
+  showNewHistory() {
+    const fullscreen = this.data.historyFullscreen;
+    this.openHistoryRecord(null);
+    this.setData({ historyFullscreen: fullscreen });
+  },
+  toggleHistoryRow(e) {
+    this.setData(publicHistory.toggleRow(this.data, Number(e.currentTarget.dataset.key)));
   },
   filterHistory(e) {
-    const historyFilter = e.currentTarget.dataset.filter;
-    if (!["all", "vote", "quest", "skill", "other"].includes(historyFilter)) return;
-    this.setData({ historyFilter, visibleHistory: this.filteredHistory(this.data.history, true, historyFilter) });
+    this.setData(publicHistory.filter(this.data, e.currentTarget.dataset.filter), () => {
+      this.setData({ historyScrollTarget: "public-history-top" });
+    });
   },
   showLatestRecord() {
     const entry = this.data.latestResult;
     if (!entry) return;
-    const room = this.data.room;
-    const historyExpanded = this.data.historyExpanded || !this.data.history.slice(-3).some(h => h.key === entry.key);
-    this.setData({ focusedHistoryKey: null }, () => {
-      if (this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
-      this.setData({
-        historyExpanded,
-        historyFilter: "all",
-        focusedHistoryKey: entry.key,
-        visibleHistory: this.filteredHistory(this.data.history, historyExpanded, "all"),
-      }, () => {
-        if (this.data.room?.code !== room?.code || this.data.room?.game !== room?.game) return;
-        wx.pageScrollTo({ selector: `#history-record-${entry.key}`, duration: 250 });
-      });
-    });
+    this.openHistoryRecord(entry.key);
   },
   showQuestRecord(e) {
     const entry = this.data.questTimeline.find(h => h.key === Number(e.currentTarget.dataset.key));
@@ -1516,7 +1514,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   ...playerCardMethods(api),
   async openPlayerCard(seat) {
     const room = this.data.room, player = room?.players.find(p => p.seat === seat);
-    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult || this.data.identityHistoryOpen) return;
+    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult || this.data.identityHistoryOpen || this.data.historyOpen) return;
     const sourceAvatarUrl = player.avatarUrl;
     const card = { id: player.statsId, seat, name: player.name, isHost: player.isHost, sourceAvatarUrl,
       avatarUrl: sourceAvatarUrl ? api.assetUrl(sourceAvatarUrl) : "", initial: Array.from(player.name || "友")[0], avatarFailed: false };
@@ -1589,7 +1587,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       toolDescription:
         {
           skills:
-            "全员同时提交，按车长顺序结算。再次发起会进入下一轮，新身份技能随之生效。",
+            "全员同时提交。再次发起会进入下一轮，新身份技能随之生效。",
           conversion: "抽取一张转换牌，按牌面决定兰斯洛特是否交换阵营。",
           fairy: "仅仙女持有者选择目标，私密查验并传递仙女。",
         }[toolType] || "",
@@ -1999,7 +1997,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   identityOverlayBlocked() {
     return !this.alive || !this.foreground || !this.data.room || this.data.error ||
       this.data.actionDialog || this.data.actionLoading || this.data.identityChange ||
-      this.data.fairyResult || this.data.identityHistoryOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
+      this.data.fairyResult || this.data.identityHistoryOpen || this.data.historyOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
   },
   showDealtIdentity() {
     const key = this.identityDealKey();

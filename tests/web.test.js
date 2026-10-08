@@ -172,6 +172,11 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   assert.equal(registration.status, 200);
   vm.runInNewContext(registration.text, registrationContext);
   assert.equal(typeof registrationContext.window.shadowtableResultRegistration.flow, 'function');
+  assert.ok(home.text.indexOf('/public-history.js') < home.text.indexOf('/app.js'));
+  const history = await a.raw('/public-history.js'), historyContext = { window: {} };
+  assert.equal(history.status, 200);
+  vm.runInNewContext(history.text, historyContext);
+  assert.equal(historyContext.window.shadowtablePublicHistory.initialData().historyOpen, false);
   const catalog = await a.raw('/builtin-avatars.js'), context = { window: {} };
   assert.equal(catalog.status, 200);
   assert.match(catalog.headers['content-type'], /javascript/);
@@ -190,6 +195,7 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   const disabled = await setup(t);
   assert.equal((await disabled.raw('/fun-copy.js')).status, 401);
   assert.equal((await disabled.raw('/result-registration.js')).status, 401);
+  assert.equal((await disabled.raw('/public-history.js')).status, 401);
   assert.equal((await disabled.raw('/builtin-avatars.js')).status, 401);
   assert.equal((await disabled.raw(builtinAvatars[0].path)).status, 401);
 });

@@ -4,6 +4,7 @@
   const rankPresentation = window.shadowtableLeaderboard;
   const resultRegistration = window.shadowtableResultRegistration;
   const resultFlow = resultRegistration.flow;
+  const publicHistory = window.shadowtablePublicHistory;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -649,8 +650,7 @@
     seatOccupiedCount: 0,
     seatReadyCount: 0,
     operationProgressExpanded: false,
-    historyExpanded: false,
-    focusedHistoryKey: null,
+    ...publicHistory.initialData(),
     canStart: false,
     startHint: "",
     canSettle: false,
@@ -1072,6 +1072,7 @@
     } catch (e) {}
   }
   function mask() {
+    state.historyOpen = false;
     closePlayerCard(false);
     generation++;
     actionGeneration++;
@@ -1444,6 +1445,8 @@ function roomListItems(rooms) {
     });
     history.forEach(function (entry, i) {
       var source = room.history[i];
+      entry.category = publicHistory.category(source);
+      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
       var time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
@@ -1460,9 +1463,8 @@ function roomListItems(rooms) {
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
     patch.operationProgressExpanded = !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
-    patch.historyExpanded = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.historyExpanded : false;
-    patch.focusedHistoryKey = state.room?.code === room.code && state.room?.game === room.game && room.phase !== "lobby" ? state.focusedHistoryKey : null;
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
+    Object.assign(patch, publicHistory.sync(state, history, room));
     patch.history = history;
     patch.latestResult = history.filter(function (entry) {
       var h = room.history[entry.key];
@@ -2113,7 +2115,7 @@ function roomListItems(rooms) {
   function identityOverlayBlocked() {
     return !alive || !foreground || !state.room || state.error || !modal.hidden ||
       state.actionDialog || state.actionLoading || state.identityChange || state.fairyResult ||
-      state.identityHistoryOpen || state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
+      state.identityHistoryOpen || state.historyOpen || state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
   }
   function showDealtIdentity() {
     var key = identityDealKey();
@@ -2617,7 +2619,7 @@ function roomListItems(rooms) {
       toolDescription:
         {
           skills:
-            "全员同时提交，按车长顺序结算。再次发起会进入下一轮，新身份技能随之生效。",
+            "全员同时提交。再次发起会进入下一轮，新身份技能随之生效。",
           conversion: "抽取一张转换牌，按牌面决定兰斯洛特是否交换阵营。",
           fairy: "仅仙女持有者选择目标，私密查验并传递仙女。",
         }[kind] || "",
@@ -3030,7 +3032,7 @@ function roomListItems(rooms) {
   }
   function viewPlayerCard() {
     const p = state.playerCard, stats = state.playerCardStats;
-    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen) return "";
+    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen || state.historyOpen) return "";
     let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div></div>';
     if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
@@ -3789,57 +3791,14 @@ function roomListItems(rooms) {
             ? btn("primary", "closeOffline", "线下已完成，记录结果", null, state.busy)
             : "") +
           "</div>";
-      if (state.history.length) html += '<div class="section-title">公开记录 · 共' + state.history.length + '条</div>';
-      var visibleHistory = state.history.slice(state.historyExpanded ? 0 : -3).reverse();
-      for (var hh = 0; hh < visibleHistory.length; hh++) {
-        var h = visibleHistory[hh];
-        html += '<div id="history-record-' + h.key + '" tabindex="-1" class="' + (state.focusedHistoryKey === h.key ? 'history-row history-row-focused' : 'history-row') + '"><div class="history-heading-line"><div class="history-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span>' + (h.timeLabel ? '<span class="history-time">' + esc(h.timeLabel) + '</span>' : '') + '</div><span class="history-number">#' + (h.key + 1) + '</span></div>';
-        if (h.historyNote) html += '<div class="small muted history-subtitle">' + esc(h.historyNote) + '</div>';
-        if (h.teamLabel) html += '<div class="result-team">队伍 ' + esc(h.teamLabel) + '</div>';
-        if (h.resultRows) html += '<div class="history-result-rows">' + h.resultRows.map(function (row) { return '<div class="history-result-line' + (row.final ? ' is-final' : '') + '"><span class="history-result-label">' + esc(row.label) + '</span><span class="history-result-value">' + esc(row.value) + '</span></div>'; }).join('') + '</div>';
-        if (h.voteGroups) {
-          html += h.voteGroups
-            .map(function (g) {
-              return (
-                '<div class="history-vote-line"><div class="history-vote-count ' +
-                g.tone +
-                '"><span class="history-count">' +
-                g.count +
-                "</span><span>票" +
-                esc(g.label) +
-                '</span></div><div class="history-vote-seats">' +
-                esc(g.seats) +
-                "</div></div>"
-              );
-            })
-            .join("");
-        } else if (h.cards) {
-          html +=
-            '<div class="history-cards">' +
-            h.cards
-              .map(function (c) {
-                return (
-                  '<div class="history-card-count"><span>' +
-                  esc(c.label) +
-                  '</span><span class="history-count ' + esc(c.tone || "") + '">' +
-                  c.count +
-                  "</span><span>张</span></div>"
-                );
-              })
-              .join("") +
-            "</div>";
-        } else if (h.detail && !h.resultRows)
-          html += '<div class="muted small history-detail">' + esc(h.detail) + "</div>";
-        html += "</div>";
-      }
-      if (state.history.length > 3) html += '<button type="button" class="history-more" data-action="toggleHistory" aria-expanded="' + !!state.historyExpanded + '" aria-label="' + (state.historyExpanded ? '收起记录' : '展开更早的 ' + (state.history.length - 3) + ' 条记录') + '"><span class="history-more-label">' + (state.historyExpanded ? '收起记录' : '更早记录') + '</span><span class="history-more-chevron' + (state.historyExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
+
     }
     if (r.canUseTools)
       html +=
         '<div class="finish-game-footer">' +
         btn("finish-game-button", "finishTools", "结束本局", null, state.busy) +
         "</div>";
-    html += viewHostBar();
+    if (r.phase !== 'lobby') html += '<div class="public-history-dock' + (r.canUseTools && r.hasActiveOperation && r.phase !== 'offlineFinal' ? ' with-host-actions' : '') + '">' + viewHistoryEntry() + viewHostBar() + '</div>';
     return html;
   }
   function resultIcon(tone) {
@@ -3849,11 +3808,11 @@ function roomListItems(rooms) {
     var r = state.room;
     if (!r.canUseTools || !r.hasActiveOperation || r.phase === "offlineFinal")
       return "";
-    if (r.closeWaiting) return '<div class="host-action-bar"><div class="host-action-bar-inner has-waiting"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
+    if (r.closeWaiting) return '<div class="host-action-bar-inner has-waiting"><div class="host-waiting-copy small muted">' + esc(state.settleHint) + '<div>收齐自动结算</div></div>' +
       btn("secondary bar-cancel bar-cutoff", "closeWaiting", r.closeWaiting.label || "结束等待", null, state.busy || !state.network) +
-      (r.closeWaiting.mode !== "cancel" ? btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy || !state.network) : "") + '</div></div>';
+      (r.closeWaiting.mode !== "cancel" ? btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy || !state.network) : "") + '</div>';
     return (
-      '<div class="host-action-bar"><div class="host-action-bar-inner">' +
+      '<div class="host-action-bar-inner">' +
       btn(
         "primary bar-settle",
         "settleTool",
@@ -3862,8 +3821,68 @@ function roomListItems(rooms) {
         state.busy || !state.network || !state.canSettle,
       ) +
       btn("secondary bar-cancel", "cancelTool", "作废", null, state.busy) +
-      "</div></div>"
+      "</div>"
     );
+  }
+  function hasPublicHistorySheet() {
+    return state.historyOpen && state.room && state.room.phase !== 'lobby' &&
+      !state.error && !state.actionDialog && !state.dealtIdentityDialog && !state.identityChange &&
+      !state.fairyResult && !state.identityHistoryOpen && !state.toolType && !state.resultDialog &&
+      !state.showRoomRules && !state.showRoomSettings;
+  }
+  function viewHistoryEntry() {
+    const latest = state.historyLatest;
+    const preview = latest ? '最新：' + (latest.historyText || latest.text) + (latest.timeLabel ? ' · ' + latest.timeLabel : '') : '本局暂无公开记录';
+    return '<button type="button" class="public-history-entry" data-action="openHistory" aria-haspopup="dialog" aria-label="查看公开记录，共' + state.history.length + '条' + (state.historyUnreadCount ? '，' + state.historyUnreadCount + '条新记录' : '') + '"><span class="public-history-icon" aria-hidden="true"></span><span class="public-history-entry-copy"><span class="public-history-entry-title">公开记录 <span class="public-history-total">' + state.history.length + '</span></span><span class="public-history-preview ' + esc(latest?.resultTone || '') + '">' + esc(preview) + '</span></span>' + (state.historyUnreadCount ? '<span class="public-history-badge">' + state.historyUnreadCount + '条新</span>' : '') + '<span class="public-history-chevron is-expanded" aria-hidden="true"></span></button>';
+  }
+  function viewHistorySheet() {
+    if (!hasPublicHistorySheet()) return '';
+    let html = '<div class="dialog-backdrop public-history-backdrop" data-public-history-backdrop><section class="public-history-sheet' + (state.historyFullscreen ? ' is-fullscreen' : '') + '" role="dialog" aria-modal="true" aria-labelledby="public-history-title"><div class="public-history-handle" aria-hidden="true"></div><div class="public-history-header"><div class="public-history-heading"><div class="public-history-title" id="public-history-title">公开记录</div><div class="public-history-subtitle">共' + state.history.length + '条 · 仅本局公开信息</div></div><button type="button" class="public-history-fullscreen" data-action="toggleHistoryFullscreen" aria-label="' + (state.historyFullscreen ? '退出记录全屏' : '全屏查看记录') + '">' + (state.historyFullscreen ? '还原' : '全屏') + '</button><button type="button" class="public-history-close" data-action="closeHistory" aria-label="关闭公开记录">×</button></div>';
+    html += '<div class="public-history-filters" role="group" aria-label="记录分类">' + state.historyFilters.map(item => '<button type="button" class="public-history-filter' + (state.historyFilter === item.value ? ' is-active' : '') + '" data-action="filterHistory" data-value="' + item.value + '" aria-pressed="' + (state.historyFilter === item.value) + '">' + item.label + '</button>').join('') + '</div>';
+    html += '<div class="public-history-toolbar">' + (state.historyUnreadCount ? '<button type="button" class="public-history-new" data-action="showNewHistory">' + state.historyUnreadCount + '条新记录 · 点击查看 ↑</button>' : '<span class="public-history-order">最新在前</span>') + '</div>';
+    html += '<div class="public-history-body" id="public-history-body" tabindex="0" aria-label="公开记录列表"><div id="public-history-top"></div>';
+    if (!state.visibleHistory.length) html += '<div class="public-history-empty">' + (state.history.length ? '暂无此类公开记录' : '投票、任务等结算后，记录会显示在这里') + '</div>';
+    for (const h of state.visibleHistory) {
+      const title = '<span class="public-history-row-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span>' + (h.isNew ? '<span class="public-history-new-mark">新</span>' : '') + '</span>';
+      html += '<div id="history-record-' + h.key + '" tabindex="-1" class="public-history-row' + (state.focusedHistoryKey === h.key ? ' is-focused' : '') + '">';
+      html += h.hasDetails ? '<button type="button" class="public-history-row-toggle" data-action="toggleHistoryRow" data-key="' + h.key + '" aria-expanded="' + h.expanded + '" aria-label="' + esc((h.expanded ? '收起' : '展开') + (h.historyText || h.text) + '详情') + '">' + title + '<span class="public-history-chevron' + (h.expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>' : title;
+      html += '<div class="public-history-meta"><span>' + esc(h.timeLabel || '') + '</span><span>#' + (h.key + 1) + '</span></div>';
+      if (h.teamLabel) html += '<div class="public-history-team">队伍 ' + esc(h.teamLabel) + '</div>';
+      if (h.voteGroups) html += '<div class="public-history-counts">' + h.voteGroups.map(g => '<span class="public-history-count ' + esc(g.tone) + '">' + g.count + '票' + esc(g.label) + '</span>').join('') + '</div>';
+      else if (h.cards) html += '<div class="public-history-counts">' + h.cards.map(c => '<span class="public-history-count ' + esc(c.tone || '') + '">' + esc(c.label) + ' ' + c.count + ' 张</span>').join('') + '</div>';
+      if (h.expanded && h.hasDetails) {
+        html += '<div class="public-history-details">';
+        if (h.historyNote) html += '<div class="public-history-note">' + esc(h.historyNote) + '</div>';
+        if (h.resultRows) html += '<div class="public-history-results">' + h.resultRows.map(row => '<div class="public-history-result' + (row.final ? ' is-final' : '') + '"><span class="public-history-result-label">' + esc(row.label) + '</span><span class="public-history-result-value">' + esc(row.value) + '</span></div>').join('') + '</div>';
+        if (h.voteGroups) html += '<div class="public-history-voters">' + h.voteGroups.map(g => '<div class="public-history-vote-group"><span class="public-history-vote-label">' + esc(g.label) + '</span><div class="public-history-seat-list">' + (g.seatNumbers.length ? g.seatNumbers.map(seat => '<span class="public-history-seat">' + seat + '</span>').join('') : '<span class="public-history-note">无</span>') + '</div></div>').join('') + '</div>';
+        else if (h.detail && !h.cards && !h.resultRows) html += '<div class="public-history-note">' + esc(h.detail) + '</div>';
+        if (h.thresholdLabel) html += '<div class="public-history-note">' + esc(h.thresholdLabel) + '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    if (state.visibleHistory.length) html += '<div class="public-history-end">已显示' + state.visibleHistory.length + '条' + (state.historyFilter === 'all' ? '记录' : '筛选记录') + '</div>';
+    return html + '</div></section></div>';
+  }
+  let historyReturnFocus = null;
+  function openHistoryRecord(key = null, trigger) {
+    historyReturnFocus = trigger || document.activeElement;
+    closePlayerCard(false);
+    setState({ ...publicHistory.open(state, key), identityHintVisible: false });
+    const body = document.getElementById('public-history-body');
+    const target = key === null ? null : document.getElementById('history-record-' + key);
+    if (body) {
+      if (target?.getBoundingClientRect && body.getBoundingClientRect)
+        body.scrollTop += target.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      else body.scrollTop = 0;
+    }
+    (target || app.querySelector('.public-history-close'))?.focus({ preventScroll: true });
+  }
+  function closeHistory() {
+    setState({ historyOpen: false, historyFullscreen: false, focusedHistoryKey: null, visibleHistory: [] });
+    const target = historyReturnFocus?.isConnected ? historyReturnFocus : app.querySelector('.public-history-entry');
+    target?.focus({ preventScroll: true });
+    historyReturnFocus = null;
   }
   function viewSettingsDialog() {
     if (!state.showRoomSettings || !state.settings) return "";
@@ -4217,8 +4236,8 @@ function roomListItems(rooms) {
       viewDealtIdentity() +
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
-      (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen ? ' inert' : '') + '>' +
+      (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
+      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen || (state.page === 'table' && hasPublicHistorySheet()) ? ' inert' : '') + '>' +
       (state.page === 'profile' ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4229,7 +4248,7 @@ function roomListItems(rooms) {
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
-      viewPlayerCard() + viewSettingsDialog() +
+      (state.page === 'table' ? viewHistorySheet() : '') + viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
     enhanceSelects(next);
     patchDOM(app, next);
@@ -4519,24 +4538,21 @@ function roomListItems(rooms) {
     retrySettings: loadSettings,
     toggleSeats: function () { if (state.room && state.room.phase !== "lobby") setState({ seatsExpanded: !state.seatsExpanded }); },
     toggleOperationProgress: function () { if (state.room?.canUseTools && state.room.operationProgress) setState({ operationProgressExpanded: !state.operationProgressExpanded }); },
-    toggleHistory: function () { setState({ historyExpanded: !state.historyExpanded }); },
-    showLatestRecord: function () {
-      var entry = state.latestResult;
-      if (!entry) return;
-      setState({
-        historyExpanded: state.historyExpanded || !state.history.slice(-3).some(function (h) { return h.key === entry.key; }),
-        focusedHistoryKey: entry.key,
-      });
-      var target = document.getElementById("history-record-" + entry.key);
-      if (target) {
-        // Restart the brief highlight when the same record is revisited.
-        target.classList.remove("history-row-focused");
-        void target.offsetWidth;
-        target.classList.add("history-row-focused");
-        target.focus({ preventScroll: true });
-        target.scrollIntoView({ block: "start", behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-      }
+    openHistory: el => { if (state.room && state.room.phase !== 'lobby') openHistoryRecord(null, el); },
+    closeHistory,
+    toggleHistoryFullscreen: () => setState({ historyFullscreen: !state.historyFullscreen }),
+    filterHistory: el => {
+      setState(publicHistory.filter(state, el.dataset.value));
+      const body = document.getElementById('public-history-body');
+      if (body) body.scrollTop = 0;
     },
+    toggleHistoryRow: el => setState(publicHistory.toggleRow(state, Number(el.dataset.key))),
+    showNewHistory: () => {
+      const fullscreen = state.historyFullscreen, origin = historyReturnFocus;
+      openHistoryRecord(null, origin);
+      setState({ historyFullscreen: fullscreen });
+    },
+    showLatestRecord: el => { if (state.latestResult) openHistoryRecord(state.latestResult.key, el); },
     showQuestRecord: function (el) {
       var entry = state.history.find(function (h) { return h.key === Number(el.dataset.key); });
       if (entry) confirm(entry.text, entry.detail, false);
@@ -4629,6 +4645,7 @@ function roomListItems(rooms) {
     if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
+    if (e.target?.hasAttribute?.('data-public-history-backdrop')) return closeHistory();
     if (e.target?.hasAttribute?.('data-identity-history-backdrop')) return closeIdentityHistory();
     if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
     if (e.target?.hasAttribute?.('data-player-card-backdrop')) return closePlayerCard();
@@ -4782,6 +4799,16 @@ function roomListItems(rooms) {
     const index = controls.indexOf(document.activeElement);
     event.preventDefault();
     controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (state.page !== 'table' || !hasPublicHistorySheet() || !modal.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeHistory(); return; }
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(app.querySelectorAll('.public-history-sheet button, .public-history-body'));
+    if (!controls.length) return;
+    const index = controls.indexOf(document.activeElement);
+    event.preventDefault();
+    controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus({ preventScroll: true });
   });
   window.addEventListener('hashchange', async function () {
     if (location.hash === currentRoute) return;

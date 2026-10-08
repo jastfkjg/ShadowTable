@@ -35,6 +35,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../player-card') return require('../miniprogram/player-card');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name === '../../room-share') return require('../miniprogram/room-share');
+        if (name === '../../public-history') return require('../miniprogram/public-history');
         if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -1474,7 +1475,7 @@ test("小程序点自己的座位确认站起，点空位坐下，点他人不�
   assert.equal(calls.length, 2);
 });
 
-test("公开记录默认最近三条，分类保留完整记录且刷新后保持筛选", async () => {
+test("公开记录抽屉默认收起，分类保留完整记录且刷新后保持筛选", async () => {
   const room = { code: "123456", stage: "t1", phase: "tools", capacity: 6, players: [], team: [], me: { seat: 1 }, history: [
     { kind: "toolVote", approved: true, team: [1], votes: [{ seat: 1, approve: true }] },
     { kind: "toolQuest", success: false, team: [1, 2], fails: 2, threshold: 2 },
@@ -1485,18 +1486,18 @@ test("公开记录默认最近三条，分类保留完整记录且刷新后保�
   p.roomCode = room.code;
   await p.refresh();
   assert.equal(p.data.history.length, 4);
-  assert.equal(p.data.visibleHistory.length, 3);
-  assert.equal(p.data.visibleHistory[0].text, "已作废");
+  assert.equal(p.data.visibleHistory.length, 0);
+  assert.equal(p.data.historyLatest.text, "已作废");
   assert.equal(p.data.questTimeline[0].thresholdLabel, "至少 2 张失败票才失败");
-  p.toggleHistory();
+  p.openHistory();
   assert.equal(p.data.visibleHistory.length, 4);
   p.filterHistory({ currentTarget: { dataset: { filter: "quest" } } });
   await p.refresh();
   assert.equal(p.data.visibleHistory.length, 1);
   assert.equal(p.data.visibleHistory[0].questResult, "failure");
-  p.toggleHistory();
-  assert.equal(p.data.historyFilter, "all");
-  assert.equal(p.data.visibleHistory.length, 3);
+  p.closeHistory();
+  assert.equal(p.data.historyOpen, false);
+  assert.equal(p.data.visibleHistory.length, 0);
   room.phase = "lobby";
   room.history = [];
   await p.refresh();
@@ -1517,7 +1518,7 @@ test("行动入口按公开阶段命名，特殊技能不暴露角色", async ()
 test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
   let definition, url;
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8") + "\nPage(module.exports());", {
-    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : {}, Page: p => definition = p,
+    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : name === '../../public-history' ? require('../miniprogram/public-history') : {}, Page: p => definition = p,
     wx: { navigateTo: o => url = o.url },
   });
   const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };
@@ -1645,22 +1646,22 @@ test("小程序最近结果包含转换，时间到分钟，收起座位和点�
   assert.equal(p.data.latestResult.text, "本轮阵营转换");
   assert.equal(p.data.latestResult.timeLabel, "23:40");
   assert.equal(p.data.history[0].timeLabel, "");
-  assert.equal(p.data.visibleHistory.length, 3);
+  assert.equal(p.data.visibleHistory.length, 0);
   p.toggleSeats();
   p.onReachBottom?.();
-  assert.equal(p.data.visibleHistory.length, 3);
-  p.toggleHistory();
+  assert.equal(p.data.visibleHistory.length, 0);
+  p.openHistory();
   assert.equal(p.data.visibleHistory.length, 4);
   assert.equal(p.data.visibleHistory[0].key, 3);
   await p.refresh();
   assert.equal(p.data.seatsExpanded, false);
-  assert.equal(p.data.historyExpanded, true);
-  p.toggleHistory();
+  assert.equal(p.data.historyOpen, true);
+  p.closeHistory();
   p.onReachBottom?.();
-  assert.equal(p.data.visibleHistory.length, 3);
+  assert.equal(p.data.visibleHistory.length, 0);
   p.onPageScroll?.({ scrollTop: 100 });
   p.onReachBottom?.();
-  assert.equal(p.data.visibleHistory.length, 3);
+  assert.equal(p.data.visibleHistory.length, 0);
 });
 
 test("仙女结果关闭确认可取消，确认期间换结果或切后台不误确认", async () => {
@@ -1694,17 +1695,19 @@ test("查看最近结果清除记录筛选并在渲染后定位目标记录", ()
   p.data.latestResult = p.data.history[0];
   p.data.historyFilter = "quest";
   p.showLatestRecord();
-  assert.equal(p.data.historyExpanded, true);
+  assert.equal(p.data.historyOpen, true);
   assert.equal(p.data.historyFilter, "all");
   assert.equal(p.data.visibleHistory.length, 6);
   assert.equal(p.data.focusedHistoryKey, 0);
-  assert.equal(p.scrolls[0].selector, "#history-record-0");
-  p.data.historyExpanded = false;
+  assert.equal(p.data.historyScrollTarget, "history-record-0");
+  assert.equal(p.data.visibleHistory.find(h => h.key === 0).expanded, true);
+  p.data.historyOpen = false;
   p.data.latestResult = p.data.history[5];
   p.showLatestRecord();
-  assert.equal(p.data.historyExpanded, false);
-  assert.equal(p.data.visibleHistory.length, 3);
-  assert.equal(p.scrolls[1].selector, "#history-record-5");
+  assert.equal(p.data.historyOpen, true);
+  assert.equal(p.data.visibleHistory.length, 6);
+  assert.equal(p.data.historyScrollTarget, "history-record-5");
+  assert.equal(p.scrolls.length, 0);
 });
 
 test("首页个人牌桌备注、移除撤销和重新进入保持座位，列表操作复用幂等请求", async () => {
@@ -2004,6 +2007,7 @@ test("公开记录隐藏轮次推进，保留转换与最新结果的原记录�
   p.roomCode = room.code;
   await p.refresh();
   assert.deepEqual(Array.from(p.data.history, h => h.key), [1, 2]);
+  p.openHistory();
   assert.equal(p.data.visibleHistory.length, 2);
   assert.equal(p.data.latestResult.key, 2);
   assert.ok(p.data.latestResult.timeLabel);
