@@ -1211,8 +1211,10 @@ test("网页隐藏轮次推进，时间和序号清晰展示，记录定位和�
   c.ACTIONS.openHistory();
   const html = c.viewHistorySheet();
   assert.ok(!html.includes("进入第"));
-  assert.match(html, /public-history-meta"><span>\d{2}:\d{2}<\/span><span>#3/);
+  assert.match(html, /public-history-meta"><span>\d{2}:\d{2} · <\/span><span>#3/);
   assert.ok(!html.includes('class="history-subtitle"'));
+  assert.ok(!html.includes("全屏"));
+  assert.equal(c.ACTIONS.toggleHistoryFullscreen, undefined);
 });
 
 test("网页战绩空态、错误重试与第三阵营结算选择", async () => {

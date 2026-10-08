@@ -1055,7 +1055,8 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
   assert.ok(byHandler(opened, 'showLatestRecord'));
   assert.ok(byHandler(opened, 'finishTools'));
   assert.ok(byHandler(opened, 'closeHistory'));
-  assert.ok(byHandler(opened, 'toggleHistoryFullscreen'));
+  assert.ok(!byHandler(opened, 'toggleHistoryFullscreen'));
+  assert.ok(!JSON.stringify(opened).includes('全屏'));
   assert.equal(nodes(opened).filter(n => n.attr?.bindtap === 'openHistory').length, 1);
   assert.ok(nodes(opened).find(n => n.tag === 'wx-scroll-view' && n.attr?.class === 'public-history-body'));
   assert.equal(nodes(opened).filter(n => n.attr?.class === 'public-history-seat').length, 2);

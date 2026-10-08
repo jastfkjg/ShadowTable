@@ -3835,25 +3835,33 @@ function roomListItems(rooms) {
     const preview = latest ? '最新：' + (latest.historyText || latest.text) + (latest.timeLabel ? ' · ' + latest.timeLabel : '') : '本局暂无公开记录';
     return '<button type="button" class="public-history-entry" data-action="openHistory" aria-haspopup="dialog" aria-label="查看公开记录，共' + state.history.length + '条' + (state.historyUnreadCount ? '，' + state.historyUnreadCount + '条新记录' : '') + '"><span class="public-history-icon" aria-hidden="true"></span><span class="public-history-entry-copy"><span class="public-history-entry-title">公开记录 <span class="public-history-total">' + state.history.length + '</span></span><span class="public-history-preview ' + esc(latest?.resultTone || '') + '">' + esc(preview) + '</span></span>' + (state.historyUnreadCount ? '<span class="public-history-badge">' + state.historyUnreadCount + '条新</span>' : '') + '<span class="public-history-chevron is-expanded" aria-hidden="true"></span></button>';
   }
+  function viewHistorySummary(h) {
+    let html = '<span class="public-history-summary"><span class="public-history-event-icon is-' + esc(h.eventIcon || 'record') + '" aria-hidden="true"></span><span class="public-history-copy"><span class="public-history-headline"><span class="public-history-row-title"><span>' + esc(h.historyText || h.text) + '</span>' + (h.isNew ? '<span class="public-history-new-mark">新</span>' : '') + '</span><span class="public-history-meta">' + (h.timeLabel ? '<span>' + esc(h.timeLabel) + ' · </span>' : '') + '<span>#' + (h.key + 1) + '</span></span></span>';
+    if (h.teamLabel) html += '<span class="public-history-team">队伍 ' + esc(h.teamLabel) + '</span>';
+    if (h.voteGroups) html += '<span class="public-history-counts">' + h.voteGroups.map(g => '<span class="public-history-count ' + esc(g.tone) + '">' + g.count + '票' + esc(g.label) + '</span>').join('') + '</span>';
+    else if (h.cards) html += '<span class="public-history-counts">' + h.cards.map(c => '<span class="public-history-count ' + esc(c.tone || '') + '">' + esc(c.label) + ' ' + c.count + ' 张</span>').join('') + '</span>';
+    return html + '</span>' + (h.hasDetails ? '<span class="public-history-chevron' + (h.expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span>' : '') + '</span>';
+  }
+  function viewHistoryResult(row) {
+    return '<div class="public-history-result' + (row.final ? ' is-final' : '') + ' ' + esc(row.tone) + '">' +
+      (row.tone ? '<span class="public-history-outcome-icon ' + esc(row.tone) + '" aria-hidden="true"></span>' : '') +
+      '<span class="public-history-result-label">' + esc(row.label) + '</span><span class="public-history-result-value">' +
+      (row.seatNumbers.length ? row.seatNumbers.map(seat => '<span class="public-history-result-seat ' + esc(row.tone) + '">' + seat + '号</span>').join('') : esc(row.value)) + '</span></div>';
+  }
   function viewHistorySheet() {
     if (!hasPublicHistorySheet()) return '';
-    let html = '<div class="dialog-backdrop public-history-backdrop" data-public-history-backdrop><section class="public-history-sheet' + (state.historyFullscreen ? ' is-fullscreen' : '') + '" role="dialog" aria-modal="true" aria-labelledby="public-history-title"><div class="public-history-handle" aria-hidden="true"></div><div class="public-history-header"><div class="public-history-heading"><div class="public-history-title" id="public-history-title">公开记录</div><div class="public-history-subtitle">共' + state.history.length + '条 · 仅本局公开信息</div></div><button type="button" class="public-history-fullscreen" data-action="toggleHistoryFullscreen" aria-label="' + (state.historyFullscreen ? '退出记录全屏' : '全屏查看记录') + '">' + (state.historyFullscreen ? '还原' : '全屏') + '</button><button type="button" class="public-history-close" data-action="closeHistory" aria-label="关闭公开记录">×</button></div>';
+    let html = '<div class="dialog-backdrop public-history-backdrop" data-public-history-backdrop><section class="public-history-sheet" role="dialog" aria-modal="true" aria-labelledby="public-history-title"><div class="public-history-handle" aria-hidden="true"></div><div class="public-history-header"><div class="public-history-heading"><div class="public-history-title" id="public-history-title">公开记录</div><div class="public-history-subtitle">共' + state.history.length + '条</div></div><button type="button" class="public-history-close" data-action="closeHistory" aria-label="关闭公开记录">×</button></div>';
     html += '<div class="public-history-filters" role="group" aria-label="记录分类">' + state.historyFilters.map(item => '<button type="button" class="public-history-filter' + (state.historyFilter === item.value ? ' is-active' : '') + '" data-action="filterHistory" data-value="' + item.value + '" aria-pressed="' + (state.historyFilter === item.value) + '">' + item.label + '</button>').join('') + '</div>';
-    html += '<div class="public-history-toolbar">' + (state.historyUnreadCount ? '<button type="button" class="public-history-new" data-action="showNewHistory">' + state.historyUnreadCount + '条新记录 · 点击查看 ↑</button>' : '<span class="public-history-order">最新在前</span>') + '</div>';
-    html += '<div class="public-history-body" id="public-history-body" tabindex="0" aria-label="公开记录列表"><div id="public-history-top"></div>';
+    if (state.historyUnreadCount) html += '<div class="public-history-toolbar"><button type="button" class="public-history-new" data-action="showNewHistory">' + state.historyUnreadCount + '条新记录 · 点击查看 ↑</button></div>';
+    html += '<div class="public-history-body" id="public-history-body" tabindex="0" aria-label="公开记录列表，最新在前"><div id="public-history-top"></div>';
     if (!state.visibleHistory.length) html += '<div class="public-history-empty">' + (state.history.length ? '暂无此类公开记录' : '投票、任务等结算后，记录会显示在这里') + '</div>';
     for (const h of state.visibleHistory) {
-      const title = '<span class="public-history-row-title">' + resultIcon(h.resultTone) + '<span>' + esc(h.historyText || h.text) + '</span>' + (h.isNew ? '<span class="public-history-new-mark">新</span>' : '') + '</span>';
       html += '<div id="history-record-' + h.key + '" tabindex="-1" class="public-history-row' + (state.focusedHistoryKey === h.key ? ' is-focused' : '') + '">';
-      html += h.hasDetails ? '<button type="button" class="public-history-row-toggle" data-action="toggleHistoryRow" data-key="' + h.key + '" aria-expanded="' + h.expanded + '" aria-label="' + esc((h.expanded ? '收起' : '展开') + (h.historyText || h.text) + '详情') + '">' + title + '<span class="public-history-chevron' + (h.expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>' : title;
-      html += '<div class="public-history-meta"><span>' + esc(h.timeLabel || '') + '</span><span>#' + (h.key + 1) + '</span></div>';
-      if (h.teamLabel) html += '<div class="public-history-team">队伍 ' + esc(h.teamLabel) + '</div>';
-      if (h.voteGroups) html += '<div class="public-history-counts">' + h.voteGroups.map(g => '<span class="public-history-count ' + esc(g.tone) + '">' + g.count + '票' + esc(g.label) + '</span>').join('') + '</div>';
-      else if (h.cards) html += '<div class="public-history-counts">' + h.cards.map(c => '<span class="public-history-count ' + esc(c.tone || '') + '">' + esc(c.label) + ' ' + c.count + ' 张</span>').join('') + '</div>';
+      html += h.hasDetails ? '<button type="button" class="public-history-row-toggle" data-action="toggleHistoryRow" data-key="' + h.key + '" aria-expanded="' + h.expanded + '" aria-label="' + esc((h.expanded ? '收起' : '展开') + (h.historyText || h.text) + '详情') + '">' + viewHistorySummary(h) + '</button>' : viewHistorySummary(h);
       if (h.expanded && h.hasDetails) {
         html += '<div class="public-history-details">';
-        if (h.historyNote) html += '<div class="public-history-note">' + esc(h.historyNote) + '</div>';
-        if (h.resultRows) html += '<div class="public-history-results">' + h.resultRows.map(row => '<div class="public-history-result' + (row.final ? ' is-final' : '') + '"><span class="public-history-result-label">' + esc(row.label) + '</span><span class="public-history-result-value">' + esc(row.value) + '</span></div>').join('') + '</div>';
+        if (h.historyNote) html += '<div class="public-history-note-badge">' + esc(h.historyNote) + '</div>';
+        if (h.resultRows) html += '<div class="public-history-results">' + h.resultRows.map(viewHistoryResult).join('') + '</div>';
         if (h.voteGroups) html += '<div class="public-history-voters">' + h.voteGroups.map(g => '<div class="public-history-vote-group"><span class="public-history-vote-label">' + esc(g.label) + '</span><div class="public-history-seat-list">' + (g.seatNumbers.length ? g.seatNumbers.map(seat => '<span class="public-history-seat">' + seat + '</span>').join('') : '<span class="public-history-note">无</span>') + '</div></div>').join('') + '</div>';
         else if (h.detail && !h.cards && !h.resultRows) html += '<div class="public-history-note">' + esc(h.detail) + '</div>';
         if (h.thresholdLabel) html += '<div class="public-history-note">' + esc(h.thresholdLabel) + '</div>';
@@ -3879,7 +3887,7 @@ function roomListItems(rooms) {
     (target || app.querySelector('.public-history-close'))?.focus({ preventScroll: true });
   }
   function closeHistory() {
-    setState({ historyOpen: false, historyFullscreen: false, focusedHistoryKey: null, visibleHistory: [] });
+    setState({ historyOpen: false, focusedHistoryKey: null, visibleHistory: [] });
     const target = historyReturnFocus?.isConnected ? historyReturnFocus : app.querySelector('.public-history-entry');
     target?.focus({ preventScroll: true });
     historyReturnFocus = null;
@@ -4540,7 +4548,6 @@ function roomListItems(rooms) {
     toggleOperationProgress: function () { if (state.room?.canUseTools && state.room.operationProgress) setState({ operationProgressExpanded: !state.operationProgressExpanded }); },
     openHistory: el => { if (state.room && state.room.phase !== 'lobby') openHistoryRecord(null, el); },
     closeHistory,
-    toggleHistoryFullscreen: () => setState({ historyFullscreen: !state.historyFullscreen }),
     filterHistory: el => {
       setState(publicHistory.filter(state, el.dataset.value));
       const body = document.getElementById('public-history-body');
@@ -4548,9 +4555,7 @@ function roomListItems(rooms) {
     },
     toggleHistoryRow: el => setState(publicHistory.toggleRow(state, Number(el.dataset.key))),
     showNewHistory: () => {
-      const fullscreen = state.historyFullscreen, origin = historyReturnFocus;
-      openHistoryRecord(null, origin);
-      setState({ historyFullscreen: fullscreen });
+      openHistoryRecord(null, historyReturnFocus);
     },
     showLatestRecord: el => { if (state.latestResult) openHistoryRecord(state.latestResult.key, el); },
     showQuestRecord: function (el) {

@@ -1210,15 +1210,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     });
   },
   closeHistory() {
-    this.setData({ historyOpen: false, historyFullscreen: false, historyScrollTarget: "", focusedHistoryKey: null, visibleHistory: [] });
-  },
-  toggleHistoryFullscreen() {
-    this.setData({ historyFullscreen: !this.data.historyFullscreen });
+    this.setData({ historyOpen: false, historyScrollTarget: "", focusedHistoryKey: null, visibleHistory: [] });
   },
   showNewHistory() {
-    const fullscreen = this.data.historyFullscreen;
     this.openHistoryRecord(null);
-    this.setData({ historyFullscreen: fullscreen });
   },
   toggleHistoryRow(e) {
     this.setData(publicHistory.toggleRow(this.data, Number(e.currentTarget.dataset.key)));

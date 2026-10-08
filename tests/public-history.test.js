@@ -51,14 +51,38 @@ test('打开最近结果清除筛选并展开原始序号，票型显示两位�
 test('新阶段保留阅读状态；同房重开、换房、回到准备阶段清除旧抽屉和未读状态', () => {
   for (const changedRoom of [{ ...room, game: 2 }, { ...room, code: '654321' }, { ...room, phase: 'lobby' }]) {
     const state = model();
-    Object.assign(state, historyUI.open(state), { historyFullscreen: true });
+    Object.assign(state, historyUI.open(state));
     Object.assign(state, historyUI.sync(state, state.history, { ...room, phase: 'teamVote' }));
     assert.equal(state.historyOpen, true);
-    assert.equal(state.historyFullscreen, true);
     Object.assign(state, historyUI.sync(state, state.history, changedRoom));
     assert.equal(state.historyOpen, false);
-    assert.equal(state.historyFullscreen, false);
     assert.equal(state.historyUnreadCount, 0);
     assert.equal(state.visibleHistory.length, 0);
   }
+});
+
+test('记录图标和技能座位只派生公开内容，保留复活过程、空值和原始文本', () => {
+  const state = model();
+  state.history = [
+    { key: 0, category: 'skill', text: '仙女查验已完成' },
+    { key: 1, category: 'skill', text: '本轮阵营转换' },
+    { key: 2, category: 'skill', text: '技能最终结果', historyText: '技能结算', historyNote: '提前截止', resultRows: [
+      { label: '最终仍出局', value: '12 号', final: true },
+      { label: '本轮出局', value: '3、7、12 号' },
+      { label: '抽牌复活', value: '3、7 号' },
+      { label: '原牌复活', value: '无' },
+      { label: '说明', value: '第3轮结果待确认' },
+    ] },
+  ];
+  const before = structuredClone(state.history);
+  Object.assign(state, historyUI.open(state, 2));
+  const [skill, conversion, fairy] = state.visibleHistory;
+  assert.equal(skill.eventIcon, 'skill');
+  assert.equal(conversion.eventIcon, 'conversion');
+  assert.equal(fairy.eventIcon, 'inspect');
+  assert.deepEqual(skill.resultRows.map(row => row.seatNumbers), [[12], [3, 7, 12], [3, 7], [], []]);
+  assert.deepEqual(skill.resultRows.map(row => row.tone), ['failure', 'failure', 'success', 'success', '']);
+  assert.equal(skill.resultRows[0].final, true);
+  assert.equal(skill.resultRows[4].value, '第3轮结果待确认');
+  assert.deepEqual(state.history, before);
 });

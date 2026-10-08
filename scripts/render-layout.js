@@ -521,7 +521,16 @@ const historyBase = { ...roomData(), ...publicHistory.initialData(), history: hi
 historyBase.room = {...historyBase.room,phase:'tools',phaseName:'自由操作',canUseTools:true,hasActiveOperation:false,needsSubmission:false};
 scenes.publicHistoryClosed = historyBase;
 scenes.publicHistoryOpen = { ...historyBase, ...publicHistory.open(historyBase) };
-scenes.publicHistoryFull = { ...scenes.publicHistoryOpen, historyFullscreen: true };
+const refinedRows = historyRows.slice(0, 5).concat([
+  { key: 6, category: 'skill', text: '技能结算', historyNote: '提前截止', timeLabel: '15:31', resultRows: [{label:'本轮出局',value:'3、7 号'},{label:'抽牌复活',value:'3、7 号'}] },
+  { key: 7, category: 'skill', text: '仙女查验已完成', timeLabel: '15:32' },
+  { key: 8, category: 'skill', text: '本轮阵营转换', timeLabel: '15:33' },
+  { key: 9, category: 'skill', text: '仙女查验已完成', timeLabel: '15:33' },
+]);
+const refinedHistory = { ...historyBase, history: refinedRows, historySeenKey: 9 };
+Object.assign(refinedHistory, publicHistory.open(refinedHistory));
+Object.assign(refinedHistory, publicHistory.toggleRow(refinedHistory, 6));
+scenes.publicHistoryRefined = refinedHistory;
 scenes.publicHistoryHost = { ...historyBase,room: {...historyBase.room,phase:'teamVote',hasActiveOperation:true,closeWaiting:{mode:'settle',label:'结束等待'}},settleHint:'还差 2 人提交' };
 
 const css = fs
