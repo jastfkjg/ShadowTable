@@ -805,6 +805,22 @@ test("独立设置页使用原生开关自动保存，仅失败时显示重试",
   assert.ok(!nodes(tree).some((n) => n.attr?.bindchange === "pickCapacity"));
 });
 
+test("仙女目标弹窗禁用不合法座位，未选目标不能确认，传递提示与选中目标一致", () => {
+  const data = { ...base, room: { phase: "fairy", needsSubmission: true, me: { submitted: false }, team: [] },
+    actionDialog: true, stagedChoice: true, skillAction: true, skillTargetMode: "fairy", skillTitle: "仙女查验", skillHint: "查验并传递",
+    skillTargetMeta: "第 2 轮 · 2 号持有仙女", skillBodyHeight: 264, skillTargetCaption: "结果仅你可见", skillEligibility: "历任持有者不可选",
+    skillTargets: [{ value: "target:3", label: "查验 3号", seat: 3, name: "玩家三" }, { value: "disabled:2", label: "2号", seat: 2, name: "玩家二", disabledReason: "你 · 当前持有者" }],
+    skillOtherChoices: [], swapOptions: [], swapPlayers: [], swapSeats: [], draftChoice: "", skillSummary: "尚未选择目标", skillConfirmLabel: "请先选择目标", skillConsequence: "确认提交后不可更改" };
+  let tree = render(data);
+  assert.equal(byHandler(tree, "confirmChoice").attr.disabled, true);
+  assert.ok(nodes(tree).find(n => n.attr?.class?.includes("skill-option-unavailable")).attr.disabled);
+  assert.equal(nodes(tree).filter(n => n.attr?.class === "skill-other-choices").length, 0);
+  tree = render({ ...data, draftChoice: "target:3", skillSummary: "查验目标：3 号 · 玩家三", skillConfirmLabel: "确认查验 3 号", skillConsequence: "仙女将传给 3 号 · 确认后不可更改" });
+  assert.equal(byHandler(tree, "confirmChoice").attr.disabled, false);
+  assert.match(JSON.stringify(tree), /仙女将传给 3 号/);
+  assert.match(JSON.stringify(tree), /查验目标：3 号 · 玩家三/);
+});
+
 test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显示", () => {
   const data = {
     ...base,
@@ -817,6 +833,7 @@ test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显�
   const shown = render({ ...data, fairyResultRevealed: true });
   assert.ok(JSON.stringify(shown).includes("4号查验结果：坏人"));
   assert.ok(byHandler(shown, "acknowledgeFairyResult"));
+  assert.ok(byHandler(shown, "hidePrivatePreview"));
 });
 
 test("拓展板子不显示线下辅助提示，身份确认使用线上视野文案", () => {
@@ -996,12 +1013,13 @@ test("结果卡和表决展示队伍，座位可折叠，公开记录底部展�
   assert.ok(nodes(tree).some(n => n.attr?.class?.includes("quest-result-icon success")));
 });
 
-test("查验结果突出座位阵营，仅保留一个关闭入口", () => {
+test("查验结果突出座位阵营，可临时遮盖且仅有一个永久关闭入口", () => {
   const tree = render({ ...base, fairyResult: { revision: 1, information: "6号查验结果：坏人（第1轮）", summary: "6号 · 坏人" }, fairyResultRevealed: true });
   const text = JSON.stringify(tree);
   assert.ok(text.includes("6号 · 坏人"));
   assert.ok(!text.includes("第1轮"));
-  assert.ok(!text.includes("立即遮盖"));
+  assert.ok(byHandler(tree, "hidePrivatePreview"));
+  assert.equal(nodes(tree).filter(n => n.attr?.bindtap === "acknowledgeFairyResult").length, 1);
   assert.ok(byHandler(tree, "acknowledgeFairyResult"));
 });
 
@@ -1095,6 +1113,37 @@ test("技能网格独立选择，底部确认默认禁用并显示明确目标",
   assert.ok(nodes(selected).some(n => n.attr?.class?.includes("skill-option is-selected")));
   const offline = render({ ...data, draftChoice: "target:2", network: false });
   assert.equal(byHandler(offline, "confirmChoice").attr.disabled, true);
+});
+
+test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回不伪装成选项", () => {
+  const source = require("node:fs").readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8");
+  const presentation = vm.runInNewContext("(function(){" + source.slice(source.indexOf("function skillView("), source.indexOf("function factionTone(")) + "return { skillView, skillSelectionView };})()");
+  const { cases, fixture } = require("./helpers/skill-target-fixtures");
+  for (const [role, mode, value] of cases) {
+    const { room, secret } = fixture(role, mode);
+    const swapOptions = (secret.action.choices || []).filter(v => v.startsWith("swap:"));
+    const options = mode === "final" ? secret.action.targets.map(t => ({ value: "target:" + t.seat, label: "目标" + t.seat }))
+      : secret.action.hunterModes ? secret.action.options.filter(c => c.value.startsWith(mode + ":")).concat([{ value: "mode:", label: "返回选择技能方式" }])
+      : secret.action.options.filter(c => !c.value.startsWith("swap:"));
+    const data = { ...base, room, actionDialog: true, stagedChoice: true, draftChoice: "", swapOptions, swapSeats: [], swapPlayers: [],
+      ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions) };
+    const initial = render(data);
+    const seats = nodes(initial).filter(n => n.attr?.class?.split(" ").includes("skill-option"));
+    assert.equal(seats.length, 12, role);
+    assert.ok(seats.some(n => n.attr.disabled && n.attr.ariaLabel.includes("已出局")), role);
+    assert.equal(byHandler(initial, "confirmChoice").attr.disabled, true);
+    assert.ok(nodes(initial).some(n => n.attr?.class?.split(" ").includes("skill-target-dialog")));
+    if (secret.action.hunterModes) {
+      const back = nodes(initial).find(n => n.attr?.["data-value"] === "mode:");
+      assert.ok(back.attr.class.includes("skill-navigation"));
+      assert.ok(!nodes(back).some(n => n.attr?.class === "skill-pass-mark"));
+    }
+    const selected = render({ ...data, draftChoice: value,
+      ...(mode === "swap" ? { swapSeats: [2, 7], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: [2, 7].includes(p.seat) })) } : {}),
+      ...presentation.skillSelectionView(room, value, mode) });
+    assert.equal(byHandler(selected, "confirmChoice").attr.disabled, false, role);
+    assert.ok(!byHandler(selected, "confirmSwap"));
+  }
 });
 
 test("结算需要主动选择胜方，支持第三阵营；零有效局不显示0%", () => {

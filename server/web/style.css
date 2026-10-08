@@ -5,6 +5,8 @@
   --muted: #b1bfc6;
   --accent: #e5c68b;
   --border: #536570;
+  --control-border: #8295a0;
+  --control-bg: #14232c;
   --seat-empty-border: rgba(83, 101, 112, 0.65);
   --good: #a3dfbe;
   --evil: #f2b6ae;
@@ -1822,6 +1824,50 @@ button.room-menu-action.danger { margin-top: 12px; border: 1px solid var(--menu-
 
 .history-time { white-space:nowrap; color:var(--muted); font-size:12px; font-weight:400; }
 
+/* Player-target skills share a compact seat picker with a persistent footer. */
+.dialog-backdrop.skill-target-backdrop { padding: 16px; }
+.error-dialog.skill-target-dialog { --skill-footer-bg: #1f303a; --skill-disabled-bg: #34464f; width: 100%; max-width: 390px; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); border-radius: 22px; border-color: var(--border); }
+.skill-target-dialog .skill-header { padding: 22px 20px 16px; }
+.skill-meta { margin-bottom: 8px; color: var(--accent); font-size: 12px; line-height: 1.5; }
+.skill-target-dialog .skill-title { font-size: 24px; font-weight: 650; line-height: 1.4; }
+.skill-target-dialog .skill-hint { margin-top: 7px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.skill-target-dialog .skill-body { max-height: 52vh; padding: 0 20px 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.skill-target-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
+.skill-target-caption { color: var(--muted); font-size: 12px; }
+.skill-target-dialog .skill-target-grid { gap: 9px; }
+.skill-target-dialog button.skill-option { gap: 0; min-height: 68px; padding: 8px 6px; border: 1px solid var(--control-border); border-radius: 12px; background: var(--control-bg); transition: background .14s, color .14s, border-color .14s; }
+.skill-target-dialog .skill-check { top: 4px; right: 7px; font-size: 12px; line-height: 1.4; }
+.skill-target-dialog .skill-seat { font-size: 22px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.skill-target-dialog .skill-seat-unit { font-size: 11px; font-weight: 400; }
+.skill-target-dialog .skill-name { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.skill-target-dialog button.skill-option.is-selected { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.skill-target-dialog .is-selected .skill-name { color: var(--bg); }
+.skill-target-dialog button.skill-option-unavailable[disabled] { opacity: 1; background: var(--surface); color: var(--muted); border-color: var(--border); border-style: dashed; }
+.skill-target-dialog .skill-option-unavailable .skill-name { font-size: 11px; }
+.skill-eligibility { margin-top: 11px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.skill-target-dialog .skill-other-choices { padding: 0 20px 16px; }
+.skill-target-dialog button.skill-other { min-height: 48px; padding: 10px 13px; border: 1px solid var(--control-border); border-radius: 12px; justify-content: space-between; gap: 12px; font-size: 13px; background: var(--control-bg); border-color: var(--control-border); }
+.skill-target-dialog button.skill-other.is-selected { color: var(--accent); border-color: var(--accent); background: var(--surface); }
+.skill-target-dialog button.skill-navigation { justify-content: center; }
+.skill-target-dialog .skill-context { font-size: 13px; }
+.skill-pass-mark { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; flex-shrink: 0; border: 1px solid var(--muted); border-radius: 50%; }
+.is-selected .skill-pass-mark { border-color: var(--accent); }
+.is-selected .skill-pass-mark::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.skill-target-dialog .skill-footer { background: var(--skill-footer-bg); margin-top: 0; padding: 15px 20px calc(8px + env(safe-area-inset-bottom)); }
+.skill-target-dialog .skill-summary { font-size: 14px; font-weight: 550; line-height: 1.6; }
+.skill-consequence { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.skill-target-dialog button.skill-confirm { min-height: 48px; padding: 12px; margin-top: 12px; font-size: 15px; font-weight: 650; border-radius: 12px; }
+.skill-target-dialog button.skill-confirm[disabled] { opacity: 1; background: var(--skill-disabled-bg); color: var(--muted); }
+.skill-target-dialog button[disabled] { cursor: default; }
+.skill-target-dialog button.skill-later { padding: 0; min-height: 44px; margin: 0; font-size: 12px; }
+@media (max-height: 480px) {
+  .error-dialog.skill-target-dialog { display: block; overflow-y: auto; }
+  .skill-target-dialog .skill-body { height: auto !important; max-height: none !important; overflow: visible; overscroll-behavior: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-target-dialog button.skill-option { transition: none; }
+}
+
 /* Personal match records and explicit result selection. */
 .stats-section { margin-top: 24px; border-block: 1px solid var(--border); }
 .stats-toggle { width: 100%; min-height: 52px; display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; text-align: left; }
@@ -2135,9 +2181,8 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 .is-selected .score-choice-mark::after { content: ""; position: absolute; left: 6px; top: 3px; width: 4px; height: 8px; border-right: 2px solid var(--bg); border-bottom: 2px solid var(--bg); transform: rotate(45deg); }
 .score-choice-title { display: block; font-size: 16px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
 .is-selected .score-choice-title { color: var(--accent); }
-.score-dialog button.score-other-entry { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 52px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 10px; color: var(--accent); background: var(--score-inset); text-align: left; line-height: 1.5; font-size: 16px; font-weight: 550; }
+.score-dialog button.score-other-entry { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 52px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--score-border); border-radius: 10px; color: var(--text); background: var(--score-inset); text-align: left; line-height: 1.5; font-size: 16px; font-weight: 550; }
 .score-other-entry strong { font-size: inherit; font-weight: inherit; }
-.score-other-entry .score-chevron { color: inherit; }
 .score-entry-title { font-size: 14px; font-weight: 550; }
 .score-chevron { width: 8px; height: 8px; margin-right: 4px; flex-shrink: 0; border-top: 1.7px solid currentColor; border-right: 1.7px solid currentColor; transform: rotate(45deg); color: var(--muted); }
 .score-option-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin: 0 0 12px; font-size: 14px; }

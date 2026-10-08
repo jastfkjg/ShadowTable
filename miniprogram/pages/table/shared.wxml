@@ -114,6 +114,7 @@
     <view class="small muted">仅供本人查看</view>
     <block wx:if="{{fairyResultRevealed}}">
       <view class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
+      <button hover-class="none" class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
       <button hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button>
     </block>
     <block wx:else>
@@ -166,35 +167,39 @@
       </view>
     </view>
   </view>
-  <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
+  <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop {{skillTargetMode?'skill-target-backdrop':''}}" catchtouchmove="blockScroll">
+    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog {{skillTargetMode?'skill-target-dialog':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
       <view class="skill-header">
+        <view wx:if="{{skillTargetMode}}" class="skill-meta">{{skillTargetMeta}}</view>
         <view class="skill-title">{{skillTitle}}</view>
         <view class="skill-hint">{{skillHint}}</view>
       </view>
-      <scroll-view wx:if="{{skillTargets.length || swapPlayers.length}}" scroll-y class="skill-body" style="height: {{skillBodyHeight}}rpx; max-height: 42vh;">
+      <scroll-view wx:if="{{skillTargets.length || swapPlayers.length}}" scroll-y class="skill-body" style="height: {{skillBodyHeight}}{{skillTargetMode?'px':'rpx'}}; max-height: {{skillTargetMode?'52vh':'42vh'}};">
+        <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
         <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
-          <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+' '+item.name+(draftChoice===item.value?'，已选':'')}}">
-            <view class="skill-seat">{{item.seat}} 号</view><view class="skill-name">{{item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check">✓</text>
+          <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}">
+            <view class="skill-seat">{{item.seat}}<text class="skill-seat-unit"> 号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="{{true}}">✓</text>
           </button>
         </view>
         <block wx:if="{{swapOptions.length}}">
           <view class="skill-context">已选 {{swapSeats.length}} / 2</view>
           <view class="skill-target-grid">
-            <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">
-              <view class="skill-seat">{{item.seat}} 号</view><view class="skill-name">{{item.name}}</view><text wx:if="{{item.selected}}" class="skill-check">✓</text>
+            <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(item.selected?'，已选':'')}}">
+              <view class="skill-seat">{{item.seat}}<text class="skill-seat-unit"> 号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="{{true}}">✓</text>
             </button>
           </view>
         </block>
+        <view wx:if="{{skillEligibility}}" class="skill-eligibility">{{skillEligibility}}</view>
       </scroll-view>
-        <view class="skill-other-choices">
-          <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><text class="skill-other-mark">{{draftChoice===item.value?'✓':item.value==='pass'?'○':'›'}}</text>{{item.label}}</button>
+        <view wx:if="{{skillOtherChoices.length}}" class="skill-other-choices">
+          <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{item.value==='mode:'?'skill-navigation':''}} {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><text wx:if="{{!skillTargetMode}}" class="skill-other-mark" aria-hidden="{{true}}">{{draftChoice===item.value?'✓':item.value==='pass'?'○':'›'}}</text><text>{{item.label}}</text><view wx:if="{{skillTargetMode && item.value!=='mode:'}}" class="skill-pass-mark" aria-hidden="{{true}}" /></button>
         </view>
       <view class="skill-footer">
-        <view class="skill-summary">{{draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
+        <view class="skill-summary" aria-live="polite">{{skillTargetMode?skillSummary:draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
+        <view wx:if="{{skillTargetMode}}" class="skill-consequence">{{skillConsequence}}</view>
         <view wx:if="{{hunterModes && draftChoice==='pass'}}" class="small">本轮若出局，将不会触发被动开枪。是否确认？</view>
-        <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button>
+        <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':skillTargetMode?skillConfirmLabel:draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button>
         <button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
       </view>
     </view>

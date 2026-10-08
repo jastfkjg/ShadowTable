@@ -1058,9 +1058,9 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   c.ACTIONS.confirmChoice();
   c.ACTIONS.submitChoice({ dataset: { value: "target:2" } });
   assert.equal(writes.length, 0);
-  assert.match(c.viewActionDialog(), /确认对 2号开刀/);
+  assert.match(c.viewActionDialog(), /确认对 2 号开刀/);
   c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
-  assert.match(c.viewActionDialog(), /确认不使用技能/);
+  assert.match(c.viewActionDialog(), /确认本轮不开刀/);
   c.state.room.stage = "s2";
   c.ACTIONS.confirmChoice();
   assert.equal(writes.length, 0);
@@ -1079,6 +1079,117 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   c.ACTIONS.closeAction();
   assert.equal(c.state.skillTargets.length, 0);
   assert.equal(c.state.draftChoice, "");
+});
+
+test("网页十二骑士选人技能统一网格，双选与特殊目标仍提交原协议", async () => {
+  const { cases, fixture } = require("./helpers/skill-target-fixtures");
+  for (const [role, mode, value, selfAllowed] of cases) {
+    const { room, secret } = fixture(role, mode);
+    const writes = [];
+    const c = client(async (path, init) => {
+      if (init.method === "POST") { writes.push(JSON.parse(init.body)); return response({}); }
+      return response(secret);
+    });
+    c.state.room = room;
+    c.setRefresh(async () => {});
+    c.setConfirm(() => { throw new Error("不应弹第二层确认"); });
+    const choose = value => c.ACTIONS.submitChoice({ dataset: { value } });
+    await c.ACTIONS.openAction();
+    if (secret.action.hunterModes) await choose("mode:" + mode);
+    assert.equal(c.state.skillTargetMode, mode, role);
+    assert.match(c.viewActionDialog(), /skill-target-dialog/);
+    assert.match(c.viewActionDialog(), /已出局/);
+    assert.match(c.viewActionDialog(), /&lt;小鱼&gt;/);
+    const grid = mode === "swap" ? c.state.swapPlayers : c.state.skillTargets;
+    assert.equal(grid.length, 12, role);
+    assert.equal(!grid.find(t => t.seat === 2).disabledReason, selfAllowed, role);
+    c.ACTIONS.confirmChoice();
+    await choose(mode === "inspect" ? "inspect:5" : "target:5");
+    assert.equal(c.state.draftChoice, "");
+    if (mode === "swap") {
+      const toggle = seat => c.ACTIONS.toggleSwapSeat({ dataset: { seat } });
+      toggle(5); assert.equal(c.state.swapSeats.length, 0);
+      toggle(2); c.ACTIONS.confirmChoice(); assert.equal(writes.length, 0);
+      assert.match(c.viewActionDialog(), /请再选择一个座位/);
+      toggle(7);
+      assert.match(c.viewActionDialog(), /确认交换 2 号与 7 号/);
+      await choose("pass");
+      assert.equal(c.state.swapSeats.length, 0);
+      assert.ok(c.state.swapPlayers.every(t => !t.selected));
+      toggle(2); toggle(7);
+      assert.equal(c.state.swapPlayers.find(t => t.seat === 5).disabledReason, "已出局");
+    } else {
+      await choose(value);
+      if (mode === "final") {
+        assert.match(c.viewActionDialog(), /确认本次空刀/);
+        await choose("target:7");
+        assert.match(c.viewActionDialog(), /最终盘刀目标：7 号/);
+        await choose(value);
+      } else if (!secret.action.hunterModes) {
+        await choose("pass");
+        assert.ok(c.state.skillTargets.every(t => t.value !== c.state.draftChoice));
+        await choose(value);
+      } else {
+        assert.doesNotMatch(c.viewActionDialog(), /返回选择技能方式<\/span><span class="skill-pass-mark"/);
+      }
+    }
+    assert.equal(writes.length, 0);
+    c.state.hasPendingRequest = true; c.ACTIONS.confirmChoice(); c.state.hasPendingRequest = false;
+    assert.equal(writes.length, 0);
+    c.ACTIONS.confirmChoice(); c.ACTIONS.confirmChoice();
+    for (let i = 0; i < 20 && c.state.busy; i++) await Promise.resolve();
+    assert.equal(writes.length, 1, role);
+    assert.equal(writes[0].value, mode === "final" ? 0 : value, role);
+    c.ACTIONS.closeAction();
+    assert.equal(c.state.skillTargetMode, "");
+  }
+});
+
+test("网页仙女只确认合法当前目标，提示传递关系并阻止过期与重复提交", async () => {
+  const writes = [];
+  const options = [1, 3, 4].map(seat => ({ value: `target:${seat}`, label: `查验 ${seat}号并传递仙女` }));
+  const c = client(async (path, init) => {
+    if (init.method === "POST") { writes.push(JSON.parse(init.body)); return response({}); }
+    return response({ stage: "f1", action: { choices: options.map(c => c.value), options } });
+  });
+  c.state.room = { stage: "f1", phase: "fairy", round: 2, fairyHolder: 2,
+    needsSubmission: true, me: { seat: 2, submitted: false },
+    players: [1, 2, 3, 4, 5].map(seat => ({ seat, name: seat === 3 ? '<玩家三>' : `玩家${seat}` })) };
+  c.setRefresh(async () => {});
+  c.setConfirm(() => { throw new Error("仙女选择不应再弹第二层确认框"); });
+  await c.ACTIONS.openAction();
+  assert.equal(c.state.draftChoice, "");
+  assert.match(c.viewActionDialog(), /skill-target-dialog/);
+  assert.match(c.viewActionDialog(), /当前持有者/);
+  assert.match(c.viewActionDialog(), /曾持有仙女/);
+  assert.match(c.viewActionDialog(), /请先选择目标/);
+  c.ACTIONS.submitChoice({ dataset: { value: "target:5" } });
+  assert.equal(c.state.draftChoice, "");
+  c.ACTIONS.submitChoice({ dataset: { value: "target:3" } });
+  assert.equal(writes.length, 0);
+  assert.match(c.viewActionDialog(), /查验目标：3 号 · &lt;玩家三&gt;/);
+  assert.match(c.viewActionDialog(), /仙女将传给 3 号 · 确认后不可更改/);
+  c.state.room.stage = "f2";
+  c.ACTIONS.confirmChoice();
+  c.state.room.stage = "f1";
+  c.state.network = false;
+  c.ACTIONS.confirmChoice();
+  assert.equal(writes.length, 0);
+  c.state.network = true;
+  c.ACTIONS.confirmChoice();
+  c.ACTIONS.confirmChoice();
+  for (let i = 0; i < 20 && c.state.busy; i++) await Promise.resolve();
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].value, "target:3");
+  c.ACTIONS.closeAction();
+  assert.equal(c.state.skillTargetMode, "");
+  assert.equal(c.state.skillSummary, "");
+  c.state.fairyResult = { revision: 1, information: "3号查验结果：好人" };
+  c.state.fairyResultRevealed = true;
+  c.ACTIONS.hideFairyResult();
+  assert.equal(c.state.fairyResultRevealed, false);
+  assert.equal(c.state.fairyResult.revision, 1);
+  assert.equal(writes.length, 1);
 });
 
 test("网页隐藏轮次推进，时间在标题右侧，记录定位和最新结果保持对应", async () => {

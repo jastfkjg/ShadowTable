@@ -358,6 +358,53 @@ command(knightRoom, "p1", {
   stage: knightRoom.stage,
 });
 scenes.knightTools = roomData(knightRoom);
+// Render the shipped target-picker presentation against real allowed actions.
+const skillSource = fs.readFileSync(path.join(root, "pages/table/controller.js"), "utf8");
+const skillPresentation = vm.runInNewContext("(function(){" + skillSource.slice(
+  skillSource.indexOf("function skillView("), skillSource.indexOf("function factionTone("),
+) + "return { skillView, skillSelectionView };})()");
+for (const mode of ["fairy", "sword"]) {
+  const source = structuredClone(knightRoom);
+  const uid = "p2";
+  source.round = source.knights.round = 2;
+  source.players.forEach((player, index) => {
+    player.name = ["阿木", "林间", "小橙", "晚风", "Kiki", "北川", "小鱼", "向晚", "舟舟", "阿辰", "星河", "七月"][index];
+  });
+  source.roles[uid] = "redSwordsman";
+  source.knights.fairy = 2;
+  source.knights.fairyVisited = [5];
+  if (mode === "sword") source.knights.players.p5.alive = false;
+  command(source, source.host, { type: "beginActivity", kind: mode === "fairy" ? "fairy" : "skills", stage: source.stage });
+  const room = publicView(source, uid);
+  const action = privateView(source, uid).action;
+  const presentation = skillPresentation.skillView(room, action.options, false, "", []);
+  const data = { ...roomData(source), room, actionDialog: true, stagedChoice: true,
+    actionLabel: action.label, actionChoices: action.options, actionTargets: [],
+    draftChoice: "", draftLabel: "", swapOptions: [], swapPlayers: [], swapSeats: [],
+    ...presentation };
+  scenes[mode + "TargetPicker"] = data;
+  scenes[mode + "TargetSelected"] = { ...data, draftChoice: "target:7", draftLabel: action.options.find(c => c.value === "target:7").label,
+    ...skillPresentation.skillSelectionView(room, "target:7", mode) };
+  if (mode === "sword") scenes.swordTargetPass = { ...data, draftChoice: "pass", draftLabel: "本轮不开刀",
+    ...skillPresentation.skillSelectionView(room, "pass", mode) };
+}
+for (const [role, mode, value] of require("../tests/helpers/skill-target-fixtures").cases) {
+  const { source, room, secret } = require("../tests/helpers/skill-target-fixtures").fixture(role, mode);
+  const swapOptions = (secret.action.choices || []).filter(v => v.startsWith("swap:"));
+  const actionChoices = mode === "final" ? secret.action.targets.map(t => ({ value: "target:" + t.seat, label: t.seat ? "最终盘刀 " + t.seat + "号" : "本次空刀" }))
+    : secret.action.hunterModes ? secret.action.options.filter(c => c.value.startsWith(mode + ":")).concat([{ value: "mode:", label: "返回选择技能方式" }])
+    : secret.action.options.filter(c => !c.value.startsWith("swap:"));
+  const data = { ...roomData(source), room, actionDialog: true, stagedChoice: true,
+    actionChoices, actionTargets: [], hunterModes: !!secret.action.hunterModes, hunterMode: secret.action.hunterModes ? mode : "",
+    draftChoice: "", draftLabel: "", swapOptions, swapPlayers: [], swapSeats: [],
+    ...skillPresentation.skillView(room, actionChoices, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions) };
+  scenes[mode + "TargetPicker"] = data;
+  scenes[mode + "TargetSelected"] = { ...data, draftChoice: value,
+    ...(mode === "swap" ? { swapSeats: [2, 7], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: [2, 7].includes(p.seat) })) } : {}),
+    ...skillPresentation.skillSelectionView(room, value, mode) };
+  if (mode === "swap") scenes.swapTargetPartial = { ...data, swapSeats: [2], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: p.seat === 2 })),
+    ...skillPresentation.skillSelectionView(room, "", mode, [2]) };
+}
 scenes.tablePlayingHost = {
   ...scenes.knightTools,
   room: { ...scenes.knightTools.room, testRoom: true, fairyHolder: 11 },

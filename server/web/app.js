@@ -27,39 +27,108 @@
   };
   // Derive private skill controls only from the server's allowed choices.
   function skillView(room, choices, hunterModes, hunterMode, swapOptions) {
-    const skillAction = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
-    const targets = choices.filter(c => /^(target|inspect|detonate|passive):\d+$/.test(c.value)).map(c => {
+    const fairyAction = room.phase === "fairy";
+    const finalAction = !!room.knights && ["assassination", "reverseStrike"].includes(room.phase) && choices.some(c => /^target:\d+$/.test(c.value));
+    const skillAction = fairyAction || finalAction || ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
+    const targets = choices.filter(c => /^(target|inspect|detonate|passive):\d+$/.test(c.value) && Number(c.value.split(":")[1]) > 0).map(c => {
       const seat = Number(c.value.split(":")[1]);
       const player = (room.players || []).find(p => p.seat === seat);
       return { ...c, seat, name: player ? player.name : "" };
     });
-    let title = "使用技能";
-    let hint = "请选择一名目标，或本轮不使用技能";
-    if (swapOptions.length) {
-      title += " · 秘密换号";
-      hint = "选择两个座位交换号码，再次点击可取消";
-    } else if (hunterModes) {
-      title += hunterMode === "detonate" ? " · 主动自爆" : hunterMode === "passive" ? " · 被动开枪" : " · 猎人";
-      hint = hunterMode === "detonate" ? "第 2 步：选择相邻一人，自己将自爆出局" : hunterMode === "passive" ? "第 2 步：选择出局时开枪的目标；替女巫出局不触发" : "第 1 步：选择主动技能、被动技能，或本轮不开枪";
-    } else if (targets.length) {
-      const label = targets[0].label;
-      const name = ["指定替死者", "秘密守护", "查验", "复活", "开枪", "决斗", "开刀"].find(word => label.includes(word));
-      if (name) title += " · " + name;
-      if (name === "查验") hint = "选择一名玩家，查验其是否拥有主动击杀能力";
-    } else {
-      hint = "本阶段没有可选目标，请确认本轮选择";
+    const label = targets[0]?.label || "";
+    const mode = fairyAction ? "fairy" : finalAction ? "final" : swapOptions.length ? "swap"
+      : hunterModes ? hunterMode
+      : targets[0]?.value.startsWith("inspect:") ? "inspect"
+      : label.includes("使用刀 / 决斗") ? "attack"
+      : label.includes("开刀") ? "sword" : label.includes("决斗") ? "duel"
+      : label.includes("指定替死者") ? "substitute" : label.includes("秘密守护") ? "guard"
+      : label.includes("复活") ? "revive" : label.includes("开枪") ? "gun"
+      : targets.length ? "target" : "";
+    const copy = skillTargetCopy(mode);
+    const players = (room.players?.length ? room.players : targets).slice().sort((a, b) => a.seat - b.seat);
+    const swapSeats = new Set(swapOptions.flatMap(v => v.split(":").slice(1).map(Number)));
+    function unavailable(player, allowed) {
+      if (allowed) return "";
+      if (fairyAction && player.seat === room.fairyHolder) return "你 · 当前持有者";
+      if (player.alive === false) return "已出局";
+      if (player.seat === room.me?.seat) return "你 · 不可选择";
+      return fairyAction ? "曾持有仙女" : mode === "detonate" ? "仅相邻玩家可选" : "不可选择";
     }
+    const skillTargets = mode && mode !== "swap" ? players.map(player => {
+      const choice = targets.find(c => c.seat === player.seat);
+      return { value: "disabled:" + player.seat, label: player.seat + "号", ...choice,
+        seat: player.seat, name: player.name, disabledReason: unavailable(player, !!choice) };
+    }) : targets;
+    const round = room.knights?.round || room.round;
+    const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
+      selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
+    const count = mode === "swap" ? swapSeats.size : targets.length;
     return {
-      skillAction, skillTitle: title, skillHint: hint, skillTargets: targets,
-      skillBodyHeight: Math.ceil((swapOptions.length ? new Set(swapOptions.flatMap(v => v.split(":").slice(1))).size : targets.length) / 3) * 164 + (swapOptions.length ? 60 : 0),
-      skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({
-        ...c, label: c.value === "pass" ? (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
+      skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
+      skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : "本阶段没有可选目标，请确认本轮选择"),
+      skillTargets,
+      ...(mode === "swap" ? { swapPlayers } : {}),
+      skillTargetMeta: mode ? (round ? "第 " + round + " 轮 · " : "") +
+        (fairyAction ? (room.fairyHolder || room.me?.seat) + " 号持有仙女" : finalAction ? "最终盘刀" : "技能准备") : "",
+      skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
+      skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
+      skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
+      skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+        label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
+          ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
       })),
+      ...skillSelectionView(room, "", mode),
     };
   }
-  function skillDraftLabel(choice, hunterModes) {
-    if (choice.value === "pass") return hunterModes ? "本轮不开枪" : choice.label === "确认" ? "本轮确认" : "不使用技能";
-    if (choice.value.startsWith("inspect:")) return "查验 " + choice.value.split(":")[1] + " 号";
+  function skillTargetCopy(mode) {
+    return {
+      fairy: { title: "仙女查验", hint: "查验一名玩家，并将仙女传给 TA。", verb: "查验", privateResult: true, eligibility: "当前持有者、曾持有仙女或已出局的玩家不可选。" },
+      sword: { title: "选择开刀目标", hint: "选择一名玩家，或本轮不开刀。", verb: "开刀", pass: "本轮不开刀", eligibility: "自己与已出局玩家不可选。" },
+      duel: { title: "骑士决斗", hint: "选择一名玩家决斗，或本轮不决斗。", verb: "决斗", pass: "本轮不决斗", eligibility: "自己与已出局玩家不可选。", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
+      inspect: { title: "石像鬼查验", hint: "查验一名玩家是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true, eligibility: "可查验自己；已出局玩家不可选。" },
+      guard: { title: "秘密守护", hint: "选择一名玩家守护，或本轮不守护。", verb: "守护", pass: "本轮不守护", eligibility: "可守护自己；已出局玩家不可选。" },
+      substitute: { title: "指定替死者", hint: "选择一名玩家作为替死者，或本轮不指定。", verb: "指定替死", pass: "本轮不指定替死者", eligibility: "可选择自己；已出局玩家不可选。" },
+      detonate: { title: "猎人主动自爆", hint: "第 2 步：选择相邻一人，自己将自爆出局", verb: "自爆开枪", eligibility: "仅可选择相邻且存活的玩家。", consequence: "你将自爆出局并向目标开枪 · 确认后不可更改" },
+      passive: { title: "猎人被动开枪", hint: "第 2 步：选择出局时开枪的目标；替女巫出局不触发", verb: "被动开枪", eligibility: "自己与已出局玩家不可选。", consequence: "仅在符合条件的出局时开枪 · 确认后不可更改" },
+      gun: { title: "选择开枪目标", hint: "选择一名玩家开枪，或本轮不开枪。", verb: "开枪", pass: "本轮不开枪", eligibility: "自己与已出局玩家不可选。" },
+      attack: { title: "选择技能目标", hint: "选择一名玩家使用刀或决斗，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能", eligibility: "自己与已出局玩家不可选。" },
+      revive: { title: "选择复活目标", hint: "选择一名可复活的玩家，或本轮不复活。", verb: "复活", pass: "本轮不复活", eligibility: "仅可选择本阶段允许复活的玩家。" },
+      swap: { title: "魔术师秘密换号", hint: "选择两个座位交换号码，再次点击可取消。", verb: "换号", pass: "本轮不换号", eligibility: "可选择自己；已出局玩家不可选。" },
+      final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标，或选择空刀。", verb: "最终盘刀", eligibility: "自己与已出局玩家不可选。" },
+      target: { title: "选择技能目标", hint: "选择一名玩家，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能" },
+    }[mode];
+  }
+  function skillSelectionView(room, value, mode, swapSeats = []) {
+    if (!mode) return { skillSummary: "", skillConsequence: "", skillConfirmLabel: "" };
+    const copy = skillTargetCopy(mode);
+    const seat = /^(target|inspect|detonate|passive):\d+$/.test(value) ? Number(value.split(":")[1]) : null;
+    const player = (room.players || []).find(p => p.seat === seat);
+    let summary = "尚未选择目标", confirm = "请先选择目标";
+    if (value === "pass") {
+      summary = "已选择：" + copy.pass;
+      confirm = "确认" + copy.pass;
+    } else if (mode === "final" && seat === 0) {
+      summary = "已选择：本次空刀";
+      confirm = "确认本次空刀";
+    } else if (seat !== null) {
+      summary = copy.verb + "目标：" + seat + " 号" + (player?.name ? " · " + player.name : "");
+      confirm = mode === "fairy" || mode === "inspect" ? "确认查验 " + seat + " 号" : "确认对 " + seat + " 号" + copy.verb;
+    } else if (mode === "swap") {
+      const seats = value.startsWith("swap:") ? value.split(":").slice(1).map(Number) : swapSeats;
+      summary = seats.length ? "已选 " + seats.length + " / 2：" + seats.join(" 号、") + " 号" : "尚未选择座位 · 需选 2 人";
+      confirm = seats.length === 2 && value ? "确认交换 " + seats.join(" 号与 ") + " 号" : seats.length ? "请再选择一个座位" : "请选择两个座位";
+    }
+    return {
+      skillSummary: summary,
+      skillConsequence: mode === "fairy" && seat !== null ? "仙女将传给 " + seat + " 号 · 确认后不可更改"
+        : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
+      skillConfirmLabel: confirm,
+    };
+  }
+  function skillDraftLabel(choice, hunterModes, mode) {
+    const copy = skillTargetCopy(mode);
+    if (choice.value === "pass") return copy?.pass || (hunterModes ? "本轮不开枪" : choice.label === "确认" ? "本轮确认" : "不使用技能");
+    if (choice.value.startsWith("inspect:") || mode === "fairy") return "查验 " + choice.value.split(":")[1] + " 号";
     return choice.label;
   }
   function factionTone(faction) {
@@ -531,7 +600,8 @@
     draftChoice: "",
     draftLabel: "",
     stagedChoice: false,
-      skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
+    skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
+    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -1026,6 +1096,7 @@
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -1302,6 +1373,7 @@ function roomListItems(rooms) {
       patch.skillTargets = [];
       patch.skillBodyHeight = 0;
       patch.skillOtherChoices = [];
+      Object.assign(patch, { skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "" });
       patch.swapOptions = [];
       patch.swapSeats = [];
       patch.swapPlayers = [];
@@ -2166,6 +2238,7 @@ function roomListItems(rooms) {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -2210,7 +2283,8 @@ function roomListItems(rooms) {
         }),
       );
       var hunterChoices = response.action.hunterModes ? response.action.options : [];
-      const actionChoices = response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "本轮不开枪" }] : (response.action.choices || [])
+      const finalTarget = !!room.knights && response.action.kind === "target";
+      const actionChoices = finalTarget ? response.action.targets.map(t => ({ value: "target:" + t.seat, label: t.seat ? "最终盘刀 " + t.seat + "号" : "本次空刀" })) : response.action.hunterModes ? [{ value: "mode:detonate", label: "主动技能" }, { value: "mode:passive", label: "被动技能" }, { value: "pass", label: "本轮不开枪" }] : (response.action.choices || [])
           .filter(function (v) {
             return swapOptions.indexOf(v) === -1;
           })
@@ -2229,7 +2303,7 @@ function roomListItems(rooms) {
         hunterModes: !!response.action.hunterModes,
         hunterMode: "",
         hunterChoices: hunterChoices,
-        stagedChoice: ["teamVote", "quest", "skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase),
+        stagedChoice: finalTarget || ["teamVote", "quest", "skillPrepare", "skillTurn", "paladinTurn", "hunterTurn", "fairy"].includes(room.phase),
         draftChoice: "",
         draftLabel: "",
         swapOptions: swapOptions,
@@ -2323,8 +2397,9 @@ function roomListItems(rooms) {
       var choice = state.actionChoices.filter(function (c) {
         return c.value === value;
       })[0];
-      if (choice) setState({ draftChoice: value, draftLabel: state.skillAction ? skillDraftLabel(choice, state.hunterModes) : choice.label,
-        swapSeats: [], swapPlayers: state.swapPlayers.map(p => ({ ...p, selected: false })) });
+      if (choice) setState({ draftChoice: value, draftLabel: state.skillAction ? skillDraftLabel(choice, state.hunterModes, state.skillTargetMode) : choice.label,
+        swapSeats: [], swapPlayers: state.swapPlayers.map(p => ({ ...p, selected: false })),
+        ...skillSelectionView(state.room, value, state.skillTargetMode) });
       return;
     }
     if (
@@ -2359,7 +2434,7 @@ function roomListItems(rooms) {
     if (!value || value.startsWith("mode:") ||
       !(state.actionChoices.some(c => c.value === value) ||
         (state.skillAction && state.swapOptions.includes(value)))) return;
-    cmd("submit", { value: value });
+    cmd("submit", { value: state.skillTargetMode === "final" ? Number(value.split(":")[1]) : value });
   }
   async function submitTarget(seatNum) {
     return confirmCommand(
@@ -2382,7 +2457,7 @@ function roomListItems(rooms) {
     )
       return;
     if (!state.swapPlayers.some(function (p) {
-      return p.seat === seatNum;
+      return p.seat === seatNum && !p.disabledReason;
     }))
       return;
     var selected =
@@ -2397,9 +2472,10 @@ function roomListItems(rooms) {
     const draft = state.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
     setState({
       ...(state.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
+      ...skillSelectionView(state.room, draft || "", state.skillTargetMode, selected),
       swapSeats: selected,
       swapPlayers: state.swapPlayers.map(function (p) {
-        return { seat: p.seat, name: p.name, selected: selected.indexOf(p.seat) !== -1 };
+        return { ...p, selected: selected.indexOf(p.seat) !== -1 };
       }),
     });
   }
@@ -2975,6 +3051,7 @@ function roomListItems(rooms) {
         ? '<div class="fairy-result-summary">' +
           esc(state.fairyResult.summary || state.fairyResult.information) +
           "</div>" +
+          btn("text-button", "hideFairyResult", "立即遮盖") +
           btn("primary", "acknowledgeFairyResult", "记住了，遮盖结果", null, state.busy)
         : '<div class="private-info muted">结果已遮盖，请确认周围无人查看。</div>' +
           btn("primary", "revealFairyResult", "查看查验结果", null, state.busy)) +
@@ -3103,32 +3180,37 @@ function roomListItems(rooms) {
   }
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
-    var html = '<div class="dialog-backdrop"><div class="error-dialog action-dialog skill-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-title" aria-describedby="skill-hint">' +
-      '<div class="skill-header"><div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
+    var targetMode = !!state.skillTargetMode;
+    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title" aria-describedby="skill-hint">' +
+      '<div class="skill-header">' + (targetMode ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '') + '<div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
       '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' +
       '</div><div class="skill-body">';
+    if (targetMode) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
     if (["hunterTurn", "paladinTurn"].includes(state.room.phase) && state.room.operationStatus)
       html += '<div class="skill-context">' + esc(state.room.operationStatus.detail) + '</div>';
     function seatButton(c, swap) {
       var selected = swap ? c.selected : state.draftChoice === c.value;
-      return '<button type="button" class="skill-option' + (selected ? ' is-selected' : '') + '" data-action="' + (swap ? 'toggleSwapSeat' : 'submitChoice') + '" ' +
-        (swap ? 'data-seat="' + c.seat : 'data-value="' + esc(c.value)) + '" aria-pressed="' + selected + '" aria-label="' + esc((swap ? c.seat + '号' : c.label) + ' ' + c.name) + '"' +
-        (locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + ' 号</span><span class="skill-name">' + esc(c.name) + '</span>' +
+      return '<button type="button" class="skill-option' + (selected ? ' is-selected' : '') + (c.disabledReason ? ' skill-option-unavailable' : '') + '" data-action="' + (swap ? 'toggleSwapSeat' : 'submitChoice') + '" ' +
+        (swap ? 'data-seat="' + c.seat : 'data-value="' + esc(c.value)) + '" aria-pressed="' + selected + '" aria-label="' + esc((swap ? c.seat + '号' : c.label) + ' ' + c.name + (c.disabledReason ? '，' + c.disabledReason : '')) + '"' +
+        (c.disabledReason || locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + '<span class="skill-seat-unit"> 号</span></span><span class="skill-name">' + esc(c.disabledReason || c.name) + '</span>' +
         (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
     }
     if (state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
     if (state.swapOptions.length) html += '<div class="skill-context">已选 ' + state.swapSeats.length + ' / 2</div><div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
-    html += '</div><div class="skill-other-choices">';
+    if (state.skillEligibility) html += '<div class="skill-eligibility">' + esc(state.skillEligibility) + '</div>';
+    html += '</div>' + (state.skillOtherChoices.length ? '<div class="skill-other-choices">' : '');
     for (var c of state.skillOtherChoices) {
       var selected = state.draftChoice === c.value;
-      html += '<button type="button" class="skill-other' + (selected ? ' is-selected' : '') + '" data-action="submitChoice" data-value="' + esc(c.value) + '"' +
-        (c.value === 'pass' ? ' aria-pressed="' + selected + '"' : '') + (locked ? ' disabled' : '') + '><span class="skill-other-mark" aria-hidden="true">' +
-        (selected ? '✓' : c.value === 'pass' ? '○' : '›') + '</span>' + esc(c.label) + '</button>';
+      var navigation = c.value.startsWith('mode:');
+      html += '<button type="button" class="skill-other' + (navigation ? ' skill-navigation' : '') + (selected ? ' is-selected' : '') + '" data-action="submitChoice" data-value="' + esc(c.value) + '"' +
+        (!navigation ? ' aria-pressed="' + selected + '"' : '') + (locked ? ' disabled' : '') + '>' + (targetMode ? '<span>' + esc(c.label) + '</span>' + (navigation ? '' : '<span class="skill-pass-mark" aria-hidden="true"></span>') : '<span class="skill-other-mark" aria-hidden="true">' +
+        (selected ? '✓' : c.value === 'pass' ? '○' : '›') + '</span>' + esc(c.label)) + '</button>';
     }
-    html += '</div><div class="skill-footer"><div class="skill-summary" aria-live="polite">' +
-      (state.draftChoice ? '已选择：' + esc(state.draftLabel) : state.swapSeats.length ? '还需选择一个座位' : '尚未选择') + '</div>' +
+    html += (state.skillOtherChoices.length ? '</div>' : '') + '<div class="skill-footer"><div class="skill-summary" aria-live="polite">' +
+      (targetMode ? esc(state.skillSummary) : state.draftChoice ? '已选择：' + esc(state.draftLabel) : state.swapSeats.length ? '还需选择一个座位' : '尚未选择') + '</div>' +
+      (targetMode ? '<div class="skill-consequence">' + esc(state.skillConsequence) + '</div>' : '') +
       (state.hunterModes && state.draftChoice === 'pass' ? '<div class="small">本轮若出局，将不会触发被动开枪。是否确认？</div>' : '') +
-      btn('primary skill-confirm', 'confirmChoice', state.busy ? '正在提交…' : state.draftChoice ? (state.draftLabel === '本轮确认' ? '确认本轮选择' : '确认' + state.draftLabel) : '请先选择', null, locked || !state.draftChoice) +
+      btn('primary skill-confirm', 'confirmChoice', state.busy && state.busyAction === 'submit' ? '正在提交…' : targetMode ? state.skillConfirmLabel : state.draftChoice ? (state.draftLabel === '本轮确认' ? '确认本轮选择' : '确认' + state.draftLabel) : '请先选择', null, locked || !state.draftChoice) +
       btn('text-button skill-later', 'closeAction', '稍后选择', null, state.busy) + '</div></div></div>';
     return html;
   }
@@ -4235,6 +4317,7 @@ function roomListItems(rooms) {
       if (state.busy || !foreground || !state.fairyResult) return;
       setState({ fairyResultRevealed: true });
     },
+    hideFairyResult: function () { setState({ fairyResultRevealed: false }); },
     acknowledgeFairyResult: acknowledgeFairyResult,
     revealChangedIdentity: function () {
       if (state.busy || !foreground || !state.identityChange) return;
