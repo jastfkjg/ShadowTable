@@ -478,16 +478,18 @@ function dealtWebRoom(overrides = {}) {
 }
 test("网页身份历程只读且转义旧视野，关闭返回当前身份，遮盖后台与阶段变化清空", async () => {
   const room = dealtWebRoom({ me: { seat: 1, identityRevision: 1 } });
-  const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营", sinceLabel: "第1轮 · 换牌" },
-    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野<script>", detailAvailable: true, sinceLabel: "开局 · A牌" }];
+  const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营", sinceLabel: "第1轮 · 换牌", skillHistory: [{ round: 2, text: "刀8号" }] },
+    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野<script>", detailAvailable: true, sinceLabel: "开局 · A牌", skillHistory: [{ round: 1, text: "刀9号<script>" }] }];
   const storage = new Map([["session", "session"]]);
-  const c = client(async url => response(structuredClone(url.endsWith('/private') ? { stage: room.stage, faction: "坏人阵营", identityHistory: history } : room)), storage);
+  const c = client(async url => response(structuredClone(url.endsWith('/private') ? { stage: room.stage, faction: "坏人阵营", identityHistory: history, skillHistory: history[0].skillHistory } : room)), storage);
   c.state.room = room;
   await c.ACTIONS.reveal();
   assert.match(c.viewRoom(), /data-action="openIdentityHistory"/);
+  assert.match(c.viewRoom(), /技能记录/); assert.match(c.viewRoom(), /刀8号/);
   c.ACTIONS.openIdentityHistory();
   assert.equal(c.state.identityHistoryExpandedId, 0);
   assert.match(c.viewIdentityHistory(), /旧视野&lt;script&gt;|初始|当前/);
+  assert.match(c.viewIdentityHistory(), /刀8号/); assert.match(c.viewIdentityHistory(), /刀9号&lt;script&gt;/);
   assert.doesNotMatch(c.viewIdentityHistory(), /data-action="submit|<script>/);
   c.ACTIONS.toggleIdentityHistory({ dataset: { id: "0" } });
   assert.match(c.viewIdentityHistory(), /class="identity-history-detail" hidden/);
@@ -499,7 +501,7 @@ test("网页身份历程只读且转义旧视野，关闭返回当前身份，�
   await c.ACTIONS.reveal(); c.ACTIONS.openIdentityHistory();
   c.document.hidden = true; c.events.visibilitychange();
   assert.equal(c.state.identityHistoryOpen, false); assert.equal(c.state.secret, null);
-  assert.doesNotMatch(JSON.stringify([...storage]), /红兰斯洛特|旧视野/);
+  assert.doesNotMatch(JSON.stringify([...storage]), /红兰斯洛特|旧视野|刀8号|刀9号/);
   c.document.hidden = false; c.events.visibilitychange();
   await c.ACTIONS.reveal(); c.ACTIONS.openIdentityHistory();
   room.stage = "new-stage"; await c.refresh();

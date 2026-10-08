@@ -38,7 +38,8 @@
           <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
           <view class="identity-history-meta small muted">{{item.sinceLabel}}</view>
           <view wx:if="{{item.current}}" class="identity-history-summary small muted">{{item.faction}}{{item.skillStatus?' · '+item.skillStatus.title:''}}</view>
-          <view wx:elif="{{identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="small muted">{{item.faction}}</view><view class="identity-history-information">{{item.detailAvailable?item.information:'旧对局未记录当时视野，仅保留初始身份。'}}</view><view class="identity-history-readonly small muted">曾用身份 · 仅供回看</view></view>
+          <view wx:if="{{item.skillHistory.length}}" class="identity-skill-history"><view class="small muted">技能记录</view><view wx:for="{{item.skillHistory}}" wx:for-item="skill" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{skill.round}}轮</text><text class="identity-skill-text">{{skill.text}}</text></view></view>
+          <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="small muted">{{item.faction}}</view><view class="identity-history-information">{{item.detailAvailable?item.information:'旧对局未记录当时视野，仅保留初始身份。'}}</view><view class="identity-history-readonly small muted">曾用身份 · 仅供回看</view></view>
         </view>
       </view>
     </scroll-view>
@@ -413,6 +414,7 @@
         <text class="muted">{{secret.faction}}</text>
         <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
 <view wx:if="{{secret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{secret.skillStatus.title}}</view>{{secret.skillStatus.detail}}</view>
+        <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
         <button hover-class="none" class="secondary" bindtap="reveal">立即遮盖</button>
       </view>
     </block>

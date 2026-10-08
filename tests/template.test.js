@@ -16,18 +16,23 @@ const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
 test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
-  const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌' },
-    { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌' }];
+  const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌', skillHistory: [{ id: 0, round: 2, text: '刀8号' }] },
+    { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌', skillHistory: [{ id: 0, round: 1, text: '刀9号' }] }];
   const data = { ...base, room: { code: '123456', phase: 'tools', capacity: 12, me: { seat: 1 }, players: [], team: [], history: [] }, revealed: true, identityHistoryOpen: true, identityHistoryExpandedId: 0,
-    secret: { role: '觉醒红刀客', faction: '坏人阵营', identityHistory: history } };
+    secret: { role: '觉醒红刀客', faction: '坏人阵营', identityHistory: history, skillHistory: history[0].skillHistory } };
   let tree = renderTable(data), text = JSON.stringify(tree);
   assert.ok(byHandler(tree, 'openIdentityHistory'));
   assert.ok(byHandler(tree, 'closeIdentityHistory'));
   assert.ok(byHandler(tree, 'hideIdentityHistory'));
   assert.match(text, /旧视野|初始|当前/);
+  assert.match(text, /刀8号/); assert.match(text, /刀9号/);
+  const card = nodes(tree).find(node => node.attr?.class === 'identity open');
+  assert.match(JSON.stringify(card), /技能记录/); assert.match(JSON.stringify(card), /刀8号/);
+  const collapsed = JSON.stringify(renderTable({ ...data, identityHistoryExpandedId: null }));
+  assert.match(collapsed, /刀9号/); assert.doesNotMatch(collapsed, /旧视野/);
   assert.equal(byHandler(tree, 'toggleIdentityHistory').attr.ariaExpanded, true);
   tree = renderTable({ ...data, revealed: false });
-  assert.doesNotMatch(JSON.stringify(tree), /红兰斯洛特|旧视野/);
+  assert.doesNotMatch(JSON.stringify(tree), /红兰斯洛特|旧视野|刀8号|刀9号/);
   tree = renderTable({ ...data, identityHistoryOpen: false, secret: { identityHistory: [history[0]] } });
   assert.equal(byHandler(tree, 'openIdentityHistory'), undefined);
   history[1].detailAvailable = false;

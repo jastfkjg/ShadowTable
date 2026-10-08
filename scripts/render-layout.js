@@ -372,6 +372,25 @@ scenes.tablePlayingStates = {
   seats: scenes.tablePlayingHost.seats.map(p => p.seat === 11
     ? { ...p, name: '这是一个很长的玩家昵称', inTeam: true, alive: false } : p),
 };
+// Real settled skills exercise the current card and its archived identity together.
+const memoryRoom = structuredClone(knightRoom);
+for (const player of memoryRoom.players) {
+  memoryRoom.roles[player.uid] = "servant";
+  Object.assign(memoryRoom.knights.players[player.uid], { armor: false, used: false, b: false });
+}
+Object.assign(memoryRoom.roles, { p1: "gareth", p2: "redLancelot", p3: "blueAwakened", p9: "redSwordsman" });
+memoryRoom.knights.initialRoles = { ...memoryRoom.roles };
+memoryRoom.knights.deck = ["blueGuard"];
+for (const actions of [{ p2: "target:8", p3: "target:2" }, { p1: "target:9", p2: "target:9" }]) {
+  command(memoryRoom, "p1", { type: "beginActivity", kind: "skills", stage: memoryRoom.stage });
+  for (const player of memoryRoom.players)
+    command(memoryRoom, player.uid, { type: "submit", value: actions[player.uid] || "pass", stage: memoryRoom.stage });
+}
+const memorySecret = privateView(memoryRoom, "p2");
+memorySecret.factionTone = "good";
+memorySecret.identityHistory.forEach(record => record.factionTone = record.faction === "好人阵营" ? "good" : "evil");
+scenes.identitySkills = { ...roomData(memoryRoom), room: publicView(memoryRoom, "p2"), revealed: true, secret: memorySecret };
+scenes.identitySkillHistory = { ...scenes.identitySkills, identityHistoryOpen: true, identityHistoryExpandedId: 0 };
 knightRoom.roles.p1 = "magician";
 command(knightRoom, "p1", {
   type: "beginActivity",

@@ -46,6 +46,7 @@ function init(room, shuffle) {
           availableRound: 1,
           faction: null,
           b: false,
+          skillHistory: [],
           identityHistory: [],
           identitySince: { round: 1, reason: "initial" },
         },
@@ -131,6 +132,28 @@ function drawVision(room, uid) {
   const targets = living(room);
   if (targets.length)
     inspect(room, uid, targets[randomInt(targets.length)], true);
+}
+// Keep the seats chosen at the time, even if later identities or seats change.
+function skillHistory(room, uid) {
+  return (room.knights.players[uid].skillHistory || []).map((record, id) => {
+    const targets = record.targets.join("、") + "号";
+    let text = {
+      knife: `刀${targets}`,
+      duel: `决斗${targets}`,
+      detonate: `主动自爆并向${targets}开枪`,
+      passiveGun: `${record.status === "triggered" ? "被动开枪" : "预选被动开枪"}${targets}`,
+      guard: `守护${targets}`,
+      substitute: `指定${targets}替死`,
+      swap: `换号${record.targets.map(seat => seat + "号").join(" ↔ ")}`,
+      inspect: `查验${targets}`,
+      reflect: `反伤${targets}`,
+    }[record.kind];
+    if (record.resolvedTargets)
+      text += `（换号后目标${record.resolvedTargets.join("、")}号）`;
+    if (record.status === "triggered") text += " · 已触发，技能已消耗";
+    if (record.status === "notTriggered") text += " · 未触发，技能未消耗";
+    return { id, round: record.round, text };
+  });
 }
 // Private, caller-only status; never include this in public room state.
 function skillStatus(room, uid) {
@@ -298,6 +321,7 @@ function begin(room, kind, check) {
       deck: [...k.deck],
     };
     k.events = [];
+    k.skillUses = [];
     k.funEvents = [];
     k.funCycle = room.activity?.number || room.stage;
     k.cycleEliminated = [];
@@ -328,10 +352,20 @@ function cancel(room) {
   });
   room.roles = k.snapshot.roles;
   delete k.funEvents;
+  delete k.skillUses;
   delete k.snapshot;
 }
 function settle(room, check, allRoles, rememberIdentity) {
   const k = room.knights;
+  k.skillUses ||= [];
+  const recordSkill = (uid, kind, targets, resolvedTargets = targets, status = "used") => {
+    const record = { uid, kind, targets, status };
+    if (targets.some((seat, i) => seat !== resolvedTargets[i]))
+      record.resolvedTargets = resolvedTargets;
+    k.skillUses.push(record);
+    return record;
+  };
+  const seatOf = uid => room.players.find(p => p.uid === uid).seat;
   const entity = uid => {
     if (!uid) return null;
     const role = k.snapshot?.roles[uid] || room.roles[uid];
@@ -402,6 +436,7 @@ function settle(room, check, allRoles, rememberIdentity) {
         room.roles[attacker] !== "witch"
       ) {
         if (!k.reflected.includes(uid)) k.reflected.push(uid);
+        recordSkill(uid, "reflect", [seatOf(attacker)]);
         kill(attacker, false, new Set(), true);
         k.events.push(
           `${room.players.find((p) => p.uid === uid).seat}号反伤，${room.players.find((p) => p.uid === attacker).seat}号出局`,
@@ -464,6 +499,16 @@ function settle(room, check, allRoles, rememberIdentity) {
     for (const p of room.players) {
       const value = val(p.uid),
         role = room.roles[p.uid];
+      const targets = value.split(":").slice(1).map(Number);
+      if (value.startsWith("swap:"))
+        recordSkill(p.uid, "swap", targets, targets, "notTriggered");
+      else if (value.startsWith("target:") && [...guards, "witch"].includes(role))
+        recordSkill(p.uid, role === "witch" ? "substitute" : "guard", targets,
+          [seatOf(targetUid(value))], "notTriggered");
+      else if (value.startsWith("inspect:"))
+        recordSkill(p.uid, "inspect", targets);
+      else if (value.startsWith("passive:"))
+        recordSkill(p.uid, "passiveGun", targets, targets, "notTriggered");
       if (value.startsWith("swap:"))
         k.events.push(
           `${p.seat}号换号：${value.split(":").slice(1).join("、")}号`,
@@ -515,6 +560,7 @@ function settle(room, check, allRoles, rememberIdentity) {
     k.players[actor].used = true;
     kill(actor, false, new Set(), true);
     const target = targetUid(value, true);
+    recordSkill(actor, "detonate", [Number(value.split(":")[1])], [seatOf(target)]);
     const result = kill(target, false, new Set(), false, actor);
     attackEvent(actor, value, target, result, "gun");
     k.events.push(
@@ -530,6 +576,18 @@ function settle(room, check, allRoles, rememberIdentity) {
     const target = targetUid(value, true),
       targetRole = room.roles[target];
     k.players[actor].used = true;
+    if (hunter) {
+      const record = k.skillUses.find(entry => entry.uid === actor && entry.kind === "passiveGun");
+      if (record) {
+        record.status = "triggered";
+        if (record.targets[0] !== seatOf(target)) record.resolvedTargets = [seatOf(target)];
+      } else {
+        recordSkill(actor, "passiveGun", [Number(value.split(":")[1])], [seatOf(target)], "triggered");
+      }
+    } else {
+      recordSkill(actor, ["blueKnight", "redKnight"].includes(role) ? "duel" : "knife",
+        [Number(value.split(":")[1])], [seatOf(target)]);
+    }
     let resolution;
     if (hunter || ["blueAwakened", "redAwakened"].includes(role))
       resolution = kill(target, false, new Set(), false, actor);
@@ -574,6 +632,15 @@ function settle(room, check, allRoles, rememberIdentity) {
   }
   for (const uid of k.reflected) k.players[uid].used = true;
   for (const uid of k.forcedPaladins) kill(uid, true, new Set(), true);
+  // Save before drawing a new identity so simultaneous skills stay on the old card.
+  for (const { uid, ...record } of k.skillUses) {
+    if (["guard", "substitute"].includes(record.kind))
+      record.status = k.players[uid].used ? "triggered" : "notTriggered";
+    if (record.kind === "swap")
+      record.status = k.swap?.triggered ? "triggered" : "notTriggered";
+    (k.players[uid].skillHistory ||= []).push({ ...record, round: k.round });
+  }
+  delete k.skillUses;
   const drawn = [];
   // Draw once, in death order, only for players who remain dead.
   for (const death of k.deaths) {
@@ -643,6 +710,7 @@ function updateNight(room, allRoles) {
 }
 module.exports = {
   gargoyleHistory,
+  skillHistory,
   migrate,
   skillStatus,
   updateNight,

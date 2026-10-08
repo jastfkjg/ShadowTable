@@ -335,6 +335,10 @@ button.identity-history-toggle { width: 100%; min-height: 88rpx; margin: 0; padd
 .identity-history-chevron.is-expanded { transform: rotate(225deg); }
 .identity-history-meta { margin-top: 14rpx; }
 .identity-history-summary { margin-top: 22rpx; }
+.identity-skill-history { margin-top: 24rpx; text-align: left; }
+.identity-skill-record { display: flex; align-items: baseline; gap: 16rpx; margin-top: 12rpx; font-size: 30rpx; line-height: 1.6; }
+.identity-skill-round { flex-shrink: 0; }
+.identity-skill-text { min-width: 0; overflow-wrap: anywhere; }
 .identity-history-detail { margin-top: 26rpx; padding: 28rpx; border-radius: 16rpx; background: var(--bg); }
 .identity-history-information { margin-top: 18rpx; white-space: pre-line; overflow-wrap: anywhere; font-size: 30rpx; line-height: 1.85; }
 .identity-history-readonly { margin-top: 24rpx; }

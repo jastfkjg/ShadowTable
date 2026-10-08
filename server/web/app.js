@@ -3090,10 +3090,16 @@ function roomListItems(rooms) {
         (record.current ? '<div class="identity-history-record-heading">' + heading + '</div>' : '<button type="button" class="identity-history-toggle" data-action="toggleIdentityHistory" data-id="' + record.id + '" aria-expanded="' + expanded + '" aria-controls="identity-history-detail-' + record.id + '">' + heading + '<span class="identity-history-chevron' + (expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>') +
         '<div class="identity-history-meta small muted">' + esc(record.sinceLabel) + '</div>';
       if (record.current) html += '<div class="identity-history-summary small muted">' + esc(record.faction) + (record.skillStatus ? ' · ' + esc(record.skillStatus.title) : '') + '</div>';
-      else html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + esc(record.detailAvailable ? record.information : '旧对局未记录当时视野，仅保留初始身份。') + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
+      html += viewSkillHistory(record);
+      if (!record.current) html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + esc(record.detailAvailable ? record.information : '旧对局未记录当时视野，仅保留初始身份。') + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
       html += '</div>';
     });
     return html + '</div></div><div class="identity-history-footer"><div class="small muted">本局记录 · 仅你可见</div>' + btn('secondary', 'hideIdentityHistory', '立即遮盖') + '</div></section></div>';
+  }
+  function viewSkillHistory(secret, currentCard) {
+    if (!secret?.skillHistory?.length) return "";
+    return '<div class="identity-skill-history' + (currentCard ? ' private-info' : '') + '"><div class="' + (currentCard ? 'label' : 'small muted') + '">技能记录</div>' +
+      secret.skillHistory.map(record => '<div class="identity-skill-record"><span class="identity-skill-round small muted">第' + esc(record.round) + '轮</span><span class="identity-skill-text">' + esc(record.text) + '</span></div>').join('') + '</div>';
   }
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
@@ -3472,6 +3478,7 @@ function roomListItems(rooms) {
             : "") +
           "</div>" +
           viewSkillStatus(state.secret) +
+          viewSkillHistory(state.secret, true) +
           btn("secondary", "reveal", "立即遮盖") +
           "</div>";
     }

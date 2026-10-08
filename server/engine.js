@@ -687,6 +687,7 @@ function privateIdentity(room, uid) {
     stage: room.stage,
     identityRevision: identityRevision(room, uid),
     skillStatus: room.knights ? knights.skillStatus(room, uid) : null,
+    skillHistory: room.knights ? knights.skillHistory(room, uid) : [],
     passiveVision: !!room.knights && role === "prophet",
     fairyResult: fairyResult?.fairyInfo
       ? {
@@ -734,9 +735,11 @@ function rememberKnightIdentity(room, uid, reason = "redraw") {
   state.identityHistory = [...history, {
     id: history.length, role: view.role, faction: view.faction,
     information: view.information, detailAvailable: true,
+    skillHistory: view.skillHistory,
     ...knightIdentitySince(room, uid),
   }];
   state.identitySince = { round: room.knights.round, reason };
+  state.skillHistory = [];
 }
 function privateView(room, uid) {
   const view = privateIdentity(room, uid);
@@ -746,6 +749,7 @@ function privateView(room, uid) {
   const records = [{
     id: history.length, role: view.role, faction: view.faction,
     information: view.information, skillStatus: view.skillStatus,
+    skillHistory: view.skillHistory,
     detailAvailable: true, current: true, ...knightIdentitySince(room, uid),
   }, ...history.slice().reverse().map(record => ({ ...record, current: false }))];
   view.identityHistory = records.map(record => ({
