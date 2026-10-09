@@ -100,7 +100,7 @@
       <view class="muted">{{dealtIdentitySecret.faction}}</view>
       <view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view>
       <view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view>
-      <view class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</view>
+      <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
       <button hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
     </block>
     <block wx:else>
@@ -379,7 +379,7 @@
         <button hover-class="none" class="copy-room lobby-room-code" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}"><text>房间 {{room.code}}</text><view class="lobby-copy-icon" aria-hidden="true" /></button>
         <button wx:if="{{room.phase==='lobby'}}" class="lobby-header-link room-invite-button" hover-class="room-invite-pressed" open-type="share" disabled="{{busy || loading || hasPendingRequest || reconnecting || !network}}" aria-label="{{'邀请好友加入房间'+room.code}}">邀请好友</button>
         <view wx:elif="{{room.me.seat!==null}}" class="room-identity-anchor">
-          <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{revealed?'遮盖我的身份':'查看我的身份'}}">{{room.me.seat}}号 · {{revealed?'遮盖身份':'我的身份 ›'}}</button>
+          <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{room.me.seat+'号 · '+(revealed?'遮盖我的身份':'查看我的身份')}}"><view wx:if="{{!(busy && busyAction==='identity')}}" class="room-identity-icon" aria-hidden="true" /><text>{{revealed?'遮盖身份':'查看身份'}}</text></button>
           <view wx:if="{{identityHintVisible && !dealtIdentityDialog && !actionDialog && !identityChange && !fairyResult && !error && !toolType && !showRoomRules && !showRoomSettings}}" class="identity-entry-hint">
             <text role="status">随时点这里，查看身份与视野。</text>
             <button hover-class="none" class="identity-hint-close" bindtap="dismissIdentityHint" aria-label="关闭身份入口提示">×</button>

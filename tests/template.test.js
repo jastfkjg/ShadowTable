@@ -55,7 +55,8 @@ test('准备阶段显示房间邀请，开局后只保留身份入口；首次�
       const summary = nodes(tree).find(node => node.attr?.class === 'room-summary');
       assert.ok(byHandler(summary, 'copyRoomCode'));
       assert.ok(byHandler(summary, 'reveal'));
-      assert.match(JSON.stringify(byHandler(summary, 'reveal')), /2号 · 我的身份/);
+      assert.match(JSON.stringify(byHandler(summary, 'reveal')), /查看身份/);
+      assert.equal(byHandler(summary, 'reveal').attr.ariaLabel, '2号 · 查看我的身份');
     }
   }
   const data = { ...base, isLobby: false, loading: false, invitation: { code: '372338', boardName: '阿瓦隆 · 十二骑士', capacity: 12, occupied: 12 }, invitationNeedsName: true };

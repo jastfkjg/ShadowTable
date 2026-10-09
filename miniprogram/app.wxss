@@ -1392,7 +1392,9 @@ button.home-entry[disabled]:not([type]) { background: transparent; padding: 16rp
 .room-summary { flex-wrap: wrap; margin-top: 8rpx; }
 .lobby-room-header .room-summary { margin: 0; }
 button.room-identity,
-button.room-identity[disabled]:not([type]) { width: auto; min-height: 88rpx; margin: 0; padding: 16rpx 0 16rpx 16rpx; color: var(--accent); background: transparent; font-size: 26rpx; }
+button.room-identity[disabled]:not([type]) { width: auto; min-height: 88rpx; margin: 0; padding: 0 20rpx; gap: 10rpx; border: 12rpx solid transparent; border-left: 0; border-right: 0; border-radius: 24rpx; color: var(--bg); background: var(--accent); background-clip: padding-box; font-size: 26rpx; font-weight: 600; white-space: nowrap; }
+/* Keep the 88rpx tap target while reducing the visible gold surface to 64rpx. */
+.room-identity-icon { flex-shrink: 0; width: 32rpx; height: 32rpx; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23101c24' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); }
 .room-identity-anchor { position: relative; flex-shrink: 0; margin-left: auto; }
 button.room-identity.identity-entry-highlight { outline: 2rpx solid var(--accent); outline-offset: 6rpx; border-radius: 12rpx; }
 .identity-entry-hint { position: absolute; top: calc(100% + 16rpx); right: 0; z-index: 950; display: flex; align-items: center; width: 460rpx; max-width: calc(100vw - 80rpx); padding: 12rpx 8rpx 12rpx 24rpx; box-sizing: border-box; border: 2rpx solid var(--accent); border-radius: 16rpx; background: var(--surface); color: var(--text); box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.2); font-size: 26rpx; line-height: 1.6; }
