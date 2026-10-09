@@ -14,6 +14,18 @@ function model() {
   return state;
 }
 
+test('普通打开默认收起，任务牌数和队伍可展开；定位打开只展开目标记录', () => {
+  const state = model();
+  state.history[0].teamLabel = '1、10、12 号';
+  Object.assign(state, historyUI.open(state));
+  assert.ok(state.visibleHistory.every(row => !row.expanded));
+  assert.equal(state.visibleHistory.find(row => row.key === 2).hasDetails, true);
+  Object.assign(state, historyUI.toggleRow(state, 2));
+  assert.equal(state.visibleHistory.find(row => row.key === 2).expanded, true);
+  Object.assign(state, historyUI.open(state, 0));
+  assert.deepEqual(state.visibleHistory.filter(row => row.expanded).map(row => row.key), [0]);
+});
+
 test('初次载入不把已有记录当作未读；新记录只提示，不插入正在浏览的列表', () => {
   const state = model();
   assert.equal(state.historyUnreadCount, 0);
@@ -32,7 +44,9 @@ test('初次载入不把已有记录当作未读；新记录只提示，不插�
   assert.equal(state.visibleHistory[0].key, 5);
   assert.equal(state.visibleHistory[0].recordNumber, 4);
   assert.equal(state.visibleHistory[0].isNew, true);
+  assert.equal(state.visibleHistory[0].isLatest, true);
   assert.equal(state.visibleHistory[1].isNew, false);
+  assert.equal(state.visibleHistory[1].isLatest, false);
 });
 
 test('打开最近结果清除筛选并展开原始序号，票型显示两位数座位且不改写原记录', () => {
@@ -90,6 +104,25 @@ test('记录图标和技能座位只派生公开内容，保留复活过程、�
   assert.equal(skill.resultRows[0].final, true);
   assert.equal(skill.resultRows[4].value, '第3轮结果待确认');
   assert.deepEqual(state.history, before);
+});
+
+test('队伍标签只解析明确的公开座位列表；最新标记在筛选和新记录到达时保留浏览快照', () => {
+  const state = model();
+  state.history[0].teamLabel = '1、10、12 号';
+  state.history[1].teamLabel = '等待3人入队';
+  state.history[2].teamLabel = '无';
+  const before = structuredClone(state.history);
+  Object.assign(state, historyUI.open(state));
+  assert.deepEqual(state.visibleHistory.map(row => row.teamSeatNumbers), [[], [], [1, 10, 12]]);
+  assert.deepEqual(state.visibleHistory.filter(row => row.isLatest).map(row => row.key), [3]);
+  Object.assign(state, historyUI.filter(state, 'vote'));
+  assert.equal(state.visibleHistory[0].isLatest, false);
+  Object.assign(state, historyUI.filter(state, 'all'));
+  state.history.push({ key: 4, category: 'skill', text: '技能结算' });
+  Object.assign(state, historyUI.sync(state, state.history, room));
+  assert.equal(state.historyUnreadCount, 1);
+  assert.deepEqual(state.visibleHistory.filter(row => row.isLatest).map(row => row.key), [3]);
+  assert.deepEqual(state.history.slice(0, 3), before);
 });
 
 test('转换、查验及旧记录归其他，技能结算和最终行动仍归技能', () => {

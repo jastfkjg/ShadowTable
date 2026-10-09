@@ -1037,7 +1037,7 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
   assert.ok(!text.includes("本阶段你无需操作"));
   const located = render({ ...data, historyOpen: true, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
   const record = nodes(located).find(n => n.attr?.id === "history-record-0");
-  assert.equal(record.attr.class, "public-history-row is-focused");
+  assert.match(record.attr.class, /public-history-row is-focused/);
   const pending = render({ ...data, room: { ...room, phase: "quest", needsSubmission: true }, actionEntryLabel: "提交任务牌" });
   const phase = nodes(pending).find(n => n.attr?.class === "phase-strip");
   assert.ok(byHandler(phase, "openAction"));
@@ -1050,10 +1050,12 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
     latestDetail: '2票赞成', teamLabel: '1、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '1、12 号' }] };
   const data = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 }, canUseTools: true },
     history: [record], historyLatest: record, latestResult: record };
-  const closed = render(data), openedData = { ...data, ...historyUI.open(data) }, opened = render(openedData);
+  const closed = render(data), openedData = { ...data, ...historyUI.open(data, 4) }, opened = render(openedData);
   const meta = nodes(opened).find(n => n.attr?.class === 'public-history-meta');
-  assert.match(JSON.stringify(meta), /#1/);
-  assert.doesNotMatch(JSON.stringify(meta), /#5/);
+  assert.match(JSON.stringify(meta), /16:32/);
+  assert.doesNotMatch(JSON.stringify(meta), /#/);
+  assert.equal(nodes(opened).filter(n => n.attr?.class === 'public-history-latest-mark').length, 1);
+  assert.equal(nodes(opened).filter(n => n.attr?.class === 'public-history-team-seat').length, 2);
   const result = tree => nodes(tree).find(n => n.attr?.class === 'latest-result');
   assert.deepEqual(result(opened), result(closed));
   assert.ok(byHandler(opened, 'showLatestRecord'));
@@ -1070,6 +1072,40 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
   assert.ok(byHandler(dock, 'openHistory'));
   assert.ok(byHandler(dock, 'settleTool'));
   assert.ok(byHandler(dock, 'cancelTool'));
+});
+
+test('任务和投票收起仅显示摘要，展开后完整展示队伍票数，所有记录保留时间与箭头列', () => {
+  const historyUI = require('../miniprogram/public-history');
+  const history = [
+    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+    { key: 1, category: 'vote', text: '投票通过', timeLabel: '15:51', teamLabel: '10、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '10、12 号' }] },
+    { key: 2, category: 'other', text: '本轮不转换', timeLabel: '15:52' },
+  ];
+  const state = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 } }, history };
+  Object.assign(state, historyUI.open(state));
+  const records = tree => nodes(tree).filter(n => n.attr?.id?.startsWith('history-record-'));
+  const collapsed = records(render(state));
+  assert.equal(collapsed.length, 3);
+  for (const record of collapsed) {
+    const children = nodes(record);
+    assert.equal(children.filter(n => n.attr?.class === 'public-history-meta').length, 1);
+    assert.equal(children.filter(n => n.attr?.class === 'public-history-chevron-slot').length, 1);
+    assert.ok(!children.some(n => ['public-history-details', 'public-history-team', 'public-history-counts'].includes(n.attr?.class)));
+  }
+  for (const key of [0, 1]) {
+    Object.assign(state, historyUI.toggleRow(state, key));
+    const record = records(render(state)).find(n => n.attr.id === `history-record-${key}`);
+    const summary = nodes(record).find(n => n.attr?.class === 'public-history-summary');
+    const details = nodes(record).find(n => n.attr?.class === 'public-history-details');
+    assert.equal(state.visibleHistory.find(row => row.key === key).expanded, true);
+    assert.equal(byHandler(record, 'toggleHistoryRow').attr.ariaExpanded, true);
+    assert.ok(!nodes(summary).some(n => ['public-history-team', 'public-history-counts'].includes(n.attr?.class)));
+    assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-team'));
+    assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-counts'));
+    assert.match(JSON.stringify(details), key === 0 ? /至少 1 张失败票才失败/ : /2票赞成/);
+    Object.assign(state, historyUI.toggleRow(state, key));
+    assert.ok(!nodes(records(render(state)).find(n => n.attr.id === `history-record-${key}`)).some(n => n.attr?.class === 'public-history-details'));
+  }
 });
 
 

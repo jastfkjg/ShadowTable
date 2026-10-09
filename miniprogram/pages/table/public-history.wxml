@@ -3,10 +3,10 @@
     <view class="public-history-icon" aria-hidden="{{true}}" />
     <view class="public-history-entry-copy">
       <view class="public-history-entry-title"><text>公开记录</text><text class="public-history-total">{{history.length || 0}}</text></view>
-      <view class="public-history-preview {{historyLatest.resultTone}}">{{historyLatest?'最新：'+(historyLatest.historyText || historyLatest.text)+(historyLatest.timeLabel?' · '+historyLatest.timeLabel:''):'本局暂无公开记录'}}</view>
+      <view class="public-history-preview {{historyLatest.resultTone}}">{{historyLatest?(historyLatest.historyText || historyLatest.text)+(historyLatest.timeLabel?' · '+historyLatest.timeLabel:''):'本局暂无公开记录'}}</view>
     </view>
     <text wx:if="{{historyUnreadCount}}" class="public-history-badge">{{historyUnreadCount}}条新</text>
-    <view class="public-history-chevron is-expanded" aria-hidden="{{true}}" />
+    <view class="public-history-chevron is-forward" aria-hidden="{{true}}" />
   </button>
 </template>
 <template name="publicHistorySummary">
@@ -14,15 +14,12 @@
     <view class="public-history-event-icon is-{{item.eventIcon || 'record'}}" aria-hidden="{{true}}" />
     <view class="public-history-copy">
       <view class="public-history-headline">
-        <view class="public-history-row-title"><text>{{item.historyText || item.text}}</text><text wx:if="{{item.isNew}}" class="public-history-new-mark">新</text></view>
-        <view class="public-history-meta"><text wx:if="{{item.timeLabel}}">{{item.timeLabel}} · </text><text>#{{item.recordNumber}}</text></view>
+        <view class="public-history-row-title"><text>{{item.historyText || item.text}}</text><text wx:if="{{item.isLatest}}" class="public-history-latest-mark">最新</text><text wx:elif="{{item.isNew}}" class="public-history-new-mark">新</text></view>
       </view>
       <view wx:if="{{item.inspectionLabel}}" class="public-history-inspection">{{item.inspectionLabel}}</view>
-      <view wx:if="{{item.teamLabel}}" class="public-history-team">队伍 {{item.teamLabel}}</view>
-      <view wx:if="{{item.voteGroups}}" class="public-history-counts"><text wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="public-history-count {{group.tone}}">{{group.count}}票{{group.label}}</text></view>
-      <view wx:elif="{{item.cards}}" class="public-history-counts"><text wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="public-history-count {{card.tone}}">{{card.label}} {{card.count}} 张</text></view>
     </view>
-    <view wx:if="{{item.hasDetails}}" class="public-history-chevron {{item.expanded?'is-expanded':''}}" aria-hidden="{{true}}" />
+    <view class="public-history-meta"><text>{{item.timeLabel}}</text></view>
+    <view class="public-history-chevron-slot" aria-hidden="{{true}}"><view wx:if="{{item.hasDetails}}" class="public-history-chevron {{item.expanded?'is-expanded':''}}" /></view>
   </view>
 </template>
 <view wx:if="{{historyOpen && room && room.phase!=='lobby' && !error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !toolType && !resultDialog && !showRoomRules && !showRoomSettings}}" class="dialog-backdrop public-history-backdrop" catchtap="closeHistory" catchtouchmove="blockScroll">
@@ -35,29 +32,35 @@
     <view class="public-history-filters">
       <button hover-class="none" wx:for="{{historyFilters}}" wx:key="value" class="public-history-filter {{historyFilter===item.value?'is-active':''}}" bindtap="filterHistory" data-filter="{{item.value}}" aria-pressed="{{historyFilter===item.value}}">{{item.label}}</button>
     </view>
-    <view wx:if="{{historyUnreadCount}}" class="public-history-toolbar">
-      <button hover-class="none" class="public-history-new" bindtap="showNewHistory">{{historyUnreadCount}}条新记录 · 点击查看 ↑</button>
+    <view class="public-history-toolbar">
+      <text class="public-history-order">最新在前</text>
+      <button hover-class="none" wx:if="{{historyUnreadCount}}" class="public-history-new" bindtap="showNewHistory">{{historyUnreadCount}}条新记录 · 点击查看 ↑</button>
     </view>
     <scroll-view scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" class="public-history-body" scroll-into-view="{{historyScrollTarget}}" aria-label="公开记录列表，最新在前">
       <view id="public-history-top" />
       <view wx:if="{{!visibleHistory.length}}" class="public-history-empty">{{history.length?'暂无此类公开记录':'投票、任务等结算后，记录会显示在这里'}}</view>
-      <view wx:for="{{visibleHistory}}" wx:key="key" id="history-record-{{item.key}}" class="public-history-row {{focusedHistoryKey===item.key?'is-focused':''}}">
-        <button hover-class="none" wx:if="{{item.hasDetails}}" class="disclosure-button public-history-row-toggle" bindtap="toggleHistoryRow" data-key="{{item.key}}" aria-expanded="{{item.expanded}}" aria-label="{{(item.expanded?'收起':'展开')+(item.historyText || item.text)+'详情'}}">
-          <template is="publicHistorySummary" data="{{item}}" />
-        </button>
-        <view wx:else><template is="publicHistorySummary" data="{{item}}" /></view>
-        <view wx:if="{{item.expanded && item.hasDetails}}" class="public-history-details">
-          <view wx:if="{{item.historyNote}}" class="public-history-note-badge">{{item.historyNote}}</view>
-          <view wx:if="{{item.resultRows}}" class="public-history-results">
-            <view wx:for="{{item.resultRows}}" wx:for-item="row" wx:key="label" class="public-history-result {{row.final?'is-final':''}} {{row.tone}}">
-              <view class="public-history-outcome-icon {{row.tone}}" wx:if="{{row.tone}}" aria-hidden="{{true}}" />
-              <text class="public-history-result-label">{{row.label}}</text>
-              <view class="public-history-result-value"><text wx:for="{{row.seatNumbers}}" wx:for-item="seat" wx:key="*this" class="public-history-result-seat {{row.tone}}">{{seat}}号</text><text wx:if="{{!row.seatNumbers.length}}">{{row.value}}</text></view>
+      <view class="public-history-timeline">
+        <view wx:for="{{visibleHistory}}" wx:key="key" id="history-record-{{item.key}}" class="public-history-row {{focusedHistoryKey===item.key?'is-focused':''}} {{item.isLatest?'is-latest':''}}">
+          <button hover-class="none" wx:if="{{item.hasDetails}}" class="disclosure-button public-history-row-toggle" bindtap="toggleHistoryRow" data-key="{{item.key}}" aria-expanded="{{item.expanded}}" aria-label="{{(item.expanded?'收起':'展开')+(item.historyText || item.text)+'详情'}}">
+            <template is="publicHistorySummary" data="{{item}}" />
+          </button>
+          <view wx:else><template is="publicHistorySummary" data="{{item}}" /></view>
+          <view wx:if="{{item.expanded && item.hasDetails}}" class="public-history-details">
+            <view wx:if="{{item.teamLabel}}" class="public-history-team"><text class="public-history-team-label">队伍</text><view wx:if="{{item.teamSeatNumbers.length}}" class="public-history-team-seats"><text wx:for="{{item.teamSeatNumbers}}" wx:for-item="seat" wx:key="*this" class="public-history-team-seat">{{seat}}号</text></view><text wx:else>{{item.teamLabel}}</text></view>
+            <view wx:if="{{item.voteGroups}}" class="public-history-counts"><text wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="public-history-count {{group.tone}}">{{group.count}}票{{group.label}}</text></view>
+            <view wx:elif="{{item.cards}}" class="public-history-counts"><text wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="public-history-count {{card.tone}}">{{card.label}} {{card.count}} 张</text></view>
+            <view wx:if="{{item.historyNote}}" class="public-history-note-badge">{{item.historyNote}}</view>
+            <view wx:if="{{item.resultRows}}" class="public-history-results">
+              <view wx:for="{{item.resultRows}}" wx:for-item="row" wx:key="label" class="public-history-result {{row.final?'is-final':''}} {{row.tone}}">
+                <view class="public-history-outcome-icon {{row.tone}}" wx:if="{{row.tone}}" aria-hidden="{{true}}" />
+                <text class="public-history-result-label">{{row.label}}</text>
+                <view class="public-history-result-value"><text wx:for="{{row.seatNumbers}}" wx:for-item="seat" wx:key="*this" class="public-history-result-seat {{row.tone}}">{{seat}}号</text><text wx:if="{{!row.seatNumbers.length}}">{{row.value}}</text></view>
+              </view>
             </view>
+            <view wx:if="{{item.voteGroups}}" class="public-history-voters"><view wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="public-history-vote-group"><text class="public-history-vote-label">{{group.label}}</text><view class="public-history-seat-list"><text wx:for="{{group.seatNumbers}}" wx:for-item="seat" wx:key="*this" class="public-history-seat">{{seat}}</text><text wx:if="{{!group.seatNumbers.length}}" class="public-history-note">无</text></view></view></view>
+            <view wx:elif="{{item.detail && !item.cards && !item.resultRows}}" class="public-history-note">{{item.detail}}</view>
+            <view wx:if="{{item.thresholdLabel}}" class="public-history-note">{{item.thresholdLabel}}</view>
           </view>
-          <view wx:if="{{item.voteGroups}}" class="public-history-voters"><view wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="public-history-vote-group"><text class="public-history-vote-label">{{group.label}}</text><view class="public-history-seat-list"><text wx:for="{{group.seatNumbers}}" wx:for-item="seat" wx:key="*this" class="public-history-seat">{{seat}}</text><text wx:if="{{!group.seatNumbers.length}}" class="public-history-note">无</text></view></view></view>
-          <view wx:elif="{{item.detail && !item.cards && !item.resultRows}}" class="public-history-note">{{item.detail}}</view>
-          <view wx:if="{{item.thresholdLabel}}" class="public-history-note">{{item.thresholdLabel}}</view>
         </view>
       </view>
       <view wx:if="{{visibleHistory.length}}" class="public-history-end">已显示{{visibleHistory.length}}条{{historyFilter==='all'?'记录':'筛选记录'}}</view>

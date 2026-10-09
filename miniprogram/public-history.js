@@ -38,13 +38,15 @@
     if (entry.category === "skill") return "skill";
     return "record";
   }
+  function seatNumbers(value) {
+    return /^\d+(?:、\d+)*\s*号$/.test(value)
+      ? value.match(/\d+/g).map(Number) : [];
+  }
   function resultRow(row) {
     const tone = ["本轮出局", "最终仍出局"].includes(row.label) ? "failure"
       : ["抽牌复活", "原牌复活"].includes(row.label) ? "success" : "";
     // Only turn an explicit seat list into chips; preserve other public result text.
-    const seats = /^\d+(?:、\d+)*\s*号$/.test(row.value)
-      ? row.value.match(/\d+/g).map(Number) : [];
-    return { ...row, tone, seatNumbers: seats };
+    return { ...row, tone, seatNumbers: seatNumbers(row.value) };
   }
   function rows(state, history) {
     if (!state.historyOpen) return [];
@@ -54,9 +56,11 @@
       (state.historyFilter === "all" || entry.category === state.historyFilter)).slice().reverse().map(entry => ({
         ...entry,
         eventIcon: eventIcon(entry),
+        isLatest: entry.key === state.historySnapshotKey,
+        teamSeatNumbers: seatNumbers(entry.teamLabel),
         expanded: !!state.historyExpandedRows[entry.key],
         isNew: entry.key > state.historyNewSinceKey,
-        hasDetails: !!(entry.voteGroups || entry.resultRows || entry.historyNote || entry.thresholdLabel || (entry.detail && !entry.cards)),
+        hasDetails: !!(entry.teamLabel || entry.cards?.length || entry.voteGroups?.length || entry.resultRows?.length || entry.historyNote || entry.thresholdLabel || entry.detail),
         ...(entry.voteGroups ? { voteGroups: entry.voteGroups.map(group => ({ ...group, seatNumbers: (group.seats.match(/\d+/g) || []).map(Number) })) } : {}),
         ...(entry.resultRows ? { resultRows: entry.resultRows.map(resultRow) } : {}),
       }));
@@ -73,7 +77,6 @@
   function open(state, key = null) {
     const history = state.history || [];
     const expanded = {};
-    history.slice(-2).forEach(entry => { expanded[entry.key] = true; });
     if (key !== null) expanded[key] = true;
     const patch = {
       historyOpen: true, historyFilter: "all",

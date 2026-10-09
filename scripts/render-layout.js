@@ -537,6 +537,28 @@ const otherHistory = { ...fairyHistory, ...publicHistory.open(fairyHistory) };
 Object.assign(otherHistory, publicHistory.filter(otherHistory, 'other'));
 scenes.publicHistoryOther = otherHistory;
 scenes.publicHistoryHost = { ...historyBase,room: {...historyBase.room,phase:'teamVote',hasActiveOperation:true,closeWaiting:{mode:'settle',label:'结束等待'}},settleHint:'还差 2 人提交' };
+// Screenshot-like settled records, plus older rows to exercise continued scrolling.
+const previewHistoryRows = [
+  { ...historyRows[0], timeLabel: '15:49' },
+  { ...historyRows[1], timeLabel: '15:49' },
+  { key: 2, category: 'quest', text: '任务成功', resultTone: 'success', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+  { key: 3, category: 'skill', text: '技能结算', timeLabel: '15:50', detail: '本轮技能已结算' },
+  { key: 4, category: 'other', text: '本轮不转换', timeLabel: '15:51' },
+  { key: 5, category: 'other', text: '仙女查验已完成', timeLabel: '15:52' },
+  { key: 6, category: 'skill', text: '技能结算', timeLabel: '15:52', detail: '本轮技能已结算' },
+  { key: 7, category: 'other', text: '本轮不转换', timeLabel: '15:54' },
+  { key: 8, category: 'other', text: '仙女查验已完成', timeLabel: '15:54' },
+];
+const previewHistory = { ...fairyHistory, history: previewHistoryRows, historySeenKey: 8,
+  latestResult: previewHistoryRows.at(-1), historyLatest: previewHistoryRows.at(-1),
+  room: { ...fairyHistory.room, code: '372338', canUseTools: false, phaseName: '等待房主发起操作' } };
+scenes.publicHistoryPreview = { ...previewHistory, ...publicHistory.open(previewHistory) };
+scenes.publicHistoryLongTitle = { ...scenes.publicHistoryPreview, visibleHistory: scenes.publicHistoryPreview.visibleHistory.map((row, index) => index === 0
+  ? { ...row, text: '湖中仙女查验结果已由玩家确认完成', inspectionLabel: '10号查验了12号' } : row) };
+const disclosureHistory = { ...previewHistory, history: [{ ...historyRows[1], timeLabel: '15:49' }, previewHistoryRows[2], previewHistoryRows[3], previewHistoryRows[8]] };
+scenes.publicHistoryDisclosure = { ...disclosureHistory, ...publicHistory.open(disclosureHistory) };
+scenes.publicHistoryDisclosureExpanded = { ...disclosureHistory, ...publicHistory.open(disclosureHistory, 2) };
+Object.assign(scenes.publicHistoryDisclosureExpanded, publicHistory.toggleRow(scenes.publicHistoryDisclosureExpanded, 1));
 
 const css = fs
   .readFileSync(path.join(root, "app.wxss"), "utf8")

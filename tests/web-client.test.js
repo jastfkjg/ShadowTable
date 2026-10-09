@@ -707,6 +707,8 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   c.state.dealtIdentityDialog = false;
   c.ACTIONS.openHistory();
   assert.match(c.viewHistorySheet(), /id="history-record-0"/);
+  assert.doesNotMatch(c.viewHistorySheet(), /5票弃权/);
+  c.ACTIONS.toggleHistoryRow({ dataset: { key: '0' } });
   assert.match(c.viewHistorySheet(), /5票弃权/);
   assert.match(html, /本次你无需操作/);
   assert.match(c.viewHostBar(), /作废本次任务/);
@@ -945,7 +947,7 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   c.ACTIONS.openHistory();
   html = c.viewHistorySheet();
   assert.equal((html.match(/id="history-record-/g) || []).length, 4);
-  assert.ok(html.indexOf("#4") < html.indexOf("#1"));
+  assert.ok(html.indexOf('id="history-record-3"') < html.indexOf('id="history-record-0"'));
   c.ACTIONS.toggleSeats();
   assert.doesNotMatch(c.viewRoom(), /class="seats"/);
   c.ACTIONS.toggleSeats();
@@ -954,6 +956,31 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   c.state.actionDialog = true;
   c.state.actionLabel = "是否同意这支队伍？";
   assert.match(c.viewActionDialog(), /任务队伍：1、4号/);
+});
+
+test('网页任务与投票详情在收起时隐藏，点击展开后呈现队伍和票数', () => {
+  const historyUI = require('../miniprogram/public-history');
+  const c = client();
+  c.state.room = dealtWebRoom();
+  c.state.dealtIdentityDialog = false;
+  c.state.history = [
+    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+    { key: 1, category: 'vote', text: '投票通过', timeLabel: '15:51', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '10、12 号' }] },
+    { key: 2, category: 'other', text: '仙女查验已完成', timeLabel: '15:52' },
+  ];
+  Object.assign(c.state, historyUI.open(c.state));
+  let html = c.viewHistorySheet();
+  assert.equal((html.match(/public-history-chevron-slot/g) || []).length, 3);
+  assert.doesNotMatch(html, /public-history-details|public-history-team|public-history-counts/);
+  for (const key of [0, 1]) {
+    c.ACTIONS.toggleHistoryRow({ dataset: { key: String(key) } });
+    html = c.viewHistorySheet();
+    assert.match(html, /public-history-details/);
+    assert.match(html, key === 0 ? /成功 3 张/ : /2票赞成/);
+    if (key === 0) assert.match(html, /至少 1 张失败票才失败/);
+    c.ACTIONS.toggleHistoryRow({ dataset: { key: String(key) } });
+    assert.doesNotMatch(c.viewHistorySheet(), /public-history-details/);
+  }
 });
 
 test("网页仙女关闭需确认，取消保留结果，等待确认时新结果不被旧确认清除", async () => {
@@ -1196,7 +1223,7 @@ test("网页仙女只确认合法当前目标，提示传递关系并阻止过�
   assert.equal(writes.length, 1);
 });
 
-test("网页隐藏轮次推进，时间和序号清晰展示，记录定位和最新结果保持对应", async () => {
+test("网页隐藏轮次推进，时间与最新标记清晰展示，记录定位和最新结果保持对应", async () => {
   const room = dealtWebRoom({ history: [
     { kind: "variant", text: "进入第2轮" },
     { kind: "variant", text: "本轮不转换", resultType: "conversion" },
@@ -1211,9 +1238,9 @@ test("网页隐藏轮次推进，时间和序号清晰展示，记录定位和�
   c.ACTIONS.openHistory();
   const html = c.viewHistorySheet();
   assert.ok(!html.includes("进入第"));
-  assert.match(html, /public-history-meta"><span>\d{2}:\d{2} · <\/span><span>#2/);
-  assert.match(html, /<span>#1<\/span>/);
-  assert.doesNotMatch(html, /<span>#3<\/span>/);
+  assert.match(html, /public-history-meta"><span>\d{2}:\d{2}<\/span>/);
+  assert.equal((html.match(/public-history-latest-mark/g) || []).length, 1);
+  assert.doesNotMatch(html, /<span>#\d+<\/span>/);
   assert.match(html, /id="history-record-2"/);
   assert.ok(!html.includes('class="history-subtitle"'));
   assert.ok(!html.includes("全屏"));
