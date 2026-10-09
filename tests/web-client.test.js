@@ -1211,10 +1211,39 @@ test("网页隐藏轮次推进，时间和序号清晰展示，记录定位和�
   c.ACTIONS.openHistory();
   const html = c.viewHistorySheet();
   assert.ok(!html.includes("进入第"));
-  assert.match(html, /public-history-meta"><span>\d{2}:\d{2} · <\/span><span>#3/);
+  assert.match(html, /public-history-meta"><span>\d{2}:\d{2} · <\/span><span>#2/);
+  assert.match(html, /<span>#1<\/span>/);
+  assert.doesNotMatch(html, /<span>#3<\/span>/);
+  assert.match(html, /id="history-record-2"/);
   assert.ok(!html.includes('class="history-subtitle"'));
   assert.ok(!html.includes("全屏"));
   assert.equal(c.ACTIONS.toggleHistoryFullscreen, undefined);
+});
+
+test("网页转换和查验归其他，查验座位直接显示在记录和最近结果", async () => {
+  const room = dealtWebRoom({ history: [
+    { kind: "variant", text: "本轮阵营转换", resultType: "conversion" },
+    { kind: "skillResult", text: "技能最终结果", detail: "无人出局" },
+    { kind: "variant", text: "仙女查验已完成", number: 2 },
+    { kind: "variant", text: "仙女查验已完成", resultType: "fairy", number: 3, actor: 10, target: 12 },
+  ] });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  c.state.dealtIdentityDialog = false;
+  assert.match(c.viewRoom(), /history-detail">10号查验了12号/);
+  c.ACTIONS.openHistory();
+  c.ACTIONS.filterHistory({ dataset: { value: "skill" } });
+  assert.deepEqual(Array.from(c.state.visibleHistory, h => h.key), [1]);
+  assert.doesNotMatch(c.viewHistorySheet(), /仙女查验|本轮阵营转换/);
+  c.ACTIONS.filterHistory({ dataset: { value: "other" } });
+  assert.deepEqual(Array.from(c.state.visibleHistory, h => h.key), [3, 2, 0]);
+  assert.match(c.viewHistorySheet(), /public-history-inspection">10号查验了12号/);
+  assert.equal(c.state.visibleHistory[0].hasDetails, false);
+  room.history.pop();
+  await c.refresh();
+  assert.equal(c.state.latestResult.text, "仙女查验已完成");
+  assert.equal(c.state.latestResult.latestDetail, "");
+  assert.doesNotMatch(c.viewRoom(), /undefined|10号查验了12号/);
 });
 
 test("网页战绩空态、错误重试与第三阵营结算选择", async () => {

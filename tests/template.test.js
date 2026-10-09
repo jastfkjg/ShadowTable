@@ -1046,11 +1046,14 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
 
 test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，私密弹窗优先', () => {
   const historyUI = require('../miniprogram/public-history');
-  const record = { key: 0, category: 'vote', text: '投票通过', resultTone: 'success', timeLabel: '16:32',
+  const record = { key: 4, category: 'vote', text: '投票通过', resultTone: 'success', timeLabel: '16:32',
     latestDetail: '2票赞成', teamLabel: '1、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '1、12 号' }] };
   const data = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 }, canUseTools: true },
     history: [record], historyLatest: record, latestResult: record };
   const closed = render(data), openedData = { ...data, ...historyUI.open(data) }, opened = render(openedData);
+  const meta = nodes(opened).find(n => n.attr?.class === 'public-history-meta');
+  assert.match(JSON.stringify(meta), /#1/);
+  assert.doesNotMatch(JSON.stringify(meta), /#5/);
   const result = tree => nodes(tree).find(n => n.attr?.class === 'latest-result');
   assert.deepEqual(result(opened), result(closed));
   assert.ok(byHandler(opened, 'showLatestRecord'));
@@ -1069,6 +1072,23 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
   assert.ok(byHandler(dock, 'cancelTool'));
 });
 
+
+test("查验座位在公开记录收起时和最近结果中直接可见", () => {
+  const historyUI = require('../miniprogram/public-history');
+  const label = '10号查验了12号';
+  const record = { key: 0, category: 'other', text: '仙女查验已完成', inspectionLabel: label, latestDetail: label };
+  const data = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 } },
+    history: [record], latestResult: record, historyLatest: record };
+  const opened = { ...data, ...historyUI.open(data), historyExpandedRows: {} };
+  Object.assign(opened, historyUI.sync(opened, opened.history, opened.room));
+  const tree = render(opened);
+  const summary = nodes(tree).find(n => n.attr?.class === 'public-history-inspection');
+  assert.match(JSON.stringify(summary), /10号查验了12号/);
+  const latest = nodes(tree).find(n => n.attr?.class === 'latest-result');
+  assert.match(JSON.stringify(latest), /仙女查验已完成/);
+  assert.match(JSON.stringify(latest), /10号查验了12号/);
+  assert.ok(!nodes(tree).some(n => n.attr?.class === 'public-history-details'));
+});
 
 test("动态区仅等待及结束时显示结果，操作中提交前后均隐藏旧结果", () => {
   const room = { code: "123456", phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: 1 }, capacity: 6 };

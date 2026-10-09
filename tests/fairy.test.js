@@ -54,8 +54,14 @@ test("所有板子按人数默认启用湖仙，7人可开，5/6人不可绕过�
         run(r, uid, "submit", { value: `target:${target.seat}` });
         assert.equal(r.phase, "tools");
         assert.ok(privateView(r, uid).fairyResult);
-        for (const p of r.players)
-          assert.equal(publicView(r, p.uid).fairyHolder, target.seat);
+        for (const p of r.players) {
+          const view = publicView(r, p.uid);
+          assert.equal(view.fairyHolder, target.seat);
+          assert.deepEqual(view.history.at(-1), {
+            kind: "variant", text: "仙女查验已完成", resultType: "fairy", number: 1,
+            actor: holder, target: target.seat, startedAt: r.history.at(-1).startedAt,
+          });
+        }
       }
     }
   }
@@ -92,6 +98,8 @@ test("查验仅持有者可交，排除自己和历任；结果和确认权限�
     assert.ok(
       !JSON.stringify(publicView(restored, p.uid)).includes("查验结果："),
     );
+    assert.equal(publicView(restored, p.uid).history.at(-1).actor, holder);
+    assert.equal(publicView(restored, p.uid).history.at(-1).target, target.seat);
     if (p.uid !== uid) {
       assert.equal(privateView(restored, p.uid).fairyResult, null);
       assert.equal(publicView(restored, p.uid).me.fairyResultPending, false);
@@ -117,6 +125,22 @@ test("查验仅持有者可交，排除自己和历任；结果和确认权限�
       `target:${target.seat}`,
     ),
   );
+});
+
+test("连续查验保存各次座位，传递仙女和重新读取不改写旧记录", () => {
+  const r = setup();
+  r.fairy.fairy = 1;
+  begin(r);
+  run(r, "p1", "submit", { value: "target:2" });
+  begin(r);
+  run(r, "p2", "submit", { value: "target:3" });
+  const restored = JSON.parse(JSON.stringify(r));
+  for (const p of restored.players) {
+    const view = publicView(restored, p.uid);
+    assert.equal(view.fairyHolder, 3);
+    assert.deepEqual(view.history.map(h => [h.actor, h.target]), [[1, 2], [2, 3]]);
+    assert.doesNotMatch(JSON.stringify(view.history), /好人|坏人|盗贼|fairyInfo|faction/);
+  }
 });
 
 test("配置权限、人数默认值、原子性、准备状态和同房重开", () => {

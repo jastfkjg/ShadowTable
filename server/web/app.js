@@ -177,7 +177,7 @@
   function toolHistory(h, key) {
     if (["skillDetail", "skillResult", "toolCutoff"].indexOf(h.kind) !== -1)
       return { key: key, text: h.text, detail: h.detail || "" };
-    if (h.kind === "variant") return { key: key, text: h.text, detail: "" };
+    if (h.kind === "variant") return { key: key, text: h.text, detail: "", inspectionLabel: publicHistory.inspectionLabel(h) };
     if (h.kind === "toolVote")
       return {
         key: key,
@@ -1458,7 +1458,7 @@ function roomListItems(rooms) {
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
         entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
-      entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
+      entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
@@ -3836,7 +3836,8 @@ function roomListItems(rooms) {
     return '<button type="button" class="public-history-entry" data-action="openHistory" aria-haspopup="dialog" aria-label="查看公开记录，共' + state.history.length + '条' + (state.historyUnreadCount ? '，' + state.historyUnreadCount + '条新记录' : '') + '"><span class="public-history-icon" aria-hidden="true"></span><span class="public-history-entry-copy"><span class="public-history-entry-title">公开记录 <span class="public-history-total">' + state.history.length + '</span></span><span class="public-history-preview ' + esc(latest?.resultTone || '') + '">' + esc(preview) + '</span></span>' + (state.historyUnreadCount ? '<span class="public-history-badge">' + state.historyUnreadCount + '条新</span>' : '') + '<span class="public-history-chevron is-expanded" aria-hidden="true"></span></button>';
   }
   function viewHistorySummary(h) {
-    let html = '<span class="public-history-summary"><span class="public-history-event-icon is-' + esc(h.eventIcon || 'record') + '" aria-hidden="true"></span><span class="public-history-copy"><span class="public-history-headline"><span class="public-history-row-title"><span>' + esc(h.historyText || h.text) + '</span>' + (h.isNew ? '<span class="public-history-new-mark">新</span>' : '') + '</span><span class="public-history-meta">' + (h.timeLabel ? '<span>' + esc(h.timeLabel) + ' · </span>' : '') + '<span>#' + (h.key + 1) + '</span></span></span>';
+    let html = '<span class="public-history-summary"><span class="public-history-event-icon is-' + esc(h.eventIcon || 'record') + '" aria-hidden="true"></span><span class="public-history-copy"><span class="public-history-headline"><span class="public-history-row-title"><span>' + esc(h.historyText || h.text) + '</span>' + (h.isNew ? '<span class="public-history-new-mark">新</span>' : '') + '</span><span class="public-history-meta">' + (h.timeLabel ? '<span>' + esc(h.timeLabel) + ' · </span>' : '') + '<span>#' + h.recordNumber + '</span></span></span>';
+    if (h.inspectionLabel) html += '<span class="public-history-inspection">' + esc(h.inspectionLabel) + '</span>';
     if (h.teamLabel) html += '<span class="public-history-team">队伍 ' + esc(h.teamLabel) + '</span>';
     if (h.voteGroups) html += '<span class="public-history-counts">' + h.voteGroups.map(g => '<span class="public-history-count ' + esc(g.tone) + '">' + g.count + '票' + esc(g.label) + '</span>').join('') + '</span>';
     else if (h.cards) html += '<span class="public-history-counts">' + h.cards.map(c => '<span class="public-history-count ' + esc(c.tone || '') + '">' + esc(c.label) + ' ' + c.count + ' 张</span>').join('') + '</span>';

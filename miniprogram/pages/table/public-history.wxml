@@ -15,8 +15,9 @@
     <view class="public-history-copy">
       <view class="public-history-headline">
         <view class="public-history-row-title"><text>{{item.historyText || item.text}}</text><text wx:if="{{item.isNew}}" class="public-history-new-mark">新</text></view>
-        <view class="public-history-meta"><text wx:if="{{item.timeLabel}}">{{item.timeLabel}} · </text><text>#{{item.key+1}}</text></view>
+        <view class="public-history-meta"><text wx:if="{{item.timeLabel}}">{{item.timeLabel}} · </text><text>#{{item.recordNumber}}</text></view>
       </view>
+      <view wx:if="{{item.inspectionLabel}}" class="public-history-inspection">{{item.inspectionLabel}}</view>
       <view wx:if="{{item.teamLabel}}" class="public-history-team">队伍 {{item.teamLabel}}</view>
       <view wx:if="{{item.voteGroups}}" class="public-history-counts"><text wx:for="{{item.voteGroups}}" wx:for-item="group" wx:key="label" class="public-history-count {{group.tone}}">{{group.count}}票{{group.label}}</text></view>
       <view wx:elif="{{item.cards}}" class="public-history-counts"><text wx:for="{{item.cards}}" wx:for-item="card" wx:key="label" class="public-history-count {{card.tone}}">{{card.label}} {{card.count}} 张</text></view>

@@ -2325,7 +2325,7 @@ button.public-history-row-toggle:active { opacity: 1; background: rgba(177,191,1
 .public-history-summary > .public-history-chevron.is-expanded { margin-top: 10px; }
 .public-history-new-mark { white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--bg); background: var(--accent); border-radius: 3px; padding: 0 4px; }
 .public-history-meta { white-space: nowrap; display: flex; gap: 3px; flex-shrink: 0; align-items: center; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; font-variant-numeric: tabular-nums; }
-.public-history-team { display: block; color: var(--muted); font-size: 13px; font-weight: 400; margin-top: 6px; line-height: 1.6; overflow-wrap: anywhere; }
+.public-history-team, .public-history-inspection { display: block; color: var(--muted); font-size: 13px; font-weight: 400; margin-top: 6px; line-height: 1.6; overflow-wrap: anywhere; }
 .public-history-counts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 13px; font-weight: 400; }
 .public-history-details { margin: 4px 0 6px 30px; padding: 12px; border-radius: 10px; background: var(--control-bg); }
 .public-history-note { color: var(--muted); font-size: 13px; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.7; }

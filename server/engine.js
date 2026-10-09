@@ -960,8 +960,8 @@ function settleActivity(room) {
   );
   const number = room.activity.number;
   if (room.phase === "fairy") {
-    fairy.settle(room, faction);
-    room.history.push({ kind: "variant", text: "仙女查验已完成", number });
+    const inspection = fairy.settle(room, faction);
+    room.history.push({ kind: "variant", text: "仙女查验已完成", resultType: "fairy", number, ...inspection });
     room.activity = null;
     room.team = [];
     stage(room, "tools");

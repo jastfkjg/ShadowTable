@@ -20,8 +20,14 @@
   function category(source) {
     if (["toolVote", "team"].includes(source.kind)) return "vote";
     if (["toolQuest", "quest"].includes(source.kind)) return "quest";
+    if (source.kind === "variant" && (["conversion", "fairy"].includes(source.resultType) || /^(?:本轮(?:阵营转换|不转换)|仙女查验已完成)$/.test(source.text || ""))) return "other";
     if (["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind)) return "skill";
     return "other";
+  }
+  function inspectionLabel(source) {
+    if (source.kind !== "variant" || (source.resultType !== "fairy" && source.text !== "仙女查验已完成")) return "";
+    return Number.isInteger(source.actor) && source.actor > 0 && Number.isInteger(source.target) && source.target > 0
+      ? `${source.actor}号查验了${source.target}号` : "";
   }
   function lastKey(history) { return history.length ? history[history.length - 1].key : -1; }
   function eventIcon(entry) {
@@ -42,7 +48,9 @@
   }
   function rows(state, history) {
     if (!state.historyOpen) return [];
-    return history.filter(entry => entry.key <= state.historySnapshotKey &&
+    // Number public records before category filtering; keep keys for lookup and reading state.
+    return history.map((entry, index) => ({ ...entry, recordNumber: index + 1 }))
+      .filter(entry => entry.key <= state.historySnapshotKey &&
       (state.historyFilter === "all" || entry.category === state.historyFilter)).slice().reverse().map(entry => ({
         ...entry,
         eventIcon: eventIcon(entry),
@@ -85,5 +93,5 @@
     const patch = { historyExpandedRows: { ...state.historyExpandedRows, [key]: !state.historyExpandedRows[key] } };
     return { ...patch, visibleHistory: rows({ ...state, ...patch }, state.history || []) };
   }
-  return { initialData, category, sync, open, filter, toggleRow };
+  return { initialData, category, inspectionLabel, sync, open, filter, toggleRow };
 });

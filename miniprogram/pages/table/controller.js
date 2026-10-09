@@ -160,7 +160,7 @@ function voteSummary(votes) {
 function toolHistory(h, key) {
   if (["skillDetail", "skillResult", "toolCutoff"].includes(h.kind))
     return { key, text: h.text, detail: h.detail || "" };
-  if (h.kind === "variant") return { key, text: h.text, detail: "" };
+  if (h.kind === "variant") return { key, text: h.text, detail: "", inspectionLabel: publicHistory.inspectionLabel(h) };
   if (h.kind === "toolVote")
     return {
       key,
@@ -819,7 +819,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
         entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
-      entry.latestDetail = entry.voteGroups ? voteSummary(source.votes) : entry.detail;
+      entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
       entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
     });

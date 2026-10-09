@@ -513,7 +513,7 @@ scenes.personalStats = {stats:{total:0,wins:0,losses:0,rateLabel:"—",excluded:
 // Public records: use the shared drawer model with the existing result card intact.
 const publicHistory = require('../miniprogram/public-history');
 const historyRows = Array.from({length: 9}, (_, key) => key % 3 === 0
-  ? {key, category: 'skill', text: '仙女查验已完成', timeLabel: '15:33'}
+  ? {key, category: 'other', text: '仙女查验已完成', timeLabel: '15:33'}
   : key % 3 === 1
     ? {key, category: 'vote', text: '投票通过', resultTone: 'success', teamLabel: '1、2、4 号', timeLabel: '16:32', voteGroups: [{label:'赞成',count:12,tone:'approve',seats:'1、2、3、4、5、6、7、8、9、10、11、12 号'},{label:'反对',count:0,tone:'reject',seats:'无'}]}
     : {key, category: 'quest', text: '任务成功', resultTone: 'success', teamLabel: '1、3、6 号', timeLabel: '16:34', cards:[{label:'成功',count:3,tone:'success'}],detail:'成功 3 张'});
@@ -523,14 +523,19 @@ scenes.publicHistoryClosed = historyBase;
 scenes.publicHistoryOpen = { ...historyBase, ...publicHistory.open(historyBase) };
 const refinedRows = historyRows.slice(0, 5).concat([
   { key: 6, category: 'skill', text: '技能结算', historyNote: '提前截止', timeLabel: '15:31', resultRows: [{label:'本轮出局',value:'3、7 号'},{label:'抽牌复活',value:'3、7 号'}] },
-  { key: 7, category: 'skill', text: '仙女查验已完成', timeLabel: '15:32' },
-  { key: 8, category: 'skill', text: '本轮阵营转换', timeLabel: '15:33' },
-  { key: 9, category: 'skill', text: '仙女查验已完成', timeLabel: '15:33' },
+  { key: 7, category: 'other', text: '仙女查验已完成', timeLabel: '15:32', inspectionLabel: '2号查验了10号', latestDetail: '2号查验了10号' },
+  { key: 8, category: 'other', text: '本轮阵营转换', timeLabel: '15:33' },
+  { key: 9, category: 'other', text: '仙女查验已完成', timeLabel: '15:33', inspectionLabel: '10号查验了12号', latestDetail: '10号查验了12号' },
 ]);
 const refinedHistory = { ...historyBase, history: refinedRows, historySeenKey: 9 };
 Object.assign(refinedHistory, publicHistory.open(refinedHistory));
 Object.assign(refinedHistory, publicHistory.toggleRow(refinedHistory, 6));
 scenes.publicHistoryRefined = refinedHistory;
+const fairyHistory = { ...historyBase, history: refinedRows, latestResult: refinedRows.at(-1), historyLatest: refinedRows.at(-1), historySeenKey: 9 };
+scenes.publicHistoryFairy = fairyHistory;
+const otherHistory = { ...fairyHistory, ...publicHistory.open(fairyHistory) };
+Object.assign(otherHistory, publicHistory.filter(otherHistory, 'other'));
+scenes.publicHistoryOther = otherHistory;
 scenes.publicHistoryHost = { ...historyBase,room: {...historyBase.room,phase:'teamVote',hasActiveOperation:true,closeWaiting:{mode:'settle',label:'结束等待'}},settleHint:'还差 2 人提交' };
 
 const css = fs

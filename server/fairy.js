@@ -65,6 +65,7 @@ function settle(room, faction) {
   s.fairyVisited.push(s.fairy);
   s.fairy = targetSeat;
   s.fairyRound = room.round;
+  return { actor: owner.seat, target: targetSeat };
 }
 module.exports = {
   state,

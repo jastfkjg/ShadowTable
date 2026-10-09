@@ -2009,8 +2009,34 @@ test("公开记录隐藏轮次推进，保留转换与最新结果的原记录�
   assert.deepEqual(Array.from(p.data.history, h => h.key), [1, 2]);
   p.openHistory();
   assert.equal(p.data.visibleHistory.length, 2);
+  assert.deepEqual(Array.from(p.data.visibleHistory, h => h.recordNumber), [2, 1]);
   assert.equal(p.data.latestResult.key, 2);
   assert.ok(p.data.latestResult.timeLabel);
+});
+
+test("小程序转换和查验归其他，最近查验显示座位并兼容旧记录", async () => {
+  const room = dealtRoom({ history: [
+    { kind: "variant", text: "本轮不转换", resultType: "conversion" },
+    { kind: "skillResult", text: "技能最终结果", detail: "无人出局" },
+    { kind: "variant", text: "仙女查验已完成", number: 2 },
+    { kind: "variant", text: "仙女查验已完成", resultType: "fairy", number: 3, actor: 10, target: 12 },
+  ] });
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.latestResult.latestDetail, "10号查验了12号");
+  assert.equal(p.data.history[2].inspectionLabel, "");
+  p.openHistory();
+  p.filterHistory({ currentTarget: { dataset: { filter: "skill" } } });
+  assert.deepEqual(Array.from(p.data.visibleHistory, h => h.key), [1]);
+  p.filterHistory({ currentTarget: { dataset: { filter: "other" } } });
+  assert.deepEqual(Array.from(p.data.visibleHistory, h => h.key), [3, 2, 0]);
+  assert.equal(p.data.visibleHistory[0].inspectionLabel, "10号查验了12号");
+  assert.equal(p.data.visibleHistory[0].hasDetails, false);
+  room.history.pop();
+  await p.refresh();
+  assert.equal(p.data.latestResult.text, "仙女查验已完成");
+  assert.equal(p.data.latestResult.latestDetail, "");
 });
 
 test("小程序胜负登记取消及阶段过期不提交", async () => {
