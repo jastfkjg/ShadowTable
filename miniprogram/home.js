@@ -68,6 +68,10 @@ module.exports = function createHomePage(initialTab = 0) {
     },
     onPageScroll(event) {
       if (!this.restoringTabScroll) this.tabScrollTops[this.data.activeTab] = event.scrollTop;
+      if (this.data.activeTab === 0 && this.startedPanels[0]) this.lobbyController.onPageScroll(event);
+    },
+    onResize(event) {
+      if (this.startedPanels[0]) this.lobbyController.onResize(event);
     },
     switchMainTab(index) {
       if (!this.alive || ![0, 1].includes(index) || index === this.data.activeTab) return;

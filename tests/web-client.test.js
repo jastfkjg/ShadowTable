@@ -8,7 +8,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   let scheduled, scheduledDelay;
   const events = {};
   const scrolls = [], lookups = [], navigations = [];
-  const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener() {}, hidden: true, classList: { add() {}, remove() {} } };
+  const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener(name, fn) { events['app:' + name] = fn; }, hidden: true, classList: { add() {}, remove() {} } };
   if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
@@ -25,6 +25,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   };
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
+  context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
@@ -33,6 +34,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
       viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
+      viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
       getWebSessionTag() { return webSessionTag; },
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
@@ -42,6 +44,95 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+function webSwipeEvent(code, x = 250, y = 400) {
+  const row = { dataset: { roomSwipe: code } };
+  const content = { closest: () => row };
+  return { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y,
+    target: { closest: selector => selector === '.room-swipe-content' ? content : row } };
+}
+function webSwipe(c, code, x = 60) {
+  c.startRoomSwipe(webSwipeEvent(code)); c.moveRoomSwipe(webSwipeEvent(code, x)); c.finishRoomSwipe();
+}
+test('网页左滑按身份和房间状态显示操作，关闭时不向键盘和读屏暴露隐藏按钮', () => {
+  const c = client(async () => response({}));
+  c.state.loading = false;
+  for (const [status, isHost, available, canDelete] of [['lobby',true,true,true], ['ended',true,true,true],
+    ['playing',true,true,false], ['lobby',false,true,false], ['unavailable',false,false,false]]) {
+    c.state.memberRooms = [{ code:'123456', status, isHost, available }];
+    c.closeRoomSwipe();
+    const closed = c.viewEntry();
+    assert.match(closed, /class="room-swipe-actions" aria-hidden="true" inert/);
+    webSwipe(c, '123456');
+    const open = c.viewEntry();
+    assert.equal(open.includes('data-kind="delete"'), canDelete);
+    assert.match(open, /class="room-swipe-actions" aria-hidden="false"/);
+    assert.match(open, /data-action="openRoomMenu"/);
+    assert.equal(c.state.roomSwipeOffset, canDelete ? -160 : -80);
+  }
+});
+test('网页左滑不写请求，纵滑和取消收起，只有一条展开且筛选和切页清理状态', async () => {
+  const writes = [];
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') writes.push(url);
+    return response(url.endsWith('/rooms') ? { rooms: [] } : {});
+  });
+  Object.assign(c.state, { loading:false, memberRooms:[{code:'123456',status:'lobby',isHost:true},{code:'234567',status:'playing',isHost:true}] });
+  webSwipe(c,'123456');
+  c.events['app:click']({ detail:1, preventDefault() {}, target:{ closest:() => null } });
+  assert.equal(writes.length,0);
+  webSwipe(c,'234567'); assert.equal(c.state.roomSwipeCode,'234567');
+  c.startRoomSwipe(webSwipeEvent('234567')); c.moveRoomSwipe(webSwipeEvent('234567',240,510)); c.finishRoomSwipe();
+  assert.equal(c.state.roomSwipeCode,'');
+  webSwipe(c,'123456'); c.startRoomSwipe(webSwipeEvent('123456')); c.finishRoomSwipe(true);
+  assert.equal(c.state.roomSwipeCode,'');
+  c.startRoomSwipe(webSwipeEvent('123456')); c.moveRoomSwipe(webSwipeEvent('123456',60)); c.closeRoomSwipe();
+  c.events['app:click']({ detail:1, preventDefault() {}, target:{ closest:()=>({dataset:{action:'openRoom',code:'123456'}}) } });
+  assert.equal(writes.length,0);
+  webSwipe(c,'123456'); c.ACTIONS.filterRooms({dataset:{filter:'lobby'}});
+  assert.equal(c.state.roomSwipeCode,'');
+  webSwipe(c,'123456'); await c.applyRoute('#/me');
+  assert.equal(c.state.roomSwipeCode,''); assert.equal(writes.length,0);
+});
+test('网页左滑移除沿用撤销接口，业务失败不显示成功也不丢失列表项', async () => {
+  let hidden = false, fail = false;
+  const writes = [];
+  const room = {code:'123456',status:'lobby',isHost:true,available:true};
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') {
+      const body = JSON.parse(options.body); writes.push({url,body});
+      if (fail) return {status:409,json:async()=>({error:'列表已更新'})};
+      hidden = body.action === 'hide'; return response({code:room.code,accepted:true});
+    }
+    return response({rooms:hidden?[]:[room]});
+  });
+  Object.assign(c.state,{loading:false,memberRooms:[room]});
+  webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'hide'}});
+  assert.equal(c.state.memberRooms.length,0); assert.equal(c.state.undoRoom.code,room.code);
+  await c.ACTIONS.undoRemoveRoom();
+  assert.equal(c.state.memberRooms.length,1); assert.equal(c.state.undoRoom,null);
+  assert.deepEqual(writes.map(x=>x.body.action),['hide','restore']);
+  fail = true; webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'hide'}});
+  assert.equal(c.state.memberRooms.length,1); assert.equal(c.state.undoRoom,null);
+});
+test('网页左滑解散须确认，取消不删除，快捷操作不解散已经开局的房间', async () => {
+  let status = 'lobby', allow = false;
+  const calls = [], dialogs = [];
+  const room = {code:'123456',status:'lobby',isHost:true,available:true,stage:'stage'};
+  const c = client(async (url, options) => {
+    calls.push({url,method:options.method});
+    if(url.endsWith('/management'))return response({...room,status});
+    return response({rooms:[{...room,status}]});
+  });
+  c.setConfirm(async (title, message) => {dialogs.push({title,message}); return allow;});
+  Object.assign(c.state,{loading:false,memberRooms:[room]});
+  webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});
+  assert.equal(dialogs.length,1); assert.match(dialogs[0].title,/解散房间 123456/);
+  assert.equal(calls.some(x=>x.url.endsWith('/delete')),false);
+  status='playing'; allow=true; webSwipe(c,room.code);
+  await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});
+  assert.equal(dialogs.length,1); assert.equal(calls.some(x=>x.url.endsWith('/delete')),false);
+  assert.match(c.state.notice,/状态已更新/);
+});
 test('网页读取旧趣味响应时同步转换统计、比例、历史摘要和事件文案', async () => {
   const legacy = require('./helpers/fun-copy-fixtures');
   const before = JSON.stringify(legacy);

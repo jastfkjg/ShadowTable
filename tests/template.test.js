@@ -1383,6 +1383,27 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   assert.equal(nodes(sheet).filter(n => n.attr?.role === 'alert').length, 1);
 });
 
+test('小程序左滑按钮仅展开时出现，按房主状态提供解散且保留卡片内容和菜单', () => {
+  const swipe = require('../miniprogram/room-swipe');
+  for (const [status, isHost, available] of [['lobby',true,true],['ended',true,true],['playing',true,true],['lobby',false,true],['unavailable',false,false]]) {
+    const room = {code:'123456',status,isHost,available};
+    room.canSwipeDissolve = swipe.canDissolve(room);
+    const data = {...base,memberRooms:[room],visibleMemberRooms:[room],roomSwipeCode:'',roomSwipeOffset:0,roomSwipeDragging:false,roomsRefreshing:false};
+    assert.equal(nodes(render(data)).filter(n=>n.attr?.catchtap==='swipeRoomAction').length,0);
+    const tree = render({...data,roomSwipeCode:room.code,roomSwipeOffset:-swipe.width(room)});
+    const buttons = nodes(tree).filter(n=>n.attr?.catchtap==='swipeRoomAction');
+    assert.equal(buttons.length,room.canSwipeDissolve?2:1);
+    assert.equal(buttons[0].attr['data-kind'],'hide');
+    assert.equal(buttons[0].attr.disabled,false);
+    assert.ok(byHandler(tree,'openRoomMenu'));
+    const wrapper = nodes(tree).find(n=>n.attr?.bindtouchmove==='moveRoomSwipe');
+    assert.equal(wrapper.attr.bindtouchstart,'startRoomSwipe');
+    const card = nodes(tree).find(n=>n.attr?.class?.includes('room-swipe-content'));
+    assert.match(card.attr.style,/translateX\(-(?:160|80)px\)/);
+    assert.equal(nodes(render({...data,roomSwipeCode:room.code,roomSwipeOffset:-20,roomSwipeDragging:true})).find(n=>n.attr?.catchtap==='swipeRoomAction').attr.disabled,true);
+  }
+});
+
 test('点击卡片标题、房间号文字和空白进入房间，仅复制图标捕获复制事件', () => {
   const room = { code: '123456', boardName: '阿瓦隆 · 十二骑士', status: 'lobby', statusLabel: '待开局', compactRelation: '我是房主 · 1号' };
   const tree = render({ ...base, memberRooms: [room], visibleMemberRooms: [room] });

@@ -32,6 +32,23 @@
 .room-refresh-icon { width: 32rpx; height: 32rpx; }
 .room-refresh-icon.is-refreshing { animation: home-refresh-spin 900ms linear infinite; }
 .home-lobby .member-room.room-list-item { display: block; padding: 22rpx 24rpx 0; margin: 0 0 18rpx; background: var(--surface); border: 1rpx solid var(--home-card-border); border-radius: 20rpx; }
+.home-lobby .room-swipe { --swipe-remove-bg: #405360; --swipe-danger-bg: #a94440; position: relative; overflow: hidden; border-radius: 20rpx; margin-bottom: 18rpx; }
+.home-lobby .room-swipe .room-swipe-content { position: relative; z-index: 1; width: 100%; box-sizing: border-box; margin: 0; transition: transform 180ms ease-out; }
+.home-lobby .room-swipe.is-dragging .room-swipe-content { transition: none; }
+.room-swipe-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; }
+.home-lobby button.room-swipe-action,
+.home-lobby button.room-swipe-action[disabled]:not([type]) { display: flex; flex-direction: column; justify-content: center; gap: 12rpx; width: 80px; min-width: 80px; min-height: 48px; height: 100%; margin: 0; padding: 16rpx 8rpx; border: 0; border-radius: 0; background: var(--swipe-remove-bg); color: var(--text); font-size: 30rpx; line-height: 1.4; }
+.home-lobby button.room-swipe-action.danger,
+.home-lobby button.room-swipe-action.danger[disabled]:not([type]) { background: var(--swipe-danger-bg); }
+.home-lobby button.room-swipe-action[disabled]:not([type]) { opacity: 1; }
+.room-swipe-label { display: flex; flex-direction: column; }
+.room-swipe-pressed { opacity: .8; }
+.room-swipe-remove-icon { position: relative; width: 22px; height: 22px; border: 1.5px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.room-swipe-remove-icon::after { content: ''; position: absolute; width: 10px; height: 1.5px; top: 9px; left: 4.5px; background: currentColor; }
+.room-swipe-dissolve-icon { position: relative; width: 20px; height: 24px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; }
+.room-swipe-dissolve-icon > view { position: absolute; width: 13px; height: 1.5px; right: -5px; top: 10px; background: currentColor; box-shadow: 0 0 0 3px var(--swipe-danger-bg); }
+.room-swipe-dissolve-icon > view::after { content: ''; position: absolute; width: 6px; height: 6px; left: 0; top: -3px; border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .home-lobby .room-swipe .room-swipe-content { transition: none; } }
 .home-lobby .room-list-top { align-items: center; gap: 12rpx; padding-right: 54rpx; }
 .home-lobby .room-list-title { font-size: 30rpx; font-weight: 600; line-height: 1.5; }
 .home-lobby .room-status { padding: 2rpx 14rpx; border-radius: 24rpx; font-size: 22rpx; line-height: 1.5; background: var(--home-divider); color: var(--muted); white-space: nowrap; }

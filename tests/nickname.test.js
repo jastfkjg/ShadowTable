@@ -228,6 +228,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     setTimeout() { return 1; }, clearTimeout() {}, console };
   const source = readFileSync(resolve(__dirname, '../server/web/app.js'), 'utf8');
+  context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
     window.test = { state, applyRoute, ACTIONS, viewEntry };

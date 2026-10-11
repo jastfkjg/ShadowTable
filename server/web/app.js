@@ -5,6 +5,7 @@
   const resultRegistration = window.shadowtableResultRegistration;
   const resultFlow = resultRegistration.flow;
   const publicHistory = window.shadowtablePublicHistory;
+  const roomSwipe = window.shadowtableRoomSwipe;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -620,6 +621,9 @@
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
+    roomSwipeCode: "",
+    roomSwipeOffset: 0,
+    roomSwipeDragging: false,
     roomMenu: null,
     noteRoom: null,
     roomNoteDraft: "",
@@ -1072,6 +1076,7 @@
     } catch (e) {}
   }
   function mask() {
+    closeRoomSwipe();
     state.historyOpen = false;
     closePlayerCard(false);
     generation++;
@@ -1246,7 +1251,7 @@ function roomListItems(rooms) {
 }
   async function loadRooms() {
     var data = await request("/api/me/rooms");
-    if (alive) { connectionRecovered(); setState({ memberRooms: roomListItems(data.rooms), serverConnected: true }); }
+    if (alive) { closeRoomSwipe(); connectionRecovered(); setState({ memberRooms: roomListItems(data.rooms), serverConnected: true }); }
   }
   function nicknameValue() {
     var el = document.getElementById("nickname");
@@ -1904,6 +1909,7 @@ function roomListItems(rooms) {
     mutate("/api/rooms/" + code + "/join", { name: name, ...entryNicknameData() }, "enter");
   }
   async function openRoom(code) {
+    if (state.roomSwipeCode) { closeRoomSwipe(); return; }
     if (state.busy || pending) return;
     var target = state.memberRooms.filter(function (r) {
       return r.code === code;
@@ -1923,8 +1929,81 @@ function roomListItems(rooms) {
     return mutate("/api/me/rooms/" + code, { action: "visit" }, "entryVisit");
   }
   var undoRoomTimer;
+  var roomSwipeGesture = null, roomSwipePointer = null, roomSwipeTapUntil = 0;
+  function paintRoomSwipe() {
+    // Move the existing DOM during a drag: a full render would replace the touched element.
+    if (typeof app.querySelectorAll !== "function") return;
+    for (const row of app.querySelectorAll('[data-room-swipe]')) {
+      const active = row.dataset.roomSwipe === state.roomSwipeCode;
+      row.classList.toggle('is-dragging', active && state.roomSwipeDragging);
+      row.classList.toggle('is-exposed', active && state.roomSwipeOffset < 0);
+      row.classList.toggle('is-open', active && !state.roomSwipeDragging && state.roomSwipeOffset < 0);
+      row.querySelector('.room-swipe-content').style.transform = active && state.roomSwipeDragging ? 'translateX(' + state.roomSwipeOffset + 'px)' : '';
+      const actions = row.querySelector('.room-swipe-actions');
+      const enabled = active && !state.roomSwipeDragging && !state.busy && !pending && !state.loading && !state.roomsRefreshing;
+      actions.setAttribute('aria-hidden', String(!enabled));
+      actions.inert = !enabled;
+      for (const button of actions.querySelectorAll('button')) button.disabled = !enabled;
+    }
+  }
+  function closeRoomSwipe() {
+    if (roomSwipeGesture?.axis) roomSwipeTapUntil = Date.now() + 400;
+    const pointer = roomSwipePointer;
+    roomSwipeGesture = null;
+    roomSwipePointer = null;
+    if (pointer?.content.hasPointerCapture?.(pointer.id)) pointer.content.releasePointerCapture(pointer.id);
+    if (!state.roomSwipeCode && !state.roomSwipeDragging) return;
+    state.roomSwipeCode = ''; state.roomSwipeOffset = 0; state.roomSwipeDragging = false;
+    paintRoomSwipe();
+  }
+  function startRoomSwipe(event) {
+    roomSwipeTapUntil = 0;
+    if (event.isPrimary === false) return finishRoomSwipe(true);
+    if (event.pointerType === 'mouse' || state.page !== 'lobby' || state.busy || pending || state.loading || state.roomsRefreshing) return;
+    const row = event.target.closest('[data-room-swipe]');
+    const content = event.target.closest('.room-swipe-content') || row?.querySelector('.room-swipe-content');
+    if (!row) return;
+    const room = state.memberRooms.find(r => r.code === row.dataset.roomSwipe);
+    if (!room) return;
+    const opened = state.roomSwipeCode === room.code;
+    if (!opened) closeRoomSwipe();
+    roomSwipeGesture = roomSwipe.start(room, { x: event.clientX, y: event.clientY }, opened);
+    roomSwipePointer = { id: event.pointerId, content };
+  }
+  function moveRoomSwipe(event) {
+    if (!roomSwipeGesture || event.pointerId !== roomSwipePointer?.id) return;
+    if (state.busy || pending || state.loading) return finishRoomSwipe(true);
+    const gesture = roomSwipe.move(roomSwipeGesture, { x: event.clientX, y: event.clientY });
+    if (gesture.axis === 'x') {
+      if (!roomSwipePointer.content.hasPointerCapture?.(event.pointerId)) roomSwipePointer.content.setPointerCapture?.(event.pointerId);
+      state.roomSwipeCode = gesture.code; state.roomSwipeOffset = gesture.offset; state.roomSwipeDragging = true;
+      paintRoomSwipe();
+    } else if (gesture.axis === 'y') {
+      state.roomSwipeCode = ''; state.roomSwipeOffset = 0; state.roomSwipeDragging = false;
+      paintRoomSwipe();
+    }
+  }
+  function finishRoomSwipe(cancelled = false, event) {
+    if (!roomSwipeGesture || (event && event.pointerId !== roomSwipePointer?.id)) return;
+    const gesture = roomSwipeGesture, pointer = roomSwipePointer;
+    roomSwipeGesture = null; roomSwipePointer = null;
+    if (gesture.axis || cancelled) roomSwipeTapUntil = Date.now() + 400;
+    const offset = roomSwipe.settle(gesture, cancelled);
+    state.roomSwipeCode = offset ? gesture.code : ''; state.roomSwipeOffset = offset; state.roomSwipeDragging = false;
+    paintRoomSwipe();
+    if (pointer.content.hasPointerCapture?.(pointer.id)) pointer.content.releasePointerCapture(pointer.id);
+  }
+  async function swipeRoomAction(code, kind) {
+    if (state.busy || pending || state.loading || state.roomsRefreshing || state.roomSwipeDragging) return;
+    const room = state.memberRooms.find(r => r.code === code);
+    if (!room || state.roomSwipeCode !== code) return;
+    closeRoomSwipe();
+    if (kind === 'hide') return mutate('/api/me/rooms/' + code, { action: 'hide' }, 'entryHide');
+    if (kind === 'delete' && roomSwipe.canDissolve(room)) return deleteRoom(code, true);
+  }
   async function refreshRooms() {
     if (state.busy || pending || state.loading || state.roomsRefreshing) return;
+    closeRoomSwipe();
     setState({ roomsRefreshing: true });
     try { await loadRooms(); } catch (e) { handleError(e); }
     finally { setState({ roomsRefreshing: false }); }
@@ -1948,12 +2027,17 @@ function roomListItems(rooms) {
       finally { setState({ busy: false }); }
     }
   }
-  async function deleteRoom(code) {
+  async function deleteRoom(code, fromSwipe = false) {
     if (state.busy || pending) return;
     setState({ busy: true, error: "" });
     try {
       var room = await request("/api/rooms/" + code + "/management");
       if (!room.isHost) throw new Error("只有当前房主可以删除牌桌");
+      if (fromSwipe && !roomSwipe.canDissolve(room)) {
+        await loadRooms();
+        setState({ notice: "房间状态已更新，解散请使用房间管理" });
+        return;
+      }
       if (
         !(await confirm(
           "解散房间 " + code + "？",
@@ -3482,9 +3566,16 @@ function roomListItems(rooms) {
     if (state.undoRoom) html += '<div class="room-undo" role="status"><span>已从列表移除 ' + esc(state.undoRoom.code) + '</span>' + btn("history-toggle", "undoRemoveRoom", "撤销", null, state.busy || !!pending) + '</div>';
     var visible = state.memberRooms.filter(function (r) { return state.roomListFilter === "all" || r.status === state.roomListFilter; });
     visible.forEach(function (m) {
-      html += '<div class="member-room room-list-item ' + (m.available === false ? 'is-unavailable' : '') + '"><button type="button" class="room-list-open" data-action="openRoom" data-code="' + esc(m.code) + '"' + (state.busy || state.loading || pending || m.available === false ? ' disabled' : '') + '><span class="room-list-top"><span class="room-list-title">' + esc(m.note || '房间 ' + m.code) + '</span><span class="room-status ' + esc(m.status) + '">' + esc(m.statusLabel) + '</span></span>' +
+      const active = state.roomSwipeCode === m.code, exposed = active && state.roomSwipeOffset < 0;
+      const locked = state.busy || state.loading || pending || state.roomsRefreshing || state.roomSwipeDragging || !active;
+      const swipeButton = function (kind, label, icon) {
+        return '<button type="button" class="room-swipe-action' + (kind === 'delete' ? ' danger' : '') + '" data-action="swipeRoomAction" data-kind="' + kind + '" data-code="' + esc(m.code) + '" aria-label="' + label + '，房间' + esc(m.code) + (kind === 'delete' ? '，需再次确认' : '，保留房间和座位') + '"' + (locked ? ' disabled' : '') + '><span class="' + icon + '" aria-hidden="true">' + (kind === 'delete' ? '<span></span>' : '') + '</span><span class="room-swipe-label"><span>' + label.slice(0, 2) + '</span><span>' + label.slice(2) + '</span></span></button>';
+      };
+      html += '<div class="room-swipe' + (roomSwipe.canDissolve(m) ? ' has-dissolve' : '') + (exposed ? ' is-exposed' : '') + (active && state.roomSwipeDragging ? ' is-dragging' : active ? ' is-open' : '') + '" data-room-swipe="' + esc(m.code) + '"><div class="room-swipe-actions" aria-hidden="' + !!locked + '"' + (locked ? ' inert' : '') + '>' + swipeButton('hide', '移除记录', 'room-swipe-remove-icon') +
+        (roomSwipe.canDissolve(m) ? swipeButton('delete', '解散房间', 'room-swipe-dissolve-icon') : '') + '</div>';
+      html += '<div class="member-room room-list-item room-swipe-content ' + (m.available === false ? 'is-unavailable' : '') + '"><button type="button" class="room-list-open" data-action="openRoom" data-code="' + esc(m.code) + '"' + (state.busy || state.loading || pending || m.available === false ? ' disabled' : '') + '><span class="room-list-top"><span class="room-list-title">' + esc(m.note || '房间 ' + m.code) + '</span><span class="room-status ' + esc(m.status) + '">' + esc(m.statusLabel) + '</span></span>' +
         (m.note ? '<span class="small muted">房间 ' + esc(m.code) + '</span>' : '') + '<span class="room-list-board">' + esc(m.boardName) + ' · ' + esc(m.peopleLabel) + '</span><span class="room-list-meta"><span class="room-host-name">房主：' + esc(m.hostName || '未知') + '</span><span>' + esc(m.relationLabel) + '</span></span><span class="room-list-time">最近活动 ' + esc(m.activityLabel) + '</span></button>' +
-        '<button type="button" class="room-more" data-action="openRoomMenu" data-code="' + esc(m.code) + '" aria-label="管理房间' + esc(m.code) + '的个人记录"' + (state.busy || state.loading || pending ? ' disabled' : '') + '>⋯</button></div>';
+        '<button type="button" class="room-more" data-action="openRoomMenu" data-code="' + esc(m.code) + '" aria-label="管理房间' + esc(m.code) + '的个人记录"' + (state.busy || state.loading || pending ? ' disabled' : '') + '>⋯</button></div></div>';
     });
     if (!state.memberRooms.length && !state.loading) html += '<div class="room-empty"><div>还没有牌桌</div><div class="room-empty-actions">' + btn("secondary","switchEntry","加入房间",{mode:"join",scroll:"true"},state.busy || !!pending) + btn("secondary","switchEntry","创建房间",{mode:"create",scroll:"true"},state.busy || !!pending) + '</div></div>';
     else if (!visible.length) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
@@ -4383,8 +4474,9 @@ function roomListItems(rooms) {
       openRoom(el.dataset.code);
     },
     refreshRooms: refreshRooms,
-    filterRooms: function (el) { if (["all", "playing", "lobby", "ended", "unavailable"].includes(el.dataset.filter)) setState({ roomListFilter: el.dataset.filter }); },
-    openRoomMenu: function (el) { if (!state.busy && !pending) setState({ roomMenu: state.memberRooms.find(function (r) { return r.code === el.dataset.code; }) || null }); },
+    filterRooms: function (el) { closeRoomSwipe(); if (["all", "playing", "lobby", "ended", "unavailable"].includes(el.dataset.filter)) setState({ roomListFilter: el.dataset.filter }); },
+    openRoomMenu: function (el) { closeRoomSwipe(); if (!state.busy && !pending) setState({ roomMenu: state.memberRooms.find(function (r) { return r.code === el.dataset.code; }) || null }); },
+    swipeRoomAction: function (el) { return swipeRoomAction(el.dataset.code, el.dataset.kind); },
     closeRoomMenu: function () { if (!state.busy && !pending) setState({ roomMenu: null, noteRoom: null }); },
     roomMenuAction: function (el) { return roomMenuAction(el.dataset.kind); },
     saveRoomNote: function () { if (state.noteRoom) return mutate("/api/me/rooms/" + state.noteRoom.code, { action: "note", note: state.roomNoteDraft }, "entryNote"); },
@@ -4653,6 +4745,12 @@ function roomListItems(rooms) {
     if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
+    if (e.detail !== 0 && Date.now() < roomSwipeTapUntil) { e.preventDefault(); return; }
+    if (state.roomSwipeCode && !e.target.closest('.room-swipe-actions')) {
+      const closeOnly = e.target.closest('.room-swipe-content') && !e.target.closest('[data-action="openRoomMenu"]');
+      closeRoomSwipe();
+      if (closeOnly) { e.preventDefault(); return; }
+    }
     if (e.target?.hasAttribute?.('data-public-history-backdrop')) return closeHistory();
     if (e.target?.hasAttribute?.('data-identity-history-backdrop')) return closeIdentityHistory();
     if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
@@ -4665,7 +4763,7 @@ function roomListItems(rooms) {
       return;
     }
     var t = e.target.closest("[data-action]");
-    if (!t) return;
+    if (!t || t.disabled) return;
     var fn = ACTIONS[t.dataset.action];
     if (fn) fn(t);
   });
@@ -4695,6 +4793,20 @@ function roomListItems(rooms) {
   });
 
   // ===== lifecycle =====
+  app.addEventListener('pointerdown', startRoomSwipe);
+  document.addEventListener('pointerdown', function (event) {
+    if (state.roomSwipeCode && !event.target.closest('[data-room-swipe]')) closeRoomSwipe();
+  });
+  document.addEventListener('pointermove', moveRoomSwipe);
+  document.addEventListener('pointerup', function (event) { finishRoomSwipe(false, event); });
+  document.addEventListener('pointercancel', function (event) { finishRoomSwipe(true, event); });
+  window.addEventListener('resize', closeRoomSwipe);
+  window.addEventListener('scroll', function () {
+    if (roomSwipeGesture?.axis !== 'x') closeRoomSwipe();
+  }, { passive: true });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && state.roomSwipeCode) { closeRoomSwipe(); event.preventDefault(); }
+  });
   window.addEventListener("scroll", showIdentityHintWhenVisible, { passive: true });
   window.addEventListener("resize", showIdentityHintWhenVisible);
   document.addEventListener("keydown", function (event) {

@@ -4,6 +4,7 @@ const funCopy = require("../../fun-copy");
 const roomShare = require("../../room-share");
 const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
+const roomSwipe = require("../../room-swipe");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
 function roomListItems(rooms) {
@@ -14,6 +15,7 @@ function roomListItems(rooms) {
     const clock = time ? `${String(time.getHours()).padStart(2,"0")}:${String(time.getMinutes()).padStart(2,"0")}` : "";
     const day = time?.toDateString() === today.toDateString() ? "" : time?.toDateString() === yesterday.toDateString() ? "昨天 " : time ? `${time.getFullYear() === today.getFullYear() ? "" : time.getFullYear() + "/"}${time.getMonth()+1}/${time.getDate()} ` : "";
     return { ...r,
+      canSwipeDissolve: roomSwipe.canDissolve(r),
       statusLabel: ({ lobby: "待开局", playing: "进行中", ended: "已结束", unavailable: "已失效" })[r.status] || r.phaseName || "待开局",
       peopleLabel: r.status === "lobby" ? `${r.occupied || 0}/${r.capacity} 人已入座` : `${r.capacity} 人`,
       relationLabel: r.available === false ? r.phaseName : `${r.isHost ? "我是房主" : r.relation === "旁观者" ? "旁观者" : "玩家"}${r.seat != null ? " · 我在" + r.seat + "号" : ""}`,
@@ -292,6 +294,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     memberRooms: [],
     visibleMemberRooms: [],
     roomListFilter: "all",
+    roomSwipeCode: "",
+    roomSwipeOffset: 0,
+    roomSwipeDragging: false,
     roomMenu: null,
     noteRoom: null,
     roomNoteDraft: "",
@@ -363,14 +368,17 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   onHide() {
     this.foreground = false;
+    this.dismissRoomSwipe();
     this.resetEntryFocus();
     clearTimeout(this.timer);
     this.mask();
   },
   onPageScroll() {
+    if (this.roomSwipeGesture?.axis !== "x") this.dismissRoomSwipe();
     this.showIdentityHintWhenVisible();
   },
   onResize() {
+    this.dismissRoomSwipe();
     this.showIdentityHintWhenVisible();
   },
   onUnload() {
@@ -390,6 +398,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (Object.keys(changed).length) this.setData(changed);
   },
   mask() {
+    this.dismissRoomSwipe();
     this.closePlayerCard();
     this.generation = (this.generation || 0) + 1;
     this.actionGeneration = (this.actionGeneration || 0) + 1;
@@ -600,6 +609,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.alive && sequence === this.roomsReadSequence) {
       this.connectionRecovered();
       const items = roomListItems(rooms);
+      this.dismissRoomSwipe();
       this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false), visibleMemberRooms: items.filter(r => this.data.roomListFilter === "all" || r.status === this.data.roomListFilter), serverConnected: true, network: true });
     }
   },
@@ -964,10 +974,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   filterRooms(e) {
     const filter = e.currentTarget.dataset.filter;
     if (!this.data.roomFilters.some(f => f.id === filter)) return;
+    this.dismissRoomSwipe();
     this.setData({ roomListFilter: filter, visibleMemberRooms: this.data.memberRooms.filter(r => filter === "all" || r.status === filter) });
   },
   async refreshRooms() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
+    this.dismissRoomSwipe();
     this.setData({ roomsRefreshing: true });
     try {
       if (this.data.isLobby) await this.refreshLobby();
@@ -978,8 +990,62 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   openRoomMenu(e) {
     if (this.data.busy || this.pending) return;
+    if (this.consumeRoomSwipeTap()) return;
+    this.dismissRoomSwipe();
     this.setData({ roomMenu: this.data.memberRooms.find(r => r.code === e.currentTarget.dataset.code) || null });
   },
+  dismissRoomSwipe() {
+    if (this.roomSwipeGesture?.axis) this.roomSwipeTapUntil = Date.now() + 400;
+    this.roomSwipeGesture = null;
+    if (this.data.roomSwipeCode || this.data.roomSwipeDragging)
+      this.setData({ roomSwipeCode: "", roomSwipeOffset: 0, roomSwipeDragging: false });
+  },
+  consumeRoomSwipeTap() { return Date.now() < (this.roomSwipeTapUntil || 0); },
+  startRoomSwipe(e) {
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing || this.data.enteringCode) return;
+    if (e.touches?.length !== 1) return this.cancelRoomSwipe();
+    const room = this.data.memberRooms.find(r => r.code === e.currentTarget.dataset.code);
+    if (!room) return;
+    this.roomSwipeTapUntil = 0;
+    const opened = this.data.roomSwipeCode === room.code;
+    if (!opened) this.dismissRoomSwipe();
+    const touch = e.touches[0];
+    this.roomSwipeGesture = roomSwipe.start(room, { x: touch.clientX ?? touch.pageX, y: touch.clientY ?? touch.pageY }, opened);
+  },
+  moveRoomSwipe(e) {
+    const gesture = this.roomSwipeGesture;
+    if (!gesture) return;
+    if (e.touches?.length !== 1 || this.data.busy || this.pending) return this.cancelRoomSwipe();
+    const touch = e.touches[0];
+    roomSwipe.move(gesture, { x: touch.clientX ?? touch.pageX, y: touch.clientY ?? touch.pageY });
+    if (gesture.axis === "y") {
+      this.setData({ roomSwipeCode: "", roomSwipeOffset: 0, roomSwipeDragging: false });
+    } else if (gesture.axis === "x") {
+      this.setData({ roomSwipeCode: gesture.code, roomSwipeOffset: gesture.offset, roomSwipeDragging: true });
+    }
+  },
+  endRoomSwipe() {
+    const gesture = this.roomSwipeGesture;
+    if (!gesture) return;
+    this.roomSwipeGesture = null;
+    if (gesture.axis) this.roomSwipeTapUntil = Date.now() + 400;
+    const offset = roomSwipe.settle(gesture);
+    this.setData({ roomSwipeCode: offset ? gesture.code : "", roomSwipeOffset: offset, roomSwipeDragging: false });
+  },
+  cancelRoomSwipe() {
+    if (this.roomSwipeGesture) this.roomSwipeTapUntil = Date.now() + 400;
+    this.dismissRoomSwipe();
+  },
+  async swipeRoomAction(e) {
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing || this.consumeRoomSwipeTap()) return;
+    const { code, kind } = e.currentTarget.dataset;
+    const room = this.data.memberRooms.find(r => r.code === code);
+    if (!room || this.data.roomSwipeCode !== code || this.data.roomSwipeDragging) return;
+    this.dismissRoomSwipe();
+    if (kind === "hide") return this.mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
+    if (kind === "delete" && roomSwipe.canDissolve(room)) return this.deleteRoom(e, true);
+  },
+  startRoomSwipeAction() { this.roomSwipeTapUntil = 0; },
   closeRoomMenu() { if (!this.data.busy && !this.pending) this.setData({ roomMenu: null, noteRoom: null }); },
   inputRoomNote(e) { this.setData({ roomNoteDraft: e.detail.value }); },
   saveRoomNote() {
@@ -1011,13 +1077,18 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       finally { this.setData({ busy: false }); }
     }
   },
-  async deleteRoom(e) {
+  async deleteRoom(e, fromSwipe = false) {
     if (this.data.busy || this.pending) return;
     const code = e.currentTarget.dataset.code;
     this.setData({ busy: true, error: "" });
     try {
       const room = await api.request("/api/rooms/" + code + "/management");
       if (!room.isHost) throw new Error("只有当前房主可以删除牌桌");
+      if (fromSwipe && !roomSwipe.canDissolve(room)) {
+        await this.loadRooms();
+        this.setData({ notice: "房间状态已更新，解散请使用房间管理" });
+        return;
+      }
       if (
         !(await this.confirm(
           "解散房间 " + code + "？",
@@ -1078,6 +1149,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   resumePending() { if (this.data.pendingTableCode) return this.enterTable(this.data.pendingTableCode); },
   async openRoom(e) {
+    if (this.consumeRoomSwipeTap()) return;
+    if (this.data.roomSwipeCode) { this.dismissRoomSwipe(); return; }
     if (this.data.busy || this.pending || this.data.enteringCode || this.data.loading) return;
     const target = this.data.memberRooms.find(
       (r) => r.code === e.currentTarget.dataset.code,
@@ -1120,6 +1193,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   switchEntry(e) {
     if (this.data.busy || this.pending) return;
+    this.dismissRoomSwipe();
     const mode = e.currentTarget.dataset.mode;
     if (!["join", "create"].includes(mode)) return;
     this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
@@ -1186,6 +1260,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     });
   },
   copyListedRoom(e) {
+    if (this.consumeRoomSwipeTap()) return;
+    if (this.data.roomSwipeCode) { this.dismissRoomSwipe(); return; }
     const code = e.currentTarget.dataset.code;
     if (this.data.memberRooms.some(room => room.code === code)) wx.setClipboardData?.({ data: code });
   },

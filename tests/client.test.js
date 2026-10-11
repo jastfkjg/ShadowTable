@@ -36,6 +36,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name === '../../room-share') return require('../miniprogram/room-share');
         if (name === '../../public-history') return require('../miniprogram/public-history');
+        if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
         if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -1728,8 +1729,11 @@ test("首页个人牌桌备注、移除撤销和重新进入保持座位，列�
     lobby.inputRoomNote({detail:{value:'周五朋友局'}});
     await lobby.saveRoomNote();
     assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
-    lobby.openRoomMenu({currentTarget:{dataset:{code}}});
-    await lobby.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+    lobby.startRoomSwipe({currentTarget:{dataset:{code}}, touches:[{clientX:200,clientY:100}]});
+    lobby.moveRoomSwipe({touches:[{clientX:80,clientY:100}]});
+    lobby.endRoomSwipe();
+    lobby.startRoomSwipeAction();
+    await lobby.swipeRoomAction({currentTarget:{dataset:{code,kind:'hide'}}});
     assert.equal(lobby.data.memberRooms.length, 0);
     assert.equal(lobby.data.undoRoom.code, code);
     await lobby.undoRemoveRoom();

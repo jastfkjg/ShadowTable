@@ -48,6 +48,68 @@ const renderHistoryShell = factory => data => factory('pages/matches/matches.wxm
 const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[],byBoard:[],recent:[] };
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
+const swipeEvent = (code, x = 250, y = 400) => ({ currentTarget: { dataset: { code } }, touches: [{ clientX: x, clientY: y }] });
+test('小程序左滑不触发进入或删除，一次展开一条，点击卡片仅收起并保留菜单入口', async () => {
+  const { p } = page('lobby', apiBase);
+  const rooms = [{ code: '123456', status: 'lobby', isHost: true }, { code: '234567', status: 'playing', isHost: true }];
+  p.setData({ loading: false, memberRooms: rooms, visibleMemberRooms: rooms });
+  let writes = 0;
+  p.mutate = async () => { writes++; };
+  const drag = (code, x) => { p.startRoomSwipe(swipeEvent(code)); p.moveRoomSwipe(swipeEvent(code, x)); p.endRoomSwipe(); };
+  drag('123456', 50);
+  assert.equal(p.data.roomSwipeCode, '123456'); assert.equal(p.data.roomSwipeOffset, -160);
+  await p.openRoom(swipeEvent('123456'));
+  assert.equal(writes, 0);
+  drag('234567', 120);
+  assert.equal(p.data.roomSwipeCode, '234567'); assert.equal(p.data.roomSwipeOffset, -80);
+  p.startRoomSwipe(swipeEvent('234567')); p.endRoomSwipe();
+  await p.openRoom(swipeEvent('234567'));
+  assert.equal(p.data.roomSwipeCode, ''); assert.equal(writes, 0);
+  drag('123456', 60);
+  p.startRoomSwipe(swipeEvent('123456')); p.endRoomSwipe();
+  p.openRoomMenu(swipeEvent('123456'));
+  assert.equal(p.data.roomMenu.code, '123456'); assert.equal(p.data.roomSwipeCode, '');
+  p.closeRoomMenu();
+  drag('123456', 60); p.filterRooms({ currentTarget: { dataset: { filter: 'lobby' } } });
+  assert.equal(p.data.roomSwipeCode, '');
+  drag('123456', 60); p.onHide();
+  assert.equal(p.data.roomSwipeCode, '');
+  p.onUnload();
+});
+test('小程序纵滑、取消和多指操作均不展开，滑动状态不会随首页切换保留', () => {
+  const { p } = page('lobby', apiBase);
+  p.setData({ loading: false, memberRooms: [{ code: '123456', status: 'lobby', isHost: true }] });
+  p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe(swipeEvent('123456', 240, 500)); p.endRoomSwipe();
+  assert.equal(p.data.roomSwipeCode, '');
+  p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe(swipeEvent('123456', 50)); p.cancelRoomSwipe();
+  assert.equal(p.data.roomSwipeCode, '');
+  p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe({ touches: [{}, {}] }); p.endRoomSwipe();
+  assert.equal(p.data.roomSwipeCode, '');
+  p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe(swipeEvent('123456', 50)); p.dismissRoomSwipe();
+  assert.equal(p.consumeRoomSwipeTap(), true);
+});
+test('小程序左滑解散保留二次确认，状态已变为进行中时不发解散请求', async () => {
+  let status = 'lobby', confirmed = false;
+  const calls = [], dialogs = [];
+  const room = { code: '123456', status: 'lobby', isHost: true, available: true, stage: 'stage' };
+  const { p } = page('lobby', { ...apiBase, request: async (url, method) => {
+    calls.push({ url, method });
+    if (url.endsWith('/management')) return { ...room, status };
+    return { rooms: [{ ...room, status }] };
+  } }, { wx: { showModal(o) { dialogs.push(o); o.success({ confirm: confirmed }); } } });
+  p.setData({ loading: false, memberRooms: [room] });
+  const act = async () => {
+    p.startRoomSwipe(swipeEvent(room.code)); p.moveRoomSwipe(swipeEvent(room.code, 50)); p.endRoomSwipe();
+    p.startRoomSwipeAction();
+    await p.swipeRoomAction({ currentTarget: { dataset: { code: room.code, kind: 'delete' } } });
+  };
+  await act();
+  assert.equal(dialogs.length, 1); assert.match(dialogs[0].title, /解散房间 123456/);
+  assert.equal(calls.some(c => c.url.endsWith('/delete')), false);
+  status = 'playing'; confirmed = true; await act();
+  assert.equal(dialogs.length, 1); assert.equal(calls.some(c => c.url.endsWith('/delete')), false);
+  assert.match(p.data.notice, /状态已更新/);
+});
 test('旧接口的趣味统计、历史摘要和详情统一文案，保留计数和原始响应', async () => {
   const legacy = require('./helpers/fun-copy-fixtures');
   const before = JSON.stringify(legacy);
@@ -889,7 +951,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);

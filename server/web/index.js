@@ -12,6 +12,7 @@ const assets = {
   "/icon.svg": ["icon.svg", "image/svg+xml"],
   "/builtin-avatars.js": [null, "text/javascript; charset=utf-8"],
   "/public-history.js": ["../../miniprogram/public-history.js", "text/javascript; charset=utf-8"],
+  "/room-swipe.js": ["../../miniprogram/room-swipe.js", "text/javascript; charset=utf-8"],
   "/fun-copy.js": ["../../miniprogram/fun-copy.js", "text/javascript; charset=utf-8"],
   "/result-registration.js": ["../../miniprogram/result-registration.js", "text/javascript; charset=utf-8"],
   "/leaderboard-presentation.js": ["../../miniprogram/leaderboard-presentation.js", "text/javascript; charset=utf-8"],
