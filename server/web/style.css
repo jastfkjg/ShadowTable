@@ -1738,7 +1738,6 @@ button.room-refresh { width: 72px; }
 .room-filters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
 button.room-filter { width: auto; min-height: 44px; margin: 0; padding: 8px 10px; font-size: 12px; color: var(--muted); background: transparent; }
 button.room-filter.active { color: var(--accent); background: var(--surface); }
-.room-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; margin-bottom: 12px; background: var(--surface); border-radius: 8px; font-size: 12px; }
 .room-empty { padding: 20px 12px; text-align: center; color: var(--muted); }
 .room-empty-actions { display: flex; gap: 12px; margin-top: 16px; }
 .room-menu-dialog {

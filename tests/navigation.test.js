@@ -88,6 +88,36 @@ test('小程序纵滑、取消和多指操作均不展开，滑动状态不会�
   p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe(swipeEvent('123456', 50)); p.dismissRoomSwipe();
   assert.equal(p.consumeRoomSwipeTap(), true);
 });
+test('小程序左滑和菜单移除均须确认，取消或切入后台不提交，阻止重复弹窗', async () => {
+  for (const source of ['swipe', 'menu']) for (const result of ['cancel', 'confirm', 'background']) {
+    const dialogs = [], writes = [];
+    const room = {code:'123456',status:'lobby',isHost:true,available:true};
+    const { p } = page('lobby', apiBase, {wx:{showModal(o) {dialogs.push(o);}}});
+    p.setData({loading:false,memberRooms:[room]});
+    p.mutate = async (path, data, after) => {writes.push({path,data,after});};
+    if (source === 'swipe') {
+      p.startRoomSwipe(swipeEvent(room.code)); p.moveRoomSwipe(swipeEvent(room.code,50)); p.endRoomSwipe();
+      p.startRoomSwipeAction();
+    } else p.openRoomMenu(swipeEvent(room.code));
+    const action = () => source === 'swipe'
+      ? p.swipeRoomAction({currentTarget:{dataset:{code:room.code,kind:'hide'}}})
+      : p.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+    const removing = action();
+    assert.equal(p.data.busy,true); assert.equal(writes.length,0);
+    await action(); assert.equal(dialogs.length,1);
+    assert.match(dialogs[0].title,/从列表移除房间 123456/);
+    assert.match(dialogs[0].content,/不会离开或解散房间/);
+    assert.equal(dialogs[0].confirmText,'移除');
+    if (result === 'background') p.onHide();
+    dialogs[0].success({confirm:result !== 'cancel'}); await removing;
+    assert.equal(writes.length,result === 'confirm' ? 1 : 0);
+    assert.equal(p.data.busy,false);
+    if (writes.length) {
+      assert.equal(writes[0].path,'/api/me/rooms/123456');
+      assert.equal(writes[0].data.action,'hide'); assert.equal(writes[0].after,'entryHide');
+    }
+  }
+});
 test('小程序左滑解散保留二次确认，状态已变为进行中时不发解散请求', async () => {
   let status = 'lobby', confirmed = false;
   const calls = [], dialogs = [];

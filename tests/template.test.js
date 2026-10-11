@@ -1404,6 +1404,12 @@ test('小程序左滑按钮仅展开时出现，按房主状态提供解散且�
   }
 });
 
+test('小程序移除后的房间列表不显示撤销条', () => {
+  const tree = render({...base,undoRoom:{code:'123456',until:Date.now()+8000}});
+  assert.equal(nodes(tree).some(n=>n.attr?.bindtap==='undoRemoveRoom'),false);
+  assert.equal(nodes(tree).some(n=>n.attr?.class?.includes('room-undo')),false);
+});
+
 test('点击卡片标题、房间号文字和空白进入房间，仅复制图标捕获复制事件', () => {
   const room = { code: '123456', boardName: '阿瓦隆 · 十二骑士', status: 'lobby', statusLabel: '待开局', compactRelation: '我是房主 · 1号' };
   const tree = render({ ...base, memberRooms: [room], visibleMemberRooms: [room] });

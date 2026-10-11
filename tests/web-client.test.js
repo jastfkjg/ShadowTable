@@ -93,26 +93,44 @@ test('网页左滑不写请求，纵滑和取消收起，只有一条展开且�
   webSwipe(c,'123456'); await c.applyRoute('#/me');
   assert.equal(c.state.roomSwipeCode,''); assert.equal(writes.length,0);
 });
-test('网页左滑移除沿用撤销接口，业务失败不显示成功也不丢失列表项', async () => {
-  let hidden = false, fail = false;
-  const writes = [];
-  const room = {code:'123456',status:'lobby',isHost:true,available:true};
-  const c = client(async (url, options) => {
-    if (options.method === 'POST') {
-      const body = JSON.parse(options.body); writes.push({url,body});
-      if (fail) return {status:409,json:async()=>({error:'列表已更新'})};
-      hidden = body.action === 'hide'; return response({code:room.code,accepted:true});
-    }
-    return response({rooms:hidden?[]:[room]});
-  });
-  Object.assign(c.state,{loading:false,memberRooms:[room]});
-  webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'hide'}});
-  assert.equal(c.state.memberRooms.length,0); assert.equal(c.state.undoRoom.code,room.code);
-  await c.ACTIONS.undoRemoveRoom();
-  assert.equal(c.state.memberRooms.length,1); assert.equal(c.state.undoRoom,null);
-  assert.deepEqual(writes.map(x=>x.body.action),['hide','restore']);
-  fail = true; webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'hide'}});
-  assert.equal(c.state.memberRooms.length,1); assert.equal(c.state.undoRoom,null);
+test('网页左滑和菜单移除均须确认，取消或离开页面不提交，确认后不显示撤销', async () => {
+  for (const source of ['swipe', 'menu']) for (const result of ['cancel', 'confirm', 'background', 'failure']) {
+    let hidden = false, resolveConfirm;
+    const writes = [], dialogs = [];
+    const room = {code:'123456',status:'lobby',isHost:true,available:true};
+    const c = client(async (url, options) => {
+      if (options.method === 'POST') {
+        const body = JSON.parse(options.body); writes.push({url,body});
+        if (result === 'failure') return {status:409,json:async()=>({error:'列表已更新'})};
+        hidden = body.action === 'hide'; return response({code:room.code,accepted:true});
+      }
+      return response({rooms:hidden?[]:[room]});
+    });
+    c.setConfirm((title, message, showCancel, label) => {
+      dialogs.push({title,message,label});
+      return new Promise(resolve => { resolveConfirm = resolve; });
+    });
+    Object.assign(c.state,{loading:false,memberRooms:[room]});
+    if (source === 'swipe') webSwipe(c,room.code);
+    else c.ACTIONS.openRoomMenu({dataset:{code:room.code}});
+    const action = () => source === 'swipe'
+      ? c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'hide'}})
+      : c.ACTIONS.roomMenuAction({dataset:{kind:'hide'}});
+    const removing = action();
+    assert.equal(c.state.busy,true); assert.equal(writes.length,0);
+    await action(); assert.equal(dialogs.length,1);
+    assert.match(dialogs[0].title,/从列表移除房间 123456/);
+    assert.match(dialogs[0].message,/不会离开或解散房间/);
+    assert.equal(dialogs[0].label,'移除');
+    if (result === 'background') c.stop();
+    resolveConfirm(result !== 'cancel'); await removing;
+    assert.equal(writes.length,result === 'confirm' || result === 'failure' ? 1 : 0);
+    assert.equal(c.state.memberRooms.length,result === 'confirm' ? 0 : 1);
+    assert.equal(c.state.busy,false);
+    if (writes.length) assert.equal(writes[0].body.action,'hide');
+    if (result === 'failure') assert.equal(c.state.notice,'');
+    assert.doesNotMatch(c.viewEntry(),/room-undo|undoRemoveRoom|撤销/);
+  }
 });
 test('网页左滑解散须确认，取消不删除，快捷操作不解散已经开局的房间', async () => {
   let status = 'lobby', allow = false;

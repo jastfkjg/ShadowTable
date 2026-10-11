@@ -1711,7 +1711,7 @@ test("查看最近结果清除记录筛选并在渲染后定位目标记录", ()
   assert.equal(p.scrolls.length, 0);
 });
 
-test("首页个人牌桌备注、移除撤销和重新进入保持座位，列表操作复用幂等请求", async () => {
+test("首页个人牌桌备注、确认移除和重新进入保持座位，重新进入恢复列表记录", async () => {
   const a = await server();
   let guest, lobby;
   try {
@@ -1735,14 +1735,13 @@ test("首页个人牌桌备注、移除撤销和重新进入保持座位，列�
     lobby.startRoomSwipeAction();
     await lobby.swipeRoomAction({currentTarget:{dataset:{code,kind:'hide'}}});
     assert.equal(lobby.data.memberRooms.length, 0);
-    assert.equal(lobby.data.undoRoom.code, code);
-    await lobby.undoRemoveRoom();
-    assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
+    assert.equal(lobby.data.notice, '已从列表移除');
     await lobby.openRoom({currentTarget:{dataset:{code}}});
+    assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
     const resumed = guest.freshPage(); await resumed.bootstrap();
     assert.equal(resumed.data.room.me.seat, 2);
     assert.equal(resumed.roomCode, code);
-  } finally { clearTimeout(lobby?.undoRoomTimer); await a.close(); }
+  } finally { await a.close(); }
 });
 
 test("个人记录写入响应丢失时保留原幂等键，重试确认后再刷新列表", async () => {
@@ -1760,16 +1759,14 @@ test("个人记录写入响应丢失时保留原幂等键，重试确认后再�
     },
   });
   p.setData({ loading: false, roomMenu: {code:'123456',available:true} });
-  try {
-    await p.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
-    assert.ok(p.pending);
-    assert.equal(p.data.undoRoom, null);
-    await p.executePending();
-    assert.equal(p.pending, null);
-    assert.equal(calls.length, 2);
-    assert.deepEqual(calls[0], calls[1]);
-    assert.equal(p.data.undoRoom.code, '123456');
-  } finally { clearTimeout(p.undoRoomTimer); }
+  await p.roomMenuAction({currentTarget:{dataset:{kind:'hide'}}});
+  assert.ok(p.pending);
+  assert.equal(p.data.notice, '');
+  await p.executePending();
+  assert.equal(p.pending, null);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(p.data.notice, '已从列表移除');
 });
 
 test("列表进入期间仅标记目标房间，阻止重复进入且失败后清除状态", async () => {

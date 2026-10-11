@@ -300,7 +300,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     roomMenu: null,
     noteRoom: null,
     roomNoteDraft: "",
-    undoRoom: null,
     roomFilters: [{id:"all",label:"全部"},{id:"playing",label:"进行中"},{id:"lobby",label:"待开局"},{id:"ended",label:"已结束"},{id:"unavailable",label:"已失效"}],
     boardId: "classic",
     boardName: "阿瓦隆 · 经典基础",
@@ -382,7 +381,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.showIdentityHintWhenVisible();
   },
   onUnload() {
-    clearTimeout(this.undoRoomTimer);
     this.alive = false;
     this.foreground = false;
     clearTimeout(this.timer);
@@ -1042,7 +1040,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const room = this.data.memberRooms.find(r => r.code === code);
     if (!room || this.data.roomSwipeCode !== code || this.data.roomSwipeDragging) return;
     this.dismissRoomSwipe();
-    if (kind === "hide") return this.mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
+    if (kind === "hide") return this.removeRoomRecord(code);
     if (kind === "delete" && roomSwipe.canDissolve(room)) return this.deleteRoom(e, true);
   },
   startRoomSwipeAction() { this.roomSwipeTapUntil = 0; },
@@ -1052,17 +1050,28 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.data.noteRoom) return;
     return this.mutate("/api/me/rooms/" + this.data.noteRoom.code, { action: "note", note: this.data.roomNoteDraft }, "entryNote");
   },
-  undoRemoveRoom() {
-    const undo = this.data.undoRoom;
-    if (!undo || Date.now() >= undo.until) return;
-    return this.mutate("/api/me/rooms/" + undo.code, { action: "restore" }, "entryRestore");
+  async removeRoomRecord(code) {
+    if (this.data.busy || this.pending) return;
+    this.setData({ busy: true, error: "" });
+    try {
+      if (!(await this.confirm(
+        "从列表移除房间 " + code + "？",
+        "只移除你列表中的记录，不会离开或解散房间，也不会删除战绩。重新进入房间后会恢复显示。",
+        "移除",
+      ))) return;
+      if (!this.alive || !this.foreground) return;
+      this.setData({ busy: false });
+      await this.mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
+    } finally {
+      this.setData({ busy: false });
+    }
   },
   async roomMenuAction(e) {
     const room = this.data.roomMenu, kind = e.currentTarget.dataset.kind;
     if (!room || this.data.busy || this.pending) return;
     this.setData({ roomMenu: null });
     if (kind === "note") return this.setData({ noteRoom: room, roomNoteDraft: room.note || "" });
-    if (kind === "hide") return this.mutate("/api/me/rooms/" + room.code, { action: "hide" }, "entryHide");
+    if (kind === "hide") return this.removeRoomRecord(room.code);
     if (kind === "delete" && room.isHost && room.available !== false)
       return this.deleteRoom({ currentTarget: { dataset: { code: room.code } } });
     if (kind === "leave" && room.canLeave) {
@@ -1093,6 +1102,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         !(await this.confirm(
           "解散房间 " + code + "？",
           "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
+          "解散",
         ))
       )
         return;
@@ -1434,13 +1444,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         }
       }
       if (["entryHide", "entryRestore", "entryNote"].includes(pending.after)) {
-        this.setData({ roomMenu: null, noteRoom: null });
-        if (pending.after === "entryHide") {
-          const undo = { code: result.code, until: Date.now() + 8000 };
-          this.setData({ undoRoom: undo, notice: "已从列表移除" });
-          clearTimeout(this.undoRoomTimer);
-          this.undoRoomTimer = setTimeout(() => { if (this.alive && this.data.undoRoom?.until === undo.until) this.setData({ undoRoom: null }); }, 8000);
-        } else this.setData({ undoRoom: null, notice: pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
+        this.setData({ roomMenu: null, noteRoom: null,
+          notice: pending.after === "entryHide" ? "已从列表移除" : pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
         await this.loadRooms();
       } else if (pending.after === "leave" || pending.after === "delete") {
         this.clearRoom();
@@ -1609,11 +1614,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   ready() {
     this.cmd("ready", { ready: !this.data.room.me.ready });
   },
-  async confirm(title, content) {
+  async confirm(title, content, confirmText = "确定") {
     return new Promise((resolve) =>
       wx.showModal({
         title,
         content,
+        confirmText,
         success: (r) => resolve(r.confirm),
         fail: () => resolve(false),
       }),

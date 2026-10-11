@@ -1464,7 +1464,6 @@ button.room-filter,
 button.room-filter[disabled]:not([type]) { width: auto; min-height: 88rpx; margin: 0; padding: 16rpx 20rpx; font-size: 24rpx; color: var(--muted); background: transparent; }
 button.room-filter.active,
 button.room-filter.active[disabled]:not([type]) { color: var(--accent); background: var(--surface); }
-.room-undo { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 16rpx 24rpx; margin-bottom: 24rpx; background: var(--surface); border-radius: 16rpx; font-size: 24rpx; }
 .room-empty { padding: 40rpx 24rpx; text-align: center; color: var(--muted); }
 .room-empty-actions { display: flex; gap: 24rpx; margin-top: 32rpx; }
 .room-menu-dialog {

@@ -627,7 +627,6 @@
     roomMenu: null,
     noteRoom: null,
     roomNoteDraft: "",
-    undoRoom: null,
     boardId: "classic",
     boardName: "阿瓦隆 · 经典基础",
     boardRoleConfiguration: [],
@@ -1603,13 +1602,8 @@ function roomListItems(rooms) {
         window.history.pushState({}, '', currentRoute);
       }
       if (["entryHide", "entryRestore", "entryNote"].includes(p.after)) {
-        setState({ roomMenu: null, noteRoom: null });
-        if (p.after === "entryHide") {
-          var undo = { code: result.code, until: Date.now() + 8000 };
-          setState({ undoRoom: undo, notice: "已从列表移除" });
-          clearTimeout(undoRoomTimer);
-          undoRoomTimer = setTimeout(function () { if (alive && state.undoRoom && state.undoRoom.until === undo.until) setState({ undoRoom: null }); }, 8000);
-        } else setState({ undoRoom: null, notice: p.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
+        setState({ roomMenu: null, noteRoom: null,
+          notice: p.after === "entryHide" ? "已从列表移除" : p.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
         await loadRooms();
       } else if (p.after === "leave" || p.after === "delete") {
         clearRoom();
@@ -1928,7 +1922,6 @@ function roomListItems(rooms) {
     if (target && target.available === false) return;
     return mutate("/api/me/rooms/" + code, { action: "visit" }, "entryVisit");
   }
-  var undoRoomTimer;
   var roomSwipeGesture = null, roomSwipePointer = null, roomSwipeTapUntil = 0;
   function paintRoomSwipe() {
     // Move the existing DOM during a drag: a full render would replace the touched element.
@@ -1998,7 +1991,7 @@ function roomListItems(rooms) {
     const room = state.memberRooms.find(r => r.code === code);
     if (!room || state.roomSwipeCode !== code) return;
     closeRoomSwipe();
-    if (kind === 'hide') return mutate('/api/me/rooms/' + code, { action: 'hide' }, 'entryHide');
+    if (kind === 'hide') return removeRoomRecord(code);
     if (kind === 'delete' && roomSwipe.canDissolve(room)) return deleteRoom(code, true);
   }
   async function refreshRooms() {
@@ -2013,7 +2006,7 @@ function roomListItems(rooms) {
     if (!room || state.busy || pending) return;
     setState({ roomMenu: null });
     if (kind === "note") return setState({ noteRoom: room, roomNoteDraft: room.note || "" });
-    if (kind === "hide") return mutate("/api/me/rooms/" + room.code, { action: "hide" }, "entryHide");
+    if (kind === "hide") return removeRoomRecord(room.code);
     if (kind === "delete" && room.isHost && room.available !== false) return deleteRoom(room.code);
     if (kind === "leave" && room.canLeave) {
       if (!(await confirm("离开房间 " + room.code + "？", "你将退出成员关系并释放座位。房间不会解散；房主离开后仍保留管理权。"))) return;
@@ -2025,6 +2018,22 @@ function roomListItems(rooms) {
         await mutate("/api/rooms/" + room.code + "/commands", { type: "leave", stage: fresh.stage }, "leave");
       } catch (e) { handleError(e); }
       finally { setState({ busy: false }); }
+    }
+  }
+  async function removeRoomRecord(code) {
+    if (state.busy || pending) return;
+    setState({ busy: true, error: "" });
+    try {
+      if (!(await confirm(
+        "从列表移除房间 " + code + "？",
+        "只移除你列表中的记录，不会离开或解散房间，也不会删除战绩。重新进入房间后会恢复显示。",
+        true, "移除",
+      ))) return;
+      if (!alive || !foreground) return;
+      setState({ busy: false });
+      await mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
+    } finally {
+      setState({ busy: false });
     }
   }
   async function deleteRoom(code, fromSwipe = false) {
@@ -2042,6 +2051,7 @@ function roomListItems(rooms) {
         !(await confirm(
           "解散房间 " + code + "？",
           "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
+          true, "解散",
         ))
       )
         return;
@@ -3563,13 +3573,12 @@ function roomListItems(rooms) {
         return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';
       }).join('') + '</div>';
     }
-    if (state.undoRoom) html += '<div class="room-undo" role="status"><span>已从列表移除 ' + esc(state.undoRoom.code) + '</span>' + btn("history-toggle", "undoRemoveRoom", "撤销", null, state.busy || !!pending) + '</div>';
     var visible = state.memberRooms.filter(function (r) { return state.roomListFilter === "all" || r.status === state.roomListFilter; });
     visible.forEach(function (m) {
       const active = state.roomSwipeCode === m.code, exposed = active && state.roomSwipeOffset < 0;
       const locked = state.busy || state.loading || pending || state.roomsRefreshing || state.roomSwipeDragging || !active;
       const swipeButton = function (kind, label, icon) {
-        return '<button type="button" class="room-swipe-action' + (kind === 'delete' ? ' danger' : '') + '" data-action="swipeRoomAction" data-kind="' + kind + '" data-code="' + esc(m.code) + '" aria-label="' + label + '，房间' + esc(m.code) + (kind === 'delete' ? '，需再次确认' : '，保留房间和座位') + '"' + (locked ? ' disabled' : '') + '><span class="' + icon + '" aria-hidden="true">' + (kind === 'delete' ? '<span></span>' : '') + '</span><span class="room-swipe-label"><span>' + label.slice(0, 2) + '</span><span>' + label.slice(2) + '</span></span></button>';
+        return '<button type="button" class="room-swipe-action' + (kind === 'delete' ? ' danger' : '') + '" data-action="swipeRoomAction" data-kind="' + kind + '" data-code="' + esc(m.code) + '" aria-label="' + label + '，房间' + esc(m.code) + (kind === 'delete' ? '，需再次确认' : '，保留房间和座位，需再次确认') + '"' + (locked ? ' disabled' : '') + '><span class="' + icon + '" aria-hidden="true">' + (kind === 'delete' ? '<span></span>' : '') + '</span><span class="room-swipe-label"><span>' + label.slice(0, 2) + '</span><span>' + label.slice(2) + '</span></span></button>';
       };
       html += '<div class="room-swipe' + (roomSwipe.canDissolve(m) ? ' has-dissolve' : '') + (exposed ? ' is-exposed' : '') + (active && state.roomSwipeDragging ? ' is-dragging' : active ? ' is-open' : '') + '" data-room-swipe="' + esc(m.code) + '"><div class="room-swipe-actions" aria-hidden="' + !!locked + '"' + (locked ? ' inert' : '') + '>' + swipeButton('hide', '移除记录', 'room-swipe-remove-icon') +
         (roomSwipe.canDissolve(m) ? swipeButton('delete', '解散房间', 'room-swipe-dissolve-icon') : '') + '</div>';
@@ -4480,7 +4489,6 @@ function roomListItems(rooms) {
     closeRoomMenu: function () { if (!state.busy && !pending) setState({ roomMenu: null, noteRoom: null }); },
     roomMenuAction: function (el) { return roomMenuAction(el.dataset.kind); },
     saveRoomNote: function () { if (state.noteRoom) return mutate("/api/me/rooms/" + state.noteRoom.code, { action: "note", note: state.roomNoteDraft }, "entryNote"); },
-    undoRemoveRoom: function () { if (state.undoRoom && Date.now() < state.undoRoom.until) return mutate("/api/me/rooms/" + state.undoRoom.code, { action: "restore" }, "entryRestore"); },
     deleteRoom: function (el) {
       deleteRoom(el.dataset.code);
     },
