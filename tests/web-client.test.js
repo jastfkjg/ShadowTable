@@ -1589,11 +1589,12 @@ test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应�
   assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/成功 3 次 · 共 4 次机会/);
   c.ACTIONS.rankToggleMetrics();
   const options=require('../miniprogram/leaderboard-presentation').funOptions(defs,{includeFinal:true});
+  assert.equal(c.state.rankFunCategory,'all');
   let html='';
-  for(const category of ['good','evil','more']) {
+  for(const category of ['all','good','evil','more']) {
     c.ACTIONS.funRankCategory({dataset:{value:category}});
     const group=c.viewLeaderboard();html+=group;
-    assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,options.filter(item=>item.category===category).length);
+    assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,category==='all'?options.length:options.filter(item=>item.category===category).length);
   }
   assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 刀中敌方/);
   assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);

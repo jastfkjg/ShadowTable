@@ -615,8 +615,8 @@
     toolThreshold: 1,
     showRoomSettings: false,
     showTransfer: false,
-    statsOpen: false, stats: null, statsTab: "records", funExpanded: false, funRulesExpanded: false, statsLoading: false, statsError: "",
-    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'good', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
@@ -979,11 +979,12 @@
   }
   function viewRankMetricSheet() {
     const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
+    const filtered = rankPresentation.filterFunOptions(options, state.rankFunCategory);
     const pending = options.find(item => item.key === state.rankPendingMetric);
     let html = rankSheetStart('rank-metrics-sheet', '选择趣味指标', 'rankToggleMetrics');
     html += '<div class="fun-categories" role="group" aria-label="角色分类">' + rankPresentation.categories.map(item => '<button type="button" data-action="funRankCategory" data-value="' + item.id + '" class="' + (item.id === state.rankFunCategory ? 'selected' : '') + '" aria-pressed="' + (item.id === state.rankFunCategory) + '">' + item.label + '</button>').join('') + '</div><div class="fun-metric-options">';
-    html += options.filter(item => item.category === state.rankFunCategory).map(item => '<button type="button" class="fun-metric-option ' + (item.key === state.rankPendingMetric ? 'selected' : '') + '" data-action="funRankPreview" data-value="' + esc(item.key) + '" aria-label="' + esc(item.tabLabel) + '" aria-pressed="' + (item.key === state.rankPendingMetric) + '"><span class="fun-option-copy"><span><span class="fun-option-title">' + esc(item.title) + '</span><span class="fun-option-label">' + esc(item.label) + '</span></span></span><span class="fun-option-radio" aria-hidden="true">' + (item.key === state.rankPendingMetric ? '<span class="fun-option-check"></span>' : '') + '</span></button>').join('');
-    if (!options.some(item => item.category === state.rankFunCategory)) html += '<p class="small muted">当前暂无此类指标</p>';
+    html += filtered.map(item => '<button type="button" class="fun-metric-option ' + (item.key === state.rankPendingMetric ? 'selected' : '') + '" data-action="funRankPreview" data-value="' + esc(item.key) + '" aria-label="' + esc(item.tabLabel) + '" aria-pressed="' + (item.key === state.rankPendingMetric) + '"><span class="fun-option-copy"><span><span class="fun-option-title">' + esc(item.title) + '</span><span class="fun-option-label">' + esc(item.label) + '</span></span></span><span class="fun-option-radio" aria-hidden="true">' + (item.key === state.rankPendingMetric ? '<span class="fun-option-check"></span>' : '') + '</span></button>').join('');
+    if (!filtered.length) html += '<p class="small muted">当前暂无此类指标</p>';
     html += '</div><div class="rank-sheet-footer">' + (pending ? '<div class="rank-sheet-note">已选：' + esc(pending.tabLabel) + '</div>' : '') + btn('rank-confirm','funRankConfirm','查看榜单',null,!pending || state.rankLoading) + '</div></section></div>';
     return html;
   }
@@ -1757,10 +1758,10 @@ function roomListItems(rooms) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
     let html = data.legacyGames ? '<p class="small muted">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>' : '';
     if (!data.cards.length) return html + '<p class="fun-empty muted">暂无趣味记录</p>';
-    for (const card of (state.funExpanded ? data.cards : data.cards.slice(0,3))) {
+    for (const card of data.cards) {
       const rows = card.metrics.filter(row => !row.id.endsWith('aim_enemy')), primary = rows.find(row => row.positive ?? row.ranked) || rows[0];
       const combat = [':knife',':gun',':duel'].some(suffix => card.id.endsWith(suffix));
-      html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2></div><div class="fun-metrics' + (combat ? ' three' : '') + '">';
+      html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2></div>' + (card.description ? '<p class="fun-description small muted">' + esc(card.description) + '</p>' : '') + '<div class="fun-metrics' + (combat ? ' three' : '') + '">';
       for (const row of rows) {
         const color = (row.positive ?? row.ranked) ? 'good' : /_(ally|hit|bust|miss)$/.test(row.id) ? 'evil' : 'muted';
         html += '<button type="button" class="fun-metric" data-action="funRecords" data-metric="'+esc(row.id)+'" data-mode="'+esc(row.mode)+'"><span class="fun-number '+color+'">'+(row.value===null ? '—' : row.count)+'<span class="small muted"> '+esc(row.unit)+'</span></span><span class="small">'+esc(row.label)+' ›</span></button>';
@@ -1784,7 +1785,6 @@ function roomListItems(rooms) {
       }
       html += '</article>';
     }
-    if (data.cards.length > 3) html += '<button class="secondary fun-more" data-action="toggleFunCards" aria-expanded="'+!!state.funExpanded+'">'+(state.funExpanded?'收起更多记录':'查看其余 '+(data.cards.length-3)+' 项趣味记录')+'</button>';
     html += '<button class="disclosure-button fun-role-toggle" data-action="toggleFunRules" aria-expanded="'+!!state.funRulesExpanded+'">统计说明 '+(state.funRulesExpanded?'⌃':'⌄')+'</button>';
     if (state.funRulesExpanded) html += '<p class="small muted fun-note">派西维尔按初始身份记三绿车／三炸车；梅林只统计最终刺杀机会。刀、枪、决斗与最终刀分别记录，空刀单列；未使用和作废不计失败。</p>';
     return html;
@@ -4376,7 +4376,6 @@ function roomListItems(rooms) {
     retryPlayerCard: () => state.playerCard && !state.playerCardLoading && (state.playerCard.scope === 'leaderboard' ? openRankPlayerCard(state.playerCard.id) : openPlayerCard(state.playerCard.seat)),
     toggleProposalSeat: el => toggleProposalSeat(Number(el.dataset.seat)),
     recoverConnection: recoverConnection,
-    toggleFunCards: () => setState({funExpanded:!state.funExpanded}),
     toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
     funRecords: el => navigate('matches?fun='+encodeURIComponent(el.dataset.metric)+'&mode='+encodeURIComponent(el.dataset.mode)+(el.dataset.role ? '&role='+encodeURIComponent(el.dataset.role) : '')),
@@ -4390,13 +4389,13 @@ function roomListItems(rooms) {
         const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
         const option = options.find(item => item.key === state.rankMetric) || options[0];
         if (!option || state.rankLoading) return;
-        state.rankPendingMetric = option.key; state.rankFunCategory = option.category;
+        state.rankPendingMetric = option.key; state.rankFunCategory = 'all';
       }
       toggleRankSheet('rankMetricsExpanded', '.fun-metric-toggle');
       app.querySelector('.fun-metric-options .selected')?.scrollIntoView({block:'nearest'});
     },
     funRankCategory: el => { if (rankPresentation.categories.some(item => item.id === el.dataset.value)) setState({ rankFunCategory: el.dataset.value }); },
-    funRankPreview: el => { if (rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).some(item => item.category === state.rankFunCategory && item.key === el.dataset.value)) setState({ rankPendingMetric: el.dataset.value }); },
+    funRankPreview: el => { if (rankPresentation.filterFunOptions(rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}), state.rankFunCategory).some(item => item.key === el.dataset.value)) setState({ rankPendingMetric: el.dataset.value }); },
     funRankConfirm: async () => {
       if (!state.rankMetricsExpanded || state.rankLoading) return;
       const metric = state.rankPendingMetric;

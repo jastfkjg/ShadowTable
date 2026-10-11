@@ -8,7 +8,7 @@ function preserveFactions(stats, previous) {
   }) };
 }
 module.exports = function createController() { return {
-  data: { loading: true, error: "", stats: null, funExpanded: false, funRulesExpanded: false, tab: "records", funRoles: {} },
+  data: { loading: true, error: "", stats: null, funRulesExpanded: false, tab: "records", funRoles: {} },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
@@ -31,7 +31,6 @@ module.exports = function createController() { return {
     catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
-  toggleFunCards() { this.setData({ funExpanded: !this.data.funExpanded }); },
   shareStats() {
     if (this.data.tab === "fun") return this.shareFunSummary();
     if (this.data.loading || this.data.error || !this.data.stats?.total) return;

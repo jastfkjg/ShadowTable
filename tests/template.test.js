@@ -230,13 +230,13 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   assert.equal(sorts.length,2);assert.equal(sorts[0].attr.ariaPressed,true);
   const keys=[];
   for(const category of presentation.categories) {
-    const filtered=options.filter(item=>item.category===category.id);
+    const filtered=presentation.filterFunOptions(options,category.id);
     const tree=renderRank({...data,metricsExpanded:true,funCategory:category.id,filteredFunOptions:filtered});
     assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标'));
     const choices=nodes(tree).filter(n=>n.attr?.bindtap==='previewFunMetric');
     assert.equal(choices.length,filtered.length);
     assert.ok(choices.every(n=>n.tag==='wx-button'));
-    keys.push(...choices.map(n=>n.attr['data-id']));
+    if(category.id!=='all')keys.push(...choices.map(n=>n.attr['data-id']));
     assert.ok(byHandler(tree,'confirmFunMetric'));
     assert.doesNotMatch(JSON.stringify(tree), /查看不同角色的高光|至少|次数榜/);
   }

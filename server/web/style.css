@@ -2142,7 +2142,7 @@ button.fun-metric { display: flex; flex-direction: column; align-items: flex-sta
 .fun-heading h2 { min-width: 0; overflow-wrap: anywhere; font-size: 17px; }
 .fun-heading > span { flex-shrink: 0; }
 .fun-number { overflow-wrap: anywhere; font-size: 24px; }
-.fun-more { width: 100%; min-height: 48px; }
+.fun-description { margin: 8px 0; font-size: 12px; line-height: 1.75; }
 .fun-role-toggle { min-height: 48px; margin: 0; padding: 12px 0; color: var(--accent); font-size: 14px; }
 .stats-summary { padding: 16px; border-radius: 12px; background: var(--surface); }
 .stats-tabs { margin: 12px 0; }

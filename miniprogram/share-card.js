@@ -62,7 +62,7 @@ function statsCard(profile, stats, now) {
     ...breakdown(stats), asOf: now };
 }
 function canShareFun(fun) {
-  return !!fun?.cards?.some(group => group.metrics.some(row => !row.id.endsWith("aim_enemy") && Number.isFinite(row.value) && row.knownGames > 0));
+  return !!fun?.cards?.some(group => !group.id.endsWith(":final") && group.metrics.some(row => !row.id.endsWith("aim_enemy") && Number.isFinite(row.value) && row.knownGames > 0));
 }
 function knifeMetrics(group) {
   const row = id => group.metrics.find(metric => metric.id === "knife_" + id);

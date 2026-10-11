@@ -1866,10 +1866,12 @@ test('趣味指标弹层取消不换榜，确认才请求，切分类保留草�
   await p.load(false,{metric:'fun_good_shield'});
   const pick=(fn,id)=>p[fn]({currentTarget:{dataset:{id}}});
   p.toggleMine();p.toggleMetrics();assert.equal(p.data.mineExpanded,false);
+  assert.equal(p.data.funCategory,'all');assert.equal(p.data.filteredFunOptions.length,p.data.funOptions.length);
   pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');
   assert.equal(p.data.metric,'fun_good_shield');assert.equal(urls.length,1);
   p.toggleMetrics();assert.equal(urls.length,1);
   p.toggleMetrics();assert.equal(p.data.pendingFunMetric,'fun_good_shield');
+  assert.equal(p.data.funCategory,'all');
   pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');pick('chooseFunCategory','more');
   assert.equal(p.data.pendingFunMetric,'fun_assassin_miss');
   await p.confirmFunMetric();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(p.data.metricsExpanded,false);

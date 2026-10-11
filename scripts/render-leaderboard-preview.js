@@ -36,7 +36,7 @@ const shield={...base,metric:'fun_good_shield',fun:true,title:'好人',metricLab
 function scene(response,extra={}) {
   const board=presentLeaderboard(response),options=presentation.funOptions(defs),option=options.find(item=>item.key===response.metric)||options[0];
   return {...definition.data,loading:false,funAvailable:true,board,metric:response.metric,funSelected:!!response.fun,funSort:response.sort||'count',funOptions:options,
-    funCategory:option.category,pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options.filter(item=>item.category===option.category),...extra};
+    funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,...extra};
 }
 const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric})]));
 scenes.fun=scene(shield);scenes.sheet=scene(shield,{metricsExpanded:true});

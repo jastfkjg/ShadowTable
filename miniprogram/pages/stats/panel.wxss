@@ -81,7 +81,7 @@ button.fun-role-toggle { justify-content: space-between; min-height: 48px; width
 button.fun-role { display: block; width: 100%; text-align: left; font-weight: 400; font-size: 14px; padding: 12px; margin: 8px 0 0; background: var(--bg); border-radius: 8px; }
 .fun-role .small { font-size: 12px; }
 .fun-pressed { opacity: .72; }
-button.fun-more { width: 100%; min-height: 48px; font-size: 14px; }
+.fun-description { margin-top: 8px; font-size: 12px; line-height: 1.75; }
 button.fun-rules-toggle { justify-content: space-between; min-height: 48px; width: 100%; padding: 0 2px; margin: 0; color: var(--muted); font-size: 12px; }
 .fun-rules-toggle[aria-expanded="true"] .stats-chevron { transform: rotate(-45deg); }
 .fun-rules { padding: 12px 2px 24px; border-top: 1rpx solid var(--records-line); font-size: 12px; line-height: 1.75; }

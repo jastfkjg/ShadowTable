@@ -80,7 +80,7 @@ button.fun-metric-toggle { width: 100%; min-height: 48px; margin: 0; padding: 8p
 .rank-sheet-title { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; }
 button.rank-sheet-close { flex-shrink: 0; width: auto; min-width: 48px; min-height: 48px; margin: 0 -6px 0 0; padding: 4px 6px; color: var(--muted); font-size: 12.5px; }
 .fun-categories { flex-shrink: 0; display: flex; gap: 8px; padding: 0 16px 10px; }
-.fun-categories button { min-width: 68px; width: auto; min-height: 44px; margin: 0; padding: 4px 12px; background: rgba(177,191,198,.08); color: var(--muted); font-size: 13px; }
+.fun-categories button { flex: 1; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 4px 12px; background: rgba(177,191,198,.08); color: var(--muted); font-size: 13px; }
 .fun-categories .selected { color: var(--accent); background: rgba(229,198,139,.12); }
 .fun-metric-options { height: 36vh; min-height: 0; box-sizing: border-box; padding: 0 16px; }
 button.fun-metric-option { width: 100%; min-width: 0; min-height: 48px; margin: 0 0 4px; padding: 8px 10px; gap: 8px; justify-content: space-between; text-align: left; border: 0.5px solid transparent; border-radius: 8px; }
@@ -118,7 +118,7 @@ button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; ba
   button.rank-sheet-close, .fun-categories button, .fun-option-label, .rank-rule-line, .rank-visibility { font-size: 14px; }
   .fun-option-title, .rank-sheet-note, .rank-details-body .small { font-size: 12px; }
   .fun-categories { padding-bottom: 8px; }
-  .fun-categories button { min-width: 72px; padding: 4px 12px; }
+  .fun-categories button { padding: 4px 12px; }
   .fun-metric-options { height: 28vh; }
   .rank-sheet-footer { padding-top: 8px; padding-bottom: 8px; }
   .rank-sheet-note { margin-bottom: 8px; }

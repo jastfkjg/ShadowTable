@@ -10,6 +10,9 @@
     duel_enemy: "决斗敌方", duel_ally: "决斗友方",
   };
   const titles = { percival: "派西维尔", knife: "刀客刀法", duel: "骑士" };
+  const descriptions = {
+    assassin: "仅统计刺客的非空最终刺杀。",
+  };
   function metric(row) {
     const id = row.id || row.key?.replace(/^fun_/, "");
     if (!labels[id]) return row;
@@ -26,16 +29,24 @@
   }
   function summary(value) {
     if (!value) return value;
+    const cards = value.cards.filter(card => !card.id.endsWith(":final")).map(card => ({ ...card,
+      title: titles[card.id.split(":").pop()] || card.title,
+      ...(descriptions[card.id.split(":").pop()] ? { description: descriptions[card.id.split(":").pop()] } : {}),
+      metrics: card.metrics.map(metric) }));
     const teaserType = value.teaser?.startsWith("刀客刀法") ? "knife"
       : value.teaser?.startsWith("骑士") ? "duel" : "percival";
-    const teaser = value.teaser?.replace(/三绿达成|三炸收场|命中敌方|命中同伴|命中友方/g,
+    let teaser = value.teaser?.replace(/三绿达成|三炸收场|命中敌方|命中同伴|命中友方/g,
       label => legacyLabel(label, teaserType)).replace(/骑士决斗/g, "骑士");
+    if (/^(最终带刀|十二骑士最终刺杀)\s*·/.test(teaser || "")) {
+      const highlight = cards.flatMap(card => card.metrics
+        .filter(row => (row.positive ?? row.ranked) && row.count > 0)
+        .map(row => ({ ...row, title: card.title }))).sort((a, b) => b.count - a.count)[0];
+      teaser = highlight ? `${highlight.title} · ${highlight.label} ${highlight.count} ${highlight.unit}` : "";
+    }
     return { ...value,
       ...(value.teaser !== undefined ? { teaser } : {}),
-      ...(value.metrics ? { metrics: value.metrics.map(metric) } : {}),
-      cards: value.cards.map(card => ({ ...card,
-        title: titles[card.id.split(":").pop()] || card.title,
-        metrics: card.metrics.map(metric) })) };
+      ...(value.metrics ? { metrics: value.metrics.filter(row => !row.id.startsWith("final_")).map(metric) } : {}),
+      cards };
   }
   function story(value) {
     if (!value) return value;

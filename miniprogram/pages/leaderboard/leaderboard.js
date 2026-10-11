@@ -5,7 +5,7 @@ const rankPresentation = require("../../leaderboard-presentation");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "good", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
@@ -70,10 +70,10 @@ Page({
       const resolvedMode = result.mode || funMode;
       const funOptions = rankPresentation.funOptions(funMetrics);
       const pendingFunOption = funOptions.find(item => item.key === result.metric) || funOptions[0] || null;
-      const funCategory = pendingFunOption?.category || "good";
+      const funCategory = "all";
       const funRoleOptions = [{ id:"", label:"全部角色" }, ...(result.roleOptions || [])];
       this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, loading: false, loadingMore: false,
-        funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funCategory, pendingFunOption, pendingFunMetric: pendingFunOption?.key || "", filteredFunOptions: funOptions.filter(item => item.category === funCategory), funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
+        funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funCategory, pendingFunOption, pendingFunMetric: pendingFunOption?.key || "", filteredFunOptions: funOptions, funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
         notice: funUnavailable ? "当前服务尚未开放趣味榜，已显示局数榜。" : pointsAvailable ? "" : pointsUnavailable ? "当前服务尚未开放积分榜，已显示局数榜。" : "当前服务尚未开放积分榜。",
         ...(!this.visibilityPending ? { visible: !['hidden','unsupported'].includes(result.me.status) } : {}) });
     } catch (e) {
@@ -124,12 +124,12 @@ Page({
     this.closePlayerCard();
     const option = this.data.funOptions.find(item => item.key === this.data.metric) || this.data.funOptions[0];
     this.setData({ metricsExpanded: true, mineExpanded: false, rulesExpanded: false, pendingFunMetric: option.key,
-      pendingFunOption: option, funCategory: option.category, filteredFunOptions: this.data.funOptions.filter(item => item.category === option.category) });
+      pendingFunOption: option, funCategory: "all", filteredFunOptions: this.data.funOptions });
   },
   chooseFunCategory(e) {
     const category = e.currentTarget.dataset.id;
     if (!rankPresentation.categories.some(item => item.id === category)) return;
-    this.setData({ funCategory: category, filteredFunOptions: this.data.funOptions.filter(item => item.category === category) });
+    this.setData({ funCategory: category, filteredFunOptions: rankPresentation.filterFunOptions(this.data.funOptions, category) });
   },
   previewFunMetric(e) {
     const option = this.data.filteredFunOptions.find(item => item.key === e.currentTarget.dataset.id);

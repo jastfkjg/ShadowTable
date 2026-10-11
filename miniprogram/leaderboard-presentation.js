@@ -4,7 +4,7 @@
   if (typeof module === "object" && module.exports) module.exports = presentation;
   else root.shadowtableLeaderboard = presentation;
 })(typeof window === "object" ? window : this, function () {
-  const categories = [{ id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "more", label: "更多" }];
+  const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "more", label: "更多" }];
   function funOptions(definitions = [], { includeFinal = false } = {}) {
     const first = ["fun_good_shield", "fun_merlin_evade", "fun_percival_green", "fun_merlin_hit", "fun_percival_bust"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(item => {
@@ -59,5 +59,8 @@
       emptyTitle: "暂无公开排名", emptyHint: board.fun ? (board.sort === "rate" ? "有有效机会且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
       me: { ...me, statusLabel, placeLabel: me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : "未上榜" } };
   }
-  return { categories, funOptions, markTies, presentBoard };
+  function filterFunOptions(options = [], category = "all") {
+    return category === "all" ? options : options.filter(item => item.category === category);
+  }
+  return { categories, funOptions, filterFunOptions, markTies, presentBoard };
 });
