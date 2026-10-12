@@ -1,8 +1,10 @@
-<app-nav title="分享成绩" back="{{true}}" backLabel="返回" bindback="back" />
+<app-nav title="{{pageTitle || '分享成绩'}}" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page share-page">
   <view wx:if="{{loading || rendering || (!imagePath && !error)}}" class="share-placeholder" role="status">{{loading?'正在读取成绩…':'正在生成图片…'}}</view>
   <button wx:if="{{imagePath}}" class="share-preview" bindtap="preview" aria-label="{{description+'，点击放大图片'}}" hover-class="none"><image src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" class="share-image" binderror="imageError" aria-hidden="true" /></button>
   <view wx:if="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button hover-class="none" class="secondary" bindtap="retry" disabled="{{loading || rendering || acting}}">重新生成</button></view>
+  <view wx:if="{{pageCount>1}}" class="share-pagination" aria-label="分享图片分页"><button bindtap="choosePage" data-step="-1" disabled="{{pageIndex===0 || loading || rendering || acting}}" hover-class="none">上一张</button><text>第 {{pageIndex+1}} / {{pageCount}} 张</text><button bindtap="choosePage" data-step="1" disabled="{{pageIndex+1===pageCount || loading || rendering || acting}}" hover-class="none">下一张</button></view>
+  <view wx:if="{{pageCount>1}}" class="share-notice">并列玩家较多，已自动分图。可逐张发送或保存。</view>
   <view class="share-actions">
     <button wx:if="{{imageMenu}}" class="share-send" bindtap="send" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{loading || rendering || (!imagePath && !error)}}" hover-class="none">{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'发给好友'}}</button>
     <button class="share-save {{imageMenu?'':'share-save-primary'}}" bindtap="save" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{loading || rendering || (!imagePath && !error)}}" hover-class="none">{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'保存图片'}}</button>

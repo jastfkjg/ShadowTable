@@ -1,0 +1,83 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const { createRequire } = require("node:module");
+const { monthlyFixture } = require("./helpers/monthly-fixtures");
+const { monthRange } = require("../miniprogram/monthly-report");
+const tick = () => new Promise(resolve => setImmediate(resolve));
+function page(file, api, wx = {}, renderer) {
+  const filename = path.resolve(__dirname, "../miniprogram/" + file), realRequire = createRequire(filename);
+  let definition;
+  vm.runInNewContext(fs.readFileSync(filename, "utf8"), { Date, wx, Page: value => definition = value,
+    require: name => name === "../../api" ? api : name === "../../share-image" && renderer ? { renderImage: renderer } : realRequire(name) });
+  return { ...definition, data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
+}
+test("月报切换月份和回前台拒绝旧响应，失败能重试，娱乐分享保留所选月份", async () => {
+  const pending = [], urls = [], response = monthlyFixture(), links = [];
+  const api = { login: async () => {}, request: url => { urls.push(url); return new Promise((resolve, reject) => pending.push({ resolve, reject })); } };
+  const p = page("pages/monthly/monthly.js", api, { navigateTo: options => { links.push(options.url); options.complete(); } });
+  p.onLoad({ month: "2026-09" });
+  const first = p.onShow(); await tick();
+  const second = p.load("2026-08"); await tick();
+  pending[1].resolve({ ...response, month: "2026-08", ...{ periodStart: monthRange("2026-08").start, periodEnd: monthRange("2026-08").end } }); await second;
+  pending[0].resolve(response); await first;
+  assert.equal(p.data.report.month, "2026-08"); assert.equal(p.data.month, "2026-08");
+  p.chooseEdition({ currentTarget: { dataset: { id: "fun" } } }); p.share();
+  assert.equal(links[0], "/pages/share/share?kind=monthly&month=2026-08&edition=fun");
+  const failure = p.load(); await tick(); pending[2].reject(Object.assign(new Error("missing"), { status: 404 })); await failure;
+  assert.match(p.data.error, /尚未开放/); p.share(); assert.equal(links.length, 1);
+  const retry = p.retry(); await tick(); p.onHide(); pending[3].resolve(response); await retry;
+  assert.equal(p.data.report, null);
+  const show = p.onShow(); await tick(); pending[4].resolve({ ...response, month: "2026-08" }); await show;
+  assert.equal(p.data.error, ""); assert.equal(p.data.report.month, "2026-08");
+  assert.ok(urls.every(url => url.startsWith("/api/monthly-report?month=")));
+  p.onUnload();
+});
+test("月报分享页只读取月报，分张切换复用已生成图片，保存发送始终对应当前页", async () => {
+  const response = monthlyFixture();
+  response.mainBoards[0].rows = Array.from({ length: 26 }, (_, index) => ({ ...response.mainBoards[0].rows[0], publicId: "p" + index, nickname: "玩家" + index, rank: 1, tied: true }));
+  const urls = [], sent = [], saved = [], render = [];
+  const api = { login: async () => {}, request: async url => { urls.push(url); return response; } };
+  const p = page("pages/share/share.js", api, { showShareImageMenu: options => sent.push(options), saveImageToPhotosAlbum: options => saved.push(options) }, async (p, card) => { render.push(card.page); return "wxfile://monthly-" + card.page; });
+  await p.onLoad({ kind: "monthly", month: "2026-09" }); await p.onReady();
+  assert.deepEqual(urls, ["/api/monthly-report?month=2026-09"]); assert.equal(p.data.pageTitle, "分享月报"); assert.ok(p.data.pageCount > 1);
+  await p.choosePage({ currentTarget: { dataset: { step: "1" } } });
+  assert.equal(p.data.imagePath, "wxfile://monthly-2"); p.send(); sent[0].complete(); p.save(); saved[0].complete();
+  assert.equal(sent[0].path, "wxfile://monthly-2"); assert.equal(saved[0].filePath, "wxfile://monthly-2");
+  await p.choosePage({ currentTarget: { dataset: { step: "-1" } } }); assert.equal(p.data.imagePath, "wxfile://monthly-1");
+  assert.deepEqual(render, [1, 2]);
+  p.onUnload();
+});
+test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会向外溢出", () => {
+  const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
+  response.mainBoards[0].rows[0].nickname = "一个很长很长的玩家昵称🙂用于检查不会覆盖积分";
+  response.mainBoards[0].rows[0].points = -123456789;
+  const [card] = renderer.cards(response), size = renderer.dimensions(card), positions = [];
+  const context = new Proxy({ measureText: value => ({ width: Array.from(value).length * Number(/(\d+)px/.exec(context.font)?.[1] || 30) * .8 }), fillText: (value, x, y) => positions.push({ value, x, y }) }, { get(target, key) { return key in target ? target[key] : () => {}; } });
+  renderer.drawCard(context, card);
+  assert.ok(positions.every(({ x, y }) => x >= 0 && x <= size.width && y > 0 && y < size.height));
+  assert.ok(positions.some(({ value }) => value.endsWith("…"))); assert.ok(positions.some(({ value }) => value === "-123456789分"));
+  assert.ok(size.height <= renderer.MAX_HEIGHT);
+});
+test("原生月报等待本地背景与远程头像，头像失败仍绘制背景并导出", async () => {
+  const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
+  const avatarPath = "/api/avatars/" + "a".repeat(64);
+  response.mainBoards[0].rows[0].avatarUrl = avatarPath;
+  const [card] = renderer.cards(response), loaded = [], drawn = [], labels = [];
+  const context = new Proxy({ measureText: value => ({ width: String(value).length * 20 }), fillText: value => labels.push(value), drawImage: source => drawn.push(source) }, { get: (target, key) => key in target ? target[key] : () => {} });
+  const canvas = { getContext: () => context, createImage() { const image = { width: 941, height: 1672, set src(path) { this.path = path; loaded.push(this); } }; return image; } };
+  let exported;
+  const wx = { createSelectorQuery() { const query = { in: () => query, select: () => query, fields: () => query, exec: callback => callback([{ node: canvas }]) }; return query; }, canvasToTempFilePath(options) { exported = options; options.success({ tempFilePath: "wxfile://monthly-artwork" }); } };
+  const filename = path.resolve(__dirname, "../miniprogram/share-image.js"), realRequire = createRequire(filename), module = { exports: {} };
+  vm.runInNewContext(fs.readFileSync(filename, "utf8"), { module, wx, setTimeout, clearTimeout, require: name => name === "./api" ? { assetUrl: path => "https://example.test" + path } : realRequire(name) });
+  const rendering = module.exports.renderImage({ alive: true }, card); await tick();
+  assert.equal(loaded.length, 2); assert.equal(exported, undefined);
+  const background = loaded.find(image => image.path === renderer.BACKGROUND_PATH);
+  assert.ok(background); loaded.find(image => image.path.endsWith(avatarPath)).onerror();
+  assert.equal(exported, undefined); background.onload();
+  assert.equal(await rendering, "wxfile://monthly-artwork");
+  assert.equal(drawn.filter(image => image === background).length, 3);
+  assert.ok(labels.includes("北")); assert.equal(exported.destHeight, renderer.dimensions(card).height);
+});

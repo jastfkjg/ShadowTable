@@ -6,6 +6,7 @@ const { actionDetails, completeActionDetails } = require("./audit");
 const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
 const { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats } = require("./player-stats");
 const { Leaderboard } = require("./leaderboard");
+const { MonthlyReport } = require("./monthly-report");
 const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const BOARD_INFO = require("./board-info");
@@ -92,6 +93,7 @@ function createApp({
   const store = new Store(database, { clock }),
     limits = new Map();
   const leaderboard = new Leaderboard(store);
+  const monthlyReport = new MonthlyReport(store);
   function limit(key, max) {
     const now = clock(),
       old = limits.get(key);
@@ -265,7 +267,7 @@ function createApp({
         check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
         const ownDataRead = req.method === "GET" && ([
           "/api/me/profile", "/api/me/stats", "/api/me/matches",
-          "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard",
+          "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard", "/api/monthly-report",
         ].includes(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
         const ownProfileWrite = req.method === "POST" && [
           "/api/me/profile", "/api/me/leaderboard-visibility",
@@ -293,6 +295,10 @@ function createApp({
       }
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
+      if (req.method === "GET" && path === "/api/monthly-report") {
+        res.setHeader("Cache-Control", "no-store");
+        return send(200, monthlyReport.read(requestUrl.searchParams, clock()));
+      }
       if (path === "/api/me/profile" || path === "/api/me/leaderboard-visibility") {
         const visibilityOnly = path === "/api/me/leaderboard-visibility";
         if (req.method === "GET" && !visibilityOnly) return send(200, readProfile(store, uid));

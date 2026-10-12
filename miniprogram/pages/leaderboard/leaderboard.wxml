@@ -10,6 +10,7 @@
       <button class="rank-tool" bindtap="shareLeaderboard" disabled="{{!board || loading || loadingMore || visibilitySaving || shareOpening}}" loading="{{loading || loadingMore || visibilitySaving || shareOpening}}" hover-class="none" aria-label="{{shareOpening?'正在打开分享页':visibilitySaving?'正在保存公开设置':loading || loadingMore?'正在读取榜单':'分享我的榜单成绩'}}"><image wx:if="{{!loading && !loadingMore && !visibilitySaving && !shareOpening}}" class="rank-tool-icon" src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button>
     </view>
   </view>
+  <button class="rank-monthly-entry" bindtap="openMonthlyReport" hover-class="none"><view><text>月度战报</text><text class="small muted">本月荣誉与历史月报</text></view><text class="rank-chevron" aria-hidden="true"></text></button>
   <view class="rank-metrics" aria-label="排行指标">
     <button wx:for="{{groups}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))?'selected':''}}" bindtap="chooseGroup" data-id="{{item.id}}" disabled="{{(item.id==='points' && !pointsAvailable) || (item.id==='fun' && !funAvailable)}}" aria-pressed="{{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))}}" hover-class="none"><view class="rank-metric-label"><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button>
   </view>

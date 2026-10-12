@@ -4,6 +4,7 @@
     "pages/me/me",
     "pages/stats/stats",
     "pages/leaderboard/leaderboard",
+    "pages/monthly/monthly",
     "pages/share/share",
     "pages/matches/matches",
     "pages/scores/scores",

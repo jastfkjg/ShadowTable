@@ -1,5 +1,6 @@
 // Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
 const funCopy = require("./fun-copy");
+const monthlyCards = require("./monthly-report-card");
 const SIZE = 1080;
 const COLORS = { background: "#101c24", surface: "#192c36", text: "#f2eee5", muted: "#b1bfc6", accent: "#e5c68b", border: "#3d515d", good: "#80b4d7", evil: "#d88f91", self: "#30352f" };
 const metricNames = { points: "积分榜", games: "局数榜", overall: "总胜率榜", good: "好人胜率榜", evil: "坏人胜率榜" };
@@ -19,6 +20,7 @@ function identity(profile) {
   return { name: clean(profile.nickname) || "新朋友", avatar: /^\/api\/avatars\/[a-f0-9]{64}$/.test(profile.avatarUrl || "") ? profile.avatarUrl : "" };
 }
 function describe(card) {
+  if (card.kind === "monthly") return monthlyCards.describe(card);
   return [card.name, card.title, card.context, card.scope, card.label, card.hero == null ? "" : card.hero + card.unit, card.rank ? "第 " + card.rank + " 名" : card.rankLabel,
     ...(card.chart ? [card.chart.label + " " + card.chart.value] : []), ...(card.metrics || []).map(item => item.label + " " + item.value), ...(card.notes || []),
     ...(card.sections || []).flatMap(section => [section.title, ...section.metrics.map(item => item.label + " " + item.value)]),
@@ -130,6 +132,8 @@ function parseSelection(options) {
   }
   if (options.kind === "stats") return { kind: "stats" };
   if (options.kind === "funSummary") return { kind: "funSummary" };
+  if (options.kind === "monthly" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") && [undefined, "fun"].includes(options.edition))
+    return { kind: "monthly", month: options.month, ...(options.edition ? { edition: options.edition } : {}) };
   if (options.kind === "fun" && /^(classic|knights|other):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };
   if (options.kind !== "leaderboard" || !["all", "month"].includes(options.period) ||
@@ -225,10 +229,11 @@ function layout(card) {
   const footerTop = notesTop + card.notes.length * 42 + 24;
   return { heroTop, metricsTop, notesTop, footerTop, height: footerTop + 100 };
 }
-const dimensions = card => ({ width: SIZE, height: layout(card).height });
+const dimensions = card => card.kind === "monthly" ? monthlyCards.dimensions(card) : ({ width: SIZE, height: layout(card).height });
 
 // Same renderer runs on a native Canvas 2D node and in visual verification.
 function drawCard(ctx, card, avatar, nearbyAvatars = new Map()) {
+  if (card.kind === "monthly") return monthlyCards.drawCard(ctx, card, nearbyAvatars);
   const box = layout(card), { heroTop, footerTop, height } = box;
   const font = (size, weight = 400) => { ctx.font = weight + " " + size + "px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif"; };
   const text = (value, x, y, size, color = COLORS.text, width = 936, align = "left", weight = 400) => {

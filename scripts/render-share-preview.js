@@ -10,7 +10,8 @@ const root = path.resolve(__dirname, "../miniprogram");
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
-const source = fs.readFileSync(path.join(root, "share-card.js"), "utf8");
+const source = fs.readFileSync(path.join(root, "share-card.js"), "utf8").replace('require("./fun-copy")', 'window.shadowtableFunCopy').replace('require("./monthly-report-card")', 'window.shadowtableMonthlyCard');
+const browserDependencies = ["fun-copy.js", "monthly-report.js", "monthly-report-card.js"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const safe = text => String(text).replace(/[&<>"']/g, value => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[value]);
 const css = file => fs.readFileSync(path.join(root, file), "utf8").replace(/^page\s*\{/m, "body {").replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 function html(node) {
@@ -51,7 +52,7 @@ const scenes = {
 const output = path.resolve(__dirname, "../output/playwright");
 fs.mkdirSync(output, { recursive: true });
 const script = card => `<script>{const module={exports:{}};${source}\nconst card=${JSON.stringify(card)};const size=module.exports.dimensions(card);const canvas=document.createElement('canvas');Object.assign(canvas,size);module.exports.drawCard(canvas.getContext('2d'),card);document.querySelectorAll('img.share-image').forEach(image=>image.src=canvas.toDataURL());document.querySelectorAll('canvas.card').forEach(target=>{Object.assign(target,size);module.exports.drawCard(target.getContext('2d'),card)});}</script>`;
-const base = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>分享图片 · 布局验证</title>`;
+const base = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>分享图片 · 布局验证</title><script>${browserDependencies}</script>`;
 for (const [name, card] of Object.entries(scenes)) {
   const state = { imagePath: "", description: cards.describe(card), imageMenu: true };
   const tree = factory("pages/share/share.wxml")({ ...state, imagePath: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" });

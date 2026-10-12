@@ -17,6 +17,10 @@ const assets = {
   "/result-registration.js": ["../../miniprogram/result-registration.js", "text/javascript; charset=utf-8"],
   "/leaderboard-presentation.js": ["../../miniprogram/leaderboard-presentation.js", "text/javascript; charset=utf-8"],
   "/leaderboard.css": ["leaderboard.css", "text/css; charset=utf-8"],
+  "/monthly-report.js": ["../../miniprogram/monthly-report.js", "text/javascript; charset=utf-8"],
+  "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
+  "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
+  "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];

@@ -1,5 +1,6 @@
 const api = require("../../api");
 const cards = require("../../share-card");
+const monthlyCards = require("../../monthly-report-card");
 const { renderImage } = require("../../share-image");
 const { backToMe } = require("../../profile");
 async function readLeaderboard(query) {
@@ -12,12 +13,13 @@ async function readLeaderboard(query) {
   }
 }
 Page({
-  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true },
+  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true, pageTitle: "分享成绩", pageIndex: 0, pageCount: 1 },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ imageMenu: typeof wx.showShareImageMenu === "function" && (!wx.canIUse || wx.canIUse("showShareImageMenu")) });
     try { this.selection = cards.parseSelection(options); }
     catch (error) { this.setData({ loading: false, error: error.message }); return; }
+    if (this.selection.kind === "monthly") this.setData({ pageTitle: "分享月报" });
     return this.load();
   },
   onReady() { this.canvasReady = true; if (this.card) return this.render(); },
@@ -27,16 +29,18 @@ Page({
     this.fetching = true;
     const sequence = this.sequence = (this.sequence || 0) + 1;
     this.card = null;
-    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "" });
+    this.imagePaths = []; this.cardPages = [];
+    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "", pageIndex: 0, pageCount: 1 });
     try {
       await api.login();
       const { kind, ...query } = this.selection;
-      const [profile, result] = await Promise.all([api.request("/api/me/profile"), kind === "leaderboard" ? readLeaderboard(query) : api.request("/api/me/stats")]);
+      const [profile, result] = await Promise.all([kind === "monthly" ? Promise.resolve(null) : api.request("/api/me/profile"), kind === "monthly" ? api.request("/api/monthly-report?month=" + encodeURIComponent(query.month)) : kind === "leaderboard" ? readLeaderboard(query) : api.request("/api/me/stats")]);
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
-      this.card = kind === "leaderboard" ? cards.leaderboardCard(profile, result)
+      this.cardPages = kind === "monthly" ? monthlyCards.cards(result, query.edition === "fun") : [];
+      this.card = kind === "monthly" ? this.cardPages[0] : kind === "leaderboard" ? cards.leaderboardCard(profile, result)
         : kind === "stats" ? cards.statsCard(profile, result, now) : kind === "funSummary" ? cards.funSummaryCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
-      this.setData({ description: cards.describe(this.card) });
+      this.setData({ description: cards.describe(this.card), pageCount: this.cardPages.length || 1 });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { this.fetching = false; if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }
     if (this.alive && sequence === this.sequence && this.card && this.canvasReady) await this.render();
@@ -47,13 +51,21 @@ Page({
     this.setData({ rendering: true, imagePath: "", error: "", actionError: "", albumDenied: false });
     try {
       const path = await renderImage(this, card);
-      if (this.alive && sequence === this.sequence && card === this.card) this.setData({ imagePath: path });
+      if (this.alive && sequence === this.sequence && card === this.card) { this.imagePaths[this.data.pageIndex] = path; this.setData({ imagePath: path }); }
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { if (this.alive) this.setData({ rendering: false }); }
   },
   retry() { return this.card ? this.render() : this.load(); },
+  async choosePage(e) {
+    if (this.data.loading || this.data.rendering || this.data.acting) return;
+    const pageIndex = this.data.pageIndex + Number(e.currentTarget.dataset.step);
+    if (pageIndex < 0 || pageIndex >= this.cardPages.length) return;
+    this.card = this.cardPages[pageIndex];
+    this.setData({ pageIndex, imagePath: this.imagePaths[pageIndex] || "", description: cards.describe(this.card), error: "", actionError: "" });
+    if (!this.data.imagePath) await this.render();
+  },
   preview() {
-    if (this.data.imagePath && !this.data.acting) wx.previewImage({ current: this.data.imagePath, urls: [this.data.imagePath] });
+    if (this.data.imagePath && !this.data.acting) wx.previewImage({ current: this.data.imagePath, urls: this.imagePaths.filter(Boolean) });
   },
   send() {
     if (!this.data.imagePath || this.data.acting || this.data.rendering) return;

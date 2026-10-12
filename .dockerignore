@@ -11,6 +11,11 @@
 !miniprogram/result-registration.js
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
+!miniprogram/room-swipe.js
+!miniprogram/monthly-report.js
+!miniprogram/monthly-report-card.js
+!miniprogram/assets/
+!miniprogram/assets/monthly-report-background.jpg
 !miniprogram/pages/
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/

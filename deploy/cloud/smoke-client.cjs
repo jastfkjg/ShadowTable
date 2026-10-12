@@ -52,6 +52,10 @@ async function main() {
       body: "{}",
     }));
     if (!/^[a-f0-9]{64}$/.test(data.token)) throw new Error("Guest login returned an invalid token");
+    const artwork = await request("/assets/monthly-report-background.jpg");
+    if (Buffer.from(artwork, "utf8").length < 1000) throw new Error("Monthly artwork was not packaged");
+    const report = JSON.parse(await request("/api/monthly-report", { headers: { Authorization: "Bearer " + data.token } }));
+    if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(report.month) || !Array.isArray(report.mainBoards)) throw new Error("Monthly report is unavailable in the image");
     fs.writeFileSync(sessionFile, data.token, { mode: 0o600 });
   } else if (process.argv[2] === "resume") {
     const token = fs.readFileSync(sessionFile, "utf8");

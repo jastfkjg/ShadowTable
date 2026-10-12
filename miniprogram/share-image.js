@@ -1,5 +1,6 @@
 const api = require("./api");
 const { dimensions, drawCard } = require("./share-card");
+const monthlyCards = require("./monthly-report-card");
 
 function canvasFor(page) {
   return new Promise((resolve, reject) => {
@@ -20,14 +21,15 @@ function avatarFor(canvas, path) {
     const timer = setTimeout(() => done(null), 3000);
     image.onload = () => done(image.width && image.height ? image : null);
     image.onerror = () => done(null);
-    try { image.src = api.assetUrl(path); } catch { done(null); }
+    try { image.src = path.startsWith("/assets/") ? path : api.assetUrl(path); } catch { done(null); }
   });
 }
 async function renderImage(page, card) {
   const canvas = await canvasFor(page);
   const { width, height } = dimensions(card);
   canvas.width = width; canvas.height = height;
-  const paths = [...new Set([card.avatar, ...(card.nearby || []).map(row => row.avatar)].filter(Boolean))];
+  const paths = [...new Set([card.avatar, ...(card.nearby || []).map(row => row.avatar),
+    ...(card.kind === "monthly" ? monthlyCards.imagePaths(card) : [])].filter(Boolean))];
   const avatars = new Map(await Promise.all(paths.map(async path => [path, await avatarFor(canvas, path)])));
   if (!page.alive) return null;
   drawCard(canvas.getContext("2d"), card, avatars.get(card.avatar), avatars);

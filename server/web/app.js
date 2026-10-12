@@ -2,6 +2,8 @@
   "use strict";
   const funCopy = window.shadowtableFunCopy;
   const rankPresentation = window.shadowtableLeaderboard;
+  const monthlyPresentation = window.shadowtableMonthlyReport;
+  const monthlyCard = window.shadowtableMonthlyCard;
   const resultRegistration = window.shadowtableResultRegistration;
   const resultFlow = resultRegistration.flow;
   const publicHistory = window.shadowtablePublicHistory;
@@ -618,6 +620,7 @@
     statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyDetailsExpanded: false, monthlyRulesExpanded: false, monthlyEntertainment: false, monthlySort: 'count', monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -685,6 +688,7 @@
 
   // Personal destinations use hash URLs so refresh, browser back and shared room links remain meaningful.
   var routeSequence = 0, currentRoute = '#/lobby', profileSequence = 0, profilePending = null;
+  var monthlySequence = 0;
   var statsSequence = 0, statsRequestRoute = -1;
   var seatAvatarFailures = new Set();
   function routeInfo(hash) {
@@ -693,6 +697,7 @@
     const parts = (hash || '').split('?'), query = new URLSearchParams(parts[1] || '');
     if (parts[0] === '#/matches') return { page: 'matches', scored: query.get('scored') === '1', fun: query.get('fun') ? { metric: query.get('fun'), mode: query.get('mode') || 'classic', role: query.get('role') || '' } : null };
     if (parts[0] === '#/stats') return { page: 'stats', tab: query.get('tab') === 'fun' ? 'fun' : 'records' };
+    if (parts[0] === '#/monthly') return { page: 'monthly', month: query.get('month') || monthlyPresentation.monthAt() };
     var name = (hash || '').replace(/^#\//, '');
     return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'help', 'login'].includes(name) ? name : 'lobby' };
   }
@@ -713,6 +718,7 @@
   async function applyRoute(hash) {
     if (state.page === 'login' && routeInfo(hash).page !== 'login' && !await cancelWebLogin()) return;
     const sequence = ++routeSequence, route = routeInfo(hash);
+    ++monthlySequence;
     currentRoute = '#/' + route.page + (route.code ? '/' + route.code : '');
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
@@ -721,6 +727,7 @@
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
+      ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
       rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
     const heading = app.querySelector('[data-page-heading]');
@@ -744,6 +751,7 @@
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
       else if (route.page === 'leaderboard') await loadLeaderboard();
+      else if (route.page === 'monthly') await loadMonthlyReport(route.month);
       else if (route.page === 'matches') await loadMatches();
       else if (route.page === 'help') await loadScoreRules();
     } catch (e) { if (sequence === routeSequence) handleError(e); }
@@ -994,6 +1002,7 @@
     const overlay = state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded;
     let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜"><div class="rank-workspace"' + (overlay ? ' inert' : '') + '>';
     html += '<div class="rank-toolbar"><div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div><div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
+    html += '<button type="button" class="rank-monthly-entry" data-action="openMonthly"><span>月度战报 <span class="small muted">本月荣誉与历史月报</span></span><span class="rank-chevron" aria-hidden="true"></span></button>';
     html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => {
       const selected = metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric);
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
@@ -1017,6 +1026,84 @@
     if (state.rankRulesExpanded) html += rankSheetStart('rank-rules-sheet','榜单规则','rankToggleRules') + '<div class="rank-rules-body"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + (board.period === 'month' ? '本月' : '全部') + '</div>' + board.ruleLines.map(line => '<p class="rank-rule-line">' + esc(line) + '</p>').join('') + '</div></section></div>';
     if (state.rankMineExpanded) html += rankSheetStart('rank-details-dialog','我的榜单','rankToggleMine','我的排名与公开设置') + '<div class="rank-details-body"><div class="rank-mine-content"><div><div class="rank-mine-label">我的排名</div><div class="rank-mine-place">' + esc(me.placeLabel) + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + esc(board.valueHeading) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (!me.rank ? '<div class="rank-status-label">' + esc(me.statusLabel) + '</div>' : '') + (board.fun ? '<div class="small muted fun-mine-sample">' + esc(me.sampleLabel) + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label><div class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></section></div>';
     return html + '</section>';
+  }
+  async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt()) {
+    const sequence = ++monthlySequence, route = routeSequence;
+    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', monthlyReport: null, monthlyImages: [], monthlyImageIndex: 0, monthlySharing: false });
+    try {
+      const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
+      if (sequence !== monthlySequence || route !== routeSequence || state.page !== 'monthly' || !foreground) return;
+      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyLoading: false });
+    } catch (error) {
+      if (sequence === monthlySequence && route === routeSequence && state.page === 'monthly') setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message });
+    }
+  }
+  function viewMonthlyBoard(board) {
+    return '<section class="monthly-board" aria-label="' + esc(board.title) + '"><div class="monthly-section-title"><span>' + esc(board.title) + '</span><span class="monthly-top-label">TOP 3</span></div><div class="monthly-caption">' + esc(board.subtitle) + '</div>' + (!board.rows.length ? '<p class="monthly-empty-board">' + esc(board.emptyHint) + '</p>' : '<ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank' + (row.rank === 1 ? ' monthly-first' : '') + '"><span>' + row.rank + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-avatar monthly-avatar-' + row.rank + '" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name">' + esc(row.nickname) + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol>') + '</section>';
+  }
+  function viewMonthlyReport() {
+    const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt();
+    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><div class="monthly-toolbar"><label class="monthly-month-picker">月份 <input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label><button type="button" class="monthly-rule-button" data-action="monthlyRules" aria-expanded="' + !!state.monthlyRulesExpanded + '">规则</button></div>';
+    if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
+    if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
+    if (!report || state.monthlyLoading) return html + '</section>';
+    html += '<header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt="" aria-hidden="true"><div class="monthly-hero-content"><div class="monthly-month-title">' + esc(report.monthTitle) + '</div><div class="monthly-title">月度战报</div><div class="monthly-hero-tagline">这个月，谁是桌边的传奇？</div><div class="monthly-hero-meta"><span>' + report.statusLabel + '</span><span>' + report.versionLabel + '</span></div></div></header><div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家'], [report.overview.activeDays, '活跃天数']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
+    if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
+    else {
+      html += report.coreBoards.map(viewMonthlyBoard).join('') + '<div class="monthly-featured-heading">本月趣味荣誉</div>' + report.featured.map(viewMonthlyBoard).join('');
+      if (!report.featured.length) html += '<p class="monthly-empty-board">本月暂无完整的公开趣味成绩</p>';
+      if (report.highlights.length) html += '<div class="monthly-highlight"><div>本月高光</div>' + report.highlights.map(line => '<p>' + esc(line) + '</p>').join('') + '</div>';
+      html += '<button class="monthly-details-toggle" type="button" data-action="monthlyDetails" aria-expanded="' + !!state.monthlyDetailsExpanded + '">' + (state.monthlyDetailsExpanded ? '收起完整月报' : '查看完整月报') + '<span aria-hidden="true">' + (state.monthlyDetailsExpanded ? '−' : '＋') + '</span></button>';
+      if (state.monthlyDetailsExpanded) {
+        html += report.extraBoards.map(viewMonthlyBoard).join('');
+        html += '<div class="monthly-tabs" role="group" aria-label="趣味榜类型">' + [['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" data-action="monthlyEdition" data-value="' + id + '" aria-pressed="' + ((id === 'fun') === !!state.monthlyEntertainment) + '" class="' + (((id === 'fun') === !!state.monthlyEntertainment) ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
+        html += '<div class="monthly-tabs monthly-sort" role="group" aria-label="趣味榜排序">' + [['count', '按次数'], ['rate', state.monthlyEntertainment ? '按发生率' : '按成功率']].map(([id, label]) => '<button type="button" data-action="monthlySort" data-value="' + id + '" aria-pressed="' + ((state.monthlySort || 'count') === id) + '" class="' + ((state.monthlySort || 'count') === id ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
+        html += monthlyPresentation.detailBoards(report, state.monthlySort || 'count', !!state.monthlyEntertainment).map(viewMonthlyBoard).join('');
+      }
+      html += btn('monthly-share', 'monthlyShare', state.monthlySharing ? '正在生成图片…' : state.monthlyEntertainment ? '生成娱乐版分享图' : '生成月报分享图', null, state.monthlySharing);
+      if (state.monthlyImages?.length) {
+        html += '<div class="monthly-image-result"><img class="monthly-image-preview" src="' + state.monthlyImages[state.monthlyImageIndex || 0] + '" alt="' + esc(report.monthLabel + '月度战报分享图，第' + ((state.monthlyImageIndex || 0) + 1) + '张') + '">';
+        if (state.monthlyImages.length > 1) html += '<div class="monthly-pagination">' + btn('text-button', 'monthlyPreviousImage', '上一张', null, !state.monthlyImageIndex) + '<span>第 ' + ((state.monthlyImageIndex || 0) + 1) + ' / ' + state.monthlyImages.length + ' 张</span>' + btn('text-button', 'monthlyNextImage', '下一张', null, (state.monthlyImageIndex || 0) + 1 === state.monthlyImages.length) + '</div><p class="monthly-caption">并列玩家较多，已自动分图。可逐张保存。</p>';
+        html += btn('secondary', 'monthlyDownload', '保存当前图片') + '</div>';
+      }
+    }
+    html += '<footer class="monthly-footnote">北京时间 ' + esc(report.rangeLabel) + '<span>截至 ' + esc(report.asOfLabel) + ' · ' + report.versionLabel + '</span><span>榜单仅展示已公开玩家</span></footer>';
+    if (state.monthlyRulesExpanded) html += '<div class="monthly-rules"><div class="monthly-section-title">月报规则</div>' + report.rules.map(rule => '<p class="monthly-caption">' + esc(rule) + '</p>').join('') + '</div>';
+    return html + '</section>';
+  }
+  async function shareMonthlyReport() {
+    if (!state.monthlyReport?.canShare || state.monthlySharing || state.monthlyLoading || state.monthlyError) return;
+    const route = routeSequence, sequence = monthlySequence, month = state.monthlyMonth, entertainment = !!state.monthlyEntertainment;
+    const active = () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly' && foreground;
+    setState({ monthlySharing: true, monthlyImages: [], monthlyError: '' });
+    try {
+      const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
+      if (!active()) return;
+      const cards = monthlyCard.cards(response, entertainment);
+      const paths = [...new Set(cards.flatMap(card => monthlyCard.imagePaths(card)))];
+      const avatars = new Map(await Promise.all(paths.map(path => new Promise(resolve => {
+        const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
+        const timer = setTimeout(() => done(null), 3000);
+        image.onload = () => done(image.width && image.height ? image : null); image.onerror = () => done(null); image.src = path;
+      }))));
+      if (!active()) return;
+      const images = cards.map(card => { const canvas = document.createElement('canvas'); Object.assign(canvas, monthlyCard.dimensions(card)); monthlyCard.drawCard(canvas.getContext('2d'), card, avatars); return canvas.toDataURL('image/png'); });
+      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyImages: images, monthlyImageIndex: 0 });
+      app.querySelector('.monthly-image-result')?.scrollIntoView({ block: 'start' });
+    } catch (error) { if (active()) setState({ monthlyError: error.message }); }
+    finally { if (route === routeSequence && sequence === monthlySequence) setState({ monthlySharing: false }); }
+  }
+  function openMonthlyPlayer(id) {
+    const row = [...(state.monthlyReport?.mainBoards || []), ...(state.monthlyReport?.funBoards || [])].flatMap(board => board.rows).find(row => row.publicId === id);
+    if (!row || state.page !== 'monthly' || state.monthlyLoading || !foreground) return;
+    const route = routeSequence, sequence = monthlySequence;
+    return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '', initial: row.initial }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats', () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly');
+  }
+  function downloadMonthlyImage() {
+    const path = state.monthlyImages?.[state.monthlyImageIndex || 0];
+    if (!path) return;
+    const link = document.createElement('a'); link.href = path; link.download = '桌边助手-月度战报-' + state.monthlyMonth + '-' + ((state.monthlyImageIndex || 0) + 1) + '.png';
+    document.body.appendChild(link); link.click(); link.remove();
   }
   function viewHelp() {
     return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
@@ -2097,7 +2184,7 @@ function roomListItems(rooms) {
     const card = state.playerCard, seatNum = card?.seat;
     playerCardSequence++;
     setState({ playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "" });
-    if (restoreFocus && card?.scope === 'leaderboard') app.querySelector('[data-action="rankPlayerCard"][data-id="' + card.id + '"]')?.focus({ preventScroll: true });
+    if (restoreFocus && card?.scope === 'leaderboard') app.querySelector('[data-action="' + (state.page === 'monthly' ? 'monthlyPlayer' : 'rankPlayerCard') + '"][data-id="' + card.id + '"]')?.focus({ preventScroll: true });
     if (restoreFocus && seatNum != null) app.querySelector('[data-action="seat"][data-seat="' + seatNum + '"]')?.focus({ preventScroll: true });
   }
   async function openPlayerCard(seatNum) {
@@ -4347,7 +4434,7 @@ function roomListItems(rooms) {
       viewDealtIdentity() +
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
-      (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","help"].includes(state.page) ? " personal-page" : "") +
+      (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
       (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen || (state.page === 'table' && hasPublicHistorySheet()) ? ' inert' : '') + '>' +
       (state.page === 'profile' ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
@@ -4357,7 +4444,7 @@ function roomListItems(rooms) {
       viewResultDialog() +
       (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
+      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
       (state.page === 'table' ? viewHistorySheet() : '') + viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
@@ -4369,11 +4456,22 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    openMonthly: () => navigate('monthly'),
+    monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
+    monthlyRetry: () => loadMonthlyReport(),
+    monthlyRules: () => setState({ monthlyRulesExpanded: !state.monthlyRulesExpanded }),
+    monthlyDetails: () => setState({ monthlyDetailsExpanded: !state.monthlyDetailsExpanded }),
+    monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
+    monthlySort: el => { if (['count', 'rate'].includes(el.dataset.value)) setState({ monthlySort: el.dataset.value }); },
+    monthlyShare: shareMonthlyReport,
+    monthlyDownload: downloadMonthlyImage,
+    monthlyPreviousImage: () => { if (state.monthlyImageIndex > 0) setState({ monthlyImageIndex: state.monthlyImageIndex - 1 }); },
+    monthlyNextImage: () => { if (state.monthlyImageIndex + 1 < state.monthlyImages?.length) setState({ monthlyImageIndex: state.monthlyImageIndex + 1 }); },
     openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     closePlayerCard: () => closePlayerCard(),
     rankPlayerCard: el => openRankPlayerCard(el.dataset.id),
-    retryPlayerCard: () => state.playerCard && !state.playerCardLoading && (state.playerCard.scope === 'leaderboard' ? openRankPlayerCard(state.playerCard.id) : openPlayerCard(state.playerCard.seat)),
+    retryPlayerCard: () => state.playerCard && !state.playerCardLoading && (state.page === 'monthly' ? openMonthlyPlayer(state.playerCard.id) : state.playerCard.scope === 'leaderboard' ? openRankPlayerCard(state.playerCard.id) : openPlayerCard(state.playerCard.seat)),
     toggleProposalSeat: el => toggleProposalSeat(Number(el.dataset.seat)),
     recoverConnection: recoverConnection,
     toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
@@ -4672,6 +4770,7 @@ function roomListItems(rooms) {
     },
   };
   var CHANGES = {
+    monthlyMonth: el => navigate('monthly?month=' + encodeURIComponent(el.value)),
     funRankRole: el => loadLeaderboard(false,{rankFunRole:el.value}),
     rankVisibility: el => changeRankVisibility(el.checked),
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
@@ -4861,6 +4960,7 @@ function roomListItems(rooms) {
     } else {
       foreground = true;
       if (state.page === 'login') pollWebLogin();
+      if (state.page === 'monthly') loadMonthlyReport();
       if (alive) {
         if (state.reconnecting || pending) recoverConnection();
         else if (roomCode && !state.needsLogin) refresh().catch(handleError);

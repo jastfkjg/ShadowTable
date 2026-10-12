@@ -4,6 +4,8 @@ button.share-preview { display: block; width: 100%; padding: 0; margin: 0; line-
 .share-image { display: block; width: 100%; }
 .share-placeholder { min-height: 280px; display: flex; align-items: center; justify-content: center; background: var(--surface); border-radius: 20rpx; color: var(--muted); }
 .share-actions { display: flex; gap: 20rpx; margin-top: 28rpx; }
+.share-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 20rpx; font-size: 26rpx; }
+.share-pagination button { width: auto; min-height: 48px; margin: 0; padding: 12rpx; font-size: 26rpx; color: var(--accent); }
 .share-actions button { flex: 1; width: 0; min-width: 0; min-height: 48px; margin: 0; }
 .share-actions .share-send, .share-actions .share-save-primary { background: var(--accent); color: var(--bg); font-weight: 600; }
 .share-actions .share-save { border: 1px solid var(--border); }
