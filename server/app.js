@@ -9,6 +9,7 @@ const { Leaderboard } = require("./leaderboard");
 const { MonthlyReport } = require("./monthly-report");
 const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
+const honors = require("./honors");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -260,6 +261,7 @@ function createApp({
       const session = browserSession || bearerSession;
       check(session, "登录已过期，请重新登录", 401);
       const uid = session.uid;
+      honors.settleDue(store);
       if (uid.startsWith("test:")) {
         check(admin, "陪测平台未启用", 403);
         const adminSession = admin.authenticate(req);
@@ -396,6 +398,7 @@ function createApp({
         if (match[2] === "private") return send(200, privateView(room, uid));
         // Authorize and build the existing allowlisted view before enriching presentation.
         const view = publicView(room, uid);
+        view.honors = honors.view(store, room, uid);
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
         view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat), statsId: playerStatsId(room, room.players.find(player => player.seat === p.seat)) }));
@@ -475,6 +478,7 @@ function createApp({
               "牌桌状态已变化，请重新确认删除",
               409,
             );
+            honors.closeForRoom(store, room);
             room.players = [];
           } else if (match[2] === "join") {
             if (Object.hasOwn(b, "createdAt")) {
@@ -486,7 +490,13 @@ function createApp({
               check(room.players.some(p => p.uid === uid) || room.players.length < room.capacity,
                 "房间已满，请刷新后重试", 409);
             enter(room, uid, b.name);
-          } else command(room, uid, b);
+          } else if (["honorStart", "honorVote", "honorClose"].includes(b.type)) {
+            honors.handle(store, room, uid, b);
+            room = store.get(room.code);
+          } else {
+            if (b.type === "rematch") { honors.closeForRoom(store, room); room = store.get(room.code); }
+            command(room, uid, b);
+          }
           if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };
         }
@@ -529,6 +539,11 @@ function createApp({
       });
     }
   });
+  const honorTimer = setInterval(() => {
+    try { honors.settleDue(store); } catch (error) { console.error("Honor settlement failed", error.message); }
+  }, 1000);
+  honorTimer.unref();
+  server.on("close", () => clearInterval(honorTimer));
   const metricsTimer = setInterval(() => metrics.flush(), 60000); metricsTimer.unref();
   server.on("close", () => clearInterval(metricsTimer));
   server.requestTimeout = 15000;

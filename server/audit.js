@@ -14,6 +14,7 @@ const labels = {
   beginActivity: "发起操作",
   cancelActivity: "作废当前操作",
   finishTools: "结束本局",
+  honorStart: "发起最佳玩家票选", honorVote: "提交最佳玩家选票", honorClose: "结束最佳玩家票选",
   leave: "离开房间",
   transfer: "转交房主",
   kick: "移出玩家",

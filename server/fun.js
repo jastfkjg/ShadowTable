@@ -1,8 +1,8 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
 const VERSION = "fun-2026-10-v2";
-const { labels, titles } = require("../miniprogram/fun-copy");
-const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
+const { labels, titles, honors } = require("../miniprogram/fun-copy");
+const modes = { voted: "玩家票选", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
 const modeFor = (board) =>
   /^knights(?:-|$)/.test(board)
     ? "knights"
@@ -17,6 +17,8 @@ const extraRankings = {
   duel_ally: { rateThreshold: 1 },
 };
 const definitions = [
+  ["honor_mvp", "胜方最佳", "honor", "本场最佳", "次", true],
+  ["honor_svp", "败方最佳", "honor", "本场最佳", "次", true],
   ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 1],
   ["percival_bust", labels.percival_bust, "percival", titles.percival, "局", false],
   ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 1],
@@ -65,12 +67,14 @@ const definitions = [
   ]),
 ].map(([id, label, group, title, unit, positive, rateThreshold]) => ({
   id,
+  countOnly: group === "honor",
   label,
   group,
   title,
   unit,
   positive,
   ranked: positive || Object.hasOwn(extraRankings, id),
+  ...(honors[id] ? { honorTitle: honors[id].title, description: honors[id].description } : {}),
   rankLabel: extraRankings[id]?.label || label,
   rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
   rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
@@ -203,6 +207,13 @@ function project(record, players, roles) {
         opportunities,
         status: excluded ? "excluded" : known ? "known" : "unknown",
       });
+    if (record.honorResult?.status === "settled" && !player.uid.startsWith("test:") && ["win", "loss"].includes(player.outcome)) {
+      for (const key of ["mvp", "svp"]) {
+        const award = record.honorResult[key].find(p => p.seat === player.seat);
+        add("honor_" + key, "all", award ? 1 : 0, 0, true);
+        if (award) events.push({ id: "honor_" + key, label: "最强 " + key.toUpperCase(), detail: `${award.votes} 票 · 玩家匿名票选${record.honorResult[key].length > 1 ? " · 并列获奖" : ""}` });
+      }
+    }
     if (initial === "percival") {
       const known = !!t && t.reason !== "final_action";
       add(
@@ -500,7 +511,8 @@ function aggregate(rows, legacyGames = 0) {
 function publicMetrics() {
   return definitions
     .filter((item) => item.ranked)
-    .map((item) => ({ ...item, label: item.rankLabel, key: "fun_" + item.id }));
+    .sort((a,b) => Number(a.countOnly) - Number(b.countOnly))
+    .map((item) => ({ ...item, title: item.honorTitle || item.title, label: item.rankLabel, key: "fun_" + item.id }));
 }
 module.exports = {
   VERSION,

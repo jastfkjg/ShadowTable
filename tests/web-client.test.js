@@ -23,6 +23,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     URL, URLSearchParams, console,
     ...runtime,
   };
+  context.window.shadowtableHonors = require('../miniprogram/honors');
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
   context.window.shadowtableMonthlyReport = require('../miniprogram/monthly-report');
   context.window.shadowtableMonthlyCard = require('../miniprogram/monthly-report-card');
@@ -33,7 +34,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
+      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
@@ -1844,4 +1845,16 @@ test('网页月报默认完整展示且不重复榜单，荣誉使用头像明�
   const empty = c.viewMonthlyReport();
   assert.doesNotMatch(empty, /monthly-featured-heading|monthly-details-toggle|monthly-honor-row|暂无/);
   assert.match(empty, /有效对局/);
+});
+
+test('网页最佳玩家票选选择、截止前修改与全部并列获奖卡片', async()=>{
+  const hp=require('../miniprogram/honors');const c=client(async()=>response({}));
+  const h=hp.present({status:'open',matchId:'m',canVote:true,canClose:true,deadline:120000,serverNow:0,total:6,completed:0,required:3,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},{key:'svp',title:'最强 SVP',side:'败方',players:[{seat:5,name:'晚风'}]}]});
+  Object.assign(c.state,{page:'table',honors:h,network:true,busy:false});c.ACTIONS.openHonors();
+  c.ACTIONS.chooseHonor({dataset:{key:'mvp',seat:'1'}});assert.equal(c.state.honorReady,false);
+  c.ACTIONS.chooseHonor({dataset:{key:'mvp',seat:'2'}});c.ACTIONS.chooseHonor({dataset:{key:'svp',seat:'5'}});assert.equal(c.state.honorReady,true);
+  assert.match(c.viewHonorBallot(),/aria-pressed="true"/);assert.match(c.viewHonorBallot(),/我 · 不可选/);
+  c.ACTIONS.dismissHonors();assert.equal(c.viewHonorBallot(),'');
+  const shown=hp.present({status:'settled',completed:6,total:6,mvp:[{seat:2,name:'林间',votes:3},{seat:3,name:'阿风',votes:3}],svp:[{seat:5,name:'晚风',votes:4}]});
+  const html=c.viewHonors(shown);assert.equal((html.match(/class="honor-winner"/g)||[]).length,3);assert.match(html,/并列获奖/);assert.match(html.replace(/<[^>]*>/g,''),/2 号 · 3 票/);
 });

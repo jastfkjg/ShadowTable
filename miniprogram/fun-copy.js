@@ -5,16 +5,22 @@
   else root.shadowtableFunCopy = copy;
 })(typeof window === "object" ? window : this, function () {
   const labels = {
+    honor_mvp: "胜方最佳", honor_svp: "败方最佳",
     percival_green: "三绿车", percival_bust: "三炸车",
     knife_enemy: "刀中敌方", knife_ally: "刀中友方",
     duel_enemy: "决斗敌方", duel_ally: "决斗友方",
   };
-  const titles = { percival: "派西维尔", knife: "刀客刀法", duel: "骑士" };
+  const titles = { honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士" };
+  const honors = {
+    honor_mvp: { title: "最强 MVP", description: "获得胜方最佳玩家的次数", countOnly: true, roleLabel: "玩家票选", conditionLabel: "获得胜方最佳玩家的次数" },
+    honor_svp: { title: "最强 SVP", description: "获得败方最佳玩家的次数", countOnly: true, roleLabel: "玩家票选", conditionLabel: "获得败方最佳玩家的次数" },
+  };
   const descriptions = {
     assassin: "仅统计刺客的非空最终刺杀。",
   };
   function metric(row) {
     const id = row.id || row.key?.replace(/^fun_/, "");
+    if (honors[id]) return { ...row, ...honors[id], honorTitle: honors[id].title, label: labels[id], ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}), title: row.key ? honors[id].title : titles.honor };
     if (!labels[id]) return row;
     return { ...row, label: labels[id],
       ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}),
@@ -65,7 +71,7 @@
     const id = value.metric?.replace(/^fun_/, "");
     return { ...value,
       ...(value.availableFunMetrics ? { availableFunMetrics: value.availableFunMetrics.map(metric) } : {}),
-      ...(value.fun && labels[id] ? {
+      ...(value.fun && honors[id] ? { ...honors[id], metricLabel: "获奖次数" } : value.fun && labels[id] ? {
         title: titles[id.split("_")[0]],
         metricLabel: labels[id] + (value.sort === "rate" ? "率" : "次数"),
       } : {}) };
@@ -80,5 +86,5 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, metric, summary, story, leaderboard, response };
+  return { labels, titles, honors, metric, summary, story, leaderboard, response };
 });

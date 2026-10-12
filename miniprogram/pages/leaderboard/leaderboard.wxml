@@ -21,8 +21,8 @@
     </button>
     <view class="fun-sort-row">
       <view class="fun-sort" aria-label="排序方式">
-        <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">按次数</button>
-        <button bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}" hover-class="none">按{{board.rateLabel || '成功率'}}</button>
+        <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">{{board.countOnly?'按获奖次数':'按次数'}}</button>
+        <button wx:if="{{!board.countOnly}}" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}" hover-class="none">按{{board.rateLabel || '成功率'}}</button>
       </view>
       <text class="fun-sort-direction">由高到低</text>
     </view>

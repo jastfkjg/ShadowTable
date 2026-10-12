@@ -1,5 +1,6 @@
 const api = require("../../api");
 const { presentMatches, backToMe } = require("../../profile");
+const { withoutAvatar } = require("../../honors");
 Page({
   data: { loading: true, error: "", record: null },
   onLoad(options = {}) { this.alive = true; this.id = options.id || ""; return this.load(); },
@@ -17,6 +18,9 @@ Page({
   },
   historyToggleMembers() {
     if (this.data.record) this.setData({ record: { ...this.data.record, membersExpanded: !this.data.record.membersExpanded } });
+  },
+  honorAvatarError(event) {
+    if (this.data.record) this.setData({ record: { ...this.data.record, honors: withoutAvatar(this.data.record.honors, event.currentTarget.dataset.url) } });
   },
   openReplay() {
     if (!this.data.record?.replayAvailable || this.openingReplay) return;

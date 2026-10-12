@@ -1504,3 +1504,33 @@ test('表单和键盘任意一项打开时移除底栏节点，均关闭后恢�
     }
   }
 });
+
+test('最终结果为所有玩家显示获奖头像昵称号码票数，平票渲染全部，票选弹层排除本人',()=>{
+  const hp=require('../miniprogram/honors');
+  const room={code:'123456',phase:'ended',result:{winner:'good'},capacity:6,me:{seat:1,isHost:false},players:[],history:[],team:[]};
+  const honors=hp.present({status:'settled',completed:6,total:6,mvp:[{seat:2,name:'林间',avatarUrl:'/api/avatars/test',votes:3},{seat:3,name:'阿风',votes:3}],svp:[{seat:5,name:'晚风',votes:4}]});
+  const tree=renderTable({...base,room,honors,network:true});const text=JSON.stringify(tree);
+  for(const name of ['林间','阿风','晚风','最强 MVP','最强 SVP','并列获奖'])assert(text.includes(name),name);
+  assert.equal(nodes(tree).filter(n=>n.attr?.class==='honor-winner').length,3);
+  assert(nodes(tree).some(n=>n.tag==='wx-image' && n.attr.src==='/api/avatars/test'));
+  const ballot=hp.present({status:'open',matchId:'x',canVote:true,deadline:120000,serverNow:0,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间',disabled:false}]}]});
+  const polling=renderTable({...base,room,honors:ballot,...hp.sync({},ballot),network:true});
+  const options=nodes(polling).filter(n=>n.attr?.bindtap==='chooseHonor');assert.equal(options.length,2);assert.equal(options[0].attr.disabled,true);
+  assert.equal(byHandler(polling,'submitHonors').attr.disabled,true);
+});
+
+test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示次数排序',()=>{
+  const fun=require('../server/fun');const {presentStats}=require('../miniprogram/profile');
+  const rows=['honor_mvp','honor_svp'].map((metric,i)=>({metric,mode:'voted',role:'all',role_label:'玩家票选',match_id:'m',status:'known',count:i?0:1,opportunities:0}));
+  const stats=presentStats({total:1,wins:1,byFaction:[],byRole:[],byBoard:[],recent:[],fun:fun.aggregate(rows)});
+  const text=JSON.stringify(renderStatsShell({tab:'fun',stats}));
+  assert.match(text,/最强 MVP/);assert.match(text,/最强 SVP/);assert.match(text,/按获奖局数统计/);assert.doesNotMatch(text,/成功率/);
+  const presentation=require('../miniprogram/leaderboard-presentation');
+  for(const metric of ['fun_honor_mvp','fun_honor_svp']) {
+    const board=presentation.presentBoard({fun:true,countOnly:true,metric,sort:'count',period:'all',unit:'次',availableFunMetrics:fun.publicMetrics(),rows:[],me:{knownGames:1,count:1,status:'ranked',rank:1}});
+    const tree=factory('pages/leaderboard/leaderboard.wxml')({board,metric,funSelected:true,funSort:'count'});
+    assert.match(JSON.stringify(tree),/按获奖次数/);
+    assert.equal(nodes(tree).filter(n=>n.attr?.bindtap==='chooseFunSort' && n.attr['data-id']==='rate').length,0);
+    assert.match(board.ruleLines.join(),/每局每项荣誉最多增加一次/);
+  }
+});

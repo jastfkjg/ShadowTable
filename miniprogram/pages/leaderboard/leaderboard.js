@@ -44,7 +44,10 @@ Page({
     this.closePlayerCard();
     const sequence = this.sequence = (this.sequence || 0) + 1;
     let { metric } = { ...this.data, ...selection };
-    const { period, board, funMode, funSort, funRole } = { ...this.data, ...selection };
+    const { period, board } = { ...this.data, ...selection };
+    const countOnly = /^fun_honor_(mvp|svp)$/.test(metric);
+    const selected = { ...this.data, ...selection };
+    const funMode = countOnly ? "all" : selected.funMode, funSort = countOnly ? "count" : selected.funSort, funRole = countOnly ? "" : selected.funRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     this.failedSelection = null;
     // Keep the rendered snapshot mounted until the replacement is ready.
@@ -107,9 +110,9 @@ Page({
     const key = e.currentTarget.dataset.id;
     if (!this.data.funOptions.some(item => item.key === key)) return;
     this.setData({ metricsExpanded: false });
-    if (key !== this.data.metric) return this.load(false, { metric: key, funMode: "all", funRole: "" });
+    if (key !== this.data.metric) return this.load(false, { metric: key, funMode: "all", funRole: "", funSort: this.data.funOptions.find(item => item.key === key)?.countOnly ? "count" : this.data.funSort });
   },
-  chooseFunSort(e) { const funSort=e.currentTarget.dataset.id; if(["count","rate"].includes(funSort) && funSort!==this.data.funSort) return this.load(false,{funSort}); },
+  chooseFunSort(e) { const funSort=e.currentTarget.dataset.id; if(!(this.data.board?.countOnly && funSort === "rate") && ["count","rate"].includes(funSort) && funSort!==this.data.funSort) return this.load(false,{funSort}); },
   chooseFunRole(e) { const role=this.data.funRoleOptions[Number(e.detail.value)]; if(role) return this.load(false,{funRole:role.id}); },
   choosePeriod(e) {
     const period = e.currentTarget.dataset.id;

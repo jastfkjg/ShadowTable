@@ -37,6 +37,8 @@ class Store {
       CREATE TABLE IF NOT EXISTS profiles(uid TEXT PRIMARY KEY, nickname TEXT NOT NULL, avatar_hash TEXT, version INTEGER NOT NULL, updated INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS avatars(hash TEXT PRIMARY KEY, mime TEXT NOT NULL, data BLOB NOT NULL);
       CREATE TABLE IF NOT EXISTS matches(id TEXT PRIMARY KEY, snapshot TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS honor_polls(match_id TEXT PRIMARY KEY,state TEXT NOT NULL,status TEXT NOT NULL,deadline INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS honor_deadline ON honor_polls(status,deadline);
       CREATE TABLE IF NOT EXISTS match_players(match_id TEXT NOT NULL, uid TEXT NOT NULL, board TEXT NOT NULL, faction TEXT NOT NULL, outcome TEXT NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
       CREATE INDEX IF NOT EXISTS match_players_user ON match_players(uid,ended DESC);
       CREATE TABLE IF NOT EXISTS match_scores(match_id TEXT NOT NULL, uid TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('scored','excluded')), points INTEGER NOT NULL, ended INTEGER NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(match_id,uid));
@@ -118,7 +120,7 @@ class Store {
   writeFun(match, uid, projection) {
     this.db.prepare("DELETE FROM match_fun_stats WHERE match_id=? AND uid=?").run(match.id, uid);
     const insert = this.db.prepare("INSERT INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)");
-    for (const row of projection.metrics) insert.run(match.id, uid, projection.mode, row.id, row.role, roleName(row.role) || "未知角色", row.count, row.opportunities, row.status, match.endedAt);
+    for (const row of projection.metrics) insert.run(match.id, uid, fun.metrics[row.id]?.countOnly ? "voted" : projection.mode, row.id, row.role, roleName(row.role) || "未知角色", row.count, row.opportunities, row.status, match.endedAt);
   }
   rebuildFun(match, players) {
     const projections = fun.project(match, players, roleName);
@@ -366,6 +368,10 @@ class Store {
       this.db.prepare("UPDATE match_scores SET status='scored' WHERE match_id=? AND uid=?").run(id,uid);
       this.rebuildScores(uid, id);
     }
+    if (before.winner !== match.winner) {
+      require("./honors").invalidate(this, id);
+      match.honorResult = { status: "invalidated", mvp: [], svp: [] };
+    }
     this.rebuildFun(match, this.matchParticipants(match));
     this.syncScoreRooms(id);
     this.invalidateLeaderboard();
@@ -395,6 +401,10 @@ class Store {
     match.source="manual";match.excludedReason=null;match.scoreRevision=(match.scoreRevision || 0)+1;
     this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
     players.forEach(p=>p.outcome=p.faction===match.winner ? "win" : "loss");
+    if (before.winner !== match.winner) {
+      require("./honors").invalidate(this, id);
+      match.honorResult = { status: "invalidated", mvp: [], svp: [] };
+    }
     this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision}};
   }
@@ -568,6 +578,7 @@ class Store {
       name: player.name, seat: player.seat, role: player.role,
       faction: player.faction, outcome: player.outcome,
       fun: funCopy.story(player.fun) || null,
+      honorResult: game.excludedReason ? null : game.honorResult || null,
       score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
       scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
       members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),

@@ -1,6 +1,8 @@
 (function () {
   "use strict";
   const funCopy = window.shadowtableFunCopy;
+  const honorPresentation = window.shadowtableHonors;
+  const honorAvatarFailures = new Set();
   const rankPresentation = window.shadowtableLeaderboard;
   const monthlyPresentation = window.shadowtableMonthlyReport;
   const monthlyCard = window.shadowtableMonthlyCard;
@@ -667,10 +669,12 @@
   };
 
   function setState(patch) {
+    const hadHonorDialog = state.honorDialog;
     var previousMenu = state.roomMenu || state.noteRoom;
     for (var k in patch) state[k] = patch[k];
     render();
     if (typeof app.querySelector === "function") {
+      if (!hadHonorDialog && state.honorDialog) app.querySelector('.honor-sheet button:not(:disabled)')?.focus({preventScroll:true});
       if (patch.roomMenu || patch.noteRoom) {
         var first = app.querySelector('.room-list-dialog input, .room-list-dialog button:not(:disabled)');
         if (first) first.focus();
@@ -923,7 +927,8 @@
     const sequence = ++rankSequence, route = routeSequence;
     let metric = selection.rankMetric || state.rankMetric;
     const period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
-    const funMode = selection.rankFunMode || state.rankFunMode, funSort = selection.rankFunSort || state.rankFunSort, funRole = selection.rankFunRole ?? state.rankFunRole;
+    const countOnly = /^fun_honor_(mvp|svp)$/.test(metric);
+    const funMode = countOnly ? "all" : selection.rankFunMode || state.rankFunMode, funSort = countOnly ? "count" : selection.rankFunSort || state.rankFunSort, funRole = countOnly ? "" : selection.rankFunRole ?? state.rankFunRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     rankFailedSelection = null;
     setState({ ...selection, rankRulesExpanded: false, rankMetricsExpanded: false, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
@@ -1245,7 +1250,7 @@
     const idle = ["lobby", "ended", "terminated"].includes(state.room?.phase);
     const delay = state.reconnecting
       ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, reconnectAttempts - 1))) * (.8 + Math.random() * .2)
-      : idle ? Math.min(10000, 2500 * (1 + Math.floor(unchangedPolls / 4))) : 2500;
+      : state.room?.honors?.status === "open" ? 2500 : idle ? Math.min(10000, 2500 * (1 + Math.floor(unchangedPolls / 4))) : 2500;
     timer = setTimeout(async function () {
       try {
         if (state.reconnecting) await recoverConnection();
@@ -1255,6 +1260,7 @@
     }, Math.max(delay, rateLimitUntil - Date.now()));
   }
   function clearRoom() {
+    state.honorDialog = false; state.honors = null;
     clearTimeout(timer);
     seatAvatarFailures.clear();
     refreshSequence++;
@@ -1420,7 +1426,9 @@ function roomListItems(rooms) {
     if (stageChanged)
       buzz(room.needsSubmission && !room.me.submitted ? [50, 40, 50] : [25]);
     var selected = stageChanged ? [] : state.selected;
+    const honors = honorPresentation.present(room.honors, undefined, honorAvatarFailures);
     var patch = {
+      honors, ...honorPresentation.sync(state, honors, state.historyOpen || state.playerCard || state.resultDialog || !foreground || !modal.hidden),
       notice:
         state.notice === "请求较多，冷却后会自动刷新" ? "" : state.notice,
       room: room,
@@ -1718,7 +1726,7 @@ function roomListItems(rooms) {
     if (!r) return;
     var body = { type: type, stage: r.stage };
     if (extra) for (var k in extra) body[k] = extra[k];
-    mutate("/api/rooms/" + r.code + "/commands", body, after);
+    return mutate("/api/rooms/" + r.code + "/commands", body, after);
   }
   async function confirmCommand(title, content, type, extra) {
     var stage = state.room && state.room.stage;
@@ -1838,6 +1846,39 @@ function roomListItems(rooms) {
     if (!record.events.length && !record.reason) html += '<div class="small muted">本局没有适用的趣味事件。</div>';
     return html + '</section>';
   }
+  function honorAvatar(player) {
+    return player.avatarUrl ? '<img class="honor-avatar" src="' + esc(player.avatarUrl) + '" alt="" data-honor-avatar />'
+      : '<span class="honor-avatar honor-initial" aria-hidden="true">' + esc(player.initial) + '</span>';
+  }
+  function viewHonors(h) {
+    if (!h) return '';
+    let html = '<section class="honor-result' + (h.status === 'settled' ? ' is-settled' : '') + '" aria-label="本场最佳票选">';
+    if (h.status === 'not_started') html += '<div class="honor-heading">谁是本场最佳？</div><div class="honor-help">胜方 MVP · 败方 SVP，由本局玩家匿名票选</div>' + (h.canStart ? btn('primary honor-primary','startHonors','发起 MVP / SVP 投票',null,state.busy || !!pending) : '<div class="honor-help">等待房主选择发起票选</div>') + '<div class="honor-footnote">可选环节，不影响胜负与积分 · 每局仅一次</div>';
+    else if (h.status === 'open') html += '<div class="honor-heading">本场最佳 · 投票中</div><div class="honor-progress"><span>' + h.completed + ' / ' + h.total + ' 人已投票</span><span>剩余 ' + h.timeLabel + '</span></div>' + (h.canVote ? btn('primary honor-primary','openHonors',h.ballot ? '已提交 · 修改投票' : '投出我的 MVP / SVP',null,state.busy || !!pending) : '') + '<div class="honor-footnote">至少 ' + h.required + ' 人完成投票才颁奖 · 匿名票选</div>' + (h.canClose ? btn('text-button honor-close-poll','closeHonors','结束投票并结算',null,state.busy || !!pending) : '');
+    else if (h.status === 'settled') {
+      html += '<div class="honor-result-heading"><div class="honor-heading">本场最佳</div><div class="honor-help">' + h.completed + ' / ' + h.total + ' 人票选</div></div><div class="honor-awards">';
+      for (const award of h.awards) html += '<div class="honor-award ' + award.key + '"><div class="honor-award-heading"><span>' + award.title + '</span>' + (award.tied ? '<span class="honor-tied" aria-label="并列获奖">并列</span>' : '') + '</div><div class="honor-winners">' + award.players.map(player => '<div class="honor-winner">' + honorAvatar(player) + '<div class="honor-player-copy"><div class="honor-player-name">' + esc(player.name) + '</div><div class="honor-player-meta">' + player.seat + ' 号 · <span class="honor-votes">' + player.votes + ' 票</span></div></div></div>').join('') + '</div>' + (award.players.length ? '' : '<div class="honor-help">暂无有效选票</div>') + '</div>';
+      html += '</div>';
+    } else html += '<div class="honor-help">' + esc(h.resultNote) + '</div>';
+    return html + '</section>';
+  }
+  function viewHonorBallot() {
+    if (!state.honorDialog || state.page !== 'table' || state.error || state.honors?.status !== 'open') return '';
+    const disabled = state.busy || !!pending || !state.network;
+    return '<div class="dialog-backdrop honor-backdrop"><section class="honor-sheet" role="dialog" aria-modal="true" aria-labelledby="honor-title"><div class="honor-handle" aria-hidden="true"></div><div class="honor-sheet-header"><div class="honor-heading" id="honor-title">本场最佳 · 请投票</div>' + btn('honor-later','dismissHonors','稍后',null,disabled) + '</div><div class="honor-sheet-intro honor-help">胜方、败方各选 1 人，不可投自己</div><div class="honor-sheet-body">' + state.honorGroups.map(group => '<div class="honor-ballot-group ' + group.key + '"><div class="honor-award-heading"><span>' + group.title + '</span><span class="honor-tag">' + group.side + '</span></div><div class="honor-help">' + (group.key === 'mvp' ? '选出带领队伍获胜的玩家' : '选出虽败犹荣的玩家') + '</div><div class="honor-candidates">' + group.players.map(player => '<button type="button" class="honor-candidate' + (player.selected ? ' selected' : '') + '" data-action="chooseHonor" data-key="' + group.key + '" data-seat="' + player.seat + '" aria-pressed="' + player.selected + '"' + (disabled || player.disabled ? ' disabled' : '') + '>' + honorAvatar(player) + '<span class="honor-player-copy"><span class="honor-help">' + player.seat + ' 号</span><span class="honor-player-name">' + esc(player.name) + '</span>' + (player.disabled ? '<span class="honor-footnote">我 · 不可选</span>' : '') + '</span><span class="honor-radio" aria-hidden="true">' + (player.selected ? '✓' : '') + '</span></button>').join('') + '</div>' + (group.skip ? '<div class="honor-help">本项无可选玩家，自动跳过</div>' : '') + '</div>').join('') + '</div><div class="honor-sheet-footer"><div class="honor-help">已选 ' + state.honorSelected + ' / ' + state.honorRequired + ' · 匿名投票 · 剩余 ' + state.honors.timeLabel + '</div>' + btn('primary honor-primary','submitHonors',state.honors.ballot ? '保存修改' : '提交投票',null,disabled || !state.honorReady) + '<div class="honor-footnote">截止前可修改 · 关闭后可从牌桌继续</div></div></section></div>';
+  }
+  function dismissHonors() {
+    if (state.busy || pending) return;
+    setState({ honorDialog: false, honorDismissed: state.honors?.matchId || '' });
+    app.querySelector('[data-action="openHonors"]')?.focus({preventScroll:true});
+  }
+  function openHonors() {
+    const h = state.honors;
+    if (!h?.canVote || h.status !== 'open' || state.busy || pending) return;
+    const draft = h.ballot || { mvp:null, svp:null };
+    setState({ honorDialog:true, honorMatchId:h.matchId, honorDraft:draft, ...honorPresentation.selection(h,draft) });
+  }
+
   function viewFunStats(data) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
     let html = data.legacyGames ? '<p class="small muted">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>' : '';
@@ -1845,10 +1886,11 @@ function roomListItems(rooms) {
     for (const card of data.cards) {
       const rows = card.metrics.filter(row => !row.id.endsWith('aim_enemy')), primary = rows.find(row => row.positive ?? row.ranked) || rows[0];
       const combat = [':knife',':gun',':duel'].some(suffix => card.id.endsWith(suffix));
+      if (primary.countOnly) html += '<div class="fun-section-title">玩家票选</div>';
       html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2></div>' + (card.description ? '<p class="fun-description small muted">' + esc(card.description) + '</p>' : '') + '<div class="fun-metrics' + (combat ? ' three' : '') + '">';
       for (const row of rows) {
-        const color = (row.positive ?? row.ranked) ? 'good' : /_(ally|hit|bust|miss)$/.test(row.id) ? 'evil' : 'muted';
-        html += '<button type="button" class="fun-metric" data-action="funRecords" data-metric="'+esc(row.id)+'" data-mode="'+esc(row.mode)+'"><span class="fun-number '+color+'">'+(row.value===null ? '—' : row.count)+'<span class="small muted"> '+esc(row.unit)+'</span></span><span class="small">'+esc(row.label)+' ›</span></button>';
+        const color = row.countOnly ? row.id === 'honor_mvp' ? 'mvp' : 'svp' : (row.positive ?? row.ranked) ? 'good' : /_(ally|hit|bust|miss)$/.test(row.id) ? 'evil' : 'muted';
+        html += '<button type="button" class="fun-metric" data-action="funRecords" data-metric="'+esc(row.id)+'" data-mode="'+esc(row.mode)+'"><span class="fun-number '+color+'">'+(row.value===null ? '—' : row.count)+'<span class="small muted"> '+esc(row.unit)+'</span></span><span class="small">'+esc(row.countOnly ? row.honorTitle : row.label)+' ›</span></button>';
       }
       html += '</div>';
       if (combat && primary.opportunities) {
@@ -1858,7 +1900,8 @@ function roomListItems(rooms) {
           return '<rect class="fun-bar-' + ((row.positive ?? row.ranked) ? 'good' : row.id.endsWith('ally') ? 'evil' : 'muted') + '" x="'+start+'" y="0" width="'+width+'" height="1" />';
         }).join('') + '</svg>';
       }
-      html += '<p class="fun-caption small muted">' + (combat ? esc(primary.label) + '率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
+      if (primary.countOnly) html += '<p class="fun-caption small muted">按获奖局数统计 · 点击查看对局</p>';
+      else html += '<p class="fun-caption small muted">' + (combat ? esc(primary.label) + '率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
       if (state.funRulesExpanded && card.id.endsWith(':shield')) html += '<p class="small muted">挡刀率按终局面对最终非空刀的有效机会计算。</p>';
       const aim = card.metrics.find(row=>row.id.endsWith('aim_enemy'));
       if (state.funRulesExpanded && aim?.rate!==null && aim) html += '<p class="small muted">选敌率 '+aim.rate.toFixed(1)+'%；选中敌方但被挡下仍计未生效。</p>';
@@ -1876,7 +1919,7 @@ function roomListItems(rooms) {
   function viewFunRankFilters(board) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
     const rateLabel = option?.rateLabel || board?.rateLabel || '成功率';
-    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-metric-role">' + esc(option?.title || '') + '</span><span class="fun-metric-name">' + esc(option?.label || '选择指标') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + ['count','rate'].map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
+    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-metric-role">' + esc(option?.title || '') + '</span><span class="fun-metric-name">' + esc(option?.label || '选择指标') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + (board?.countOnly ? ['count'] : ['count','rate']).map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? board?.countOnly ? '获奖次数' : '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
     if (board?.roleOptions?.length) html += '<label class="fun-role-filter"><span class="fun-filter-label">出刀角色</span><select class="fun-picker" data-change="funRankRole" aria-label="出刀角色">' + [{ id: '', label: '全部角色' }, ...board.roleOptions].map(item => '<option value="' + esc(item.id) + '"' + (item.id === state.rankFunRole ? ' selected' : '') + '>' + esc(item.label) + '</option>').join('') + '</select></label>';
     return html + '</div>';
   }
@@ -1887,7 +1930,7 @@ function roomListItems(rooms) {
     if (!state.matches.length) html += '<div class="muted" role="status">' + (state.matchesLoading ? '正在读取对局…' : '暂无对局记录') + '</div>';
     else html += '<div class="small muted">共 ' + state.matchesTotal + ' 场对局</div>';
     state.matches.forEach(record => {
-      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (record.fun?.highlights?.length ? '<div class="match-fun-label">' + record.fun.highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewScoreBreakdown(record.score) + viewFunStory(record.fun) + '<div class="small muted">同桌成员：' + record.members.map(member => esc(member.seat + '号 ' + member.name)).join('、') + '</div></details>';
+      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (record.fun?.highlights?.length ? '<div class="match-fun-label">' + record.fun.highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewScoreBreakdown(record.score) + viewFunStory(record.fun) + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures)) + '<div class="small muted">同桌成员：' + record.members.map(member => esc(member.seat + '号 ' + member.name)).join('、') + '</div></details>';
     });
     if (state.matchesMore) html += btn('secondary','moreMatches',state.matchesLoading ? '正在加载…' : '加载更多',null,state.matchesLoading);
     if(scoreAdjustmentRecords.length && !state.matchFun) {
@@ -3957,8 +4000,9 @@ function roomListItems(rooms) {
           '<div class="small muted">' + (r.result.source === "manual" ? "房主登记" : r.result.source === "system" ? "系统判定" : "") + "</div>" +
           (r.myFun?.hasEffectiveHighlights && r.phase === "ended" ? viewFunStory(r.myFun) + btn("text-button","navigate","查看趣味统计 ›",{page:"stats?tab=fun"}) : "") +
           (r.myScore ? viewScoreBreakdown(r.myScore) + btn("text-button", "scoreRecords", "查看积分明细 ›") : "") +
+          viewHonors(state.honors) +
           (r.me.isHost
-            ? btn("primary", "rematch", "同房再开一局", null, state.busy)
+            ? btn(state.honors && ["not_started", "open"].includes(state.honors.status) ? "secondary" : "primary", "rematch", "同房再开一局", null, state.busy)
             : '<span class="muted">等待房主开启下一局</span>') +
           "</div>";
       }
@@ -4432,7 +4476,7 @@ function roomListItems(rooms) {
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen || (state.page === 'table' && hasPublicHistorySheet()) ? ' inert' : '') + '>' +
+      (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
       (state.page === 'profile' ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4443,7 +4487,7 @@ function roomListItems(rooms) {
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
-      (state.page === 'table' ? viewHistorySheet() : '') + viewPlayerCard() + viewSettingsDialog() +
+      (state.page === 'table' ? viewHistorySheet() + viewHonorBallot() : '') + viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewNavigation();
     enhanceSelects(next);
     patchDOM(app, next);
@@ -4650,8 +4694,30 @@ function roomListItems(rooms) {
     },
     propose: propose,
     leave: leave,
+    startHonors: () => { if (state.honors?.canStart) return cmd('honorStart',{matchId:state.honors.matchId}); },
+    openHonors, dismissHonors,
+    chooseHonor: function (el) {
+      const d = el.dataset;
+      if (!state.honorDialog || state.busy || pending) return;
+      const group = state.honors?.groups.find(g=>g.key===d.key);
+      if (!group?.players.some(p=>p.seat===Number(d.seat) && !p.disabled)) return;
+      const draft = {...state.honorDraft,[d.key]:Number(d.seat)};
+      setState({honorDraft:draft,...honorPresentation.selection(state.honors,draft)});
+    },
+    submitHonors: function () {
+      if (!state.honorDialog || !state.honorReady || state.busy || pending) return;
+      const h=state.honors,draft={...state.honorDraft};
+      h.groups.filter(g=>g.skip).forEach(g=>draft[g.key]=null);
+      setState({honorDialog:false,honorDismissed:h.matchId});
+      return cmd('honorVote',{matchId:h.matchId,...draft});
+    },
+    closeHonors: function () {
+      const h=state.honors;if (!h?.canClose) return;
+      return confirmCommand('结束本场票选？',`已收到 ${h.completed} / ${h.total} 人投票，至少 ${h.required} 人完成才颁奖。截止后不可修改。`,'honorClose',{matchId:h.matchId});
+    },
     rematch: function () {
-      cmd("rematch");
+      if (state.honors?.status==='open') return confirmCommand('结束票选并开下一局？','将按当前选票结算；未达到半数参与则不颁奖。投票和结果都会保留在本局记录中。','rematch');
+      return cmd("rematch");
     },
     closeOffline: function () {
       confirmCommand(
@@ -4837,6 +4903,15 @@ function roomListItems(rooms) {
 
   // Image errors do not bubble; capture them without changing seat click handling.
   app.addEventListener("error", function (e) {
+    if (e.target?.hasAttribute?.('data-honor-avatar')) {
+    const url = e.target.getAttribute('src');
+    honorAvatarFailures.add(url);
+    if (state.room?.honors) {
+      const honors = honorPresentation.present(state.room.honors, undefined, honorAvatarFailures);
+      setState({honors,...honorPresentation.selection(honors,state.honorDraft)});
+    } else render();
+    }
+
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
     if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
@@ -5030,6 +5105,16 @@ function roomListItems(rooms) {
     const index = controls.indexOf(document.activeElement);
     event.preventDefault();
     controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus({ preventScroll: true });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (!state.honorDialog || state.page !== 'table' || state.error || !modal.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); dismissHonors(); return; }
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(app.querySelectorAll('.honor-sheet button:not(:disabled)'));
+    if (!controls.length) return;
+    event.preventDefault();
+    const index = controls.indexOf(document.activeElement);
+    controls[(index+(event.shiftKey ? controls.length-1 : 1))%controls.length].focus();
   });
   window.addEventListener('hashchange', async function () {
     if (location.hash === currentRoute) return;

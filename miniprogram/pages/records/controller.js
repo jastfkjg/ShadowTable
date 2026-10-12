@@ -1,6 +1,7 @@
 const createStatistics = require("../stats/controller");
 const createHistory = require("../matches/controller");
 const { backToMe } = require("../../profile");
+const { withoutAvatar } = require("../../honors");
 
 // Both public routes enter the same retained surface; tabs never add pages.
 module.exports = function createRecordsPage(initialTab = "records") {
@@ -88,6 +89,10 @@ module.exports = function createRecordsPage(initialTab = "records") {
       if (this.historyController.fetching) return;
       this.setData({ historyFromFun: false });
       return this.historyController.clearFunFilter();
+    },
+    honorAvatarError(event) {
+      const url = event.currentTarget.dataset.url;
+      this.historyController.setData({ records: this.historyController.data.records.map(record => ({ ...record, honors: withoutAvatar(record.honors, url) })) });
     },
     back() {
       if (this.data.history.filtersExpanded) return this.historyController.closeFilters();

@@ -771,7 +771,7 @@ test("趣味榜一次机会可参与比例排名，保留次数并列、分母�
     const noOpportunity = board.read("wx:zero", new URLSearchParams("metric=fun_merlin_evade&sort=rate"));
     assert.equal(noOpportunity.me.opportunities, 0); assert.equal(noOpportunity.me.rate, null); assert.equal(noOpportunity.me.rank, null);
     assert.equal(board.read("wx:unknown", new URLSearchParams("metric=fun_merlin_evade&sort=rate")).me.status, "no_records");
-    assert.ok(rate.availableFunMetrics.every(item => item.rateThreshold === 1));
+    assert.ok(rate.availableFunMetrics.filter(item => !item.countOnly).every(item => item.rateThreshold === 1));
     assert.equal(read("metric=fun_merlin_evade&mode=knights").rows.length, 0);
     store.transaction(() =>
       saveProfile(store, "wx:b", {

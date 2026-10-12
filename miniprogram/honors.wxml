@@ -1,0 +1,64 @@
+<template name="honorResults">
+  <view wx:if="{{honors}}" class="honor-result {{honors.status==='settled'?'is-settled':''}}">
+    <block wx:if="{{honors.status==='not_started'}}">
+      <view class="honor-heading">谁是本场最佳？</view>
+      <view class="honor-help">胜方 MVP · 败方 SVP，由本局玩家匿名票选</view>
+      <button wx:if="{{honors.canStart}}" class="primary honor-primary" bindtap="startHonors" disabled="{{busy}}" hover-class="none">发起 MVP / SVP 投票</button>
+      <view wx:else class="honor-help">等待房主选择发起票选</view>
+      <view class="honor-footnote">可选环节，不影响胜负与积分 · 每局仅一次</view>
+    </block>
+    <block wx:elif="{{honors.status==='open'}}">
+      <view class="honor-heading">本场最佳 · 投票中</view>
+      <view class="honor-progress"><text>{{honors.completed}} / {{honors.total}} 人已投票</text><text>剩余 {{honors.timeLabel}}</text></view>
+      <button wx:if="{{honors.canVote}}" class="primary honor-primary" bindtap="openHonors" disabled="{{busy}}" hover-class="none">{{honors.ballot?'已提交 · 修改投票':'投出我的 MVP / SVP'}}</button>
+      <view class="honor-footnote">至少 {{honors.required}} 人完成投票才颁奖 · 匿名票选</view>
+      <button wx:if="{{honors.canClose}}" class="text-button honor-close-poll" bindtap="closeHonors" disabled="{{busy}}" hover-class="none">结束投票并结算</button>
+    </block>
+    <block wx:elif="{{honors.status==='settled'}}">
+      <view class="honor-result-heading"><view class="honor-heading">本场最佳</view><view class="honor-help">{{honors.completed}} / {{honors.total}} 人票选</view></view>
+      <view class="honor-awards">
+        <view wx:for="{{honors.awards}}" wx:for-item="award" wx:key="key" class="honor-award {{award.key}}">
+          <view class="honor-award-heading"><text>{{award.title}}</text><text wx:if="{{award.tied}}" class="honor-tied" aria-label="并列获奖">并列</text></view>
+          <view class="honor-winners">
+            <view wx:for="{{award.players}}" wx:for-item="player" wx:key="seat" class="honor-winner">
+              <image wx:if="{{player.avatarUrl}}" class="honor-avatar" src="{{player.avatarUrl}}" mode="aspectFill" binderror="honorAvatarError" data-url="{{player.avatarUrl}}" aria-hidden="true" />
+              <view wx:else class="honor-avatar honor-initial" aria-hidden="true">{{player.initial}}</view>
+              <view class="honor-player-copy"><view class="honor-player-name">{{player.name}}</view><view class="honor-player-meta">{{player.seat}} 号 · <text class="honor-votes">{{player.votes}} 票</text></view></view>
+            </view>
+          </view>
+          <view wx:if="{{!award.players.length}}" class="honor-help">暂无有效选票</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="honor-help">{{honors.resultNote}}</view>
+  </view>
+</template>
+<template name="honorBallot">
+  <view wx:if="{{honorDialog}}" class="dialog-backdrop honor-backdrop" catchtouchmove="blockScroll">
+    <view class="honor-sheet" role="dialog" aria-modal="true" aria-label="本场最佳票选">
+      <view class="honor-handle"></view>
+      <view class="honor-sheet-header"><view class="honor-heading">本场最佳 · 请投票</view><button class="honor-later" bindtap="dismissHonors" disabled="{{busy}}" hover-class="none">稍后</button></view>
+      <view class="honor-sheet-intro honor-help">胜方、败方各选 1 人，不可投自己</view>
+      <scroll-view class="honor-sheet-body" scroll-y="{{true}}" show-scrollbar="{{false}}">
+        <view wx:for="{{honorGroups}}" wx:key="key" wx:for-item="group" class="honor-ballot-group {{group.key}}">
+          <view class="honor-award-heading"><text>{{group.title}}</text><text class="honor-tag">{{group.side}}</text></view>
+          <view class="honor-help">{{group.key==='mvp'?'选出带领队伍获胜的玩家':'选出虽败犹荣的玩家'}}</view>
+          <view class="honor-candidates">
+            <button wx:for="{{group.players}}" wx:key="seat" wx:for-item="player" class="honor-candidate {{player.selected?'selected':''}}" data-key="{{group.key}}" data-seat="{{player.seat}}" bindtap="chooseHonor" disabled="{{busy || player.disabled}}" aria-pressed="{{player.selected}}" aria-label="{{player.seat+'号 '+player.name+(player.disabled?'，我，不可选择':'')}}" hover-class="none">
+              <image wx:if="{{player.avatarUrl}}" class="honor-avatar" src="{{player.avatarUrl}}" mode="aspectFill" binderror="honorAvatarError" data-url="{{player.avatarUrl}}" aria-hidden="true" />
+              <view wx:else class="honor-avatar honor-initial" aria-hidden="true">{{player.initial}}</view>
+              <view class="honor-player-copy"><view class="honor-help">{{player.seat}} 号</view><view class="honor-player-name">{{player.name}}</view><view wx:if="{{player.disabled}}" class="honor-footnote">我 · 不可选</view></view>
+              <view class="honor-radio" aria-hidden="true">{{player.selected?'✓':''}}</view>
+            </button>
+          </view>
+          <view wx:if="{{group.skip}}" class="honor-help">本项无可选玩家，自动跳过</view>
+        </view>
+      </scroll-view>
+      <view class="honor-sheet-footer">
+        <view class="honor-help">已选 {{honorSelected}} / {{honorRequired}} · 匿名投票 · 剩余 {{honors.timeLabel}}</view>
+        <button class="primary honor-primary" bindtap="submitHonors" disabled="{{busy || !honorReady}}" loading="{{busy}}" hover-class="none">{{honors.ballot?'保存修改':'提交投票'}}</button>
+        <view class="honor-footnote">截止前可修改 · 关闭后可从牌桌继续</view>
+      </view>
+    </view>
+  </view>
+</template>

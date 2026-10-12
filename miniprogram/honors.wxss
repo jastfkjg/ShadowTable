@@ -1,0 +1,55 @@
+.honor-result { --honor-color: #e5c68b; margin: 22px 0; padding-top: 20px; border-top: 1px solid var(--border); text-align: left; }
+.honor-result.is-settled { margin: 16px 0 0; padding-top: 14px; }
+.honor-result-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 10px; }
+.honor-result-heading .honor-heading { font-size: 14px; line-height: 1.5; }
+.honor-result-heading .honor-heading + .honor-help { font-size: 12px; margin: 0; }
+.honor-awards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.honor-heading { font-size: 20px; font-weight: 600; line-height: 1.4; }
+.honor-help { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.honor-heading + .honor-help { margin-top: 6px; }
+.honor-footnote { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
+.honor-primary { width: 100%; min-height: 48px; margin: 16px 0 8px; }
+.honor-progress { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.honor-close-poll { min-height: 44px; font-size: 13px; }
+.honor-award, .honor-ballot-group { --honor-color: #e5c68b; }
+.honor-ballot-group { margin-top: 20px; }
+.honor-award { padding: 10px; min-width: 0; background: var(--surface); border: 1px solid rgba(229,198,139,.24); border-radius: 10px; }
+.honor-award.svp { border-color: rgba(170,199,229,.24); }
+.honor-award.svp, .honor-ballot-group.svp { --honor-color: #aac7e5; }
+.honor-award-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--honor-color); font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.honor-tag { border: 1px solid currentColor; padding: 0 6px; border-radius: 5px; font-size: 12px; font-weight: 400; }
+.honor-award .honor-award-heading { justify-content: space-between; gap: 4px; margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
+.honor-tied { font-size: 12px; font-weight: 400; }
+.honor-winner { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.honor-winner + .honor-winner { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(177,191,198,.14); }
+.honor-avatar { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: var(--control-bg, #14232c); }
+.honor-initial { display: flex; align-items: center; justify-content: center; color: var(--honor-color); font-size: 19px; }
+.honor-player-copy { flex: 1; min-width: 0; text-align: left; }
+.honor-player-copy > .honor-help, .honor-player-copy > .honor-player-name, .honor-player-copy > .honor-footnote { display: block; }
+.honor-player-name { font-size: 15px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; word-break: break-all; }
+.honor-winner .honor-avatar { width: 30px; height: 30px; }
+.honor-winner .honor-initial { font-size: 16px; }
+.honor-winner .honor-player-name { font-size: 14px; line-height: 1.5; }
+.honor-player-meta { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.honor-votes { color: var(--honor-color); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.honor-result.is-settled + button { margin-top: 18px; }
+.dialog-backdrop.honor-backdrop { padding: 0; align-items: flex-end; }
+.honor-sheet { --honor-color: #e5c68b; width: 100%; max-width: 540px; max-height: 92vh; display: flex; flex-direction: column; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 22px 22px 0 0; overflow: hidden; padding-bottom: env(safe-area-inset-bottom); }
+.honor-handle { flex-shrink: 0; margin: 10px auto 0; width: 32px; height: 4px; border-radius: 4px; background: var(--border); }
+.honor-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 20px; flex-shrink: 0; }
+button.honor-later { width: auto; min-width: 48px; min-height: 48px; padding: 8px; margin: 0 -8px 0 0; color: var(--muted); font-size: 13px; }
+.honor-sheet-intro { padding: 0 20px 8px; flex-shrink: 0; }
+.honor-sheet-body { flex: 1 1 auto; min-height: 0; height: 50vh; box-sizing: border-box; overflow-y: auto; padding: 0 20px 16px; }
+.honor-ballot-group:first-child { margin-top: 8px; }
+.honor-candidates { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 10px; }
+button.honor-candidate { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 76px; margin: 0; padding: 10px; border: 1px solid var(--control-border, #8295a0); background: var(--control-bg, #14232c); border-radius: 10px; box-sizing: border-box; }
+.honor-candidate.selected { border: 2px solid var(--honor-color); padding: 9px; background: rgba(177,191,198,.08); }
+.honor-candidate .honor-avatar { width: 32px; height: 32px; }
+.honor-radio { width: 17px; height: 17px; flex-shrink: 0; border: 1px solid var(--control-border, #8295a0); border-radius: 50%; font-size: 12px; line-height: 17px; color: #101c24; text-align: center; }
+.selected .honor-radio { background: var(--honor-color); border-color: var(--honor-color); }
+.honor-sheet-footer { flex-shrink: 0; padding: 14px 20px 18px; border-top: 1px solid var(--border); text-align: center; }
+.honor-sheet-footer .honor-primary { margin-top: 8px; }
+.fun-number.mvp { color: #e5c68b; }
+.fun-number.svp { color: #aac7e5; }
+@media (max-width: 350px) { .honor-sheet-header, .honor-sheet-body, .honor-sheet-footer { padding-left: 14px; padding-right: 14px; } .honor-candidates { grid-template-columns: minmax(0,1fr); } }
+@media (max-height: 500px) { .honor-sheet { max-height: 98vh; } .honor-sheet-body { height: 28vh; } .honor-sheet-footer { padding-top: 8px; padding-bottom: 8px; } }

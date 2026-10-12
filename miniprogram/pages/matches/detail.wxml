@@ -1,3 +1,4 @@
+<import src="../../honors.wxml" />
 <template name="matchDetails">
         <view class="match-details">
           <view class="match-result"><text>{{item.winner==='good' || item.winner==='evil' || item.winner==='third'?item.winnerLabel+'获胜':'胜方未登记'}}</text><text class="match-source">{{item.sourceLabel}}</text></view>
@@ -19,6 +20,7 @@
             <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
             <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
           </block>
+          <template is="honorResults" data="{{honors:item.honors}}" />
           <view wx:if="{{item.members.length}}" class="match-members-section">
             <button hover-class="none" class="disclosure-button match-members-toggle" bindtap="historyToggleMembers" data-id="{{item.id}}" aria-expanded="{{item.membersExpanded}}" aria-label="{{item.membersExpanded?'收起':'展开'}}同桌成员，共{{item.members.length}}人"><text>同桌成员<text class="match-member-count"> · {{item.members.length}}人</text></text><view class="match-arrow {{item.membersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
             <view wx:if="{{item.membersExpanded}}" class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text class="match-seat">{{member.seat}}号</text><text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text></view></view>

@@ -33,6 +33,7 @@ function parseQuery(params) {
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
   if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && (fun.combatType(role) !== funMetric.group && funMetric.group !== "final") || role && !roleName(role)
     : ["mode", "role", "sort"].some(key => params.has(key))) throw new RuleError("排行榜参数无效",400);
+  if (funMetric?.countOnly && (sort !== "count" || role || mode !== "all")) throw new RuleError("票选荣誉仅支持跨玩法获奖次数榜", 400);
   return { metric, period, offset: Number(offset), version, funMetric, mode, role, sort, nearby };
 }
 const summary = row => {
@@ -165,7 +166,7 @@ class Leaderboard {
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
     const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,tied:row.tied,isSelf:row.uid===uid,...present(row)});
-    return { metric, period, mode, role, sort, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.title, rateLabel: def.rateLabel,
+    return { metric, period, mode, role, sort, countOnly: !!def.countOnly, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.honorTitle || def.title, description: def.description, rateLabel: def.rateLabel,
       unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && (def.group === "final" || fun.combatType(role)===def.group)).map(role=>({id:role,label:roleName(role)})),
       periodStart: range.start,periodEnd:range.end,timezone:"Asia/Shanghai",eligibleCount:snapshot.eligible.length,maxRows:MAX_ROWS,updatedAt:snapshot.updatedAt,version:snapshot.version,

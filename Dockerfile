@@ -7,6 +7,7 @@ COPY --chown=node:node server ./server
 COPY --chown=node:node miniprogram/builtin-avatars.js ./miniprogram/builtin-avatars.js
 COPY --chown=node:node miniprogram/avatar-library.js ./miniprogram/avatar-library.js
 COPY --chown=node:node miniprogram/fun-copy.js ./miniprogram/fun-copy.js
+COPY --chown=node:node miniprogram/honors.js miniprogram/honors.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/result-registration.js miniprogram/leaderboard-presentation.js miniprogram/public-history.js ./miniprogram/
 COPY --chown=node:node miniprogram/room-swipe.js miniprogram/monthly-report.js miniprogram/monthly-report-card.js ./miniprogram/
 COPY --chown=node:node miniprogram/assets/monthly-report-background.jpg ./miniprogram/assets/monthly-report-background.jpg

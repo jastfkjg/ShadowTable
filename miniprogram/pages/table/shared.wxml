@@ -48,6 +48,8 @@
     <view class="identity-history-footer"><view class="small muted">本局记录 · 仅你可见</view><button hover-class="none" class="secondary" bindtap="hideIdentityHistory">立即遮盖</button></view>
   </view>
 </view>
+<import src="../../honors.wxml" />
+<template is="honorBallot" data="{{honorDialog:honorDialog && !error,honorGroups,honorReady,honorSelected,honorRequired,honors,busy:busy || hasPendingRequest || !network}}" />
 <template name="tableResult">
     <view wx:if="{{latestResult && (room.phase==='tools' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
       <view class="result-summary-heading"><text class="small muted">最近结果</text><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
@@ -88,7 +90,8 @@
       <view wx:for="{{room.myFun.highlights}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.count}}{{item.unit}}</text></view>
       <view wx:if="{{room.myFun.reason}}" class="small muted final-result-source">{{room.myFun.reason}}</view>
     </view>
-    <button hover-class="none" wx:if="{{room.me.isHost}}" class="primary" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
+    <template is="honorResults" data="{{honors,busy:busy || hasPendingRequest || !network}}" />
+    <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{honors.status==='not_started' || honors.status==='open'?'secondary':'primary'}}" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
@@ -432,7 +435,7 @@
       </view>
     </block>
     <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : room.phase==='tools' || room.phase==='ended'?'result-first':'operation-first'}}">
-      <block wx:if="{{room.result}}"><template is="tableFinalResult" data="{{room, hasPendingRequest, busy}}" /></block>
+      <block wx:if="{{room.result}}"><template is="tableFinalResult" data="{{room, honors, network, hasPendingRequest, busy}}" /></block>
       <block wx:elif="{{room.phase==='tools' || room.phase==='ended'}}"><template is="tableResult" data="{{room, latestResult}}" /><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
       <block wx:else><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
     </view>

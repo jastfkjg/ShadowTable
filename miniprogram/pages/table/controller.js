@@ -1,6 +1,7 @@
 const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const funCopy = require("../../fun-copy");
+const honorPresentation = require("../../honors");
 const roomShare = require("../../room-share");
 const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
@@ -290,6 +291,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     boardIndex: 0,
     capacityIndex: 1,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
+    honors: null, honorDialog: false, honorMatchId: "", honorDismissed: "", honorDraft: { mvp: null, svp: null }, honorGroups: [], honorReady: false,
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
@@ -667,7 +669,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.foreground || !this.alive || (!this.roomCode && !this.data.reconnecting)) return;
     const delay = this.data.reconnecting
       ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, (this.reconnectAttempts || 1) - 1))) * (0.8 + Math.random() * 0.2)
-      : ["lobby", "ended", "terminated"].includes(this.data.room?.phase) ? Math.min(10000, 2500 * (1 + Math.floor((this.unchangedPolls || 0) / 4))) : 2500;
+      : this.data.room?.honors?.status === "open" ? 2500 : ["lobby", "ended", "terminated"].includes(this.data.room?.phase) ? Math.min(10000, 2500 * (1 + Math.floor((this.unchangedPolls || 0) / 4))) : 2500;
     this.timer = setTimeout(async () => {
       if (this.data.reconnecting) {
         if (this.data.network) await this.recoverConnection();
@@ -833,9 +835,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     });
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     const historyUpdate = publicHistory.sync(this.data, history, room);
+    const honors = honorPresentation.present(room.honors, api.assetUrl, this.honorAvatarFailures || new Set());
+    const honorState = honorPresentation.sync(this.data, honors, this.data.historyOpen || this.data.playerCard || this.data.resultDialog || !this.foreground);
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
-      ...privacyUpdate,
+      ...privacyUpdate, honors, ...honorState,
       ...(stageChanged ? { resultDialog: false } : {}),
       ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
       actionEntryLabel,
@@ -1553,7 +1557,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   cmd(type, extra = {}, after) {
     const r = this.data.room;
     if (r)
-      this.mutate(
+      return this.mutate(
         "/api/rooms/" + r.code + "/commands",
         { type, stage: r.stage, ...extra },
         after,
@@ -1875,8 +1879,52 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       { keepPlaying: true },
     );
   },
+  startHonors() {
+    if (!this.data.honors?.canStart) return;
+    return this.cmd("honorStart", { matchId: this.data.honors.matchId });
+  },
+  openHonors() {
+    const h = this.data.honors;
+    if (!h?.canVote || h.status !== "open" || this.data.busy || this.pending) return;
+    const draft = h.ballot || { mvp: null, svp: null };
+    this.setData({ honorDialog: true, honorMatchId: h.matchId, honorDraft: draft, ...honorPresentation.selection(h, draft) });
+  },
+  dismissHonors() {
+    if (!this.data.busy && !this.pending) this.setData({ honorDialog: false, honorDismissed: this.data.honors?.matchId || "" });
+  },
+  chooseHonor(e) {
+    const { key, seat } = e.currentTarget.dataset;
+    if (!this.data.honorDialog || this.data.busy || this.pending) return;
+    const group = this.data.honors?.groups.find(g => g.key === key);
+    if (!group?.players.some(p => p.seat === Number(seat) && !p.disabled)) return;
+    const draft = { ...this.data.honorDraft, [key]: Number(seat) };
+    this.setData({ honorDraft: draft, ...honorPresentation.selection(this.data.honors, draft) });
+  },
+  submitHonors() {
+    if (!this.data.honorDialog || !this.data.honorReady || this.data.busy || this.pending) return;
+    const h = this.data.honors, draft = { ...this.data.honorDraft };
+    h.groups.filter(g => g.skip).forEach(g => draft[g.key] = null);
+    this.setData({ honorDialog: false, honorDismissed: h.matchId });
+    return this.cmd("honorVote", { matchId: h.matchId, ...draft });
+  },
+  closeHonors() {
+    const h = this.data.honors;
+    if (!h?.canClose) return;
+    return this.confirmCommand("结束本场票选？", `已收到 ${h.completed} / ${h.total} 人投票。至少 ${h.required} 人完成才颁奖，截止后不可修改。`, "honorClose", { matchId: h.matchId });
+  },
+  honorAvatarError(e) {
+    const shownUrl = e.currentTarget.dataset.url;
+    if (!shownUrl || !this.data.room?.honors) return;
+    this.honorAvatarFailures ||= new Set();
+    const h = this.data.room.honors;
+    const players = [...(h.groups || []).flatMap(g => g.players), ...(h.mvp || []), ...(h.svp || [])];
+    players.filter(p => p.avatarUrl && api.assetUrl(p.avatarUrl) === shownUrl).forEach(p => this.honorAvatarFailures.add(p.avatarUrl));
+    const honors = honorPresentation.present(h, api.assetUrl, this.honorAvatarFailures);
+    this.setData({ honors, ...honorPresentation.selection(honors, this.data.honorDraft) });
+  },
   rematch() {
-    this.cmd("rematch");
+    if (this.data.honors?.status === "open") return this.confirmCommand("结束票选并开下一局？", "将按当前选票结算；未达到半数参与则不颁奖。投票和结果都会保留在本局记录中。", "rematch");
+    return this.cmd("rematch");
   },
   async leave() {
     if (this.data.busy || this.pending || !this.data.room) return;

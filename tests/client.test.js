@@ -33,6 +33,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
       module: { exports: {} },
       require: name => {
         if (name === '../../player-card') return require('../miniprogram/player-card');
+        if (name === '../../honors') return require('../miniprogram/honors');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name === '../../room-share') return require('../miniprogram/room-share');
         if (name === '../../public-history') return require('../miniprogram/public-history');
@@ -2109,4 +2110,22 @@ test('战绩卡：关闭、切后台及阶段变化丢弃迟到响应，重试�
   fail=true;await p.openPlayerCard(1);assert.equal(p.data.playerCardError,'网络暂不可用');assert.equal(p.data.error,'');
   fail=false;opening=p.retryPlayerCard();resolveStats(result);await opening;assert.equal(p.data.playerCardStatus,'');assert.match(p.data.playerCardError,/战绩暂时无法读取/);assert.equal(p.data.playerCardLoading,false);
   room.players[0]={seat:1,name:'甲',statsId:'b'.repeat(64)};await p.refresh();assert.equal(p.data.playerCard,null);
+});
+test('最佳玩家弹窗只自动提示一次，可修改本人选票，刷新保留草稿，结算关闭弹窗', async()=>{
+  const {newRoom,enter,command,publicView}=require('../server/engine');
+  const r=newRoom('123456','u1','我','classic',6);for(let i=2;i<=6;i++)enter(r,'u'+i,'玩家'+i);
+  const room=publicView(r,'u1');room.phase='ended';room.result={winner:'good'};
+  room.honors={matchId:'match-1',status:'open',canVote:true,canClose:true,total:6,completed:0,required:3,deadline:120000,serverNow:1000,ballot:null,
+    groups:[{key:'mvp',title:'最强 MVP',side:'胜方',skip:false,players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},
+      {key:'svp',title:'最强 SVP',side:'败方',skip:false,players:[{seat:5,name:'晚风'},{seat:6,name:'小树'}]}]};
+  const p=page({request:async()=>structuredClone(room),assetUrl:url=>url});p.roomCode=r.code;
+  await p.refresh();assert.equal(p.data.honorDialog,true);
+  p.chooseHonor({currentTarget:{dataset:{key:'mvp',seat:1}}});assert.equal(p.data.honorReady,false);
+  p.chooseHonor({currentTarget:{dataset:{key:'mvp',seat:2}}});p.chooseHonor({currentTarget:{dataset:{key:'svp',seat:5}}});
+  await p.refresh();assert.equal(p.data.honorReady,true);assert.equal(p.data.honorDraft.mvp,2);
+  p.dismissHonors();await p.refresh();assert.equal(p.data.honorDialog,false);
+  room.honors.ballot={mvp:2,svp:5};await p.refresh();p.openHonors();assert.equal(p.data.honorReady,true);
+  let sent;p.cmd=(type,data)=>sent={type,data};p.submitHonors();assert.equal(sent.type,'honorVote');assert.equal(sent.data.matchId,'match-1');assert.equal(sent.data.mvp,2);
+  room.honors={matchId:'match-1',status:'settled',mvp:[{seat:2,name:'林间',votes:3}],svp:[{seat:5,name:'晚风',votes:3}]};
+  await p.refresh();assert.equal(p.data.honorDialog,false);assert.equal(p.data.honors.awards[0].players[0].votes,3);
 });

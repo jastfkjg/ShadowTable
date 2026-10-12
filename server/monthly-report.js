@@ -84,7 +84,7 @@ class MonthlyReport {
       f.public_id,f.nickname,f.avatar_hash FROM match_fun_stats s
       JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN profiles f ON f.uid=s.uid
       WHERE ${valid} AND ${publicPlayers} GROUP BY s.metric,s.uid`).all(start, end);
-    const funBoards = Object.values(fun.metrics).filter(def => def.ranked).flatMap(def => {
+    const funBoards = Object.values(fun.metrics).filter(def => def.ranked && !def.countOnly).flatMap(def => {
       const rows = funRows.filter(row => row.metric === def.id).map(row => ({ ...identity(row),
         count: row.count, opportunities: row.opportunities, rate: percent(row.count, row.opportunities), knownGames: row.knownGames, unknownGames: row.unknownGames }));
       return ["count", "rate"].map(sort => ({ id: def.id + ":" + sort, metric: def.id, title: awards[def.id] || def.title + " · " + def.label,

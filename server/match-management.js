@@ -259,6 +259,7 @@ function change(store, input) {
         input.action === "restore" ? c.previous_reason || "" : reason,
         store.clock(),
       );
+    require("./honors").closeForRoom(store, { matchRecord: { id: d.id } });
     const game = JSON.parse(
       store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(d.id)
         .snapshot,

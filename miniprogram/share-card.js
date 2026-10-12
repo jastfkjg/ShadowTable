@@ -82,6 +82,7 @@ function funCard(profile, stats, cardId, metricId, now) {
   const group = stats.fun?.cards?.find(card => card.id === cardId);
   const metric = group?.metrics?.find(row => row.id === metricId && row.ranked);
   if (!metric || metric.value == null || !metric.knownGames) throw new Error("这项成绩还没有完整记录，暂时无法生成图片。");
+  if (metric.countOnly) return { kind: "combat", ...identity(profile), context: "玩家票选", scope: "", title: metric.honorTitle, metrics: [{label:"获奖次数",value:number(metric.count),color:"accent"}], notes:["每局获奖计一次 · 平票并列获奖"], asOf:now };
   if (cardId.endsWith(":knife")) return { kind: "combat", ...identity(profile), context: "趣味成绩", scope: "", title: "刀客刀法", metrics: knifeMetrics(group), notes: [], asOf: now };
   return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: metricId === "good_shield" ? "" : clean(group.title),
     hero: number(metric.count), unit: clean(metric.unit), label: clean(metric.label),
@@ -134,7 +135,7 @@ function parseSelection(options) {
   if (options.kind === "funSummary") return { kind: "funSummary" };
   if (options.kind === "monthly" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") && [undefined, "fun"].includes(options.edition))
     return { kind: "monthly", month: options.month, ...(options.edition ? { edition: options.edition } : {}) };
-  if (options.kind === "fun" && /^(classic|knights|other):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
+  if (options.kind === "fun" && /^(classic|knights|other|voted):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };
   if (options.kind !== "leaderboard" || !["all", "month"].includes(options.period) ||
     !(hasOwn(metricNames, options.metric) || /^fun_[a-z_]+$/.test(options.metric || ""))) throw new Error("分享内容无效，请返回原页面重新生成。");
