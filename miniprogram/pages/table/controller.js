@@ -1803,6 +1803,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   viewScoreRecord() { wx.navigateTo({ url: "/pages/scores/scores" }); },
   viewFunRecord() { wx.navigateTo({ url: "/pages/stats/stats?tab=fun" }); },
+  viewReplay() {
+    const room = this.data.room;
+    if (!room?.replayId || !["ended", "terminated"].includes(room.phase) || !this.foreground ||
+      this.openingReplay || this.data.busy || this.data.hasPendingRequest || this.pending) return;
+    this.openingReplay = true;
+    wx.navigateTo({ url: "/pages/replay/replay?id=" + encodeURIComponent(room.replayId),
+      fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingReplay = false; } });
+  },
   async saveResult() {
     const room = this.data.room, choice = this.data.resultChoice;
     const scoring = !!room?.scoreSettlement?.length;

@@ -1281,6 +1281,9 @@ function publicView(room, uid) {
     scoreNotice: excludedRecord || room.recordPurpose === "test" && managedState !== "active" ? "本局不计积分" : room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     myFun: excludedRecord ? null : funCopy.story(room.matchRecord?.players.find(player => player.uid === uid)?.fun) || null,
+    replayId: ["ended", "terminated"].includes(room.phase) && managedState !== "deleted" &&
+      replay.supported(room.matchRecord?.board) && room.matchRecord.players.some(player => player.uid === uid)
+      ? room.matchRecord.id : null,
     canKick:
       room.host === uid &&
       ["lobby", "ended", "terminated"].includes(room.phase),

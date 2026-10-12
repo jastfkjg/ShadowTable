@@ -61,7 +61,8 @@
 </template>
 <template name="tableFinalResult">
   <view class="final-result" role="status" aria-label="本局最终结果">
-    <text class="kicker">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
+    <text class="kicker {{room.replayId?'final-result-replay-kicker':''}}">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
+    <button wx:if="{{room.replayId}}" class="final-result-replay" bindtap="viewReplay" hover-class="none" disabled="{{hasPendingRequest || busy}}" aria-label="查看本局复盘"><view class="final-result-replay-control"><image class="final-result-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
     <view class="final-result-title">{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view>
     <view wx:if="{{room.result.reason && room.result.reason!=='房主已登记线下结果，战绩已归档。' && room.result.reason!=='房主已登记线下胜负，战绩已归档。'}}" class="final-result-detail">{{room.result.reason}}</view>
     <view wx:if="{{room.result.source}}" class="small muted final-result-source">{{room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</view>

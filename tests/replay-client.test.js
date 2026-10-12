@@ -69,6 +69,33 @@ test("列表和详情的复盘入口只接受已有受支持记录，原有展�
   const detail = page({}, "match-detail"); detail.p.setData({ record: { id: "m", replayAvailable: true } });
   detail.p.openReplay(); assert.equal(detail.navigations[0], "/pages/replay/replay?id=m");
 });
+test("牌桌复盘按本局编号跳转，防止重复进入，失败后可重试并保留牌桌", () => {
+  const { p, wx, navigations, toasts } = page({}, "table");
+  p.alive = true; p.foreground = true;
+  let navigation;
+  wx.navigateTo = options => { navigation = options; navigations.push(options.url); };
+  p.setData({ room: { phase: "tools", replayId: "current/a" } });
+  p.viewReplay(); assert.equal(navigations.length, 0);
+  p.setData({ room: { phase: "ended", replayId: null } });
+  p.viewReplay(); assert.equal(navigations.length, 0);
+  p.setData({ room: { phase: "ended", replayId: "current/a" }, busy: true });
+  p.viewReplay(); assert.equal(navigations.length, 0);
+  p.setData({ busy: false, hasPendingRequest: true });
+  p.viewReplay(); assert.equal(navigations.length, 0);
+  p.setData({ hasPendingRequest: false });
+  p.viewReplay(); p.viewReplay();
+  assert.deepEqual(navigations, ["/pages/replay/replay?id=current%2Fa"]);
+  navigation.fail(); navigation.complete();
+  assert.deepEqual(toasts, ["暂时无法打开，请重试"]);
+  assert.equal(p.data.room.replayId, "current/a");
+  p.viewReplay(); navigation.complete(); assert.equal(navigations.length, 2);
+  p.foreground = false; p.viewReplay(); assert.equal(navigations.length, 2);
+  p.foreground = true;
+  p.setData({ room: { phase: "terminated", replayId: "terminated" } });
+  p.viewReplay(); assert.equal(navigations[2], "/pages/replay/replay?id=terminated");
+  p.alive = false; navigation.fail(); navigation.complete();
+  assert.equal(toasts.length, 1);
+});
 test("生产 WXML 编译并显示真实复盘，个人视角和旧局不虚构缺失内容", () => {
   const context = { window: {}, global: {}, console }; vm.createContext(context);
   const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);

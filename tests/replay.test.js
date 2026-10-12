@@ -50,6 +50,35 @@ test("秘密提交、进行中的技能和已作废操作不会成为有效复�
   finally { store.close(); }
 });
 
+test("牌桌只给已结束对局的参与者提供复盘编号，删除和重开后撤下入口", () => {
+  const room = setup(), store = new Store(":memory:");
+  try {
+    assert.equal(publicView(room, room.host).replayId, null);
+    run(room, "finishTools", { winner: "good" }); store.save(room);
+    const id = room.matchRecord.id;
+    for (const uid of [room.host, "wx:replay-5"]) {
+      const view = publicView(store.get(room.code), uid);
+      assert.equal(view.replayId, id);
+      assert.equal(store.replayFor(uid, view.replayId).id, id);
+      assert.doesNotMatch(JSON.stringify(view), /"initialPlayers"|"draws"|"matchRecord"/);
+      assert.equal(Object.hasOwn(view, "roles"), false);
+    }
+    assert.equal(publicView(room, "spectator").replayId, null);
+    assert.equal(publicView({ ...room, matchRecord: undefined }, room.host).replayId, null);
+    assert.equal(publicView({ ...room, matchRecord: { ...room.matchRecord, board: "classic" } }, room.host).replayId, null);
+    store.transaction(() => store.manageMatches({ action: "exclude", reason: "核对", matches: [{ id, revision: 0 }] }));
+    assert.equal(publicView(store.get(room.code), room.host).replayId, id);
+    assert.equal(store.replayFor(room.host, id).self.outcome, "excluded");
+    store.transaction(() => store.manageMatches({ action: "delete", reason: "删除", matches: [{ id, revision: 1 }] }));
+    assert.equal(publicView(store.get(room.code), room.host).replayId, null);
+    assert.throws(() => store.replayFor(room.host, id), { status: 404 });
+    run(room, "rematch"); store.save(room);
+    assert.equal(publicView(room, room.host).replayId, null);
+    const terminated = setup(); run(terminated, "terminate");
+    assert.equal(publicView(terminated, terminated.host).replayId, terminated.matchRecord.id);
+  } finally { store.close(); }
+});
+
 test("复盘准确解释换号、守护、替死、反伤和复活甲，不改变技能结算", () => {
   const room = setup();
   Object.assign(room.roles, { "wx:replay-5": "blueAwakened", "wx:replay-6": "magician", "wx:replay-7": "blueGuard", "wx:replay-8": "paladin" });
@@ -238,11 +267,16 @@ test("复盘 HTTP 接口要求认证和本局参与资格，进行中记录、�
     const room = setup(), token = randomBytes(32).toString("hex"), outsider = randomBytes(32).toString("hex");
     const hash = value => createHash("sha256").update(value).digest("hex");
     app.store.addSession(hash(token), "wx:replay-5"); app.store.addSession(hash(outsider), "outsider"); app.store.save(room);
+    const roomUrl = `http://127.0.0.1:${app.server.address().port}/api/rooms/${room.code}`;
+    const roomHeaders = { Authorization: "Bearer " + token };
+    assert.equal((await (await fetch(roomUrl, { headers: roomHeaders })).json()).replayId, null);
     const url = `http://127.0.0.1:${app.server.address().port}/api/me/matches/${room.matchId}/replay`;
     assert.equal((await fetch(url)).status, 401);
     assert.equal((await fetch(url, { headers: { Authorization: "Bearer " + token } })).status, 404);
     run(room, "finishTools", { winner: "good" }); app.store.save(room);
-    const response = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+    const ended = await (await fetch(roomUrl, { headers: roomHeaders })).json();
+    assert.equal(ended.replayId, room.matchRecord.id);
+    const response = await fetch(`http://127.0.0.1:${app.server.address().port}/api/me/matches/${ended.replayId}/replay`, { headers: roomHeaders });
     assert.equal(response.status, 200); assert.equal((await response.json()).replay.initialPlayers.length, 12);
     assert.equal((await fetch(url, { headers: { Authorization: "Bearer " + outsider } })).status, 404);
     assert.equal((await fetch(url + "?view=all", { headers: { Authorization: "Bearer " + token } })).status, 400);
