@@ -46,4 +46,31 @@ function completed() {
   run(room, "finishTools", { scoreReason: "assassination", scoreTarget: 1 });
   return room;
 }
-module.exports = { setup, completed, run, submit, task, skills, metadata };
+function onlineCompleted() {
+  const room = setup();
+  run(room, "beginActivity", { kind: "vote", team: [1, 2, 7] });
+  submit(room, { 10: "reject", 11: "reject", 12: "reject" });
+  task(room, [1, 2, 7]);
+  room.knights.fairy = 1;
+  run(room, "beginActivity", { kind: "fairy" });
+  submit(room, { 1: "target:7" });
+  run(room, "beginActivity", { kind: "conversion" });
+  skills(room, { 6: "target:7", 7: "target:6" });
+  run(room, "beginActivity", { kind: "vote", team: [1, 3, 10] });
+  run(room, "submit", { value: "approve" }, room.host);
+  run(room, "closeWaiting", { confirm: true });
+  task(room, [1, 3, 10], [10]);
+  run(room, "beginActivity", { kind: "conversion" });
+  run(room, "beginActivity", { kind: "fairy" });
+  submit(room, { 7: "target:10" });
+  skills(room);
+  run(room, "beginActivity", { kind: "quest", team: [1, 2, 3], threshold: 1 });
+  run(room, "cancelActivity");
+  run(room, "beginActivity", { kind: "assassination", actor: 1 });
+  submit(room);
+  run(room, "beginActivity", { kind: "assassination", actor: 10 });
+  submit(room, { 10: 1 });
+  run(room, "finishTools", { winner: "evil" });
+  return room;
+}
+module.exports = { setup, completed, onlineCompleted, run, submit, task, skills, metadata };

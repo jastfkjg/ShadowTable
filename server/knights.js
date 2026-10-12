@@ -634,12 +634,13 @@ function settle(room, check, allRoles, rememberIdentity) {
   for (const uid of k.reflected) k.players[uid].used = true;
   for (const uid of k.forcedPaladins) kill(uid, true, new Set(), true);
   // Save before drawing a new identity so simultaneous skills stay on the old card.
-  for (const { uid, ...record } of k.skillUses) {
+  for (const record of k.skillUses) {
     if (["guard", "substitute"].includes(record.kind))
-      record.status = k.players[uid].used ? "triggered" : "notTriggered";
+      record.status = k.players[record.uid].used ? "triggered" : "notTriggered";
     if (record.kind === "swap")
       record.status = k.swap?.triggered ? "triggered" : "notTriggered";
-    (k.players[uid].skillHistory ||= []).push({ ...record, round: k.round });
+    const { uid, ...history } = record;
+    (k.players[uid].skillHistory ||= []).push({ ...history, round: k.round });
   }
   const replayActions = replay.skillActions(room, k.skillUses, k.funEvents || [], allRoles);
   delete k.skillUses;

@@ -2,7 +2,7 @@
 const configured = require("./scoring-rules.json");
 const { createHash } = require("node:crypto");
 const clone = value => JSON.parse(JSON.stringify(value));
-const conditionKeys = new Set(["faction", "outcome", "roleId", "reason", "isTarget"]);
+const conditionKeys = new Set(["faction", "outcome", "roleId", "roleIdNot", "reason", "isTarget"]);
 function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
     || !Array.isArray(rules.endReasons)) throw Error("积分规则配置不完整");
@@ -13,6 +13,8 @@ function validateRules(rules) {
   for (const award of rules.awards) {
     if (!award.id || ids.has(award.id) || !award.label || !Number.isSafeInteger(award.points) || award.points < -100 || award.points > 100
       || !award.when || Object.keys(award.when).some(key => !conditionKeys.has(key))) throw Error("积分奖励配置无效");
+    if (Object.hasOwn(award.when, "roleIdNot") && (![].concat(award.when.roleIdNot).length
+      || [].concat(award.when.roleIdNot).some(role => typeof role !== "string" || !role))) throw Error("积分排除角色配置无效");
     ids.add(award.id);
   }
   ids.clear();
@@ -71,7 +73,8 @@ function scorePlayer(player, facts, rules, excludedReason) {
   if (excludedReason) return { status: "excluded", total: 0, breakdown: [], reason: excludedReason, ruleVersion: rules?.version || null };
   const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target && player.alive !== false };
   const breakdown = rules.awards.filter(award => Object.entries(award.when).every(([key, value]) =>
-    Array.isArray(value) ? value.includes(context[key]) : context[key] === value))
+    key === "roleIdNot" ? ![].concat(value).includes(context.roleId)
+      : Array.isArray(value) ? value.includes(context[key]) : context[key] === value))
     .filter(award => award.points !== 0).map(({ id, label, points }) => ({ id, label, points }));
   return { status: "scored", total: breakdown.reduce((sum, item) => sum + item.points, 0), breakdown,
     ruleVersion: rules.version, ruleFingerprint: rules.fingerprint };
@@ -84,8 +87,10 @@ function publicRules(rules = policy()) {
     isTarget: { true: "最终刺杀目标为本人", false: "最终刺杀目标不是本人" } };
   return { title: rules.title, scopeLabel: rules.scopeLabel, version: rules.version,
     items: rules.awards.map(award => {
-      const details = Object.entries(award.when).map(([key, value]) =>
-        [].concat(value).map(item => names[key]?.[item] || String(item)).join("／")).join(" · ") || "所有计分玩家";
+      const details = Object.entries(award.when).map(([key, value]) => {
+        const labels = [].concat(value).map(item => (key === "roleIdNot" ? roleNames[item] : names[key]?.[item]) || String(item)).join("／");
+        return key === "roleIdNot" ? `${labels}除外` : labels;
+      }).join(" · ") || "所有计分玩家";
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
     notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，历史积分保留。",

@@ -24,19 +24,20 @@ function draftState(filters, options, previousGroups) {
 }
 function completeOutcomeSummary(records, total, hasMore) {
   // Never present a loaded page's wins/losses as the whole filtered result.
-  if (hasMore || !total || records.length !== total) return "";
+  if (hasMore || !total || records.length !== total) return { outcomeSummary: "", outcomeCounts: null };
   const wins = records.filter(row => row.outcome === "win").length;
   const losses = records.filter(row => row.outcome === "loss").length;
   const excluded = total - wins - losses;
-  return `${wins} 胜 · ${losses} 负${excluded ? ` · ${excluded} 场不计入` : ""}`;
+  return { outcomeSummary: `${wins} 胜 · ${losses} 负${excluded ? ` · ${excluded} 场不计入` : ""}`,
+    outcomeCounts: { wins, losses, excluded } };
 }
 module.exports = function createController() { return {
-  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, outcomeSummary: "", scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters), ...draftState(defaultFilters) },
+  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, outcomeSummary: "", outcomeCounts: null, scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters), ...draftState(defaultFilters) },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ scoredOnly: options.scored === "1", funFilter: options.fun ? { metric: options.fun, mode: options.mode || "classic", role: options.role || "" } : null });
     const preview = !this.data.scoredOnly && !this.data.funFilter && personalPreview("matches");
-    if (preview) this.setData({ records: presentMatches(preview.records), total: preview.total, hasMore: preview.hasMore, outcomeSummary: completeOutcomeSummary(preview.records, preview.total, preview.hasMore), loaded: true });
+    if (preview) this.setData({ records: presentMatches(preview.records), total: preview.total, hasMore: preview.hasMore, ...completeOutcomeSummary(preview.records, preview.total, preview.hasMore), loaded: true });
     return this.load();
   },
   onUnload() { this.alive = false; },
@@ -50,7 +51,7 @@ module.exports = function createController() { return {
       if (this.alive) this.setData({ records: presentMatches(result.records).map(row => {
         const previous = this.data.records.find(old => old.id === row.id);
         return { ...row, expanded: !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
-      }), total: result.total, hasMore: result.hasMore, outcomeSummary: completeOutcomeSummary(result.records, result.total, result.hasMore), loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
+      }), total: result.total, hasMore: result.hasMore, ...completeOutcomeSummary(result.records, result.total, result.hasMore), loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
@@ -61,7 +62,7 @@ module.exports = function createController() { return {
       const result = await api.request(this.query(this.data.records.length));
       if (this.alive) {
         const records = this.data.records.concat(presentMatches(result.records));
-        this.setData({ records, total: result.total, hasMore: result.hasMore, outcomeSummary: completeOutcomeSummary(records, result.total, result.hasMore) });
+        this.setData({ records, total: result.total, hasMore: result.hasMore, ...completeOutcomeSummary(records, result.total, result.hasMore) });
       }
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loadingMore: false }); }

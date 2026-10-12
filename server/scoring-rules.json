@@ -1,5 +1,5 @@
 {
-  "version": "avalon-2026-10-v6",
+  "version": "avalon-2026-10-v7",
   "defaultEnabledMinPlayers": 10,
   "title": "阿瓦隆积分规则",
   "scopeLabel": "经典基础 5–8、10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
@@ -14,9 +14,9 @@
   ],
   "awards": [
     { "id": "good_win", "label": "好人获胜", "points": 2, "when": { "faction": "good", "outcome": "win" } },
-    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"] } },
+    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"], "roleIdNot": ["merlin", "percival"] } },
     { "id": "evil_win", "label": "坏人获胜", "points": 3, "when": { "faction": "evil", "outcome": "win" } },
     { "id": "role", "label": "梅林／派西角色奖励", "points": 1, "when": { "faction": "good", "outcome": "win", "roleId": ["merlin", "percival"] } },
-    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true } }
+    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true, "roleIdNot": ["merlin", "percival"] } }
   ]
 }

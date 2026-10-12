@@ -175,12 +175,14 @@ test('对局筛选重置分页、保留趣味回查条件，失败可重试并�
   assert.equal(urls.length, 1); assert.equal(p.data.filterCount, 0);
   await p.confirmFilters(); assert.equal(urls.length, 2); assert.equal(p.data.filtersExpanded, false);
   assert.equal(p.data.outcomeSummary, '');
+  assert.equal(p.data.outcomeCounts, null);
   assert.equal(p.data.filterCount, 4); assert.match(p.data.filterSummary, /本月.*十二骑士.*魔术师.*胜利/);
   const query = new URL('http://test' + urls.at(-1)).searchParams;
   for (const [key, value] of Object.entries({ scored: '1', fun: 'knife_enemy', role: 'gaheris', matchRole: '魔术师', board: 'knights', outcome: 'win', period: 'month', offset: '0' }))
     assert.equal(query.get(key), value);
   await p.loadMore(); assert.equal(p.data.records.length, 2); assert.equal(new URL('http://test' + urls.at(-1)).searchParams.get('offset'), '1');
   assert.equal(p.data.outcomeSummary, '2 胜 · 0 负');
+  assert.deepEqual({ ...p.data.outcomeCounts }, { wins: 2, losses: 0, excluded: 0 });
   fail = true; p.toggleFilters(); await choose('outcome', 2); await p.confirmFilters();
   assert.equal(p.data.records.length, 0); assert.equal(p.data.error, '网络中断'); assert.equal(p.data.filters.outcome, 'loss');
   const failedUrl = urls.at(-1); await p.retry(); assert.equal(urls.at(-1), failedUrl); assert.equal(p.data.error, '');

@@ -8,7 +8,7 @@ const { Store } = require("../server/store");
 const { createApp } = require("../server/app");
 const { publicView, privateView } = require("../server/engine");
 const { presentReplay, trajectory } = require("../miniprogram/replay");
-const { setup, completed, run, task, skills, submit } = require("./helpers/replay-fixtures");
+const { setup, completed, onlineCompleted, run, task, skills, submit } = require("./helpers/replay-fixtures");
 
 test("完整复盘保留初始身份、当时阵营、同时互刀、抽牌顺序和最终计分，主流程结果不变", () => {
   const room = completed(), record = room.matchRecord;
@@ -57,6 +57,7 @@ test("复盘准确解释换号、守护、替死、反伤和复活甲，不改�
   skills(room, { 5: "target:9", 6: "swap:8:9", 7: "target:8" });
   const attack = room.replay.events.find(e => e.kind === "skills").actions.find(a => a.actor.seat === 5);
   assert.equal(attack.targets[0].seat, 9); assert.equal(attack.resolvedTargets[0].seat, 8); assert.equal(attack.effect, "reflected");
+  assert.equal(room.replay.events[0].actions.find(a => a.kind === "swap").status, "triggered");
   assert.equal(room.knights.players["wx:replay-8"].alive, true);
   assert.ok(room.replay.events[0].actions.some(a => a.kind === "guard" && a.status === "notTriggered"));
   const armor = setup(); armor.roles["wx:replay-5"] = "blueAwakened";
@@ -66,9 +67,11 @@ test("复盘准确解释换号、守护、替死、反伤和复活甲，不改�
   const protectedRoom = setup(); protectedRoom.roles["wx:replay-6"] = "blueGuard";
   skills(protectedRoom, { 5: "target:8", 6: "target:8" });
   assert.equal(protectedRoom.replay.events[0].actions.find(a => a.actor.seat === 5).effect, "guarded");
+  assert.equal(protectedRoom.replay.events[0].actions.find(a => a.kind === "guard").status, "triggered");
   const substitute = setup(); substitute.roles["wx:replay-5"] = "blueAwakened"; substitute.roles["wx:replay-8"] = "witch";
   skills(substitute, { 5: "target:8", 8: "target:9" });
   assert.equal(substitute.replay.events[0].actions.find(a => a.actor.seat === 5).recipient.seat, 9);
+  assert.equal(substitute.replay.events[0].actions.find(a => a.kind === "substitute").status, "triggered");
 });
 
 test("投票弃权、仙女查验、重复转换和未触发被动枪均按真实结果记录", () => {
@@ -87,6 +90,68 @@ test("投票弃权、仙女查验、重复转换和未触发被动枪均按真�
   run(room, "beginActivity", { kind: "skills" });
   run(room, "closeWaiting", { confirm: true });
   assert.equal(room.replay.events.filter(e => e.kind === "skills").at(-1).earlyClosed, true);
+});
+
+test("所有已完成线上操作按发生顺序归档，湖仙保留查验当时阵营，未形成盘刀决定也有记录", () => {
+  const room = onlineCompleted(), events = room.matchRecord.replay.events;
+  assert.deepEqual(events.map(e => e.kind), ["vote", "quest", "fairy", "conversion", "skills", "vote",
+    "quest", "conversion", "fairy", "skills", "canceled", "knife", "knife"]);
+  const votes = events.filter(e => e.kind === "vote");
+  assert.equal(votes[0].votes.filter(v => v.approve).length, 9);
+  assert.equal(votes[0].approved, true); assert.equal(votes[1].approved, false);
+  assert.equal(votes[1].votes.filter(v => v.approve === null).length, 11);
+  assert.equal(votes[1].earlyClosed, true);
+  const fairy = events.filter(e => e.kind === "fairy");
+  assert.equal(fairy[0].target.seat, 7); assert.equal(fairy[0].target.faction, "good");
+  assert.equal(fairy[0].target.roleId, "blueLancelot");
+  assert.equal(room.roles["wx:replay-7"], "blueGuard");
+  assert.equal(events.find(e => e.kind === "conversion").changes.find(c => c.seat === 7).after.faction, "evil");
+  assert.equal(fairy[1].actor.seat, 7); assert.equal(fairy[1].target.faction, "evil");
+  const knives = events.filter(e => e.kind === "knife");
+  assert.equal(knives[0].decision, false); assert.equal(knives[0].hit, null); assert.equal(knives[0].targetSeat, null);
+  assert.equal(knives[1].actor.seat, 10); assert.equal(knives[1].targetSeat, 1); assert.equal(knives[1].hit, true);
+  assert.doesNotMatch(JSON.stringify(events), /wx:replay-|"uid"|"submissions"/);
+});
+
+test("旧局仅合并相邻攻击片段，转换与完整技能周期仍保留顺序，不改写归档或推测结果", () => {
+  const store = new Store(":memory:");
+  try {
+    const room = completed(); store.save(room);
+    const raw = store.replayFor("wx:replay-5", room.matchRecord.id);
+    const skill = raw.events.find(e => e.kind === "skills" && e.round === 2);
+    const fragment = (id, action) => ({ id, kind: "skills", round: 2, actions: [action], summary: null });
+    const first = fragment("old-1", skill.actions[0]), second = fragment("old-2", skill.actions[1]);
+    raw.events = [first, second, { id: "conversion", kind: "conversion", round: 2, converted: false, changes: [] }, first, skill];
+    const frozen = JSON.stringify(raw), projected = presentReplay(raw).rounds[0].events;
+    assert.deepEqual(projected.map(e => e.kind), ["skills", "conversion", "skills", "skills"]);
+    assert.equal(projected[0].rows.length, 2); assert.equal(projected[0].footer, "");
+    assert.equal(projected[2].rows.length, 1); assert.equal(projected[3].drawRows.length, 2);
+    assert.equal(JSON.stringify(raw), frozen);
+    assert.doesNotMatch(JSON.stringify(projected), /旧记录仅保留|undefined/);
+    raw.events = [{ id: "unknown-knife", kind: "knife", round: 1, hit: null, targetSeat: null }];
+    assert.equal(presentReplay(raw).rounds[0].events[0].badge, "结果未记录");
+  } finally { store.close(); }
+});
+
+test("抽牌随机查验、主动查验和每轮先知视野都保留各自的实际结果", () => {
+  const room = setup(); room.knights.deck = ["gargoyle", "prophet"];
+  skills(room, { 5: "target:8", 6: "target:7" });
+  const first = room.replay.events.find(e => e.kind === "skills");
+  assert.equal(first.draws.find(d => d.after.roleId === "gargoyle").inspection.initial, true);
+  assert.equal(room.replay.events.find(e => e.kind === "vision").actor.seat, 7);
+  skills(room, { 8: "inspect:10" });
+  const inspection = room.replay.events.filter(e => e.kind === "skills")[1].actions.find(a => a.kind === "inspect");
+  assert.equal(inspection.targets[0].seat, 10); assert.equal(inspection.inspection.canKill, true);
+  assert.deepEqual(room.replay.events.filter(e => e.kind === "vision").map(e => e.round), [1, 2]);
+  run(room, "finishTools", { winner: "good" });
+  const store = new Store(":memory:");
+  try {
+    store.save(room); const projected = presentReplay(store.replayFor("wx:replay-8", room.matchRecord.id));
+    const events = projected.rounds.flatMap(r => r.events);
+    assert.match(events.find(e => e.kind === "skills").drawRows[0].result, /随机查验/);
+    assert.equal(events.filter(e => e.kind === "skills")[1].rows[0].result, "拥有主动击杀能力");
+    assert.match(events.filter(e => e.kind === "vision")[1].rows[0].detail, /第2轮B牌坏人/);
+  } finally { store.close(); }
 });
 
 test("归档复盘在重开、删房和重启后保留，仅参与者可读，旧局明确显示缺失过程", () => {

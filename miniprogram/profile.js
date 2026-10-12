@@ -82,6 +82,12 @@ function presentMatches(records) {
     const pad = value => String(value).padStart(2, "0");
     const hasFunEvents = !!record.fun?.events?.length;
     const funNote = record.fun?.status === "legacy" && !hasFunEvents ? "本局暂无过程记录" : record.fun?.reason || "";
+    const funHighlights = (record.fun?.highlights || [])
+      .filter(item => item.id !== "final_miss" && !String(item.id || "").endsWith("_failed")
+        && !["最终歪刀", "未生效"].includes(item.label))
+      .slice(0, 2).map(item => ({ ...item,
+        label: item.label + (item.count > 1 ? " ×" + item.count : ""),
+        color: /_(ally|hit|bust|miss)$/.test(item.id) && !(item.positive ?? item.ranked) ? "evil" : "good" }));
     return {
       ...record,
       boardTitle: (record.boardName || "").replace(/\s*[（(]\s*(\d+)\s*人\s*[）)]\s*$/, (suffix, count) => Number(count) === Number(record.capacity) ? "" : suffix),
@@ -95,10 +101,8 @@ function presentMatches(records) {
       hasFunEvents,
       showInitialRole: !!record.fun?.initialRole && record.fun.initialRole !== record.role,
       funNote: funNote === record.excludedReason || funNote === record.score?.reason ? "" : funNote,
-      funLabel: record.fun?.highlights?.map(item => item.label + (item.count > 1 ? " ×" + item.count : "")).slice(0,2).join(" · ") || "",
-      funHighlights: (record.fun?.highlights || []).slice(0, 2).map(item => ({ ...item,
-        label: item.label + (item.count > 1 ? " ×" + item.count : ""),
-        color: /_(ally|hit|bust|miss)$/.test(item.id) && !(item.positive ?? item.ranked) ? "evil" : item.id.endsWith("failed") ? "muted" : "good" })),
+      funLabel: funHighlights.map(item => item.label).join(" · "),
+      funHighlights,
       scoreLabel: record.score?.status === "scored" ? (record.score.total >= 0 ? "+" : "") + record.score.total + " 分" : "未计分",
       dateLabel: validDate ? date.toLocaleString("zh-CN", { hour12: false }) : "日期未知",
       outcomeLabel: record.outcome === "win" ? "胜利" : record.outcome === "loss" ? "失利" : "不计入战绩",

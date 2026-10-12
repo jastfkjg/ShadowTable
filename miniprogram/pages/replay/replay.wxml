@@ -17,18 +17,38 @@
       <view class="replay-player-grid"><button wx:for="{{initialPlayers}}" wx:key="seat" class="replay-player {{item.isSelf?'is-self':''}}" data-seat="{{item.seat}}" bindtap="openPlayer" hover-class="none" aria-label="{{item.seat}}号{{item.name}}，初始{{item.roleLabel}}，查看身份轨迹"><view class="replay-seat-name"><text>{{item.seat}}号</text><text>{{item.name}}</text><text wx:if="{{item.isSelf}}" class="replay-self-tag">我</text></view><view class="replay-player-role {{item.faction}}">{{item.roleLabel}}</view></button></view>
     </view>
     <view class="replay-section">
-      <view class="replay-section-heading"><text>每轮过程</text><text class="replay-legend">点击展开详情</text></view>
-      <scroll-view class="replay-jumps" scroll-x show-scrollbar="{{false}}"><view class="replay-jumps-inner"><button data-id="replay-initial" bindtap="jumpTo" hover-class="none">开局</button><button wx:for="{{rounds}}" wx:key="id" data-id="{{item.id}}" bindtap="jumpTo" hover-class="none">{{item.number?'第'+item.number+'轮':'未记录轮次'}}</button><button data-id="replay-final" bindtap="jumpTo" hover-class="none">结算</button></view></scroll-view>
+      <view class="replay-section-heading"><text>每轮过程</text><text class="replay-legend">{{rounds.length}} 轮记录</text></view>
+      <scroll-view class="replay-jumps" scroll-x show-scrollbar="{{false}}"><view class="replay-jumps-inner"><button class="{{activeRoundId==='replay-initial'?'selected':''}}" data-id="replay-initial" bindtap="jumpTo" hover-class="none">开局</button><button wx:for="{{rounds}}" wx:key="id" class="{{activeRoundId===item.id?'selected':''}}" data-id="{{item.id}}" bindtap="jumpTo" hover-class="none">{{item.number?'第'+item.number+'轮':'未记录轮次'}}</button><button class="{{activeRoundId==='replay-final'?'selected':''}}" data-id="replay-final" bindtap="jumpTo" hover-class="none">结算</button></view></scroll-view>
       <view wx:if="{{!rounds.length}}" class="replay-empty">每轮过程未记录。</view>
-      <view wx:for="{{rounds}}" wx:for-item="round" wx:key="id" id="{{round.id}}" class="replay-round">
-        <button class="disclosure-button replay-round-toggle" bindtap="toggleRound" data-id="{{round.id}}" aria-expanded="{{round.expanded}}" hover-class="none"><view class="replay-round-number">{{round.number || '–'}}</view><view class="replay-round-summary"><view class="replay-round-title"><text>{{round.title}}</text><view class="replay-round-result {{round.tone}}">{{round.badge}}<view class="replay-arrow {{round.expanded?'expanded':''}}" aria-hidden="true"></view></view></view><view class="replay-note">{{round.summary}}</view></view></button>
+      <view wx:for="{{rounds}}" wx:for-item="round" wx:key="id" id="{{round.id}}" class="replay-round {{round.expanded?'is-expanded':''}}">
+        <button class="disclosure-button replay-round-toggle" bindtap="toggleRound" data-id="{{round.id}}" aria-expanded="{{round.expanded}}" aria-label="{{round.title}}，{{round.badge}}，{{round.expanded?'收起':'展开'}}详情" hover-class="none"><view class="replay-round-number">{{round.number || '–'}}</view><view class="replay-round-summary"><view class="replay-round-title"><text>{{round.title}}</text><view class="replay-round-result"><text class="replay-badge {{round.tone}}">{{round.badge}}</text><view class="replay-arrow {{round.expanded?'expanded':''}}" aria-hidden="true"></view></view></view><view wx:if="{{!round.expanded}}" class="replay-note">{{round.summary}}</view></view></button>
         <view wx:if="{{round.expanded}}" class="replay-stages">
           <view wx:if="{{!round.events.length}}" class="replay-note">本轮没有我的行动记录。</view>
           <view wx:for="{{round.events}}" wx:for-item="event" wx:key="id" class="replay-stage">
-            <view class="replay-stage-dot" aria-hidden="true"></view><view class="replay-stage-heading"><text>{{event.title}}</text><text wx:if="{{event.badge}}" class="replay-badge {{event.tone}}">{{event.badge}}</text></view>
-            <view wx:if="{{event.summary}}" class="replay-event-summary">{{event.summary}}</view>
-            <view wx:for="{{event.rows}}" wx:for-item="row" wx:key="id" class="replay-action"><view class="replay-action-heading"><text class="{{row.tone}}">{{row.headline}}</text><text class="replay-note">{{row.action}}</text></view><view class="replay-action-detail">{{row.detail}}</view><view wx:if="{{row.result}}" class="replay-action-result">{{row.result}}</view></view>
+            <view class="replay-stage-heading"><text>{{event.title}}</text><text wx:if="{{event.badge && !event.hideBadge}}" class="{{event.kind==='skills'?'replay-legend':'replay-badge '+event.tone}}">{{event.badge}}</text></view>
+            <view wx:if="{{event.stats.length}}" class="replay-task-summary">
+              <view class="replay-stats"><view wx:for="{{event.stats}}" wx:for-item="stat" wx:key="id" class="replay-stat"><view class="replay-stat-value {{stat.tone}}">{{stat.value}}<text>{{stat.unit}}</text></view><view class="replay-stat-label">{{stat.label}}</view></view></view>
+              <view class="replay-team"><text class="replay-team-label">{{event.kind==='vote'?'组队队伍':'任务队伍'}}</text><text>{{event.teamLabel}}</text></view>
+              <view wx:if="{{event.leader}}" class="replay-note replay-leader">{{event.leader}}号带队</view>
+            </view>
+            <view wx:if="{{event.summary && !event.stats.length}}" class="replay-event-summary">{{event.summary}}</view>
+            <block wx:if="{{event.kind==='vote' || event.kind==='quest'}}">
+              <view wx:if="{{event.rows.length}}" class="replay-roster-heading">{{event.kind==='vote'?'投票明细':'逐人出牌'}}</view>
+              <view class="replay-ballots"><view wx:for="{{event.rows}}" wx:for-item="row" wx:key="id" class="replay-ballot"><text class="replay-ballot-player">{{row.headline}}</text><text class="replay-ballot-value {{row.tone}}">{{row.detail}}</text></view></view>
+            </block>
+            <block wx:else>
+              <view wx:for="{{event.rows}}" wx:for-item="row" wx:key="id" class="replay-action {{event.kind==='conversion'?'replay-conversion':''}}">
+                <view class="replay-action-heading"><view class="replay-actor"><text wx:if="{{row.actorSeat}}" class="replay-actor-seat {{row.tone}}">{{row.actorSeat}}号</text><text class="replay-actor-role {{row.tone}}">{{row.actorLabel || row.headline}}</text></view><text wx:if="{{row.action}}" class="replay-note replay-action-kind">{{row.action}}</text></view>
+                <view wx:if="{{event.kind==='conversion'}}" class="replay-conversion-result"><text class="{{row.beforeTone}}">{{row.beforeLabel}}</text><text class="replay-note" aria-hidden="true">→</text><text class="{{row.tone}}">{{row.afterLabel}}</text></view>
+                <block wx:else>
+                  <view class="replay-action-detail {{row.targetLabel?'has-target':''}}"><view wx:if="{{row.targetLabel}}" class="replay-target-arrow" aria-hidden="true"></view><text>{{row.targetLabel || row.detail}}</text></view>
+                  <view wx:if="{{row.extraDetail}}" class="replay-note replay-action-extra">{{row.extraDetail}}</view>
+                  <view wx:if="{{row.result}}" class="replay-action-result {{row.resultTone}}"><view wx:if="{{event.kind==='skills'}}" class="replay-result-marker" aria-hidden="true"></view><text>{{row.resultLabel || row.result}}</text></view>
+                </block>
+              </view>
+            </block>
             <block wx:if="{{event.drawRows.length}}"><view class="replay-draw-heading">抽取 B 牌</view><view wx:for="{{event.drawRows}}" wx:for-item="draw" wx:key="id" class="replay-draw"><view>{{draw.headline}}</view><view class="{{draw.tone}}">{{draw.detail}}</view><view class="replay-note">{{draw.result}}</view></view><view class="replay-note">新身份技能在下一轮启用。</view></block>
+            <view wx:if="{{event.settlements.length}}" class="replay-settlements"><view wx:for="{{event.settlements}}" wx:for-item="settlement" wx:key="id" class="replay-settlement"><text class="replay-note">{{settlement.label}}</text><text class="{{settlement.tone}}">{{settlement.text}}</text></view></view>
             <view wx:if="{{event.confirmationsLabel}}" class="replay-note replay-confirmations">{{event.confirmationsLabel}}</view>
             <view wx:if="{{event.footer}}" class="replay-event-footer">{{event.footer}}</view>
           </view>

@@ -150,6 +150,36 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   assert.match(text(render()), /刀中敌方/);
   assert.match(text(render()), /最终结果未记录/);
 });
+test('对局摘要把人数放在板子行，隐藏冗余与未生效标签后仍保留有效表现', () => {
+  const { presentMatches } = require('../miniprogram/profile');
+  const highlights = [
+    { id: 'final_miss', label: '最终歪刀', count: 1 },
+    { id: 'knife_failed', label: '未生效', count: 2 },
+    { id: 'good_shield', label: '成功挡刀', count: 1 },
+    { id: 'knife_enemy', label: '命中敌方', count: 2 },
+  ];
+  const base = { boardName: '阿瓦隆 · 十二骑士（12人）', capacity: 12, role: '蓝刀客·加赫雷斯', faction: 'good', outcome: 'win', members: [], endedAt: 1,
+    score: { status: 'scored', total: 0 }, fun: { events: [{ id: 'knife', label: '未生效', detail: '目标已被挡下' }], highlights } };
+  const before = JSON.stringify(base);
+  const [shown, empty, assassin] = presentMatches([
+    { ...base, id: 'shown' },
+    { ...base, id: 'empty', fun: { highlights: highlights.slice(0, 2) } },
+    { ...base, id: 'assassin', fun: { highlights: [{ id: 'assassin_miss', label: '歪刀', count: 1 }, highlights[0]] } },
+  ]);
+  assert.deepEqual(shown.funHighlights.map(item => item.label), ['成功挡刀', '刀中敌方 ×2']);
+  assert.equal(shown.funLabel, '成功挡刀 · 刀中敌方 ×2');
+  assert.deepEqual(empty.funHighlights, []); assert.equal(empty.funLabel, '');
+  assert.deepEqual(assassin.funHighlights.map(item => item.label), ['歪刀']);
+  assert.equal(shown.fun.highlights.length, 4); assert.equal(shown.fun.events[0].label, '未生效');
+  assert.equal(JSON.stringify(base), before);
+  const tree = renderHistoryShell({ records: [shown, empty, assassin], total: 3, loaded: true });
+  const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join('');
+  const rendered = nodes(tree);
+  assert.equal(text(rendered.find(node => node.attr?.class === 'match-board')), '阿瓦隆 · 十二骑士 · 12 人');
+  assert.equal(text(rendered.find(node => node.attr?.class === 'match-identity')), '蓝刀客·加赫雷斯好人');
+  assert.equal(rendered.filter(node => node.attr?.class === 'match-highlights').length, 2);
+  assert.doesNotMatch(text(tree), /最终歪刀|未生效/);
+});
 test('战绩区分未计分与零分计分局，没有计分局也保留独立调分', () => {
   const renderStats = renderStatsShell;
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join(' ');

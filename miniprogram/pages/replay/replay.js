@@ -3,7 +3,7 @@ const { backToMe } = require("../../profile");
 const { presentReplay, trajectory } = require("../../replay");
 Page({
   data: { loading: true, error: "", replay: null, view: "global", initialPlayers: [], finalPlayers: [],
-    rounds: [], taskPips: [], selfTrajectory: null, playerDetail: null, playersExpanded: false },
+    rounds: [], taskPips: [], selfTrajectory: null, playerDetail: null, playersExpanded: false, activeRoundId: "" },
   onLoad(options = {}) { this.alive = true; this.id = options.id || ""; return this.load(); },
   onUnload() { this.alive = false; this.rawReplay = null; },
   async load() {
@@ -24,7 +24,7 @@ Page({
   },
   toggleRound(e) {
     const id = e.currentTarget.dataset.id;
-    this.setData({ rounds: this.data.rounds.map(r => r.id === id ? { ...r, expanded: !r.expanded } : r) });
+    this.setData({ activeRoundId: id, rounds: this.data.rounds.map(r => r.id === id ? { ...r, expanded: !r.expanded } : r) });
   },
   openPlayer(e) {
     if (!this.rawReplay) return;
@@ -37,6 +37,7 @@ Page({
   jumpTo(e) {
     const id = e.currentTarget.dataset.id;
     if (!this.data.replay || !["replay-initial", "replay-final", ...this.data.rounds.map(r => r.id)].includes(id)) return;
+    this.setData({ activeRoundId: id });
     if (id.startsWith("round-")) this.setData({ rounds: this.data.rounds.map(r => r.id === id ? { ...r, expanded: true } : r) }, () => this.scrollTo(id));
     else this.scrollTo(id);
   },

@@ -1045,6 +1045,7 @@ function settleActivity(room) {
       room.history.push({
         kind: "variant",
         number,
+        resultType: "knifeUnavailable",
         text: "未形成有效盘刀决定，请根据线下翻牌重新选择带刀人",
       });
       room.activity = null;

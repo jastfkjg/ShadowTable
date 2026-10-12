@@ -4,7 +4,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { wxmlToJs } = require("miniprogram-compiler");
 const { Store } = require("../server/store");
-const { completed } = require("../tests/helpers/replay-fixtures");
+const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures");
 const { presentReplay, trajectory } = require("../miniprogram/replay");
 const { presentMatches } = require("../miniprogram/profile");
 const createRecords = require("../miniprogram/pages/records/controller");
@@ -28,16 +28,27 @@ function html(node) {
 const css = file => fs.readFileSync(path.join(root, file), "utf8")
   .replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name))))
   .replace(/^page\s*\{/m, "body {").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
-const store = new Store(":memory:"); let raw, record;
+const store = new Store(":memory:"); let raw, record, online;
 try {
   const room = completed(); store.save(room); raw = store.replayFor("wx:replay-5", room.matchRecord.id);
   record = presentMatches([store.matchFor("wx:replay-5", room.matchRecord.id)])[0];
+  const onlineRoom = onlineCompleted(); store.save(onlineRoom);
+  online = store.replayFor("wx:replay-5", onlineRoom.matchRecord.id);
 }
 finally { store.close(); }
+const longNames = structuredClone(online);
+for (const p of longNames.initialPlayers) p.name = "昵称较长的玩家名字测试";
+for (const e of longNames.events) for (const card of e.cards || []) if (card.actor) card.actor.name = "昵称较长的玩家名字测试";
 const scenes = {
   overview: presentReplay(raw), round: presentReplay(raw, "global", ["round-2"]),
   mine: presentReplay(raw, "mine", ["round-1"]),
   player: { ...presentReplay(raw), playerDetail: trajectory(raw, 7) },
+  online: presentReplay(online, "global", ["round-1", "round-2", "round-3"]),
+  onlineMine: presentReplay(online, "mine", ["round-1", "round-2", "round-3"]),
+  longNames: presentReplay(longNames, "global", ["round-1", "round-2", "round-3"]),
+  legacyRound: presentReplay({ ...raw, message: "", status: "legacy", events: raw.events.filter(e => e.round === 2).flatMap(e =>
+    e.kind === "quest" ? [{ ...e, cards: [] }] : e.kind === "skills" ? e.actions.map((action, i) =>
+      ({ id: e.id + ":" + i, kind: "skills", round: e.round, actions: [action], summary: null })) : []) }, "global", ["round-2"]),
   legacy: presentReplay({ ...raw, events: [], status: "legacy", message: "旧对局未保存完整复盘，仅展示已有记录；缺失过程不作推测。" }),
   error: { replay: null, error: "对局记录不存在或已移除" },
 };
@@ -47,7 +58,8 @@ function writeScene(name, file, data, styles) {
   const rendered = html(factory(file)(data));
   fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>对局复盘 · ${name}</title><style>body{margin:0}view,section{display:block}button{font:inherit;border:0}.preview-nav{height:76px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:100;background:#101c24;border-bottom:1px solid #30404a}.preview-nav button{position:absolute;left:12px;width:44px;min-height:44px;font-size:30px;padding:0}.replay-jumps,.replay-task-pips{overflow:auto}.replay-sheet-body,.records-pane{overflow-y:auto}${styles}</style>${rendered}</html>`);
 }
-for (const [name, data] of Object.entries(scenes)) writeScene(name, "pages/replay/replay.wxml", { loading: false, error: "", playersExpanded: false, playerDetail: null, ...data }, styles);
+for (const [name, data] of Object.entries(scenes)) writeScene(name, "pages/replay/replay.wxml", { loading: false, error: "", playersExpanded: false, playerDetail: null,
+  activeRoundId: data.rounds?.find(r => r.expanded)?.id || "", ...data }, styles);
 const records = createRecords("matches").data;
 writeScene("entry", "pages/matches/matches.wxml", { ...records, historyStarted: true,
   history: { ...records.history, loading: false, loaded: true, records: [record], total: 1 } }, css("app.wxss") + css("pages/matches/matches.wxss"));

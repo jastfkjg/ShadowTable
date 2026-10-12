@@ -27,19 +27,22 @@ function knightDeal(options={}) {
   room.roles=Object.fromEntries(room.players.map((player,index)=>[player.uid,roles[index]]));
   return room;
 }
-test('十二骑士10到13人默认计分，所有结局与派西挡刀沿用现有分值，经典板不提供提前盘刀',()=>{
+test('十二骑士10到13人默认计分，三绿和提前盘刀均排除梅派阶段及挡刀奖励，经典板不提供提前盘刀',()=>{
   for(const [board,capacity] of [['knights-10',10],['knights-11',11],['knights',12],['knights-13',13]]) {
     const room=newRoom('123456','wx:host','房主',board,capacity);
     assert.equal(room.scoreEnabled,true);assert.equal(publicView(room,room.host).scoreSettings.unavailableReason,null);
-    const good=deal({board,capacity}),target=good.players.find(player=>good.roles[player.uid]==='percival').seat;
-    assert.deepEqual(publicView(good,good.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
-    finish(good,{scoreReason:'assassination',scoreTarget:target});
-    for(const player of good.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?0:player.roleId==='percival'?5:player.roleId==='merlin'?3:2);
+    for(const reason of ['assassination','early_assassination']) {
+      const good=deal({board,capacity}),target=good.players.find(player=>good.roles[player.uid]==='percival').seat;
+      assert.deepEqual(publicView(good,good.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
+      finish(good,{scoreReason:reason,scoreTarget:target});
+      for(const player of good.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?0:['merlin','percival'].includes(player.roleId)?3:2);
+      assert.ok(!good.matchRecord.players.find(player=>player.seat===target).score.breakdown.some(award=>award.id==='shield'));
+    }
     for(const reason of ['assassination','quest_fail','five_rejections','early_assassination']) {
       const bad=deal({board,capacity}),merlin=bad.players.find(player=>bad.roles[player.uid]==='merlin').seat;
       finish(bad,{scoreReason:reason,scoreTarget:merlin});
       assert.equal(bad.result.winner,'evil');
-      for(const player of bad.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?3:['assassination','early_assassination'].includes(reason)?1:0);
+      for(const player of bad.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?3:['assassination','early_assassination'].includes(reason) && !['merlin','percival'].includes(player.roleId)?1:0);
     }
   }
   const classic=deal();assert.ok(!publicView(classic,classic.host).scoreSettlement.some(option=>option.id==='early_assassination'));
@@ -63,14 +66,14 @@ test('十二骑士空刀依据存活梅林判胜，出局目标无效；管理�
   const absent=knightDeal();absent.knights.players['wx:1'].alive=false;
   const snapshot=structuredClone(absent);
   assert.throws(()=>finish(absent,{scoreReason:'assassination',scoreTarget:1}),/在场/);assert.deepEqual(absent,snapshot);
-  finish(absent,{scoreReason:'assassination',scoreTarget:0});assert.equal(absent.result.winner,'evil');assert.equal(absent.matchRecord.players[0].score.total,1);
+  finish(absent,{scoreReason:'assassination',scoreTarget:0});assert.equal(absent.result.winner,'evil');assert.equal(absent.matchRecord.players[0].score.total,0);
   const store=new Store(':memory:');try {
     store.transaction(()=>store.save(absent));
     store.transaction(()=>store.correctMatch(absent.matchId,{revision:0,scoreReason:'early_assassination',scoreTarget:0}));
-    assert.equal(store.matchesFor('wx:1').records[0].winner,'evil');assert.equal(store.statsFor('wx:1').score.total,1);
+    assert.equal(store.matchesFor('wx:1').records[0].winner,'evil');assert.equal(store.statsFor('wx:1').score.total,0);
     assert.throws(()=>store.transaction(()=>store.correctMatch(absent.matchId,{revision:1,scoreReason:'assassination',scoreTarget:1})),/在场/);
     store.transaction(()=>store.correctMatch(absent.matchId,{revision:1,scoreReason:'assassination',scoreTarget:2}));
-    assert.equal(store.statsFor('wx:2').score.total,5);
+    assert.equal(store.statsFor('wx:2').score.total,3);
     const classic=deal();finish(classic);store.transaction(()=>store.save(classic));
     assert.throws(()=>store.transaction(()=>store.correctMatch(classic.matchId,{revision:0,scoreReason:'early_assassination',scoreTarget:1})),/结束原因无效/);
   }finally {store.close();}
@@ -152,10 +155,12 @@ test('房主关闭只排除积分，胜负仍归档，不改变已有积分；�
     assert.ok(reverse.matchRecord.players.every(p=>p.score.status==='excluded'));
   } finally {store.close();}
 });
-test("三绿刺中、未中、派西挡刀、刺到坏人和空刀正确分解积分",()=>{
-  assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:1}),[1,1,1,1,3,3]);
+test("三蓝车刺中、未中、派西被刺、普通好人挡刀、刺到坏人和空刀正确分解积分",()=>{
+  const hit=deal();
+  assert.deepEqual(finish(hit,{scoreReason:"assassination",scoreTarget:1}),[0,0,1,1,3,3]);
+  for(const player of hit.matchRecord.players.slice(0,2)) assert.deepEqual(player.score.breakdown,[]);
   assert.deepEqual(finish(deal()),[3,3,4,2,0,0]);
-  assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[3,5,2,2,0,0]);
+  assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[3,3,2,2,0,0]);
   for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[3,3,2,2,0,0]);
   for(const reason of ["quest_fail","five_rejections"]) assert.deepEqual(finish(deal(),{scoreReason:reason}),[0,0,0,0,3,3]);
 });
@@ -215,7 +220,7 @@ test('正式玩家与陪测账号同桌的十二骑士正常结算并计入积�
     assert.equal(publicView(room,player.uid).myScore,null);
     saveProfile(store,'wx:1',{nickname:'房主',version:0,leaderboardVisible:true});
     const ranking=new Leaderboard(store).read('wx:1',new URLSearchParams('metric=points'));
-    assert.equal(ranking.me.points,1);assert.equal(ranking.me.total,1);assert.equal(ranking.me.status,'ranked');
+    assert.equal(ranking.me.points,0);assert.equal(ranking.me.total,1);assert.equal(ranking.me.status,'ranked');
   }finally{store.close();}
 });
 test("规则与表单在开局固定，修改服务端规则只影响新局，说明随配置生成",()=>{
@@ -230,6 +235,27 @@ test("规则与表单在开局固定，修改服务端规则只影响新局，�
   const bad=policy();bad.awards[0].when.secret="anything";assert.throws(()=>validateRules(bad));
   const alternatives=policy();alternatives.awards[0].when={faction:['good','evil'],outcome:['win','loss'],reason:['quest_fail','five_rejections'],isTarget:false};
   assert.match(publicRules(alternatives).items[0].text,/好人／坏人 · 获胜／失利 · 三次任务失败／连续五次组队被否决 · 最终刺杀目标不是本人/);
+});
+test('角色排除条件由服务端下发说明，拒绝无效配置',()=>{
+  for(const id of ['good_stage','shield']) assert.match(publicRules().items.find(item=>item.id===id).text,/梅林／派西维尔除外/);
+  for(const invalid of [[],null,123,['merlin',null],'']) {
+    const rules=policy();rules.awards[0].when.roleIdNot=invalid;
+    assert.throws(()=>validateRules(rules),/排除角色/);
+  }
+});
+test('调整前开局的规则仍发梅派阶段分和派西挡刀分，归档及管理员更正保留旧分值',()=>{
+  const store=new Store(':memory:');
+  try {
+    const old=deal();old.scorePolicy.version='avalon-2026-10-v6';
+    for(const award of old.scorePolicy.awards) delete award.when.roleIdNot;
+    assert.deepEqual(finish(old,{scoreReason:'assassination',scoreTarget:1}),[1,1,1,1,3,3]);
+    store.transaction(()=>store.save(old));
+    store.transaction(()=>store.correctMatch(old.matchId,{revision:0,scoreReason:'assassination',scoreTarget:2}));
+    const score=store.matchesFor('wx:2').records[0].score;
+    assert.equal(score.total,5);assert.equal(score.ruleVersion,'avalon-2026-10-v6');
+    assert.ok(score.breakdown.some(award=>award.id==='shield'));
+    assert.deepEqual(finish(deal(),{scoreReason:'assassination',scoreTarget:2}),[3,3,2,2,0,0]);
+  } finally {store.close();}
 });
 test("结算无身份预览，非法目标不泄露身份，只有房主能提交，结束后只返回本人积分",()=>{
   const room=deal();room.spectators=[{uid:"wx:observer",name:"围观",seat:null}];

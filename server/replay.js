@@ -102,6 +102,9 @@ function observe(room, before, input, uid, roles) {
     else if (["toolKnife", "assassination"].includes(entry.kind))
       append(room, roles, { ...base, kind: "knife", actor: after.find(p => p.seat === before.activity?.actor) || null,
         target: after.find(p => p.seat === entry.target) || null, targetSeat: entry.target, hit: entry.hit });
+    else if (entry.resultType === "knifeUnavailable" && before.activity?.kind === "assassination")
+      append(room, roles, { ...base, kind: "knife", actor: before.players.find(p => p.seat === before.activity.actor) || null,
+        target: null, targetSeat: null, hit: null, decision: false, text: entry.text });
     else if (entry.kind === "toolOffline")
       append(room, roles, { ...base, kind: "offline", text: "线下操作已完成，具体过程未记录" });
   }

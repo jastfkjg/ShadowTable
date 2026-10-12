@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { wxmlToJs } = require("miniprogram-compiler");
 const { Store } = require("../server/store");
-const { completed } = require("./helpers/replay-fixtures");
+const { completed, onlineCompleted } = require("./helpers/replay-fixtures");
 const { presentReplay } = require("../miniprogram/replay");
 const root = path.resolve(__dirname, "../miniprogram");
 function fixture() {
@@ -40,7 +40,9 @@ test("复盘页按本人认证读取，折叠、视角切换、身份轨迹和�
   await p.onLoad({ id: raw.id }); assert.equal(logins, 1); assert.equal(p.data.loading, false);
   assert.equal(p.data.rounds.length, 4); assert.equal(p.data.rounds[0].expanded, false);
   p.toggleRound(tap({ id: "round-1" })); assert.equal(p.data.rounds[0].expanded, true);
+  assert.equal(p.data.activeRoundId, "round-1");
   p.chooseView(tap({ view: "mine" })); assert.equal(p.data.initialPlayers.length, 1); assert.equal(p.data.rounds[0].expanded, true);
+  assert.equal(p.data.activeRoundId, "round-1");
   p.openPlayer(tap({ seat: 7 })); assert.equal(p.data.playerDetail.seat, 7);
   p.back(); assert.equal(p.data.playerDetail, null); assert.equal(navigations.length, 0);
   p.togglePlayers(); assert.equal(p.data.playersExpanded, true); p.back(); assert.equal(navigations[0], "back");
@@ -80,4 +82,37 @@ test("生产 WXML 编译并显示真实复盘，个人视角和旧局不虚构�
   assert.doesNotMatch(JSON.stringify(render({ loading: true, replay: null })), /初始身份|最终结算/);
   raw.status = "legacy"; raw.message = "旧对局未保存完整复盘"; raw.events = [];
   assert.match(JSON.stringify(render({ ...presentReplay(raw), loading: false })), /每轮过程未记录/);
+});
+
+test("生产复盘展示线上投票和出牌明细、转换前后阵营、湖仙结果、抽牌及作废与盘刀结果", () => {
+  const store = new Store(":memory:");
+  try {
+    const room = onlineCompleted(); store.save(room);
+    const raw = store.replayFor("wx:replay-5", room.matchRecord.id);
+    const projected = presentReplay(raw, "global", ["round-1", "round-2", "round-3"]);
+    const events = projected.rounds.flatMap(r => r.events);
+    const votes = events.filter(e => e.kind === "vote");
+    assert.deepEqual(votes[0].stats.map(s => s.value), [9, 3, 0]);
+    assert.deepEqual(votes[1].stats.map(s => s.value), [1, 0, 11]);
+    assert.equal(votes[0].rows.length, 12); assert.equal(votes[1].rows.length, 12);
+    const quests = events.filter(e => e.kind === "quest");
+    assert.deepEqual(quests[1].stats.map(s => s.value), [2, 1, 1]);
+    assert.equal(quests[1].rows.find(r => r.headline.startsWith("10号")).detail, "失败");
+    assert.ok(quests.every(e => e.hideBadge));
+    assert.equal(events.find(e => e.kind === "fairy").rows[0].resultLabel, "当时阵营：好人");
+    const conversion = events.find(e => e.kind === "conversion" && e.converted);
+    assert.equal(conversion.rows.find(r => r.actorSeat === 7).beforeLabel, "好人阵营");
+    assert.equal(conversion.rows.find(r => r.actorSeat === 7).afterLabel, "坏人阵营");
+    const context = { window: {}, global: {}, console }; vm.createContext(context);
+    const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
+    const text = JSON.stringify(factory("pages/replay/replay.wxml")({ ...projected, loading: false }));
+    for (const label of ["投票明细", "逐人出牌", "阵营转换", "好人阵营", "坏人阵营", "不转换",
+      "湖仙查验", "当时阵营：好人", "当时阵营：坏人", "湖仙传递给 7号", "抽取 B 牌",
+      "提前截止", "作废操作", "未形成决定", "本次没有提交有效目标", "命中"])
+      assert.ok(text.includes(label), label);
+    assert.doesNotMatch(text, /旧记录仅保留|undefined|wx:replay-/);
+    const mine = presentReplay(raw, "mine", ["round-1"]);
+    assert.equal(mine.rounds[0].events.find(e => e.kind === "vote").rows.length, 1);
+    assert.equal(mine.rounds[0].events.find(e => e.kind === "vote").rows[0].headline, "5号 子龙");
+  } finally { store.close(); }
 });
