@@ -8,6 +8,7 @@
     "pages/matches/matches",
     "pages/scores/scores",
     "pages/match-detail/match-detail",
+    "pages/replay/replay",
     "pages/table/table",
     "pages/settings/settings",
     "pages/board-details/board-details",

@@ -118,6 +118,15 @@ module.exports = function createController() { return {
     const id = e.currentTarget.dataset.id;
     this.setData({ records: this.data.records.map(record => record.id === id ? { ...record, expanded: !record.expanded } : record) });
   },
+  openReplay(e) {
+    if (this.openingReplay) return;
+    const record = this.data.records.find(row => row.id === e.currentTarget.dataset.id && row.replayAvailable);
+    if (!record) return;
+    this.openingReplay = true;
+    wx.navigateTo({ url: "/pages/replay/replay?id=" + encodeURIComponent(record.id),
+      fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingReplay = false; } });
+  },
   toggleMembers(e) {
     const id = e.currentTarget.dataset.id;
     this.setData({ records: this.data.records.map(record => record.id === id && record.expanded ? { ...record, membersExpanded: !record.membersExpanded } : record) });

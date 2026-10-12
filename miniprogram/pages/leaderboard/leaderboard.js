@@ -93,7 +93,7 @@ Page({
   chooseGroup(e) {
     if (e.currentTarget.dataset.id === "fun") {
       if (!this.data.funAvailable || this.data.funSelected) return;
-      return this.load(false,{metric:"fun_merlin_evade",funMode:"all",funRole:"",funSort:"count"});
+      return this.load(false,{metric:this.data.funOptions[0].key,funMode:"all",funRole:"",funSort:"count"});
     }
     if (e.currentTarget.dataset.id === "overall" && ["overall", "good", "evil"].includes(this.data.metric)) return;
     return this.chooseMetric(e);

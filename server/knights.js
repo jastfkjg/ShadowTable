@@ -2,6 +2,7 @@
 const { randomUUID, randomInt } = require("node:crypto");
 const { roles } = require("./variants");
 const fun = require("./fun");
+const replay = require("./replay");
 const swords = [
   "gareth",
   "gaheris",
@@ -640,6 +641,7 @@ function settle(room, check, allRoles, rememberIdentity) {
       record.status = k.swap?.triggered ? "triggered" : "notTriggered";
     (k.players[uid].skillHistory ||= []).push({ ...record, round: k.round });
   }
+  const replayActions = replay.skillActions(room, k.skillUses, k.funEvents || [], allRoles);
   delete k.skillUses;
   const drawn = [];
   // Draw once, in death order, only for players who remain dead.
@@ -686,6 +688,7 @@ function settle(room, check, allRoles, rememberIdentity) {
     ),
   };
   k.skillRound = k.round;
+  replay.skills(room, replayActions, drawn, allRoles);
   if (room.fun) room.fun.events.push(...(k.funEvents || []));
   delete k.funEvents;
   delete k.snapshot;

@@ -7,6 +7,7 @@ const { roomSummary, RuleError, roleName } = require("./engine");
 const scoring = require("./scoring");
 const fun = require("./fun");
 const funCopy = require("../miniprogram/fun-copy");
+const replay = require("./replay");
 const management = require("./match-management");
 const { migrate: migrateKnights } = require("./knights");
 const companion = player => player.uid.startsWith("test:");
@@ -324,7 +325,7 @@ class Store {
     const recent = this.db.prepare("SELECT p.match_id,m.snapshot AS game, p.snapshot AS player FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
       .map(row => {
         const shown = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
-        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, companions, ...game } = shown.game;
+        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, companions, replay: replayFacts, ...game } = shown.game;
         const { roleId, ...player } = shown.player;
         return { ...game, ...player, fun: funCopy.story(player.fun) };
       });
@@ -582,6 +583,7 @@ class Store {
     const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
     return {
       id: row.match_id, boardName: game.boardName, capacity: game.capacity,
+      replayAvailable: replay.supported(game.board),
       startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
       source: game.source, excludedReason: game.excludedReason,
       name: player.name, seat: player.seat, role: player.role,
@@ -591,6 +593,15 @@ class Store {
       scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
       members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),
     };
+  }
+
+  replayFor(uid, id) {
+    const row = this.db.prepare(`SELECT p.match_id,m.snapshot AS game,p.snapshot AS player
+      FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? AND p.match_id=?`).get(uid, id);
+    if (!row) throw new RuleError("对局记录不存在或已移除", 404);
+    const { game, player } = management.present(this, id, JSON.parse(row.game), JSON.parse(row.player));
+    if (!replay.supported(game.board)) throw new RuleError("当前板子暂未提供复盘", 404);
+    return replay.present(game, this.matchParticipants(game), uid, player, roleName);
   }
 
   session(hash) {

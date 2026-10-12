@@ -18,5 +18,12 @@ Page({
   historyToggleMembers() {
     if (this.data.record) this.setData({ record: { ...this.data.record, membersExpanded: !this.data.record.membersExpanded } });
   },
+  openReplay() {
+    if (!this.data.record?.replayAvailable || this.openingReplay) return;
+    this.openingReplay = true;
+    wx.navigateTo({ url: "/pages/replay/replay?id=" + encodeURIComponent(this.data.record.id),
+      fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingReplay = false; } });
+  },
   back: backToMe,
 });

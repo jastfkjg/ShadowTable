@@ -326,6 +326,11 @@ function createApp({
         check(revision === null || /^(0|[1-9]\d{0,14})$/.test(revision), "积分明细版本无效");
         return send(200, store.scoreLedger(uid, Number(offset), 20, revision === null ? null : Number(revision)));
       }
+      const personalReplay = path.match(/^\/api\/me\/matches\/([^/]+)\/replay$/);
+      if (req.method === "GET" && personalReplay) {
+        check(!requestUrl.search, "复盘查询参数无效");
+        return send(200, { replay: store.replayFor(uid, personalReplay[1]) });
+      }
       const personalMatch = path.match(/^\/api\/me\/matches\/([^/]+)$/);
       if (req.method === "GET" && personalMatch)
         return send(200, { record: store.matchFor(uid, personalMatch[1]) });

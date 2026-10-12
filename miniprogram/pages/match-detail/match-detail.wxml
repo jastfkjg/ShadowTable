@@ -10,5 +10,6 @@
       <view class="match-secondary">{{record.role}} · {{record.factionLabel}} · {{record.capacity}}人</view>
     </view>
     <template is="matchDetails" data="{{item:record}}" />
+    <button wx:if="{{record.replayAvailable}}" class="match-replay-entry" bindtap="openReplay" hover-class="none"><text>查看复盘</text><view class="match-arrow" aria-hidden="true"></view></button>
   </block>
 </view>

@@ -8,6 +8,7 @@
 .match-year { font-size: 12px; font-weight: 400; }
 .match-day-line { height: 1rpx; flex: 1; min-width: 12px; margin-left: 4px; background: var(--records-line); }
 .match-entry { border-bottom: 1rpx solid var(--records-line); }
+button.match-replay-entry { display: flex; justify-content: space-between; width: 100%; min-height: 44px; margin: 0 0 8px; padding: 6px 0; border-radius: 0; color: var(--accent); font-size: 12px; font-weight: 400; }
 .match-entry.match-day-last { border-bottom: 0; }
 button.match-toggle { display: block; width: 100%; margin: 0; padding: 17px 0 18px; text-align: left; border-radius: 0; font-weight: 400; }
 .match-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

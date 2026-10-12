@@ -4381,7 +4381,7 @@ function roomListItems(rooms) {
     funRecords: el => navigate('matches?fun='+encodeURIComponent(el.dataset.metric)+'&mode='+encodeURIComponent(el.dataset.mode)+(el.dataset.role ? '&role='+encodeURIComponent(el.dataset.role) : '')),
     funRankMetric: el => { if(el.dataset.value!==state.rankMetric && state.rankFunMetrics.some(item=>item.key===el.dataset.value)) return loadLeaderboard(false,{rankMetric:el.dataset.value,rankFunMode:'all',rankFunRole:''}); },
     funRankSort: el => { if(['count','rate'].includes(el.dataset.value)) return loadLeaderboard(false,{rankFunSort:el.dataset.value}); },
-    rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:'fun_merlin_evade',rankFunMode:'all',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
+    rankMetric: el => { if(el.dataset.value==='fun' && state.rankFunMetrics.length && !state.rankMetric.startsWith('fun_')) return loadLeaderboard(false,{rankMetric:state.rankFunMetrics[0].key,rankFunMode:'all',rankFunSort:'count',rankFunRole:''}); if (rankMetrics.some(item => item[0] === el.dataset.value) && el.dataset.value !== state.rankMetric && (el.dataset.value !== 'points' || state.rankPointsAvailable)) return loadLeaderboard(false, { rankMetric: el.dataset.value }); },
     rankToggleMine: () => toggleRankSheet('rankMineExpanded', '.rank-mine-toggle'),
     rankToggleRules: () => toggleRankSheet('rankRulesExpanded', '[data-action="rankToggleRules"]'),
     rankToggleMetrics: () => {

@@ -5,6 +5,7 @@ const knights = require("./knights");
 const fairy = require("./fairy");
 const scoring = require("./scoring");
 const fun = require("./fun");
+const replay = require("./replay");
 const funCopy = require("../miniprogram/fun-copy");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
@@ -272,6 +273,7 @@ function archiveResult(room) {
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
     funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
+    ...(replay.supported(room.board) ? { replay: replay.snapshot(room) } : {}),
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
       alive: room.knights?.players[p.uid].alive ?? true,
@@ -428,6 +430,7 @@ function start(room, flexible = false) {
   room.activity = null;
   room.toolSequence = 0;
   if (isKnights(room.board)) knights.init(room, shuffle);
+  if (isKnights(room.board)) replay.init(room, ROLES);
   fairy.init(room);
   if (isKnights(room.board) || room.board === "chaos") room.flexible = true;
   stage(room, room.flexible ? "tools" : "identity");
@@ -1371,15 +1374,17 @@ function publicView(room, uid) {
   };
 }
 function command(room, uid, input) {
+  const replayBefore = replay.capture(room, ROLES);
   const previousPhase = room.phase;
   const previous = new Set(room.history);
   const startedAt = room.activity?.startedAt || Date.now();
   applyCommand(room, uid, input);
-  if (!["ended", "terminated"].includes(previousPhase) && ["ended", "terminated"].includes(room.phase) && room.roles)
-    archiveResult(room);
   for (const entry of room.history) {
     if (!previous.has(entry) && !entry.startedAt) entry.startedAt = startedAt;
   }
+  replay.observe(room, replayBefore, input, uid, ROLES);
+  if (!["ended", "terminated"].includes(previousPhase) && ["ended", "terminated"].includes(room.phase) && room.roles)
+    archiveResult(room);
 }
 function applyCommand(room, uid, input) {
   const p = member(room, uid);
@@ -1738,6 +1743,7 @@ function applyCommand(room, uid, input) {
       "scorePolicy",
       "scoringFacts",
       "fun",
+      "replay",
     ])
       delete room[key];
     room.history = [];

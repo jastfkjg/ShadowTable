@@ -6,7 +6,7 @@
 })(typeof window === "object" ? window : this, function () {
   const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "more", label: "更多" }];
   function funOptions(definitions = [], { includeFinal = false } = {}) {
-    const first = ["fun_good_shield", "fun_merlin_evade", "fun_percival_green", "fun_merlin_hit", "fun_percival_bust"];
+    const first = ["fun_good_shield", "fun_merlin_evade", "fun_merlin_hit", "fun_percival_green", "fun_percival_bust"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(item => {
       const title = item.key === "fun_good_shield" ? "好人" : item.title;
       const category = /^fun_(good_shield|merlin_|percival_)/.test(item.key) ? "good"

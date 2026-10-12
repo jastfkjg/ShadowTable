@@ -1,0 +1,83 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const { wxmlToJs } = require("miniprogram-compiler");
+const { Store } = require("../server/store");
+const { completed } = require("./helpers/replay-fixtures");
+const { presentReplay } = require("../miniprogram/replay");
+const root = path.resolve(__dirname, "../miniprogram");
+function fixture() {
+  const store = new Store(":memory:");
+  try { const room = completed(); store.save(room); return store.replayFor("wx:replay-5", room.matchRecord.id); }
+  finally { store.close(); }
+}
+function page(api, route = "replay") {
+  let definition;
+  const navigations = [], toasts = [];
+  const wx = { navigateBack: () => navigations.push("back"), navigateTo: o => { navigations.push(o.url); o.complete?.(); },
+    showToast: o => toasts.push(o.title) };
+  function load(file) {
+    if (file === path.join(root, "api.js")) return api;
+    const module = { exports: {} };
+    vm.runInNewContext(fs.readFileSync(file, "utf8"), { module,
+      require: name => load(path.resolve(path.dirname(file), name + ".js")),
+      wx, Page: p => definition = p, getCurrentPages: () => [{}, {}], getApp: () => ({}), setTimeout, clearTimeout });
+    return module.exports;
+  }
+  if (route === "matches") definition = load(path.join(root, "pages/matches/controller.js"))();
+  else load(path.join(root, "pages/" + route + "/" + route + ".js"));
+  const p = { ...definition, data: structuredClone(definition.data), setData(patch, callback) { Object.assign(this.data, patch); callback?.(); } };
+  return { p, navigations, wx, toasts };
+}
+const tap = data => ({ currentTarget: { dataset: data } });
+test("复盘页按本人认证读取，折叠、视角切换、身份轨迹和返回保留正确状态", async () => {
+  const raw = fixture(); let logins = 0;
+  const { p, navigations } = page({ login: async () => logins++, request: async url => {
+    assert.equal(url, "/api/me/matches/" + raw.id + "/replay"); return { replay: raw };
+  } });
+  await p.onLoad({ id: raw.id }); assert.equal(logins, 1); assert.equal(p.data.loading, false);
+  assert.equal(p.data.rounds.length, 4); assert.equal(p.data.rounds[0].expanded, false);
+  p.toggleRound(tap({ id: "round-1" })); assert.equal(p.data.rounds[0].expanded, true);
+  p.chooseView(tap({ view: "mine" })); assert.equal(p.data.initialPlayers.length, 1); assert.equal(p.data.rounds[0].expanded, true);
+  p.openPlayer(tap({ seat: 7 })); assert.equal(p.data.playerDetail.seat, 7);
+  p.back(); assert.equal(p.data.playerDetail, null); assert.equal(navigations.length, 0);
+  p.togglePlayers(); assert.equal(p.data.playersExpanded, true); p.back(); assert.equal(navigations[0], "back");
+  p.onUnload(); assert.equal(p.rawReplay, null);
+});
+test("读取失败可重试、无对局编号不请求、重复读取和卸载后的迟到响应不改页面", async () => {
+  const raw = fixture(); let reads = 0;
+  const first = page({ login: async () => {}, request: async () => { reads++; if (reads === 1) throw Error("网络中断"); return { replay: raw }; } }).p;
+  await first.onLoad({ id: raw.id }); assert.equal(first.data.replay, null); assert.equal(first.data.error, "网络中断");
+  await first.load(); assert.equal(first.data.error, ""); assert.equal(first.data.replay.id, raw.id);
+  const missing = page({ login: async () => { throw Error("不应请求"); } }).p;
+  await missing.onLoad(); assert.match(missing.data.error, /不存在/);
+  let resolve, calls = 0;
+  const pending = page({ login: async () => {}, request: () => { calls++; return new Promise(done => resolve = done); } }).p;
+  const load = pending.onLoad({ id: raw.id }); await Promise.resolve(); await pending.load(); assert.equal(calls, 1);
+  pending.onUnload(); resolve({ replay: raw }); await load; assert.equal(pending.data.replay, null);
+});
+test("列表和详情的复盘入口只接受已有受支持记录，原有展开和返回行为保持不变", () => {
+  const history = page({}, "matches"); history.p.alive = true;
+  history.p.setData({ records: [{ id: "a/b", replayAvailable: true, expanded: false }, { id: "classic", replayAvailable: false }] });
+  history.p.openReplay(tap({ id: "classic" })); history.p.openReplay(tap({ id: "missing" })); assert.equal(history.navigations.length, 0);
+  history.p.openReplay(tap({ id: "a/b" })); assert.equal(history.navigations[0], "/pages/replay/replay?id=a%2Fb");
+  history.p.toggleRecord(tap({ id: "a/b" })); assert.equal(history.p.data.records[0].expanded, true);
+  const detail = page({}, "match-detail"); detail.p.setData({ record: { id: "m", replayAvailable: true } });
+  detail.p.openReplay(); assert.equal(detail.navigations[0], "/pages/replay/replay?id=m");
+});
+test("生产 WXML 编译并显示真实复盘，个人视角和旧局不虚构缺失内容", () => {
+  const context = { window: {}, global: {}, console }; vm.createContext(context);
+  const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
+  const render = factory("pages/replay/replay.wxml"), raw = fixture();
+  const global = presentReplay(raw, "global", ["round-2"]);
+  const text = JSON.stringify(render({ ...global, loading: false }));
+  assert.match(text, /初始身份|技能结算|魔术师|红骑士|最终结算|刺中梅林|三绿阶段奖励/);
+  assert.doesNotMatch(text, /undefined|wx:replay-/);
+  const mine = presentReplay(raw, "mine", ["round-2"]);
+  assert.match(JSON.stringify(render({ ...mine, loading: false })), /本轮没有我的行动记录/);
+  assert.doesNotMatch(JSON.stringify(render({ loading: true, replay: null })), /初始身份|最终结算/);
+  raw.status = "legacy"; raw.message = "旧对局未保存完整复盘"; raw.events = [];
+  assert.match(JSON.stringify(render({ ...presentReplay(raw), loading: false })), /每轮过程未记录/);
+});

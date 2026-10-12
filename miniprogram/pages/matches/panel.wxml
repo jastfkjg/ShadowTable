@@ -28,6 +28,7 @@
           <view wx:if="{{item.funHighlights.length}}" class="match-highlights"><text wx:for="{{item.funHighlights}}" wx:for-item="highlight" wx:key="id" class="match-highlight {{highlight.color}}">{{highlight.label}}</text></view>
           <view wx:elif="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
         </button>
+        <button wx:if="{{item.replayAvailable}}" class="match-replay-entry" bindtap="historyOpenReplay" data-id="{{item.id}}" hover-class="none" aria-label="查看{{item.boardName}}的复盘"><text>查看复盘</text><view class="match-arrow" aria-hidden="true"></view></button>
         <template wx:if="{{item.expanded}}" is="matchDetails" data="{{item}}" />
       </view>
     </block>
