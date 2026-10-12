@@ -1,52 +1,63 @@
-.monthly-page { padding-top: 8px; }
-.monthly-toolbar { display: flex; align-items: center; justify-content: space-between; }
-.monthly-month-picker { display: flex; align-items: center; gap: 12px; min-height: 48px; font-size: 15px; color: var(--accent); }
-.monthly-picker-arrow { font-size: 16px; }
-.monthly-hero { position: relative; overflow: hidden; padding: 17px 0 14px; min-height: 115px; }
-.monthly-hero-art { position: absolute; top: 0; left: 0; width: 100%; height: auto; opacity: .9; }
-.monthly-hero::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(90deg, rgba(16,28,36,.78), rgba(16,28,36,.18) 60%, transparent); pointer-events: none; }
+.monthly-page { --monthly-border: #3c515b; --monthly-bg: #0e2028; padding: 0 21px calc(14px + env(safe-area-inset-bottom)); max-width: 640px; background: var(--monthly-bg); }
+.monthly-hero { position: relative; overflow: hidden; height: 164px; margin: 0 -21px; padding: 22px 21px; box-sizing: border-box; }
+.monthly-hero-art { position: absolute; top: 0; left: 0; width: 100%; height: auto; }
+.monthly-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--monthly-bg), transparent 28%); pointer-events: none; }
 .monthly-hero-content { position: relative; z-index: 1; }
-.monthly-month-title { color: var(--accent); font-size: 41px; font-family: "Songti SC", serif; font-weight: 600; line-height: 1.2; }
-.monthly-title { font-size: 35px; font-family: "Songti SC", serif; font-weight: 600; margin-top: 5px; }
-.monthly-overview { display: flex; padding: 13px 0 16px; border-top: 0.5px solid var(--accent); border-bottom: 0.5px solid var(--border); }
-.monthly-overview > div { flex: 1; min-width: 0; display: flex; align-items: center; flex-direction: column; }
-.monthly-overview > div + div { border-left: 0.5px solid var(--border); }
-.monthly-overview-value { font-size: 30px; font-family: "Songti SC", serif; color: var(--accent); font-weight: 600; overflow-wrap: anywhere; }
-.monthly-caption { color: var(--muted); font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
-.monthly-board { margin: 18px 0; }
-.monthly-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 19px; font-family: "Songti SC", serif; font-weight: 600; }
-.monthly-top-label { font-size: 11.5px; color: var(--accent); font-weight: 400; }
-.monthly-board > .monthly-caption { margin: 4px 0 6px; }
-button.monthly-row { width: 100%; display: flex; justify-content: flex-start; text-align: left; gap: 9px; padding: 11px 0; min-height: 55px; border-radius: 0; border-bottom: 0.5px solid var(--border); font-weight: 400; }
-.monthly-rank { flex-shrink: 0; min-width: 19px; display: flex; flex-direction: column; align-items: center; color: var(--muted); font-size: 17px; }
-.monthly-first { color: var(--accent); }
-.monthly-tied { font-size: 10px; }
-.monthly-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.monthly-name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
-.monthly-value { max-width: 37%; font-size: 22px; font-family: "Songti SC", serif; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.monthly-month-picker { display: flex; align-items: center; gap: 7px; min-height: 48px; width: fit-content; color: var(--accent); font-size: 13.5px; }
+.monthly-picker-arrow { width: 5px; height: 5px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); margin-top: -3px; }
+.monthly-title { font-family: "Songti SC", serif; font-size: 35px; line-height: 1.2; letter-spacing: 2px; font-weight: 600; margin-top: 6px; }
+.monthly-overview { display: flex; padding: 16px 0 19px; border-top: 0.5px solid var(--accent); border-bottom: 0.5px solid var(--border); }
+.monthly-overview > div { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 11px; }
+.monthly-overview > div + view { border-left: 0.5px solid var(--monthly-border); }
+.monthly-overview-value { font-size: 38px; line-height: 1.1; font-family: "Songti SC", serif; color: var(--accent); overflow-wrap: anywhere; }
+.monthly-caption { color: var(--muted); font-size: 11.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.monthly-overview .monthly-caption { white-space: nowrap; font-size: 12.5px; }
+.monthly-board { margin-top: 24px; }
+.monthly-section-title { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 20px; font-family: "Songti SC", serif; font-weight: 600; line-height: 1.4; }
+.monthly-heading-label { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.monthly-heading-icon { width: 21px; height: 21px; flex-shrink: 0; }
+.monthly-top-label { font-size: 10.5px; color: var(--accent); font-weight: 400; font-family: -apple-system, "PingFang SC", sans-serif; white-space: nowrap; }
+.monthly-board-caption { margin: 4px 0 8px 30px; }
+button.monthly-row { width: 100%; display: flex; justify-content: flex-start; text-align: left; gap: 11px; padding: 11px 0; margin: 0; min-height: 67px; border-radius: 0; border-bottom: 0.5px solid var(--monthly-border); font-weight: 400; }
+button.monthly-row:last-child { border-bottom: 0; }
+.monthly-row-first { background: linear-gradient(90deg, rgba(229,198,139,.04), transparent); }
+.monthly-rank { width: 32px; height: 38px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; color: #bf9278; font-size: 16px; font-family: "Songti SC", serif; }
+.monthly-rank img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.monthly-rank-1 { color: var(--accent); }
+.monthly-rank-2 { color: #a9c2ce; }
+.monthly-avatar { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%; border: 0.5px solid var(--muted); color: var(--text); background: var(--surface); font-family: "Songti SC", serif; font-size: 18px; }
+.monthly-avatar-1 { border-color: var(--accent); }
+.monthly-avatar-3 { border-color: #bf9278; }
+.monthly-avatar img { width: 100%; height: 100%; }
+.monthly-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2.5px; }
+.monthly-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.monthly-name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.monthly-tied { color: var(--muted); font-size: 9px; line-height: 1.5; padding: 0 3px; border: 0.5px solid var(--border); border-radius: 2px; white-space: nowrap; }
+.monthly-value { max-width: 36%; flex-shrink: 0; font-size: 28px; line-height: 1.2; font-family: "Songti SC", serif; text-align: right; overflow-wrap: anywhere; }
+.monthly-row-first .monthly-value { color: var(--accent); }
 .monthly-compact { font-size: 16px; }
-.monthly-unit { font-size: 12px; margin-left: 3px; color: var(--muted); font-weight: 400; }
-.monthly-empty-board { padding: 14px 0; font-size: 13px; color: var(--muted); }
+.monthly-unit { font-size: 11.5px; margin-left: 3px; color: var(--muted); font-family: -apple-system, "PingFang SC", sans-serif; font-weight: 400; }
 .monthly-empty { padding: 28px 0; line-height: 1.8; }
-.monthly-featured-heading { margin-top: 26px; color: var(--accent); font-size: 15px; border-top: 0.5px solid var(--border); padding-top: 14px; }
-button.monthly-details-toggle { width: 100%; margin: 12px 0; min-height: 48px; padding: 6px 0; justify-content: space-between; color: var(--accent); font-size: 14px; }
 .monthly-tabs { display: flex; gap: 8px; margin-top: 14px; border-bottom: 0.5px solid var(--border); }
 .monthly-tabs button { flex: 1; width: 0; min-width: 0; min-height: 48px; margin: 0; padding: 6px 4px; font-size: 14px; border-radius: 0; color: var(--muted); }
 .monthly-tabs button.selected { color: var(--accent); border-bottom: 1.5px solid var(--accent); }
 .monthly-sort { margin-top: 6px; }
-button.monthly-share { width: 100%; min-height: 48px; margin-top: 16px; background: var(--accent); color: var(--bg); font-size: 15px; font-weight: 600; }
-@media (orientation: landscape) { .monthly-page { max-width: 640px; } .monthly-caption { font-size: 14px; } .monthly-name { font-size: 16px; } .monthly-value { font-size: 24px; } .monthly-unit, .monthly-tied { font-size: 13px; } .monthly-tabs button, button.monthly-share, button.monthly-details-toggle { font-size: 16px; } }
+.monthly-share-bar { padding-top: 14px; }
+button.monthly-share { width: 100%; min-height: 52px; margin: 0; background: var(--accent); color: var(--bg); font-size: 15px; font-weight: 600; }
+@media (orientation: landscape) { .monthly-hero { height: 230px; } .monthly-caption { font-size: 14px; } .monthly-name { font-size: 18px; } .monthly-value { font-size: 30px; } .monthly-unit, .monthly-tied { font-size: 13px; } .monthly-tabs button, button.monthly-share { font-size: 16px; } }
 
 .monthly-list { list-style: none; margin: 0; padding: 0; }
-.monthly-month-picker input { font: inherit; color: var(--accent); background: var(--surface); border: 1px solid var(--control-border); border-radius: 8px; padding: 8px; min-height: 48px; box-sizing: border-box; color-scheme: dark; }
+.monthly-list > li:last-child .monthly-row { border-bottom: 0; }
+.monthly-list > li:not(:last-child) .monthly-row { border-bottom: 1px solid var(--monthly-border); }
+.monthly-month-picker { position: relative; cursor: pointer; }
+.monthly-month-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; color-scheme: dark; }
+.monthly-month-picker:focus-within { outline: 2px solid var(--accent); outline-offset: 4px; }
+.monthly-month-picker input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
 .monthly-image-result { margin-top: 24px; }
+.monthly-image-scroll { max-height: 75vh; overflow: auto; border-radius: 10px; }
 .monthly-image-preview { display: block; width: 100%; height: auto; }
 .monthly-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .monthly-pagination button { width: auto; min-height: 48px; margin: 0; }
-.monthly-row:hover, .monthly-details-toggle:hover { background: var(--surface); }
-.monthly-page button:focus-visible, .monthly-page input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-
-.monthly-avatar { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%; border: .5px solid var(--muted); color: var(--text); background: var(--surface); font-family: "Songti SC", serif; font-size: 15px; }
-.monthly-avatar-1 { border-color: var(--accent); }
-.monthly-avatar-3 { border-color: #bf9278; }
-.monthly-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.monthly-row:hover { background-color: var(--surface); }
+.monthly-page button:focus-visible, .monthly-image-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.monthly-avatar img { object-fit: cover; }

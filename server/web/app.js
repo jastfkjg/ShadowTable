@@ -620,7 +620,7 @@
     statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyDetailsExpanded: false, monthlyEntertainment: false, monthlySort: 'count', monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyEntertainment: false, monthlySort: 'count', monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -1037,31 +1037,32 @@
       if (sequence === monthlySequence && route === routeSequence && state.page === 'monthly') setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message });
     }
   }
+  function monthlyHeading(title, iconPath, meta, extraClass = '') {
+    return '<div class="monthly-section-title ' + extraClass + '"><span class="monthly-heading-label"><img class="monthly-heading-icon" src="' + esc(iconPath) + '" alt=""><span>' + esc(title) + '</span></span><span class="monthly-top-label">' + esc(meta) + '</span></div>';
+  }
   function viewMonthlyBoard(board) {
-    return '<section class="monthly-board" aria-label="' + esc(board.title) + '"><div class="monthly-section-title"><span>' + esc(board.title) + '</span><span class="monthly-top-label">TOP 3</span></div><div class="monthly-caption">' + esc(board.subtitle) + '</div>' + (!board.rows.length ? '<p class="monthly-empty-board">' + esc(board.emptyHint) + '</p>' : '<ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank' + (row.rank === 1 ? ' monthly-first' : '') + '"><span>' + row.rank + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-avatar monthly-avatar-' + row.rank + '" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name">' + esc(row.nickname) + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol>') + '</section>';
+    if (!board.rows.length) return '';
+    return '<section class="monthly-board" aria-label="' + esc(board.title) + '">' + monthlyHeading(board.title, board.iconPath, 'TOP 3') + '<div class="monthly-caption monthly-board-caption">' + esc(board.subtitle) + '</div><ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row' + (row.rank === 1 ? ' monthly-row-first' : '') + '" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank monthly-rank-' + row.rank + '" aria-hidden="true"><img src="/assets/monthly-laurel-' + row.rank + '.svg" alt=""><span>' + esc(row.rankLabel) + '</span></span><span class="monthly-avatar monthly-avatar-' + row.rank + '" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name-line"><span class="monthly-name">' + esc(row.nickname) + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol></section>';
   }
   function viewMonthlyReport() {
     const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt();
-    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><div class="monthly-toolbar"><label class="monthly-month-picker">月份 <input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label></div>';
+    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt=""><div class="monthly-hero-content"><label class="monthly-month-picker"><span>' + esc(report?.monthLabel || month) + '</span><span class="monthly-picker-arrow" aria-hidden="true"></span><input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label><div class="monthly-title">月度战报</div></div></header>';
     if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
     if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
     if (!report || state.monthlyLoading) return html + '</section>';
-    html += '<header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt="" aria-hidden="true"><div class="monthly-hero-content"><div class="monthly-month-title">' + esc(report.monthTitle) + '</div><div class="monthly-title">月度战报</div></div></header><div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
+    html += '<div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
     if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
     else {
-      html += report.coreBoards.map(viewMonthlyBoard).join('') + '<div class="monthly-featured-heading">本月趣味荣誉</div>' + report.featured.map(viewMonthlyBoard).join('');
-      if (!report.featured.length) html += '<p class="monthly-empty-board">本月暂无完整的公开趣味成绩</p>';
-      html += '<button class="monthly-details-toggle" type="button" data-action="monthlyDetails" aria-expanded="' + !!state.monthlyDetailsExpanded + '">' + (state.monthlyDetailsExpanded ? '收起完整月报' : '查看完整月报') + '<span aria-hidden="true">' + (state.monthlyDetailsExpanded ? '−' : '＋') + '</span></button>';
-      if (state.monthlyDetailsExpanded) {
-        html += report.extraBoards.map(viewMonthlyBoard).join('');
+      html += [...report.coreBoards, ...report.extraBoards].map(viewMonthlyBoard).join('');
+      if (report.hasFunBoards) {
         html += '<div class="monthly-tabs" role="group" aria-label="趣味榜类型">' + [['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" data-action="monthlyEdition" data-value="' + id + '" aria-pressed="' + ((id === 'fun') === !!state.monthlyEntertainment) + '" class="' + (((id === 'fun') === !!state.monthlyEntertainment) ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
         html += '<div class="monthly-tabs monthly-sort" role="group" aria-label="趣味榜排序">' + [['count', '按次数'], ['rate', state.monthlyEntertainment ? '按发生率' : '按成功率']].map(([id, label]) => '<button type="button" data-action="monthlySort" data-value="' + id + '" aria-pressed="' + ((state.monthlySort || 'count') === id) + '" class="' + ((state.monthlySort || 'count') === id ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
         html += monthlyPresentation.detailBoards(report, state.monthlySort || 'count', !!state.monthlyEntertainment).map(viewMonthlyBoard).join('');
       }
       html += btn('monthly-share', 'monthlyShare', state.monthlySharing ? '正在生成图片…' : state.monthlyEntertainment ? '生成娱乐版分享图' : '生成月报分享图', null, state.monthlySharing);
       if (state.monthlyImages?.length) {
-        html += '<div class="monthly-image-result"><img class="monthly-image-preview" src="' + state.monthlyImages[state.monthlyImageIndex || 0] + '" alt="' + esc(report.monthLabel + '月度战报分享图，第' + ((state.monthlyImageIndex || 0) + 1) + '张') + '">';
-        if (state.monthlyImages.length > 1) html += '<div class="monthly-pagination">' + btn('text-button', 'monthlyPreviousImage', '上一张', null, !state.monthlyImageIndex) + '<span>第 ' + ((state.monthlyImageIndex || 0) + 1) + ' / ' + state.monthlyImages.length + ' 张</span>' + btn('text-button', 'monthlyNextImage', '下一张', null, (state.monthlyImageIndex || 0) + 1 === state.monthlyImages.length) + '</div><p class="monthly-caption">并列玩家较多，已自动分图。可逐张保存。</p>';
+        html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[state.monthlyImageIndex || 0] + '" alt="' + esc(report.monthLabel + '月度战报分享图，第' + ((state.monthlyImageIndex || 0) + 1) + '张') + '"></div>';
+        if (state.monthlyImages.length > 1) html += '<div class="monthly-pagination">' + btn('text-button', 'monthlyPreviousImage', '上一张', null, !state.monthlyImageIndex) + '<span>第 ' + ((state.monthlyImageIndex || 0) + 1) + ' / ' + state.monthlyImages.length + ' 张</span>' + btn('text-button', 'monthlyNextImage', '下一张', null, (state.monthlyImageIndex || 0) + 1 === state.monthlyImages.length) + '</div><p class="monthly-caption">内容较多，已自动分图。可逐张保存。</p>';
         html += btn('secondary', 'monthlyDownload', '保存当前图片') + '</div>';
       }
     }
@@ -4454,7 +4455,6 @@ function roomListItems(rooms) {
   var ACTIONS = {
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
-    monthlyDetails: () => setState({ monthlyDetailsExpanded: !state.monthlyDetailsExpanded }),
     monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
     monthlySort: el => { if (['count', 'rate'].includes(el.dataset.value)) setState({ monthlySort: el.dataset.value }); },
     monthlyShare: shareMonthlyReport,

@@ -12,26 +12,27 @@
   <view class="matches-result-summary" wx:if="{{loaded || filterCount}}">
     <view class="matches-result-copy"><view wx:if="{{loaded}}" class="matches-count"><text>{{filterCount?'筛选结果':'共'}}</text><text class="matches-count-value">{{total}}</text><text>场</text></view><view wx:if="{{filterCount}}" class="match-filter-summary">{{filterSummary}}</view></view>
     <button wx:if="{{filterCount}}" class="matches-filter-clear" bindtap="historyClearFilters" disabled="{{loading || loadingMore}}" hover-class="none">清空筛选</button>
-    <view wx:elif="{{loaded && outcomeSummary}}" class="matches-outcome-summary"><block wx:if="{{outcomeCounts}}"><text class="win">{{outcomeCounts.wins}} 胜</text><text aria-hidden="true">·</text><text class="loss">{{outcomeCounts.losses}} 负</text><block wx:if="{{outcomeCounts.excluded}}"><text aria-hidden="true">·</text><text>{{outcomeCounts.excluded}} 场不计入</text></block></block><text wx:else>{{outcomeSummary}}</text></view>
+    <view wx:elif="{{loaded && outcomeSummary}}" class="matches-outcome-summary"><block wx:if="{{outcomeCounts}}"><text class="win">{{outcomeCounts.wins}} 胜</text><text aria-hidden="true">·</text><text class="loss">{{outcomeCounts.losses}} 负</text><block wx:if="{{outcomeCounts.excluded}}"><text aria-hidden="true">·</text><text>{{outcomeCounts.excluded}} 未计入</text></block></block><text wx:else>{{outcomeSummary}}</text></view>
   </view>
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="historyRetry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>
   <block wx:if="{{records.length}}">
     <block wx:for="{{records}}" wx:key="id">
-      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day"><text>{{item.dayShortLabel || item.dayLabel}}</text><text wx:if="{{item.yearLabel}}" class="match-year">{{item.yearLabel}}</text><view class="match-day-line" aria-hidden="true"></view></view>
-      <view class="match-entry {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}}">
-        <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
-          <view class="match-heading">
-            <view class="match-copy"><view class="match-board"><text>{{item.boardTitle || item.boardName}}</text><text wx:if="{{item.capacity}}" class="match-capacity"> · {{item.capacity}} 人</text></view><view class="match-identity"><text class="match-role">{{item.role}}</text><text class="match-context">{{item.factionLabel}}</text></view></view>
-            <view class="match-state"><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text><view class="match-arrow {{item.expanded?'expanded':''}}" aria-hidden="true"></view></view>
-          </view>
-          <view wx:if="{{item.funHighlights.length}}" class="match-highlights"><text wx:for="{{item.funHighlights}}" wx:for-item="highlight" wx:key="id" class="match-highlight {{highlight.color}}">{{highlight.label}}</text></view>
-          <view wx:elif="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
-        </button>
-        <view class="match-footer">
-          <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored' && item.score.total!==0?'accent':''}}">{{item.scoreLabel}}</text></view>
-          <button wx:if="{{item.replayAvailable}}" class="match-replay-entry" bindtap="historyOpenReplay" data-id="{{item.id}}" hover-class="none" aria-label="查看{{item.boardName}}的复盘"><view class="match-replay-control"><image class="match-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
+      <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day"><text>{{item.dayShortLabel || item.dayLabel}}</text><text wx:if="{{item.yearLabel}}" class="match-year">{{item.yearLabel}}</text></view>
+      <view class="match-entry {{index===0 || item.dayKey!==records[index-1].dayKey?'match-day-first':''}} {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}} {{item.expanded?'match-expanded':''}}">
+        <view class="match-summary">
+          <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
+            <view class="match-heading">
+              <view class="match-identity"><text class="match-role">{{item.role}}</text><view wx:if="{{item.funHighlights.length}}" class="match-highlights"><text wx:for="{{item.funHighlights}}" wx:for-item="highlight" wx:key="id" class="match-highlight {{highlight.color}}">{{highlight.label}}</text></view><text wx:elif="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</text></view>
+              <text class="match-outcome {{item.outcome}}">{{item.outcome==='win' || item.outcome==='loss'?item.outcomeLabel:'未计入'}}</text>
+            </view>
+            <view class="match-board"><text>{{item.boardTitle || item.boardName}}</text><text wx:if="{{item.capacity}}" class="match-capacity"> · {{item.capacity}}人</text><text class="match-context"> · {{item.factionLabel}}</text></view>
+            <view class="match-footer {{item.replayAvailable?'has-replay':''}}">
+              <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored'?(item.score.total>0?'accent':item.score.total<0?'match-score-negative':''):''}}">{{item.scoreLabel}}</text></view>
+            </view>
+          </button>
+          <button wx:if="{{item.replayAvailable}}" class="match-replay-entry" bindtap="historyOpenReplay" data-id="{{item.id}}" hover-class="none" aria-label="查看{{item.boardName}}的复盘"><text>复盘</text><view class="match-replay-chevron" aria-hidden="true"></view></button>
         </view>
         <template wx:if="{{item.expanded}}" is="matchDetails" data="{{item}}" />
       </view>

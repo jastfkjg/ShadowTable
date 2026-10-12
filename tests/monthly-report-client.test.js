@@ -58,8 +58,46 @@ test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会�
   const context = new Proxy({ measureText: value => ({ width: Array.from(value).length * Number(/(\d+)px/.exec(context.font)?.[1] || 30) * .8 }), fillText: (value, x, y) => positions.push({ value, x, y }) }, { get(target, key) { return key in target ? target[key] : () => {}; } });
   renderer.drawCard(context, card);
   assert.ok(positions.every(({ x, y }) => x >= 0 && x <= size.width && y > 0 && y < size.height));
-  assert.ok(positions.some(({ value }) => value.endsWith("…"))); assert.ok(positions.some(({ value }) => value === "-123456789分"));
+  assert.ok(positions.some(({ value }) => value.endsWith("…"))); assert.ok(positions.some(({ value }) => value === "-123456789"));
+  assert.ok(positions.some(({ value }) => value === "分"));
   assert.ok(size.height <= renderer.MAX_HEIGHT);
+});
+test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分记录仍保留", () => {
+  const presentation = require("../miniprogram/monthly-report"), renderer = require("../miniprogram/monthly-report-card");
+  const response = monthlyFixture();
+  response.mainBoards[0].rows[0].points = 0;
+  response.mainBoards[1].rows = [];
+  response.funBoards.filter(board => board.metric === "assassin_hit").forEach(board => { board.rows = []; });
+  const report = presentation.presentReport(response);
+  assert.deepEqual(report.coreBoards.map(board => board.id), ["points"]);
+  assert.deepEqual(report.extraBoards.map(board => board.id), ["games"]);
+  assert.equal(report.coreBoards[0].rows[0].value, "0");
+  assert.equal(report.featured.length, 2);
+  assert.ok(presentation.detailBoards(report).every(board => board.rows.length));
+  const labels = [];
+  const context = new Proxy({ measureText: value => ({ width: String(value).length * 25 }), fillText: value => labels.push(value) }, { get: (target, key) => key in target ? target[key] : () => {} });
+  for (const card of renderer.cards(response)) renderer.drawCard(context, card);
+  assert.doesNotMatch(labels.join(" "), /战绩榜|好人胜率榜|坏人胜率榜|刺客神刀手|暂无|榜单仅展示|趣味榜仅统计|统计范围|截至/);
+  assert.ok(labels.includes("梅林躲刀王"));
+  for (const board of [...response.mainBoards, ...response.funBoards]) board.rows = [];
+  const empty = presentation.presentReport(response);
+  assert.equal(empty.hasDetails, false); assert.equal(empty.featured.length, 0);
+  const [card] = renderer.cards(response);
+  assert.equal(card.sections.length, 0); assert.deepEqual(card.overview, { games: 96, players: 34 });
+  response.overview.games = 0;
+  assert.throws(() => renderer.cards(response), /没有有效对局/);
+});
+test("纵排趣味荣誉在大量并列时完整分页，重复标题计入画布高度", () => {
+  const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
+  response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));
+  const pages = renderer.cards(response);
+  assert.ok(pages.length > 1);
+  assert.ok(pages.every(card => renderer.dimensions(card).height <= renderer.MAX_HEIGHT));
+  const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
+  assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
+  assert.ok(pages.slice(1).every(card => card.sections[0].showGroupTitle));
+  const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "good_shield"].includes(section.id));
+  assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
 });
 test("原生月报等待本地背景与远程头像，头像失败仍绘制背景并导出", async () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();

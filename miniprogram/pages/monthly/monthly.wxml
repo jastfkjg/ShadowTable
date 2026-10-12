@@ -1,40 +1,30 @@
 <template name="monthly-board">
-  <view class="monthly-board">
-    <view class="monthly-section-title"><text>{{board.title}}</text><text class="monthly-top-label">TOP 3</text></view>
-    <view class="monthly-caption">{{board.subtitle}}</view>
-    <view wx:if="{{!board.rows.length}}" class="monthly-empty-board">{{board.emptyHint}}</view>
-    <button wx:for="{{board.rows}}" wx:key="publicId" class="monthly-row" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" hover-class="none" aria-label="{{(item.tied?'并列':'')+'第'+item.rank+'名，'+item.nickname+'，'+item.value+board.unit+'，查看玩家战绩'}}">
-      <view class="monthly-rank {{item.rank===1?'monthly-first':''}}"><text>{{item.rank}}</text><text wx:if="{{item.tied}}" class="monthly-tied">并列</text></view>
+  <view wx:if="{{board.rows.length}}" class="monthly-board">
+    <view class="monthly-section-title"><view class="monthly-heading-label"><image class="monthly-heading-icon" src="{{board.iconPath}}" aria-hidden="true" /><text>{{board.title}}</text></view><text class="monthly-top-label">TOP 3</text></view>
+    <view class="monthly-caption monthly-board-caption">{{board.subtitle}}</view>
+    <button wx:for="{{board.rows}}" wx:key="publicId" class="monthly-row {{item.rank===1?'monthly-row-first':''}}" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" hover-class="none" aria-label="{{(item.tied?'并列':'')+'第'+item.rank+'名，'+item.nickname+'，'+item.value+board.unit+'，查看玩家战绩'}}">
+      <view class="monthly-rank monthly-rank-{{item.rank}}" aria-hidden="true"><image src="/assets/monthly-laurel-{{item.rank}}.svg" /><text>{{item.rankLabel}}</text></view>
       <view class="monthly-avatar monthly-avatar-{{item.rank}}" aria-hidden="true"><image wx:if="{{item.avatarSrc}}" src="{{item.avatarSrc}}" mode="aspectFill" /><text wx:else>{{item.initial}}</text></view>
-      <view class="monthly-identity"><text class="monthly-name">{{item.nickname}}</text><text class="monthly-caption">{{item.secondaryLabel}}</text></view>
+      <view class="monthly-identity"><view class="monthly-name-line"><text class="monthly-name">{{item.nickname}}</text><text wx:if="{{item.tied}}" class="monthly-tied">并列</text></view><text class="monthly-caption">{{item.secondaryLabel}}</text></view>
       <view class="monthly-value {{item.valueCompact?'monthly-compact':''}}">{{item.value}}<text class="monthly-unit">{{board.unit}}</text></view>
     </button>
   </view>
 </template>
-<app-nav title="月度战报" back="{{true}}" backLabel="返回排行榜" bindback="back" />
+<app-nav title="月度战报" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page monthly-page">
-  <view class="monthly-toolbar">
-    <picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="选择月报月份"><view class="monthly-month-picker">{{month}}<view class="monthly-picker-arrow" aria-hidden="true"></view></view></picker>
-  </view>
+  <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="选择月报月份"><view class="monthly-month-picker">{{report?report.monthLabel:month}}<view class="monthly-picker-arrow" aria-hidden="true"></view></view></picker><view class="monthly-title">月度战报</view></view></view>
   <view wx:if="{{loading}}" class="status" role="status">正在生成月度战报…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button class="secondary" bindtap="retry" disabled="{{loading}}" hover-class="none">重试</button></view>
   <block wx:if="{{report && !loading}}">
-    <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><view class="monthly-month-title">{{report.monthTitle}}</view><view class="monthly-title">月度战报</view></view></view>
     <view class="monthly-overview"><view><text class="monthly-overview-value">{{report.overview.games}}</text><text class="monthly-caption">有效对局</text></view><view><text class="monthly-overview-value">{{report.overview.players}}</text><text class="monthly-caption">参赛玩家</text></view></view>
     <view wx:if="{{!report.canShare}}" class="monthly-empty"><view>这个月还没有有效对局</view><text class="monthly-caption">换一个月份，或完成对局后再来看看。</text></view>
     <block wx:else>
       <block wx:for="{{report.coreBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
-      <view class="monthly-featured-heading">本月趣味荣誉</view>
-      <block wx:for="{{report.featured}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
-      <view wx:if="{{!report.featured.length}}" class="monthly-empty-board">本月暂无完整的公开趣味成绩</view>
-      <button class="disclosure-button monthly-details-toggle" bindtap="toggleDetails" aria-expanded="{{detailsExpanded}}" hover-class="none">{{detailsExpanded?'收起完整月报':'查看完整月报'}}<text aria-hidden="true">{{detailsExpanded?'−':'＋'}}</text></button>
-      <view wx:if="{{detailsExpanded}}" class="monthly-details">
-        <block wx:for="{{report.extraBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
-        <view class="monthly-tabs" aria-label="趣味榜类型"><button bindtap="chooseEdition" data-id="honors" class="{{!entertainment?'selected':''}}" aria-pressed="{{!entertainment}}" hover-class="none">趣味荣誉</button><button bindtap="chooseEdition" data-id="fun" class="{{entertainment?'selected':''}}" aria-pressed="{{entertainment}}" hover-class="none">娱乐榜</button></view>
-        <view class="monthly-tabs monthly-sort" aria-label="趣味榜排序"><button bindtap="chooseSort" data-id="count" class="{{sort==='count'?'selected':''}}" aria-pressed="{{sort==='count'}}" hover-class="none">按次数</button><button bindtap="chooseSort" data-id="rate" class="{{sort==='rate'?'selected':''}}" aria-pressed="{{sort==='rate'}}" hover-class="none">按{{entertainment?'发生率':'成功率'}}</button></view>
-        <block wx:for="{{detailBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
-      </view>
-      <button class="monthly-share" bindtap="share" loading="{{shareOpening}}" disabled="{{shareOpening || loading}}" hover-class="none">{{entertainment?'生成娱乐版分享图':'生成月报分享图'}}</button>
+      <block wx:for="{{report.extraBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
+      <block wx:if="{{report.hasFunBoards}}"><view class="monthly-tabs" aria-label="趣味榜类型"><button bindtap="chooseEdition" data-id="honors" class="{{!entertainment?'selected':''}}" aria-pressed="{{!entertainment}}" hover-class="none">趣味荣誉</button><button bindtap="chooseEdition" data-id="fun" class="{{entertainment?'selected':''}}" aria-pressed="{{entertainment}}" hover-class="none">娱乐榜</button></view>
+      <view class="monthly-tabs monthly-sort" aria-label="趣味榜排序"><button bindtap="chooseSort" data-id="count" class="{{sort==='count'?'selected':''}}" aria-pressed="{{sort==='count'}}" hover-class="none">按次数</button><button bindtap="chooseSort" data-id="rate" class="{{sort==='rate'?'selected':''}}" aria-pressed="{{sort==='rate'}}" hover-class="none">按{{entertainment?'发生率':'成功率'}}</button></view>
+      <block wx:for="{{detailBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block></block>
+      <view class="monthly-share-bar"><button class="monthly-share" bindtap="share" loading="{{shareOpening}}" disabled="{{shareOpening || loading}}" hover-class="none">{{entertainment?'生成娱乐版分享图':'生成月报分享图'}}</button></view>
     </block>
   </block>
 </view>

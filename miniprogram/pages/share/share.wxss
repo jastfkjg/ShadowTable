@@ -18,3 +18,17 @@ button.share-preview { display: block; width: 100%; padding: 0; margin: 0; line-
   .share-notice, .share-action-error { font-size: 14px; }
   .share-actions button { font-size: 16px; }
 }
+
+/* The monthly poster keeps its full width inside a scroll area; actions remain visible. */
+.monthly-share-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.monthly-share-shell > app-nav { flex-shrink: 0; }
+.share-page.monthly-share-page { display: flex; flex: 1; flex-direction: column; width: 100%; min-height: 0; padding: 0; }
+.share-preview-heading { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; padding: 18rpx 28rpx; color: var(--muted); font-size: 23rpx; }
+.share-preview-heading > text + text { color: var(--accent); }
+.share-scroll { flex: 1; height: 0; min-height: 0; width: 100%; box-sizing: border-box; padding: 0 18rpx 24rpx; }
+.monthly-share-page .share-footer { flex-shrink: 0; padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--border); background: var(--bg); }
+.monthly-share-page .share-actions { margin-top: 0; }
+.monthly-share-page .share-actions button { min-height: 52px; font-size: 32rpx; }
+.monthly-share-page .share-pagination { margin: 0 0 12rpx; }
+.monthly-share-page .share-notice { margin: 8rpx 0 16rpx; font-size: 23rpx; }
+.monthly-share-page .share-action-error { margin-top: 14rpx; font-size: 25rpx; }

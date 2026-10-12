@@ -21,18 +21,20 @@
     const countUnit = board.sort === "rate" ? (/^percival_/.test(board.metric) ? "局" : "次") : board.unit;
     const rows = board.rows.map(row => {
       const value = board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
-      return { ...row, initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
+      return { ...row, rankLabel: pad(row.rank), initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
         secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : board.label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
           : board.id === "points" ? row.scoredGames + " 场计分局" + (row.adjustmentPoints ? " · 调整 " + (row.adjustmentPoints > 0 ? "+" : "") + row.adjustmentPoints + " 分" : "")
           : row.wins + " 胜 / " + row.total + " 局" };
     });
-    return { ...board, subtitle: board.id === "points" ? "本月积分" : board.subtitle, rows, emptyHint: board.sort === "rate" ? "暂无满足 5 次有效机会的公开玩家" : board.threshold === 10 ? "暂无满足 10 局条件的公开玩家" : "暂无满足条件的公开记录" };
+    const icon = board.id === "points" ? "crown" : board.metric?.includes("shield") || board.id === "good" ? "shield" : board.metric?.includes("assassin") ? "moon" : "sword";
+    return { ...board, iconPath: "/assets/monthly-" + icon + ".svg", subtitle: board.id === "points" ? "本月积分" : board.subtitle, rows };
   }
   function presentReport(report) {
     const mainBoards = report.mainBoards.map(presentBoard), funBoards = report.funBoards.map(presentBoard);
-    const featured = report.featuredIds.map(id => funBoards.find(board => board.id === id)).filter(Boolean);
+    const featured = report.featuredIds.map(id => funBoards.find(board => board.id === id)).filter(board => board?.rows.length);
     const range = monthRange(report.month);
-    return { ...report, mainBoards, funBoards, featured, coreBoards: mainBoards.slice(0, 2), extraBoards: mainBoards.slice(2),
+    return { ...report, mainBoards, funBoards, featured, coreBoards: mainBoards.slice(0, 2).filter(board => board.rows.length), extraBoards: mainBoards.slice(2).filter(board => board.rows.length),
+      hasFunBoards: funBoards.some(board => board.rows.length), hasDetails: mainBoards.slice(2).some(board => board.rows.length) || funBoards.some(board => board.rows.length),
       monthLabel: report.month.replace("-", " 年 ") + " 月", monthTitle: report.month.replace("-", "."),
       statusLabel: report.status === "preview" ? "本月实时预览" : "完整月报",
       rangeLabel: displayTime(range.start).slice(0, 10) + "—" + displayTime(range.end - 1).slice(0, 10),
@@ -46,7 +48,7 @@
         "本月为实时预览；月份结束后查看完整月报。更正结果、积分、记录状态或公开资料后重新查看，内容有变化时版本递增。已发送的图片不会同步更新。"] };
   }
   function detailBoards(report, sort = "count", entertainment = false) {
-    return report.funBoards.filter(board => board.sort === sort && (entertainment ? !board.positive : board.positive));
+    return report.funBoards.filter(board => board.rows.length && board.sort === sort && (entertainment ? !board.positive : board.positive));
   }
   return { monthAt, monthRange, displayTime, presentBoard, presentReport, detailBoards };
 });

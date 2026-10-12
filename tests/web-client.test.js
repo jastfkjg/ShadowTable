@@ -24,6 +24,8 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     ...runtime,
   };
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
+  context.window.shadowtableMonthlyReport = require('../miniprogram/monthly-report');
+  context.window.shadowtableMonthlyCard = require('../miniprogram/monthly-report-card');
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
@@ -32,7 +34,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
-      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
       getWebSessionTag() { return webSessionTag; },
@@ -1818,4 +1820,28 @@ test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背�
   c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
   await c.ACTIONS.funRankConfirm();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(c.state.rankMetricsExpanded,false);
   c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
+});
+
+test('网页月报默认完整展示且不重复榜单，荣誉使用头像明细并隐藏空榜', () => {
+  const report = require('../tests/helpers/monthly-fixtures').monthlyFixture();
+  report.mainBoards[1].rows = [];
+  report.funBoards.filter(board => board.metric === 'assassin_hit').forEach(board => { board.rows = []; });
+  report.mainBoards[0].rows[0].nickname = '<img src=x onerror=alert(1)>';
+  const c = client(async () => response({}));
+  c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
+  c.state.monthlyMonth = report.month;
+  const html = c.viewMonthlyReport();
+  assert.doesNotMatch(html, /好人胜率榜|坏人胜率榜|战绩榜|刺客神刀手|暂无满足|<img src=x/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(html, /查看完整月报|收起完整月报|monthly-honor-row/);
+  assert.equal((html.match(/class="monthly-board" aria-label="梅林躲刀王"/g) || []).length, 1);
+  assert.match(html, /monthly-avatar/);
+  assert.match(html, /成功率 80% · 10 次机会/);
+  assert.match(html, /桌边常驻王/);
+  assert.match(html, /生成月报分享图/);
+  for (const board of [...report.mainBoards, ...report.funBoards]) board.rows = [];
+  c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
+  const empty = c.viewMonthlyReport();
+  assert.doesNotMatch(empty, /monthly-featured-heading|monthly-details-toggle|monthly-honor-row|暂无/);
+  assert.match(empty, /有效对局/);
 });

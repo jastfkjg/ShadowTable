@@ -22,6 +22,8 @@ const assets = {
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
+for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
+  assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.

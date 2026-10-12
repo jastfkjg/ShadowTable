@@ -3,43 +3,40 @@
   if (typeof module === "object" && module.exports) module.exports = value;
   else root.shadowtableMonthlyCard = value;
 })(typeof window === "object" ? window : this, function (presentation) {
-  const WIDTH = 1080, MAX_HEIGHT = 3600, HEADER = 528, FOOTER = 224;
+  const WIDTH = 1080, MAX_HEIGHT = 3600, HEADER = 676, FOOTER = 172;
   const BACKGROUND_PATH = "/assets/monthly-report-background.jpg";
   const colors = { bg: "#0e2028", surface: "#1b313b", text: "#f5f0e6", muted: "#adc1cc", accent: "#efd091", border: "#557079", silver: "#a9c2ce", bronze: "#bf9278" };
   const clean = value => String(value ?? "").replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").trim();
   const rowProjection = row => ({ rank: row.rank, tied: row.tied, name: clean(row.nickname) || "新朋友", avatar: /^\/api\/avatars\/[a-f0-9]{64}$/.test(row.avatarUrl || "") ? row.avatarUrl : "",
     value: clean(row.value), secondary: clean(row.secondaryLabel) });
-  const rowHeight = section => section.id === "overall" ? 94 : 116;
+  const rowHeight = section => section.type === "honor" ? 90 : 152;
   function sectionHeight(section) {
-    return section.type === "featured" ? 180 + Math.max(...section.boards.map(board => board.rows.length), 1) * 52
-      : 88 + Math.max(section.rows.length, 1) * rowHeight(section);
+    return 154 + section.rows.length * rowHeight(section) + (section.showGroupTitle ? 100 : 0);
   }
   function imagePaths(card) {
-    return [...new Set([BACKGROUND_PATH, ...card.sections.flatMap(section => section.type === "featured"
-      ? section.boards.flatMap(board => board.rows.map(row => row.avatar)) : section.rows.map(row => row.avatar))].filter(Boolean))];
+    return [...new Set([BACKGROUND_PATH, ...card.sections.filter(section => section.type === "board").flatMap(section => section.rows.map(row => row.avatar))].filter(Boolean))];
   }
   function cards(response, entertainment = false) {
     const report = presentation.presentReport(response);
     if (!report.canShare) throw new Error("这个月还没有有效对局，暂时无法生成月报图片。");
-    const sections = report.coreBoards.map(board => ({ type: "board", id: board.id, title: board.title + " TOP 3", subtitle: board.subtitle, unit: board.unit,
-      rows: board.rows.map(rowProjection), emptyHint: board.emptyHint }));
-    const featured = entertainment ? presentation.detailBoards(report, "count", true).filter(board => board.rows.length).slice(0, 3) : report.featured;
-    // Small leaderboards share a three-column section; ties get full-width rows so nobody disappears.
-    if (featured.length && featured.every(board => board.rows.length <= 3)) sections.push({ type: "featured", title: entertainment ? "本月娱乐榜" : "本月趣味荣誉",
-      boards: featured.map(board => ({ id: board.metric, title: board.title, subtitle: board.label, unit: board.unit, rows: board.rows.map(rowProjection) })) });
-    else for (const board of featured) sections.push({ type: "board", id: board.metric, title: board.title + " TOP 3", subtitle: board.subtitle, unit: board.unit, rows: board.rows.map(rowProjection) });
+    const sections = report.coreBoards.map(board => ({ type: "board", id: board.id, title: board.title, subtitle: board.subtitle, unit: board.unit, rows: board.rows.map(rowProjection) }));
+    const featured = entertainment ? presentation.detailBoards(report, "count", true).slice(0, 3) : report.featured;
+    for (const board of featured) sections.push({ type: "honor", id: board.metric, title: board.title, subtitle: board.label, unit: board.unit,
+      groupTitle: entertainment ? "本月娱乐榜" : "本月趣味荣誉", rows: board.rows.map(rowProjection) });
     const metadata = { kind: "monthly", title: entertainment ? "月度战报 · 娱乐版" : "月度战报", month: report.monthTitle, range: report.rangeLabel,
       asOf: report.asOfLabel, overview: { games: report.overview.games, players: report.overview.players } };
     const pages = []; let current = { ...metadata, sections: [] }, used = HEADER + FOOTER;
     const flush = () => { pages.push(current); current = { ...metadata, sections: [] }; used = HEADER + FOOTER; };
     for (const section of sections) {
-      const maximumRows = Math.floor((MAX_HEIGHT - HEADER - FOOTER - 88) / rowHeight(section));
-      const chunks = section.type === "featured" || section.rows.length <= maximumRows ? [section]
-        : Array.from({ length: Math.ceil(section.rows.length / maximumRows) }, (_, index) => ({ ...section, title: section.title + (index ? " · 续" : ""), rows: section.rows.slice(index * maximumRows, (index + 1) * maximumRows) }));
-      for (const chunk of chunks) {
-        const height = sectionHeight(chunk);
-        if (used + height > MAX_HEIGHT && current.sections.length) flush();
-        current.sections.push(chunk); used += height;
+      // Reserve the repeated honor heading even when the first chunk follows a main board.
+      const maximumRows = Math.floor((MAX_HEIGHT - HEADER - FOOTER - 154 - (section.type === "honor" ? 100 : 0)) / rowHeight(section));
+      for (let offset = 0; offset < section.rows.length; offset += maximumRows) {
+        const chunk = { ...section, continued: offset > 0, rows: section.rows.slice(offset, offset + maximumRows),
+          showGroupTitle: section.type === "honor" && !current.sections.some(item => item.type === "honor") };
+        if (used + sectionHeight(chunk) > MAX_HEIGHT && current.sections.length) {
+          flush(); chunk.showGroupTitle = section.type === "honor";
+        }
+        current.sections.push(chunk); used += sectionHeight(chunk);
       }
     }
     flush();
@@ -49,12 +46,11 @@
     return { width: WIDTH, height: HEADER + card.sections.reduce((height, section) => height + sectionHeight(section), 0) + FOOTER };
   }
   function describe(card) {
-    return [card.month + " " + card.title, "第 " + card.page + " / " + card.pages + " 张", ...card.sections.flatMap(section => section.type === "featured"
-      ? section.boards.flatMap(board => [board.title, ...board.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + board.unit)])
-      : [section.title, ...section.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + section.unit)]), "统计范围 " + card.range, "截至 " + card.asOf].filter(Boolean).join("，");
+    return [card.month + " " + card.title, "第 " + card.page + " / " + card.pages + " 张", ...card.sections.flatMap(section =>
+      [section.title, ...section.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + section.unit)])].join("，");
   }
   function drawCard(ctx, card, avatars = new Map()) {
-    const { height } = dimensions(card), left = 48, right = 1032, inner = right - left;
+    const { height } = dimensions(card), left = 60, right = 1020, inner = right - left;
     const font = (size, weight = 400, serif = false) => { ctx.font = weight + " " + size + "px " + (serif ? "'Songti SC', 'Noto Serif CJK SC', serif" : "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif"); };
     const text = (value, x, y, size, color = colors.text, maxWidth = inner, align = "left", weight = 400, serif = true) => {
       const original = Array.from(clean(value)), chars = original.slice();
@@ -107,87 +103,87 @@
     rect(0,0,WIDTH,height,gradient(ctx.createLinearGradient(0,0,WIDTH,height),[[0,"#10252e"],[.52,colors.bg],[1,"#0a1b23"]],colors.bg));
     const artwork=avatars.get(BACKGROUND_PATH);
     if(artwork?.width && artwork?.height) {
-      ctx.drawImage(artwork,0,artwork.height*.25,artwork.width,artwork.height*.55,0,376,WIDTH,height-676);
-      ctx.drawImage(artwork,0,0,artwork.width,artwork.height*.25,0,0,WIDTH,376);
+      ctx.drawImage(artwork,0,artwork.height*.25,artwork.width,artwork.height*.55,0,490,WIDTH,height-790);
+      ctx.drawImage(artwork,0,0,artwork.width,artwork.height*.25,0,0,WIDTH,490);
       ctx.drawImage(artwork,0,artwork.height*.80,artwork.width,artwork.height*.20,0,height-300,WIDTH,300);
-      rect(0,0,WIDTH,376,gradient(ctx.createLinearGradient(0,0,WIDTH,0),[[0,"rgba(14,32,40,.65)"],[.45,"rgba(14,32,40,.20)"],[.73,"rgba(14,32,40,0)"]],"transparent"));
-      rect(0,316,WIDTH,60,gradient(ctx.createLinearGradient(0,316,0,376),[[0,"rgba(14,32,40,0)"],[1,colors.bg]],"transparent"));
+      rect(0,0,WIDTH,490,gradient(ctx.createLinearGradient(0,0,WIDTH,0),[[0,"rgba(14,32,40,.65)"],[.45,"rgba(14,32,40,.20)"],[.73,"rgba(14,32,40,0)"]],"transparent"));
+      rect(0,410,WIDTH,80,gradient(ctx.createLinearGradient(0,410,0,490),[[0,"rgba(14,32,40,0)"],[1,colors.bg]],"transparent"));
       rect(0,height-300,WIDTH,300,gradient(ctx.createLinearGradient(0,height-300,0,height),[[0,"rgba(14,32,40,0)"],[.35,"rgba(14,32,40,.20)"],[1,"rgba(14,32,40,.12)"]],"transparent"));
     } else {
       icon("moon",738,112,58);
       for(const [x,y] of [[643,60],[836,128],[940,202]])icon("star",x,y,10);
     }
-    text("桌边助手 · ShadowTable",left,64,32,colors.text,700,"left",400);
-    text(card.month,left,182,100,colors.accent,570,"left",600);
-    text(card.title,left,293,card.title.length>6?73:112,colors.text,700,"left",600);
-    text(card.range.slice(5).replace(/—20\d{2}\./," — "),left,345,27,colors.muted,680);
-    line(left,376,right,376,colors.accent);
-    for(const x of [left,right]) { ctx.fillStyle=colors.accent;polygon([[x,370],[x+4,376],[x,382],[x-4,376]]); }
-    [[card.overview.games,"有效对局","swords"],[card.overview.players,"参赛玩家","players"]].forEach(([value,label,kind],index)=>{
-      const x=left+index*492;
-      ctx.strokeStyle=colors.silver;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x+106,448,43,0,Math.PI*2);ctx.stroke();
-      icon(kind,x+106,448,44,kind==="players"?colors.silver:colors.accent);
-      text(String(value),x+302,463,fit(value,82,240),colors.accent,240,"center",600);
-      text(label,x+302,501,29,colors.text,240,"center");
-      if(!index)line(x+492,407,x+492,505,colors.border);
+    text("桌边助手 · ShadowTable",left,80,32,colors.text,700);
+    text(card.month,left,212,84,colors.accent,540);
+    text(card.title,left,350,card.title.length>6?76:112,colors.text,960,"left",600);
+    text(card.range.slice(5).replace(/—20\d{2}\./," — "),left,428,26,colors.muted,680,"left",400,false);
+    line(left,490,right,490,colors.accent);
+    [[card.overview.games,"有效对局"],[card.overview.players,"参赛玩家"]].forEach(([value,label],index)=>{
+      const x=left+index*480;
+      text(String(value),x+185,613,fit(value,96,170),colors.accent,170,"right");
+      text(label,x+215,600,30,colors.muted,235,"left",500,false);
+      if(!index)line(x+480,530,x+480,628,colors.border);
     });
+    line(left,HEADER-2,right,HEADER-2,colors.border);
     let cursor=HEADER;
     const boardIcon = id => id==="points"?"crown":id==="overall"?"swords":id?.includes("shield")?"shield":id?.includes("assassin")?"moon":"sword";
+    const drawValue = (row, unit, y, size = 70) => {
+      text(unit,right,y-1,28,colors.muted,42,"right",400,false);
+      text(row.value,right-44,y,fit(row.value,size,212,24),row.rank===1?colors.accent:colors.text,212,"right");
+    };
     for(const section of card.sections) {
-      const top=cursor;line(left,top,right,top,colors.accent);
-      icon(section.type==="featured"?"star":boardIcon(section.id),left+30,top+41,44);
-      if(section.type==="featured") {
-        text(section.title,left+78,top+55,43,colors.text,650,"left",600);
-        text("按次数排名 · 每榜前三",right,top+52,24,colors.muted,320,"right");
-      } else {
-        const heading=section.title.split(" TOP 3")[0];font(44,600,true);
-        const titleWidth=Math.min(ctx.measureText(heading).width,440);
-        text(heading,left+78,top+55,44,colors.text,440,"left",600);
-        text("TOP 3"+(section.title.includes("续")?" · 续":""),left+92+titleWidth,top+55,42,colors.accent,230,"left",600);
-        text(section.subtitle,right,top+52,24,colors.muted,350,"right");
+      let top=cursor;
+      if(section.showGroupTitle) {
+        icon("star",left+25,top+47,44);
+        text(section.groupTitle,left+73,top+63,50,colors.text,650,"left",600);
+        text("按次数 · 每榜前三",right,top+60,24,colors.accent,285,"right",400,false);
+        top+=100;
       }
-      line(left,top+78,right,top+78,colors.accent);
-      if(section.type==="featured") {
-        const columnWidth=inner/section.boards.length;
-        section.boards.forEach((board,index)=>{
-          const x=left+index*columnWidth+22,width=columnWidth-44;
-          if(index)line(x-22,top+100,x-22,top+sectionHeight(section)-20,colors.border);
-          icon(boardIcon(board.id),x+24,top+119,44);
-          text(board.title,x+70,top+122,31,colors.accent,width-66,"left",600);
-          text(board.subtitle,x+70,top+153,22,colors.muted,width-66);
-          board.rows.forEach((row,i)=>{
-            const y=top+196+i*52;
-            text(row.rank,x+4,y,30,rankColor(row.rank),32,"left",600);
-            text(row.name,x+58,y,29,colors.text,Math.max(70,width-142),"left",500);
-            text(row.value+" "+board.unit,x+width,y,fit(row.value+" "+board.unit,30,85),colors.text,85,"right");
-            if(i<board.rows.length-1)line(x,y+13,x+width,y+13,colors.border);
-          });
-        });
-      } else {
-        const step=rowHeight(section),compact=section.id==="overall";
-        if(!section.rows.length)text(section.emptyHint||"暂无公开成绩",left+30,top+144,30,colors.muted);
+      if(section.type==="honor") {
+        ctx.strokeStyle="#717663"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(left+46,top+62,44,0,Math.PI*2); ctx.stroke();
+        icon(boardIcon(section.id),left+46,top+62,50);
+        text(section.title+(section.continued?" · 续":""),left+126,top+60,50,colors.accent,inner-126,"left",600);
+        text(section.subtitle,left+126,top+102,28,colors.muted,inner-126,"left",400,false);
         section.rows.forEach((row,index)=>{
-          const y=top+88+index*step,cy=y+step/2;
-          laurel(row.rank,left+58,cy-3,row.tied);avatar(row,left+197,cy-2,compact?39:46);
-          text(row.name,left+284,cy+(compact?13:-1),42,colors.text,compact?175:354,"left",600);
-          if(compact)text(row.secondary,left+471,cy+13,26,colors.muted,224);
-          else text(row.secondary,left+284,cy+35,26,colors.muted,555);
-          const result=row.value+section.unit;
-          text(result,right-12,cy+17,fit(result,compact?60:68,300),row.rank===1?colors.accent:colors.text,300,"right",600);
-          if(index<section.rows.length-1)line(left,y+step-2,right,y+step-2,colors.border);
+          const y=top+174+index*90;
+          text(String(row.rank).padStart(2,"0"),left+126,y,34,rankColor(row.rank),56);
+          text(row.name,left+200,y,46,colors.text,row.tied?410:495,"left",500,false);
+          if(row.tied) {
+            font(46,500,false);
+            const nameWidth=Math.min(ctx.measureText(row.name).width,410);
+            text("并列",left+218+nameWidth,y-3,24,colors.muted,70,"left",400,false);
+          }
+          drawValue(row,section.unit,y,66);
+        });
+        line(left,cursor+sectionHeight(section)-1,right,cursor+sectionHeight(section)-1,colors.border);
+      } else {
+        icon(boardIcon(section.id),left+25,top+55,44);
+        text(section.title,left+73,top+73,52,colors.text,inner-240,"left",600);
+        text("TOP 3"+(section.continued?" · 续":""),right,top+65,26,colors.accent,220,"right",400,false);
+        text(section.subtitle,left+73,top+111,26,colors.muted,inner-73,"left",400,false);
+        section.rows.forEach((row,index)=>{
+          const y=top+134+index*152,cy=y+76;
+          if(row.rank===1) rect(left,y,inner,152,"rgba(229,198,139,.035)");
+          laurel(row.rank,left+40,cy-1,false); avatar(row,left+161,cy-1,46);
+          text(row.name,left+240,cy-4,46,colors.text,row.tied?365:450,"left",600,false);
+          if(row.tied) {
+            font(46,600,false);
+            const nameWidth=Math.min(ctx.measureText(row.name).width,365);
+            text("并列",left+258+nameWidth,cy-7,23,colors.muted,70,"left",400,false);
+          }
+          text(row.secondary,left+240,cy+36,26,colors.muted,440,"left",400,false);
+          drawValue(row,section.unit,cy+20,74);
+          if(index<section.rows.length-1)line(left,y+151,right,y+151,colors.border);
         });
       }
       cursor+=sectionHeight(section);
     }
-    line(left,cursor,right,cursor,colors.border);
-    text("统计范围：北京时间 "+card.range,left,cursor+44,22,colors.muted,720);
-    text("榜单仅展示已公开玩家 · 趣味榜仅统计完整记录",left,cursor+79,22,colors.muted,850);
-    text("截至 "+card.asOf,left,cursor+112,21,colors.muted,760);
-    text(card.page+"/"+card.pages,right,cursor+112,22,colors.accent,190,"right");
-    text("在桌边，遇见更好的朋友",left,cursor+182,29,colors.accent,650);
-    line(left+365,cursor+173,right-270,cursor+173,colors.border);
-    text("桌边助手 · ShadowTable",right,cursor+172,22,colors.text,275,"right");
-    text("GOOD PLAYERS  BETTER STORIES",right,cursor+196,12,colors.muted,275,"right",400,false);
+    // The footer is a signature, without statistical/disclosure copy.
+    text("在桌边，遇见更好的朋友",left,cursor+112,33,colors.accent,650);
+    text("桌边助手",right,cursor+91,28,colors.text,240,"right");
+    text("ShadowTable",right,cursor+128,23,colors.muted,240,"right");
+    if(card.pages>1)text(card.page+" / "+card.pages,right,cursor+37,23,colors.muted,180,"right",400,false);
+
   }
   return { cards, dimensions, describe, drawCard, imagePaths, BACKGROUND_PATH, MAX_HEIGHT };
 });

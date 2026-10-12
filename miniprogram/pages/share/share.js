@@ -13,13 +13,13 @@ async function readLeaderboard(query) {
   }
 }
 Page({
-  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true, pageTitle: "分享成绩", pageIndex: 0, pageCount: 1 },
+  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true, pageTitle: "分享成绩", monthly: false, pageIndex: 0, pageCount: 1 },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ imageMenu: typeof wx.showShareImageMenu === "function" && (!wx.canIUse || wx.canIUse("showShareImageMenu")) });
     try { this.selection = cards.parseSelection(options); }
     catch (error) { this.setData({ loading: false, error: error.message }); return; }
-    if (this.selection.kind === "monthly") this.setData({ pageTitle: "分享月报" });
+    if (this.selection.kind === "monthly") this.setData({ pageTitle: "分享月报", monthly: true });
     return this.load();
   },
   onReady() { this.canvasReady = true; if (this.card) return this.render(); },
