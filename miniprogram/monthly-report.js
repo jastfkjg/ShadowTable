@@ -18,14 +18,15 @@
     return date.getUTCFullYear() + "." + pad(date.getUTCMonth() + 1) + "." + pad(date.getUTCDate()) + " " + pad(date.getUTCHours()) + ":" + pad(date.getUTCMinutes());
   }
   function presentBoard(board) {
+    const countUnit = board.sort === "rate" ? (/^percival_/.test(board.metric) ? "局" : "次") : board.unit;
     const rows = board.rows.map(row => {
       const value = board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
       return { ...row, initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
-        secondaryLabel: board.sort ? (board.positive ? "成功 " : "发生 ") + row.count + " " + (board.sort === "count" ? board.unit : "次") + " / " + row.opportunities + " 次有效机会"
+        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : board.label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
           : board.id === "points" ? row.scoredGames + " 场计分局" + (row.adjustmentPoints ? " · 调整 " + (row.adjustmentPoints > 0 ? "+" : "") + row.adjustmentPoints + " 分" : "")
           : row.wins + " 胜 / " + row.total + " 局" };
     });
-    return { ...board, rows, emptyHint: board.sort === "rate" ? "暂无满足 5 次有效机会的公开玩家" : board.threshold === 10 ? "暂无满足 10 局条件的公开玩家" : "暂无满足条件的公开记录" };
+    return { ...board, subtitle: board.id === "points" ? "本月积分" : board.subtitle, rows, emptyHint: board.sort === "rate" ? "暂无满足 5 次有效机会的公开玩家" : board.threshold === 10 ? "暂无满足 10 局条件的公开玩家" : "暂无满足条件的公开记录" };
   }
   function presentReport(report) {
     const mainBoards = report.mainBoards.map(presentBoard), funBoards = report.funBoards.map(presentBoard);

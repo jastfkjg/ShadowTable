@@ -261,16 +261,6 @@ class Store {
     for (const { uid, ...player } of participants) {
       player.fun = projections.find(p => p.uid === uid).fun;
       this.initializeLeaderboardProfile(uid);
-      if (player.score?.status === "scored" && !this.db.prepare("SELECT 1 FROM match_players WHERE match_id=? AND uid=?").get(match.id, uid)) {
-        const streak = player.outcome === "win" ? this.streakFor(uid).current + 1 : 0;
-        const bonus = record.scorePolicy?.streakBonus;
-        player.score = { ...player.score, breakdown: [...player.score.breakdown], streak };
-        if (bonus?.enabled && streak === bonus.threshold) {
-          player.score.breakdown.push({ id: "streak", label: bonus.label, points: bonus.points });
-          player.score.total += bonus.points;
-        }
-        players.find(p => p.uid === uid).score = player.score;
-      }
       const result = insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
       if (result.changes) {
         this.writeFun(match, uid, player.fun);
@@ -340,14 +330,7 @@ class Store {
     for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
     const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(CASE WHEN created>=? AND created<? THEN delta ELSE 0 END),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=?").get(monthStart,monthEnd,uid);
     return { identityType: uid.split(":")[0], ...overview, byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
-      score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual, ...this.streakFor(uid) } };
-  }
-  streakFor(uid) {
-    const rows = this.db.prepare(`SELECT p.outcome FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
-      WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
-    let current = 0, best = 0;
-    for (const row of rows) { current = row.outcome === "win" ? current + 1 : 0; best = Math.max(best,current); }
-    return { current, best };
+      score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual } };
   }
   correctMatch(id, input) {
     if (!this.inTransaction) throw Error("对局更正必须在事务中执行");
@@ -381,7 +364,7 @@ class Store {
       player.outcome = player.faction === match.winner ? "win" : "loss";
       this.db.prepare("UPDATE match_players SET outcome=?,snapshot=? WHERE match_id=? AND uid=?").run(player.outcome,JSON.stringify(player),id,uid);
       this.db.prepare("UPDATE match_scores SET status='scored' WHERE match_id=? AND uid=?").run(id,uid);
-      this.rebuildScores(uid);
+      this.rebuildScores(uid, id);
     }
     this.rebuildFun(match, this.matchParticipants(match));
     this.syncScoreRooms(id);
@@ -416,7 +399,7 @@ class Store {
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision}};
   }
   syncScoreRooms(resultId = null) {
-    // Synchronize any still-visible completed table, including later streak awards.
+    // Synchronize still-visible completed tables with their saved result and score.
     for (const roomRow of this.db.prepare("SELECT code,state FROM rooms WHERE json_extract(state,'$.matchRecord.id') IS NOT NULL").all()) {
       const room = JSON.parse(roomRow.state), archived = this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(room.matchRecord.id);
       if (!archived) continue;
@@ -427,17 +410,13 @@ class Store {
       this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room),room.code);
     }
   }
-  rebuildScores(uid) {
+  rebuildScores(uid, id) {
     const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM active_match_scores s
       JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN matches m ON m.id=s.match_id
-      WHERE s.uid=? AND s.status='scored' ORDER BY s.ended,s.rowid`).all(uid);
-    let streak = 0;
+      WHERE s.uid=? AND s.match_id=? AND s.status='scored'`).all(uid,id);
     for (const row of rows) {
       const player=JSON.parse(row.player), game=JSON.parse(row.game);
-      streak = player.outcome === "win" ? streak + 1 : 0;
-      const score = {...scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null),streak};
-      const bonus = game.scorePolicy.streakBonus;
-      if (bonus.enabled && streak === bonus.threshold) {score.breakdown.push({id:"streak",label:bonus.label,points:bonus.points});score.total+=bonus.points;}
+      const score = scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null);
       const override = JSON.parse(row.score).manualOverride;
       if (override) {
         score.manualOverride = override;
@@ -539,7 +518,7 @@ class Store {
       if (change.points===null) delete score.manualOverride;
       else score.manualOverride={points:change.points,reason,created};
       this.db.prepare("UPDATE match_scores SET snapshot=? WHERE match_id=? AND uid=?").run(JSON.stringify(score),id,change.uid);
-      this.rebuildScores(change.uid);
+      this.rebuildScores(change.uid, id);
     }
     const match=JSON.parse(this.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id).snapshot);
     match.scoreRevision=data.revision+1;

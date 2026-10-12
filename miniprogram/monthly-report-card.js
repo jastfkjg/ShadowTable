@@ -3,7 +3,7 @@
   if (typeof module === "object" && module.exports) module.exports = value;
   else root.shadowtableMonthlyCard = value;
 })(typeof window === "object" ? window : this, function (presentation) {
-  const WIDTH = 1080, MAX_HEIGHT = 3600, HEADER = 572, FOOTER = 224, HIGHLIGHT = 104;
+  const WIDTH = 1080, MAX_HEIGHT = 3600, HEADER = 528, FOOTER = 224;
   const BACKGROUND_PATH = "/assets/monthly-report-background.jpg";
   const colors = { bg: "#0e2028", surface: "#1b313b", text: "#f5f0e6", muted: "#adc1cc", accent: "#efd091", border: "#557079", silver: "#a9c2ce", bronze: "#bf9278" };
   const clean = value => String(value ?? "").replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").trim();
@@ -29,7 +29,7 @@
       boards: featured.map(board => ({ id: board.metric, title: board.title, subtitle: board.label, unit: board.unit, rows: board.rows.map(rowProjection) })) });
     else for (const board of featured) sections.push({ type: "board", id: board.metric, title: board.title + " TOP 3", subtitle: board.subtitle, unit: board.unit, rows: board.rows.map(rowProjection) });
     const metadata = { kind: "monthly", title: entertainment ? "月度战报 · 娱乐版" : "月度战报", month: report.monthTitle, range: report.rangeLabel,
-      status: report.statusLabel, version: report.versionLabel, asOf: report.asOfLabel, overview: { games: report.overview.games, players: report.overview.players, activeDays: report.overview.activeDays } };
+      asOf: report.asOfLabel, overview: { games: report.overview.games, players: report.overview.players } };
     const pages = []; let current = { ...metadata, sections: [] }, used = HEADER + FOOTER;
     const flush = () => { pages.push(current); current = { ...metadata, sections: [] }; used = HEADER + FOOTER; };
     for (const section of sections) {
@@ -42,19 +42,16 @@
         current.sections.push(chunk); used += height;
       }
     }
-    const highlight = response.highlights.map(clean).join(" ");
-    if (highlight && used + HIGHLIGHT <= MAX_HEIGHT) current.highlight = highlight;
-    else if (highlight) { flush(); current.highlight = highlight; }
     flush();
     return pages.map((page, index) => ({ ...page, page: index + 1, pages: pages.length }));
   }
   function dimensions(card) {
-    return { width: WIDTH, height: HEADER + card.sections.reduce((height, section) => height + sectionHeight(section), 0) + (card.highlight ? HIGHLIGHT : 0) + FOOTER };
+    return { width: WIDTH, height: HEADER + card.sections.reduce((height, section) => height + sectionHeight(section), 0) + FOOTER };
   }
   function describe(card) {
-    return [card.month + " " + card.title, card.status, card.version, "第 " + card.page + " / " + card.pages + " 张", ...card.sections.flatMap(section => section.type === "featured"
+    return [card.month + " " + card.title, "第 " + card.page + " / " + card.pages + " 张", ...card.sections.flatMap(section => section.type === "featured"
       ? section.boards.flatMap(board => [board.title, ...board.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + board.unit)])
-      : [section.title, ...section.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + section.unit)]), card.highlight, "统计范围 " + card.range, "截至 " + card.asOf].filter(Boolean).join("，");
+      : [section.title, ...section.rows.map(row => (row.tied ? "并列" : "") + "第" + row.rank + "名 " + row.name + " " + row.value + section.unit)]), "统计范围 " + card.range, "截至 " + card.asOf].filter(Boolean).join("，");
   }
   function drawCard(ctx, card, avatars = new Map()) {
     const { height } = dimensions(card), left = 48, right = 1032, inner = right - left;
@@ -80,7 +77,6 @@
       else if (kind === "moon") { ctx.beginPath();ctx.arc(0,0,21,.30,Math.PI*1.73);ctx.bezierCurveTo(-7,-17,-14,8,20,7);ctx.closePath();ctx.stroke(); }
       else if (kind === "shield") { polygon([[-19,-21],[19,-21],[18,5],[10,17],[0,25],[-10,17],[-18,5]],false); line(0,-18,0,20,color,2); }
       else if (kind === "players") { for (const [a,b,r] of [[0,-12,8],[-16,-8,6],[16,-8,6]]) { ctx.beginPath();ctx.arc(a,b,r,0,Math.PI*2);ctx.fill(); } for (const [a,b,w,h] of [[-10,0,20,22],[-25,4,12,17],[13,4,12,17]]) { ctx.beginPath();ctx.moveTo(a,b+h);ctx.lineTo(a,b+7);ctx.quadraticCurveTo(a+w/2,b-7,a+w,b+7);ctx.lineTo(a+w,b+h);ctx.closePath();ctx.fill(); } }
-      else if (kind === "calendar") { ctx.strokeRect(-20,-18,40,39);line(-20,-8,20,-8,color,2);line(-11,-24,-11,-13,color,3);line(11,-24,11,-13,color,3);for(let r=0;r<2;r++)for(let c=0;c<3;c++)rect(-12+c*10,r*11,4,4,color); }
       else { polygon(Array.from({length:8},(_,i)=>{const angle=-Math.PI/2+i*Math.PI/4,r=i%2?5:23;return [Math.cos(angle)*r,Math.sin(angle)*r];})); }
       ctx.restore();
     };
@@ -111,32 +107,29 @@
     rect(0,0,WIDTH,height,gradient(ctx.createLinearGradient(0,0,WIDTH,height),[[0,"#10252e"],[.52,colors.bg],[1,"#0a1b23"]],colors.bg));
     const artwork=avatars.get(BACKGROUND_PATH);
     if(artwork?.width && artwork?.height) {
-      ctx.drawImage(artwork,0,artwork.height*.25,artwork.width,artwork.height*.55,0,420,WIDTH,height-720);
-      ctx.drawImage(artwork,0,0,artwork.width,artwork.height*.25,0,0,WIDTH,420);
+      ctx.drawImage(artwork,0,artwork.height*.25,artwork.width,artwork.height*.55,0,376,WIDTH,height-676);
+      ctx.drawImage(artwork,0,0,artwork.width,artwork.height*.25,0,0,WIDTH,376);
       ctx.drawImage(artwork,0,artwork.height*.80,artwork.width,artwork.height*.20,0,height-300,WIDTH,300);
-      rect(0,0,WIDTH,420,gradient(ctx.createLinearGradient(0,0,WIDTH,0),[[0,"rgba(14,32,40,.65)"],[.45,"rgba(14,32,40,.20)"],[.73,"rgba(14,32,40,0)"]],"transparent"));
-      rect(0,360,WIDTH,60,gradient(ctx.createLinearGradient(0,360,0,420),[[0,"rgba(14,32,40,0)"],[1,colors.bg]],"transparent"));
+      rect(0,0,WIDTH,376,gradient(ctx.createLinearGradient(0,0,WIDTH,0),[[0,"rgba(14,32,40,.65)"],[.45,"rgba(14,32,40,.20)"],[.73,"rgba(14,32,40,0)"]],"transparent"));
+      rect(0,316,WIDTH,60,gradient(ctx.createLinearGradient(0,316,0,376),[[0,"rgba(14,32,40,0)"],[1,colors.bg]],"transparent"));
       rect(0,height-300,WIDTH,300,gradient(ctx.createLinearGradient(0,height-300,0,height),[[0,"rgba(14,32,40,0)"],[.35,"rgba(14,32,40,.20)"],[1,"rgba(14,32,40,.12)"]],"transparent"));
     } else {
       icon("moon",738,112,58);
       for(const [x,y] of [[643,60],[836,128],[940,202]])icon("star",x,y,10);
     }
     text("桌边助手 · ShadowTable",left,64,32,colors.text,700,"left",400);
-    ctx.strokeStyle=colors.accent;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(871,34);ctx.lineTo(1016,34);ctx.quadraticCurveTo(1032,34,1032,50);ctx.lineTo(1032,57);ctx.quadraticCurveTo(1032,73,1016,73);ctx.lineTo(871,73);ctx.quadraticCurveTo(855,73,855,57);ctx.lineTo(855,50);ctx.quadraticCurveTo(855,34,871,34);ctx.stroke();
-    text(card.status,944,61,24,colors.accent,157,"center",400);
     text(card.month,left,182,100,colors.accent,570,"left",600);
     text(card.title,left,293,card.title.length>6?73:112,colors.text,700,"left",600);
-    text("这个月，谁是桌边的传奇？",left,345,32,colors.text,660);
-    text(card.range.slice(5).replace(/—20\d{2}\./," — "),left,396,27,colors.muted,680);
-    line(left,420,right,420,colors.accent);
-    for(const x of [left,right]) { ctx.fillStyle=colors.accent;polygon([[x,414],[x+4,420],[x,426],[x-4,420]]); }
-    [[card.overview.games,"有效对局","swords"],[card.overview.players,"参赛玩家","players"],[card.overview.activeDays,"活跃天数","calendar"]].forEach(([value,label,kind],index)=>{
-      const x=left+index*328;
-      ctx.strokeStyle=colors.silver;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x+58,492,43,0,Math.PI*2);ctx.stroke();
-      icon(kind,x+58,492,44,kind==="players"?colors.silver:colors.accent);
-      text(String(value),x+196,507,fit(value,82,182),colors.accent,182,"center",600);
-      text(label,x+196,545,29,colors.text,215,"center");
-      if(index<2)line(x+328,451,x+328,549,colors.border);
+    text(card.range.slice(5).replace(/—20\d{2}\./," — "),left,345,27,colors.muted,680);
+    line(left,376,right,376,colors.accent);
+    for(const x of [left,right]) { ctx.fillStyle=colors.accent;polygon([[x,370],[x+4,376],[x,382],[x-4,376]]); }
+    [[card.overview.games,"有效对局","swords"],[card.overview.players,"参赛玩家","players"]].forEach(([value,label,kind],index)=>{
+      const x=left+index*492;
+      ctx.strokeStyle=colors.silver;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x+106,448,43,0,Math.PI*2);ctx.stroke();
+      icon(kind,x+106,448,44,kind==="players"?colors.silver:colors.accent);
+      text(String(value),x+302,463,fit(value,82,240),colors.accent,240,"center",600);
+      text(label,x+302,501,29,colors.text,240,"center");
+      if(!index)line(x+492,407,x+492,505,colors.border);
     });
     let cursor=HEADER;
     const boardIcon = id => id==="points"?"crown":id==="overall"?"swords":id?.includes("shield")?"shield":id?.includes("assassin")?"moon":"sword";
@@ -186,22 +179,11 @@
       }
       cursor+=sectionHeight(section);
     }
-    if(card.highlight) {
-      line(left,cursor,right,cursor,colors.accent);icon("star",left+26,cursor+40,36);
-      text("本月高光",left+66,cursor+52,32,colors.accent,168,"left",600);line(left+230,cursor+24,left+230,cursor+60,colors.accent);
-      let chars=Array.from(card.highlight),y=cursor+50;
-      for(let i=0;chars.length&&i<2;i++,y+=34) {
-        let count=chars.length;font(28,400,true);
-        while(count>1&&ctx.measureText(chars.slice(0,count).join("")).width>730)count--;
-        text(chars.splice(0,count).join(""),left+258,y,28,colors.text,730);
-      }
-      cursor+=HIGHLIGHT;
-    }
     line(left,cursor,right,cursor,colors.border);
     text("统计范围：北京时间 "+card.range,left,cursor+44,22,colors.muted,720);
     text("榜单仅展示已公开玩家 · 趣味榜仅统计完整记录",left,cursor+79,22,colors.muted,850);
     text("截至 "+card.asOf,left,cursor+112,21,colors.muted,760);
-    text(card.version+" · "+card.page+"/"+card.pages,right,cursor+112,22,colors.accent,190,"right");
+    text(card.page+"/"+card.pages,right,cursor+112,22,colors.accent,190,"right");
     text("在桌边，遇见更好的朋友",left,cursor+182,29,colors.accent,650);
     line(left+365,cursor+173,right-270,cursor+173,colors.border);
     text("桌边助手 · ShadowTable",right,cursor+172,22,colors.text,275,"right");

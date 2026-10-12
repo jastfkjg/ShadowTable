@@ -3,7 +3,7 @@ const monthly = require("../../monthly-report");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const { backToMe } = require("../../profile");
 Page({
-  data: { ...initialPlayerCardData, month: "", maxMonth: monthly.monthAt(), minMonth: "2000-01", report: null, loading: true, error: "", detailsExpanded: false, rulesExpanded: false, entertainment: false, sort: "count", detailBoards: [], shareOpening: false },
+  data: { ...initialPlayerCardData, month: "", maxMonth: monthly.monthAt(), minMonth: "2000-01", report: null, loading: true, error: "", detailsExpanded: false, entertainment: false, sort: "count", detailBoards: [], shareOpening: false },
   ...playerCardMethods(api),
   onLoad(options = {}) { this.alive = true; this.foreground = true; this.setData({ month: /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") ? options.month : monthly.monthAt() }); },
   onShow() { this.foreground = true; return this.load(); },
@@ -29,7 +29,6 @@ Page({
   chooseMonth(e) { const month = e.detail.value; if (month !== this.data.month) return this.load(month); },
   retry() { return this.load(); },
   toggleDetails() { this.setData({ detailsExpanded: !this.data.detailsExpanded }); },
-  toggleRules() { this.setData({ rulesExpanded: !this.data.rulesExpanded }); },
   chooseSort(e) { const sort = e.currentTarget.dataset.id; if (["count", "rate"].includes(sort) && this.data.report) this.setData({ sort, detailBoards: monthly.detailBoards(this.data.report, sort, this.data.entertainment) }); },
   chooseEdition(e) { const entertainment = e.currentTarget.dataset.id === "fun"; if (this.data.report) this.setData({ entertainment, detailBoards: monthly.detailBoards(this.data.report, this.data.sort, entertainment) }); },
   share() {

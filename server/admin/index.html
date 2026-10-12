@@ -97,7 +97,7 @@
                   <div class="score-field"><label for="player-score-mode">调整方式</label><select id="player-score-mode"><option value="delta" data-hint="在当前总积分上增加或扣除">加减积分</option><option value="set" data-hint="将总积分调整到指定数值">设置总积分</option></select></div>
                   <div class="score-field"><label id="player-score-points-label" for="player-score-points">调整分值</label><input id="player-score-points" type="number" step="1" min="-1000000" max="1000000" required placeholder="如 5 或 -5" aria-describedby="player-score-help player-score-preview" /></div>
                 </div>
-                <p id="player-score-help" class="score-hint">正数加分，负数扣分；不改变胜负、连胜或场均积分。</p>
+                <p id="player-score-help" class="score-hint">正数加分，负数扣分；不改变胜负或场均积分。</p>
                 <div class="score-form-footer"><p id="player-score-preview" class="score-preview" aria-live="polite">输入分值，预览调整后的总积分。</p><button id="player-score-submit" class="primary" disabled>确认调整玩家积分</button></div>
               </form>
               <details class="score-history"><summary>调整记录</summary><div id="player-score-history"></div><button id="player-score-history-more" hidden>加载更多调整记录</button></details>
@@ -138,12 +138,12 @@
             <div id="match-score-editor" class="score-editor" hidden>
               <form id="match-score-form">
                 <h3>本局玩家积分</h3>
-                <p class="score-hint">直接修改得分，或恢复自动计分。胜负与连胜保持原结果。</p>
+                <p class="score-hint">直接修改得分，或恢复自动计分。胜负保持原结果。</p>
                 <div id="match-score-players"></div>
                 <div class="score-form-footer"><p id="match-score-preview" class="score-preview" aria-live="polite"></p><button id="match-score-submit" class="primary" disabled>保存本局积分调整</button></div>
               </form>
               <details id="correction-editor" class="score-correction">
-                <summary>更正对局结果<span>同步重算战绩、连胜及适用的积分</span></summary>
+                <summary>更正对局结果<span>同步重算战绩及适用的积分</span></summary>
                 <form id="correction-form">
                   <div class="score-fields">
                     <div class="score-field"><label for="correction-result">实际结束方式</label><select id="correction-result" required disabled></select></div>

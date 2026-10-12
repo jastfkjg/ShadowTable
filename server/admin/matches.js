@@ -387,7 +387,7 @@
             el("small", p.uid),
             el(
               "p",
-              `有效局 ${p.before.games} → ${p.after.games} · 胜场 ${p.before.wins} → ${p.after.wins} · 积分 ${p.before.points} → ${p.after.points} · 当前连胜 ${p.before.streak} → ${p.after.streak} · 趣味次数合计 ${p.before.fun} → ${p.after.fun}`,
+              `有效局 ${p.before.games} → ${p.after.games} · 胜场 ${p.before.wins} → ${p.after.wins} · 积分 ${p.before.points} → ${p.after.points} · 趣味次数合计 ${p.before.fun} → ${p.after.fun}`,
             ),
           );
           return block;

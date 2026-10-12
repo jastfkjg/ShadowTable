@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(__
 const context = { window: {}, global: {}, console }; vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
 const safe = value => String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const css = file => fs.readFileSync(path.join(root, file), "utf8").replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name)))).replace(/^page\s*\{/m, "body {").replace(/> view/g, "> div").replace(/\.monthly-highlight text/g, ".monthly-highlight span").replace(/\.monthly-footnote text/g, ".monthly-footnote span").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+const css = file => fs.readFileSync(path.join(root, file), "utf8").replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name)))).replace(/^page\s*\{/m, "body {").replace(/> view/g, "> div").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
   if (node.tag === "wx-app-nav") return html(factory("components/app-nav/app-nav.wxml")({ ...node.attr, statusBarHeight: 24, navHeight: 44, totalHeight: 68 }));
@@ -31,10 +31,10 @@ for (const board of [...fixture.mainBoards, ...fixture.funBoards]) for (const ro
   if (avatar) { row.avatarUrl = "/api/avatars/" + avatar.hash; row.avatarSrc = avatar.path; }
 }
 const report = monthly.presentReport(fixture);
-const data = { month: report.month, report, loading: false, error: "", detailsExpanded: false, rulesExpanded: false, entertainment: false, sort: "count", detailBoards: monthly.detailBoards(report), shareOpening: false };
+const data = { month: report.month, report, loading: false, error: "", detailsExpanded: false, entertainment: false, sort: "count", detailBoards: monthly.detailBoards(report), shareOpening: false };
 const scenes = {
   summary: data,
-  details: { ...data, detailsExpanded: true, rulesExpanded: true },
+  details: { ...data, detailsExpanded: true },
   empty: { ...data, report: monthly.presentReport({ ...fixture, overview: { games: 0, players: 0, activeDays: 0 }, mainBoards: fixture.mainBoards.map(board => ({ ...board, rows: [] })), featuredIds: [], highlights: [] }) },
   long: { ...data, report: monthly.presentReport({ ...fixture, mainBoards: fixture.mainBoards.map((board, index) => index ? board : { ...board, rows: [{ ...board.rows[0], nickname: "非常非常长的玩家昵称用于检查换行", points: -123456789, rank: 1, tied: true }] }) }) },
 };

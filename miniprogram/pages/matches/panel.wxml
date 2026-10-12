@@ -21,14 +21,16 @@
     <block wx:for="{{records}}" wx:key="id">
       <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day"><text>{{item.dayShortLabel || item.dayLabel}}</text><text wx:if="{{item.yearLabel}}" class="match-year">{{item.yearLabel}}</text><view class="match-day-line" aria-hidden="true"></view></view>
       <view class="match-entry {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}}">
-        <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
-          <view class="match-top"><text class="match-board">{{item.boardName}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
+        <button hover-class="match-toggle-pressed" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
+          <view class="match-top"><text class="match-board">{{item.boardTitle || item.boardName}}</text><text class="match-outcome {{item.outcome}}">{{item.outcomeLabel}}</text></view>
           <view class="match-secondary"><view class="match-identity"><text class="match-role">{{item.role}}</text><text class="match-context">{{item.factionLabel}} · {{item.capacity}} 人</text></view><view class="match-arrow {{item.expanded?'expanded':''}}" aria-hidden="true"></view></view>
-          <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored'?'accent':''}}">{{item.scoreLabel}}</text></view>
           <view wx:if="{{item.funHighlights.length}}" class="match-highlights"><text wx:for="{{item.funHighlights}}" wx:for-item="highlight" wx:key="id" class="match-highlight {{highlight.color}}">{{highlight.label}}</text></view>
           <view wx:elif="{{item.funLabel}}" class="match-fun-label">{{item.funLabel}}</view>
         </button>
-        <button wx:if="{{item.replayAvailable}}" class="match-replay-entry" bindtap="historyOpenReplay" data-id="{{item.id}}" hover-class="none" aria-label="查看{{item.boardName}}的复盘"><text>查看复盘</text><view class="match-arrow" aria-hidden="true"></view></button>
+        <view class="match-footer">
+          <view class="match-meta"><text>{{item.timeLabel}}</text><text class="match-meta-dot" aria-hidden="true">·</text><text class="{{item.score.status==='scored'?'accent':''}}">{{item.scoreLabel}}</text></view>
+          <button wx:if="{{item.replayAvailable}}" class="match-replay-entry" bindtap="historyOpenReplay" data-id="{{item.id}}" hover-class="match-replay-pressed" aria-label="查看{{item.boardName}}的复盘"><view class="match-replay-control"><image class="match-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
+        </view>
         <template wx:if="{{item.expanded}}" is="matchDetails" data="{{item}}" />
       </view>
     </block>

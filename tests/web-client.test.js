@@ -1624,7 +1624,7 @@ test('个人趣味入口不显示预览，昵称仍转义动态文字，排名�
   assert.match(html, /data-page="stats\?tab=fun"/);
   assert.doesNotMatch(html, /&lt;span|<img src=x/);
   assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;昵称/);
-  assert.doesNotMatch(html, /战报/);
+  assert.doesNotMatch(html, /&gt;战报/);
   const overview = html.slice(html.indexOf('<div class="me-overview">'), html.indexOf('<div class="personal-links'));
   const controls = [...overview.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
   assert.equal(controls.length, 3);

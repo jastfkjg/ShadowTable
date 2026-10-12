@@ -26,7 +26,7 @@ function presentStats(stats) {
     scoreAverageLabel: row.score?.average == null ? "—" : row.score.average.toFixed(2) });
   const byRole = (stats.byRole || []).map(rate);
   const factionOrder = { good: 0, evil: 1, third: 2, unknown: 3 };
-  return { ...rate(stats), fun: presentFun(stats.fun), score: stats.score || { total: 0, month: 0, games: 0, average: null, current: 0, best: 0 }, byFaction: stats.byFaction.filter(row => row.total > 0)
+  return { ...rate(stats), fun: presentFun(stats.fun), score: stats.score || { total: 0, month: 0, games: 0, average: null }, byFaction: stats.byFaction.filter(row => row.total > 0)
     .sort((a, b) => (factionOrder[a.faction] ?? 9) - (factionOrder[b.faction] ?? 9))
     .map(row => ({ ...rate(row), roles: byRole.filter(role => role.faction === row.faction), expanded: false })),
     byRole, roleCount: new Set(byRole.map(row => row.role)).size, byBoard: stats.byBoard.map(rate),
@@ -53,14 +53,24 @@ function presentFun(value) {
       ally: metrics.find(row => row.id.endsWith("ally"))?.byRole.find(row => row.role === role.role)?.count || 0,
       failed: metrics.find(row => row.id.endsWith("failed"))?.byRole.find(row => row.role === role.role)?.count || 0,
       url: primary ? primary.url + "&role=" + role.role : "" }));
-    return { ...card, metrics, roles, icon: card.id.endsWith(":shield") ? "/assets/record-shield.svg" : card.id.endsWith(":knife") ? "/assets/record-sword.svg" : "",
+    const isCombat = ["knife","gun","duel"].some(group => card.id.endsWith(":"+group));
+    return { ...card, metrics, roles, icon: card.id.endsWith(":shield") ? "/assets/record-shield-good.svg" : card.id.endsWith(":knife") ? "/assets/record-sword.svg" : "",
+      section: card.id.split(":")[0] + ":" + (isCombat ? "combat" : "terminal"),
+      sectionLabel: isCombat ? "轮内技能" : "终局表现",
+      sampleNote: card.id.endsWith(":shield") ? "按最终刀统计" : "",
+      combatRateLabel: card.id.endsWith(":duel") ? "决斗敌方率" : "敌方命中率",
       rateAvailable: primary?.value != null && primary?.rate != null && primary.opportunities > 0,
       successFraction: primary?.value != null && primary?.opportunities > 0 ? `成功 ${primary.count} / ${primary.opportunities}` : "",
-      shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat: ["knife","gun","duel"].some(group => card.id.endsWith(":"+group)),
+      shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat,
       enemyLabel: metrics.find(row => row.id.endsWith("enemy"))?.label || "敌方", allyLabel: metrics.find(row => row.id.endsWith("ally"))?.label || "友方",
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
       sampleLabel: !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `共 ${primary.opportunities} ${["knife","gun","duel"].some(group => card.id.endsWith(":"+group)) ? "次出手" : "次机会"}`,
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
+  });
+  const multipleModes = new Set(cards.map(card => card.id.split(":")[0])).size > 1;
+  const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
+  cards.forEach((card, index) => {
+    card.sectionTitle = cards[index - 1]?.section === card.section ? "" : (multipleModes ? modes[card.id.split(":")[0]] + " · " : "") + card.sectionLabel;
   });
   return { ...value, available: true, cards, shareable: canShareFun(value) };
 }
@@ -74,6 +84,7 @@ function presentMatches(records) {
     const funNote = record.fun?.status === "legacy" && !hasFunEvents ? "本局暂无过程记录" : record.fun?.reason || "";
     return {
       ...record,
+      boardTitle: (record.boardName || "").replace(/\s*[（(]\s*(\d+)\s*人\s*[）)]\s*$/, (suffix, count) => Number(count) === Number(record.capacity) ? "" : suffix),
       expanded: false,
       membersExpanded: false,
       dayKey: validDate ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` : "unknown",

@@ -15,20 +15,18 @@
 <view class="page monthly-page">
   <view class="monthly-toolbar">
     <picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="选择月报月份"><view class="monthly-month-picker">{{month}}<view class="monthly-picker-arrow" aria-hidden="true"></view></view></picker>
-    <button class="disclosure-button monthly-rule-button" bindtap="toggleRules" aria-expanded="{{rulesExpanded}}" hover-class="none">规则</button>
   </view>
   <view wx:if="{{loading}}" class="status" role="status">正在生成月度战报…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button class="secondary" bindtap="retry" disabled="{{loading}}" hover-class="none">重试</button></view>
   <block wx:if="{{report && !loading}}">
-    <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><view class="monthly-month-title">{{report.monthTitle}}</view><view class="monthly-title">月度战报</view><view class="monthly-hero-tagline">这个月，谁是桌边的传奇？</view><view class="monthly-hero-meta"><text>{{report.statusLabel}}</text><text>{{report.versionLabel}}</text></view></view></view>
-    <view class="monthly-overview"><view><text class="monthly-overview-value">{{report.overview.games}}</text><text class="monthly-caption">有效对局</text></view><view><text class="monthly-overview-value">{{report.overview.players}}</text><text class="monthly-caption">参赛玩家</text></view><view><text class="monthly-overview-value">{{report.overview.activeDays}}</text><text class="monthly-caption">活跃天数</text></view></view>
+    <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><view class="monthly-month-title">{{report.monthTitle}}</view><view class="monthly-title">月度战报</view></view></view>
+    <view class="monthly-overview"><view><text class="monthly-overview-value">{{report.overview.games}}</text><text class="monthly-caption">有效对局</text></view><view><text class="monthly-overview-value">{{report.overview.players}}</text><text class="monthly-caption">参赛玩家</text></view></view>
     <view wx:if="{{!report.canShare}}" class="monthly-empty"><view>这个月还没有有效对局</view><text class="monthly-caption">换一个月份，或完成对局后再来看看。</text></view>
     <block wx:else>
       <block wx:for="{{report.coreBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
       <view class="monthly-featured-heading">本月趣味荣誉</view>
       <block wx:for="{{report.featured}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
       <view wx:if="{{!report.featured.length}}" class="monthly-empty-board">本月暂无完整的公开趣味成绩</view>
-      <view wx:if="{{report.highlights.length}}" class="monthly-highlight"><view>本月高光</view><text wx:for="{{report.highlights}}" wx:key="*this">{{item}}</text></view>
       <button class="disclosure-button monthly-details-toggle" bindtap="toggleDetails" aria-expanded="{{detailsExpanded}}" hover-class="none">{{detailsExpanded?'收起完整月报':'查看完整月报'}}<text aria-hidden="true">{{detailsExpanded?'−':'＋'}}</text></button>
       <view wx:if="{{detailsExpanded}}" class="monthly-details">
         <block wx:for="{{report.extraBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
@@ -38,8 +36,6 @@
       </view>
       <button class="monthly-share" bindtap="share" loading="{{shareOpening}}" disabled="{{shareOpening || loading}}" hover-class="none">{{entertainment?'生成娱乐版分享图':'生成月报分享图'}}</button>
     </block>
-    <view class="monthly-footnote">北京时间 {{report.rangeLabel}}<text>截至 {{report.asOfLabel}} · {{report.versionLabel}}</text><text>榜单仅展示已公开玩家</text></view>
-    <view wx:if="{{rulesExpanded}}" class="monthly-rules"><view class="monthly-section-title">月报规则</view><view wx:for="{{report.rules}}" wx:key="*this" class="monthly-caption">{{item}}</view></view>
   </block>
 </view>
 <include src="../../player-card.wxml" />

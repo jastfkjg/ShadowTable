@@ -49,7 +49,6 @@ function game(
       ["merlin", "percival", "servant", "servant", "morgana", "assassin"][i],
     ]),
   );
-  room.scorePolicy.streakBonus.enabled = true;
   command(room, room.host, {
     type: "finishTools",
     stage: room.stage,
@@ -80,7 +79,7 @@ function input(store, action, ...rooms) {
 const manage = (store, action, ...rooms) =>
   store.transaction(() => store.manageMatches(input(store, action, ...rooms)));
 
-test("删除及恢复同步个人明细、各类榜单、趣味、月份、连胜奖励，保留手动得分与独立调分；预览不写入", () => {
+test("删除及恢复同步个人明细、各类榜单、趣味、月份，保留手动得分与独立调分；预览不写入", () => {
   const store = new Store(":memory:");
   try {
     const first = game(store, { ended: 100 }),
@@ -114,7 +113,7 @@ test("删除及恢复同步个人明细、各类榜单、趣味、月份、连�
     const impact = preview.players.find((p) => p.uid === "wx:3");
     assert.equal(impact.before.games, 3);
     assert.equal(impact.after.games, 2);
-    assert.equal(impact.before.points - impact.after.points, 5);
+    assert.equal(impact.before.points - impact.after.points, 4);
     assert.deepEqual(store.statsFor("wx:3"), before);
     assert.equal(store.scoreRevision("wx:3"), scoreVersion);
     assert.equal(store.leaderboardRevision, revision);
@@ -132,7 +131,6 @@ test("删除及恢复同步个人明细、各类榜单、趣味、月份、连�
       4,
     );
     assert.equal(store.scoreAdjustments("wx:3").total, 1);
-    assert.deepEqual(store.streakFor("wx:3"), { current: 2, best: 2 });
     assert.equal(
       board.read("wx:3", new URLSearchParams("metric=games")).me.total,
       2,

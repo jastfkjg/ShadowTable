@@ -166,7 +166,7 @@ test('战绩区分未计分与零分计分局，没有计分局也保留独立�
   const scored = { ...score, games: 1, average: 0 };
   const zeroPoints = show({ ...stats, score: scored, scoreAverageLabel: '0.00', byFaction: [{ ...faction, score: scored, scoreAverageLabel: '0.00', roles: [{ ...role, score: scored, scoreAverageLabel: '0.00' }] }] });
   assert.doesNotMatch(zeroPoints, /暂无计分对局/);
-  assert.match(zeroPoints, /计分局连胜/);
+  assert.doesNotMatch(zeroPoints, /连胜/);
   assert.match(zeroPoints, /0 分 · 场均 0.00/);
 
   for (const total of [-5, 5]) {
@@ -1304,7 +1304,7 @@ test('趣味单指标把比例和样本一起呈现，未知与零机会不显�
   const renderMetric = extra => renderStatsShell({tab:'fun',stats:{fun:presentFun({legacyGames:0,cards:[{id:'classic:shield',title:'好人',metrics:[{...metric,...extra}]}]})}});
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
   const zero = renderMetric({});
-  assert.match(textOf(zero), /0%.*成功率.*共 1 次机会.*成功 0 \/ 1/);
+  assert.match(textOf(zero), /0%.*成功率.*成功 0 \/ 1 次机会/);
   assert.ok(byHandler(zero,'openFunMatches'));
   const unknown = textOf(renderMetric({value:null,rate:null}));
   assert.match(unknown,/—.*暂无完整样本/); assert.doesNotMatch(unknown,/成功率|成功 0/);
@@ -1312,6 +1312,20 @@ test('趣味单指标把比例和样本一起呈现，未知与零机会不显�
   assert.match(noChance,/暂无有效机会/); assert.doesNotMatch(noChance,/成功率|0%/);
 });
 
+test('趣味页按玩法和终局／轮内技能分组，保持全部指标与回查入口', () => {
+  const { presentFun } = require('../miniprogram/profile');
+  const metric = (id,mode) => ({id,mode,label:id,unit:'次',count:1,value:1,rate:100,opportunities:1,knownGames:1,unknownGames:0,positive:true,ranked:true,byRole:[]});
+  const fun = presentFun({legacyGames:0,cards:[
+    {id:'classic:shield',title:'好人',metrics:[metric('good_shield','classic')]},
+    {id:'classic:assassin',title:'刺客',metrics:[metric('assassin_hit','classic')]},
+    {id:'knights:knife',title:'刀客刀法',metrics:[metric('knife_enemy','knights')]},
+  ]});
+  assert.deepEqual(fun.cards.map(card=>card.sectionTitle),['经典 · 终局表现','','十二骑士 · 轮内技能']);
+  assert.equal(fun.cards[0].icon,'/assets/record-shield-good.svg');
+  const tree=renderStatsShell({tab:'fun',stats:{fun}});
+  assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);
+  assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-card').length,3);
+});
 test('积分页只有真实空数据才显示空态，按北京日期分组，调整不可点，对局可点且零分不遗漏', () => {
   const { presentEntries } = require('../miniprogram/pages/scores/presentation');
   const time = Date.parse('2026-10-02T16:05:00Z');

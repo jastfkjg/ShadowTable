@@ -10,7 +10,6 @@ Page({
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
   onHide() { this.foreground = false; this.closePlayerCard(); },
-  openMonthlyReport() { wx.navigateTo({ url: "/pages/monthly/monthly" }); },
   openRankPlayerCard(e) {
     const id = e.currentTarget.dataset.id, row = this.data.board?.rows.find(row => row.publicId === id);
     if (!row || this.foreground === false || this.data.loading || this.data.loadingMore || this.data.visibilitySaving) return;

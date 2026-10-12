@@ -269,7 +269,7 @@ function change(store, input) {
       .run(JSON.stringify(game), d.id);
     d.players.filter(p => !p.companion).forEach((p) => uids.add(p.uid));
   }
-  for (const uid of uids) store.rebuildScores(uid);
+  for (const uid of uids) store.touchScore(uid);
   store.syncScoreRooms();
   store.invalidateLeaderboard();
   return {
@@ -294,7 +294,6 @@ function preview(store, input) {
       games: stats.total,
       wins: stats.wins,
       points: stats.score.total,
-      streak: stats.score.current,
       fun: stats.fun.metrics.reduce(
         (sum, metric) => sum + (metric.count || 0),
         0,

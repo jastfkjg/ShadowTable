@@ -1,5 +1,5 @@
 {
-  "version": "avalon-2026-10-v5",
+  "version": "avalon-2026-10-v6",
   "defaultEnabledMinPlayers": 10,
   "title": "阿瓦隆积分规则",
   "scopeLabel": "经典基础 5–8、10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
@@ -18,6 +18,5 @@
     { "id": "evil_win", "label": "坏人获胜", "points": 3, "when": { "faction": "evil", "outcome": "win" } },
     { "id": "role", "label": "梅林／派西角色奖励", "points": 1, "when": { "faction": "good", "outcome": "win", "roleId": ["merlin", "percival"] } },
     { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true } }
-  ],
-  "streakBonus": { "enabled": false, "threshold": 3, "points": 1, "label": "三连胜奖励" }
+  ]
 }

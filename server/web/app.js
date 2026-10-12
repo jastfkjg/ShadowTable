@@ -620,7 +620,7 @@
     statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyDetailsExpanded: false, monthlyRulesExpanded: false, monthlyEntertainment: false, monthlySort: 'count', monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyDetailsExpanded: false, monthlyEntertainment: false, monthlySort: 'count', monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -886,7 +886,7 @@
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     html += '</section>' + viewScoreOverview(stats?.score) + '</div>';
     const link = (page, title, note, icon) => '<button class="personal-link" type="button" data-action="navigate" data-page="'+page+'"><span class="me-icon me-icon-'+icon+'" aria-hidden="true"></span><span class="me-link-copy"><span>'+title+'</span>'+(note?'<span class="small muted link-note">'+esc(note)+'</span>':'')+'</span><span aria-hidden="true">›</span></button>';
-    html += '<div class="personal-links me-links-primary">' + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('leaderboard','排行榜','','rank') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
+    html += '<div class="personal-links me-links-primary">' + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
     return html;
   }
   function viewProfileEditor() {
@@ -1002,7 +1002,6 @@
     const overlay = state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded;
     let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜"><div class="rank-workspace"' + (overlay ? ' inert' : '') + '>';
     html += '<div class="rank-toolbar"><div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div><div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
-    html += '<button type="button" class="rank-monthly-entry" data-action="openMonthly"><span>月度战报 <span class="small muted">本月荣誉与历史月报</span></span><span class="rank-chevron" aria-hidden="true"></span></button>';
     html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => {
       const selected = metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric);
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
@@ -1043,16 +1042,15 @@
   }
   function viewMonthlyReport() {
     const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt();
-    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><div class="monthly-toolbar"><label class="monthly-month-picker">月份 <input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label><button type="button" class="monthly-rule-button" data-action="monthlyRules" aria-expanded="' + !!state.monthlyRulesExpanded + '">规则</button></div>';
+    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><div class="monthly-toolbar"><label class="monthly-month-picker">月份 <input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label></div>';
     if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
     if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
     if (!report || state.monthlyLoading) return html + '</section>';
-    html += '<header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt="" aria-hidden="true"><div class="monthly-hero-content"><div class="monthly-month-title">' + esc(report.monthTitle) + '</div><div class="monthly-title">月度战报</div><div class="monthly-hero-tagline">这个月，谁是桌边的传奇？</div><div class="monthly-hero-meta"><span>' + report.statusLabel + '</span><span>' + report.versionLabel + '</span></div></div></header><div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家'], [report.overview.activeDays, '活跃天数']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
+    html += '<header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt="" aria-hidden="true"><div class="monthly-hero-content"><div class="monthly-month-title">' + esc(report.monthTitle) + '</div><div class="monthly-title">月度战报</div></div></header><div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
     if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
     else {
       html += report.coreBoards.map(viewMonthlyBoard).join('') + '<div class="monthly-featured-heading">本月趣味荣誉</div>' + report.featured.map(viewMonthlyBoard).join('');
       if (!report.featured.length) html += '<p class="monthly-empty-board">本月暂无完整的公开趣味成绩</p>';
-      if (report.highlights.length) html += '<div class="monthly-highlight"><div>本月高光</div>' + report.highlights.map(line => '<p>' + esc(line) + '</p>').join('') + '</div>';
       html += '<button class="monthly-details-toggle" type="button" data-action="monthlyDetails" aria-expanded="' + !!state.monthlyDetailsExpanded + '">' + (state.monthlyDetailsExpanded ? '收起完整月报' : '查看完整月报') + '<span aria-hidden="true">' + (state.monthlyDetailsExpanded ? '−' : '＋') + '</span></button>';
       if (state.monthlyDetailsExpanded) {
         html += report.extraBoards.map(viewMonthlyBoard).join('');
@@ -1067,8 +1065,6 @@
         html += btn('secondary', 'monthlyDownload', '保存当前图片') + '</div>';
       }
     }
-    html += '<footer class="monthly-footnote">北京时间 ' + esc(report.rangeLabel) + '<span>截至 ' + esc(report.asOfLabel) + ' · ' + report.versionLabel + '</span><span>榜单仅展示已公开玩家</span></footer>';
-    if (state.monthlyRulesExpanded) html += '<div class="monthly-rules"><div class="monthly-section-title">月报规则</div>' + report.rules.map(rule => '<p class="monthly-caption">' + esc(rule) + '</p>').join('') + '</div>';
     return html + '</section>';
   }
   async function shareMonthlyReport() {
@@ -1931,7 +1927,7 @@ function roomListItems(rooms) {
       if (state.statsTab !== 'fun') html += '<div class="stats-summary"><div><div class="stats-rate">' + rate(stats) + '</div><span class="small muted">总胜率</span></div><div><div>' + stats.wins + ' 胜 · ' + stats.losses + ' 负</div><span class="small muted">' + stats.total + ' 局有效对局</span></div></div>';
       html += '<div class="stats-tabs" role="group" aria-label="战绩分类">' + [['records','胜负积分'],['fun','趣味记录']].map(item=>'<button type="button" data-action="statsTab" data-value="'+item[0]+'" aria-pressed="'+(state.statsTab===item[0])+'">'+item[1]+'</button>').join('') + '</div>';
       if (state.statsTab === 'fun') return html + viewFunStats(stats.fun) + '</section>';
-      if (stats.score) html += '<div class="score-stats muted">积分 ' + stats.score.total + ' · ' + stats.score.games + '场计分局 · 场均 ' + (stats.score.average == null ? '—' : stats.score.average.toFixed(2)) + '<br>当前 ' + stats.score.current + ' 连胜 · 最高 ' + stats.score.best + ' 连胜</div>';
+      if (stats.score) html += '<div class="score-stats muted">积分 ' + stats.score.total + ' · ' + stats.score.games + '场计分局 · 场均 ' + (stats.score.average == null ? '—' : stats.score.average.toFixed(2)) + '</div>';
       if (stats.excluded) html += '<div class="small muted">' + stats.excluded + ' 局不计入战绩</div>';
       if (stats.identityType === 'guest') html += '<div class="stats-note small">当前为游客战绩，仅随本浏览器登录凭证保留；清缓存或登录过期后无法自动找回。</div>';
       if (!stats.total) html += '<div class="stats-note">还没有有效战绩</div>';
@@ -4456,10 +4452,8 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
-    openMonthly: () => navigate('monthly'),
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
-    monthlyRules: () => setState({ monthlyRulesExpanded: !state.monthlyRulesExpanded }),
     monthlyDetails: () => setState({ monthlyDetailsExpanded: !state.monthlyDetailsExpanded }),
     monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
     monthlySort: el => { if (['count', 'rate'].includes(el.dataset.value)) setState({ monthlySort: el.dataset.value }); },

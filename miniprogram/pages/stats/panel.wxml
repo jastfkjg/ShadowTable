@@ -5,11 +5,11 @@
   <block wx:if="{{stats}}">
     <view class="stats-overview" aria-label="总战绩">
       <view class="records-scope"><text>全部对局</text><button wx:if="{{stats.total}}" class="records-share" hover-class="none" bindtap="shareStats" disabled="{{loading || !!error}}" aria-label="分享战绩图片"><image src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button></view>
-      <view class="personal-metrics"><view class="overview-rate"><view class="metric-value accent">{{stats.rateValue || stats.rateLabel}}<text wx:if="{{stats.rateUnit}}" class="rate-unit">{{stats.rateUnit}}</text></view><text class="small muted">总胜率</text></view><view><view class="metric-value">{{stats.total}}</view><text class="small muted">对局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜场</text></view></view>
+      <view class="personal-metrics"><view class="overview-rate"><text class="overview-label muted">总胜率</text><view class="metric-value accent">{{stats.rateValue || stats.rateLabel}}<text wx:if="{{stats.rateUnit}}" class="rate-unit">{{stats.rateUnit}}</text></view></view><view><view class="metric-value">{{stats.total}}</view><text class="small muted">对局数</text></view><view><view class="metric-value">{{stats.wins}}</view><text class="small muted">胜场</text></view></view>
     </view>
     <view wx:if="{{stats.total}}" class="stats-breakdown">
       <view class="stats-section-title"><text>阵营与角色</text><text wx:if="{{stats.roleCount}}" class="stats-section-note">共 {{stats.roleCount}} 个角色</text></view>
-      <view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
+      <view class="faction-list"><view wx:for="{{stats.byFaction}}" wx:key="faction" class="faction-group">
         <button hover-class="none" class="disclosure-button faction-toggle" bindtap="toggleFaction" data-faction="{{item.faction}}" aria-expanded="{{item.expanded}}" aria-label="{{item.label}}，{{item.total}}局，{{item.wins}}胜，胜率{{item.rateLabel}}，{{item.expanded?'收起角色':'展开角色'}}">
           <image class="faction-emblem" src="{{item.faction==='good'?'/assets/record-shield-good.svg':'/assets/record-shield.svg'}}" aria-hidden="true" /><view class="faction-heading"><text class="faction-name">{{item.label}}</text><text class="faction-detail">{{item.total}} 局 · {{item.wins}} 胜</text><text wx:if="{{item.score.games}}" class="faction-detail faction-score">{{item.score.total}} 分 · {{item.score.games}} 场计分 · 场均 {{item.scoreAverageLabel}}</text></view>
           <view class="faction-result"><text class="faction-rate">{{item.rateLabel}}</text><text class="faction-detail">胜率</text></view>
@@ -20,7 +20,7 @@
           <view wx:for="{{item.roles}}" wx:for-item="role" wx:key="role" wx:if="{{item.rolesExpanded || 5 > index}}" class="role-row"><view class="role-name"><text>{{role.role}}</text><view wx:if="{{role.score.games}}" class="small muted">{{role.score.total}} 分 · 场均 {{role.scoreAverageLabel}}</view></view><text class="role-stat role-record">{{role.total}} 局 · {{role.wins}} 胜</text><text class="role-stat">{{role.rateLabel}}</text></view>
           <button wx:if="{{item.roles.length > 5}}" class="disclosure-button role-more" hover-class="none" bindtap="toggleFactionRoles" data-faction="{{item.faction}}" aria-expanded="{{item.rolesExpanded}}">{{item.rolesExpanded?'收起角色':'查看全部 '+item.roles.length+' 个角色'}}<view class="stats-chevron {{item.rolesExpanded?'expanded':''}}" aria-hidden="true"></view></button>
         </view>
-      </view>
+      </view></view>
     </view>
     <view wx:else class="stats-empty"><view>暂无有效对局</view><view class="small muted">完成并登记胜负后，这里会展示你的战绩。</view></view>
     <view class="stats-points {{stats.score.games?'':'stats-points-compact'}}">
@@ -29,7 +29,6 @@
       </button>
       <block wx:if="{{stats.score.games}}">
         <view class="personal-metrics"><view><view class="metric-value">{{stats.score.total}}</view><text class="small muted">总积分</text></view><view><view class="metric-value">{{stats.score.games}}</view><text class="small muted">计分局数</text></view><view><view class="metric-value">{{stats.scoreAverageLabel}}</view><text class="small muted">场均积分</text></view></view>
-        <view class="small muted score-streak"><text>计分局连胜</text><text>当前 {{stats.score.current}} · 最高 {{stats.score.best}}</text></view>
       </block>
       <view wx:else class="score-empty-note muted">{{stats.score.total ? '来自积分调整 · 暂无计分对局' : '暂无计分对局'}}</view>
     </view>
