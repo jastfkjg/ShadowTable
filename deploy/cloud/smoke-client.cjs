@@ -56,6 +56,12 @@ async function main() {
     if (Buffer.from(artwork, "utf8").length < 1000) throw new Error("Monthly artwork was not packaged");
     const report = JSON.parse(await request("/api/monthly-report", { headers: { Authorization: "Bearer " + data.token } }));
     if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(report.month) || !Array.isArray(report.mainBoards)) throw new Error("Monthly report is unavailable in the image");
+    const badges = JSON.parse(await request("/api/me/badges", { headers: { Authorization: "Bearer " + data.token } }));
+    if (!Array.isArray(badges.badges) || badges.maxEquipped !== 3) throw new Error("Honor badge API is unavailable in the image");
+    for (const badge of require(require("node:path").join(process.cwd(), "miniprogram/badges")).catalogue) {
+      const image = await request(badge.imageUrl);
+      if (Buffer.byteLength(image) < 1000) throw new Error(`Badge artwork was not packaged: ${badge.id}`);
+    }
     fs.writeFileSync(sessionFile, data.token, { mode: 0o600 });
   } else if (process.argv[2] === "resume") {
     const token = fs.readFileSync(sessionFile, "utf8");

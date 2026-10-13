@@ -8,6 +8,7 @@
 !miniprogram/builtin-avatars.js
 !miniprogram/avatar-library.js
 !miniprogram/fun-copy.js
+!miniprogram/badges.js
 !miniprogram/result-registration.js
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
@@ -16,6 +17,8 @@
 !miniprogram/monthly-report-card.js
 !miniprogram/assets/
 !miniprogram/assets/monthly-report-background.jpg
+!miniprogram/assets/badges/
+!miniprogram/assets/badges/**
 !miniprogram/pages/
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/
