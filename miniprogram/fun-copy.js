@@ -5,6 +5,7 @@
   else root.shadowtableFunCopy = copy;
 })(typeof window === "object" ? window : this, function () {
   const labels = {
+    survival_revive: "复活", survival_knifed: "被刀",
     honor_mvp: "胜方最佳", honor_svp: "败方最佳",
     percival_green: "三蓝并保护梅林", percival_bust: "三红或梅林被刺",
     merlin_evade: "成功躲刀", merlin_hit: "被刺中",
@@ -14,8 +15,10 @@
     knife_enemy: "刀中敌方", knife_ally: "刀中友方",
     duel_enemy: "决斗敌方", duel_ally: "决斗友方",
   };
-  const titles = { honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能" };
+  const titles = { survival: "生存趣事", honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能" };
   const honors = {
+    survival_revive: { title: "我在阿瓦隆玩重生", description: "十二骑士中实际复活的次数，包含刀、决斗、猎人、魔术师换号、女巫替死及铠甲等导致的复活", countOnly: true },
+    survival_knifed: { title: "全民公敌", description: "十二骑士中承受轮内刀和最终刀的次数，按换号及替死后的实际承受者统计；无论是否生效或复活都计入，不含枪和决斗", countOnly: true },
     honor_mvp: { title: "最强 MVP", description: "获得胜方最佳玩家的次数", countOnly: true },
     honor_svp: { title: "最强 SVP", description: "获得败方最佳玩家的次数", countOnly: true },
     percival_green: { title: "最强派西", description: "派西玩家带3蓝车并保护梅林次数最多" },
@@ -29,11 +32,12 @@
     kill_enemy: { title: "职业杀手", description: "玩家有击杀技能并击杀对方阵营次数最多" },
     kill_ally: { title: "痛击队友", description: "玩家有击杀技能并击杀友方阵营次数最多" },
   };
-  const identities = { honor: "玩家票选",
+  const identities = { survival: "十二骑士全体玩家", honor: "玩家票选",
     percival: "派西维尔", merlin: "梅林", assassin: "刺客",
     defense: "蓝守卫／魔术师", kill: "刀客／骑士／猎人等",
   };
   const conditions = {
+    survival_revive: "因各种原因实际复活的次数", survival_knifed: "被刀次数，无论是否生效或复活",
     honor_mvp: "获得胜方最佳玩家的次数", honor_svp: "获得败方最佳玩家的次数",
     percival_green: "三蓝且梅林未被刺的局数", percival_bust: "三红或梅林被刺的局数",
     merlin_evade: "成功躲过最终刺杀的次数", merlin_hit: "最终被刺中的次数",
@@ -48,6 +52,7 @@
     honor.conditionLabel = conditions[id];
   }
   const descriptions = {
+    survival: "复活按实际回场计数；被刀包含轮内刀和最终刀，按换号、替死后的承受者统计，无论是否生效或复活。",
     assassin: "仅统计刺客的非空最终刺杀。",
   };
   function metric(row) {
@@ -108,7 +113,7 @@
         title: honors[id].title, description: honors[id].description,
         roleLabel: honors[id].roleLabel, roleDetail: honors[id].roleDetail, conditionLabel: honors[id].conditionLabel,
         countOnly: !!honors[id].countOnly,
-        metricLabel: honors[id].countOnly ? "获奖次数" : (labels[id] || value.metricLabel?.replace(/次数$|率$/, "")) + (value.sort === "rate" ? "率" : "次数"),
+        metricLabel: id.startsWith("honor_") ? "获奖次数" : (labels[id] || value.metricLabel?.replace(/次数$|率$/, "")) + (value.sort === "rate" ? "率" : "次数"),
       } : value.fun && labels[id] ? {
         title: titles[id.split("_")[0]] || value.title,
         metricLabel: labels[id] + (value.sort === "rate" ? "率" : "次数"),

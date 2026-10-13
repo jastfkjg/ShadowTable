@@ -254,7 +254,7 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   const options=presentation.funOptions(require('../server/fun').publicMetrics());
   const renderRank=factory('pages/leaderboard/leaderboard.wxml');
   const data={groups:require('../miniprogram/leaderboard').groups,metric:'fun_defense_ally',funSelected:true,funAvailable:true,
-    funOptions:options,funSort:'count',funRoleOptions:[],metricsExpanded:false,funCategories:presentation.categories,
+    funOptions:options,funSort:'count',metricsExpanded:false,funCategories:presentation.categories,
     pendingFunMetric:'fun_defense_ally',pendingFunOption:options.find(item=>item.key==='fun_defense_ally'),
     board:{fun:true,threshold:1,rows:[],me:{}}};
   const collapsed=renderRank(data);
@@ -264,6 +264,8 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   assert.ok(!nodes(collapsed).some(n=>n.attr?.role==='dialog'));
   const sorts=nodes(collapsed).filter(n=>n.attr?.bindtap==='chooseFunSort');
   assert.equal(sorts.length,2);assert.equal(sorts[0].attr.ariaPressed,true);
+  assert.doesNotMatch(JSON.stringify(collapsed),/技能身份|全部身份|由高到低|排名 \/ 玩家/);
+  assert.doesNotMatch(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/蓝守卫|魔术师/);
   const keys=[];
   for(const category of presentation.categories) {
     const filtered=presentation.filterFunOptions(options,category.id);
@@ -279,7 +281,7 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   assert.deepEqual(keys.sort(),options.map(item=>item.key).sort());
   const adverse=renderRank({...data,metric:'fun_kill_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
   assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/击杀友方/);
-  assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/按发生率/);
+  assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/发生率/);
   assert.doesNotMatch(JSON.stringify(adverse),/至少.*次机会/);
 });
 
@@ -1425,12 +1427,29 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   const form = nodes(sheet).find(n => n.tag === 'wx-form');
   assert.match(form.attr.style, /bottom: 280px/);
   assert.equal(form.attr.role, 'dialog');
-  assert.ok(byHandler(sheet, 'editEntryName'));
+  const nickname = nodes(sheet).find(n => n.tag === 'wx-input' && n.attr.name === 'nickname');
+  assert.equal(nickname.attr.value, '子龙');
+  assert.equal(nickname.attr.bindfocus, 'entryInputFocus');
   assert.ok(byHandler(sheet, 'pasteRoomCode'));
   const code = nodes(sheet).find(n => n.tag === 'wx-input' && n.attr.name === 'code');
   assert.equal(code.attr.adjustPosition, false);
   assert.equal(code.attr.type, 'number');
   assert.equal(nodes(sheet).filter(n => n.attr?.role === 'alert').length, 1);
+});
+
+test('创建表单在原生 form 包装层内用普通 view 分配高度，提交按钮位于滚动区之外', () => {
+  const tree = render({ ...base, entryMode: 'create', entrySheet: true, name: '子龙', entryKeyboardHeight: 280 });
+  const form = nodes(tree).find(n => n.tag === 'wx-form');
+  const layout = form.children.find(n => n.attr?.class === 'entry-sheet-layout');
+  assert.equal(layout?.tag, 'wx-view');
+  const region = layout.children.find(n => n.attr?.class === 'entry-sheet-scroll-region');
+  assert.equal(region?.tag, 'wx-view');
+  const scroll = nodes(region).find(n => n.tag === 'wx-scroll-view');
+  assert.equal(scroll.attr.scrollY, true);
+  assert.ok(nodes(scroll).some(n => n.tag === 'wx-input' && n.attr.name === 'nickname'));
+  assert.equal(byHandler(scroll, 'create'), undefined);
+  const footer = layout.children.find(n => n.attr?.class === 'entry-sheet-footer');
+  assert.equal(byHandler(footer, 'create').attr.formType, 'submit');
 });
 
 test('小程序左滑按钮仅展开时出现，按房主状态提供解散且保留卡片内容和菜单', () => {
@@ -1512,10 +1531,31 @@ test('最终结果为所有玩家显示获奖头像昵称号码票数，平票�
   for(const name of ['林间','阿风','晚风','最强 MVP','最强 SVP','并列获奖'])assert(text.includes(name),name);
   assert.equal(nodes(tree).filter(n=>n.attr?.class==='honor-winner').length,3);
   assert(nodes(tree).some(n=>n.tag==='wx-image' && n.attr.src==='/api/avatars/test'));
-  const ballot=hp.present({status:'open',matchId:'x',canVote:true,deadline:120000,serverNow:0,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间',disabled:false}]}]});
+  const ballot=hp.present({status:'open',matchId:'x',canVote:true,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间',disabled:false}]}]});
   const polling=renderTable({...base,room,honors:ballot,...hp.sync({},ballot),network:true});
   const options=nodes(polling).filter(n=>n.attr?.bindtap==='chooseHonor');assert.equal(options.length,2);assert.equal(options[0].attr.disabled,true);
   assert.equal(byHandler(polling,'submitHonors').attr.disabled,true);
+  assert.doesNotMatch(JSON.stringify(polling),/剩余|截止前可修改|关闭后可从牌桌继续|NaN/);
+});
+
+test('等待票选仅显示简短提示，房主显示未投名单和结束入口',()=>{
+  const hp=require('../miniprogram/honors');
+  const room={code:'123456',phase:'ended',result:{winner:'good'},capacity:6,me:{seat:1,isHost:false},players:[],history:[],team:[]};
+  const data={...base,room,network:true};
+  const waiting=JSON.stringify(renderTable({...data,honors:hp.present({status:'not_started',canStart:false})}));
+  assert.match(waiting,/等待房主发起票选/);
+  assert.doesNotMatch(waiting,/胜方 MVP|可选环节|每局仅一次|等待房主选择/);
+  const start=renderTable({...data,honors:hp.present({status:'not_started',canStart:true})});
+  assert.ok(byHandler(start,'startHonors'));
+  const open=hp.present({status:'open',canVote:true,canClose:true,total:6,completed:2,required:3,
+    pendingPlayers:[{seat:3,name:'林间'},{seat:5,name:'晚风'}]});
+  const host=renderTable({...data,honors:open});
+  assert.match(JSON.stringify(host),/未投票：3号 林间、5号 晚风/);
+  assert.ok(byHandler(host,'closeHonors'));
+  assert.doesNotMatch(JSON.stringify(host),/剩余|NaN/);
+  const player=renderTable({...data,honors:hp.present({...open,canClose:false})});
+  assert.doesNotMatch(JSON.stringify(player),/未投票：/);
+  assert.equal(byHandler(player,'closeHonors'),undefined);
 });
 
 test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示次数排序',()=>{
@@ -1528,7 +1568,7 @@ test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示�
   for(const metric of ['fun_honor_mvp','fun_honor_svp']) {
     const board=presentation.presentBoard({fun:true,countOnly:true,metric,sort:'count',period:'all',unit:'次',availableFunMetrics:fun.publicMetrics(),rows:[],me:{knownGames:1,count:1,status:'ranked',rank:1}});
     const tree=factory('pages/leaderboard/leaderboard.wxml')({board,metric,funSelected:true,funSort:'count'});
-    assert.match(JSON.stringify(tree),/按获奖次数/);
+    assert.match(JSON.stringify(tree),/获奖次数/);
     assert.equal(nodes(tree).filter(n=>n.attr?.bindtap==='chooseFunSort' && n.attr['data-id']==='rate').length,0);
     assert.match(board.ruleLines.join(),/每局每项荣誉最多增加一次/);
   }

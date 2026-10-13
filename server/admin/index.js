@@ -27,8 +27,15 @@ function createAdmin({ store, origin, key, body, limit }) {
   );
   const secure = url.protocol === "https:";
   const cookieName = secure ? "__Host-shadowtable_admin" : "shadowtable_admin";
-  const sessions = new Map();
   const keyHash = digest(key);
+  const sessionBinding = digest(JSON.stringify([origin, key])).toString("hex");
+  store.db.exec(`CREATE TABLE IF NOT EXISTS admin_sessions(
+    hash TEXT PRIMARY KEY, binding TEXT NOT NULL, expires INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS admin_sessions_expiry ON admin_sessions(expires);`);
+  // Keep valid cookies across restarts, but revoke them when configuration changes.
+  store.db
+    .prepare("DELETE FROM admin_sessions WHERE binding<>? OR expires<=?")
+    .run(sessionBinding, store.clock());
   const cookie = (token, age) =>
     `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure ? "; Secure" : ""}`;
   function authenticate(req) {
@@ -42,9 +49,11 @@ function createAdmin({ store, origin, key, body, limit }) {
         .map((s) => s.trim())
         .find((s) => s.startsWith(cookieName + "="))
         ?.slice(cookieName.length + 1) || "";
-    const session = sessions.get(digest(raw).toString("hex"));
-    fail(session && session.expires > Date.now(), "请先登录管理平台", 401);
-    return { ...session, hash: digest(raw).toString("hex") };
+    const session = store.db
+      .prepare("SELECT hash,expires FROM admin_sessions WHERE hash=? AND binding=? AND expires>?")
+      .get(digest(raw).toString("hex"), sessionBinding, store.clock());
+    fail(session, "请先登录管理平台", 401);
+    return session;
   }
   function asset(res, file, type) {
     res.setHeader("Content-Type", type);
@@ -115,6 +124,8 @@ function createAdmin({ store, origin, key, body, limit }) {
             .replaceAll("/dev/", "/admin/companion/")
             .replaceAll("仅本机开发", "已认证 · 测试房间")
             .replaceAll("本地陪测", "在线陪测")
+            .replace("这里仅操作本面板创建的测试账号", "批量操作仅控制本面板创建的测试账号；清空会清理当前房间的全部陪测账号")
+            .replace("失效记录可单独移除；服务器残留座位需从管理平台清理。", "失效记录可单独移除；清空陪测玩家也会清理服务器残留座位，未确认操作会随凭据一起撤销。")
             .replaceAll("LOCAL PLAYTEST", "AUTHORIZED PLAYTEST");
           html = html.replace(
             '<section class="entry">',
@@ -144,13 +155,15 @@ function createAdmin({ store, origin, key, body, limit }) {
         "管理密钥错误",
         401,
       );
-      for (const [id, s] of sessions)
-        if (s.expires <= Date.now()) sessions.delete(id);
-      fail(sessions.size < 100, "管理员会话过多，请稍后重试", 429);
+      store.db.prepare("DELETE FROM admin_sessions WHERE expires<=?").run(store.clock());
+      fail(
+        store.db.prepare("SELECT count(*) AS n FROM admin_sessions").get().n < 100,
+        "管理员会话过多，请稍后重试", 429,
+      );
       const token = randomBytes(32).toString("hex");
-      sessions.set(digest(token).toString("hex"), {
-        expires: Date.now() + 8 * 3600000,
-      });
+      store.db
+        .prepare("INSERT INTO admin_sessions VALUES(?,?,?)")
+        .run(digest(token).toString("hex"), sessionBinding, store.clock() + 8 * 3600000);
       audit("login");
       res.setHeader("Set-Cookie", cookie(token, 8 * 3600));
       send(200, { ok: true });
@@ -183,7 +196,7 @@ function createAdmin({ store, origin, key, body, limit }) {
       });
     };
     if (path === "/api/admin/logout" && req.method === "POST") {
-      sessions.delete(session.hash);
+      store.db.prepare("DELETE FROM admin_sessions WHERE hash=?").run(session.hash);
       res.setHeader("Set-Cookie", cookie("", 0));
       send(200, { ok: true });
       return true;
@@ -329,6 +342,12 @@ function createAdmin({ store, origin, key, body, limit }) {
       send(200,result);return true;
     }
     const match = path.match(/^\/api\/admin\/rooms\/(\d{6})$/);
+    if (match && req.method === "GET") {
+      const room = store.get(match[1]);
+      fail(room, "房间不存在", 404);
+      send(200, describe(room));
+      return true;
+    }
     if (match && req.method === "POST") {
       const b = await body(req);
       fail(
@@ -352,7 +371,27 @@ function createAdmin({ store, origin, key, body, limit }) {
           b.confirm === true || b.confirm === match[1],
           "请确认管理操作",
         );
+      const retryableClear = b.action === "clear-testers" && b.requestId !== undefined;
+      if (retryableClear)
+        fail(
+          typeof b.requestId === "string" && /^[a-f0-9-]{36}$/.test(b.requestId),
+          "缺少合法请求编号",
+        );
+      if (b.resetCompanionHost !== undefined)
+        fail(
+          b.action === "clear-testers" && b.resetCompanionHost === true && b.confirm === true,
+          "请确认清空陪测玩家",
+        );
+      const clearActor = "admin:clear-testers";
+      const fingerprint = retryableClear ? digest(JSON.stringify([path, b])).toString("hex") : null;
       store.transaction(() => {
+        if (retryableClear) {
+          const cached = store.receipt(clearActor, b.requestId);
+          if (cached) {
+            fail(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409);
+            return;
+          }
+        }
         const room = store.get(match[1]);
         fail(room, "房间不存在", 404);
         fail(b.stage === room.stage, "房间状态已变化，请刷新后重试", 409);
@@ -363,16 +402,24 @@ function createAdmin({ store, origin, key, body, limit }) {
             .run(`test:${room.code}:%`);
         } else {
           if (b.action === "clear-testers") {
+            const humans = room.players.filter((p) => !p.uid.startsWith("test:"));
+            if (room.host.startsWith("test:"))
+              fail(humans.length, "请先让真人入座接任房主", 409);
+            if (b.resetCompanionHost && room.phase !== "lobby") {
+              fail(
+                room.testRoom && room.host.startsWith("test:"),
+                "请先由房主在小程序结束本局并点击同房重开，回到准备阶段后再清空", 409,
+              );
+              if (!["ended", "terminated"].includes(room.phase))
+                command(room, room.host, { type: "terminate", stage: room.stage });
+              command(room, room.host, { type: "rematch", stage: room.stage });
+            }
             fail(
               room.phase === "lobby",
               "请先结束对局并同房重开，再清理陪测座位",
               409,
             );
-            const humans = room.players.filter(
-              (p) => !p.uid.startsWith("test:"),
-            );
             if (room.host.startsWith("test:")) {
-              fail(humans.length, "请先让真人入座接任房主", 409);
               room.host = humans[0].uid;
             }
             room.players = humans;
@@ -404,6 +451,7 @@ function createAdmin({ store, origin, key, body, limit }) {
           store.save(room);
         }
         audit(b.action, room.code, (b.reason || "").trim());
+        if (retryableClear) store.addReceipt(clearActor, b.requestId, fingerprint, { ok: true });
       });
       send(200, { ok: true });
       return true;

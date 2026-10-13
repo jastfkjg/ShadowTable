@@ -2115,11 +2115,12 @@ test('最佳玩家弹窗只自动提示一次，可修改本人选票，刷新�
   const {newRoom,enter,command,publicView}=require('../server/engine');
   const r=newRoom('123456','u1','我','classic',6);for(let i=2;i<=6;i++)enter(r,'u'+i,'玩家'+i);
   const room=publicView(r,'u1');room.phase='ended';room.result={winner:'good'};
-  room.honors={matchId:'match-1',status:'open',canVote:true,canClose:true,total:6,completed:0,required:3,deadline:120000,serverNow:1000,ballot:null,
+  room.honors={matchId:'match-1',status:'open',canVote:true,canClose:true,total:6,completed:0,required:3,pendingPlayers:[{seat:2,name:'林间'},{seat:5,name:'晚风'}],ballot:null,
     groups:[{key:'mvp',title:'最强 MVP',side:'胜方',skip:false,players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},
       {key:'svp',title:'最强 SVP',side:'败方',skip:false,players:[{seat:5,name:'晚风'},{seat:6,name:'小树'}]}]};
   const p=page({request:async()=>structuredClone(room),assetUrl:url=>url});p.roomCode=r.code;
   await p.refresh();assert.equal(p.data.honorDialog,true);
+  assert.equal(p.data.honors.pendingLabel,'2号 林间、5号 晚风');assert.equal(p.data.honors.timeLabel,undefined);
   p.chooseHonor({currentTarget:{dataset:{key:'mvp',seat:1}}});assert.equal(p.data.honorReady,false);
   p.chooseHonor({currentTarget:{dataset:{key:'mvp',seat:2}}});p.chooseHonor({currentTarget:{dataset:{key:'svp',seat:5}}});
   await p.refresh();assert.equal(p.data.honorReady,true);assert.equal(p.data.honorDraft.mvp,2);

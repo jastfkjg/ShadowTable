@@ -252,7 +252,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     availableBoards: [],
     entryMode: "join",
     entrySheet: false,
-    entryEditingName: false,
     entryFocusedField: "",
     entryScrollTarget: "",
     entryKeyboardHeight: 0,
@@ -1214,7 +1213,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({
       entryMode: mode,
       entrySheet: true,
-      entryEditingName: this.data.nicknameSetup || !this.data.name.trim(),
       entryFocusedField: "",
       entryKeyboardHeight: 0,
       entryNameError: "", entryCodeError: "", entryError: "",
@@ -1222,7 +1220,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       notice: "",
     }, () => {
       if (mode === "join" && this.data.entrySheet && this.foreground)
-        this.setData({ entryFocusedField: this.data.entryEditingName ? "nickname" : "code" });
+        this.setData({ entryFocusedField: this.data.nicknameSetup || !this.data.name.trim() ? "nickname" : "code" });
     });
   },
   resetEntryFocus() {
@@ -1236,10 +1234,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending) return;
     this.setData({ entrySheet: false });
     this.resetEntryFocus();
-  },
-  editEntryName() {
-    if (this.data.busy || this.pending) return;
-    this.setData({ entryEditingName: true, entryFocusedField: "nickname" });
   },
   entryInputFocus(e) {
     if (!this.data.entrySheet || !this.foreground) return;
@@ -1354,7 +1348,16 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   selectCapacity(capacity) {
     const availableBoards = this.data.boards.filter(
       (b) => b.available && b.counts.includes(capacity),
-    );
+    ).map(b => ({
+      ...b,
+      shortName: (b.namesByCapacity?.[capacity] || b.name).replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
+      entryHint: b.id.startsWith("knights") ? "技能与 B 牌" : ({
+        "classic-court": capacity === 12 ? "双奥伯伦" : "经典阵容",
+        "classic-11": "逆仆指认",
+        "shadow-assist": "红蓝内奸",
+        chaos: "术士与盗贼",
+      })[b.id] || "",
+    }));
     const b =
       availableBoards.find((b) => b.id === this.data.boardId) ||
       availableBoards[0];
@@ -1522,7 +1525,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const entryCodeError = this.data.entryMode === "join" && !/^\d{6}$/.test(this.data.code) ? "请输入完整的 6 位数字房间码" : "";
       this.setData({ entryNameError, entryCodeError, entryError: "" });
       if (entryNameError || entryCodeError) {
-        this.setData({ entryEditingName: this.data.entryEditingName || !!entryNameError, entryFocusedField: entryNameError ? "nickname" : "code" });
+        this.setData({ entryFocusedField: entryNameError ? "nickname" : "code" });
         return;
       }
     }
@@ -1910,7 +1913,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   closeHonors() {
     const h = this.data.honors;
     if (!h?.canClose) return;
-    return this.confirmCommand("结束本场票选？", `已收到 ${h.completed} / ${h.total} 人投票。至少 ${h.required} 人完成才颁奖，截止后不可修改。`, "honorClose", { matchId: h.matchId });
+    return this.confirmCommand("结束本场票选？", `已收到 ${h.completed} / ${h.total} 人投票。至少 ${h.required} 人完成才颁奖，结束后不可修改。`, "honorClose", { matchId: h.matchId });
   },
   honorAvatarError(e) {
     const shownUrl = e.currentTarget.dataset.url;

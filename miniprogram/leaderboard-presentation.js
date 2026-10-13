@@ -33,8 +33,12 @@
       const value = board.fun ? !row.knownGames ? "—" : board.sort === "count" ? String(row.count) : Number.isFinite(row.rate) ? row.rate.toFixed(1) : "—"
         : points ? String(row.points || 0) : games ? String(row.total || 0) : Number.isFinite(row.winRate) ? row.winRate.toFixed(1) : "—";
       const unit = value === "—" ? "" : board.fun ? board.sort === "count" ? countUnit : "%" : points ? "分" : games ? "局" : "%";
-      const sampleLabel = board.countOnly || selected?.countOnly ? "玩家票选 · 获奖 " + row.count + " 次" : board.fun ? !row.knownGames ? "暂无完整样本" : (rateLabel === "发生率" ? "发生 " : "成功 ") + row.count + " " + countUnit + " · 共 " + row.opportunities + " 次机会" : "";
-      return { ...row, value, unit, sampleLabel, valueCompact: value.length > 6, secondaryLabel: board.fun ? sampleLabel : points ? (row.total || 0) + " 场计分局"
+      const sampleLabel = (board.countOnly || selected?.countOnly) && !board.metric?.startsWith("fun_honor_") ? (!row.knownGames ? "暂无完整样本" : "十二骑士 · " + row.knownGames + " 局有记录") : board.countOnly || selected?.countOnly ? "玩家票选 · 获奖 " + row.count + " 次" : board.fun ? !row.knownGames ? "暂无完整样本" : (rateLabel === "发生率" ? "发生 " : "成功 ") + row.count + " " + countUnit + " · 共 " + row.opportunities + " 次机会" : "";
+      const listSampleLabel = board.fun && board.sort === "count" && row.knownGames
+        ? board.metric?.startsWith("fun_honor_") ? "玩家票选"
+          : board.countOnly || selected?.countOnly ? sampleLabel : "共 " + row.opportunities + " 次机会"
+        : sampleLabel;
+      return { ...row, value, unit, sampleLabel, valueCompact: value.length > 6, secondaryLabel: board.fun ? listSampleLabel : points ? (row.total || 0) + " 场计分局"
         : games ? (row.wins || 0) + " 胜 · 胜率 " + percent(row.winRate) + (Number.isFinite(row.winRate) ? "%" : "") : (row.wins || 0) + " 胜 · " + (row.total || 0) + " 局" };
     };
     const me = describe(board.me || {});
@@ -42,7 +46,9 @@
       : me.status === "not_enough" ? "还差 " + me.remaining + (board.fun && board.sort === "rate" ? " 次机会" : board.fun ? " " + countUnit : " 局") + "上榜"
       : me.status === "no_records" ? "尚无完整记录" : me.status === "no_games" ? "暂无有效对局" : "未上榜";
     const ruleLines = [board.period === "month" ? "本月按北京时间统计，从每月 1 日零点起计算。" : "全部榜统计历史有效记录。"];
-    if (board.countOnly || selected?.countOnly) {
+    if ((board.countOnly || selected?.countOnly) && !board.metric?.startsWith("fun_honor_")) {
+      ruleLines.push(board.description || selected?.description || "", "按实际发生次数累计，同局可计多次；次数相同并列，不提供比例榜。", "缺失过程不按零次计算。");
+    } else if (board.countOnly || selected?.countOnly) {
       ruleLines.push("按获奖局数统计，每局每项荣誉最多增加一次；票数不累加到排行榜。", "最高票同票并列获奖；累计获奖次数相同则并列排名。", "仅计入至少半数玩家完成投票的有效对局，不提供成功率榜。");
     } else if (board.fun) {
       if (board.description || selected?.description) ruleLines.push(board.description || selected.description);
@@ -61,6 +67,7 @@
     const endLabel = count > rows.length ? "已展示前 " + rows.length + " 位 · 共 " + count + " 位玩家上榜" : "已展示全部 " + count + " 位上榜玩家";
     return { ...board, countOnly: !!(board.countOnly || selected?.countOnly), rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
       currentFunOption: selected || null, rateThreshold, ruleLines, endLabel,
+      participantLabel: "共 " + count + " 人上榜", compactEndLabel: count > rows.length ? "已展示前 " + rows.length + " 位" : "已显示全部",
       emptyTitle: board.fun ? "暂无记录" : "暂无公开排名", emptyHint: board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
       me: { ...me, statusLabel, placeLabel: me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : "未上榜" } };
   }

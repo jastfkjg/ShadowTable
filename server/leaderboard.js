@@ -41,7 +41,7 @@ function parseQuery(params) {
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
   if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && !eligibleRole(funMetric, role) || role && !roleName(role)
     : ["mode", "role", "sort"].some(key => params.has(key))) throw new RuleError("排行榜参数无效",400);
-  if (funMetric?.countOnly && (sort !== "count" || role || mode !== "all")) throw new RuleError("票选荣誉仅支持跨玩法获奖次数榜", 400);
+  if (funMetric?.countOnly && (sort !== "count" || role || mode !== "all")) throw new RuleError("该趣味指标仅支持总次数榜，不提供比例或身份筛选", 400);
   return { metric, period, offset: Number(offset), version, funMetric, mode, role, sort, nearby };
 }
 const summary = row => {

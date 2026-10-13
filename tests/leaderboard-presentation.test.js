@@ -30,11 +30,28 @@ test('所有可选趣味指标仅出现一次，反向记录均可访问', () =>
   assert.equal(new Set(options.map(item=>item.key)).size,options.length);
   for(const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_defense_enemy','fun_kill_ally'])assert.ok(options.some(item=>item.key===key));
   assert.ok(options.every(item=>['good','evil','other'].includes(item.category)));
-  assert.equal(options.length,12);
+  assert.equal(options.length,14);
   assert.deepEqual(options.filter(item=>item.key.startsWith('fun_defense_')).map(item=>item.title),['绝对防御','卧龙凤雏']);
   assert.ok(options.filter(item=>item.key.startsWith('fun_defense_')).every(item=>item.category==='good'));
   assert.ok(options.every(item=>item.roleLabel && item.conditionLabel));
   assert.equal(options.find(item=>item.key==='fun_defense_ally').roleLabel,'蓝守卫／魔术师');
   assert.match(options.find(item=>item.key==='fun_kill_enemy').roleDetail,/刺客.*蓝骑士.*红猎人/);
   assert.equal(presentBoard({fun:true,metric:'fun_defense_ally',availableFunMetrics,rows:[],me:{}}).emptyTitle,'暂无记录');
+});
+
+test('趣味次数榜精简重复次数，比例榜与个人详情保留完整样本，榜尾不误报截断', () => {
+  const row={publicId:'a',count:1,opportunities:4,knownGames:4,rate:25,rank:1};
+  const base={fun:true,metric:'fun_kill_ally',availableFunMetrics,rows:[row],me:row,eligibleCount:2};
+  const count=presentBoard({...base,sort:'count'});
+  assert.equal(count.rows[0].secondaryLabel,'共 4 次机会');
+  assert.equal(count.me.sampleLabel,'发生 1 次 · 共 4 次机会');
+  assert.equal(count.participantLabel,'共 2 人上榜');
+  assert.equal(count.compactEndLabel,'已展示前 1 位');
+  assert.equal(presentBoard({...base,sort:'count',eligibleCount:1}).compactEndLabel,'已显示全部');
+  const rate=presentBoard({...base,sort:'rate'});
+  assert.equal(rate.rows[0].value,'25.0');
+  assert.equal(rate.rows[0].secondaryLabel,'发生 1 次 · 共 4 次机会');
+  const unknown=presentBoard({...base,sort:'count',rows:[{...row,knownGames:0}]});
+  assert.equal(unknown.rows[0].secondaryLabel,'暂无完整样本');
+  assert.equal(unknown.rows[0].value,'—');
 });

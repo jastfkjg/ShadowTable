@@ -24,7 +24,7 @@ function html(n) {
   return '<'+tag+' '+attrs+'>'+(n.children||[]).map(html).join('')+(tag==='img'?'':'</'+tag+'>');
 }
 const players=['小鱼','林间','阿风','大野','晚风','小树'].map((name,i)=>({seat:i+1,name,avatarUrl:'/pages/profile/assets/avatars/avatar-0'+(i+1)+'.jpg',disabled:i===0}));
-const poll=hp.present({matchId:'example',status:'open',canVote:true,canClose:true,ballot:null,completed:3,total:6,required:3,deadline:120000,serverNow:35000,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:players.slice(0,4),skip:false},{key:'svp',title:'最强 SVP',side:'败方',players:players.slice(4),skip:false}]});
+const poll=hp.present({matchId:'example',status:'open',canVote:true,canClose:true,ballot:null,completed:3,total:6,required:3,pendingPlayers:players.filter(p=>[1,4,6].includes(p.seat)),groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:players.slice(0,4),skip:false},{key:'svp',title:'最强 SVP',side:'败方',players:players.slice(4),skip:false}]});
 const awards=hp.present({status:'settled',completed:6,total:6,required:3,mvp:[{...players[1],votes:3},{...players[2],votes:3}],svp:[{...players[4],votes:4}]});
 const single=hp.present({...awards,mvp:[{...players[1],votes:4}]});
 const longNames=hp.present({...awards,mvp:[{...players[1],name:'长昵称测试玩家甲乙丙丁戊己庚辛',votes:3},{...players[2],name:'CaptainLongNames',votes:3}]});
@@ -34,6 +34,8 @@ const stats=presentStats({total:12,wins:8,losses:4,winRate:66.7,byFaction:[],byR
 const rank=presentBoard({fun:true,countOnly:true,metric:'fun_honor_mvp',metricLabel:'获奖次数',period:'all',sort:'count',unit:'次',availableFunMetrics:fun.publicMetrics(),rows:players.slice(1,4).map((p,i)=>({...p,nickname:p.name,publicId:'p'+i,initial:p.name[0],rank:i+1,count:[12,9,8][i],knownGames:12,isSelf:i===2})),me:{rank:3,count:8,knownGames:12,status:'ranked'},eligibleCount:3});
 const scenes={
   entry:['pages/table/table.wxml',{...base,honors:hp.present({status:'not_started',matchId:'example',canStart:true})}],
+  waiting:['pages/table/table.wxml',{...base,room:{...room,me:{seat:2,isHost:false}},honors:hp.present({status:'not_started',matchId:'example',canStart:false})}],
+  pending:['pages/table/table.wxml',{...base,honors:poll}],
   ballot:['pages/table/table.wxml',{...base,honors:poll,honorDialog:true,...hp.selection(poll,{mvp:2,svp:5})}],
   awards:['pages/table/table.wxml',{...base,honors:awards}],
   'awards-single':['pages/table/table.wxml',{...base,honors:single}],

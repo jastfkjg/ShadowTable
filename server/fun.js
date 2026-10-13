@@ -1,6 +1,6 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
-const VERSION = "fun-2026-10-v3";
+const VERSION = "fun-2026-10-v4";
 const { labels, titles, honors } = require("../miniprogram/fun-copy");
 const { roles: variantRoles } = require("./variants");
 const bRoles = new Set(Object.keys(variantRoles).slice(Object.keys(variantRoles).indexOf("blueAwakened")));
@@ -21,6 +21,8 @@ const extraRankings = {
   kill_ally: { rateThreshold: 1 },
 };
 const definitions = [
+  ["survival_revive", labels.survival_revive, "survival", titles.survival, "次", true],
+  ["survival_knifed", labels.survival_knifed, "survival", titles.survival, "次", true],
   ["honor_mvp", "胜方最佳", "honor", "本场最佳", "次", true],
   ["honor_svp", "败方最佳", "honor", "本场最佳", "次", true],
   ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 1],
@@ -75,7 +77,7 @@ const definitions = [
   ]),
 ].map(([id, label, group, title, unit, positive, rateThreshold]) => ({
   id,
-  countOnly: group === "honor",
+  countOnly: !!honors[id]?.countOnly,
   label,
   group,
   title,
@@ -368,6 +370,22 @@ function project(record, players, roles) {
       );
     }
     if (mode === "knights") {
+      // Draws are actual returns to play, including armor and all indirect causes.
+      const revivals = (record.replay?.events || []).filter(e => e.kind === "skills")
+        .flatMap(cycle => (cycle.draws || []).filter(draw => draw.after?.seat === player.seat)
+          .map((draw, index) => ({ id: `${cycle.id}:revive:${index}`, round: cycle.round, draw })));
+      const received = (state?.events || []).filter(e => e.kind === "attack" && e.type === "knife" &&
+        (e.recipient || e.selected)?.uid === player.uid);
+      const finalKnife = Number.isInteger(t?.target) && t.target > 0 && t.target === player.seat;
+      add("survival_revive", "all", revivals.length, 0, !!record.replay?.complete);
+      add("survival_knifed", "all", received.length + Number(finalKnife), 0, !!state?.attacksComplete);
+      for (const e of revivals)
+        events.push({ id: e.id, round: e.round, kind: "revive", label: labels.survival_revive,
+          detail: e.draw.armor ? "消耗铠甲，保留原身份复活" : "抽取新身份复活" });
+      for (const e of received)
+        events.push({ id: e.id + ":received", round: e.round, kind: "receivedKnife", label: labels.survival_knifed,
+          detail: `${e.actor.seat}号出刀 · ${effects[e.effect] || e.effect}` });
+      if (finalKnife) events.push({ id: "final-received", label: labels.survival_knifed, detail: "最终刀落到本人" });
       const attacks = (state?.events || []).filter(
         (e) => e.kind === "attack" && e.actor.uid === player.uid,
       );

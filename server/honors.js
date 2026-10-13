@@ -3,7 +3,6 @@
 const { RuleError } = require("./engine");
 const { readAvatarUrls } = require("./profile");
 const { control } = require("./match-management");
-const DURATION = 120000;
 const keys = ["mvp", "svp"];
 const check = (ok, message, status = 400) => { if (!ok) throw new RuleError(message, status); };
 const read = (store, id) => {
@@ -12,7 +11,8 @@ const read = (store, id) => {
 };
 function save(store, poll) {
   store.db.prepare("INSERT INTO honor_polls VALUES(?,?,?,?) ON CONFLICT(match_id) DO UPDATE SET state=excluded.state,status=excluded.status,deadline=excluded.deadline")
-    .run(poll.matchId, JSON.stringify(poll), poll.status, poll.deadline);
+    // Keep the legacy non-null deadline column compatible; polls no longer expire.
+    .run(poll.matchId, JSON.stringify(poll), poll.status, 0);
 }
 function matchFor(store, id) {
   const row = store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
@@ -81,8 +81,13 @@ function invalidate(store, id) {
   const match = matchFor(store, id);
   if (match) publish(store, match, { status: "invalidated", mvp: [], svp: [] });
 }
-function settleDue(store) {
-  const rows = store.db.prepare("SELECT state FROM honor_polls WHERE status='open' AND deadline<=?").all(store.clock());
+function settleOrphaned(store) {
+  // A management rematch or room removal can discard the table's poll context.
+  // Only those polls close here; an active table never closes because time passed.
+  const rows = store.db.prepare(`SELECT state FROM honor_polls WHERE status='open' AND NOT EXISTS (
+    SELECT 1 FROM rooms WHERE json_extract(rooms.state,'$.matchRecord.id')=honor_polls.match_id
+      AND json_extract(rooms.state,'$.phase')='ended'
+  )`).all();
   if (!rows.length) return;
   const finish = () => rows.forEach(row => settle(store, JSON.parse(row.state)));
   if (store.inTransaction) finish(); else store.transaction(finish);
@@ -96,12 +101,12 @@ function handle(store, room, uid, input) {
     check(room.host === uid, "只有房主可以发起票选", 403);
     check(!poll, "本局已经发起过票选", 409);
     const players = participants(store, match).map(({ uid, seat, name, outcome }) => ({ uid, seat, name, outcome }));
-    poll = { matchId: match.id, winner: match.winner, status: "open", players, required: Math.ceil(players.length / 2), ballots: {}, deadline: store.clock() + DURATION };
+    poll = { matchId: match.id, winner: match.winner, status: "open", players, required: Math.ceil(players.length / 2), ballots: {} };
     if (players.every(p => p.uid.startsWith("test:")))
       poll.testMatch = { id: match.id, code: match.code, winner: match.winner, players };
     save(store, poll);
   } else {
-    check(poll?.status === "open" && store.clock() < poll.deadline, "投票已截止，请刷新查看结果", 409);
+    check(poll?.status === "open", "投票已结束，请刷新查看结果", 409);
     if (input.type === "honorClose") {
       check(room.host === uid, "只有房主可以结束票选", 403);
       settle(store, poll);
@@ -130,9 +135,11 @@ function view(store, room, uid) {
   if (!poll) return { matchId: match.id, status: "not_started", canStart: room.host === uid };
   if (poll.status !== "open") return { matchId: match.id, ...(match.honorResult || poll.result), canStart: false };
   const avatars = readAvatarUrls(store, poll.players.map(p => p.uid));
-  return { matchId: match.id, status: "open", deadline: poll.deadline, serverNow: store.clock(),
+  return { matchId: match.id, status: "open",
     total: poll.players.length, completed: Object.keys(poll.ballots).length, required: poll.required,
     canVote: poll.players.some(p => p.uid === uid), canClose: room.host === uid, ballot: poll.ballots[uid] || null,
+    ...(room.host === uid ? { pendingPlayers: poll.players.filter(p => !Object.hasOwn(poll.ballots, p.uid))
+      .map(({ seat, name }) => ({ seat, name })) } : {}),
     groups: keys.map(key => ({ key, title: "最强 " + key.toUpperCase(), side: key === "mvp" ? "胜方" : "败方",
       skip: !choices(poll, uid, key).length,
       players: poll.players.filter(p => p.outcome === (key === "mvp" ? "win" : "loss")).map(p => ({
@@ -141,4 +148,4 @@ function view(store, room, uid) {
     })),
   };
 }
-module.exports = { handle, view, settleDue, closeForRoom, invalidate, DURATION };
+module.exports = { handle, view, settleOrphaned, closeForRoom, invalidate };

@@ -46,20 +46,49 @@ test('anonymous ballots validate both outcomes and self; all submitted settles t
     const rank=new Leaderboard(s).read('wx:2',new URLSearchParams('metric=fun_honor_mvp'));
     assert.equal(rank.rows.length,2); assert(rank.rows.every(p=>p.rank===1 && p.tied && p.count===1));
     assert.throws(()=>new Leaderboard(s).read('wx:2',new URLSearchParams('metric=fun_honor_mvp&sort=rate')),/次数榜/);
-    assert.throws(()=>vote(s,r,1),/截止/);
+    assert.throws(()=>vote(s,r,1),/结束/);
   } finally {s.close();}
 });
-test('timeout, quorum and archived results survive a rematch',()=>{
+test('polls have no timeout, including legacy deadlines; host closes and rematch preserves quorum result',()=>{
   let now=Date.now();const s=new Store(':memory:',{clock:()=>now});
   try {
     const r=fixture(s);act(s,r,r.host,'honorStart');vote(s,r,1);vote(s,r,2);
-    now+=honors.DURATION+1;honors.settleDue(s);
+    const id=r.matchRecord.id;
+    const poll=JSON.parse(s.db.prepare('SELECT state FROM honor_polls WHERE match_id=?').get(id).state);
+    assert.equal(poll.deadline,undefined);
+    // An open election created by an older server must also remain open.
+    poll.deadline=now+120000;
+    s.db.prepare('UPDATE honor_polls SET state=?,deadline=? WHERE match_id=?').run(JSON.stringify(poll),poll.deadline,id);
+    now+=7*24*60*60*1000;honors.settleOrphaned(s);
+    const open=honors.view(s,s.get(r.code),'wx:1');
+    assert.equal(open.status,'open');assert.equal(open.deadline,undefined);assert.equal(open.serverNow,undefined);
+    vote(s,r,1,3,6);
+    assert.deepEqual(honors.view(s,s.get(r.code),'wx:1').ballot,{mvp:3,svp:6});
+    act(s,r,r.host,'honorClose');
     assert.equal(honors.view(s,s.get(r.code),'wx:1').status,'insufficient');
     assert(!s.funFor('wx:2').metrics.some(p=>p.id==='honor_mvp'));
     const room=s.get(r.code);s.transaction(()=>{honors.closeForRoom(s,room);command(room,room.host,{type:'rematch',stage:room.stage});s.save(room);});
     assert.equal(honors.view(s,s.get(r.code),'wx:1'),null);
     assert.equal(s.matchFor('wx:1',r.matchRecord.id).honorResult.status,'insufficient');
   } finally {s.close();}
+});
+test('only the current host sees pending voters, without revealing other ballots',()=>{
+  const s=new Store(':memory:');
+  try {
+    const r=fixture(s);act(s,r,r.host,'honorStart');vote(s,r,1);
+    let view=honors.view(s,s.get(r.code),r.host);
+    assert.deepEqual(view.pendingPlayers,Array.from({length:5},(_,i)=>({seat:i+2,name:'玩家'+(i+2)})));
+    vote(s,r,2);vote(s,r,2,3,6);
+    view=honors.view(s,s.get(r.code),r.host);
+    assert.equal(view.completed,2);assert.deepEqual(view.pendingPlayers.map(p=>p.seat),[3,4,5,6]);
+    assert.deepEqual(view.ballot,{mvp:2,svp:5});
+    for(const uid of ['wx:2','guest:observer'])assert.equal(honors.view(s,s.get(r.code),uid).pendingPlayers,undefined);
+    const room=s.get(r.code);room.host='wx:3';s.transaction(()=>s.save(room));
+    assert.equal(honors.view(s,s.get(r.code),'wx:1').pendingPlayers,undefined);
+    assert.deepEqual(honors.view(s,s.get(r.code),'wx:3').pendingPlayers.map(p=>p.seat),[3,4,5,6]);
+    assert.equal(honors.view(s,s.get(r.code),'wx:3').ballot,null);
+    assert(!JSON.stringify(honors.view(s,s.get(r.code),'wx:3')).includes('wx:'));
+  } finally{s.close();}
 });
 test('early host settlement requires half; changing the winner invalidates awards',()=>{
   const s=new Store(':memory:');
@@ -148,7 +177,9 @@ test('pure companion elections persist and settle without creating match archive
     for(const i of [0,2,3])act(s,r,uids[i],'honorVote',{mvp:2,svp:5});
     s.close();s=new Store(path.join(dir,'test.sqlite'),{clock:()=>now});
     assert.equal(honors.view(s,s.get(r.code),uids[1]).completed,3);
-    now+=honors.DURATION+1;honors.settleDue(s);
+    now+=7*24*60*60*1000;honors.settleOrphaned(s);
+    assert.equal(honors.view(s,s.get(r.code),uids[1]).status,'open');
+    act(s,r,r.host,'honorClose');
     const shown=honors.view(s,s.get(r.code),uids[1]);
     assert.equal(shown.status,'settled');assert.equal(shown.mvp[0].votes,3);assert.equal(shown.svp[0].votes,3);
     assert.equal(s.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
@@ -157,13 +188,13 @@ test('pure companion elections persist and settle without creating match archive
     const room=s.get(r.code);s.transaction(()=>{honors.closeForRoom(s,room);command(room,room.host,{type:'rematch',stage:room.stage});s.save(room);});
     assert.equal(honors.view(s,s.get(r.code),uids[1]),null);
     assert.throws(()=>act(s,r,uids[1],'honorVote',{mvp:3,svp:6}),/本局已变化/);
-    // Management rematches can replace the room before the deadline scanner.
+    // Management rematches can replace the room before orphan reconciliation.
     // The private poll must still settle using only its companion context.
     const next=fixture(s,uids);act(s,next,next.host,'honorStart');
     for(const i of [0,2,3])act(s,next,uids[i],'honorVote',{mvp:2,svp:5});
     const replaced=s.get(next.code);
     s.transaction(()=>{command(replaced,replaced.host,{type:'rematch',stage:replaced.stage});s.save(replaced);});
-    now+=honors.DURATION+1;honors.settleDue(s);
+    honors.settleOrphaned(s);
     const poll=JSON.parse(s.db.prepare('SELECT state FROM honor_polls WHERE match_id=?').get(next.matchRecord.id).state);
     assert.equal(poll.status,'settled');assert.equal(poll.result.mvp[0].votes,3);
     assert.equal(s.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
@@ -205,6 +236,8 @@ test('HTTP votes use idempotent receipts and private projections; stale match ne
   assert.equal((await post(1,'honorVote',{mvp:2,svp:5},id)).status,200);
   assert.equal((await post(1,'honorVote',{mvp:3,svp:5},id)).status,409);
   const other=await req(2);assert.equal(other.body.honors.completed,1);assert.equal(other.body.honors.ballot,null);
+  assert.equal(other.body.honors.pendingPlayers,undefined);
+  assert.deepEqual((await req(1)).body.honors.pendingPlayers.map(p=>p.seat),[2,3,4,5,6]);
   assert.deepEqual((await req(1)).body.honors.ballot,{mvp:2,svp:5});
   assert.equal((await post(7,'honorVote',{mvp:2,svp:5})).status,403);
   for(const i of [3,4])assert.equal((await post(i,'honorVote',{mvp:2,svp:5})).status,200);

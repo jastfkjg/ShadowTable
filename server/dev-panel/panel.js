@@ -19,16 +19,19 @@ async function pooled(items, task, limit = 4) {
   if (errors.length) throw errors[0];
 }
 class Companion {
-  constructor({ request, save = () => {}, state = { code: "", actors: [] } }) {
+  constructor({ request, managed = false, save = () => {}, state = { code: "", actors: [] } }) {
     this.request = request;
+    this.managed = managed;
     this.saveState = save;
     this.code = state.code;
     this.actors = state.actors;
+    this.cleanup = state.cleanup || null;
     this.revision = 0;
   }
   save() {
     this.saveState({
       code: this.code,
+      cleanup: this.cleanup,
       actors: this.actors.map(({ id, token, name, joined, pending }) => ({
         id,
         token,
@@ -39,6 +42,7 @@ class Companion {
     });
   }
   async add(code) {
+    if (this.cleanup) throw new Error("请先重试清空陪测玩家，确认后再添加");
     if (!/^\d{6}$/.test(code)) throw new Error("请输入6位房间号");
     if (this.code && this.code !== code && this.actors.length)
       throw new Error("请先点击“打开 / 切换房间”，原房间会话将保留");
@@ -69,12 +73,14 @@ class Companion {
     return actor;
   }
   async send(actor, path, data, after) {
+    if (this.cleanup) throw new Error("请先重试清空陪测玩家，确认后再操作");
     if (actor.pending) throw new Error("该玩家仍有未确认操作，请重试原操作");
     actor.pending = { path, data, after, id: crypto.randomUUID() };
     this.save();
     return this.retry(actor);
   }
   async retry(actor) {
+    if (this.cleanup) throw new Error("请先重试清空陪测玩家，确认后再操作");
     const pending = actor.pending;
     if (!pending) return;
     this.revision++;
@@ -155,6 +161,7 @@ class Companion {
     );
   }
   async fill(progress = () => {}) {
+    if (this.cleanup) throw new Error("请先重试清空陪测玩家，确认后再补位");
     if (this.actors.some((a) => a.pending))
       throw new Error("请先重试未确认的操作");
     const viewer = this.actors.find((a) => a.joined && !a.unavailable);
@@ -184,6 +191,7 @@ class Companion {
     return unavailable.length;
   }
   async clearPlayers() {
+    if (this.managed) return this.clearManagedPlayers();
     if (this.actors.some((a) => a.pending))
       throw new Error("请先重试未确认的操作，再清空陪测玩家");
     await this.refresh();
@@ -217,6 +225,45 @@ class Companion {
         this.save();
       }
     }
+  }
+  async clearManagedPlayers() {
+    if (!/^\d{6}$/.test(this.code)) throw new Error("请输入6位房间号");
+    const path = "/api/admin/rooms/" + this.code;
+    if (!this.cleanup) {
+      let room;
+      try {
+        room = await this.request(path);
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        // The room was deleted, so there are no server seats left to remove.
+        this.revision++;
+        this.actors = [];
+        this.save();
+        return;
+      }
+      this.cleanup = {
+        action: "clear-testers",
+        stage: room.stage,
+        resetCompanionHost: true,
+        confirm: true,
+        reason: "陪测台清空陪测玩家",
+        requestId: crypto.randomUUID(),
+      };
+      this.save();
+    }
+    this.revision++;
+    try {
+      await this.request(path, null, this.cleanup, this.cleanup.requestId);
+    } catch (error) {
+      if (error.status && error.status < 500 && ![401, 429].includes(error.status))
+        this.cleanup = null;
+      this.save();
+      throw error;
+    }
+    this.revision++;
+    this.actors = [];
+    this.cleanup = null;
+    this.save();
   }
   async batch(value, progress = () => {}) {
     let count = 0;
@@ -259,12 +306,13 @@ if (typeof document !== "undefined") {
   }
   const rooms = state?.rooms || {};
   if (state?.code && state?.actors)
-    rooms[state.code] = { code: state.code, actors: state.actors };
+    rooms[state.code] = { code: state.code, actors: state.actors, cleanup: state.cleanup };
   const requestedCode = new URLSearchParams(location.search || "").get("room");
   if (/^\d{6}$/.test(requestedCode || ""))
     state = rooms[requestedCode] || { code: requestedCode, actors: [] };
   let retryAt = 0;
   const companion = new Companion({
+    managed,
     state: state || undefined,
     save: (value) => {
       if (value.code) rooms[value.code] = value;
@@ -283,6 +331,7 @@ if (typeof document !== "undefined") {
         signal: AbortSignal.timeout(10000),
         headers: {
           ...(token ? { Authorization: "Bearer " + token } : {}),
+          ...(managed && token ? { "X-Companion-Actor": "1" } : {}),
           ...(data
             ? {
                 "Content-Type": "application/json",
@@ -367,6 +416,8 @@ if (typeof document !== "undefined") {
       key.toUpperCase() + "：" + (h[key]?.map(p => `${p.seat}号 ${escape(p.name)} · ${p.votes}票`).join("、") || "暂无有效选票")).join("<br>") + '</p></section>';
     if (h.status !== "open") return '<p>本场最佳 · ' + (h.status === "insufficient" ? "参与人数不足，本局不颁奖" : "原票选已失效") + '</p>';
     let html = `<section class="honor-vote" aria-label="MVP / SVP 投票"><p>${h.completed} / ${h.total} 人已投票 · 至少 ${h.required} 人完成才颁奖</p>`;
+    if (h.canClose && h.pendingPlayers?.length)
+      html += '<p class="muted">未投票：' + h.pendingPlayers.map(p => `${p.seat}号 ${escape(p.name)}`).join("、") + '</p>';
     const selection = honorSelection(actor);
     if (selection) {
       html += '<div class="honor-vote-fields">' + selection.groups.map(g => `<label>${escape(g.title)} · ${escape(g.side)}<select data-honor="${escape(g.key)}" ${g.skip ? "disabled" : ""}>` +
@@ -374,7 +425,7 @@ if (typeof document !== "undefined") {
           `<option value="${p.seat}" ${selection.draft[g.key] === p.seat ? "selected" : ""} ${p.disabled ? "disabled" : ""}>${p.seat}号 · ${escape(p.name)}${p.disabled ? "（我，不可选）" : ""}</option>`).join("")) + '</select></label>').join("") + '</div>';
       html += button("honorVote", h.ballot ? "保存 MVP / SVP 修改" : "提交 MVP / SVP 投票", !selection.ready);
     }
-    return html + '<p class="muted">匿名票选 · 截止前可修改 · 陪测账号的获奖不计入趣味记录和排行榜</p></section>';
+    return html + '<p class="muted">匿名票选 · 陪测账号的获奖不计入趣味记录和排行榜</p></section>';
   }
   let changedActor = null;
   let resultDraft = null;
@@ -471,7 +522,7 @@ if (typeof document !== "undefined") {
   };
   function showChangedIdentity() {
     const dialog = $("identity-change");
-    if (busy || acting.size || resultDraft || document.hidden || dialog.open) return;
+    if (companion.cleanup || busy || acting.size || resultDraft || document.hidden || dialog.open) return;
     const actor = companion.actors.find(
       (a) => a.room?.me.identityChanged && a.secret && !a.pending,
     );
@@ -511,7 +562,7 @@ if (typeof document !== "undefined") {
     renderResult();
     showChangedIdentity();
     $("identity-change-confirm").disabled = busy;
-    $("workspace").hidden = !companion.actors.length;
+    $("workspace").hidden = !companion.actors.length && !(managed && companion.code);
     const room = companion.actors.find((a) => a.room)?.room;
     $("phase").textContent = room ? room.phaseName : "等待玩家入座";
     $("summary").textContent = room
@@ -530,7 +581,9 @@ if (typeof document !== "undefined") {
         const r = actor.room,
           spec = actor.secret?.action;
         let actions = "";
-        if (acting.has(actor.id))
+        if (companion.cleanup)
+          actions = '<span class="muted">请重试清空陪测玩家，确认后再操作</span>';
+        else if (acting.has(actor.id))
           actions = button("waiting", "正在确认…", true);
         else if (actor.pending) actions = button("retry", "重试未确认操作");
         else if (!actor.joined)
@@ -585,6 +638,7 @@ if (typeof document !== "undefined") {
             button("target", "确认目标");
         }
         if (
+          !companion.cleanup &&
           r?.phase === "proposal" &&
           r.leader === r.me.seat &&
           !actor.pending
@@ -593,7 +647,7 @@ if (typeof document !== "undefined") {
             teams[actor.id]?.stage === r.stage ? teams[actor.id].seats : [];
           actions += `<div><p>选择 ${r.teamSize} 名队员</p><div class="team">${r.players.map((p) => `<label><input type="checkbox" data-seat="${p.seat}" ${team.includes(p.seat) ? "checked" : ""}>${p.seat}号</label>`).join("")}</div>${button("propose", "提交队伍", team.length !== r.teamSize)}</div>`;
         }
-        if (r?.me.isHost && !actor.pending) {
+        if (!companion.cleanup && r?.me.isHost && !actor.pending) {
           let hostActions = '<section class="host-controls" aria-label="房主管理"><div class="host-heading">房主管理</div><div class="host-primary">';
           if (r.phase === "lobby") hostActions += button("start", "开始游戏");
           if (r.canAdvance && !r.flexible)
@@ -683,23 +737,24 @@ if (typeof document !== "undefined") {
     if (!busy && !acting.size) {
       ["join", "refresh"].forEach((id) => ($(id).disabled = false));
       $("join").disabled =
-        $("code").value.trim() === companion.code &&
+        !!companion.cleanup || ($("code").value.trim() === companion.code &&
         !!room &&
-        (room.phase !== "lobby" || room.players.length >= room.capacity);
-      $("leave").disabled = companion.actors.some((a) => a.pending);
+        (room.phase !== "lobby" || room.players.length >= room.capacity));
+      $("leave").disabled = !managed && companion.actors.some((a) => a.pending);
+      $("leave").textContent = companion.cleanup ? "重试清空陪测玩家" : "清空陪测玩家";
       $("switch-room").disabled = false;
       $("forget-unavailable").disabled = !companion.actors.some(
         (a) => a.unavailable,
       );
       $("fill").disabled =
-        !room ||
+        !!companion.cleanup || !room ||
         room.phase !== "lobby" ||
         companion.actors.some((a) => a.pending);
       document
         .querySelectorAll("[data-batch]")
         .forEach(
           (b) =>
-            (b.disabled = !companion.actors.some(
+            (b.disabled = !!companion.cleanup || !companion.actors.some(
               (a) =>
                 a.room &&
                 !a.pending &&
@@ -756,6 +811,7 @@ if (typeof document !== "undefined") {
         if (typeof history !== "undefined")
           history.replaceState(null, "", location.pathname + "?room=" + code);
         companion.actors = next.actors.map((a) => ({ ...a }));
+        companion.cleanup = next.cleanup || null;
         companion.save();
         $("identity-change").close();
         changedActor = null;
@@ -984,11 +1040,13 @@ if (typeof document !== "undefined") {
   $("leave").onclick = () => {
     if (
       !confirm(
-        "清空本面板的陪测玩家？若陪测玩家是房主，将先结束本局、回到准备阶段并转交房主给真人玩家。保留真人玩家和牌桌，可重新添加陪测玩家。",
+        managed
+          ? "清空当前房间的全部陪测玩家（含失效账号）？未确认操作可能已经生效；清空将撤销陪测凭据。若陪测玩家是房主，将先结束本局、回到准备阶段并转交给真人玩家。保留真人玩家和牌桌。"
+          : "清空本面板的陪测玩家？若陪测玩家是房主，将先结束本局、回到准备阶段并转交房主给真人玩家。保留真人玩家和牌桌，可重新添加陪测玩家。",
       )
     )
       return;
-    run(() => companion.clearPlayers(), "陪测玩家已清空，可重新添加测试玩家");
+    return run(() => companion.clearPlayers(), "陪测玩家已清空，可重新添加测试玩家");
   };
   render();
   if (companion.actors.length)

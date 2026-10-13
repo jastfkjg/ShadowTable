@@ -120,7 +120,7 @@ class Store {
   writeFun(match, uid, projection) {
     this.db.prepare("DELETE FROM match_fun_stats WHERE match_id=? AND uid=?").run(match.id, uid);
     const insert = this.db.prepare("INSERT INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)");
-    for (const row of projection.metrics) insert.run(match.id, uid, fun.metrics[row.id]?.countOnly ? "voted" : projection.mode, row.id, row.role, roleName(row.role) || "未知角色", row.count, row.opportunities, row.status, match.endedAt);
+    for (const row of projection.metrics) insert.run(match.id, uid, fun.metrics[row.id]?.group === "honor" ? "voted" : projection.mode, row.id, row.role, roleName(row.role) || "未知角色", row.count, row.opportunities, row.status, match.endedAt);
   }
   rebuildFun(match, players) {
     const projections = fun.project(match, players, roleName);

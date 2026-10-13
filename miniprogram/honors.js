@@ -7,8 +7,7 @@
   function present(value, asset = url => url, failed = new Set()) {
     if (!value) return null;
     const player = p => ({ ...p, initial: Array.from(p.name || "友")[0], avatarUrl: p.avatarUrl && !failed.has(p.avatarUrl) ? asset(p.avatarUrl) : "" });
-    const seconds = Math.max(0, Math.ceil((value.deadline - value.serverNow) / 1000));
-    return { ...value, timeLabel: Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0"),
+    return { ...value, pendingLabel: (value.pendingPlayers || []).map(p => `${p.seat}号 ${p.name}`).join("、"),
       groups: (value.groups || []).map(group => ({ ...group, players: group.players.map(player) })),
       awards: keys.map(key => ({ key, title: "最强 " + key.toUpperCase(), tied: value[key]?.length > 1, players: (value[key] || []).map(player) })),
       resultNote: value.status === "insufficient" ? `仅 ${value.completed} / ${value.total} 人投票，未达到 ${value.required} 人，本局不颁奖`

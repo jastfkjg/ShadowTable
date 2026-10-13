@@ -10,6 +10,7 @@
 .honor-footnote { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
 .honor-primary { width: 100%; min-height: 48px; margin: 16px 0 8px; }
 .honor-progress { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.honor-pending { margin-top: 6px; overflow-wrap: anywhere; word-break: break-all; }
 .honor-close-poll { min-height: 44px; font-size: 13px; }
 .honor-award, .honor-ballot-group { --honor-color: #e5c68b; }
 .honor-ballot-group { margin-top: 20px; }

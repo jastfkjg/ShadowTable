@@ -2,6 +2,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const { mkdtempSync, rmSync } = require("node:fs");
+const { tmpdir } = require("node:os");
+const { join } = require("node:path");
 const { createApp } = require("../server/app");
 const { Companion } = require("../server/dev-panel/panel");
 const key = "test-admin-key-" + "a".repeat(40);
@@ -15,10 +18,14 @@ async function setup(t, opts = {}) {
     ...opts,
   });
   await new Promise((r) => app.server.listen(0, "127.0.0.1", r));
-  t.after(async () => {
+  let closed = false;
+  const close = async () => {
+    if (closed) return;
+    closed = true;
     await new Promise((r) => app.server.close(r));
     app.store.close();
-  });
+  };
+  t.after(close);
   let cookie = "";
   async function raw(path, data, extra = {}) {
     const r = await new Promise((resolve, reject) => {
@@ -85,8 +92,208 @@ async function setup(t, opts = {}) {
       reason: "验证管理操作",
       ...extra,
     });
-  return { app, raw, api, login, player, auth, room, action };
+  return { app, raw, api, login, player, auth, room, action, close };
 }
+
+function managedPanel(a, options = {}, cookie) {
+  return new Companion({
+    managed: true,
+    request: (path, token, data, id) =>
+      a.api(path === "/api/dev-login" ? "/api/admin/actors" : path, data, {
+        ...(token ? { ...a.auth(token), "X-Companion-Actor": "1" } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(id ? { "Idempotency-Key": id } : {}),
+      }),
+    ...options,
+  });
+}
+
+test("重新部署保留管理员和陪测归属、未确认请求；退出和更换密钥仍撤销管理会话", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "shadowtable-companion-restart-"));
+  const database = join(dir, "test.sqlite");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const a = await setup(t, { database });
+  const cookie = (await a.raw("/api/admin/login", { key })).headers.get("set-cookie").split(";")[0];
+  const { code } = await a.room();
+  await a.action(code, "test-on");
+  let saved;
+  const c = managedPanel(a, { save: state => { saved = structuredClone(state); } });
+  const actor = await c.add(code);
+  const request = c.request;
+  c.request = async (...args) => {
+    await request(...args);
+    throw new Error("回执丢失");
+  };
+  await assert.rejects(c.command(actor, "ready", { ready: true }), /回执丢失/);
+  const pendingId = saved.actors[0].pending.id;
+  await a.close();
+
+  const b = await setup(t, { database });
+  assert.equal((await b.api("/api/admin/session", undefined, { Cookie: cookie })).authenticated, true);
+  const restored = managedPanel(b, { state: saved }, cookie);
+  await restored.refresh();
+  assert.equal(restored.actors[0].room.me.ready, true);
+  assert.equal(restored.actors[0].pending.id, pendingId);
+  await restored.retry(restored.actors[0]);
+  assert.equal(restored.actors[0].pending, null);
+  assert.equal(b.app.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='companion' AND json_extract(details,'$.command')='ready'").get().n, 1);
+  await b.api("/api/admin/logout", {}, { Cookie: cookie });
+  await b.close();
+
+  const d = await setup(t, { database });
+  assert.equal((await d.raw("/api/admin/rooms", undefined, { Cookie: cookie })).status, 401);
+  const otherCookie = (await d.raw("/api/admin/login", { key })).headers.get("set-cookie").split(";")[0];
+  await d.close();
+  const rotated = await setup(t, { database, adminKey: key + "rotated" });
+  assert.equal((await rotated.raw("/api/admin/rooms", undefined, { Cookie: otherCookie })).status, 401);
+  await rotated.close();
+  const reverted = await setup(t, { database });
+  assert.equal((await reverted.raw("/api/admin/rooms", undefined, { Cookie: otherCookie })).status, 401);
+  await reverted.close();
+});
+
+test("管理员会话保持八小时有效期，过期 Cookie 与陪测令牌不能继续操作", async (t) => {
+  let now = Date.now();
+  const a = await setup(t, { clock: () => now });
+  await a.login();
+  const { code } = await a.room();
+  await a.action(code, "test-on");
+  const c = managedPanel(a);
+  const actor = await c.add(code);
+  now += 8 * 3600000;
+  assert.equal((await a.api("/api/admin/session")).authenticated, false);
+  await assert.rejects(c.command(actor, "ready", { ready: true }), error => error.status === 401);
+  await a.login();
+  await assert.rejects(c.retry(actor), error => error.status === 403);
+  await c.clearPlayers();
+  assert.equal(a.app.store.get(code).players.length, 1);
+});
+
+test("失效陪测与未确认请求可通过管理权限清空，保留真人及其他房间，空本地记录也可清理服务器", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code, token } = await a.room();
+  const other = await a.room();
+  await a.action(code, "test-on");
+  await a.action(other.code, "test-on");
+  const c = managedPanel(a), d = managedPanel(a);
+  const actor = await c.add(code), otherActor = await d.add(other.code);
+  const spectator = await a.player("spectator");
+  await a.api(`/api/rooms/${code}/join`, { name: "真人围观", requireSeat: false }, a.auth(spectator));
+  const room = a.app.store.get(code);
+  const human = room.players.find(p => p.uid === room.host);
+  // Mark an existing real player as a spectator to cover both collections.
+  const watcher = room.players.find(p => p.uid !== human.uid && !p.uid.startsWith("test:"));
+  room.players = room.players.filter(p => p !== watcher);
+  room.spectators = [watcher];
+  a.app.store.save(room);
+  const request = c.request;
+  c.request = async (...args) => { await request(...args); throw new Error("回执丢失"); };
+  await assert.rejects(c.command(actor, "ready", { ready: true }), /回执丢失/);
+  c.request = request;
+  a.app.store.db.prepare("UPDATE sessions SET expires=? WHERE uid LIKE ?").run(Date.now() - 1, `test:${code}:%`);
+  await a.login();
+  await c.refresh();
+  assert.equal(actor.unavailable, true);
+  assert.ok(actor.pending);
+  await c.clearPlayers();
+  const cleared = a.app.store.get(code);
+  assert.equal(cleared.host, human.uid);
+  assert.deepEqual(cleared.players, [human]);
+  assert.equal(cleared.spectators.length, 1);
+  assert.equal(cleared.spectators[0].name, "真人围观");
+  assert.equal(c.actors.length, 0);
+  assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM sessions WHERE uid LIKE ?").get(`test:${code}:%`).n, 0);
+  assert.ok(a.app.store.get(other.code).players.some(p => p.name === otherActor.name));
+  await c.add(code);
+  const noLocalActors = managedPanel(a, { state: { code, actors: [] } });
+  await noLocalActors.clearPlayers();
+  assert.equal(a.app.store.get(code).players.length, 1);
+  assert.equal((await a.api(`/api/rooms/${code}`, undefined, a.auth(token))).me.isHost, true);
+  await c.add(code);
+  await a.action(code, "delete");
+  await c.clearPlayers();
+  assert.deepEqual(c.actors, []);
+});
+
+test("清空响应丢失后跨刷新重试原编号，不重复清理新陪测或重复审计", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  const { code } = await a.room();
+  await a.action(code, "test-on");
+  let saved;
+  const c = managedPanel(a, { save: state => { saved = structuredClone(state); } });
+  await c.add(code);
+  const request = c.request;
+  c.request = async (...args) => {
+    const result = await request(...args);
+    if (args[2]?.action === "clear-testers") throw new Error("回执丢失");
+    return result;
+  };
+  await assert.rejects(c.clearPlayers(), /回执丢失/);
+  const id = saved.cleanup.requestId;
+  assert.equal(c.actors.length, 1);
+  await assert.rejects(c.add(code), /重试清空/);
+  const newPanel = managedPanel(a);
+  await newPanel.add(code);
+  await a.login();
+  const restored = managedPanel(a, { state: saved });
+  assert.equal(restored.cleanup.requestId, id);
+  await restored.clearPlayers();
+  assert.equal(restored.cleanup, null);
+  assert.deepEqual(restored.actors, []);
+  assert.equal(a.app.store.get(code).players.length, 2);
+  assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='clear-testers'").get().n, 1);
+  const invalidReuse = { ...saved.cleanup, stage: "different-stage" };
+  await assert.rejects(a.api(`/api/admin/rooms/${code}`, invalidReuse), error => error.status === 409);
+});
+
+test("失效陪测房主可结束并重开后清空，真人房主的进行中对局及唯一陪测房主保持不变", async (t) => {
+  const a = await setup(t);
+  await a.login();
+  for (const phase of ["tools", "terminated", "ended", "human-host", "no-human"]) {
+    const { code, token } = await a.room();
+    await a.action(code, "test-on");
+    const c = managedPanel(a);
+    const bot = await c.add(code);
+    await c.fill();
+    const hostCommand = (type, extra = {}, actorToken = token) => a.api(`/api/rooms/${code}/commands`, {
+      type, stage: a.app.store.get(code).stage, ...extra,
+    }, a.auth(actorToken));
+    await hostCommand("ready", { ready: true });
+    await c.batch("ready");
+    if (phase !== "human-host") await hostCommand("transfer", { seat: bot.room.me.seat });
+    if (phase === "no-human") await hostCommand("leave");
+    else {
+      const hostToken = phase === "human-host" ? token : bot.token;
+      await hostCommand("start", { flexible: true }, hostToken);
+      if (["ended", "terminated"].includes(phase))
+        await hostCommand(phase === "ended" ? "finishTools" : "terminate", { winner: "good" }, hostToken);
+    }
+    const before = a.app.store.get(code);
+    if (["human-host", "no-human"].includes(phase)) {
+      const path = `/api/admin/rooms/${code}`;
+      const input = { action: "clear-testers", stage: before.stage,
+        requestId: randomUUID(), resetCompanionHost: true };
+      await assert.rejects(a.api(path, input), error => error.status === 400);
+      await assert.rejects(a.api(path, { ...input, confirm: true, stage: "stale" }), error => error.status === 409);
+      await assert.rejects(c.clearPlayers(), /请先/);
+      assert.deepEqual(a.app.store.get(code), before);
+      assert.equal(c.actors.length, 5);
+      assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM sessions WHERE uid LIKE ?").get(`test:${code}:%`).n, 5);
+    } else {
+      a.app.store.db.prepare("DELETE FROM sessions WHERE uid LIKE ?").run(`test:${code}:%`);
+      await c.clearPlayers();
+      const room = a.app.store.get(code);
+      assert.equal(room.phase, "lobby");
+      assert.equal(room.players.length, 1);
+      assert.equal(room.host, room.players[0].uid);
+      assert.equal(room.players[0].ready, false);
+      await c.add(code);
+      assert.equal(c.actors.length, 1);
+    }
+  }
+});
 test("管理平台默认关闭，生产配置要求 HTTPS 和长密钥", async (t) => {
   const a = await setup(t, { adminKey: "" });
   assert.equal((await a.raw("/admin")).status, 404);
@@ -318,8 +525,26 @@ test("同域网页登录 Cookie 不干扰陪测入座、恢复重试和操作，
   await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
     ...a.auth(bot.token), Cookie: `${secondAdmin.headers.get("set-cookie").split(";")[0]}; ${webCookie}`,
   }), e => e.status === 403);
+  webCookie = await browserLogin(await a.player("fresh-web-player"));
+  a.app.store.db.prepare("UPDATE sessions SET expires=? WHERE uid LIKE ?")
+    .run(Date.now() - 1, `test:${code}:%`);
+  const staleHeaders = { ...a.auth(bot.token), Cookie: `${adminCookie}; ${webCookie}` };
+  // Reproduce the misleading player-cookie error, then verify explicit actor requests.
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, staleHeaders), e => e.status === 409);
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+    ...staleHeaders, "X-Companion-Actor": "1",
+  }), e => e.status === 401 && /陪测登录已失效/.test(e.message));
+  await assert.rejects(a.api(`/api/rooms/${code}/commands`, {
+    type: "submit", stage: a.app.store.get(code).stage, value: "confirm",
+  }, { ...staleHeaders, "X-Companion-Actor": "1" }), e => e.status === 401);
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+    ...a.auth(token), Cookie: `${adminCookie}; ${webCookie}`, "X-Companion-Actor": "1",
+  }), e => e.status === 401);
+  assert.equal(a.app.store.get(code).submissions[a.app.store.get(code).host], undefined);
   await a.api("/api/admin/logout", {}, { Cookie: adminCookie });
-  await assert.rejects(request(`/api/rooms/${code}`, bot.token), e => e.status === 401);
+  await assert.rejects(a.api(`/api/rooms/${code}`, undefined, {
+    ...staleHeaders, "X-Companion-Actor": "1",
+  }), e => e.status === 401);
 });
 test("在线陪测不归档个人对局数据，接口仍绑定管理会话与测试房间", async (t) => {
   const a = await setup(t);
@@ -465,6 +690,7 @@ test("管理写操作原因选填，保留状态冲突检查与概览身份隔�
   await assert.rejects(a.action(code, "test-on"), (e) => e.status === 409);
   const list = await a.api("/api/admin/rooms");
   assert.doesNotMatch(JSON.stringify(list), /SECRET|wx:|token|openid/);
+  assert.doesNotMatch(JSON.stringify(await a.api(`/api/admin/rooms/${code}`)), /SECRET|wx:|token|openid/);
   await a.action(code, "terminate", { reason: "" });
   assert.equal(a.app.store.get(code).phase, "terminated");
   await a.action(code, "rematch", { reason: undefined });

@@ -1599,7 +1599,7 @@ test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应�
     const group=c.viewLeaderboard();html+=group;
     assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,category==='all'?options.length:options.filter(item=>item.category===category).length);
   }
-  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 12 项/);
+  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 14 项/);
   assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);
   c.ACTIONS.rankToggleMetrics();
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_defense_ally'}});assert.match(urls.at(-1),/metric=fun_defense_ally.*mode=all&sort=rate$/);
@@ -1847,13 +1847,20 @@ test('网页月报默认完整展示且不重复榜单，荣誉使用头像明�
   assert.match(empty, /有效对局/);
 });
 
-test('网页最佳玩家票选选择、截止前修改与全部并列获奖卡片', async()=>{
+test('网页最佳玩家票选不限时，支持房主未投名单、选择修改与全部并列获奖卡片', async()=>{
   const hp=require('../miniprogram/honors');const c=client(async()=>response({}));
-  const h=hp.present({status:'open',matchId:'m',canVote:true,canClose:true,deadline:120000,serverNow:0,total:6,completed:0,required:3,groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},{key:'svp',title:'最强 SVP',side:'败方',players:[{seat:5,name:'晚风'}]}]});
+  const h=hp.present({status:'open',matchId:'m',canVote:true,canClose:true,total:6,completed:0,required:3,pendingPlayers:[{seat:2,name:'<林间>'},{seat:5,name:'晚风'}],groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},{key:'svp',title:'最强 SVP',side:'败方',players:[{seat:5,name:'晚风'}]}]});
   Object.assign(c.state,{page:'table',honors:h,network:true,busy:false});c.ACTIONS.openHonors();
   c.ACTIONS.chooseHonor({dataset:{key:'mvp',seat:'1'}});assert.equal(c.state.honorReady,false);
   c.ACTIONS.chooseHonor({dataset:{key:'mvp',seat:'2'}});c.ACTIONS.chooseHonor({dataset:{key:'svp',seat:'5'}});assert.equal(c.state.honorReady,true);
   assert.match(c.viewHonorBallot(),/aria-pressed="true"/);assert.match(c.viewHonorBallot(),/我 · 不可选/);
+  assert.doesNotMatch(c.viewHonorBallot(),/剩余|截止前可修改|关闭后可从牌桌继续|NaN/);
+  const pending=c.viewHonors(h);assert.match(pending,/未投票：2号 &lt;林间&gt;、5号 晚风/);
+  assert.match(pending,/data-action="closeHonors"/);assert.doesNotMatch(pending,/剩余|NaN/);
+  assert.doesNotMatch(c.viewHonors({...h,canClose:false}),/未投票：|data-action="closeHonors"/);
+  const waiting=c.viewHonors(hp.present({status:'not_started',canStart:false}));
+  assert.match(waiting,/等待房主发起票选/);assert.doesNotMatch(waiting,/胜方 MVP|可选环节|每局仅一次/);
+  assert.match(c.viewHonors(hp.present({status:'not_started',canStart:true})),/data-action="startHonors"/);
   c.ACTIONS.dismissHonors();assert.equal(c.viewHonorBallot(),'');
   const shown=hp.present({status:'settled',completed:6,total:6,mvp:[{seat:2,name:'林间',votes:3},{seat:3,name:'阿风',votes:3}],svp:[{seat:5,name:'晚风',votes:4}]});
   const html=c.viewHonors(shown);assert.equal((html.match(/class="honor-winner"/g)||[]).length,3);assert.match(html,/并列获奖/);assert.match(html.replace(/<[^>]*>/g,''),/2 号 · 3 票/);

@@ -370,6 +370,7 @@ function roleConfiguration(roles) {
     ].filter((id) => roles.includes(id) && ROLES[id][1] === faction);
     return {
       faction,
+      count: roles.filter((id) => ROLES[id][1] === faction).length,
       label:
         faction === "good"
           ? "好人阵营"

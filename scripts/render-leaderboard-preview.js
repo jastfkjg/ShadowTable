@@ -39,6 +39,12 @@ function scene(response,extra={}) {
     funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,funOptionsCanScroll:true,...extra};
 }
 const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric})]));
+const allyRows=[{publicId:'ally-a',nickname:'玥玥子',rank:1,count:1,opportunities:4,knownGames:4,rate:25},{publicId:'ally-b',nickname:'元',rank:1,count:1,opportunities:5,knownGames:5,rate:20}];
+const ally={...shield,metric:'fun_kill_ally',title:'痛击队友',metricLabel:'击杀友方次数',rows:allyRows,eligibleCount:2,me:{status:'not_enough',rank:null,count:0,opportunities:1,knownGames:1,rate:0,remaining:1}};
+scenes.ally=scene(ally);
+scenes['ally-rate']=scene({...ally,sort:'rate',unit:'%',rows:allyRows.map((row,i)=>({...row,rank:i+1})),metricLabel:'击杀友方发生率'});
+scenes['ally-rules']=scene(ally,{rulesExpanded:true});
+scenes.honor=scene({...ally,metric:'fun_honor_mvp',countOnly:true});
 scenes.fun=scene(shield);scenes.sheet=scene(shield,{metricsExpanded:true});
 scenes.good=scene(shield,{metricsExpanded:true,funCategory:'good',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'good')});
 scenes.evil=scene(shield,{metricsExpanded:true,funCategory:'evil',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'evil'),funOptionsCanScroll:false});

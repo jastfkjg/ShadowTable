@@ -95,11 +95,11 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
-test("十二项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
+test("十四项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
   const fun = require("../server/fun");
   assert.deepEqual(fun.publicMetrics().map(m => m.honorTitle), [
     "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "职业刺客", "背锅侠",
-    "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "最强 MVP", "最强 SVP",
+    "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "我在阿瓦隆玩重生", "全民公敌", "最强 MVP", "最强 SVP",
   ]);
   for (const [reason, target, green, bust] of [
     ["assassination", 3, 1, 0], ["assassination", 1, 0, 1],
@@ -1242,4 +1242,101 @@ test("HTTP趣味登记鉴权、幂等和本人过滤；管理员更正同步记�
       .get().n,
     1,
   );
+});
+
+test("十二骑士复活覆盖刀、决斗、猎人、换号、替死、反伤和铠甲，未回场不计", () => {
+  const scenarios = [
+    [{"wx:1":"redAwakened","wx:2":"blueAwakened"}, {"wx:1":"target:2"}, [2]],
+    [{"wx:1":"redKnight","wx:2":"blueAwakened"}, {"wx:1":"target:2"}, [2]],
+    [{"wx:1":"blueKnight","wx:2":"blueAwakened"}, {"wx:1":"target:2"}, [1]],
+    [{"wx:1":"redHunter","wx:2":"blueAwakened"}, {"wx:1":"detonate:2"}, [1,2]],
+    [{"wx:1":"redAwakened","wx:2":"blueHunter","wx:3":"blueAwakened"}, {"wx:1":"target:2","wx:2":"passive:3"}, [2,3]],
+    [{"wx:1":"redAwakened","wx:2":"blueAwakened","wx:3":"magician","wx:4":"blueAwakened"}, {"wx:1":"target:2","wx:3":"swap:2:4"}, [4]],
+    [{"wx:1":"redAwakened","wx:2":"witch","wx:3":"blueAwakened"}, {"wx:1":"target:2","wx:2":"target:3"}, [3]],
+    [{"wx:1":"redAwakened","wx:2":"paladin"}, {"wx:1":"target:2"}, [1]],
+  ];
+  for (const [map, actions, revived] of scenarios) {
+    const r = deal(true); configure(r, map); r.knights.deck = ["servant", "servant", "servant"];
+    skills(r, actions); finish(r, {winner:"good"});
+    for (const p of r.players) {
+      assert.equal(row(r,p.uid,"survival_revive").count, Number(revived.includes(p.seat)), JSON.stringify(map)+p.uid);
+      assert.equal(row(r,p.uid,"survival_revive").status,"known");
+    }
+  }
+  for (const armor of [false,true]) {
+    const r=deal(true); configure(r,{"wx:1":"redAwakened","wx:2":"blueAwakened"});
+    r.knights.players["wx:2"].armor=armor;
+    if (armor) r.knights.deck=["servant"];
+    skills(r,{"wx:1":"target:2"}); finish(r,{winner:"good"});
+    assert.equal(row(r,"wx:2","survival_revive").count, Number(armor));
+    assert.equal(row(r,"wx:2","survival_knifed").count,1);
+  }
+});
+
+test("被刀不要求生效，按换号替死后的承受者统计，枪和决斗不计", () => {
+  const cases = [
+    [{"wx:1":"gareth"},{"wx:1":"target:2"},2,"invalid_role"],
+    [{"wx:1":"redAwakened","wx:3":"blueGuard"},{"wx:1":"target:2","wx:3":"target:2"},2,"guarded"],
+    [{"wx:1":"gareth","wx:2":"assassin"},{"wx:1":"target:2"},2,"disarmed"],
+    [{"wx:1":"redAwakened","wx:2":"paladin"},{"wx:1":"target:2"},2,"reflected"],
+    [{"wx:1":"redAwakened","wx:3":"magician"},{"wx:1":"target:2","wx:3":"swap:2:4"},4,"eliminated"],
+    [{"wx:1":"redAwakened","wx:2":"witch"},{"wx:1":"target:2","wx:2":"target:3"},3,"eliminated"],
+    [{"wx:1":"redHunter"},{"wx:1":"detonate:2"},0,"eliminated"],
+    [{"wx:1":"redKnight"},{"wx:1":"target:2"},0,"eliminated"],
+  ];
+  for (const [map,actions,recipient,effect] of cases) {
+    const r=deal(true); configure(r,map); r.knights.players["wx:2"].b=false;
+    skills(r,actions); finish(r,{winner:"good"});
+    assert.equal(r.matchRecord.funFacts.events.find(e=>e.kind==="attack").effect,effect);
+    for(const p of r.players) assert.equal(row(r,p.uid,"survival_knifed").count,Number(p.seat===recipient));
+  }
+  const multi=deal(true); configure(multi,{"wx:1":"redAwakened","wx:3":"redAwakened"});
+  skills(multi,{"wx:1":"target:2","wx:3":"target:2"}); finish(multi,{winner:"good"});
+  assert.equal(row(multi,"wx:2","survival_knifed").count,2);
+});
+
+test("同局多次复活和被刀、最终刀、取消与未知历史不混淆", () => {
+  const r=deal(true); configure(r,{"wx:1":"redAwakened","wx:3":"redAwakened"}); r.knights.deck=["servant","servant"];
+  skills(r,{"wx:1":"target:2"}); r.knights.round++;
+  skills(r,{"wx:3":"target:2"}); finish(r,{funReason:"assassination",funTarget:2,funActor:1});
+  assert.equal(row(r,"wx:2","survival_revive").count,2);
+  assert.equal(row(r,"wx:2","survival_knifed").count,3);
+  const fun=require("../server/fun"), record=structuredClone(r.matchRecord);
+  delete record.replay; record.funFacts.attacksComplete=false;
+  const old=fun.project(record,record.players,id=>id).find(p=>p.uid==="wx:2");
+  assert.ok(old.fun.metrics.filter(m=>m.id.startsWith("survival_")).every(m=>m.status==="unknown"));
+  const canceled=deal(true); run(canceled,"beginActivity",{kind:"skills"});
+  run(canceled,"cancelActivity"); finish(canceled,{winner:"good"});
+  assert.equal(row(canceled,"wx:2","survival_revive").count,0);
+  assert.equal(row(canceled,"wx:2","survival_knifed").count,0);
+  const classic=deal(); finish(classic);
+  assert.ok(classic.matchRecord.players.every(p=>!p.fun.metrics.some(m=>m.id.startsWith("survival_"))));
+});
+
+test("生存趣事投影重启回填幂等、保持十二骑士分组，次数榜与分享不混用票选文案", () => {
+  const directory=mkdtempSync(join(tmpdir(),"shadowtable-survival-")), path=join(directory,"data.sqlite");
+  let store=new Store(path);
+  try {
+    const r=deal(true); configure(r,{"wx:1":"redAwakened"}); r.knights.deck=["servant"];
+    skills(r,{"wx:1":"target:2"}); finish(r,{funReason:"assassination",funTarget:2,funActor:1});
+    store.save(r); saveProfile(store,"wx:2",{nickname:"复活玩家",version:readProfile(store,"wx:2").version,leaderboardVisible:true});
+    store.db.exec("DELETE FROM match_fun_stats WHERE metric LIKE 'survival_%'; UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.version','fun-2026-10-v3')");
+    store.close(); store=new Store(path);
+    const stats=store.funFor("wx:2"), card=stats.cards.find(c=>c.id==="knights:survival");
+    assert.deepEqual(card.metrics.map(m=>m.count),[1,2]);
+    const board=new Leaderboard(store);
+    for(const metric of ["survival_revive","survival_knifed"]) {
+      const result=board.read("wx:2",new URLSearchParams("metric=fun_"+metric));
+      assert.equal(result.me.rank,1); assert.equal(result.countOnly,true);
+      assert.throws(()=>board.read("wx:2",new URLSearchParams("metric=fun_"+metric+"&sort=rate")),/次数/);
+      const presented=require("../miniprogram/leaderboard-presentation").presentBoard(result);
+      assert.doesNotMatch(presented.ruleLines.join()+presented.me.sampleLabel,/票选|获奖/);
+      const shared=require("../miniprogram/share-card").funCard({}, {fun:stats},card.id,metric,Date.now());
+      assert.equal(shared.context,"十二骑士"); assert.doesNotMatch(shared.metrics[0].label,/获奖/);
+      assert.equal(store.matchesFor("wx:2",0,20,false,{metric,mode:"knights"}).total,1);
+    }
+    const before=JSON.stringify(stats); store.close(); store=new Store(path);
+    store.transaction(()=>store.archiveMatch(r.matchRecord));
+    assert.equal(JSON.stringify(store.funFor("wx:2")),before);
+  } finally {store.close();rmSync(directory,{recursive:true,force:true});}
 });

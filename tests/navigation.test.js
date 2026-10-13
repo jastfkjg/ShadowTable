@@ -983,7 +983,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -994,6 +994,8 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   assert.ok(disclosures>=10);
   const styles=fs.readFileSync(path.join(root,'app.wxss'),'utf8');
   assert.match(styles,/button\.disclosure-button:not\(\[disabled\]\):active\s*\{\s*opacity:\s*1;/);
+  const homeStyles=fs.readFileSync(path.join(root,'pages/home/home.wxss'),'utf8');
+  assert.match(homeStyles,/\.entry-option-pressed\s*\{\s*opacity:\s*\.78;/);
 });
 test('新页面模板编译，资料与战绩只出现在个人页面，牌桌无底部导航内容', () => {
   const context = {window:{},global:{},console}; vm.createContext(context);
@@ -1479,17 +1481,18 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
   await p.clearFunFilter();assert.equal(urls.at(-1),'/api/me/matches?offset=0');
 });
-test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到响应隔离，旧服务回退独立于积分',async()=>{
+test('小程序趣味榜汇总全部身份，保留比例与样本门槛，迟到响应隔离，旧服务回退独立于积分',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=(metric='fun_kill_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'刀中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
+  const result=(metric='fun_kill_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:null,unit:'%',metricLabel:'刀中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
   const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return {...result(metric),...(metric==='fun_defense_ally'?{role:null,roleOptions:[]}: {})};}});
   const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
-  await p.load(false,{metric:'fun_kill_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
-  assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_kill_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
+  p.data.funRole='gareth'; // A stale selection must not narrow the new all-role leaderboard.
+  await p.load(false,{metric:'fun_kill_enemy',funSort:'rate'});resolveOld(result('fun_merlin_evade'));await old;
+  assert.match(urls[1],/mode=all&sort=rate$/);assert.doesNotMatch(urls[1],/[?&]role=/);assert.equal(p.data.board.metric,'fun_kill_enemy');assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
   assert.equal(p.data.funOptions.length,defs.filter(m=>m.key!=='fun_final_hit').length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_defense_ally'));assert.ok(!p.data.funOptions.some(m=>m.key==='fun_final_hit'));
   p.toggleMetrics();assert.equal(p.data.metricsExpanded,true);
   await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_defense_ally'}}});assert.match(urls.at(-1),/metric=fun_defense_ally.*mode=all&sort=rate$/);
-  assert.equal(p.data.metric,'fun_defense_ally');assert.equal(p.data.funRole,'');assert.equal(p.data.metricsExpanded,false);
+  assert.equal(p.data.metric,'fun_defense_ally');assert.equal(p.data.board.role,null);assert.equal(p.data.metricsExpanded,false);
   p.toggleMetrics();const reads=urls.length;
   await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_defense_ally'}}});assert.equal(p.data.metricsExpanded,false);assert.equal(urls.length,reads);
   for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_kill_ally','fun_defense_enemy']) {
@@ -1726,7 +1729,6 @@ test('首页入口按需展开，关闭保留草稿且清理键盘；原生键�
   assert.equal(p.data.entrySheet, false);
   p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
   assert.equal(p.data.entrySheet, true);
-  assert.equal(p.data.entryEditingName, false);
   assert.equal(p.data.entryFocusedField, 'code');
   p.entryKeyboardChange({ detail: { height: 280 } });
   assert.equal(p.data.entryKeyboardHeight, 280);
@@ -1739,7 +1741,7 @@ test('首页入口按需展开，关闭保留草稿且清理键盘；原生键�
   assert.equal(p.data.entryKeyboardHeight, 0);
   p.switchEntry({ currentTarget: { dataset: { mode: 'create' } } });
   assert.equal(p.data.entryFocusedField, '');
-  p.editEntryName();
+  p.entryInputFocus({ currentTarget: { dataset: { field: 'nickname' } }, detail: { height: 280 } });
   assert.equal(p.data.entryFocusedField, 'nickname');
   p.onHide();
   assert.equal(p.data.entryFocusedField, '');

@@ -6,7 +6,8 @@ const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const flush = () => new Promise(setImmediate);
 
-function panel({ overrides = {}, search = "", saved, pathname = "/admin/companion", playerCookie = false } = {}) {
+function panel({ overrides = {}, search = "", saved, pathname = "/admin/companion", playerCookie = false,
+  actorStatus = 200, cleanupFailure = false } = {}) {
   const elements = new Map();
   const element = (id) => {
     if (!elements.has(id))
@@ -80,15 +81,21 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
         poll = fn;
       },
       fetch: (path, options) => {
-        const token = options.headers.Authorization.slice(7);
+        const token = options.headers.Authorization?.slice(7);
         calls.push({
           path,
           method: options.method,
           credentials: options.credentials,
           token,
+          companionHeader: options.headers["X-Companion-Actor"],
           data: options.body && JSON.parse(options.body),
         });
-        if (playerCookie && options.credentials !== "omit")
+        const cleanupRequest = path.startsWith("/api/admin/rooms/");
+        if (cleanupRequest && options.method === "POST" && cleanupFailure)
+          return Promise.reject(new Error("回执丢失"));
+        if (!cleanupRequest && actorStatus !== 200)
+          return Promise.resolve(response({ error: "陪测登录已失效，请清空陪测玩家后重新添加" }, actorStatus));
+        if (playerCookie && options.credentials !== "omit" && !options.headers["X-Companion-Actor"])
           return Promise.resolve(response({ error: "浏览器账号已变化，请刷新页面" }, 409));
         const body =
           options.method === "POST" ? { accepted: true } : room(token);
@@ -190,12 +197,16 @@ test("陪测房主可发起或截止 MVP/SVP，普通玩家只显示投票操作
   assert.match(p.element("players").innerHTML, /data-action="honorStart"/);
   p.click("0", "honorStart"); await flush();
   assert.equal(p.calls.find(c => c.method === "POST").data.matchId, "honor-host");
-  overrides.honors = openHonors({ matchId: "honor-host", canClose: true }); await p.poll();
+  overrides.honors = openHonors({ matchId: "honor-host", canClose: true,
+    pendingPlayers: [{ seat: 3, name: "<胜方>" }, { seat: 5, name: "败方" }] }); await p.poll();
   assert.match(p.element("players").innerHTML, /data-action="honorClose"/);
+  assert.match(p.element("players").innerHTML, /未投票：3号 &lt;胜方&gt;、5号 败方/);
+  assert.doesNotMatch(p.element("players").innerHTML, /截止前可修改/);
   p.click("0", "honorClose"); await flush();
   assert.deepEqual(p.calls.filter(c => c.method === "POST").map(c => c.data.type), ["honorStart", "honorClose"]);
   overrides.me = { seat: 2, isHost: false }; overrides.honors.canClose = false; await p.poll();
   assert.doesNotMatch(p.element("players").innerHTML, /data-action="honorStart"|data-action="honorClose"/);
+  assert.doesNotMatch(p.element("players").innerHTML, /未投票：/);
 });
 
 test("陪测房主先选择胜方再归档，空选、取消和重复点击不提交结束请求", async () => {
@@ -322,11 +333,75 @@ test("本地陪测隔离网页登录 Cookie，管理陪测保留管理员 Cookie
   await local.element("batch-ready").onclick();
   assert.equal(local.calls.filter(call => call.method === "POST").length, 11);
   assert.ok(local.calls.every(call => call.credentials === "omit"));
+  assert.ok(local.calls.every(call => !call.companionHeader));
   assert.match(local.element("feedback").textContent, /已完成 11/);
-  const managed = panel();
+  const managed = panel({ playerCookie: true });
   await flush();
   await managed.element("batch-ready").onclick();
   assert.ok(managed.calls.every(call => call.credentials === "same-origin"));
+  assert.ok(managed.calls.every(call => call.companionHeader === "1"));
+});
+
+test("凭据失效且有未确认操作时，清空仍可用且只通过管理员权限清理，保留其他房间", async () => {
+  const oldActor = { id: "stale", token: "expired", name: "旧陪测", joined: true,
+    pending: { id: "original", path: "/api/rooms/123456/commands", data: { type: "ready" } } };
+  const p = panel({ actorStatus: 401, saved: { code: "123456", actors: [oldActor],
+    rooms: { "654321": { code: "654321", actors: [{ ...oldActor, id: "other" }] } } } });
+  await flush();
+  assert.match(p.element("players").innerHTML, /陪测登录已失效/);
+  assert.equal(p.element("leave").disabled, false);
+  await p.element("leave").onclick();
+  await flush();
+  assert.equal(p.stored().actors.length, 0);
+  assert.equal(p.stored().rooms["654321"].actors[0].pending.id, "original");
+  const writes = p.calls.filter(call => call.method === "POST");
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, "/api/admin/rooms/123456");
+  assert.equal(writes[0].token, undefined);
+  assert.equal(writes[0].companionHeader, undefined);
+  assert.equal(writes[0].data.action, "clear-testers");
+  assert.equal(writes[0].data.resetCompanionHost, true);
+  assert.equal(writes[0].data.confirm, true);
+  assert.match(p.element("feedback").textContent, /已清空/);
+});
+
+test("清空回执丢失后显示重试并阻止新操作，刷新和切换房间保留原清空编号", async () => {
+  const p = panel({ cleanupFailure: true, overrides: {
+    phase: "tools", canUseTools: true, me: { seat: 2, isHost: true },
+  } });
+  await flush();
+  await p.element("leave").onclick();
+  const saved = p.stored();
+  const id = saved.cleanup.requestId;
+  assert.match(p.element("feedback").textContent, /回执丢失/);
+  assert.match(p.element("leave").textContent, /重试清空/);
+  assert.equal(p.element("fill").disabled, true);
+  assert.equal(p.element("join").disabled, true);
+  assert.equal(p.element("batch-ready").disabled, true);
+  assert.doesNotMatch(p.element("players").innerHTML, /host-controls|data-action=/);
+  p.element("code").value = "654321";
+  await p.element("switch-room").onclick();
+  p.element("code").value = "123456";
+  await p.element("switch-room").onclick();
+  assert.equal(p.stored().cleanup.requestId, id);
+  const restored = panel({ saved, search: "?room=123456" });
+  await flush();
+  await restored.element("leave").onclick();
+  const calls = restored.calls.filter(call => call.path.startsWith("/api/admin/rooms/"));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].data.requestId, id);
+  assert.equal(restored.stored().cleanup, null);
+  assert.equal(restored.stored().actors.length, 0);
+});
+
+test("打开房间后即使本地没有账号，也保留清理服务器残留座位的入口", async () => {
+  const p = panel({ search: "?room=654321", saved: { code: "123456", actors: [] } });
+  await flush();
+  assert.equal(p.element("workspace").hidden, false);
+  assert.equal(p.element("leave").disabled, false);
+  await p.element("leave").onclick();
+  assert.equal(p.calls.find(call => call.method === "POST").path, "/api/admin/rooms/654321");
 });
 
 test("全部准备确认后直接解锁并显示结果，不追加11次状态读取", async () => {

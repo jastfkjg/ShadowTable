@@ -12,6 +12,16 @@ const {
   privateView,
 } = require("../server/engine");
 const root = path.resolve(__dirname, "../miniprogram");
+const createTablePage = require("../miniprogram/pages/table/controller");
+function entryBoardData(capacity, boardId = "classic") {
+  const controller = createTablePage({ lobby: true });
+  controller.data.boards = BOARDS;
+  controller.data.boardId = boardId;
+  controller.setData = values => Object.assign(controller.data, values);
+  controller.selectCapacity(capacity);
+  const { availableBoards, boardName, boardRoleConfiguration } = controller.data;
+  return { capacity, boardId: controller.data.boardId, availableBoards, boardName, boardRoleConfiguration };
+}
 const ctx = { window: {}, global: {}, console };
 vm.createContext(ctx);
 const factory = vm.runInContext(
@@ -62,7 +72,10 @@ function html(n) {
         : `${k}="${escape(k === "style" ? String(v).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)") : k === "src" && /^\/(?:assets|pages)\//.test(v) ? "/miniprogram" + v : v)}"`,
     )
     .join(" ");
-  return `<${tag} ${attrs}>${(n.children || []).map(html).join("")}${tag === "input" ? "" : `</${tag}>`}`;
+  let children = (n.children || []).map(html).join("");
+  // Native form has an internal block wrapper: its WXML children are not flex items.
+  if (n.tag === "wx-form") children = `<div class="wx-form-native-wrapper">${children}</div>`;
+  return `<${tag} ${attrs}>${children}${tag === "input" ? "" : `</${tag}>`}`;
 }
 const r = newRoom("628419", "p1", "林间", "classic-court", 12);
 for (let i = 2; i <= 12; i++)
@@ -99,8 +112,9 @@ const base = {
   code: "",
   boards: BOARDS,
   availableBoards: BOARDS.filter((b) => b.available && b.counts.includes(6)),
-  capacities: [6, 7, 8, 9, 10, 11, 12],
+  capacities: [5, 6, 7, 8, 9, 10, 11, 12, 13],
   entryMode: "create",
+  entryKeyboardHeight: 0,
   showRules: true,
   revealed: false,
   secret: null,
@@ -133,9 +147,7 @@ const scenes = {
   roomRules: { ...roomData(), showRoomRules: true },
   home12: {
     ...base, entrySheet: true,
-    capacity: 12,
-    boardId: "classic-court",
-    availableBoards: BOARDS.filter((b) => b.available && b.counts.includes(12)),
+    ...entryBoardData(12, "classic-court"),
   },
   join: { ...base, entryMode: "join", entrySheet: true, entryKeyboardHeight: 0 },
   joinWithRooms: {
@@ -162,7 +174,11 @@ scenes.homeJoinSheet = { ...scenes.homeRedesign, entryMode: "join", entrySheet: 
 scenes.homeJoinKeyboard = { ...scenes.homeJoinSheet, entryKeyboardHeight: 280 };
 scenes.homeJoinError = { ...scenes.homeJoinSheet, entryKeyboardHeight: 280, code: "123", entryCodeError: "请输入完整的 6 位数字房间码" };
 scenes.homeCreateSheet = { ...scenes.homeRedesign, entryMode: "create", entrySheet: true, entryKeyboardHeight: 0 };
-scenes.homeFirstJoin = { ...scenes.homeJoinKeyboard, name: "", nicknameSetup: true, code: "", entryEditingName: true, entryFocusedField: "nickname" };
+scenes.homeCreate12 = { ...scenes.homeCreateSheet, ...entryBoardData(12, "knights") };
+scenes.homeCreateChaos = { ...scenes.homeCreateSheet, ...entryBoardData(12, "chaos") };
+scenes.homeCreateKeyboard = { ...scenes.homeCreate12, entryKeyboardHeight: 280, entryFocusedField: "nickname" };
+scenes.homeCreateFirst = { ...scenes.homeCreateSheet, name: "", nicknameSetup: true };
+scenes.homeFirstJoin = { ...scenes.homeJoinKeyboard, name: "", nicknameSetup: true, code: "", entryFocusedField: "nickname" };
 scenes.homeLongNames = { ...scenes.homeRedesign, visibleMemberRooms: [{ ...homeRooms[0], note: "周五朋友十二骑士聚会的很长很长的牌桌备注", compactRelation: "房主：这是一个很长的玩家昵称 · 我在12号" }] };
 
 const playerCard = { id: "preview", seat: 3, name: "小林", initial: "小", isHost: true, avatarUrl: "/pages/profile/assets/avatars/avatar-03.jpg" };

@@ -2,14 +2,13 @@
   <view wx:if="{{honors}}" class="honor-result {{honors.status==='settled'?'is-settled':''}}">
     <block wx:if="{{honors.status==='not_started'}}">
       <view class="honor-heading">谁是本场最佳？</view>
-      <view class="honor-help">胜方 MVP · 败方 SVP，由本局玩家匿名票选</view>
       <button wx:if="{{honors.canStart}}" class="primary honor-primary" bindtap="startHonors" disabled="{{busy}}" hover-class="none">发起 MVP / SVP 投票</button>
-      <view wx:else class="honor-help">等待房主选择发起票选</view>
-      <view class="honor-footnote">可选环节，不影响胜负与积分 · 每局仅一次</view>
+      <view wx:else class="honor-help">等待房主发起票选</view>
     </block>
     <block wx:elif="{{honors.status==='open'}}">
       <view class="honor-heading">本场最佳 · 投票中</view>
-      <view class="honor-progress"><text>{{honors.completed}} / {{honors.total}} 人已投票</text><text>剩余 {{honors.timeLabel}}</text></view>
+      <view class="honor-progress"><text>{{honors.completed}} / {{honors.total}} 人已投票</text></view>
+      <view wx:if="{{honors.canClose && honors.pendingLabel}}" class="honor-help honor-pending">未投票：{{honors.pendingLabel}}</view>
       <button wx:if="{{honors.canVote}}" class="primary honor-primary" bindtap="openHonors" disabled="{{busy}}" hover-class="none">{{honors.ballot?'已提交 · 修改投票':'投出我的 MVP / SVP'}}</button>
       <view class="honor-footnote">至少 {{honors.required}} 人完成投票才颁奖 · 匿名票选</view>
       <button wx:if="{{honors.canClose}}" class="text-button honor-close-poll" bindtap="closeHonors" disabled="{{busy}}" hover-class="none">结束投票并结算</button>
@@ -55,9 +54,8 @@
         </view>
       </scroll-view>
       <view class="honor-sheet-footer">
-        <view class="honor-help">已选 {{honorSelected}} / {{honorRequired}} · 匿名投票 · 剩余 {{honors.timeLabel}}</view>
+        <view class="honor-help">已选 {{honorSelected}} / {{honorRequired}} · 匿名投票</view>
         <button class="primary honor-primary" bindtap="submitHonors" disabled="{{busy || !honorReady}}" loading="{{busy}}" hover-class="none">{{honors.ballot?'保存修改':'提交投票'}}</button>
-        <view class="honor-footnote">截止前可修改 · 关闭后可从牌桌继续</view>
       </view>
     </view>
   </view>

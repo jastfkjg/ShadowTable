@@ -16,17 +16,16 @@
   <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates" aria-label="胜率阵营"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
   <view wx:if="{{funSelected}}" class="fun-rank-filters">
     <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" aria-label="选择趣味指标" hover-class="none">
-      <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><view class="fun-option-heading"><text class="fun-metric-name">{{item.title}}</text><text wx:if="{{item.roleLabel}}" class="fun-identity">{{funRole ? funRoleOptions[funRoleIndex].label : item.roleLabel}}</text></view><view class="fun-metric-description">{{item.conditionLabel || item.label}}</view></view></block></view>
+      <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><view class="fun-option-heading"><text class="fun-metric-name">{{item.title}}</text></view><view class="fun-metric-description">{{item.conditionLabel || item.label}}</view></view></block></view>
       <view class="fun-filter-chevron" aria-hidden="true"></view>
     </button>
     <view class="fun-sort-row">
       <view class="fun-sort" aria-label="排序方式">
-        <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">{{board.countOnly?'按获奖次数':'按次数'}}</button>
-        <button wx:if="{{!board.countOnly}}" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}" hover-class="none">按{{board.rateLabel || '成功率'}}</button>
+        <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">{{board.currentFunOption.group==='honor'?'获奖次数':'次数'}}</button>
+        <button wx:if="{{!board.countOnly}}" bindtap="chooseFunSort" data-id="rate" class="{{funSort==='rate'?'selected':''}}" aria-pressed="{{funSort==='rate'}}" hover-class="none">{{board.rateLabel || '成功率'}}</button>
       </view>
-      <text class="fun-sort-direction">由高到低</text>
+      <text wx:if="{{board.fun && !loading}}" class="fun-rank-count">{{board.participantLabel}}</text>
     </view>
-    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter"><text class="fun-filter-label">技能身份</text><picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="技能身份"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker></view>
   </view>
   <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="rank-notice small muted" role="status">{{notice}}</view>
@@ -34,10 +33,10 @@
   <block wx:if="{{board}}">
     <view wx:if="{{loading || loadingMore || visibilitySaving || shareOpening}}" class="rank-share-status small muted" role="status">{{shareOpening?'正在打开分享页…':visibilitySaving?'正在保存公开设置…':'正在读取榜单…'}}</view>
     <view wx:if="{{shareNotice}}" class="rank-share-status small muted" role="alert">{{shareNotice}}</view>
-    <view class="rank-list-heading"><text>排名 / 玩家</text><text>{{board.valueHeading || (board.metric==='games'?'有效局数':board.metricLabel)}}</text></view>
+    <view wx:if="{{!board.fun}}" class="rank-list-heading"><text>排名 / 玩家</text><text>{{board.valueHeading || (board.metric==='games'?'有效局数':board.metricLabel)}}</text></view>
     <view wx:if="{{board.rows.length}}" class="rank-list">
       <button wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}}" bindtap="openRankPlayerCard" data-id="{{item.publicId}}" disabled="{{loading || loadingMore || visibilitySaving}}" hover-class="none" aria-label="{{'查看'+item.nickname+'的玩家战绩'+(item.rank?'，'+(item.tied?'并列':'')+'第'+item.rank+'名':'')}}">
-        <view class="rank-number rank-place-{{item.rank}}" aria-hidden="true"><image wx:if="{{item.rank===1}}" class="rank-crown" src="/assets/rank-1.svg" /><text>{{item.rank}}</text><text wx:if="{{item.tied}}" class="rank-tie">并列</text></view>
+        <view class="rank-number rank-place-{{item.rank}}" aria-hidden="true"><text>{{item.rank}}</text><text wx:if="{{item.tied}}" class="rank-tie">并列</text></view>
         <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="rank-avatar" src="{{item.avatarUrl}}" mode="aspectFill" binderror="rankAvatarError" data-id="{{item.publicId}}" data-url="{{item.avatarUrl}}" aria-hidden="true" />
         <view wx:else class="rank-avatar rank-avatar-fallback" aria-hidden="true">{{item.initial}}</view>
         <view class="rank-identity"><view class="rank-name"><text class="rank-nickname">{{item.nickname}}</text><text wx:if="{{item.isSelf}}" class="rank-self-label">我</text></view><view class="rank-secondary">{{item.secondaryLabel}}</view></view>
@@ -46,10 +45,10 @@
     </view>
     <view wx:else class="rank-empty"><view class="rank-empty-title">{{board.emptyTitle || '暂无公开排名'}}</view><view class="small muted">{{board.emptyHint}}</view></view>
     <button wx:if="{{board.hasMore}}" class="rank-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loading || loadingMore}}" hover-class="none">{{loadingMore?'正在加载…':'加载更多'}}</button>
-    <view wx:elif="{{board.rows.length && !loading}}" class="rank-list-end {{board.eligibleCount===1?'is-sparse':''}}"><view>{{board.eligibleCount===1?'当前仅 1 位玩家满足上榜条件':board.endLabel}}</view><view wx:if="{{board.eligibleCount===1}}" class="rank-end-hint">有新的有效记录后，榜单会同步更新</view></view>
+    <view wx:elif="{{board.rows.length && !loading}}" class="rank-list-end {{!board.fun && board.eligibleCount===1?'is-sparse':''}}"><view>{{board.fun?board.compactEndLabel:board.eligibleCount===1?'当前仅 1 位玩家满足上榜条件':board.endLabel}}</view><view wx:if="{{!board.fun && board.eligibleCount===1}}" class="rank-end-hint">有新的有效记录后，榜单会同步更新</view></view>
     <view class="rank-mine" aria-label="我的排名">
       <button class="disclosure-button rank-mine-toggle" bindtap="toggleMine" aria-expanded="{{mineExpanded}}" aria-label="我的排名，详情与公开设置" hover-class="none">
-        <view class="rank-mine-stats"><view class="rank-mine-brief"><text class="rank-mine-label">我的排名</text><text class="rank-mine-place">{{board.me.placeLabel || (board.me.rank?'第 '+board.me.rank+' 名':'未上榜')}}</text></view><view class="rank-mine-brief rank-mine-metric"><text class="rank-mine-label">{{board.valueHeading || board.metricLabel}}</text><text class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></text></view></view>
+        <view class="rank-mine-stats"><view class="rank-mine-brief"><text class="rank-mine-label">我的排名</text><text class="rank-mine-place">{{board.me.placeLabel || (board.me.rank?'第 '+board.me.rank+' 名':'未上榜')}}</text></view><view class="rank-mine-brief rank-mine-metric"><text class="rank-mine-label">{{board.fun?(board.sort==='rate'?board.rateLabel:'当前次数'):(board.valueHeading || board.metricLabel)}}</text><text class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></text></view></view>
         <view class="rank-mine-entry"><text>我的榜单</text><view class="rank-chevron" aria-hidden="true"></view></view>
       </button>
     </view>

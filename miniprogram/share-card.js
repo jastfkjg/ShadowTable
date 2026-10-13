@@ -82,6 +82,7 @@ function funCard(profile, stats, cardId, metricId, now) {
   const group = stats.fun?.cards?.find(card => card.id === cardId);
   const metric = group?.metrics?.find(row => row.id === metricId && row.ranked);
   if (!metric || metric.value == null || !metric.knownGames) throw new Error("这项成绩还没有完整记录，暂时无法生成图片。");
+  if (metric.countOnly && !metric.id.startsWith("honor_")) return { kind: "combat", ...identity(profile), context: "十二骑士", scope: metric.conditionLabel, title: metric.honorTitle, metrics: [{label:metric.label+"次数",value:number(metric.count),color:"accent"}], notes:[], asOf:now };
   if (metric.countOnly) return { kind: "combat", ...identity(profile), context: "玩家票选", scope: "", title: metric.honorTitle, metrics: [{label:"获奖次数",value:number(metric.count),color:"accent"}], notes:["每局获奖计一次 · 平票并列获奖"], asOf:now };
   if (cardId.endsWith(":knife")) return { kind: "combat", ...identity(profile), context: "趣味成绩", scope: "", title: "刀客刀法", metrics: knifeMetrics(group), notes: [], asOf: now };
   return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: [metric.honorTitle || (metricId === "good_shield" ? "" : clean(group.title)), metric.roleLabel].filter(Boolean).join(" · "),

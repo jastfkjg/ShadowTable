@@ -485,13 +485,14 @@ test("10人仅保留用户确认的经典基础角色板", () => {
 test("所有可用板子的角色说明与实际发牌一致，六人使用派西莫甘娜配置", () => {
   const { BOARDS } = require("../server/engine");
   assert.deepEqual(BOARDS[0].roleConfigurations[6], [
-    { faction: "good", label: "好人阵营", roles: "梅林，派西维尔，忠臣×2" },
-    { faction: "evil", label: "坏人阵营", roles: "莫甘娜，刺客" },
+    { faction: "good", count: 4, label: "好人阵营", roles: "梅林，派西维尔，忠臣×2" },
+    { faction: "evil", count: 2, label: "坏人阵营", roles: "莫甘娜，刺客" },
   ]);
   for (const b of BOARDS.filter((b) => b.available)) {
     for (const n of b.counts) {
       const r = newRoom("123456", "p1", "玩家1", b.id, n);
       const expected = b.roleConfigurations[n];
+      assert.equal(expected.reduce((total, group) => total + group.count, 0), n);
       assert.deepEqual(publicView(r, "p1").roleConfiguration, expected);
       for (let i = 2; i <= n; i++) enter(r, "p" + i, "玩家" + i);
       r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
@@ -654,8 +655,8 @@ test("5人经典局使用指定阵容并按五轮任务人数开局", () => {
   const r = setup(5);
   assert.deepEqual(Object.values(r.roles).sort(), ["merlin", "percival", "servant", "morgana", "assassin"].sort());
   assert.deepEqual(publicView(r, "p1").roleConfiguration, [
-    { faction: "good", label: "好人阵营", roles: "梅林，派西维尔，忠臣" },
-    { faction: "evil", label: "坏人阵营", roles: "莫甘娜，刺客" },
+    { faction: "good", count: 3, label: "好人阵营", roles: "梅林，派西维尔，忠臣" },
+    { faction: "evil", count: 2, label: "坏人阵营", roles: "莫甘娜，刺客" },
   ]);
   assert.deepEqual(TEAMS[5], [2, 3, 2, 3, 3]);
   all(r);

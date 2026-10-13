@@ -253,6 +253,12 @@ function createApp({
       const token = (req.headers.authorization || "").replace(/^Bearer /, "");
       const bearerSession = /^[a-f0-9]{64}$/.test(token)
         ? store.session(hash(token)) : null;
+      // An expired companion token must never fall back to the browser's player cookie.
+      if (req.headers["x-companion-actor"] === "1")
+        check(
+          bearerSession?.uid.startsWith("test:"),
+          "陪测登录已失效，请清空陪测玩家后重新添加", 401,
+        );
       // Companion actors share the browser's player cookies, but use their own identity.
       // Their administrator session, ownership and room are still checked below.
       const browserSession = bearerSession?.uid.startsWith("test:")
@@ -261,7 +267,7 @@ function createApp({
       const session = browserSession || bearerSession;
       check(session, "登录已过期，请重新登录", 401);
       const uid = session.uid;
-      honors.settleDue(store);
+      honors.settleOrphaned(store);
       if (uid.startsWith("test:")) {
         check(admin, "陪测平台未启用", 403);
         const adminSession = admin.authenticate(req);
@@ -540,7 +546,7 @@ function createApp({
     }
   });
   const honorTimer = setInterval(() => {
-    try { honors.settleDue(store); } catch (error) { console.error("Honor settlement failed", error.message); }
+    try { honors.settleOrphaned(store); } catch (error) { console.error("Honor settlement failed", error.message); }
   }, 1000);
   honorTimer.unref();
   server.on("close", () => clearInterval(honorTimer));
