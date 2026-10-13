@@ -84,7 +84,7 @@ function funCard(profile, stats, cardId, metricId, now) {
   if (!metric || metric.value == null || !metric.knownGames) throw new Error("这项成绩还没有完整记录，暂时无法生成图片。");
   if (metric.countOnly) return { kind: "combat", ...identity(profile), context: "玩家票选", scope: "", title: metric.honorTitle, metrics: [{label:"获奖次数",value:number(metric.count),color:"accent"}], notes:["每局获奖计一次 · 平票并列获奖"], asOf:now };
   if (cardId.endsWith(":knife")) return { kind: "combat", ...identity(profile), context: "趣味成绩", scope: "", title: "刀客刀法", metrics: knifeMetrics(group), notes: [], asOf: now };
-  return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: metricId === "good_shield" ? "" : clean(group.title),
+  return { kind: "fun", ...identity(profile), context: "趣味成绩", scope: [metric.honorTitle || (metricId === "good_shield" ? "" : clean(group.title)), metric.roleLabel].filter(Boolean).join(" · "),
     hero: number(metric.count), unit: clean(metric.unit), label: clean(metric.label),
     chart: { ratio: metric.opportunities ? metric.count / metric.opportunities : null, value: percent(metric.rate), label: metric.rateLabel || "成功率" },
     metrics: [stat(metric.opportunities, "有效机会"), stat(metric.knownGames, "有记录局数")],
@@ -96,10 +96,11 @@ function funSummaryCard(profile, stats, now) {
   const groups = new Map();
   for (const group of stats.fun.cards) {
     const key = group.id.split(":").pop();
-    const combined = groups.get(key) || { title: key === "knife" ? "刀客刀法" : key === "shield" ? "成功挡刀" : clean(group.title), metrics: new Map() };
+    const roleLabel = ["defense", "kill"].includes(key) ? group.metrics[0]?.roleLabel : "";
+    const combined = groups.get(key) || { title: [key === "knife" ? "刀客刀法" : key === "shield" ? "成功挡刀" : clean(group.title), roleLabel].filter(Boolean).join(" · "), metrics: new Map() };
     for (const metric of group.metrics) {
       if (metric.id.endsWith("aim_enemy")) continue;
-      const item = combined.metrics.get(metric.id) || { id: metric.id, label: clean(metric.label), unit: clean(metric.unit), ranked: metric.ranked, positive: metric.positive, count: 0, opportunities: 0, knownGames: 0, value: null };
+      const item = combined.metrics.get(metric.id) || { id: metric.id, label: clean(metric.honorTitle || metric.label), unit: clean(metric.unit), ranked: metric.ranked, positive: metric.positive, count: 0, opportunities: 0, knownGames: 0, value: null };
       if (Number.isFinite(metric.value) && metric.knownGames > 0) {
         item.count += metric.count; item.opportunities += metric.opportunities; item.knownGames += metric.knownGames; item.value = item.count;
       }
@@ -187,7 +188,7 @@ function leaderboardCard(profile, board) {
   else if (me.status === "unsupported") notes.push("当前账号不参与排行榜");
   else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? board.sort === "rate" ? " 次有效机会" : " 次" : " 局") : ""));
   return { kind: "rank", ...identity(profile), title, context: period,
-    scope: board.fun ? [board.metric === "fun_good_shield" ? "" : clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role)].filter(Boolean).join(" · ") : "",
+    scope: board.fun ? [board.metric === "fun_good_shield" ? "" : clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role || board.roleLabel)].filter(Boolean).join(" · ") : "",
     hero: board.fun ? board.sort === "rate" ? decimal(me.rate) : number(me.count) : points ? number(me.points) : games ? number(me.total) : decimal(me.winRate),
     unit: board.fun ? clean(board.unit) : points ? "分" : games ? "局" : "%",
     label: board.fun ? clean(board.metricLabel) : points ? "我的积分" : games ? "有效局数" : title.replace(/榜$/, ""),

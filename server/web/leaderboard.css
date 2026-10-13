@@ -59,8 +59,8 @@ button.rank-mine-toggle { width: 100%; min-height: 56px; margin: 0 auto; padding
 .fun-rank-filters { padding-top: 12px; }
 button.fun-metric-toggle { width: 100%; min-height: 48px; margin: 0; padding: 8px 12px; justify-content: space-between; gap: 10px; text-align: left; background: var(--surface); border-radius: 9px; }
 .fun-metric-current { min-width: 0; overflow-wrap: anywhere; }
-.fun-metric-role { font-size: 13px; color: var(--muted); font-weight: 400; margin-right: 7px; }
 .fun-metric-name { font-size: 15px; font-weight: 600; }
+.fun-metric-description { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .fun-filter-chevron { color: var(--muted); flex-shrink: 0; width: 6px; height: 6px; margin-top: -3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); }
 .fun-sort-row, .fun-role-filter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fun-sort-row { margin-top: 3px; }
@@ -79,15 +79,20 @@ button.fun-metric-toggle { width: 100%; min-height: 48px; margin: 0; padding: 8p
 .rank-sheet-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; }
 .rank-sheet-title { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; }
 button.rank-sheet-close { flex-shrink: 0; width: auto; min-width: 48px; min-height: 48px; margin: 0 -6px 0 0; padding: 4px 6px; color: var(--muted); font-size: 12.5px; }
-.fun-categories { flex-shrink: 0; display: flex; gap: 8px; padding: 0 16px 10px; }
-.fun-categories button { flex: 1; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 4px 12px; background: rgba(177,191,198,.08); color: var(--muted); font-size: 13px; }
+.fun-categories { flex-shrink: 0; display: flex; gap: 6px; padding: 0 16px 8px; }
+.fun-categories button { flex: 1; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 4px 6px; background: rgba(177,191,198,.08); color: var(--muted); font-size: 13px; white-space: nowrap; }
 .fun-categories .selected { color: var(--accent); background: rgba(229,198,139,.12); }
-.fun-metric-options { height: 36vh; min-height: 0; box-sizing: border-box; padding: 0 16px; }
-button.fun-metric-option { width: 100%; min-width: 0; min-height: 48px; margin: 0 0 4px; padding: 8px 10px; gap: 8px; justify-content: space-between; text-align: left; border: 0.5px solid transparent; border-radius: 8px; }
+.fun-options-count { flex-shrink: 0; padding: 0 16px 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.fun-metric-options { height: 44vh; min-height: 0; box-sizing: border-box; padding: 0 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.fun-metric-options.is-compact { height: 144px; max-height: 44vh; }
+button.fun-metric-option { width: 100%; min-width: 0; min-height: 68px; margin: 0 0 4px; padding: 10px; gap: 8px; justify-content: space-between; text-align: left; border: 0.5px solid transparent; border-radius: 8px; }
 button.fun-metric-option.selected { border-color: rgba(229,198,139,.5); background: rgba(229,198,139,.08); }
-.fun-option-copy { min-width: 0; overflow-wrap: anywhere; }
-.fun-option-title { color: var(--muted); font-size: 12px; font-weight: 400; margin-right: 7px; }
-.fun-option-label { font-size: 14px; font-weight: 500; }
+.fun-option-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fun-option-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.fun-option-title { font-size: 15px; font-weight: 600; line-height: 1.5; }
+.fun-identity { display: inline-block; max-width: 100%; padding: 1px 6px; border-radius: 4px; background: rgba(177,191,198,.09); color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; white-space: nowrap; }
+.fun-option-label { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; font-weight: 400; line-height: 1.5; }
+.fun-scroll-hint { flex-shrink: 0; min-height: 24px; padding: 2px 16px 4px; box-sizing: border-box; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
 .fun-option-radio { flex-shrink: 0; display: flex; justify-content: center; align-items: center; width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; }
 .selected .fun-option-radio { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .fun-option-check { width: 4px; height: 7px; margin-bottom: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
@@ -116,9 +121,9 @@ button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; ba
   .rank-sheet-header, .fun-categories, .fun-metric-options, .rank-sheet-footer, .rank-rules-body, .rank-details-body { padding-left: 16px; padding-right: 16px; }
   .rank-sheet-title { font-size: 20px; }
   button.rank-sheet-close, .fun-categories button, .fun-option-label, .rank-rule-line, .rank-visibility { font-size: 14px; }
-  .fun-option-title, .rank-sheet-note, .rank-details-body .small { font-size: 12px; }
+  .rank-sheet-note, .rank-details-body .small { font-size: 12px; }
   .fun-categories { padding-bottom: 8px; }
-  .fun-categories button { padding: 4px 12px; }
+  .fun-categories button { padding: 4px 6px; }
   .fun-metric-options { height: 28vh; }
   .rank-sheet-footer { padding-top: 8px; padding-bottom: 8px; }
   .rank-sheet-note { margin-bottom: 8px; }

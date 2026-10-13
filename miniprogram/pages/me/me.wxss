@@ -1,33 +1,35 @@
 .me-page {
-  --me-divider: rgba(177, 191, 198, .12);
-  padding-top: 32rpx;
+  --me-divider: rgba(177, 191, 198, .2);
+  padding: 48rpx 40rpx calc(48rpx + 50px + env(safe-area-inset-bottom));
 }
 
 .me-profile,
 .me-results,
 .me-results-heading,
+.me-points-link,
 .me-links .personal-link { box-sizing: border-box; color: var(--text); line-height: 1.5; }
 .me-page .me-pressed { opacity: .72; }
+.me-page .inline-error button { min-height: 44px; }
 
 .me-profile {
   display: block;
   width: 100%;
-  min-height: 136rpx;
+  min-height: 124rpx;
   margin: 0;
-  padding: 24rpx 32rpx;
+  padding: 0;
   text-align: left;
-  background: var(--surface);
-  border-radius: 24rpx;
 }
-.me-profile-main { display: flex; align-items: center; gap: 24rpx; min-width: 0; }
-.me-profile .profile-avatar { width: 88rpx; height: 88rpx; border: 1rpx solid var(--me-divider); }
-.me-profile .avatar-fallback { font-size: 36rpx; font-weight: 500; }
+.me-profile-main { display: flex; align-items: center; gap: 28rpx; min-width: 0; }
+.me-profile .profile-avatar { width: 124rpx; height: 124rpx; border: 0; border-radius: 40rpx; }
+.me-profile .avatar-fallback { font-size: 48rpx; font-weight: 500; }
 .me-profile .profile-identity { min-width: 0; flex: 1; }
-.me-profile .profile-name { font-size: 36rpx; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
-.me-profile-action { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--muted); font-size: 24rpx; }
+.me-profile .profile-name { font-size: 44rpx; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.me-profile-caption { margin-top: 4rpx; color: var(--muted); font-size: 24rpx; }
+.me-profile-action { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-width: 44px; min-height: 44px; color: var(--accent); font-size: 24rpx; }
 .me-page .account-note { margin: 20rpx 0 0; }
 
-.me-results { display: block; margin-top: 32rpx; padding: 32rpx; background: var(--surface); border-radius: 24rpx; }
+.me-overview { margin-top: 44rpx; padding: 0 36rpx; background: var(--surface); border-radius: 32rpx; }
+.me-results { display: block; margin: 0; padding: 24rpx 0; }
 .me-results-heading {
   display: flex;
   align-items: center;
@@ -37,14 +39,25 @@
   margin: 0;
   padding: 0;
   text-align: left;
-  font-size: 32rpx;
+  font-size: 36rpx;
   font-weight: 600;
 }
-.me-results-detail { display: flex; align-items: center; flex-shrink: 0; gap: 8rpx; color: var(--muted); font-size: 24rpx; font-weight: 400; }
-.me-points-link { display: block; padding: 8rpx 0 16rpx; color: var(--text); line-height: 1.5; }
-.me-stats-panel { padding: 32rpx 0 0; }
+.me-results-detail { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-width: 44px; min-height: 44px; color: var(--accent); font-size: 24rpx; font-weight: 400; }
+.me-stats-panel { padding-top: 20rpx; }
+.me-overview .personal-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 16rpx; padding: 0; text-align: left; }
+.me-overview .me-metric { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; gap: 6rpx; }
+.me-overview .metric-value { font-size: 56rpx; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.me-overview .me-value-compact { font-size: 36rpx; }
+.me-overview .me-metric .small { display: block; font-size: 24rpx; line-height: 1.4; }
+.me-points { display: flex; align-items: center; gap: 16rpx; padding: 12rpx 0 20rpx; border-top: 1rpx solid var(--me-divider); font-size: 24rpx; line-height: 1.5; }
+.me-points-summary { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 4rpx 16rpx; min-width: 0; color: var(--muted); }
+.me-points-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6rpx; min-width: 0; }
+.me-points-item > text:first-child { flex-shrink: 0; }
+.me-points-value { min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.me-points-link { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-height: 44px; color: var(--accent); }
 
-.me-links { margin-top: 24rpx; border-top: 0; }
+.me-links { margin-top: 44rpx; border-top: 0; }
+.me-section-label { margin-bottom: 4rpx; color: var(--muted); font-size: 24rpx; line-height: 1.5; }
 .me-links .personal-link {
   position: relative;
   display: flex;
@@ -52,10 +65,10 @@
   justify-content: space-between;
   gap: 24rpx;
   width: 100%;
-  min-height: 112rpx;
-  min-height: max(48px, 112rpx);
+  min-height: 116rpx;
+  min-height: max(48px, 116rpx);
   margin: 0;
-  padding: 24rpx 32rpx;
+  padding: 24rpx 0;
   border: 0;
   border-radius: 0;
   text-align: left;
@@ -65,13 +78,14 @@
 .me-links .personal-link::before {
   content: "";
   position: absolute;
-  left: 100rpx;
-  right: 32rpx;
+  left: 0;
+  right: 0;
   bottom: 0;
   height: 1rpx;
   background: var(--me-divider);
 }
-.me-links .personal-link:last-child::before { display: none; }
+.me-links-secondary { margin-top: 32rpx; }
+.me-links-secondary .personal-link:last-child::before { display: none; }
 .me-link-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .me-chevron {
   box-sizing: border-box;
@@ -83,6 +97,9 @@
   border-right: 2rpx solid var(--muted);
   transform: rotate(45deg);
 }
+.me-profile-action .me-chevron,
+.me-results-detail .me-chevron,
+.me-points-link .me-chevron { border-color: var(--accent); }
 
 /* Inline vectors share the tab icons' 24-unit canvas and 1.7-unit stroke. */
 .me-icon { width: 44rpx; height: 44rpx; flex-shrink: 0; background: center / contain no-repeat; }
@@ -98,17 +115,10 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7h.01'/%3E%3C/svg%3E");
 }
 
-/* A single overview keeps totals together; deeper records have their own destinations. */
-.me-overview { margin-top: 24rpx; padding: 0 28rpx; background: var(--surface); border-radius: 24rpx; }
-.me-overview .me-results, .me-overview .me-points { margin: 0; padding: 8rpx 0 16rpx; border-radius: 0; background: transparent; }
-.me-overview .me-points { position: relative; padding: 0; border-top: 1rpx solid var(--me-divider); }
-.me-overview .me-stats-panel { padding-top: 4rpx; }
-.me-overview .personal-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 16rpx; padding: 0; text-align: center; }
-.me-overview .score-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.me-overview .me-metric { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 4rpx; }
-.me-overview .metric-value { font-size: 52rpx; font-weight: 500; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.me-overview .me-metric .small { display: block; font-size: 24rpx; line-height: 1.4; }
-.me-results-heading .me-results-detail { min-width: 44px; min-height: 44px; justify-content: flex-end; }
-.me-links-secondary { margin-top: 16rpx; border-top: 1rpx solid var(--me-divider); }
-.me-links .personal-link { padding-left: 16rpx; padding-right: 16rpx; }
 .me-icon-spark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z'/%3E%3C/svg%3E"); }
+
+@media (max-width: 360px) {
+  .me-profile-caption, .me-profile-action, .me-results-detail,
+  .me-overview .me-metric .small, .me-points, .me-section-label { font-size: 12px; }
+  .me-links .personal-link { font-size: 14px; }
+}

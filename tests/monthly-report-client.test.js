@@ -77,8 +77,8 @@ test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分�
   const labels = [];
   const context = new Proxy({ measureText: value => ({ width: String(value).length * 25 }), fillText: value => labels.push(value) }, { get: (target, key) => key in target ? target[key] : () => {} });
   for (const card of renderer.cards(response)) renderer.drawCard(context, card);
-  assert.doesNotMatch(labels.join(" "), /战绩榜|好人胜率榜|坏人胜率榜|刺客神刀手|暂无|榜单仅展示|趣味榜仅统计|统计范围|截至/);
-  assert.ok(labels.includes("梅林躲刀王"));
+  assert.doesNotMatch(labels.join(" "), /战绩榜|好人胜率榜|坏人胜率榜|职业刺客|暂无|榜单仅展示|趣味榜仅统计|统计范围|截至/);
+  assert.ok(labels.includes("闪身步大神"));
   for (const board of [...response.mainBoards, ...response.funBoards]) board.rows = [];
   const empty = presentation.presentReport(response);
   assert.equal(empty.hasDetails, false); assert.equal(empty.featured.length, 0);
@@ -96,7 +96,7 @@ test("纵排趣味荣誉在大量并列时完整分页，重复标题计入画�
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
   assert.ok(pages.slice(1).every(card => card.sections[0].showGroupTitle));
-  const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "good_shield"].includes(section.id));
+  const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
 });
 test("原生月报等待本地背景与远程头像，头像失败仍绘制背景并导出", async () => {

@@ -16,7 +16,7 @@
   <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates" aria-label="胜率阵营"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
   <view wx:if="{{funSelected}}" class="fun-rank-filters">
     <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" aria-label="选择趣味指标" hover-class="none">
-      <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><text class="fun-metric-role">{{item.title}}</text><text class="fun-metric-name">{{item.label}}</text></view></block></view>
+      <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><view class="fun-option-heading"><text class="fun-metric-name">{{item.title}}</text><text wx:if="{{item.roleLabel}}" class="fun-identity">{{funRole ? funRoleOptions[funRoleIndex].label : item.roleLabel}}</text></view><view class="fun-metric-description">{{item.conditionLabel || item.label}}</view></view></block></view>
       <view class="fun-filter-chevron" aria-hidden="true"></view>
     </button>
     <view class="fun-sort-row">
@@ -26,7 +26,7 @@
       </view>
       <text class="fun-sort-direction">由高到低</text>
     </view>
-    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter"><text class="fun-filter-label">出刀角色</text><picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="出刀角色"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker></view>
+    <view wx:if="{{funRoleOptions.length>1}}" class="fun-role-filter"><text class="fun-filter-label">技能身份</text><picker range="{{funRoleOptions}}" range-key="label" value="{{funRoleIndex}}" bindchange="chooseFunRole" aria-label="技能身份"><view class="fun-picker"><text>{{funRoleOptions[funRoleIndex].label}}</text><view class="fun-filter-chevron" aria-hidden="true"></view></view></picker></view>
   </view>
   <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="rank-notice small muted" role="status">{{notice}}</view>
@@ -60,12 +60,14 @@
   <view class="rank-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="选择趣味指标">
     <view class="rank-sheet-handle" aria-hidden="true"></view>
     <view class="rank-sheet-header"><view class="rank-sheet-title">选择趣味指标</view><button class="rank-sheet-close" bindtap="toggleMetrics" aria-label="关闭趣味指标选择" hover-class="none">关闭</button></view>
-    <view class="fun-categories" aria-label="角色分类"><button wx:for="{{funCategories}}" wx:key="id" class="{{funCategory===item.id?'selected':''}}" bindtap="chooseFunCategory" data-id="{{item.id}}" aria-pressed="{{funCategory===item.id}}" hover-class="none">{{item.label}}</button></view>
-    <scroll-view scroll-y class="fun-metric-options" scroll-into-view="fun-option-{{pendingFunMetric}}" enhanced show-scrollbar="{{false}}">
-      <button wx:for="{{filteredFunOptions}}" wx:key="key" id="fun-option-{{item.key}}" class="fun-metric-option {{pendingFunMetric===item.key?'selected':''}}" bindtap="previewFunMetric" data-id="{{item.key}}" aria-label="{{item.tabLabel}}" aria-pressed="{{pendingFunMetric===item.key}}" hover-class="none"><view class="fun-option-copy"><view><text class="fun-option-title">{{item.title}}</text><text class="fun-option-label">{{item.label}}</text></view></view><view class="fun-option-radio" aria-hidden="true"><view wx:if="{{pendingFunMetric===item.key}}" class="fun-option-check"></view></view></button>
-      <view wx:if="{{!filteredFunOptions.length}}" class="small muted rank-category-empty">当前暂无此类指标</view>
+    <view class="fun-categories" aria-label="指标分类"><button wx:for="{{funCategories}}" wx:key="id" class="{{funCategory===item.id?'selected':''}}" bindtap="chooseFunCategory" data-id="{{item.id}}" aria-pressed="{{funCategory===item.id}}" hover-class="none">{{item.label}}</button></view>
+    <view class="fun-options-count">共 {{funOptions.length}} 项<text wx:if="{{funCategory!=='all'}}"> · 当前分类 {{filteredFunOptions.length}} 项</text></view>
+    <scroll-view scroll-y class="fun-metric-options {{filteredFunOptions.length<=2?'is-compact':''}}" scroll-top="{{funOptionsScrollTop}}" scroll-into-view="{{funOptionsScrollTarget}}" bindscroll="onFunOptionsScroll" bindscrolltolower="onFunOptionsBottom" lower-threshold="2" enhanced show-scrollbar="{{true}}">
+      <view class="fun-options-content"><button wx:for="{{filteredFunOptions}}" wx:key="key" id="fun-option-{{item.key}}" class="fun-metric-option {{pendingFunMetric===item.key?'selected':''}}" bindtap="previewFunMetric" data-id="{{item.key}}" aria-label="{{item.accessibilityLabel}}" aria-pressed="{{pendingFunMetric===item.key}}" hover-class="none"><view class="fun-option-copy"><view class="fun-option-heading"><text class="fun-option-title">{{item.title}}</text><text wx:if="{{item.roleLabel}}" class="fun-identity">{{item.roleLabel}}</text></view><view class="fun-option-label">{{item.conditionLabel || item.label}}</view></view><view class="fun-option-radio" aria-hidden="true"><view wx:if="{{pendingFunMetric===item.key}}" class="fun-option-check"></view></view></button>
+      <view wx:if="{{!filteredFunOptions.length}}" class="small muted rank-category-empty">当前暂无此类指标</view></view>
     </scroll-view>
-    <view class="rank-sheet-footer"><view wx:if="{{pendingFunOption}}" class="rank-sheet-note">已选：{{pendingFunOption.tabLabel}}</view><button class="rank-confirm" bindtap="confirmFunMetric" disabled="{{!pendingFunMetric || loading}}" hover-class="none">查看榜单</button></view>
+    <view class="fun-scroll-hint"><text wx:if="{{funOptionsCanScroll}}">下滑查看更多</text></view>
+    <view class="rank-sheet-footer"><view wx:if="{{pendingFunOption}}" class="rank-sheet-note">已选：{{pendingFunOption.title}}<text wx:if="{{pendingFunOption.roleLabel}}"> · {{pendingFunOption.roleLabel}}</text></view><button class="rank-confirm" bindtap="confirmFunMetric" disabled="{{!pendingFunMetric || loading}}" hover-class="none">查看榜单</button></view>
   </view>
 </view>
 <view wx:if="{{rulesExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop" catchtap="toggleRules" catchtouchmove="blockScroll">

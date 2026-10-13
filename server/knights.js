@@ -373,6 +373,12 @@ function settle(room, check, allRoles, rememberIdentity) {
     const state = k.snapshot?.players[uid] || k.players[uid];
     return { uid, seat: room.players.find(p => p.uid === uid).seat, role, faction: state.faction || allRoles[role][1] };
   };
+  const defenseEvent = (uid, protectedUid) => {
+    if (!room.fun) return;
+    const actor = entity(uid), protectedPlayer = entity(protectedUid);
+    (k.funEvents ||= []).push({ id: `defense:${k.funCycle}:${uid}:${k.funEvents.length}`, kind: "defense", round: k.round,
+      actor, protected: protectedPlayer, outcome: actor.faction === protectedPlayer.faction ? "ally" : "enemy" });
+  };
   const attackEvent = (actor, value, target, result, type) => {
     if (!room.fun) return;
     const attacker = entity(actor), selected = entity(room.players.find(p => p.seat === Number(value.split(":")[1]))?.uid);
@@ -382,6 +388,9 @@ function settle(room, check, allRoles, rememberIdentity) {
     (k.funEvents ||= []).push({ id: `attack:${k.funCycle}:${actor}:${type}`, kind: "attack", round: k.round, type,
       actor: attacker, selected, recipient, effect,
       outcome: effective ? recipient.faction === attacker.faction ? "ally" : "enemy" : "failed" });
+    if (k.swap && selected.uid !== target && recipient?.uid !== selected.uid &&
+        fun.canHarm(attacker, selected, k.players[selected.uid]))
+      defenseEvent(k.swap.uid, selected.uid);
   };
   // Continue rooms whose skill cycle began before this version.
   k.cycleEliminated ||= room.players
@@ -450,6 +459,7 @@ function settle(room, check, allRoles, rememberIdentity) {
     );
     if (guard && !selfDestruct) {
       k.players[guard].used = true;
+      defenseEvent(guard, uid);
       return { effect: "guarded", recipient: uid };
     }
     if (

@@ -5,10 +5,11 @@ const rankPresentation = require("../../leaderboard-presentation");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部角色"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funRole: "", funMetrics: [], funOptions: [], funRoleOptions: [{id:"",label:"全部身份"}], funRoleIndex: 0, pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
+  onResize() { if (this.data.metricsExpanded) this.measureFunOptions(this.data.funOptionsScrollTarget); },
   onHide() { this.foreground = false; this.closePlayerCard(); },
   openRankPlayerCard(e) {
     const id = e.currentTarget.dataset.id, row = this.data.board?.rows.find(row => row.publicId === id);
@@ -74,7 +75,7 @@ Page({
       const funOptions = rankPresentation.funOptions(funMetrics);
       const pendingFunOption = funOptions.find(item => item.key === result.metric) || funOptions[0] || null;
       const funCategory = "all";
-      const funRoleOptions = [{ id:"", label:"全部角色" }, ...(result.roleOptions || [])];
+      const funRoleOptions = [{ id:"", label:"全部身份" }, ...(result.roleOptions || [])];
       this.setData({ metric: result.metric, pointsAvailable, period: result.period, board: result, loading: false, loadingMore: false,
         funSelected: !!result.fun, funAvailable: !funUnavailable && !!funMetrics.length, funMetrics, funOptions, funCategory, pendingFunOption, pendingFunMetric: pendingFunOption?.key || "", filteredFunOptions: funOptions, funMode: resolvedMode, funSort: result.sort || funSort, funRole: result.role || "", funRoleOptions, funRoleIndex: Math.max(0,funRoleOptions.findIndex(item => item.id === result.role)),
         notice: funUnavailable ? "当前服务尚未开放趣味榜，已显示局数榜。" : pointsAvailable ? "" : pointsUnavailable ? "当前服务尚未开放积分榜，已显示局数榜。" : "当前服务尚未开放积分榜。",
@@ -126,13 +127,20 @@ Page({
     if (this.data.loading || !this.data.funOptions.length) return;
     this.closePlayerCard();
     const option = this.data.funOptions.find(item => item.key === this.data.metric) || this.data.funOptions[0];
+    this.funOptionsOffset = 0;
     this.setData({ metricsExpanded: true, mineExpanded: false, rulesExpanded: false, pendingFunMetric: option.key,
-      pendingFunOption: option, funCategory: "all", filteredFunOptions: this.data.funOptions });
+      pendingFunOption: option, funCategory: "all", filteredFunOptions: this.data.funOptions,
+      funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: true });
+    this.measureFunOptions("fun-option-" + option.key);
   },
   chooseFunCategory(e) {
     const category = e.currentTarget.dataset.id;
     if (!rankPresentation.categories.some(item => item.id === category)) return;
-    this.setData({ funCategory: category, filteredFunOptions: rankPresentation.filterFunOptions(this.data.funOptions, category) });
+    this.funOptionsOffset = 0;
+    const filteredFunOptions = rankPresentation.filterFunOptions(this.data.funOptions, category);
+    this.setData({ funCategory: category, filteredFunOptions,
+      funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: true });
+    this.measureFunOptions(filteredFunOptions[0] ? "fun-option-" + filteredFunOptions[0].key : "");
   },
   previewFunMetric(e) {
     const option = this.data.filteredFunOptions.find(item => item.key === e.currentTarget.dataset.id);
@@ -142,6 +150,33 @@ Page({
     if (this.data.loading || !this.data.metricsExpanded) return;
     return this.chooseFunMetric({ currentTarget: { dataset: { id: this.data.pendingFunMetric } } });
   },
+  measureFunOptions(scrollTarget) {
+    if (!wx.createSelectorQuery) return;
+    const category = this.data.funCategory;
+    const measure = () => {
+      if (!this.alive || !this.data.metricsExpanded || this.data.funCategory !== category) return;
+      this.setData({ funOptionsScrollTarget: scrollTarget });
+      wx.createSelectorQuery().in(this)
+      .select(".fun-metric-options").boundingClientRect()
+      .select(".fun-options-content").boundingClientRect()
+      .exec(rects => {
+        if (!this.alive || !this.data.metricsExpanded || this.data.funCategory !== category || !rects[0] || !rects[1]) return;
+        this.funOptionsHeight = rects[0].height;
+        this.updateFunOptionsHint(rects[1].height);
+      });
+    };
+    if (wx.nextTick) wx.nextTick(measure); else measure();
+  },
+  updateFunOptionsHint(scrollHeight) {
+    if (!this.funOptionsHeight) return;
+    const canScroll = scrollHeight - (this.funOptionsOffset || 0) - this.funOptionsHeight > 2;
+    if (canScroll !== this.data.funOptionsCanScroll) this.setData({ funOptionsCanScroll: canScroll });
+  },
+  onFunOptionsScroll(e) {
+    this.funOptionsOffset = e.detail.scrollTop;
+    this.updateFunOptionsHint(e.detail.scrollHeight);
+  },
+  onFunOptionsBottom() { this.setData({ funOptionsCanScroll: false }); },
   blockScroll() {},
   loadMore() { return this.load(true); },
   retry() { return this.load(this.data.moreError, this.failedSelection || {}); },

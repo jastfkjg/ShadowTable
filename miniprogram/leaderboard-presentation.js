@@ -1,17 +1,18 @@
 // Shared display metadata. Ranking and eligibility remain server-authoritative.
 (function (root, factory) {
-  const presentation = factory();
+  const presentation = factory(typeof module === "object" && module.exports ? require("./fun-copy") : root.shadowtableFunCopy);
   if (typeof module === "object" && module.exports) module.exports = presentation;
   else root.shadowtableLeaderboard = presentation;
-})(typeof window === "object" ? window : this, function () {
-  const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "more", label: "更多" }];
+})(typeof window === "object" ? window : this, function (funCopy) {
+  const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "other", label: "其他" }];
   function funOptions(definitions = [], { includeFinal = false } = {}) {
-    const first = ["fun_good_shield", "fun_merlin_evade", "fun_merlin_hit", "fun_percival_green", "fun_percival_bust"];
-    return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(item => {
-      const title = item.honorTitle || (item.key === "fun_good_shield" ? "好人" : item.title);
-      const category = /^fun_(good_shield|merlin_|percival_)/.test(item.key) ? "good"
-        : /^fun_assassin_/.test(item.key) ? "evil" : "more";
-      return { ...item, title, category, tabLabel: title + " · " + item.label };
+    const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
+    return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(funCopy.metric).map(item => {
+      const title = item.honorTitle || item.title;
+      const category = /^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
+        : /^fun_assassin_/.test(item.key) ? "evil" : "other";
+      return { ...item, title, category, tabLabel: title + " · " + item.label,
+        accessibilityLabel: [title, item.roleLabel, item.conditionLabel || item.label].filter(Boolean).join("，") };
     }).sort((a, b) => (first.includes(a.key) ? first.indexOf(a.key) : first.length) - (first.includes(b.key) ? first.indexOf(b.key) : first.length));
   }
   function markTies(rows = []) {
@@ -44,9 +45,11 @@
     if (board.countOnly || selected?.countOnly) {
       ruleLines.push("按获奖局数统计，每局每项荣誉最多增加一次；票数不累加到排行榜。", "最高票同票并列获奖；累计获奖次数相同则并列排名。", "仅计入至少半数玩家完成投票的有效对局，不提供成功率榜。");
     } else if (board.fun) {
+      if (board.description || selected?.description) ruleLines.push(board.description || selected.description);
+      if (selected?.roleDetail) ruleLines.push("适用身份：" + selected.roleDetail + "。");
       ruleLines.push("次数榜按对应记录排名；" + rateLabel + "榜按有效机会统计。",
         "次数相同则并列；比例按未舍入值排序，相同比例时机会数多者优先，两者相同则并列。",
-        board.metric === "fun_good_shield" ? "挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。空刀单列，缺失记录不按零次计算。" : "只统计已完整记录的对应机会；缺失记录不按零次计算。");
+        board.metric?.startsWith("fun_defense_") ? "守卫按实际挡下伤害计数；魔术师换号使原攻击目标实际避开伤害时计一次，按该目标在技能发生时的阵营区分友方与对方。比例分母为实际保护总次数。" : board.metric?.startsWith("fun_kill_") ? "合并刀、枪、决斗造成的实际出局，按技能发生时实际承受者的阵营统计。缴械及未生效不计击杀，最终刺杀单独统计。" : board.metric === "fun_good_shield" ? "挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。空刀单列，缺失记录不按零次计算。" : "只统计已完整记录的对应机会；缺失记录不按零次计算。");
     } else {
       ruleLines.push(points ? "积分包含有效计分局成绩和积分调整；至少有 1 场有效计分局才参与排名。积分相同则并列。"
         : games ? "只统计已登记胜负的有效对局；有效局数相同则并列。"
@@ -58,7 +61,7 @@
     const endLabel = count > rows.length ? "已展示前 " + rows.length + " 位 · 共 " + count + " 位玩家上榜" : "已展示全部 " + count + " 位上榜玩家";
     return { ...board, countOnly: !!(board.countOnly || selected?.countOnly), rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
       currentFunOption: selected || null, rateThreshold, ruleLines, endLabel,
-      emptyTitle: "暂无公开排名", emptyHint: board.fun ? (board.sort === "rate" ? "有有效机会且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
+      emptyTitle: board.fun ? "暂无记录" : "暂无公开排名", emptyHint: board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
       me: { ...me, statusLabel, placeLabel: me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : "未上榜" } };
   }
   function filterFunOptions(options = [], category = "all") {

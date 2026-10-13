@@ -22,7 +22,7 @@ function html(node) {
   const tag=({'wx-text':'span','wx-button':'button','wx-image':'img','wx-label':'label'})[node.tag]||'div';
   const attrs=Object.entries(node.attr||{}).flatMap(([key,value])=>{
     if(key==='disabled')return value?['disabled']:[];
-    if(key==='src'&&value.startsWith('/'))value='file://'+root+value;
+    if(key==='src'&&value.startsWith('/'))value='/miniprogram'+value;
     if(key.startsWith('aria'))key=key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
     if(key==='style')value=String(value).replace(/(-?[\d.]+)rpx/g,'calc($1 * 100vw / 750)');
     return ['class','src','style','role','aria-label','aria-pressed','aria-expanded','aria-hidden'].includes(key)?[`${key}="${safe(value)}"`]:[];
@@ -32,15 +32,17 @@ function html(node) {
 const defs=require('../server/fun').publicMetrics();
 const rows=Array.from({length:7},(_,i)=>({publicId:'p'+i,nickname:i?'新朋友':'子龙',isSelf:i===0,rank:i?2:1,tied:i>0,total:i?2:3,wins:i<2?2:1,winRate:i===0?66.7:i===1?100:50,points:i?24:36}));
 const base={period:'all',availableFunMetrics:defs,availableMetrics:['points','games','overall','good','evil'],rows,me:{...rows[0],status:'ranked'},eligibleCount:7,hasMore:false,threshold:1};
-const shield={...base,metric:'fun_good_shield',fun:true,title:'好人',metricLabel:'成功挡刀次数',sort:'count',unit:'次',rows:[{...rows[0],count:1,opportunities:1,knownGames:1,rate:100}],me:{...rows[0],status:'ranked',count:1,opportunities:1,knownGames:1,rate:100},eligibleCount:1};
+const shield={...base,metric:'fun_defense_ally',fun:true,title:'绝对防御',metricLabel:'保护友方次数',sort:'count',unit:'次',rows:[{...rows[0],count:1,opportunities:1,knownGames:1,rate:100}],me:{...rows[0],status:'ranked',count:1,opportunities:1,knownGames:1,rate:100},eligibleCount:1};
 function scene(response,extra={}) {
   const board=presentLeaderboard(response),options=presentation.funOptions(defs),option=options.find(item=>item.key===response.metric)||options[0];
   return {...definition.data,loading:false,funAvailable:true,board,metric:response.metric,funSelected:!!response.fun,funSort:response.sort||'count',funOptions:options,
-    funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,...extra};
+    funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,funOptionsCanScroll:true,...extra};
 }
 const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric})]));
 scenes.fun=scene(shield);scenes.sheet=scene(shield,{metricsExpanded:true});
-scenes.more=scene(shield,{metricsExpanded:true,funCategory:'more',filteredFunOptions:presentation.funOptions(defs).filter(item=>item.category==='more')});
+scenes.good=scene(shield,{metricsExpanded:true,funCategory:'good',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'good')});
+scenes.evil=scene(shield,{metricsExpanded:true,funCategory:'evil',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'evil'),funOptionsCanScroll:false});
+scenes.other=scene(shield,{metricsExpanded:true,funCategory:'other',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'other'),funOptionsCanScroll:false});
 scenes.rules=scene({...base,metric:'overall'},{rulesExpanded:true});
 scenes.mine=scene(shield,{mineExpanded:true});
 scenes.empty=scene({...base,metric:'games',rows:[],eligibleCount:0,me:{status:'hidden',rank:null,total:0,wins:0,winRate:null}});

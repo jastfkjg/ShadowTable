@@ -37,7 +37,7 @@ const sparseFixture = structuredClone(fixture);
 sparseFixture.month = "2026-10"; sparseFixture.overview = { games: 8, players: 18, activeDays: 2 };
 sparseFixture.mainBoards[0].rows = [["阿伟",19,6,1],["wyc",12,6,2],["元",11,6,3],["橙C",11,4,3]].map(([nickname,points,scoredGames,rank],i) => ({ ...fixture.mainBoards[0].rows[0], publicId: "sparse"+i, avatarUrl: null, avatarSrc: "", nickname, points, scoredGames, rank, tied: rank===3 }));
 sparseFixture.mainBoards.slice(1).forEach(board => { board.rows = []; });
-const sparseNames = { merlin_evade: [["月下江头",1],["阿伟",1]], assassin_hit: [["元",2]], good_shield: [["子龙",1],["阿伟",1]] };
+const sparseNames = { merlin_evade: [["月下江头",1],["阿伟",1]], assassin_hit: [["元",2]], defense_ally: [["子龙",1],["阿伟",1]] };
 sparseFixture.funBoards.forEach(board => { board.rows = board.sort === "count" && sparseNames[board.metric] ? sparseNames[board.metric].map(([nickname,count],i) => ({ ...board.rows[0], publicId: board.id+i, nickname, count, rank: 1, tied: sparseNames[board.metric].length>1, avatarUrl: null, avatarSrc: "" })) : []; });
 const scenes = {
   summary: data,
@@ -49,7 +49,7 @@ const scenes = {
 const styles = css("app.wxss") + css("components/app-nav/app-nav.wxss") + css("pages/monthly/monthly.wxss");
 fs.mkdirSync(output, { recursive: true });
 for (const [name, scene] of Object.entries(scenes)) fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>月度战报 · ${name}</title><style>body{margin:0}button{font:inherit;border:0}img{object-fit:cover}${styles}</style>${html(factory("pages/monthly/monthly.wxml")(scene))}</html>`);
-const source = fs.readFileSync(path.join(root, "monthly-report.js"), "utf8") + "\n" + fs.readFileSync(path.join(root, "monthly-report-card.js"), "utf8");
+const source = ["fun-copy.js", "monthly-report.js", "monthly-report-card.js"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const assetUrls = Object.fromEntries(avatars.map(avatar => ["/api/avatars/" + avatar.hash, "/miniprogram" + avatar.path]));
 assetUrls["/assets/monthly-report-background.jpg"] = "/miniprogram/assets/monthly-report-background.jpg";
 const posterFixtures = { poster: fixture, "poster-sparse": sparseFixture, "poster-long": { ...fixture, mainBoards: fixture.mainBoards.map((board, index) => index ? board : { ...board, rows: [{ ...board.rows[0], nickname: "非常非常长的玩家昵称用于检查换行", points: -123456789, rank: 1, tied: true }] }) },

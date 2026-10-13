@@ -6,25 +6,58 @@
 })(typeof window === "object" ? window : this, function () {
   const labels = {
     honor_mvp: "胜方最佳", honor_svp: "败方最佳",
-    percival_green: "三绿车", percival_bust: "三炸车",
+    percival_green: "三蓝并保护梅林", percival_bust: "三红或梅林被刺",
+    merlin_evade: "成功躲刀", merlin_hit: "被刺中",
+    assassin_hit: "刺中梅林", assassin_miss: "刺错梅林",
+    defense_ally: "保护友方", defense_enemy: "保护对方",
+    kill_enemy: "击杀对方", kill_ally: "击杀友方",
     knife_enemy: "刀中敌方", knife_ally: "刀中友方",
     duel_enemy: "决斗敌方", duel_ally: "决斗友方",
   };
-  const titles = { honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士" };
+  const titles = { honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能" };
   const honors = {
-    honor_mvp: { title: "最强 MVP", description: "获得胜方最佳玩家的次数", countOnly: true, roleLabel: "玩家票选", conditionLabel: "获得胜方最佳玩家的次数" },
-    honor_svp: { title: "最强 SVP", description: "获得败方最佳玩家的次数", countOnly: true, roleLabel: "玩家票选", conditionLabel: "获得败方最佳玩家的次数" },
+    honor_mvp: { title: "最强 MVP", description: "获得胜方最佳玩家的次数", countOnly: true },
+    honor_svp: { title: "最强 SVP", description: "获得败方最佳玩家的次数", countOnly: true },
+    percival_green: { title: "最强派西", description: "派西玩家带3蓝车并保护梅林次数最多" },
+    percival_bust: { title: "竭尽全力", description: "派西玩家带3红车或梅林被刺次数最多" },
+    merlin_evade: { title: "闪身步大神", description: "梅林玩家成功躲刀次数最多" },
+    merlin_hit: { title: "舍我其谁", description: "梅林玩家被刺中次数最多" },
+    assassin_hit: { title: "职业刺客", description: "刺客玩家刺中梅林次数最多" },
+    assassin_miss: { title: "背锅侠", description: "刺客玩家刺错梅林次数最多" },
+    defense_ally: { title: "绝对防御", description: "玩家有防御技能（适用于守卫、魔术师）并保护友方阵营次数最多" },
+    defense_enemy: { title: "卧龙凤雏", description: "玩家有防御技能（适用于守卫、魔术师）并保护对方阵营次数最多" },
+    kill_enemy: { title: "职业杀手", description: "玩家有击杀技能并击杀对方阵营次数最多" },
+    kill_ally: { title: "痛击队友", description: "玩家有击杀技能并击杀友方阵营次数最多" },
   };
+  const identities = { honor: "玩家票选",
+    percival: "派西维尔", merlin: "梅林", assassin: "刺客",
+    defense: "蓝守卫／魔术师", kill: "刀客／骑士／猎人等",
+  };
+  const conditions = {
+    honor_mvp: "获得胜方最佳玩家的次数", honor_svp: "获得败方最佳玩家的次数",
+    percival_green: "三蓝且梅林未被刺的局数", percival_bust: "三红或梅林被刺的局数",
+    merlin_evade: "成功躲过最终刺杀的次数", merlin_hit: "最终被刺中的次数",
+    assassin_hit: "最终刺中梅林的次数", assassin_miss: "最终刺杀未命中梅林的次数",
+    defense_ally: "成功保护友方的次数", defense_enemy: "成功保护对方的次数",
+    kill_enemy: "成功击杀对方的次数", kill_ally: "成功击杀友方的次数",
+  };
+  const killIdentities = "蓝刀客·加雷斯、蓝刀客·加赫雷斯、红刀客·奥伯伦、蓝兰斯洛特、红兰斯洛特、刺客、觉醒蓝刀客、觉醒红刀客、蓝骑士、红骑士、蓝猎人、红猎人";
+  for (const [id, honor] of Object.entries(honors)) {
+    honor.roleLabel = identities[id.split("_")[0]];
+    honor.roleDetail = id.startsWith("kill_") ? killIdentities : honor.roleLabel;
+    honor.conditionLabel = conditions[id];
+  }
   const descriptions = {
     assassin: "仅统计刺客的非空最终刺杀。",
   };
   function metric(row) {
     const id = row.id || row.key?.replace(/^fun_/, "");
-    if (honors[id]) return { ...row, ...honors[id], honorTitle: honors[id].title, label: labels[id], ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}), title: row.key ? honors[id].title : titles.honor };
-    if (!labels[id]) return row;
-    return { ...row, label: labels[id],
-      ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}),
-      ...(row.title !== undefined ? { title: titles[id.split("_")[0]] } : {}) };
+    const title = row.key && honors[id] ? honors[id].title : titles[id?.split("_")[0]];
+    return { ...row, ...(labels[id] ? { label: labels[id],
+      ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}) } : {}),
+      ...(row.title !== undefined && title ? { title } : {}),
+      ...(honors[id] ? { countOnly: !!honors[id].countOnly, honorTitle: honors[id].title, description: honors[id].description,
+        roleLabel: honors[id].roleLabel, roleDetail: honors[id].roleDetail, conditionLabel: honors[id].conditionLabel } : {}) };
   }
   function legacyLabel(label, type) {
     if (label === "三绿达成") return labels.percival_green;
@@ -71,8 +104,13 @@
     const id = value.metric?.replace(/^fun_/, "");
     return { ...value,
       ...(value.availableFunMetrics ? { availableFunMetrics: value.availableFunMetrics.map(metric) } : {}),
-      ...(value.fun && honors[id] ? { ...honors[id], metricLabel: "获奖次数" } : value.fun && labels[id] ? {
-        title: titles[id.split("_")[0]],
+      ...(value.fun && honors[id] ? {
+        title: honors[id].title, description: honors[id].description,
+        roleLabel: honors[id].roleLabel, roleDetail: honors[id].roleDetail, conditionLabel: honors[id].conditionLabel,
+        countOnly: !!honors[id].countOnly,
+        metricLabel: honors[id].countOnly ? "获奖次数" : (labels[id] || value.metricLabel?.replace(/次数$|率$/, "")) + (value.sort === "rate" ? "率" : "次数"),
+      } : value.fun && labels[id] ? {
+        title: titles[id.split("_")[0]] || value.title,
         metricLabel: labels[id] + (value.sort === "rate" ? "率" : "次数"),
       } : {}) };
   }

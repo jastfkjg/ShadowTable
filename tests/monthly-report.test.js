@@ -87,11 +87,11 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     const a = match(store, [{ uid: "wx:a" }]), b = match(store, [{ uid: "wx:b" }]), c = match(store, [{ uid: "wx:c" }]);
     funRecord(store, a, "wx:a", "merlin_evade", 3, 5); funRecord(store, b, "wx:b", "merlin_evade", 3, 6);
     funRecord(store, c, "wx:c", "merlin_evade", 1, 1);
-    funRecord(store, a, "wx:a", "assassin_hit", 2, 5); funRecord(store, b, "wx:b", "good_shield", 1, 5);
+    funRecord(store, a, "wx:a", "assassin_hit", 2, 5); funRecord(store, b, "wx:b", "defense_ally", 1, 5);
     funRecord(store, b, "wx:b", "assassin_miss", 4, 5);
     const unknown = match(store, [{ uid: "wx:a" }]); funRecord(store, unknown, "wx:a", "merlin_evade", 100, 100, "unknown");
     const response = read(reports), report = presentation.presentReport(response);
-    assert.deepEqual(report.featured.map(board => board.id), ["merlin_evade:count", "assassin_hit:count", "good_shield:count"]);
+    assert.deepEqual(report.featured.map(board => board.id), ["merlin_evade:count", "assassin_hit:count", "defense_ally:count"]);
     const count = report.funBoards.find(board => board.id === "merlin_evade:count"), rate = report.funBoards.find(board => board.id === "merlin_evade:rate");
     assert.deepEqual(count.rows.map(row => [row.nickname, row.rank, row.count]).sort((a, b) => a[0].localeCompare(b[0])), [["a", 1, 3], ["b", 1, 3], ["c", 3, 1]]);
     assert.equal(count.rows.find(row => row.nickname === "a").unknownGames, 1); assert.equal(count.rows[0].tied, true);
@@ -100,7 +100,7 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     assert.equal(presentation.detailBoards(report, "count", true).find(board => board.metric === "assassin_miss").rows[0].count, 4);
     assert.ok(presentation.detailBoards(report, "rate", false).every(board => board.positive && board.sort === "rate"));
     const standard = JSON.stringify(cardRenderer.cards(response)), entertainment = JSON.stringify(cardRenderer.cards(response, true));
-    assert.doesNotMatch(standard, /歪刀/); assert.match(entertainment, /刺客歪刀榜/);
+    assert.doesNotMatch(standard, /歪刀/); assert.match(entertainment, /背锅侠/);
   } finally { store.close(); }
 });
 test("前三名保留超过100人的并列，长图自动分张，公开投影不携带原始数据", () => {

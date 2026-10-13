@@ -169,7 +169,7 @@ test('对局摘要合并板子人数阵营，角色旁保留有效表现，复�
   assert.deepEqual(shown.funHighlights.map(item => item.label), ['成功挡刀', '刀中敌方 ×2']);
   assert.equal(shown.funLabel, '成功挡刀 · 刀中敌方 ×2');
   assert.deepEqual(empty.funHighlights, []); assert.equal(empty.funLabel, '');
-  assert.deepEqual(assassin.funHighlights.map(item => item.label), ['歪刀']);
+  assert.deepEqual(assassin.funHighlights.map(item => item.label), ['刺错梅林']);
   assert.equal(shown.fun.highlights.length, 4); assert.equal(shown.fun.events[0].label, '未生效');
   assert.equal(JSON.stringify(base), before);
   const tree = renderHistoryShell({ records: [shown, empty, assassin], total: 3, loaded: true });
@@ -253,12 +253,12 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   const presentation=require('../miniprogram/leaderboard-presentation');
   const options=presentation.funOptions(require('../server/fun').publicMetrics());
   const renderRank=factory('pages/leaderboard/leaderboard.wxml');
-  const data={groups:require('../miniprogram/leaderboard').groups,metric:'fun_good_shield',funSelected:true,funAvailable:true,
+  const data={groups:require('../miniprogram/leaderboard').groups,metric:'fun_defense_ally',funSelected:true,funAvailable:true,
     funOptions:options,funSort:'count',funRoleOptions:[],metricsExpanded:false,funCategories:presentation.categories,
-    pendingFunMetric:'fun_good_shield',pendingFunOption:options.find(item=>item.key==='fun_good_shield'),
+    pendingFunMetric:'fun_defense_ally',pendingFunOption:options.find(item=>item.key==='fun_defense_ally'),
     board:{fun:true,threshold:1,rows:[],me:{}}};
   const collapsed=renderRank(data);
-  assert.match(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/成功挡刀/);
+  assert.match(JSON.stringify(byHandler(collapsed,'toggleMetrics')),/保护友方/);
   assert.equal(byHandler(collapsed,'toggleMetrics').attr.ariaExpanded,false);
   assert.ok(!byHandler(collapsed,'previewFunMetric'));
   assert.ok(!nodes(collapsed).some(n=>n.attr?.role==='dialog'));
@@ -277,8 +277,8 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
     assert.doesNotMatch(JSON.stringify(tree), /查看不同角色的高光|至少|次数榜/);
   }
   assert.deepEqual(keys.sort(),options.map(item=>item.key).sort());
-  const adverse=renderRank({...data,metric:'fun_knife_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
-  assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/刀中友方/);
+  const adverse=renderRank({...data,metric:'fun_kill_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
+  assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/击杀友方/);
   assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/按发生率/);
   assert.doesNotMatch(JSON.stringify(adverse),/至少.*次机会/);
 });
@@ -1504,7 +1504,6 @@ test('表单和键盘任意一项打开时移除底栏节点，均关闭后恢�
     }
   }
 });
-
 test('最终结果为所有玩家显示获奖头像昵称号码票数，平票渲染全部，票选弹层排除本人',()=>{
   const hp=require('../miniprogram/honors');
   const room={code:'123456',phase:'ended',result:{winner:'good'},capacity:6,me:{seat:1,isHost:false},players:[],history:[],team:[]};

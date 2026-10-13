@@ -21,7 +21,7 @@
     if (!report.canShare) throw new Error("这个月还没有有效对局，暂时无法生成月报图片。");
     const sections = report.coreBoards.map(board => ({ type: "board", id: board.id, title: board.title, subtitle: board.subtitle, unit: board.unit, rows: board.rows.map(rowProjection) }));
     const featured = entertainment ? presentation.detailBoards(report, "count", true).slice(0, 3) : report.featured;
-    for (const board of featured) sections.push({ type: "honor", id: board.metric, title: board.title, subtitle: board.label, unit: board.unit,
+    for (const board of featured) sections.push({ type: "honor", id: board.metric, title: board.title, subtitle: [board.roleLabel, board.label].filter(Boolean).join(" · "), unit: board.unit,
       groupTitle: entertainment ? "本月娱乐榜" : "本月趣味荣誉", rows: board.rows.map(rowProjection) });
     const metadata = { kind: "monthly", title: entertainment ? "月度战报 · 娱乐版" : "月度战报", month: report.monthTitle, range: report.rangeLabel,
       asOf: report.asOfLabel, overview: { games: report.overview.games, players: report.overview.players } };
@@ -126,7 +126,7 @@
     });
     line(left,HEADER-2,right,HEADER-2,colors.border);
     let cursor=HEADER;
-    const boardIcon = id => id==="points"?"crown":id==="overall"?"swords":id?.includes("shield")?"shield":id?.includes("assassin")?"moon":"sword";
+    const boardIcon = id => id==="points"?"crown":id==="overall"?"swords":id?.includes("shield") || id?.startsWith("defense_")?"shield":id?.includes("assassin")?"moon":"sword";
     const drawValue = (row, unit, y, size = 70) => {
       text(unit,right,y-1,28,colors.muted,42,"right",400,false);
       text(row.value,right-44,y,fit(row.value,size,212,24),row.rank===1?colors.accent:colors.text,212,"right");

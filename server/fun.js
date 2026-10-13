@@ -1,7 +1,9 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
-const VERSION = "fun-2026-10-v2";
+const VERSION = "fun-2026-10-v3";
 const { labels, titles, honors } = require("../miniprogram/fun-copy");
+const { roles: variantRoles } = require("./variants");
+const bRoles = new Set(Object.keys(variantRoles).slice(Object.keys(variantRoles).indexOf("blueAwakened")));
 const modes = { voted: "玩家票选", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
 const modeFor = (board) =>
   /^knights(?:-|$)/.test(board)
@@ -11,21 +13,27 @@ const modeFor = (board) =>
       : "other";
 const extraRankings = {
   percival_bust: { rateThreshold: 1 },
-  merlin_hit: { label: "被刺", rateThreshold: 1 },
-  assassin_miss: { label: "歪刀", rateThreshold: 1 },
+  merlin_hit: { rateThreshold: 1 },
+  assassin_miss: { rateThreshold: 1 },
   knife_ally: { rateThreshold: 1 },
   duel_ally: { rateThreshold: 1 },
+  defense_enemy: { rateThreshold: 1 },
+  kill_ally: { rateThreshold: 1 },
 };
 const definitions = [
   ["honor_mvp", "胜方最佳", "honor", "本场最佳", "次", true],
   ["honor_svp", "败方最佳", "honor", "本场最佳", "次", true],
   ["percival_green", labels.percival_green, "percival", titles.percival, "局", true, 1],
   ["percival_bust", labels.percival_bust, "percival", titles.percival, "局", false],
-  ["merlin_evade", "成功躲刀", "merlin", "梅林", "次", true, 1],
-  ["merlin_hit", "被最终刺中", "merlin", "梅林", "次", false],
+  ["merlin_evade", labels.merlin_evade, "merlin", "梅林", "次", true, 1],
+  ["merlin_hit", labels.merlin_hit, "merlin", "梅林", "次", false],
   ["good_shield", "成功挡刀", "shield", "好人", "次", true, 1],
-  ["assassin_hit", "刺中梅林", "assassin", "刺客", "次", true, 1],
-  ["assassin_miss", "歪刀", "assassin", "刺客", "次", false],
+  ["assassin_hit", labels.assassin_hit, "assassin", "刺客", "次", true, 1],
+  ["assassin_miss", labels.assassin_miss, "assassin", "刺客", "次", false],
+  ["defense_ally", labels.defense_ally, "defense", titles.defense, "次", true, 1],
+  ["defense_enemy", labels.defense_enemy, "defense", titles.defense, "次", false],
+  ["kill_enemy", labels.kill_enemy, "kill", titles.kill, "次", true, 1],
+  ["kill_ally", labels.kill_ally, "kill", titles.kill, "次", false],
   ["final_hit", "最终刺中梅林", "final", "最终带刀", "次", true, 1],
   ["final_miss", "最终歪刀", "final", "最终带刀", "次", false],
   ["final_empty_win", "空刀获胜", "final", "最终带刀", "次", false],
@@ -74,10 +82,10 @@ const definitions = [
   unit,
   positive,
   ranked: positive || Object.hasOwn(extraRankings, id),
-  ...(honors[id] ? { honorTitle: honors[id].title, description: honors[id].description } : {}),
   rankLabel: extraRankings[id]?.label || label,
   rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
   rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
+  ...(honors[id] ? { honorTitle: honors[id].title, description: honors[id].description } : {}),
 }));
 const metrics = Object.fromEntries(definitions.map((item) => [item.id, item]));
 const combatType = (role) =>
@@ -107,9 +115,54 @@ const effects = {
   already_used: "目标已失去刀",
   invalid_role: "目标不受此刀影响",
 };
+// Test the original target, before a magician redirects the skill.
+function canHarm(actor, target, state = {}) {
+  if (!target || target.alive === false || state.alive === false) return false;
+  const type = combatType(actor.role);
+  if (type === "gun" || ["blueAwakened", "redAwakened"].includes(actor.role)) return true;
+  if (type === "duel") return actor.faction !== (target.role === "mordred" ? "good" : target.faction);
+  if (type !== "knife") return false;
+  if (target.role === "assassin") return false;
+  return combatType(target.role) === "knife" || state.b === true ||
+    bRoles.has(target.role);
+}
+function defenseFacts(record, players) {
+  const state = record.funFacts;
+  if (state?.defensesComplete)
+    return { complete: !!state.attacksComplete, events: (state.events || []).filter(e => e.kind === "defense") };
+  // Full replays retain defensive actors and targets. Older attack-only facts do not.
+  if (!record.replay?.complete || !state?.attacksComplete) return { complete: false, events: [] };
+  const events = [];
+  const entity = p => ({ uid: players.find(player => player.seat === p.seat)?.uid,
+    seat: p.seat, role: p.roleId, faction: p.faction, alive: p.alive });
+  const add = (cycle, actor, protectedPlayer) => {
+    const defender = entity(actor), protectedTarget = entity(protectedPlayer);
+    if (!defender.uid || !protectedTarget.uid) return;
+    events.push({ id: `defense:legacy:${cycle.id}:${events.length}`, kind: "defense", round: cycle.round,
+      actor: defender, protected: protectedTarget,
+      outcome: defender.faction === protectedTarget.faction ? "ally" : "enemy" });
+  };
+  for (const cycle of record.replay.events.filter(e => e.kind === "skills")) {
+    const actions = cycle.actions || [], swap = actions.find(a => a.kind === "swap" && a.actor?.roleId === "magician");
+    const out = new Set(actions.flatMap(a => [a.actor, ...(a.targets || [])]).filter(p => p?.alive === false).map(p => p.seat));
+    for (const action of actions) {
+      if (action.kind === "guard" && action.status === "triggered" && action.actor?.roleId === "blueGuard" && action.resolvedTargets?.[0])
+        add(cycle, action.actor, action.resolvedTargets[0]);
+      const target = action.targets?.[0], resolved = action.resolvedTargets?.[0];
+      if (swap && ["knife", "duel", "detonate", "passiveGun", "gun"].includes(action.kind) && target && resolved &&
+          target.seat !== resolved.seat && swap.targets.some(p => p.seat === target.seat) && !out.has(target.seat) &&
+          action.recipient?.seat !== target.seat && canHarm(entity(action.actor), entity(target)))
+        add(cycle, swap.actor, target);
+      if (action.effect === "eliminated" && action.recipient) out.add(action.recipient.seat);
+      if (action.effect === "reflected") out.add(action.actor.seat);
+    }
+  }
+  return { complete: true, events };
+}
 function init(room) {
   room.fun = {
     version: VERSION,
+    defensesComplete: true,
     initialRoles: { ...room.roles },
     events: [],
     terminal: null,
@@ -190,6 +243,7 @@ function project(record, players, roles) {
   const state = record.funFacts;
   const mode = modeFor(record.board),
     t = state?.terminal;
+  const defenses = mode === "knights" ? defenseFacts(record, players) : null;
   const excluded = !!record.excludedReason;
   const labelRole = (id) =>
     (typeof roles === "function" ? roles(id) : roles[id]?.[0]) || "未知角色";
@@ -219,16 +273,16 @@ function project(record, players, roles) {
       add(
         "percival_green",
         initial,
-        t?.reason === "assassination" ? 1 : 0,
+        t?.reason === "assassination" && !t.hit && t.merlins?.length ? 1 : 0,
         known ? 1 : 0,
         known,
       );
       add(
         "percival_bust",
         initial,
-        t?.reason === "quest_fail" ? 1 : 0,
-        known ? 1 : 0,
-        known,
+        t?.reason === "quest_fail" || t?.hit ? 1 : 0,
+        known || t?.hit ? 1 : 0,
+        known || !!t?.hit,
       );
     }
     // Classical identities do not change. In knights only the living endgame Merlin has this opportunity.
@@ -324,6 +378,10 @@ function project(record, players, roles) {
         const type = combatType(role),
           own = attacks.filter((e) => e.actor.role === role);
         if (!type) continue;
+        for (const outcome of ["enemy", "ally"])
+          add("kill_" + outcome, role,
+            own.filter(e => e.effect === "eliminated" && e.outcome === outcome).length,
+            own.length, !!state?.attacksComplete);
         for (const outcome of ["enemy", "ally", "failed", "aim_enemy"])
           add(
             type + "_" + outcome,
@@ -337,6 +395,24 @@ function project(record, players, roles) {
             !!state?.attacksComplete,
           );
       }
+      const ownDefenses = defenses.events.filter(e => e.actor.uid === player.uid);
+      const defenseRoles = new Set(ownDefenses.map(e => e.actor.role));
+      for (const role of [initial, player.roleId])
+        if (["blueGuard", "magician"].includes(role)) defenseRoles.add(role);
+      for (const cycle of record.replay?.events || [])
+        for (const action of cycle.actions || [])
+          if (action.actor?.seat === player.seat && ["blueGuard", "magician"].includes(action.actor.roleId))
+            defenseRoles.add(action.actor.roleId);
+      for (const role of defenseRoles) {
+        const own = ownDefenses.filter(e => e.actor.role === role);
+        for (const outcome of ["ally", "enemy"])
+          add("defense_" + outcome, role, own.filter(e => e.outcome === outcome).length,
+            own.length, defenses.complete);
+      }
+      for (const e of ownDefenses)
+        events.push({ id: e.id, round: e.round, role: labelRole(e.actor.role), kind: "defense",
+          label: metrics["defense_" + e.outcome].label,
+          detail: `${e.protected.seat}号${e.outcome === "ally" ? "同阵营" : "对方阵营"} · ${e.actor.role === "magician" ? "换号避开伤害" : "守护挡下伤害"}` });
       for (const e of attacks)
         events.push({
           id: "attack-" + events.length,
@@ -353,7 +429,7 @@ function project(record, players, roles) {
         role: labelRole(initial),
         label:
           {
-            assassination: metrics.percival_green.label,
+            assassination: t.hit ? metrics.percival_bust.label : t.merlins?.length ? metrics.percival_green.label : "三蓝后梅林已出局",
             quest_fail: metrics.percival_bust.label,
             five_rejections: "五次否决结束",
             early_assassination: "提前盘刀",
@@ -369,9 +445,9 @@ function project(record, players, roles) {
             : "空刀失利"
           : t.hit
             ? "刺中梅林"
-            : "歪刀"
+            : metrics.assassin_miss.label
         : t.hit && t.target === player.seat
-          ? "被最终刺中"
+          ? metrics.merlin_hit.label
           : t.target === 0
             ? "成功躲刀（对方空刀）"
             : "成功躲刀";
@@ -510,15 +586,16 @@ function aggregate(rows, legacyGames = 0) {
 }
 function publicMetrics() {
   return definitions
-    .filter((item) => item.ranked)
+    .filter((item) => honors[item.id])
     .sort((a,b) => Number(a.countOnly) - Number(b.countOnly))
-    .map((item) => ({ ...item, title: item.honorTitle || item.title, label: item.rankLabel, key: "fun_" + item.id }));
+    .map((item) => ({ ...item, title: item.honorTitle, label: labels[item.id] || item.rankLabel, key: "fun_" + item.id }));
 }
 module.exports = {
   VERSION,
   modes,
   metrics,
   combatType,
+  canHarm,
   modeFor,
   init,
   settlementOptions,

@@ -2,16 +2,10 @@
 const { createHash } = require("node:crypto");
 const { RuleError } = require("./engine");
 const fun = require("./fun");
+const { honors } = require("../miniprogram/fun-copy");
 const { monthAt, monthRange } = require("../miniprogram/monthly-report");
-const RULES_VERSION = "monthly-2026-10-v1";
+const RULES_VERSION = "monthly-2026-10-v2";
 const WIN_THRESHOLD = 10, FUN_RATE_THRESHOLD = 5;
-const awards = {
-  merlin_evade: "梅林躲刀王", assassin_hit: "刺客神刀手", good_shield: "最佳护林员",
-  percival_green: "派西三绿车", knife_enemy: "刀客神刀手", gun_enemy: "猎人神枪手",
-  duel_enemy: "决斗高手", final_hit: "最终神刀手",
-  percival_bust: "派西三炸车", merlin_hit: "梅林被刺榜", assassin_miss: "刺客歪刀榜",
-  knife_ally: "刀客友伤榜", duel_ally: "骑士友伤榜",
-};
 function rankTop(rows, compare) {
   rows.sort((a, b) => compare(a, b) || a.publicId.localeCompare(b.publicId));
   let rank = 0;
@@ -84,16 +78,16 @@ class MonthlyReport {
       f.public_id,f.nickname,f.avatar_hash FROM match_fun_stats s
       JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN profiles f ON f.uid=s.uid
       WHERE ${valid} AND ${publicPlayers} GROUP BY s.metric,s.uid`).all(start, end);
-    const funBoards = Object.values(fun.metrics).filter(def => def.ranked && !def.countOnly).flatMap(def => {
+    const funBoards = Object.values(fun.metrics).filter(def => honors[def.id] && !def.countOnly).flatMap(def => {
       const rows = funRows.filter(row => row.metric === def.id).map(row => ({ ...identity(row),
         count: row.count, opportunities: row.opportunities, rate: percent(row.count, row.opportunities), knownGames: row.knownGames, unknownGames: row.unknownGames }));
-      return ["count", "rate"].map(sort => ({ id: def.id + ":" + sort, metric: def.id, title: awards[def.id] || def.title + " · " + def.label,
+      return ["count", "rate"].map(sort => ({ id: def.id + ":" + sort, metric: def.id, title: honors[def.id].title, description: honors[def.id].description,
         label: def.label, positive: def.positive, sort, rateLabel: def.rateLabel, unit: sort === "count" ? def.unit : "%",
         threshold: sort === "count" ? 1 : FUN_RATE_THRESHOLD,
         subtitle: sort === "count" ? "按" + def.unit + "数 · " + def.label : def.rateLabel + " · 至少 5 次有效机会",
         ...rankTop(rows.filter(row => sort === "count" ? row.count >= 1 : row.opportunities >= FUN_RATE_THRESHOLD).map(row => ({ ...row })), sort === "count" ? (a, b) => b.count - a.count : ratioCompare("count", "opportunities")) }));
     });
-    const priority = ["merlin_evade", "assassin_hit", "good_shield", "percival_green", "knife_enemy", "gun_enemy", "duel_enemy", "final_hit"];
+    const priority = ["merlin_evade", "assassin_hit", "defense_ally", "percival_green", "kill_enemy"];
     const featuredIds = priority.map(id => funBoards.find(board => board.id === id + ":count" && board.rows.length)).filter(Boolean).slice(0, 3).map(board => board.id);
     const highlights = [];
     const describeWinner = board => board.rows[0] && (board.rows.filter(row => row.rank === 1).length > 1 ? board.rows[0].nickname + "等 " + board.rows.filter(row => row.rank === 1).length + " 人并列" : board.rows[0].nickname);

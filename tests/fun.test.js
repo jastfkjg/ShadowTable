@@ -95,6 +95,130 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
+test("十二项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
+  const fun = require("../server/fun");
+  assert.deepEqual(fun.publicMetrics().map(m => m.honorTitle), [
+    "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "职业刺客", "背锅侠",
+    "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "最强 MVP", "最强 SVP",
+  ]);
+  for (const [reason, target, green, bust] of [
+    ["assassination", 3, 1, 0], ["assassination", 1, 0, 1],
+    ["quest_fail", null, 0, 1], ["five_rejections", null, 0, 0],
+  ]) {
+    const r = deal(); finish(r, { funReason: reason, ...(target ? { funTarget: target } : {}) });
+    assert.equal(row(r, "wx:2", "percival_green").count, green);
+    assert.equal(row(r, "wx:2", "percival_bust").count, bust);
+    if (reason === "assassination") assert.equal(r.matchRecord.players[1].fun.events[0].label, bust ? "三红或梅林被刺" : "三蓝并保护梅林");
+  }
+  const early = deal(true);
+  configure(early, { "wx:1": "merlin", "wx:2": "percival", "wx:6": "assassin" });
+  finish(early, { funReason: "early_assassination", funTarget: 1, funActor: 6 });
+  assert.equal(row(early, "wx:2", "percival_green").count, 0);
+  assert.equal(row(early, "wx:2", "percival_bust").count, 1);
+  const empty = deal(true);
+  configure(empty, { "wx:1": "merlin", "wx:2": "percival", "wx:6": "assassin" });
+  empty.knights.players["wx:1"].alive = false;
+  finish(empty, { funReason: "assassination", funTarget: 0, funActor: 6 });
+  assert.equal(row(empty, "wx:2", "percival_green").count, 0);
+});
+test("历史投影升级重算保护与击杀，重新启动和重复归档不累计", () => {
+  const directory = mkdtempSync(join(tmpdir(), "shadowtable-honors-")), path = join(directory, "data.sqlite");
+  let store = new Store(path);
+  try {
+    const r = deal(true);
+    configure(r, { "wx:1": "redAwakened", "wx:2": "blueAwakened", "wx:3": "blueGuard", "wx:4": "redAwakened" });
+    skills(r, { "wx:1": "target:2", "wx:3": "target:2", "wx:4": "target:2" });
+    finish(r, { winner: "good" });
+    store.transaction(() => store.save(r));
+    const archived = structuredClone(r.matchRecord);
+    delete archived.funFacts.defensesComplete;
+    archived.funFacts.events = archived.funFacts.events.filter(e => e.kind !== "defense");
+    store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(archived), r.matchId);
+    store.db.exec("DELETE FROM match_fun_stats WHERE metric LIKE 'defense_%' OR metric LIKE 'kill_%'; UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.version','fun-2026-10-v2')");
+    store.close(); store = new Store(path);
+    assert.equal(store.funFor("wx:3").metrics.find(m => m.id === "defense_ally").count, 1);
+    assert.equal(store.funFor("wx:4").metrics.find(m => m.id === "kill_enemy").count, 1);
+    assert.ok(publicView(store.get(r.code), "wx:3").myFun.highlights.some(m => m.id === "defense_ally"));
+    const before = JSON.stringify(store.funFor("wx:3"));
+    store.close(); store = new Store(path);
+    assert.equal(JSON.stringify(store.funFor("wx:3")), before);
+    store.transaction(() => store.archiveMatch(archived));
+    assert.equal(JSON.stringify(store.funFor("wx:3")), before);
+  } finally { store.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+test("守卫与魔术师只计实际保护，以技能时阵营归类，换号和未触发不会误计", () => {
+  for (const [targetRole, faction, outcome] of [["blueAwakened", null, "ally"], ["redAwakened", null, "enemy"], ["redAwakened", "good", "ally"]]) {
+    const r = deal(true);
+    configure(r, { "wx:1": "redAwakened", "wx:2": targetRole, "wx:3": "blueGuard" });
+    r.knights.players["wx:2"].faction = faction;
+    skills(r, { "wx:1": "target:2", "wx:3": "target:2" });
+    finish(r, { winner: "good" });
+    assert.equal(row(r, "wx:3", "defense_" + outcome).count, 1);
+    assert.equal(row(r, "wx:3", "defense_" + outcome).opportunities, 1);
+    assert.equal(row(r, "wx:1", "kill_enemy").count, 0);
+  }
+  const swap = deal(true);
+  configure(swap, { "wx:1": "blueAwakened", "wx:2": "redAwakened", "wx:3": "blueAwakened", "wx:4": "magician" });
+  skills(swap, { "wx:1": "target:2", "wx:4": "swap:2:3" });
+  finish(swap, { winner: "good" });
+  assert.equal(row(swap, "wx:4", "defense_enemy").count, 1);
+  assert.equal(row(swap, "wx:4", "defense_ally").count, 0);
+  assert.equal(row(swap, "wx:1", "kill_ally").count, 1);
+  const immune = deal(true);
+  configure(immune, { "wx:1": "gareth", "wx:2": "merlin", "wx:3": "redAwakened", "wx:4": "magician" });
+  skills(immune, { "wx:1": "target:2", "wx:4": "swap:2:3" });
+  finish(immune, { winner: "good" });
+  assert.equal(row(immune, "wx:4", "defense_ally").count, 0);
+  const idle = deal(true);
+  configure(idle, { "wx:3": "blueGuard", "wx:4": "magician" });
+  skills(idle, { "wx:3": "target:2", "wx:4": "swap:2:3" });
+  finish(idle, { winner: "good" });
+  assert.equal(row(idle, "wx:3", "defense_ally").opportunities, 0);
+  assert.equal(row(idle, "wx:4", "defense_ally").count, 0);
+});
+test("职业杀手与痛击队友合并刀枪决斗，以实际承受者计出局，缴械不算击杀", () => {
+  const store = new Store(":memory:");
+  try {
+    for (const [role, action] of [["gareth", "target:2"], ["blueHunter", "detonate:2"], ["blueKnight", "target:2"]]) {
+      const r = deal(true);
+      configure(r, { "wx:1": role, "wx:2": "redAwakened" });
+      skills(r, { "wx:1": action }); finish(r, { winner: "good" });
+      assert.equal(row(r, "wx:1", "kill_enemy").count, 1);
+      store.transaction(() => store.save(r));
+    }
+    const board = new Leaderboard(store).read("wx:1", new URLSearchParams("metric=fun_kill_enemy"));
+    assert.equal(board.title, "职业杀手"); assert.equal(board.me.count, 3);
+    assert.equal(store.matchesFor("wx:1", 0, 20, false, { metric: "kill_enemy", mode: "knights" }).total, 3);
+    assert.ok(board.roleOptions.some(r => r.id === "blueHunter"));
+    assert.ok(board.roleOptions.some(r => r.id === "blueKnight"));
+    const disarm = deal(true);
+    configure(disarm, { "wx:1": "gareth", "wx:2": "assassin" });
+    skills(disarm, { "wx:1": "target:2" }); finish(disarm, { winner: "good" });
+    assert.equal(row(disarm, "wx:1", "knife_enemy").count, 1);
+    assert.equal(row(disarm, "wx:1", "kill_enemy").count, 0);
+  } finally { store.close(); }
+});
+test("旧防御事实从完整复盘恢复，缺少过程保持未知，防御称号只允许守卫和魔术师筛选", () => {
+  const r = deal(true);
+  configure(r, { "wx:1": "redAwakened", "wx:2": "blueGuard", "wx:3": "blueAwakened", "wx:4": "magician" });
+  skills(r, { "wx:1": "target:3", "wx:2": "target:3" }); finish(r, { winner: "good" });
+  const record = structuredClone(r.matchRecord), fun = require("../server/fun");
+  delete record.funFacts.defensesComplete;
+  record.funFacts.events = record.funFacts.events.filter(e => e.kind !== "defense");
+  let projection = fun.project(record, record.players, id => roles[id]?.[0]);
+  assert.equal(projection.find(p => p.uid === "wx:2").fun.metrics.find(m => m.id === "defense_ally").count, 1);
+  delete record.replay;
+  projection = fun.project(record, record.players, id => roles[id]?.[0]);
+  assert.equal(projection.find(p => p.uid === "wx:2").fun.metrics.find(m => m.id === "defense_ally").status, "unknown");
+  const store = new Store(":memory:");
+  try {
+    store.transaction(() => store.save(r));
+    const board = new Leaderboard(store), query = role => new URLSearchParams("metric=fun_defense_ally&role=" + role);
+    assert.equal(board.read("wx:2", query("blueGuard")).me.count, 1);
+    assert.deepEqual(board.read("wx:2", query("magician")).roleOptions.map(r => r.id), ["blueGuard", "magician"]);
+    assert.throws(() => board.read("wx:2", query("servant")), /参数无效/);
+  } finally { store.close(); }
+});
 test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不计机会，支持比例与公开开关", () => {
   const store = new Store(":memory:");
   try {
@@ -111,9 +235,9 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
     store.transaction(() => store.save(unknown));
     const board = new Leaderboard(store);
     for (const [metric, uid, count, opportunities, rate, label] of [
-      ["percival_bust", "wx:2", 2, 7, 28.6, "三炸车"],
-      ["merlin_hit", "wx:1", 2, 5, 40, "被刺"],
-      ["assassin_miss", "wx:6", 3, 5, 60, "歪刀"],
+      ["percival_bust", "wx:2", 4, 7, 57.1, "三红或梅林被刺"],
+      ["merlin_hit", "wx:1", 2, 5, 40, "被刺中"],
+      ["assassin_miss", "wx:6", 3, 5, 60, "刺错梅林"],
     ]) {
       const read = query => board.read(uid, new URLSearchParams("metric=fun_" + metric + query));
       const counts = read("");
@@ -281,7 +405,8 @@ test("挡刀榜跨板子合并次数和原始分母，少量样本可参与成�
       read("metric=fun_good_shield&mode=classic&sort=rate").me.remaining,
       0,
     );
-    assert.ok(all.availableFunMetrics.some((m) => m.key === "fun_good_shield"));
+    assert.ok(all.availableFunMetrics.some((m) => m.key === "fun_defense_ally"));
+    assert.ok(!all.availableFunMetrics.some((m) => m.key === "fun_good_shield"));
     assert.doesNotMatch(JSON.stringify(all), /wx:|"uid"|target|events/);
     assert.throws(
       () => read("metric=fun_good_shield&role=servant"),
@@ -383,9 +508,9 @@ test("旧投影启动时补算挡刀并统一历史文案，未知不补零，�
       ),
     );
     const percival = store.matchesFor("wx:2").records.find(record => record.id === known.matchId).fun;
-    assert.equal(percival.highlights.find(metric => metric.id === "percival_green").label, "三绿车");
-    assert.equal(percival.events.find(event => event.id === "task-outcome").label, "三绿车");
-    assert.equal(publicView(store.get(known.code), "wx:2").myFun.events.find(event => event.id === "task-outcome").label, "三绿车");
+    assert.equal(percival.highlights.find(metric => metric.id === "percival_green").label, "三蓝并保护梅林");
+    assert.equal(percival.events.find(event => event.id === "task-outcome").label, "三蓝并保护梅林");
+    assert.equal(publicView(store.get(known.code), "wx:2").myFun.events.find(event => event.id === "task-outcome").label, "三蓝并保护梅林");
     const before = JSON.stringify(store.funFor("wx:3"));
     store.close();
     store = new Store(path);
@@ -552,7 +677,7 @@ test("一次守护挡第一刀，第二刀生效；被挡不是同伴命中", ()
   });
   skills(r, { "wx:1": "target:2", "wx:3": "target:2", "wx:4": "target:2" });
   assert.deepEqual(
-    r.fun.events.map((e) => [e.effect, e.outcome]),
+    r.fun.events.filter(e => e.kind === "attack").map((e) => [e.effect, e.outcome]),
     [
       ["guarded", "failed"],
       ["eliminated", "enemy"],
@@ -717,11 +842,11 @@ test("管理员更正同时更新终局趣味数据、战绩和榜单，关闭�
     );
     assert.equal(
       store.funFor("wx:2").metrics.find((m) => m.id === "percival_bust").count,
-      1,
+      2,
     );
     assert.equal(
       store.funFor("wx:2").metrics.find((m) => m.id === "percival_green").count,
-      1,
+      0,
     );
   } finally {
     store.close();

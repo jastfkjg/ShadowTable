@@ -1585,27 +1585,27 @@ test('网页趣味回查深链与分页保留过滤，清除回到全部，不�
 test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应隔离，未达门槛展示本人分母',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
   const result=metric=>webRanks(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',metricLabel:'刀中敌方率',unit:'%',availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',remaining:6}});
-  const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})});});
+  const c=client(async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return response({...result(metric),...(metric==='fun_defense_ally'?{role:null,roleOptions:[]}: {})});});
   const old=c.applyRoute('#/leaderboard');await new Promise(resolve=>setImmediate(resolve));
-  await c.loadLeaderboard(false,{rankMetric:'fun_knife_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
+  await c.loadLeaderboard(false,{rankMetric:'fun_kill_enemy',rankFunSort:'rate',rankFunRole:'gareth'});resolveOld(response(webRanks('points')));await old;
   c.ACTIONS.rankToggleMine();
-  assert.equal(c.state.rankBoard.metric,'fun_knife_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/成功 3 次 · 共 4 次机会/);
+  assert.equal(c.state.rankBoard.metric,'fun_kill_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/成功 3 次 · 共 4 次机会/);
   c.ACTIONS.rankToggleMetrics();
   const options=require('../miniprogram/leaderboard-presentation').funOptions(defs,{includeFinal:true});
   assert.equal(c.state.rankFunCategory,'all');
   let html='';
-  for(const category of ['all','good','evil','more']) {
+  for(const category of ['all','good','evil','other']) {
     c.ACTIONS.funRankCategory({dataset:{value:category}});
     const group=c.viewLeaderboard();html+=group;
     assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,category==='all'?options.length:options.filter(item=>item.category===category).length);
   }
-  assert.match(html,/好人 · 成功挡刀/);assert.match(html,/刀客刀法 · 刀中敌方/);
+  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 12 项/);
   assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);
   c.ACTIONS.rankToggleMetrics();
-  await c.ACTIONS.funRankMetric({dataset:{value:'fun_good_shield'}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
-  c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/挡刀率 = 挡刀次数/);assert.equal(c.state.rankFunRole,'');
-  for (const [key,label] of [['fun_percival_bust','派西维尔 · 三炸车'],['fun_merlin_hit','梅林 · 被刺'],['fun_assassin_miss','刺客 · 歪刀'],['fun_knife_ally','刀客刀法 · 刀中友方'],['fun_duel_ally','骑士 · 决斗友方']]) {
-    assert.ok(html.includes(label));
+  await c.ACTIONS.funRankMetric({dataset:{value:'fun_defense_ally'}});assert.match(urls.at(-1),/metric=fun_defense_ally.*mode=all&sort=rate$/);
+  c.ACTIONS.rankToggleRules();assert.match(c.viewLeaderboard(),/守卫按实际挡下伤害计数/);assert.equal(c.state.rankFunRole,'');
+  for (const [key,label] of [['fun_percival_bust','竭尽全力 · 三红或梅林被刺'],['fun_merlin_hit','舍我其谁 · 被刺中'],['fun_assassin_miss','背锅侠 · 刺错梅林'],['fun_kill_ally','痛击队友 · 击杀友方'],['fun_defense_enemy','卧龙凤雏 · 保护对方']]) {
+    assert.ok(html.includes('data-value="'+key+'"'));assert.ok(html.includes(label.split(' · ')[0]));
     await c.ACTIONS.funRankMetric({dataset:{value:key}});
     assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));
     assert.equal(c.state.rankBoard.metric,key);
@@ -1813,11 +1813,11 @@ test('网页编辑资料移除同房战绩开关，旧设置不影响昵称编�
 test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背景不可交互',async()=>{
   const defs=require('../server/fun').publicMetrics(),urls=[];
   const c=client(async url=>{urls.push(url);return response(webRanks(new URL('http://test'+url).searchParams.get('metric'),{fun:true,sort:'count',unit:'次',availableFunMetrics:defs,rows:[],me:{rank:null,status:'no_records',knownGames:0}}));});
-  c.state.page='leaderboard';await c.loadLeaderboard(false,{rankMetric:'fun_good_shield'});
+  c.state.page='leaderboard';await c.loadLeaderboard(false,{rankMetric:'fun_defense_ally'});
   c.ACTIONS.rankToggleMetrics();c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
   assert.match(c.viewLeaderboard(),/rank-workspace" inert/);assert.equal(urls.length,1);
-  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankMetric,'fun_good_shield');
-  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankPendingMetric,'fun_good_shield');
+  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankMetric,'fun_defense_ally');
+  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankPendingMetric,'fun_defense_ally');
   c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
   await c.ACTIONS.funRankConfirm();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(c.state.rankMetricsExpanded,false);
   c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
@@ -1832,10 +1832,10 @@ test('网页月报默认完整展示且不重复榜单，荣誉使用头像明�
   c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
   c.state.monthlyMonth = report.month;
   const html = c.viewMonthlyReport();
-  assert.doesNotMatch(html, /好人胜率榜|坏人胜率榜|战绩榜|刺客神刀手|暂无满足|<img src=x/);
+  assert.doesNotMatch(html, /好人胜率榜|坏人胜率榜|战绩榜|职业刺客|暂无满足|<img src=x/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(html, /查看完整月报|收起完整月报|monthly-honor-row/);
-  assert.equal((html.match(/class="monthly-board" aria-label="梅林躲刀王"/g) || []).length, 1);
+  assert.equal((html.match(/class="monthly-board" aria-label="闪身步大神"/g) || []).length, 1);
   assert.match(html, /monthly-avatar/);
   assert.match(html, /成功率 80% · 10 次机会/);
   assert.match(html, /桌边常驻王/);

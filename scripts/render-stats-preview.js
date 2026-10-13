@@ -30,9 +30,16 @@ function html(node) {
   }).join(' ');
   return `<${tag} ${attrs}>${(node.children || []).map(html).join('')}${tag === 'img' ? '' : `</${tag}>`}`;
 }
-const labels = {good_shield:'成功挡刀',assassin_hit:'刺中梅林',assassin_miss:'歪刀',knife_enemy:'刀中敌方',knife_ally:'刀中友方',knife_failed:'未生效'};
+const fun = require('../server/fun');
+const labels = Object.fromEntries(Object.values(fun.metrics).map(def => [def.id, def.label]));
 const metric = (id, count, opportunities, positive) => ({ id, label: labels[id], count, value: count, opportunities, rate: opportunities ? count / opportunities * 100 : null, knownGames: opportunities, unknownGames: 0, mode: 'knights', unit: '次', positive, ranked: positive, byRole: [] });
 const shield = metric('good_shield', 1, 3, true);
+const honorGroups = new Map();
+for (const def of fun.publicMetrics()) {
+  const card = honorGroups.get(def.group) || {id:'knights:'+def.group,title:fun.metrics[def.id].title,metrics:[]};
+  card.metrics.push({...metric(def.id, def.positive ? 3 : 1, 8, def.positive), ranked:true});
+  honorGroups.set(def.group, card);
+}
 const knife = [metric('knife_enemy', 0, 3, true), metric('knife_ally', 0, 3, false), metric('knife_failed', 3, 3, false)];
 knife[0].byRole = [{role:'gaheris',label:'蓝刀客·加赫雷斯',value:0,count:0,opportunities:3}];
 const score = { total: 9, month: 9, games: 6, average: 1.5 };
@@ -40,8 +47,8 @@ const stats = presentStats({ total: 8, wins: 3, losses: 5, winRate: 37.5, score,
   byFaction: [{faction:'good',label:'好人阵营',total:6,wins:2,winRate:33.3,score:{total:6,games:4,average:1.5}}, {faction:'evil',label:'坏人阵营',total:2,wins:1,winRate:50,score:{total:3,games:2,average:1.5}}],
   byRole: ['梅林','派西维尔','忠臣','守护者','猎人','刺客','莫甘娜'].map((role, index) => ({role,faction:index<5?'good':'evil',total:index?1:2,wins:index<2||index===5?1:0,winRate:index?index<2||index===5?100:0:50})),
   byBoard: [], recent: [], fun: {legacyGames:0,cards:[
+    ...honorGroups.values(),
     {id:'knights:shield',title:'好人',metrics:[shield]},
-    {id:'knights:assassin',title:'刺客',description:'仅统计刺客本人的非空最终刺杀',metrics:[metric('assassin_hit',0,1,true),metric('assassin_miss',1,1,false)]},
     {id:'knights:knife',title:'刀客刀法',metrics:knife},
   ]},
 });

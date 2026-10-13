@@ -336,9 +336,9 @@ test('分享入口只传内容选择，拦截旧预览和读取失败，不传�
   const rawOptions=Object.fromEntries(navigations[1].split('?')[1].split('&').map(item=>item.split('=')));
   assert.equal(require('../miniprogram/share-card').parseSelection(rawOptions).card,'classic:merlin');
   const ranking=page('leaderboard',apiBase);
-  ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_knife_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
+  ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_kill_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
   ranking.p.shareLeaderboard();
-  assert.equal(ranking.navigations[0],'/pages/share/share?kind=leaderboard&metric=fun_knife_enemy&period=month&mode=knights&sort=rate&role=gareth');
+  assert.equal(ranking.navigations[0],'/pages/share/share?kind=leaderboard&metric=fun_kill_enemy&period=month&mode=knights&sort=rate&role=gareth');
   ranking.p.setData({visibilitySaving:true});ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
   ranking.p.setData({visibilitySaving:false,board:{rows:[{rank:1}],metric:'points',me:{total:0,points:0}}});
   ranking.p.shareLeaderboard();assert.equal(ranking.navigations.length,1);
@@ -357,12 +357,12 @@ test('榜单未上榜仍可分享本人真实成绩，暂无记录与无机会�
   assert.equal(notices[0].title,p.data.shareNotice);
   assert.equal(notices[0].icon,'none');
   assert.equal(navigations.length,1);
-  const fun={rows:[],metric:'fun_good_shield',period:'all',fun:true,sort:'rate',mode:'all',me:{status:'not_enough',knownGames:2,count:0,opportunities:0,rate:null}};
+  const fun={rows:[],metric:'fun_defense_ally',period:'all',fun:true,sort:'rate',mode:'all',me:{status:'not_enough',knownGames:2,count:0,opportunities:0,rate:null}};
   p.setData({board:fun});p.shareLeaderboard();
   assert.match(notices.at(-1).title,/暂无有效机会.*切换次数榜/);
   assert.equal(navigations.length,1);
   p.setData({board:{...fun,sort:'count'}});p.shareLeaderboard();
-  assert.equal(navigations[1],'/pages/share/share?kind=leaderboard&metric=fun_good_shield&period=all&mode=all&sort=count');
+  assert.equal(navigations[1],'/pages/share/share?kind=leaderboard&metric=fun_defense_ally&period=all&mode=all&sort=count');
   assert.equal(p.data.shareNotice,'');
   p.setData({error:'网络错误'});p.shareLeaderboard();
   assert.match(notices.at(-1).title,/重试读取榜单/);
@@ -1481,18 +1481,18 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
 });
 test('小程序趣味榜跨板子汇总，保留筛选与样本门槛，迟到响应隔离，旧服务回退独立于积分',async()=>{
   const defs=require('../server/fun').publicMetrics();let resolveOld;const urls=[];
-  const result=(metric='fun_knife_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'刀中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
-  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return {...result(metric),...(metric==='fun_good_shield'?{role:null,roleOptions:[]}: {})};}});
+  const result=(metric='fun_kill_enemy')=>rankResult(metric,{fun:true,mode:'all',sort:'rate',role:'gareth',unit:'%',metricLabel:'刀中敌方率',threshold:10,availableMetrics:['points','games','overall','good','evil'],availableFunMetrics:defs,roleOptions:[{id:'gareth',label:'加雷斯'}],rows:[],me:{count:3,opportunities:4,knownGames:4,rate:75,status:'not_enough',rank:null,remaining:6}});
+  const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);if(urls.length===1)return new Promise(resolve=>resolveOld=resolve);const metric=new URL('http://test'+url).searchParams.get('metric');return {...result(metric),...(metric==='fun_defense_ally'?{role:null,roleOptions:[]}: {})};}});
   const old=p.load(false,{metric:'fun_merlin_evade'});await new Promise(resolve=>setImmediate(resolve));
-  await p.load(false,{metric:'fun_knife_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
-  assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_knife_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
-  assert.equal(p.data.funOptions.length,defs.filter(m=>m.key!=='fun_final_hit').length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_good_shield'));assert.ok(!p.data.funOptions.some(m=>m.key==='fun_final_hit'));
+  await p.load(false,{metric:'fun_kill_enemy',funSort:'rate',funRole:'gareth'});resolveOld(result('fun_merlin_evade'));await old;
+  assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.equal(p.data.board.metric,'fun_kill_enemy');assert.equal(p.data.funRoleIndex,1);assert.match(p.data.board.me.statusLabel,/还差 6 次机会/);
+  assert.equal(p.data.funOptions.length,defs.filter(m=>m.key!=='fun_final_hit').length);assert.ok(p.data.funOptions.some(m=>m.key==='fun_defense_ally'));assert.ok(!p.data.funOptions.some(m=>m.key==='fun_final_hit'));
   p.toggleMetrics();assert.equal(p.data.metricsExpanded,true);
-  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.match(urls.at(-1),/metric=fun_good_shield.*mode=all&sort=rate$/);
-  assert.equal(p.data.metric,'fun_good_shield');assert.equal(p.data.funRole,'');assert.equal(p.data.metricsExpanded,false);
+  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_defense_ally'}}});assert.match(urls.at(-1),/metric=fun_defense_ally.*mode=all&sort=rate$/);
+  assert.equal(p.data.metric,'fun_defense_ally');assert.equal(p.data.funRole,'');assert.equal(p.data.metricsExpanded,false);
   p.toggleMetrics();const reads=urls.length;
-  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_good_shield'}}});assert.equal(p.data.metricsExpanded,false);assert.equal(urls.length,reads);
-  for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally']) {
+  await p.chooseFunMetric({currentTarget:{dataset:{id:'fun_defense_ally'}}});assert.equal(p.data.metricsExpanded,false);assert.equal(urls.length,reads);
+  for (const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_kill_ally','fun_defense_enemy']) {
     await p.chooseFunMetric({currentTarget:{dataset:{id:key}}});
     assert.match(urls.at(-1),new RegExp('metric='+key+'.*mode=all&sort=rate$'));
     assert.equal(p.data.board.metric,key);assert.equal(p.data.board.rateLabel,'发生率');
@@ -1865,16 +1865,19 @@ test('首页表单打开立即收起底栏，关闭、成功进入房间和切�
 test('趣味指标弹层取消不换榜，确认才请求，切分类保留草稿并关闭其他弹层',async()=>{
   const defs=require('../server/fun').publicMetrics(),urls=[];
   const {p}=page('leaderboard',{...apiBase,request:async url=>{urls.push(url);return rankResult(new URL('http://test'+url).searchParams.get('metric'),{fun:true,sort:'count',unit:'次',availableFunMetrics:defs,rows:[],me:{rank:null,status:'no_records',knownGames:0}});}});
-  await p.load(false,{metric:'fun_good_shield'});
+  await p.load(false,{metric:'fun_defense_ally'});
   const pick=(fn,id)=>p[fn]({currentTarget:{dataset:{id}}});
   p.toggleMine();p.toggleMetrics();assert.equal(p.data.mineExpanded,false);
   assert.equal(p.data.funCategory,'all');assert.equal(p.data.filteredFunOptions.length,p.data.funOptions.length);
+  p.funOptionsHeight=170;p.funOptionsOffset=0;p.updateFunOptionsHint(680);assert.equal(p.data.funOptionsCanScroll,true);
+  p.onFunOptionsScroll({detail:{scrollTop:510,scrollHeight:680}});assert.equal(p.data.funOptionsCanScroll,false);
+  p.onFunOptionsScroll({detail:{scrollTop:100,scrollHeight:680}});assert.equal(p.data.funOptionsCanScroll,true);
   pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');
-  assert.equal(p.data.metric,'fun_good_shield');assert.equal(urls.length,1);
+  assert.equal(p.data.metric,'fun_defense_ally');assert.equal(urls.length,1);
   p.toggleMetrics();assert.equal(urls.length,1);
-  p.toggleMetrics();assert.equal(p.data.pendingFunMetric,'fun_good_shield');
+  p.toggleMetrics();assert.equal(p.data.pendingFunMetric,'fun_defense_ally');
   assert.equal(p.data.funCategory,'all');
-  pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');pick('chooseFunCategory','more');
+  pick('chooseFunCategory','evil');pick('previewFunMetric','fun_assassin_miss');pick('chooseFunCategory','good');
   assert.equal(p.data.pendingFunMetric,'fun_assassin_miss');
   await p.confirmFunMetric();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(p.data.metricsExpanded,false);
   p.toggleRules();p.toggleMine();assert.equal(p.data.rulesExpanded,false);

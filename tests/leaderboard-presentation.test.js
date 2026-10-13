@@ -11,12 +11,12 @@ test('所有常规榜单展示独立主值、单位和有效样本，负积分�
 });
 test('正向与反向指标不混用成功文案，一次机会可排名，未知样本保持未知', () => {
   const base={fun:true,sort:'rate',unit:'%',availableFunMetrics,rows:[],me:{count:1,opportunities:1,knownGames:1,rate:100,rank:1,status:'ranked',remaining:0}};
-  const shield=presentBoard({...base,metric:'fun_good_shield'});
+  const shield=presentBoard({...base,metric:'fun_defense_ally'});
   assert.equal(shield.rateThreshold,1);assert.equal(shield.me.sampleLabel,'成功 1 次 · 共 1 次机会');assert.equal(shield.me.statusLabel,'第 1 名');
-  const adverse=presentBoard({...base,metric:'fun_knife_ally'});
+  const adverse=presentBoard({...base,metric:'fun_kill_ally'});
   assert.equal(adverse.rateLabel,'发生率');assert.equal(adverse.rateThreshold,1);assert.equal(adverse.me.sampleLabel,'发生 1 次 · 共 1 次机会');
   assert.doesNotMatch(shield.ruleLines.join(), /至少|门槛/);
-  const unknown=presentBoard({...base,metric:'fun_good_shield',me:{count:0,opportunities:0,knownGames:0,status:'no_records'}});
+  const unknown=presentBoard({...base,metric:'fun_defense_ally',me:{count:0,opportunities:0,knownGames:0,status:'no_records'}});
   assert.equal(unknown.me.value,'—');assert.equal(unknown.me.sampleLabel,'暂无完整样本');
 });
 test('榜尾区分全部、截断与并列，保留服务器跨页并列信息', () => {
@@ -28,6 +28,13 @@ test('榜尾区分全部、截断与并列，保留服务器跨页并列信息',
 test('所有可选趣味指标仅出现一次，反向记录均可访问', () => {
   const options=funOptions(availableFunMetrics);
   assert.equal(new Set(options.map(item=>item.key)).size,options.length);
-  for(const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_knife_ally','fun_duel_ally'])assert.ok(options.some(item=>item.key===key));
-  assert.ok(options.every(item=>['good','evil','more'].includes(item.category)));
+  for(const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_defense_enemy','fun_kill_ally'])assert.ok(options.some(item=>item.key===key));
+  assert.ok(options.every(item=>['good','evil','other'].includes(item.category)));
+  assert.equal(options.length,12);
+  assert.deepEqual(options.filter(item=>item.key.startsWith('fun_defense_')).map(item=>item.title),['绝对防御','卧龙凤雏']);
+  assert.ok(options.filter(item=>item.key.startsWith('fun_defense_')).every(item=>item.category==='good'));
+  assert.ok(options.every(item=>item.roleLabel && item.conditionLabel));
+  assert.equal(options.find(item=>item.key==='fun_defense_ally').roleLabel,'蓝守卫／魔术师');
+  assert.match(options.find(item=>item.key==='fun_kill_enemy').roleDetail,/刺客.*蓝骑士.*红猎人/);
+  assert.equal(presentBoard({fun:true,metric:'fun_defense_ally',availableFunMetrics,rows:[],me:{}}).emptyTitle,'暂无记录');
 });
