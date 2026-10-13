@@ -1076,7 +1076,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores']);
   assert.ok(links.every(n => !nodes(n).slice(1).some(child => child.tag === 'wx-navigator')));
   for (const node of nodes(tree).filter(n => ['wx-navigator','wx-button'].includes(n.tag))) {
-    assert.equal(node.attr.hoverClass,'me-pressed');
+    assert.equal(node.attr.hoverClass,String(node.attr.class || '').includes('disclosure-button') ? 'none' : 'me-pressed');
     assert.equal(node.attr.hoverStartTime,0);
     assert.equal(node.attr.hoverStayTime,70);
   }

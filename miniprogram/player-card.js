@@ -1,4 +1,4 @@
-const initialPlayerCardData = { playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "" };
+const initialPlayerCardData = { playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "", playerCardBadge: null };
 // The caller supplies its API and context guard; lifecycle and presentation are shared.
 function playerCardMethods(api) {
   return {
@@ -23,8 +23,12 @@ function playerCardMethods(api) {
         const rateLabel = value => value == null ? "—" : value.toFixed(1) + "%";
         const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
           byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
-        const playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
+        let playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
+        // Badge artwork ships in the mini-program; it also works when web hosting is disabled.
+        const { catalogue, MAX_EQUIPPED } = require('./badges');
+        playerCard = { ...playerCard, badges: (result.player.badges || []).filter(badge => catalogue.some(b => b.id === badge.id)).slice(0, MAX_EQUIPPED)
+          .map(badge => ({ ...badge, imageUrl: catalogue.find(b => b.id === badge.id).imageUrl })) };
         this.setData({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
       } catch (e) {
         if (active()) this.setData({ playerCardError: e.message || "战绩读取失败，请重试" });
@@ -33,6 +37,11 @@ function playerCardMethods(api) {
       }
     },
     playerCardAvatarError() { if (this.data.playerCard) this.setData({ playerCard: { ...this.data.playerCard, avatarFailed: true } }); },
+    showPlayerCardBadge(e) {
+      const badge = this.data.playerCard?.badges?.find(b => b.id === e.currentTarget.dataset.id);
+      this.setData({ playerCardBadge: badge?.id === this.data.playerCardBadge?.id ? null : badge || null });
+    },
+    closePlayerCardBadge() { this.setData({ playerCardBadge: null }); },
   };
 }
 module.exports = { initialPlayerCardData, playerCardMethods };

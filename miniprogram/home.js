@@ -99,6 +99,9 @@ module.exports = function createHomePage(initialTab = 0) {
     mask() { this.lobbyController?.mask(); },
     load() { return this.personalController.load(); },
     about() { return this.personalController.about(); },
+    toggleBadgeManager() { return this.personalController.toggleBadgeManager(); },
+    loadBadgeManager() { return this.personalController.loadBadgeManager(); },
+    toggleOwnedBadge(event) { return this.personalController.toggleOwnedBadge(event); },
     onShareAppMessage() { return { title: "桌边助手 · ShadowTable", path: "/pages/lobby/lobby" }; },
   };
   const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);

@@ -2,10 +2,17 @@
   <view class="player-card-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerCard.name+'的玩家战绩'}}">
     <view class="player-card-handle" aria-hidden="{{true}}" />
     <view class="player-card-heading"><text>玩家战绩</text><button hover-class="none" class="player-card-close" bindtap="closePlayerCard" aria-label="关闭玩家战绩">×</button></view>
-    <scroll-view scroll-y="{{true}}" class="player-card-body" style="height:{{playerCardStats ? 480 + playerCardStats.byFaction.length * 88 : 420}}rpx;">
-      <view class="player-card-identity">
+    <scroll-view scroll-y="{{true}}" class="player-card-body" style="height:{{(playerCardStats ? 480 + playerCardStats.byFaction.length * 88 : 420) + (playerCard.badges.length ? 112 : 0) + (playerCardBadge ? 320 : 0)}}rpx;">
+      <view class="player-card-identity {{playerCard.name.length>8 ? 'is-long-name' : ''}}">
         <view class="player-card-avatar"><text>{{playerCard.initial}}</text><image class="player-card-avatar-image" wx:if="{{playerCard.avatarUrl && !playerCard.avatarFailed}}" src="{{playerCard.avatarUrl}}" mode="aspectFill" binderror="playerCardAvatarError" aria-hidden="{{true}}" /></view>
         <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text wx:if="{{playerCard.scope!=='leaderboard'}}" class="small muted">{{playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>
+        <scroll-view wx:if="{{playerCard.badges.length}}" class="player-card-badges" scroll-x="{{true}}" show-scrollbar="{{true}}" aria-label="佩戴的荣誉徽章，可横向滑动查看">
+          <button wx:for="{{playerCard.badges}}" wx:key="id" class="disclosure-button player-badge-button" hover-class="none" bindtap="showPlayerCardBadge" data-id="{{item.id}}" aria-label="{{'查看'+item.title+'徽章'}}" aria-expanded="{{playerCardBadge.id===item.id}}"><image src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="{{true}}" /></button>
+        </scroll-view>
+      </view>
+      <view wx:if="{{playerCardBadge}}" class="player-badge-detail">
+        <view class="player-badge-detail-heading"><image src="{{playerCardBadge.imageUrl}}" mode="aspectFit" aria-hidden="{{true}}" /><text>{{playerCardBadge.title}}</text><button hover-class="none" class="player-badge-detail-close" bindtap="closePlayerCardBadge" aria-label="关闭徽章介绍">×</button></view>
+        <view>{{playerCardBadge.description}}</view>
       </view>
       <view wx:if="{{playerCardLoading}}" class="player-card-message muted" role="status">正在读取战绩…</view>
       <view wx:elif="{{playerCardError}}" class="player-card-message" role="alert"><text>{{playerCardError}}</text><button hover-class="none" class="text-button" bindtap="retryPlayerCard">重试</button></view>

@@ -2,6 +2,7 @@
 const { createHash } = require("node:crypto");
 const { RuleError } = require("./engine");
 const { readProfile } = require("./profile");
+const { equippedBadges } = require("./badges");
 
 // Scoped to a room membership, never an account ID or a management credential.
 function playerStatsId(room, player) {
@@ -15,6 +16,7 @@ function readRoomPlayerStats(store, room, viewer, targetId) {
   const profile = readProfile(store, target.uid);
   const player = { id: targetId, seat: target.seat, name: target.name, isHost: room.host === target.uid, avatarUrl: profile.avatarUrl };
   if (target.uid.startsWith("test:")) return { player, status: "untracked" };
+  player.badges = equippedBadges(store, target.uid);
   return { player, status: "available", stats: playerStatsSummary(store, target.uid) };
 }
 function playerStatsSummary(store, uid) {
@@ -28,6 +30,7 @@ function readLeaderboardPlayerStats(store, publicId) {
   const profile = readProfile(store, target.uid);
   const player = { id: publicId, name: profile.nickname || "新朋友", avatarUrl: profile.avatarUrl };
   if (target.uid.startsWith("test:")) return { player, status: "untracked" };
+  player.badges = equippedBadges(store, target.uid);
   return { player, status: "available", stats: playerStatsSummary(store, target.uid) };
 }
 module.exports = { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats };

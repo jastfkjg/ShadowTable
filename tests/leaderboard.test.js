@@ -44,14 +44,16 @@ test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可�
     assert.equal((await get(path)).status,401);
     const card=await get(path,viewer);
     assert.equal(card.status,200);assert.equal(card.cache,'no-store');
-    assert.deepEqual(card.data.player,{id,name:'公开昵称',avatarUrl:null});
+    assert.deepEqual(card.data.player,{id,name:'公开昵称',avatarUrl:null,badges:card.data.player.badges});
+    assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','overall']);
     assert.equal(card.data.stats.total,5);assert.equal(card.data.stats.wins,3);assert.equal(card.data.stats.winRate,60);
     assert.equal(card.data.stats.byFaction.length,2);
     assert.deepEqual(Object.keys(card.data.stats).sort(),['byFaction','scoreTotal','total','winRate','wins']);
     assert.doesNotMatch(JSON.stringify(card.data),/wx:|guest:|本人角色|历史昵称|records|recent|excluded|membership/);
     app.store.transaction(()=>saveProfile(app.store,owner,{nickname:'公开昵称',version:readProfile(app.store,owner).version,leaderboardVisible:false,roomStatsVisible:true}));
     const hidden=await get(path,viewer);
-    assert.equal(hidden.status,200);assert.equal(hidden.cache,'no-store');assert.deepEqual(hidden.data,card.data);
+    assert.equal(hidden.status,200);assert.equal(hidden.cache,'no-store');
+    assert.deepEqual(hidden.data,{...card.data,player:{...card.data.player,badges:[]}});
     assert.equal((await get('/api/leaderboard?metric=games',viewer)).data.rows.length,0);
     assert.equal((await get(path,owner)).status,200);
     const missing=await get('/api/leaderboard/players/'+randomUUID()+'/stats',viewer);

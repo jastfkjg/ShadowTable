@@ -133,8 +133,8 @@ class Leaderboard {
       me: { ...ownStats, rank: own?.rank || null, status, remaining: Math.max(0, METRICS[metric] - ownStats.total) },
     };
   }
-  readFun(uid, selection, now) {
-    const { metric, period, offset, version, funMetric: def, mode, role, sort, nearby } = selection;
+  funSnapshot(selection, now) {
+    const { metric, period, funMetric: def, mode, role, sort } = selection;
     const range = periodRange(period, now), key = [metric,period,mode,role,sort].join(":"), old = this.cache.get(key);
     let snapshot = old;
     const comparator = (a,b) => {
@@ -163,6 +163,12 @@ class Leaderboard {
       this.cache.set(key,snapshot);
       while (this.cache.size > 128) this.cache.delete(this.cache.keys().next().value);
     }
+    return snapshot;
+  }
+  readFun(uid, selection, now) {
+    const { metric, period, offset, version, funMetric: def, mode, role, sort, nearby } = selection;
+    const snapshot = this.funSnapshot(selection, now), range = snapshot;
+    const threshold = sort === "rate" ? def.rateThreshold : 1;
     if (version && version !== snapshot.version) throw new RuleError("榜单已更新，请刷新后继续查看",409);
     const present = row => {
       const count = Number(row?.count || 0), opportunities = Number(row?.opportunities || 0);

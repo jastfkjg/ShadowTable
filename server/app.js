@@ -331,6 +331,27 @@ function createApp({
         });
         return send(200, result);
       }
+      if (path === "/api/me/badges") {
+        res.setHeader("Cache-Control", "no-store");
+        const badges = require("./badges");
+        if (req.method === "GET") return send(200, badges.readBadges(store, uid));
+        check(req.method === "POST", "接口不存在", 404);
+        limit(`badges:${uid}`, 30);
+        const b = await body(req), id = req.headers["idempotency-key"];
+        check(typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id), "缺少合法请求编号");
+        const fingerprint = hash(JSON.stringify([path, b]));
+        const result = store.transaction(() => {
+          const cached = store.receipt(uid, id);
+          if (cached) {
+            check(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409);
+            return badges.readBadges(store, uid);
+          }
+          const value = badges.saveBadge(store, uid, b);
+          store.addReceipt(uid, id, fingerprint, value);
+          return value;
+        });
+        return send(200, result);
+      }
       if (req.method === "GET" && path === "/api/me/stats")
         return send(200, store.statsFor(uid));
       if (req.method === "GET" && path === "/api/me/score-ledger") {

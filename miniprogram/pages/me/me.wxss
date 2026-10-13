@@ -122,3 +122,6 @@
   .me-overview .me-metric .small, .me-points, .me-section-label { font-size: 12px; }
   .me-links .personal-link { font-size: 14px; }
 }
+
+.me-icon-medal { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='m8 13-2 9 6-3 6 3-2-9M12 4.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2-1.6-1.6L11 6.5Z'/%3E%3C/svg%3E"); }
+.badge-equipped-count { margin: 12px 0; color: var(--accent, #e6c27a); font-weight: 600; }

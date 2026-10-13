@@ -1,11 +1,14 @@
 const api = require("../../api");
 const { presentProfile, presentStats } = require("../../profile");
 const { selectTab } = require("../../tab-navigation");
+const { initialBadgeManager, badgeManagerMethods } = require('../../badge-manager');
 module.exports = function createMePage() { return {
-  data: { loading: true, error: "", profile: null, stats: null },
+  data: { loading: true, error: "", profile: null, stats: null, ...initialBadgeManager },
+  ...badgeManagerMethods(),
   onLoad() { this.alive = true; },
   onShow() { selectTab(this, 1); return this.load(); },
-  onUnload() { this.alive = false; },
+  onHide() { this.badgeManagerSequence = (this.badgeManagerSequence || 0) + 1; this.setData({ ...initialBadgeManager }); },
+  onUnload() { this.alive = false; this.badgeManagerSequence = (this.badgeManagerSequence || 0) + 1; },
   updateChangedData(values) {
     const changed = {};
     for (const key of Object.keys(values)) {

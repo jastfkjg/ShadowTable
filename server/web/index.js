@@ -28,6 +28,8 @@ for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "lau
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
+for (const badge of require('../../miniprogram/badges').catalogue)
+  assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
 function serve(req, res, path) {
   const asset = Object.hasOwn(assets, path) ? assets[path] : null;

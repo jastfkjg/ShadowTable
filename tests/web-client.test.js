@@ -1865,3 +1865,42 @@ test('网页最佳玩家票选不限时，支持房主未投名单、选择修�
   const shown=hp.present({status:'settled',completed:6,total:6,mvp:[{seat:2,name:'林间',votes:3},{seat:3,name:'阿风',votes:3}],svp:[{seat:5,name:'晚风',votes:4}]});
   const html=c.viewHonors(shown);assert.equal((html.match(/class="honor-winner"/g)||[]).length,3);assert.match(html,/并列获奖/);assert.match(html.replace(/<[^>]*>/g,''),/2 号 · 3 票/);
 });
+
+test('战绩卡仅显示徽章图案，点击显示称号介绍，关闭还原；佩戴管理提交明确状态', async () => {
+  const badge=require('../miniprogram/badges').catalogue.find(b=>b.id==='assassin_hit');
+  const collection={badges:[{...badge,equipped:true}],version:0,periodStart:1};
+  const calls=[];
+  const c=client(async(path,options)=>{
+    calls.push({path,data:options.body?JSON.parse(options.body):null});
+    if(options.method==='POST')return response({...collection,version:1,badges:[{...badge,equipped:false}]});
+    return response(collection);
+  });
+  c.state.playerCard={id:'p',scope:'leaderboard',name:'玩家',initial:'玩',badges:[badge]};
+  c.state.playerCardStats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
+  const html=c.viewPlayerCard();
+  assert.match(html,/aria-label="查看职业刺客徽章"/);
+  assert.doesNotMatch(html,/>职业刺客</);
+  c.ACTIONS.showPlayerCardBadge({dataset:{id:badge.id}});
+  assert.match(c.viewPlayerCard(),/>职业刺客</);assert.match(c.viewPlayerCard(),/本月/);
+  c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>职业刺客</);
+  c.state.page='me';await c.ACTIONS.toggleBadgeManager();
+  assert.equal(c.state.badgeCollection.badges[0].equipped,true);
+  await c.ACTIONS.toggleOwnedBadge({dataset:{id:badge.id}});
+  assert.deepEqual(calls.at(-1).data,{id:badge.id,equipped:false,version:0,periodStart:1});
+  assert.equal(c.state.badgeCollection.badges[0].equipped,false);
+});
+
+test('网页限制3枚并保留换装能力，徽章详情不含计算规则', async () => {
+  const badges=require('../miniprogram/badges').catalogue.slice(0,4).map((b,i)=>({...b,equipped:i<3}));
+  let calls=0;
+  const c=client(async()=>{calls++;return response({badges:badges.map(b=>({...b,equipped:false})),version:1});});
+  Object.assign(c.state,{page:'me',badgeManagerOpen:true,badgeCollection:{badges,version:0,periodStart:1}});
+  await c.ACTIONS.toggleOwnedBadge({dataset:{id:badges[3].id}});
+  assert.equal(calls,0);assert.match(c.state.badgeManagerError,/最多佩戴3枚/);
+  await c.ACTIONS.toggleOwnedBadge({dataset:{id:badges[0].id}});assert.equal(calls,1);
+  c.state.playerCard={id:'p',scope:'leaderboard',name:'甲',initial:'甲',badges};
+  c.state.playerCardStats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
+  assert.equal((c.viewPlayerCard().match(/class="player-badge-button"/g)||[]).length,3);
+  c.ACTIONS.showPlayerCardBadge({dataset:{id:badges[0].id}});
+  assert.match(c.viewPlayerCard(),/积分王者/);assert.doesNotMatch(c.viewPlayerCard(),/按北京时间本月/);
+});

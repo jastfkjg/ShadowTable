@@ -1916,3 +1916,26 @@ button.public-history-row-toggle:active { opacity: 1; background: rgba(177,191,1
   .public-history-dock .host-action-bar-inner button { min-height: 44px; padding: 8px 6px; font-size: 14px; }
   .public-history-dock .host-waiting-copy { font-size: 12px; }
 }
+
+/* Monthly leader badges: artwork only in the player identity row. */
+.player-card-identity { flex-wrap: wrap; }
+.player-card-name { flex: 1 1 100rpx; }
+.player-card-badges { flex: 0 0 156px; width: 156px; max-width: 100%; white-space: nowrap; }
+button.player-badge-button { display: inline-flex; vertical-align: middle; width: 48px; height: 48px; min-height: 48px; padding: 2px; margin: 0 4px 0 0; border-radius: 8px; }
+.player-badge-button image { width: 44px; height: 44px; }
+.badge-pressed { opacity: .7; }
+.player-badge-detail { padding: 20rpx 0; border-top: 1rpx solid var(--border); }
+.player-badge-detail-heading { display: flex; align-items: center; gap: 16rpx; font-weight: 600; }
+.player-badge-detail-heading image { width: 120rpx; height: 120rpx; flex-shrink: 0; }
+.player-badge-detail-heading text { flex: 1; }
+button.player-badge-detail-close { width: 48px; height: 48px; min-height: 48px; padding: 0; margin: 0; font-size: 24px; }
+.player-badge-detail .muted { margin-top: 12rpx; }
+.badge-manager { padding: 16rpx 0 24rpx; }
+.badge-manager-row { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 0; border-bottom: 1rpx solid var(--border); }
+.badge-manager-image { flex-shrink: 0; width: 112rpx; height: 112rpx; }
+.badge-manager-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+button.badge-wear-button { flex-shrink: 0; min-height: 48px; min-width: 64px; width: auto; margin: 0; padding: 8px; font-size: 26rpx; border: 1rpx solid var(--border); }
+button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(--accent); }
+.badge-manager-empty { padding: 32rpx 0; }
+.player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 140rpx); }
+.player-card-identity.is-long-name .player-card-badges { flex-basis: calc(100% - 136rpx); width: calc(100% - 136rpx); margin-left: 136rpx; }
