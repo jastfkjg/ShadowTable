@@ -68,6 +68,7 @@ function presentFun(value) {
       shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat,
       enemyLabel: metrics.find(row => row.id.endsWith("enemy"))?.label || "敌方", allyLabel: metrics.find(row => row.id.endsWith("ally"))?.label || "友方",
       coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
+      headerNote: primary?.countOnly ? "" : !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `${primary.opportunities} ${isCombat ? "次出手" : isDefense ? "次保护" : "次机会"}`,
       sampleLabel: isSurvival ? "按实际发生次数累计 · 点击查看对局" : isHonor ? "按获奖局数统计 · 点击查看对局" : !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `共 ${primary.opportunities} ${isCombat ? "次出手" : isDefense ? "次实际保护" : "次机会"}`,
       opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
   });
@@ -75,6 +76,7 @@ function presentFun(value) {
   const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
   cards.forEach((card, index) => {
     card.sectionTitle = cards[index - 1]?.section === card.section ? "" : (multipleModes && !card.isHonor ? modes[card.id.split(":")[0]] + " · " : "") + card.sectionLabel;
+    if (card.id.endsWith(":survival")) card.sectionTitle = multipleModes ? modes[card.id.split(":")[0]] : "";
   });
   return { ...value, available: true, cards, shareable: canShareFun(value) };
 }

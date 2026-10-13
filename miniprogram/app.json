@@ -2,6 +2,7 @@
   "pages": [
     "pages/lobby/lobby",
     "pages/me/me",
+    "pages/badges/badges",
     "pages/stats/stats",
     "pages/leaderboard/leaderboard",
     "pages/monthly/monthly",
@@ -19,7 +20,9 @@
   "subPackages": [
     {
       "root": "pages/profile",
-      "pages": ["profile"]
+      "pages": [
+        "profile"
+      ]
     }
   ],
   "window": {

@@ -37,19 +37,7 @@
       <view class="me-section-label">我的记录</view>
       <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy">对局记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-spark" aria-hidden="true"></view><view class="me-link-copy">趣味记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <button class="disclosure-button personal-link" bindtap="toggleBadgeManager" hover-class="none" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-expanded="{{badgeManagerOpen}}"><view class="me-icon me-icon-medal" aria-hidden="true"></view><view class="me-link-copy">荣誉徽章</view><view class="me-chevron" aria-hidden="true"></view></button>
-      <view wx:if="{{badgeManagerOpen}}" class="badge-manager">
-        <view class="small muted">最多佩戴3枚；先摘下一枚，再选择其他徽章。</view>
-        <view wx:if="{{badgeCollection}}" class="badge-equipped-count">已佩戴 {{badgeCollection.equippedCount}}/3</view>
-        <view wx:if="{{badgeManagerLoading}}" role="status" class="small muted">正在读取徽章…</view>
-        <view wx:if="{{badgeManagerError}}" class="inline-error" role="alert">{{badgeManagerError}}<button hover-class="none" bindtap="loadBadgeManager" class="text-button" disabled="{{badgeManagerLoading || badgeManagerSaving}}">刷新徽章</button></view>
-        <view wx:if="{{badgeCollection && !badgeCollection.badges.length}}" class="badge-manager-empty muted">本月暂无荣誉徽章，登上月榜第一即可获得。</view>
-        <view wx:for="{{badgeCollection.badges}}" wx:key="id" class="badge-manager-row">
-          <image src="{{item.imageUrl}}" mode="aspectFit" class="badge-manager-image" aria-hidden="true" />
-          <view class="badge-manager-copy"><view>{{item.title}}</view><view class="small muted">{{item.description}}</view></view>
-          <button hover-class="none" class="badge-wear-button {{item.equipped ? 'is-equipped' : ''}}" bindtap="toggleOwnedBadge" data-id="{{item.id}}" aria-label="{{(item.equipped?'摘下':'佩戴')+item.title}}" aria-pressed="{{item.equipped}}" disabled="{{badgeManagerSaving || badgeManagerLoading || (!item.equipped && badgeCollection.equippedCount >= 3)}}">{{item.equipped ? '已佩戴' : '佩戴'}}</button>
-        </view>
-      </view>
+      <navigator class="personal-link" url="/pages/badges/badges" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-medal" aria-hidden="true"></view><view class="me-link-copy">荣誉徽章</view><view class="me-chevron" aria-hidden="true"></view></navigator>
     </view>
     <view class="personal-links me-links me-links-community">
       <view class="me-section-label">一起看看</view>

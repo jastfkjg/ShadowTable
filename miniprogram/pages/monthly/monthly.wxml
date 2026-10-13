@@ -22,7 +22,6 @@
       <block wx:for="{{report.coreBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
       <block wx:for="{{report.extraBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block>
       <block wx:if="{{report.hasFunBoards}}"><view class="monthly-tabs" aria-label="趣味榜类型"><button bindtap="chooseEdition" data-id="honors" class="{{!entertainment?'selected':''}}" aria-pressed="{{!entertainment}}" hover-class="none">趣味荣誉</button><button bindtap="chooseEdition" data-id="fun" class="{{entertainment?'selected':''}}" aria-pressed="{{entertainment}}" hover-class="none">娱乐榜</button></view>
-      <view class="monthly-tabs monthly-sort" aria-label="趣味榜排序"><button bindtap="chooseSort" data-id="count" class="{{sort==='count'?'selected':''}}" aria-pressed="{{sort==='count'}}" hover-class="none">按次数</button><button bindtap="chooseSort" data-id="rate" class="{{sort==='rate'?'selected':''}}" aria-pressed="{{sort==='rate'}}" hover-class="none">按{{entertainment?'发生率':'成功率'}}</button></view>
       <block wx:for="{{detailBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block></block>
       <view class="monthly-share-bar"><button class="monthly-share" bindtap="share" loading="{{shareOpening}}" disabled="{{shareOpening || loading}}" hover-class="none">{{entertainment?'生成娱乐版分享图':'生成月报分享图'}}</button></view>
     </block>

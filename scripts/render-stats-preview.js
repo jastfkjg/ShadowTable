@@ -62,9 +62,19 @@ const matchRecords = presentMatches([
   ...Array.from({length:13},(_,i)=>({...match,id:'earlier-'+i,role:'莫甘娜',endedAt:new Date(2026,9,10,22,59-i).getTime(),outcome:i<2?'win':i<5?'loss':'excluded',replayAvailable:false,score:{status:'legacy'}})),
 ]);
 const history = {...createHistory().data,loading:false,loaded:true,filtersAvailable:true,records:matchRecords,total:17,outcomeSummary:'3 胜 · 5 负 · 9 场不计入',outcomeCounts:{wins:3,losses:5,excluded:9}};
+const compactStats = presentStats({ total: 3, wins: 1, winRate: 33.3, byFaction: [], byRole: [], byBoard: [], recent: [], fun: { legacyGames: 1, cards: [
+  { id: 'knights:survival', metrics: [{ ...metric('survival_revive', 0, 0, true), value: null }, metric('survival_knifed', 1, 0, true)] },
+  { id: 'knights:shield', title: '好人', metrics: [shield] },
+  { id: 'knights:assassin', title: '刺客', metrics: [metric('assassin_hit', 0, 1, true), metric('assassin_miss', 1, 1, false)] },
+  { id: 'knights:kill', metrics: [{ ...metric('kill_enemy', 0, 3, true), byRole: knife[0].byRole }, metric('kill_ally', 0, 3, false)] },
+  { id: 'knights:knife', metrics: knife },
+] } });
 const stressRecords = presentMatches([{...match,id:'long',role:'觉醒蓝刀客·加赫雷斯',boardName:'阿瓦隆 · 十二骑士与扩展角色（12人）',faction:'good',outcome:'loss',endedAt:new Date(2026,9,11,23,33).getTime(),score:{status:'scored',total:-12},fun:{highlights:[{id:'good_shield',label:'成功挡刀',count:1},{id:'knife_enemy',label:'刀中敌方',count:12}]}}]);
 const scenes = {
   overview: {tab:'records',statistics:{stats}}, fun: {tab:'fun',statistics:{stats}},
+  'fun-compact': {tab:'fun',statistics:{stats:compactStats}},
+  'fun-compact-rules': {tab:'fun',statistics:{stats:compactStats,funRulesExpanded:true}},
+  'fun-compact-roles': {tab:'fun',statistics:{stats:compactStats,funRoles:{'knights:knife':true,'knights:kill':true}}},
   expanded: {tab:'records',statistics:{stats:{...stats,byFaction:stats.byFaction.map(row=>({...row,expanded:true}))}}},
   roles: {tab:'fun',statistics:{stats,funRoles:{'knights:knife':true},funRulesExpanded:true}},
   empty: {tab:'records',statistics:{stats:presentStats({total:0,wins:0,winRate:null,byFaction:[],byRole:[],byBoard:[],recent:[]})}},

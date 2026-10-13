@@ -1316,7 +1316,8 @@ test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐�
   const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};
   const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
   assert.ok(!nav.attr.share);assert.equal(byHandler(ready,'shareStats').attr.ariaLabel,'分享完整趣味记录图片');
-  assert.ok(byHandler(ready,'shareFun'));
+  assert.ok(byHandler(ready,'openFunMenu'));
+  assert.ok(byHandler(ready,'toggleFunRules'));
   const empty=renderStats({...data,stats:{...data.stats,fun:{...data.stats.fun,shareable:false}}});
   assert.ok(!byHandler(empty,'shareStats'));
 });
@@ -1342,10 +1343,10 @@ test('趣味单指标把比例和样本一起呈现，未知与零机会不显�
   const renderMetric = extra => renderStatsShell({tab:'fun',stats:{fun:presentFun({legacyGames:0,cards:[{id:'classic:shield',title:'好人',metrics:[{...metric,...extra}]}]})}});
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
   const zero = renderMetric({});
-  assert.match(textOf(zero), /0%.*成功率.*成功 0 \/ 1 次机会/);
+  assert.match(textOf(zero), /1 次机会.*0%.*成功率/);
   assert.ok(byHandler(zero,'openFunMatches'));
   const unknown = textOf(renderMetric({value:null,rate:null}));
-  assert.match(unknown,/—.*暂无完整样本/); assert.doesNotMatch(unknown,/成功率|成功 0/);
+  assert.match(unknown,/暂无完整样本.*—/); assert.doesNotMatch(unknown,/成功率|成功 0/);
   const noChance = textOf(renderMetric({opportunities:0,rate:null}));
   assert.match(noChance,/暂无有效机会/); assert.doesNotMatch(noChance,/成功率|0%/);
 });
@@ -1363,6 +1364,26 @@ test('趣味页按玩法和终局／轮内技能分组，保持全部指标与�
   const tree=renderStatsShell({tab:'fun',stats:{fun}});
   assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);
   assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-card').length,3);
+});
+
+test('趣味精简卡片保留称号与未知次数，释义仅在顶部说明展开后显示', () => {
+  const { presentFun } = require('../miniprogram/profile');
+  const metric = { mode:'knights', unit:'次', count:0, opportunities:0, rate:null, knownGames:1, unknownGames:0, positive:true, ranked:true, byRole:[] };
+  const fun = presentFun({ legacyGames:1, cards:[{ id:'knights:survival', metrics:[
+    { ...metric, id:'survival_revive', value:null }, { ...metric, id:'survival_knifed', value:0 },
+  ] }] });
+  assert.equal(fun.cards[0].sectionTitle, '');
+  assert.equal(fun.cards[0].headerNote, '');
+  const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
+  const compact = renderStatsShell({ tab:'fun', stats:{fun}, funRulesExpanded:false });
+  assert.match(textOf(compact), /—我在阿瓦隆玩重生.*0全民公敌/);
+  assert.doesNotMatch(textOf(compact), /复活按实际回场|缺失数据|按实际发生次数/);
+  const expanded = renderStatsShell({ tab:'fun', stats:{fun}, funRulesExpanded:true });
+  assert.equal(byHandler(expanded, 'toggleFunRules').attr.ariaExpanded, true);
+  assert.match(textOf(expanded), /复活按实际回场/);
+  assert.match(textOf(expanded), /我在阿瓦隆玩重生：复活/);
+  assert.match(textOf(expanded), /1 局旧对局/);
+  assert.equal(nodes(expanded).filter(n => n.attr?.bindtap === 'openFunMatches').length, 2);
 });
 test('积分页只有真实空数据才显示空态，按北京日期分组，调整不可点，对局可点且零分不遗漏', () => {
   const { presentEntries } = require('../miniprogram/pages/scores/presentation');
@@ -1563,7 +1584,8 @@ test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示�
   const rows=['honor_mvp','honor_svp'].map((metric,i)=>({metric,mode:'voted',role:'all',role_label:'玩家票选',match_id:'m',status:'known',count:i?0:1,opportunities:0}));
   const stats=presentStats({total:1,wins:1,byFaction:[],byRole:[],byBoard:[],recent:[],fun:fun.aggregate(rows)});
   const text=JSON.stringify(renderStatsShell({tab:'fun',stats}));
-  assert.match(text,/最强 MVP/);assert.match(text,/最强 SVP/);assert.match(text,/按获奖局数统计/);assert.doesNotMatch(text,/成功率/);
+  assert.match(text,/最强 MVP/);assert.match(text,/最强 SVP/);assert.doesNotMatch(text,/按获奖局数统计/);
+  assert.match(JSON.stringify(renderStatsShell({tab:'fun',stats,funRulesExpanded:true})),/按获奖局数统计/);assert.doesNotMatch(text,/成功率/);
   const presentation=require('../miniprogram/leaderboard-presentation');
   for(const metric of ['fun_honor_mvp','fun_honor_svp']) {
     const board=presentation.presentBoard({fun:true,countOnly:true,metric,sort:'count',period:'all',unit:'次',availableFunMetrics:fun.publicMetrics(),rows:[],me:{knownGames:1,count:1,status:'ranked',rank:1}});

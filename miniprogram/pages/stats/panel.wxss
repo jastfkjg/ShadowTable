@@ -44,20 +44,22 @@ button.role-more { justify-content: center; gap: 12px; width: 100%; margin: 0; p
 .score-empty-note { font-size: 12px; line-height: 1.7; }
 .stats-empty { padding: 24px 0 8px; font-size: 14px; }
 .stats-empty .small { margin-top: 8px; font-size: 12px; }
-/* Counts, rates and the actual denominator stay together without a progress bar. */
-.fun-scope { margin-bottom: 8px; }
-.fun-section-title { display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; color: var(--muted); font-size: 12px; }
+/* Compact records keep definitions in the optional explanation panel. */
+.fun-scope { justify-content: flex-end; gap: 12px; margin: -4px 0 8px; }
+button.fun-info-button, .fun-scope button.records-share { display: flex; align-items: center; gap: 5px; width: auto; min-height: 44px; margin: 0; padding: 0 2px; color: var(--muted); font-size: 14px; font-weight: 400; }
+.fun-info-button image, .fun-scope .records-share image { width: 18px; height: 18px; }
+.fun-section-title { display: flex; align-items: center; gap: 8px; margin: 18px 0 10px; color: var(--muted); font-size: 13px; }
 .fun-scope + .fun-section-title { margin-top: 4px; }
-.fun-section-line { flex: 1; height: 1rpx; background: var(--records-line); }
-.fun-card { padding: 12px 16px; margin-bottom: 10px; border-radius: 16px; background: var(--surface); }
-.fun-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; font-weight: 600; font-size: 16px; line-height: 1.5; }
+.fun-card { padding: 14px 16px; margin-bottom: 10px; border-radius: 16px; background: var(--surface); }
+.fun-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; min-height: 24px; font-weight: 600; font-size: 17px; line-height: 1.5; }
 .fun-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .fun-title text { min-width: 0; overflow-wrap: anywhere; }
 .fun-title-icon { flex-shrink: 0; width: 19px; height: 19px; }
-.fun-heading-actions { display: flex; align-items: center; flex-shrink: 0; }
+.fun-heading-actions { display: flex; align-items: center; flex-shrink: 0; margin-left: auto; }
+.fun-sample { color: var(--muted); font-size: 12px; font-weight: 400; }
 .fun-heading-actions button.share-entry-button, .fun-heading-actions button.share-entry-button[disabled]:not([type]) { margin: -10px -8px -10px 0; }
-.fun-heading-actions .share-entry-icon { width: 17px; height: 17px; }
-.fun-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; margin: 8px 0 4px; }
+.fun-heading-actions .share-entry-icon { width: 20px; height: 20px; }
+.fun-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; margin: 10px 0 0; }
 .fun-metrics.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .fun-metrics.single { align-items: center; }
 button.fun-metric { display: block; width: 100%; margin: 0; text-align: left; font-weight: 400; min-width: 0; padding: 0 12px; min-height: 58px; border-radius: 0; border-left: 1rpx solid var(--records-line); }
@@ -65,25 +67,18 @@ button.fun-metric:first-child { border-left: 0; padding-left: 0; }
 button.fun-metric:last-child { padding-right: 0; }
 .fun-number { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.08; }
 .fun-number > text:first-child { overflow-wrap: anywhere; word-break: break-all; min-width: 0; max-width: 100%; }
-.fun-unit { display: inline; flex-shrink: 0; color: var(--muted); font-size: 12px; font-weight: 400; }
-.fun-metric-label { margin-top: 4px; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.fun-metric-label { margin-top: 6px; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 .fun-metric-chevron { color: var(--muted); }
 .fun-metrics.three .fun-number { font-size: 32px; }
 .fun-number.good { color: var(--good); } .fun-number.evil { color: var(--evil); } .fun-number.muted { color: var(--muted); }
-.fun-rate { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
-.fun-rate-value { font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.15; overflow-wrap: anywhere; }
-.fun-rate-label { font-size: 12px; margin-top: 7px; color: var(--muted); }
-.fun-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding-top: 10px; border-top: 1rpx solid var(--records-line); font-size: 12px; line-height: 1.5; }
-.fun-caption-rate { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.fun-rate { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding-left: 12px; border-left: 1rpx solid var(--records-line); }
+.fun-rate-value { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.22; overflow-wrap: anywhere; }
+.fun-rate-label { font-size: 13px; margin-top: 6px; color: var(--muted); }
 .fun-empty { margin: 24px 0; font-size: 14px; }
-button.fun-role-toggle { justify-content: space-between; min-height: 44px; width: 100%; padding: 10px 0 0; margin: 8px 0 -8px; border-top: 1rpx solid var(--records-line); border-radius: 0; color: var(--muted); font-size: 12px; }
+button.fun-role-toggle { justify-content: space-between; min-height: 44px; width: 100%; padding: 8px 0; margin: 10px 0 -8px; border-top: 1rpx solid var(--records-line); border-radius: 0; color: var(--muted); font-size: 13px; }
 button.fun-role { display: block; width: 100%; text-align: left; font-weight: 400; font-size: 14px; padding: 12px; margin: 8px 0 0; background: var(--bg); border-radius: 8px; }
 .fun-role .small { font-size: 12px; }
-.fun-pressed { opacity: .72; }
-.fun-description { margin-top: 5px; font-size: 12px; line-height: 1.5; }
-button.fun-rules-toggle { justify-content: space-between; min-height: 48px; width: 100%; padding: 0 2px; margin: 0; color: var(--muted); font-size: 12px; }
-.fun-rules-toggle[aria-expanded="true"] .stats-chevron { transform: rotate(-45deg); }
-.fun-rules { padding: 12px 2px 24px; border-top: 1rpx solid var(--records-line); font-size: 12px; line-height: 1.75; }
+.fun-rules { padding: 16px; margin-bottom: 16px; border: 1rpx solid var(--records-line); border-radius: 16px; font-size: 13px; line-height: 1.75; }
 .fun-rule-item + .fun-rule-item, .fun-rules > view + view { margin-top: 16px; }
 .fun-rule-title { color: var(--text); }
 @media (max-width: 350px) {

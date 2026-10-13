@@ -1,22 +1,15 @@
 const api = require('./api');
-const { catalogue, MAX_EQUIPPED } = require('./badges');
-const initialBadgeManager = { badgeManagerOpen: false, badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '' };
-const present = value => ({ ...value, equippedCount: value.badges.filter(b => b.equipped).length, maxEquipped: MAX_EQUIPPED, badges: value.badges.filter(b => catalogue.some(c => c.id === b.id))
-  .map(b => ({ ...b, imageUrl: catalogue.find(c => c.id === b.id).imageUrl })) });
+const { presentCollection, MAX_EQUIPPED } = require('./badges');
+const initialBadgeManager = { badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '' };
 function badgeManagerMethods() {
   return {
-    async toggleBadgeManager() {
-      const open = !this.data.badgeManagerOpen;
-      this.badgeManagerSequence = (this.badgeManagerSequence || 0) + 1;
-      this.setData({ badgeManagerOpen: open, badgeManagerSaving: false });
-      if (open) return this.loadBadgeManager();
-    },
     async loadBadgeManager() {
+      if (this.data.badgeManagerSaving) return;
       const sequence = this.badgeManagerSequence = (this.badgeManagerSequence || 0) + 1;
       this.setData({ badgeManagerLoading: true, badgeManagerError: '' });
       try {
         const value = await api.request('/api/me/badges');
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: present(value) });
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter) });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerError: e.message });
       } finally {
@@ -35,11 +28,11 @@ function badgeManagerMethods() {
       this.setData({ badgeManagerSaving: true, badgeManagerError: '' });
       try {
         const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart }, api.requestId());
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: present(value) });
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter), selectedBadge: null });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) {
           // Reconcile an ambiguous network result before permitting another toggle.
-          this.setData({ badgeCollection: null, badgeManagerError: e.message + '，请刷新徽章后重试。' });
+          this.setData({ badgeCollection: null, selectedBadge: null, badgeManagerError: e.message + '，请刷新徽章后重试。' });
         }
       } finally {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerSaving: false });

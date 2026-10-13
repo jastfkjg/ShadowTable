@@ -45,6 +45,17 @@ module.exports = function createController() { return {
     const card = this.data.stats?.fun.cards.find(row => row.id === event.currentTarget.dataset.card);
     if (card?.shareMetric) wx.navigateTo({ url: "/pages/share/share?" + queryString({ kind: "fun", card: card.id, metric: card.shareMetric }) });
   },
+  openFunMenu(event) {
+    if (this.data.loading || this.data.error || this.funMenuOpen) return;
+    const card = this.data.stats?.fun.cards.find(row => row.id === event.currentTarget.dataset.card);
+    if (!card?.shareMetric) return;
+    this.funMenuOpen = true;
+    wx.showActionSheet({
+      itemList: ["分享这张记录"],
+      success: result => { if (this.alive && result.tapIndex === 0) this.shareFun(event); },
+      complete: () => { this.funMenuOpen = false; },
+    });
+  },
   toggleFunRules() { this.setData({ funRulesExpanded: !this.data.funRulesExpanded }); },
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
   toggleFunRoles(e) { const id = e.currentTarget.dataset.id; this.setData({ funRoles: { ...this.data.funRoles, [id]: !this.data.funRoles[id] } }); },

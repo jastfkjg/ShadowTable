@@ -2,7 +2,7 @@
   <view class="player-card-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerCard.name+'的玩家战绩'}}">
     <view class="player-card-handle" aria-hidden="{{true}}" />
     <view class="player-card-heading"><text>玩家战绩</text><button hover-class="none" class="player-card-close" bindtap="closePlayerCard" aria-label="关闭玩家战绩">×</button></view>
-    <scroll-view scroll-y="{{true}}" class="player-card-body" style="height:{{(playerCardStats ? 480 + playerCardStats.byFaction.length * 88 : 420) + (playerCard.badges.length ? 112 : 0) + (playerCardBadge ? 320 : 0)}}rpx;">
+    <scroll-view scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" class="player-card-body" style="height:{{(playerCardStats ? 544 + playerCardStats.byFaction.length * 144 : 420) + (playerCard.badges.length ? 112 : 0) + (playerCardBadge ? 320 : 0)}}rpx;">
       <view class="player-card-identity {{playerCard.name.length>8 ? 'is-long-name' : ''}}">
         <view class="player-card-avatar"><text>{{playerCard.initial}}</text><image class="player-card-avatar-image" wx:if="{{playerCard.avatarUrl && !playerCard.avatarFailed}}" src="{{playerCard.avatarUrl}}" mode="aspectFill" binderror="playerCardAvatarError" aria-hidden="{{true}}" /></view>
         <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text wx:if="{{playerCard.scope!=='leaderboard'}}" class="small muted">{{playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>
@@ -18,14 +18,21 @@
       <view wx:elif="{{playerCardError}}" class="player-card-message" role="alert"><text>{{playerCardError}}</text><button hover-class="none" class="text-button" bindtap="retryPlayerCard">重试</button></view>
       <view wx:elif="{{playerCardStatus==='untracked'}}" class="player-card-message muted">陪测玩家不记录个人战绩</view>
       <block wx:elif="{{playerCardStats}}">
+        <view class="player-card-overview-title player-card-section-title">战绩概览</view>
         <view class="player-card-summary">
-          <view class="player-card-stat"><text class="player-card-number">{{playerCardStats.total}}</text><text class="small muted">有效局数</text></view>
-          <view class="player-card-stat"><text class="player-card-number">{{playerCardStats.wins}}</text><text class="small muted">胜场</text></view>
-          <view class="player-card-stat"><text class="player-card-number">{{playerCardStats.rateLabel}}</text><text class="small muted">总胜率</text></view>
+          <view class="player-card-stat"><text class="small muted">总积分</text><text class="player-card-number player-card-score-value">{{playerCardStats.scoreTotal}}</text></view>
+          <view class="player-card-stat"><text class="small muted">总胜率</text><text class="player-card-number">{{playerCardStats.rateLabel}}</text></view>
+          <view class="player-card-stat"><text class="small muted">有效局数</text><text class="player-card-number">{{playerCardStats.total}}</text></view>
+          <view class="player-card-stat"><text class="small muted">胜场</text><text class="player-card-number">{{playerCardStats.wins}}</text></view>
         </view>
-        <view wx:if="{{playerCardStats.total}}" class="player-card-factions"><view class="player-card-section-title">阵营表现</view><view wx:for="{{playerCardStats.byFaction}}" wx:key="faction" class="player-card-faction"><text class="faction-{{item.faction}}">{{item.label}}</text><text class="small muted">{{item.wins}}胜 / {{item.total}}局</text><text>{{item.rateLabel}}</text></view></view>
+        <view wx:if="{{playerCardStats.total}}" class="player-card-factions">
+          <view class="player-card-factions-heading"><text class="player-card-section-title">阵营表现</text><text class="small muted">胜率</text></view>
+          <view wx:for="{{playerCardStats.byFaction}}" wx:key="faction" class="player-card-faction">
+            <view class="player-card-faction-info"><text class="player-card-faction-label faction-{{item.faction}}">{{item.label}}</text><text class="small muted">{{item.wins}}胜 / {{item.total}}局</text><text class="player-card-faction-rate">{{item.rateLabel}}</text></view>
+            <view class="player-card-faction-track" aria-hidden="{{true}}"><view class="player-card-faction-fill faction-{{item.faction}}" style="width:{{item.winRate || 0}}%;" /></view>
+          </view>
+        </view>
         <view wx:else class="player-card-empty small muted">暂无有效战绩</view>
-        <view class="player-card-score"><text>总积分</text><text class="player-card-score-value">{{playerCardStats.scoreTotal}}</text></view>
       </block>
       <view wx:else class="player-card-message" role="alert"><text>战绩暂时无法读取，请稍后重试</text><button hover-class="none" class="text-button" bindtap="retryPlayerCard">重试</button></view>
     </scroll-view>

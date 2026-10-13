@@ -14,5 +14,20 @@
     id, title: honor.title, metric: 'fun_' + id,
     description: '本月「' + honor.title + '」次数榜第一。' + honor.description + '。',
   }))).map(badge => ({ ...badge, imageUrl: '/assets/badges/' + badge.id + '.png', rules }));
-  return { catalogue, rules, MAX_EQUIPPED: 3 };
+  const MAX_EQUIPPED = 3;
+  function presentCollection(value, filter = 'all') {
+    const owned = new Map((value.badges || []).map(b => [b.id, b]));
+    const items = catalogue.map(b => ({ ...b, owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped,
+      condition: copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0],
+      status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }));
+    items.sort((a, b) => Number(b.owned) - Number(a.owned));
+    const badges = items.filter(b => b.owned), equipped = badges.filter(b => b.equipped);
+    const month = new Date((value.periodStart || Date.now()) + 8 * 3600000);
+    return { ...value, badges, items, visibleBadges: items.filter(b => filter === 'owned' ? b.owned : filter === 'unowned' ? !b.owned : true),
+      slots: Array.from({ length: MAX_EQUIPPED }, (_, i) => equipped[i] || { id: 'empty-' + i, empty: true }),
+      ownedCount: badges.length, totalCount: catalogue.length, unownedCount: catalogue.length - badges.length,
+      equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
+      monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
+  }
+  return { catalogue, rules, MAX_EQUIPPED, presentCollection };
 });

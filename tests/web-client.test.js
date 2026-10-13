@@ -23,6 +23,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     URL, URLSearchParams, console,
     ...runtime,
   };
+  context.window.shadowtableBadges = require('../miniprogram/badges');
   context.window.shadowtableHonors = require('../miniprogram/honors');
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
   context.window.shadowtableMonthlyReport = require('../miniprogram/monthly-report');
@@ -35,7 +36,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
-      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
       getWebSessionTag() { return webSessionTag; },
@@ -1883,7 +1884,7 @@ test('战绩卡仅显示徽章图案，点击显示称号介绍，关闭还原�
   c.ACTIONS.showPlayerCardBadge({dataset:{id:badge.id}});
   assert.match(c.viewPlayerCard(),/>职业刺客</);assert.match(c.viewPlayerCard(),/本月/);
   c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>职业刺客</);
-  c.state.page='me';await c.ACTIONS.toggleBadgeManager();
+  await c.applyRoute('#/badges');
   assert.equal(c.state.badgeCollection.badges[0].equipped,true);
   await c.ACTIONS.toggleOwnedBadge({dataset:{id:badge.id}});
   assert.deepEqual(calls.at(-1).data,{id:badge.id,equipped:false,version:0,periodStart:1});
@@ -1894,7 +1895,7 @@ test('网页限制3枚并保留换装能力，徽章详情不含计算规则', a
   const badges=require('../miniprogram/badges').catalogue.slice(0,4).map((b,i)=>({...b,equipped:i<3}));
   let calls=0;
   const c=client(async()=>{calls++;return response({badges:badges.map(b=>({...b,equipped:false})),version:1});});
-  Object.assign(c.state,{page:'me',badgeManagerOpen:true,badgeCollection:{badges,version:0,periodStart:1}});
+  Object.assign(c.state,{page:'badges',badgeFilter:'all',badgeCollection:{badges,version:0,periodStart:1}});
   await c.ACTIONS.toggleOwnedBadge({dataset:{id:badges[3].id}});
   assert.equal(calls,0);assert.match(c.state.badgeManagerError,/最多佩戴3枚/);
   await c.ACTIONS.toggleOwnedBadge({dataset:{id:badges[0].id}});assert.equal(calls,1);
@@ -1903,4 +1904,35 @@ test('网页限制3枚并保留换装能力，徽章详情不含计算规则', a
   assert.equal((c.viewPlayerCard().match(/class="player-badge-button"/g)||[]).length,3);
   c.ACTIONS.showPlayerCardBadge({dataset:{id:badges[0].id}});
   assert.match(c.viewPlayerCard(),/积分王者/);assert.doesNotMatch(c.viewPlayerCard(),/按北京时间本月/);
+});
+
+test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不提供佩戴操作', async () => {
+  const {catalogue}=require('../miniprogram/badges');
+  const c=client(async url=>response(url.endsWith('/badges') ? {badges:[{...catalogue[1],equipped:true}],version:0,periodStart:1} : {}));
+  c.state.profile={nickname:'林间',identityType:'wx'};
+  assert.match(c.viewMe(),/data-page="badges"/); assert.doesNotMatch(c.viewMe(),/toggleBadgeManager/);
+  await c.applyRoute('#/badges');
+  assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,17);
+  c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
+  c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,16);
+  c.ACTIONS.showBadgeDetail({dataset:{id:'points'}});
+  const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
+  assert.match(detail,/积分王者/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
+  c.ACTIONS.closeBadgeDetail(); assert.equal(c.state.selectedBadgeId,'');
+});
+
+test('网页徽章页离开后丢弃加载结果，失败刷新不误显示为零枚', async () => {
+  let release, fail=false;
+  const c=client(async url=> {
+    if(url.endsWith('/badges')) { if(fail) throw new Error('网络断开'); return new Promise(resolve=>release=resolve); }
+    return response({});
+  });
+  const pending=c.applyRoute('#/badges');await Promise.resolve();await Promise.resolve();
+  await c.applyRoute('#/help');release(response({badges:[],version:0}));await pending;
+  assert.equal(c.state.page,'help');assert.equal(c.state.badgeCollection,null);
+  fail=true;await c.applyRoute('#/badges');assert.match(c.state.badgeManagerError,/网络/);
+  assert.match(c.viewBadgeManager(),/刷新徽章/);assert.doesNotMatch(c.viewBadgeManager(),/未拥有 17/);
 });

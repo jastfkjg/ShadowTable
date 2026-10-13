@@ -983,7 +983,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -1071,7 +1071,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['leaderboard','monthly','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['badges','leaderboard','monthly','help'].map(name => `/pages/${name}/${name}`)]);
   const points = nodes(tree).find(n => n.attr?.class === 'me-points');
   assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores']);
   assert.ok(links.every(n => !nodes(n).slice(1).some(child => child.tag === 'wx-navigator')));
@@ -1580,6 +1580,24 @@ test('趣味记录页顶部分享入口生成完整分享，单项入口仍保�
   p.data.stats.fun.shareable=true;p.data.error='读取失败';p.shareStats();assert.equal(navigations.length,2);
 });
 
+test('趣味卡片更多菜单确认后才分享，取消、页面退出和读取失败均不跳转', () => {
+  const menus = [];
+  const { p, navigations } = page('stats', apiBase, { wx: { showActionSheet: options => menus.push(options) } });
+  const event = { currentTarget: { dataset: { card: 'knights:knife' } } };
+  p.setData({ loading: false, error: '', stats: { fun: { cards: [{ id: 'knights:knife', shareMetric: 'knife_enemy' }] } } });
+  p.openFunMenu(event); p.openFunMenu(event);
+  assert.equal(menus.length, 1); assert.equal(navigations.length, 0);
+  assert.equal(menus[0].itemList[0], '分享这张记录');
+  menus[0].complete(); // Native cancel only completes the action sheet.
+  assert.equal(navigations.length, 0);
+  p.openFunMenu(event); menus[1].success({ tapIndex: 0 }); menus[1].complete();
+  assert.match(navigations[0], /kind=fun&card=knights%3Aknife&metric=knife_enemy/);
+  p.openFunMenu(event); p.onUnload(); menus[2].success({ tapIndex: 0 }); menus[2].complete();
+  assert.equal(navigations.length, 1);
+  p.alive = true; p.data.error = '读取失败'; p.openFunMenu(event);
+  assert.equal(menus.length, 3);
+});
+
 test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠状态，只首次进入读取数据', async () => {
   const reads = [], legacy = require('./helpers/fun-copy-fixtures');
   const api = { ...apiBase, request: async url => {
@@ -1883,4 +1901,45 @@ test('趣味指标弹层取消不换榜，确认才请求，切分类保留草�
   assert.equal(p.data.pendingFunMetric,'fun_assassin_miss');
   await p.confirmFunMetric();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(p.data.metricsExpanded,false);
   p.toggleRules();p.toggleMine();assert.equal(p.data.rulesExpanded,false);
+});
+
+test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作使用本月资格', async () => {
+  const { catalogue } = require('../miniprogram/badges');
+  let current = { badges: catalogue.filter(b => ['games','assassin_miss'].includes(b.id)).map(b => ({ ...b, equipped: true })), version: 0, periodStart: Date.UTC(2026,8,30,16) };
+  const writes = [];
+  const { p, navigations } = page('badges', { ...apiBase, request: async (url, method, body) => {
+    if (method === 'POST') { writes.push(body); current = { ...current, version: current.version + 1, badges: current.badges.map(b => b.id === body.id ? { ...b, equipped: body.equipped } : b) }; }
+    return current;
+  } });
+  p.onLoad(); await p.onShow();
+  assert.equal(p.data.badgeCollection.monthLabel,'2026年10月');
+  assert.equal(p.data.badgeCollection.items.length,17);
+  assert.equal(p.data.badgeCollection.ownedCount,2);
+  assert.equal(p.data.badgeCollection.slots.filter(b => b.empty).length,1);
+  const event = id => ({currentTarget:{dataset:{id}}});
+  p.chooseBadgeFilter(event('unowned')); assert.equal(p.data.badgeCollection.visibleBadges.length,15);
+  p.showBadgeDetail(event('points')); assert.equal(p.data.selectedBadge.owned,false);
+  await p.toggleOwnedBadge(event('points')); assert.equal(writes.length,0);
+  p.chooseBadgeFilter(event('owned')); p.showBadgeDetail(event('games'));
+  await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,1);
+  assert.equal(p.data.selectedBadge,null); assert.equal(writes[0].periodStart,current.periodStart);
+  await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,2);
+  p.back(); assert.deepEqual(navigations,['back']);
+});
+
+test('徽章页忽略离开后的响应，保存失败清空旧资格并可刷新恢复', async () => {
+  const { catalogue } = require('../miniprogram/badges');
+  let release, mode = 'pending';
+  const collection = {badges:[{...catalogue[0],equipped:true}],version:1,periodStart:1};
+  const {p} = page('badges',{...apiBase,request:async (url,method) => {
+    if (method === 'POST') throw new Error('状态已更新');
+    if (mode === 'pending') return new Promise(resolve => release=resolve);
+    return collection;
+  }});
+  p.onLoad(); const pending = p.onShow(); await new Promise(resolve => setImmediate(resolve));
+  p.onHide(); release(collection); await pending; assert.equal(p.data.badgeCollection,null);
+  mode='ready'; await p.onShow(); assert.equal(p.data.badgeCollection.ownedCount,1);
+  await p.toggleOwnedBadge({currentTarget:{dataset:{id:'points'}}});
+  assert.equal(p.data.badgeCollection,null); assert.match(p.data.badgeManagerError,/刷新/);
+  await p.loadBadgeManager(); assert.equal(p.data.badgeCollection.ownedCount,1);
 });
