@@ -16,10 +16,17 @@ function save(store, poll) {
 }
 function matchFor(store, id) {
   const row = store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id);
-  return row ? JSON.parse(row.snapshot) : null;
+  if (row) return JSON.parse(row.snapshot);
+  // Pure companion games have no personal archive. Keep their election in the
+  // existing table and private poll, without creating any personal records.
+  const room = store.db.prepare("SELECT state FROM rooms WHERE json_extract(state,'$.matchRecord.id')=?").get(id);
+  return room ? JSON.parse(room.state).matchRecord : read(store, id)?.testMatch || null;
 }
 function participants(store, match) {
-  return store.matchParticipants(match).filter(p => !p.companion && !p.uid.startsWith("test:") && ["win", "loss"].includes(p.outcome));
+  const players = match.players || store.matchParticipants(match);
+  return players.map(p => p.uid.startsWith("test:") && ["good", "evil", "third"].includes(p.faction)
+    ? { ...p, outcome: p.faction === match.winner ? "win" : "loss" } : p)
+    .filter(p => ["win", "loss"].includes(p.outcome));
 }
 function eligible(store, match) {
   if (!match?.winner || match.excludedReason || control(store, match.id).state !== "active") return false;
@@ -31,10 +38,18 @@ function choices(poll, uid, key) {
 }
 function publish(store, match, result) {
   match.honorResult = result;
-  store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match), match.id);
-  store.rebuildFun(match, store.matchParticipants(match));
-  store.syncScoreRooms();
-  store.invalidateLeaderboard();
+  const saved = store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match), match.id);
+  if (saved.changes) {
+    store.rebuildFun(match, store.matchParticipants(match));
+    store.syncScoreRooms();
+    store.invalidateLeaderboard();
+  } else {
+    const room = store.get(match.code);
+    if (room?.matchRecord?.id === match.id) {
+      room.matchRecord.honorResult = result;
+      store.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), room.code);
+    }
+  }
 }
 function settle(store, poll) {
   if (!poll || poll.status !== "open") return;
@@ -53,6 +68,7 @@ function settle(store, poll) {
       seat: p.seat, name: p.name, avatarUrl: avatars.get(p.uid) || null, votes: highest,
     }));
   }
+  poll.result = result;
   save(store, poll);
   publish(store, match, result);
 }
@@ -60,6 +76,7 @@ function invalidate(store, id) {
   const poll = read(store, id);
   if (!poll || poll.status === "invalidated") return;
   poll.status = "invalidated";
+  poll.result = { status: "invalidated", mvp: [], svp: [] };
   save(store, poll);
   const match = matchFor(store, id);
   if (match) publish(store, match, { status: "invalidated", mvp: [], svp: [] });
@@ -80,6 +97,8 @@ function handle(store, room, uid, input) {
     check(!poll, "本局已经发起过票选", 409);
     const players = participants(store, match).map(({ uid, seat, name, outcome }) => ({ uid, seat, name, outcome }));
     poll = { matchId: match.id, winner: match.winner, status: "open", players, required: Math.ceil(players.length / 2), ballots: {}, deadline: store.clock() + DURATION };
+    if (players.every(p => p.uid.startsWith("test:")))
+      poll.testMatch = { id: match.id, code: match.code, winner: match.winner, players };
     save(store, poll);
   } else {
     check(poll?.status === "open" && store.clock() < poll.deadline, "投票已截止，请刷新查看结果", 409);
@@ -109,7 +128,7 @@ function view(store, room, uid) {
   if (!eligible(store, match)) return null;
   const poll = read(store, match.id);
   if (!poll) return { matchId: match.id, status: "not_started", canStart: room.host === uid };
-  if (poll.status !== "open") return { matchId: match.id, ...match.honorResult, canStart: false };
+  if (poll.status !== "open") return { matchId: match.id, ...(match.honorResult || poll.result), canStart: false };
   const avatars = readAvatarUrls(store, poll.players.map(p => p.uid));
   return { matchId: match.id, status: "open", deadline: poll.deadline, serverNow: store.clock(),
     total: poll.players.length, completed: Object.keys(poll.ballots).length, required: poll.required,

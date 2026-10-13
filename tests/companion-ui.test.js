@@ -122,8 +122,81 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
         },
       }),
     change: (id, value) => element(id).handlers.change({ target: { value } }),
+    changeHonor: (id, key, value) => element("players").handlers.change({
+      target: { value, dataset: { honor: key },
+        hasAttribute: name => name === "data-honor",
+        closest: () => ({ dataset: { actor: id } }) },
+    }),
   };
 }
+
+function openHonors(extra = {}) {
+  return { matchId: "honor-1", status: "open", completed: 0, total: 6, required: 3,
+    canVote: true, canClose: false, ballot: null, groups: [
+      { key: "mvp", title: "最强 MVP", side: "胜方", skip: false,
+        players: [{ seat: 2, name: "本人", disabled: true }, { seat: 3, name: "<胜方>" }] },
+      { key: "svp", title: "最强 SVP", side: "败方", skip: false,
+        players: [{ seat: 5, name: "败方" }, { seat: 6, name: "败方二" }] },
+    ], ...extra };
+}
+
+test("陪测 MVP/SVP 两项选齐后提交，禁止自投、串阵营并保留刷新草稿", async () => {
+  const p = panel({ overrides: { phase: "ended", honors: openHonors() } });
+  await flush();
+  assert.match(p.element("players").innerHTML, /data-honor="mvp"|&lt;胜方&gt;|我，不可选/);
+  assert.match(p.element("players").innerHTML, /data-action="honorVote" disabled/);
+  p.changeHonor("0", "mvp", "2"); // self
+  p.changeHonor("0", "mvp", "5"); // losing side
+  p.changeHonor("0", "svp", "5");
+  p.click("0", "honorVote");
+  await flush();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+  p.changeHonor("0", "mvp", "3");
+  await p.poll();
+  assert.match(p.element("players").innerHTML, /value="3" selected/);
+  assert.match(p.element("players").innerHTML, /data-action="honorVote" >/);
+  p.hold(true);
+  p.click("0", "honorVote"); p.click("0", "honorVote");
+  await flush();
+  const writes = p.calls.filter(c => c.method === "POST");
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0].data, { type: "honorVote", stage: "s1", matchId: "honor-1", mvp: 3, svp: 5 });
+  p.hold(false); p.pending.forEach(request => request.resolve());
+  await flush();
+});
+
+test("陪测荣誉跳过唯一胜方自投，新对局重置选择，截止后展示完整并列名单", async () => {
+  const honors = openHonors(); honors.groups[0].skip = true;
+  const overrides = { phase: "ended", honors };
+  const p = panel({ overrides }); await flush();
+  assert.match(p.element("players").innerHTML, /无可选玩家，自动跳过/);
+  p.changeHonor("0", "svp", "5"); p.click("0", "honorVote"); await flush();
+  const vote = p.calls.find(c => c.method === "POST").data;
+  assert.equal(vote.mvp, null); assert.equal(vote.svp, 5);
+  overrides.honors = openHonors({ matchId: "honor-2" }); await p.poll();
+  assert.doesNotMatch(p.element("players").innerHTML, /value="5" selected/);
+  overrides.honors = { status: "settled", mvp: [{ seat: 3, name: "<林间>", votes: 3 }, { seat: 4, name: "阿风", votes: 3 }],
+    svp: [{ seat: 5, name: "晚风", votes: 4 }] };
+  await p.poll();
+  assert.match(p.element("players").innerHTML, /3号 &lt;林间&gt; · 3票、4号 阿风 · 3票/);
+  assert.match(p.element("players").innerHTML, /SVP：5号 晚风 · 4票/);
+  assert.doesNotMatch(p.element("players").innerHTML, /data-honor|data-action="honorVote"/);
+});
+
+test("陪测房主可发起或截止 MVP/SVP，普通玩家只显示投票操作", async () => {
+  const overrides = { phase: "ended", me: { seat: 2, isHost: true },
+    honors: { status: "not_started", matchId: "honor-host", canStart: true } };
+  const p = panel({ overrides }); await flush();
+  assert.match(p.element("players").innerHTML, /data-action="honorStart"/);
+  p.click("0", "honorStart"); await flush();
+  assert.equal(p.calls.find(c => c.method === "POST").data.matchId, "honor-host");
+  overrides.honors = openHonors({ matchId: "honor-host", canClose: true }); await p.poll();
+  assert.match(p.element("players").innerHTML, /data-action="honorClose"/);
+  p.click("0", "honorClose"); await flush();
+  assert.deepEqual(p.calls.filter(c => c.method === "POST").map(c => c.data.type), ["honorStart", "honorClose"]);
+  overrides.me = { seat: 2, isHost: false }; overrides.honors.canClose = false; await p.poll();
+  assert.doesNotMatch(p.element("players").innerHTML, /data-action="honorStart"|data-action="honorClose"/);
+});
 
 test("陪测房主先选择胜方再归档，空选、取消和重复点击不提交结束请求", async () => {
   const p = panel({ overrides: { phase: "tools", canUseTools: true, flexible: true,

@@ -319,6 +319,7 @@ if (typeof document !== "undefined") {
     swaps = {},
     hunterModes = {},
     hostDrafts = {},
+    honorDrafts = {},
     transfers = {};
   const names = {
     confirm: "确认",
@@ -347,6 +348,34 @@ if (typeof document !== "undefined") {
     );
   const button = (action, label, disabled = false) =>
     `<button data-action="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
+  function honorSelection(actor) {
+    const h = actor.room?.honors;
+    if (h?.status !== "open" || !h.canVote) return null;
+    if (honorDrafts[actor.id]?.matchId !== h.matchId)
+      honorDrafts[actor.id] = { matchId: h.matchId, mvp: null, svp: null, ...h.ballot };
+    const draft = honorDrafts[actor.id], groups = h.groups || [];
+    const ready = groups.length === 2 && groups.every(g => g.skip || g.players.some(p => !p.disabled && p.seat === draft[g.key]));
+    const ballot = { mvp: draft.mvp, svp: draft.svp };
+    groups.filter(g => g.skip).forEach(g => ballot[g.key] = null);
+    return { h, draft, groups, ready, ballot };
+  }
+  function renderHonors(actor) {
+    const h = actor.room?.honors;
+    if (!h) return "";
+    if (h.status === "not_started") return '<p>本场最佳 · 等待房主发起 MVP / SVP 投票</p>';
+    if (h.status === "settled") return '<section class="honor-vote" aria-label="本场最佳结果"><p>' + ["mvp", "svp"].map(key =>
+      key.toUpperCase() + "：" + (h[key]?.map(p => `${p.seat}号 ${escape(p.name)} · ${p.votes}票`).join("、") || "暂无有效选票")).join("<br>") + '</p></section>';
+    if (h.status !== "open") return '<p>本场最佳 · ' + (h.status === "insufficient" ? "参与人数不足，本局不颁奖" : "原票选已失效") + '</p>';
+    let html = `<section class="honor-vote" aria-label="MVP / SVP 投票"><p>${h.completed} / ${h.total} 人已投票 · 至少 ${h.required} 人完成才颁奖</p>`;
+    const selection = honorSelection(actor);
+    if (selection) {
+      html += '<div class="honor-vote-fields">' + selection.groups.map(g => `<label>${escape(g.title)} · ${escape(g.side)}<select data-honor="${escape(g.key)}" ${g.skip ? "disabled" : ""}>` +
+        (g.skip ? '<option value="">无可选玩家，自动跳过</option>' : '<option value="">请选择一名玩家</option>' + g.players.map(p =>
+          `<option value="${p.seat}" ${selection.draft[g.key] === p.seat ? "selected" : ""} ${p.disabled ? "disabled" : ""}>${p.seat}号 · ${escape(p.name)}${p.disabled ? "（我，不可选）" : ""}</option>`).join("")) + '</select></label>').join("") + '</div>';
+      html += button("honorVote", h.ballot ? "保存 MVP / SVP 修改" : "提交 MVP / SVP 投票", !selection.ready);
+    }
+    return html + '<p class="muted">匿名票选 · 截止前可修改 · 陪测账号的获奖不计入趣味记录和排行榜</p></section>';
+  }
   let changedActor = null;
   let resultDraft = null;
   function resultSelection() {
@@ -509,6 +538,8 @@ if (typeof document !== "undefined") {
             button("join", "重新入座") + button("forget", "移除失效账号");
         else if (r?.phase === "lobby")
           actions = button("ready", r.me.ready ? "取消准备" : "准备");
+        else if (r?.phase === "ended")
+          actions = renderHonors(actor);
         else if (r?.me.submitted)
           actions = '<span class="submitted">已提交</span>';
         else if (spec?.choices) {
@@ -569,6 +600,8 @@ if (typeof document !== "undefined") {
             hostActions += button("advance", "推进阶段");
           if (["ended", "terminated"].includes(r.phase))
             hostActions += button("rematch", "同房重开");
+          if (r.honors?.canStart) hostActions += button("honorStart", "发起 MVP / SVP 投票");
+          if (r.honors?.canClose) hostActions += button("honorClose", "结束 MVP / SVP 投票");
           if (r.phase === "offlineFinal")
             hostActions += button("closeOffline", r.flexible ? "线下操作完成" : "登记线下结果");
           if (r.canUseTools) hostActions += button("finishTools", "结束本局 · 登记结果");
@@ -765,6 +798,16 @@ if (typeof document !== "undefined") {
       (a) => a.id === e.target.closest("[data-actor]")?.dataset.actor,
     );
     if (!actor) return;
+    if (e.target.hasAttribute("data-honor")) {
+      if (busy || acting.has(actor.id) || actor.pending) return;
+      const selection = honorSelection(actor), key = e.target.dataset.honor;
+      const group = selection?.groups.find(g => g.key === key && !g.skip);
+      const seat = e.target.value ? Number(e.target.value) : null;
+      if (!group || seat !== null && !group.players.some(p => !p.disabled && p.seat === seat)) return;
+      selection.draft[key] = seat;
+      render();
+      return;
+    }
     if (e.target.hasAttribute("data-host-seat")) {
       const draft = hostDrafts[actor.id];
       if (!draft || draft.stage !== actor.room.stage) return;
@@ -833,6 +876,16 @@ if (typeof document !== "undefined") {
     if (action === "target" && !targets[actor.id]) return;
     run(async () => {
       if (action === "retry") return companion.retry(actor);
+      if (["honorStart", "honorClose"].includes(action)) {
+        const h = actor.room?.honors;
+        if (!(action === "honorStart" ? h?.canStart : h?.canClose)) return;
+        return companion.command(actor, action, { matchId: h.matchId });
+      }
+      if (action === "honorVote") {
+        const selection = honorSelection(actor);
+        if (!selection?.ready) throw new Error("请为 MVP 和 SVP 选择对应胜负方玩家，不能投自己");
+        return companion.command(actor, action, { matchId: selection.h.matchId, ...selection.ballot });
+      }
       if (action === "transfer") {
         const seat = transfers[actor.id];
         if (!seat) throw new Error("请选择接任玩家");

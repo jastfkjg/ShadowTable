@@ -387,6 +387,60 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
   assert.equal(a.app.store.statsFor(room.host).total,1);
   await assert.rejects(a.api("/api/me/matches",undefined,auth),e=>e.status===401);
 });
+test("测试房间的管理陪测可投 MVP/SVP，仅真人获奖进入趣味记录和排行榜", async (t) => {
+  const a = await setup(t); await a.login();
+  const { code, token } = await a.room(); await a.action(code, "test-on");
+  const panel = new Companion({ request: (path, actorToken, data, id) =>
+    a.api(path === "/api/dev-login" ? "/api/admin/actors" : path, data,
+      { ...a.auth(actorToken), ...(id ? { "Idempotency-Key": id } : {}) }) });
+  await panel.add(code); await panel.fill();
+  const hostCommand = (type, extra = {}, id = randomUUID()) => a.api(`/api/rooms/${code}/commands`,
+    { type, stage: a.app.store.get(code).stage, ...extra }, { ...a.auth(token), "Idempotency-Key": id });
+  await hostCommand("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true });
+  await panel.refresh(); await panel.batch("ready"); await hostCommand("ready", { ready: true });
+  await hostCommand("start", { flexible: true });
+  const room = a.app.store.get(code);
+  room.roles = Object.fromEntries(room.players.map((p, i) => [p.uid,
+    ["morgana", "merlin", "percival", "servant", "servant", "assassin"][i]]));
+  room.fun.initialRoles = { ...room.roles }; a.app.store.save(room);
+  await hostCommand("finishTools", { scoreReason: "assassination", scoreTarget: 4 });
+  const matchId = a.app.store.get(code).matchRecord.id;
+  assert.equal((await a.api(`/api/rooms/${code}`, undefined, a.auth(token))).honors.canStart, true);
+  await hostCommand("honorStart", { matchId }); await panel.refresh();
+  const first = panel.actors[0];
+  assert.equal(first.room.honors.canVote, true); assert.equal(first.room.honors.total, 6);
+  assert.equal(first.room.honors.groups[0].players.find(p => p.seat === 2).disabled, true);
+  await assert.rejects(a.api(`/api/rooms/${code}/commands`,
+    { type: "honorVote", stage: room.stage, matchId, mvp: 3, svp: 1 },
+    { ...a.auth(first.token), Cookie: "" }), e => e.status === 401);
+  await assert.rejects(panel.command(first, "honorVote", { matchId, mvp: 2, svp: 1 }), /不能投自己/);
+  const receipt = randomUUID();
+  for (let n = 0; n < 2; n++) await hostCommand("honorVote", { matchId, mvp: 2, svp: 6 }, receipt);
+  await panel.refresh();
+  assert.equal(first.room.honors.completed, 1); assert.equal(first.room.honors.ballot, null);
+  for (const [i, actor] of panel.actors.entries())
+    await panel.command(actor, "honorVote", { matchId, mvp: i === 0 ? 3 : 2, svp: 1 });
+  await panel.refresh();
+  const result = (await a.api(`/api/rooms/${code}`, undefined, a.auth(token))).honors;
+  assert.equal(result.status, "settled");
+  assert.deepEqual(result.mvp.map(p => [p.seat, p.name, p.votes]), [[2, first.name, 5]]);
+  assert.deepEqual(result.svp.map(p => [p.seat, p.votes]), [[1, 5]]);
+  for (const actor of panel.actors) {
+    assert.deepEqual(actor.room.honors, result);
+    const stats = await a.api("/api/me/stats", undefined, a.auth(actor.token));
+    assert.equal(stats.total, 0); assert.deepEqual(stats.fun.metrics, []);
+    assert.equal((await a.api("/api/me/matches", undefined, a.auth(actor.token))).total, 0);
+    const ranking = await a.api("/api/leaderboard?metric=fun_honor_mvp", undefined, a.auth(actor.token));
+    assert.equal(ranking.me.status, "unsupported"); assert.deepEqual(ranking.rows, []);
+  }
+  const stats = await a.api("/api/me/stats", undefined, a.auth(token));
+  assert.equal(stats.fun.metrics.find(p => p.id === "honor_svp").count, 1);
+  const ranking = await a.api("/api/leaderboard?metric=fun_honor_svp", undefined, a.auth(token));
+  assert.equal(ranking.rows.length, 1); assert.equal(ranking.rows[0].isSelf, true);
+  assert.equal(ranking.rows[0].count, 1);
+  assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM match_fun_stats WHERE uid LIKE 'test:%'").get().n, 0);
+  assert.doesNotMatch(JSON.stringify(result), /test:|wx:|"uid"/);
+});
 test("管理写操作原因选填，保留状态冲突检查与概览身份隔离", async (t) => {
   const a = await setup(t);
   await a.login();

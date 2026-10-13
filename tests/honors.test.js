@@ -4,9 +4,10 @@ const { Store } = require('../server/store');
 const { newRoom, enter, command } = require('../server/engine');
 const honors = require('../server/honors');
 const { Leaderboard } = require('../server/leaderboard');
-function fixture(store) {
-  const r = newRoom('123456', 'wx:1', '玩家1', 'classic', 6);
-  for (let i=2;i<=6;i++) enter(r,'wx:'+i,'玩家'+i);
+function fixture(store, uids = Array.from({length:6}, (_,i) => 'wx:'+(i+1))) {
+  const r = newRoom('123456', uids[0], '玩家1', 'classic', 6);
+  r.testRoom = uids.some(uid => uid.startsWith('test:'));
+  for (let i=2;i<=6;i++) enter(r,uids[i-1],'玩家'+i);
   r.players.forEach(p=>p.ready=true);
   command(r,r.host,{type:'start',stage:r.stage,flexible:true});
   r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
@@ -72,7 +73,7 @@ test('early host settlement requires half; changing the winner invalidates award
   } finally {s.close();}
 });
 module.exports={fixture};
-test('single winner skips their own MVP slot; companions and observers cannot vote',()=>{
+test('single winner skips their own MVP slot; nonparticipants cannot vote',()=>{
   const s=new Store(':memory:');
   try {
     const r=fixture(s),id=r.matchRecord.id;
@@ -91,6 +92,84 @@ test('single winner skips their own MVP slot; companions and observers cannot vo
     for(let i=2;i<=6;i++)act(s,r,'wx:'+i,'honorVote',{mvp:1,svp:i===2?3:2});
     assert.deepEqual(honors.view(s,s.get(r.code),'wx:6').mvp.map(p=>[p.seat,p.votes]),[[1,5]]);
   } finally{s.close();}
+});
+
+test('one human and five companions can vote; companion winners never create personal stats or rankings',()=>{
+  const s=new Store(':memory:');
+  try {
+    const uids=['wx:1',...Array.from({length:5},(_,i)=>'test:123456:owner:'+(i+2))];
+    const r=fixture(s,uids),id=r.matchRecord.id;
+    assert.equal(honors.view(s,s.get(r.code),r.host).canStart,true);
+    act(s,r,r.host,'honorStart');
+    const bot=honors.view(s,s.get(r.code),uids[1]);
+    assert.equal(bot.canVote,true);assert.equal(bot.total,6);assert.equal(bot.required,3);
+    assert.equal(bot.groups[0].players.find(p=>p.seat===2).disabled,true);
+    assert.deepEqual(bot.groups[1].players.map(p=>p.seat),[5,6]);
+    assert.throws(()=>act(s,r,uids[1],'honorVote',{mvp:2,svp:5}),/不能投自己/);
+    for(let i=0;i<6;i++)act(s,r,uids[i],'honorVote',{mvp:i===1?3:2,svp:i===4?6:5});
+    const result=honors.view(s,s.get(r.code),r.host);
+    assert.equal(result.status,'settled');assert.deepEqual(result.mvp.map(p=>[p.seat,p.votes]),[[2,5]]);
+    assert.deepEqual(result.svp.map(p=>[p.seat,p.votes]),[[5,5]]);
+    assert.equal(s.matchFor('wx:1',id).honorResult.mvp[0].name,'玩家2');
+    for(const uid of uids.slice(1)) {
+      assert.equal(s.statsFor(uid).total,0);assert.deepEqual(s.funFor(uid).metrics,[]);
+      assert.equal(s.matchesFor(uid).total,0);
+      for(const metric of ['mvp','svp']) {
+        const rank=new Leaderboard(s).read(uid,new URLSearchParams('metric=fun_honor_'+metric));
+        assert.equal(rank.me.status,'unsupported');assert.equal(rank.rows.length,0);
+      }
+    }
+    assert.equal(s.db.prepare("SELECT count(*) AS n FROM match_fun_stats WHERE uid LIKE 'test:%'").get().n,0);
+    assert.equal(s.db.prepare("SELECT count(*) AS n FROM match_players WHERE uid LIKE 'test:%'").get().n,0);
+    assert.equal(s.funFor('wx:1').metrics.find(p=>p.id==='honor_mvp').count,0);
+  } finally{s.close();}
+});
+
+test('companion ballots can award a human and only that human receives an honor count',()=>{
+  const s=new Store(':memory:');
+  try {
+    const uids=['wx:1',...Array.from({length:5},(_,i)=>'test:123456:owner:'+(i+2))];
+    const r=fixture(s,uids);act(s,r,r.host,'honorStart');
+    for(let i=0;i<6;i++)act(s,r,uids[i],'honorVote',{mvp:i===0?2:1,svp:i===4?6:5});
+    assert.equal(s.funFor('wx:1').metrics.find(p=>p.id==='honor_mvp').count,1);
+    const board=new Leaderboard(s).read('wx:1',new URLSearchParams('metric=fun_honor_mvp'));
+    assert.equal(board.rows.length,1);assert.equal(board.rows[0].isSelf,true);assert.equal(board.rows[0].count,1);
+    assert.equal(new Leaderboard(s).read('wx:1',new URLSearchParams('metric=fun_honor_svp')).rows.length,0);
+  } finally{s.close();}
+});
+
+test('pure companion elections persist and settle without creating match archives or personal records',()=>{
+  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'shadowtable-honors-companion-'));
+  let now=Date.now(),s=new Store(path.join(dir,'test.sqlite'),{clock:()=>now});
+  try {
+    const uids=Array.from({length:6},(_,i)=>'test:123456:owner:'+(i+1));
+    const r=fixture(s,uids);act(s,r,r.host,'honorStart');
+    for(const i of [0,2,3])act(s,r,uids[i],'honorVote',{mvp:2,svp:5});
+    s.close();s=new Store(path.join(dir,'test.sqlite'),{clock:()=>now});
+    assert.equal(honors.view(s,s.get(r.code),uids[1]).completed,3);
+    now+=honors.DURATION+1;honors.settleDue(s);
+    const shown=honors.view(s,s.get(r.code),uids[1]);
+    assert.equal(shown.status,'settled');assert.equal(shown.mvp[0].votes,3);assert.equal(shown.svp[0].votes,3);
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM match_players').get().n,0);
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM match_fun_stats').get().n,0);
+    const room=s.get(r.code);s.transaction(()=>{honors.closeForRoom(s,room);command(room,room.host,{type:'rematch',stage:room.stage});s.save(room);});
+    assert.equal(honors.view(s,s.get(r.code),uids[1]),null);
+    assert.throws(()=>act(s,r,uids[1],'honorVote',{mvp:3,svp:6}),/本局已变化/);
+    // Management rematches can replace the room before the deadline scanner.
+    // The private poll must still settle using only its companion context.
+    const next=fixture(s,uids);act(s,next,next.host,'honorStart');
+    for(const i of [0,2,3])act(s,next,uids[i],'honorVote',{mvp:2,svp:5});
+    const replaced=s.get(next.code);
+    s.transaction(()=>{command(replaced,replaced.host,{type:'rematch',stage:replaced.stage});s.save(replaced);});
+    now+=honors.DURATION+1;honors.settleDue(s);
+    const poll=JSON.parse(s.db.prepare('SELECT state FROM honor_polls WHERE match_id=?').get(next.matchRecord.id).state);
+    assert.equal(poll.status,'settled');assert.equal(poll.result.mvp[0].votes,3);
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM matches').get().n,0);
+    assert.equal(s.db.prepare('SELECT count(*) AS n FROM match_fun_stats').get().n,0);
+    assert.equal(s.get(next.code).matchRecord,undefined);
+  } finally{s.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
 test('open polls and settled projections survive restart and excluded records leave rankings',()=>{
   const fs=require('node:fs'),os=require('node:os'),path=require('node:path');

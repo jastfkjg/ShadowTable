@@ -119,6 +119,24 @@ summary:focus-visible {
   color: var(--bg);
   font-weight: 600;
 }
+.honor-vote {
+  width: 100%;
+}
+.honor-vote-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.honor-vote-fields select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.honor-vote .muted {
+  color: var(--muted);
+  font-size: 13px;
+}
 .danger {
   color: #f2b6ae;
 }
