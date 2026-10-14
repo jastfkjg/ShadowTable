@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { BOARDS, newRoom, publicView, invitationView, enter } = require('../server/engine');
+const { BOARDS, newRoom, publicView, invitationView, enter, command } = require('../server/engine');
 const { wxmlToJs } = require('miniprogram-compiler');
 const root = path.resolve(__dirname,'../miniprogram');
 function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false } = {}) {
@@ -705,7 +705,7 @@ test('首次邀请只填写昵称，读取原生表单最终值，确认后仍�
   assert.equal(c.p.data.invitation, null);
   assert.equal(c.p.data.entryNameError, '');
 });
-test('满座邀请进入旁观，开局后新成员被提示，原成员恢复自己的座位', async () => {
+test('满座、进行中及终局邀请均可加入旁观，原成员恢复自己的座位', async () => {
   const full = newRoom('654321', 'host', '子龙');
   for (let i = 1; i < full.capacity; i++) enter(full, 'p' + i, '玩家' + i);
   const spectator = invitationClient(full);
@@ -713,16 +713,82 @@ test('满座邀请进入旁观，开局后新成员被提示，原成员恢复�
   assert.equal(spectator.p.data.room.me.seat, null);
   assert.match(spectator.p.data.notice, /座位已满.*旁观者/);
   const playing = newRoom('234567', 'host', '子龙');
-  playing.phase = 'identity';
-  const newcomer = invitationClient(playing);
-  await newcomer.p.onLoad({ code: playing.code });
-  assert.equal(newcomer.writes.length, 0);
-  assert.match(newcomer.p.data.invitationError, /本局已开始/);
-  assert.deepEqual(newcomer.navigations, []);
+  for (const phase of ['identity', 'ended', 'terminated']) {
+    playing.phase = phase;
+    const uid = 'friend-' + phase;
+    const newcomer = invitationClient(playing, { uid });
+    try {
+      await newcomer.p.onLoad({ code: playing.code });
+      assert.equal(newcomer.writes.length, 1);
+      assert.equal(newcomer.p.data.room.me.seat, null);
+      assert.equal(newcomer.p.data.room.me.ready, false);
+      assert.equal(newcomer.p.data.invitationError, '');
+      assert.equal(newcomer.p.data.notice, '');
+      assert.equal(playing.players.length, 1);
+      assert.deepEqual(newcomer.navigations, []);
+    } finally { newcomer.p.onUnload(); }
+  }
   const member = invitationClient(playing, { uid: 'host' });
   await member.p.onLoad({ code: playing.code });
   assert.equal(member.p.data.room.me.seat, 1);
   assert.equal(member.writes.length, 0);
+  member.p.onUnload(); spectator.p.onUnload();
+});
+test('进行中和终局首次邀请可确认昵称，旁观提示说明下一局手动入座且无身份入口', async () => {
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const render = data => JSON.stringify(factory('pages/table/table.wxml')(data));
+  for (const phase of ['identity', 'ended', 'terminated']) {
+    const room = newRoom('654321', 'host', '房主'); room.phase = phase;
+    const c = invitationClient(room, { nicknameConfirmed: false });
+    try {
+      await c.p.onLoad({ code: room.code });
+      assert.equal(c.p.data.invitationNeedsName, true);
+      assert.match(render(c.p.data), phase === 'identity' ? /本局进行中，将进入旁观/ : /本局已结束，将进入旁观/);
+      await c.p.submitInvitation({ detail: { value: { nickname: '迟到的朋友' } } });
+      assert.equal(c.writes.length, 1);
+      assert.equal(c.p.data.room.me.seat, null);
+      const table = render(c.p.data);
+      assert.match(table, phase === 'identity' ? /本局进行中，你正在旁观/ : /本局已结束，你正在旁观/);
+      assert.match(table, /手动入座/);
+      assert.doesNotMatch(table, /查看身份|座位已满/);
+    } finally { c.p.onUnload(); }
+  }
+});
+test('加入请求断线期间房主开局，原请求重试成功进入旁观且不改变参赛者', async () => {
+  const room = newRoom('654321', 'host', '房主');
+  for (let i = 1; i < room.capacity; i++) enter(room, 'p' + i, '玩家' + i);
+  room.players.forEach(p => p.ready = true);
+  const writes = [];
+  const c = page('table', { ...apiBase, request: async (url, method, body, id) => {
+    if (url === '/api/boards') return { boards: BOARDS };
+    if (url.includes('/invitation')) return invitationView(room, 'late');
+    if (url === '/api/me/profile') return { nickname: '晚风', nicknameConfirmed: true, version: 0 };
+    if (method === 'POST') {
+      writes.push({ id, body });
+      if (writes.length === 1) {
+        command(room, 'host', { type: 'start', stage: room.stage });
+        throw Error('offline');
+      }
+      enter(room, 'late', body.name);
+      return { code: room.code };
+    }
+    return publicView(room, 'late');
+  } });
+  try {
+    await c.p.onLoad({ code: room.code, instance: String(room.createdAt) });
+    const participants = structuredClone(room.players);
+    assert.equal(c.p.data.hasPendingRequest, true);
+    await c.p.retry();
+    assert.equal(writes.length, 2);
+    assert.equal(writes[0].id, writes[1].id);
+    assert.equal(c.p.pending, null);
+    assert.equal(c.p.data.hasPendingRequest, false);
+    assert.equal(c.p.data.reconnecting, false);
+    assert.equal(c.storage.has('pendingEntry'), false);
+    assert.equal(c.p.data.room.me.seat, null);
+    assert.deepEqual(room.players, participants);
+  } finally { c.p.onUnload(); }
 });
 test('加入响应丢失后保留目标、创建信息与编号，重试只恢复同一成员', async () => {
   const room = newRoom('654321', 'host', '子龙');
@@ -738,7 +804,7 @@ test('加入响应丢失后保留目标、创建信息与编号，重试只恢�
   assert.equal(c.p.data.room.code, room.code);
   assert.equal(c.storage.has('pendingEntry'), false);
 });
-test('断线加入重试确认已经开局后停止重连，清除待确认状态并允许返回', async () => {
+test('旧服务拒绝中途旁观时停止重连，清除待确认状态并允许返回', async () => {
   let joins = 0;
   const c = page('table', { ...apiBase, request: async (url, method) => {
     if (url === '/api/boards') return { boards: BOARDS };

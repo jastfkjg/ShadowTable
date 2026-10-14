@@ -67,6 +67,63 @@ test("房间邀请仅返回公开预览，校验房间实例，加入满座旁�
     assert.doesNotMatch(JSON.stringify(afterDeal.data), /roles|information|submissions|membershipId|uid|梅林|刺客/);
   } finally { await a.close(); }
 });
+test("中途及终局加入只增加旁观成员，不影响私密权限、结算与战绩，重开后手动入座", async () => {
+  const a = await launch();
+  try {
+    const tokens = await users(a, 9);
+    const created = await a.req('/api/rooms', tokens[0], { name: '房主', capacity: 6 });
+    const path = '/api/rooms/' + created.data.code;
+    for (let i = 1; i < 6; i++) assert.equal((await a.req(path + '/join', tokens[i], { name: '玩家' + i })).status, 200);
+    const run = async (token, type, extra = {}) => {
+      const view = (await a.req(path, token)).data;
+      return a.req(path + '/commands', token, { type, stage: view.stage, ...extra });
+    };
+    for (const token of tokens.slice(0, 6)) assert.equal((await run(token, 'ready', { ready: true })).status, 200);
+    assert.equal((await run(tokens[0], 'start', { flexible: true })).status, 200);
+    assert.equal((await run(tokens[0], 'beginActivity', { kind: 'vote', team: [1, 2] })).status, 200);
+    const before = a.store.get(created.data.code);
+    const id = randomUUID();
+    for (let i = 0; i < 2; i++) assert.equal((await a.req(path + '/join', tokens[6], { name: '迟到者', createdAt: before.createdAt }, id)).status, 200);
+    const during = a.store.get(created.data.code);
+    assert.deepEqual(during.players, before.players);
+    assert.deepEqual(during.roles, before.roles);
+    assert.deepEqual(during.submissions, before.submissions);
+    assert.equal(during.stage, before.stage);
+    assert.equal(during.spectators.length, 1);
+    const spectator = (await a.req(path, tokens[6])).data;
+    assert.equal(spectator.me.seat, null);
+    assert.equal(spectator.needsSubmission, false);
+    assert.equal((await a.req(path + '/private', tokens[6])).status, 403);
+    assert.equal((await run(tokens[6], 'submit', { value: 'approve' })).status, 400);
+    assert.equal((await run(tokens[6], 'seat', { seat: 1 })).status, 400);
+    assert.equal((await a.req('/api/me/rooms', tokens[6])).data.rooms[0].relation, '旁观者');
+    for (const token of tokens.slice(0, 6)) assert.equal((await run(token, 'submit', { value: 'approve' })).status, 200);
+    assert.equal((await a.req(path, tokens[0])).data.phase, 'tools');
+    assert.equal((await run(tokens[0], 'finishTools', { winner: 'good' })).status, 200);
+    const record = a.store.get(created.data.code).matchRecord;
+    const targetId = (await a.req(path, tokens[0])).data.players.find(p => p.seat === 2).managementId;
+    assert.equal((await run(tokens[0], 'kick', { seat: 2, targetId, confirm: true })).status, 200);
+    assert.equal((await a.req(path + '/join', tokens[7], { name: '终局加入' })).status, 200);
+    assert.equal((await a.req(path, tokens[7])).data.me.seat, null);
+    assert.equal((await a.req(path + '/join', tokens[8], { name: '必须入座', requireSeat: true })).status, 409);
+    assert.equal((await a.req(path, tokens[8])).status, 403);
+    assert.deepEqual(a.store.get(created.data.code).matchRecord, record);
+    for (const token of [tokens[6], tokens[7]]) {
+      const stats = (await a.req('/api/me/stats', token)).data;
+      assert.equal(stats.total, 0);
+      assert.equal(stats.excluded, 0);
+    }
+    assert.equal((await run(tokens[0], 'rematch')).status, 200);
+    assert.equal((await a.req(path + '/join', tokens[6], { name: '重复进入' })).status, 200);
+    const waiting = (await a.req(path, tokens[6])).data;
+    assert.equal(waiting.me.seat, null);
+    assert.equal(waiting.me.ready, false);
+    assert.equal(waiting.players.length, 5);
+    assert.equal((await run(tokens[6], 'seat', { seat: 2 })).status, 200);
+    assert.equal((await a.req(path, tokens[6])).data.me.seat, 2);
+    assert.equal((await a.req(path, tokens[7])).data.me.seat, null);
+  } finally { await a.close(); }
+});
 test("解散后同房间号复用，旧邀请的预览、加入及恢复均拒绝，新邀请和旧房间码入口有效", async () => {
   const a = await launch();
   try {

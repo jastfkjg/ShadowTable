@@ -536,10 +536,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       await this.refresh();
       return;
     }
-    if (invitation.phase !== "lobby") {
-      this.showInvitationError("本局已开始，暂时无法加入，请等待房主开启下一局", true);
-      return;
-    }
     if (held || entry) {
       this.showInvitationError("另一项房间操作尚未确认，请返回对局处理后重试邀请", true);
       return;
@@ -1463,7 +1459,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       } else {
         this.setData({ notice: "" });
         await this.refresh();
-        if (pending.after === "enter" && this.inviteCode && this.data.room?.me.seat === null)
+        if (pending.after === "enter" && this.inviteCode && this.data.room?.phase === "lobby" && this.data.room.me.seat === null)
           this.setData({ notice: "座位已满，已以旁观者进入房间" });
       }
     } catch (e) {

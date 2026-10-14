@@ -222,10 +222,12 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
 }
 function enter(room, uid, name) {
   if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid)) return;
-  requireRule(room.phase === "lobby", "游戏已开始，无法加入");
-  const seat = Array.from({ length: room.capacity }, (_, i) => i + 1).find(
-    (s) => !room.players.some((p) => p.seat === s),
-  ) ?? null;
+  // Seats are assigned only in the lobby; spectators choose a seat after a rematch.
+  const seat = room.phase === "lobby"
+    ? Array.from({ length: room.capacity }, (_, i) => i + 1).find(
+        (s) => !room.players.some((p) => p.seat === s),
+      ) ?? null
+    : null;
   const player = {
     uid,
     membershipId: randomUUID(),

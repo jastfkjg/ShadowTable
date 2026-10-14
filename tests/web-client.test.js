@@ -48,6 +48,36 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页通过房间码在进行中和终局加入旁观，提示手动入座且不展示身份入口', async () => {
+  for (const phase of ['identity', 'ended', 'terminated']) {
+    const room = newRoom('123456', 'host', '房主'); room.phase = phase;
+    const writes = [];
+    const c = client(async (url, options) => {
+      if (options?.method === 'POST') {
+        const data = JSON.parse(options.body); writes.push({ url, data });
+        enter(room, 'late', data.name);
+        return response({ code: room.code });
+      }
+      return response(publicView(room, 'late'));
+    });
+    try {
+      await c.mutate('/api/rooms/123456/join', { name: '迟到的朋友' }, 'enter');
+      assert.equal(writes.length, 1);
+      assert.equal(c.state.room.me.seat, null);
+      assert.equal(c.state.room.me.ready, false);
+      assert.equal(room.players.length, 1);
+      const html = c.viewRoom();
+      assert.match(html, phase === 'identity' ? /本局进行中，你正在旁观/ : /本局已结束，你正在旁观/);
+      assert.match(html, /手动入座/);
+      assert.doesNotMatch(html, /data-action="reveal"|data-action="ready"/);
+      room.phase = 'lobby';
+      await c.refresh();
+      assert.equal(c.state.room.me.seat, null);
+      assert.match(c.viewRoom(), /点击入座/);
+      assert.doesNotMatch(c.viewRoom(), /本局进行中|本局已结束/);
+    } finally { c.stop(); }
+  }
+});
 function webSwipeEvent(code, x = 250, y = 400) {
   const row = { dataset: { roomSwipe: code } };
   const content = { closest: () => row };

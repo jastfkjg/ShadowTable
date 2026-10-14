@@ -513,9 +513,12 @@ function createApp({
               check(b.createdAt === (room.createdAt || 0), "该邀请已失效", 410);
             }
             // A concurrent human join must not turn a fill operation into spectators.
-            if (b.requireSeat === true)
-              check(room.players.some(p => p.uid === uid) || room.players.length < room.capacity,
+            if (b.requireSeat === true) {
+              const seated = room.players.some(p => p.uid === uid);
+              check(seated || room.phase === "lobby", "本局已开始，只能加入旁观", 409);
+              check(seated || room.players.length < room.capacity,
                 "房间已满，请刷新后重试", 409);
+            }
             enter(room, uid, b.name);
           } else if (["honorStart", "honorVote", "honorClose"].includes(b.type)) {
             honors.handle(store, room, uid, b);

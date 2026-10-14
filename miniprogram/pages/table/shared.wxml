@@ -284,7 +284,9 @@
       <input id="invite-nickname" class="input {{entryNameError?'has-error':''}}" name="nickname" type="nickname" maxlength="16" value="{{name}}" bindinput="inputName" placeholder="填写或选择微信昵称" disabled="{{busy || hasPendingRequest}}" />
       <view wx:if="{{entryNameError}}" class="entry-field-error" role="alert">{{entryNameError}}</view>
       <view class="small muted invitation-help">首次确认后用于牌桌和排行榜，可在“我的”中修改。</view>
-      <view wx:if="{{invitation.occupied >= invitation.capacity}}" class="invitation-message">座位已满，将以旁观者进入房间。</view>
+      <view wx:if="{{invitation.phase==='ended' || invitation.phase==='terminated'}}" class="invitation-message">本局已结束，将进入旁观；房主重开后可手动入座。</view>
+      <view wx:elif="{{invitation.phase!=='lobby'}}" class="invitation-message">本局进行中，将进入旁观；下一局可手动入座。</view>
+      <view wx:elif="{{invitation.occupied >= invitation.capacity}}" class="invitation-message">座位已满，将以旁观者进入房间。</view>
       <view wx:if="{{entryError}}" class="entry-field-error" role="alert">{{entryError}}</view>
       <button class="primary" hover-class="none" form-type="submit" loading="{{busy}}" disabled="{{busy || loading || hasPendingRequest || !network || needsLogin}}">进入房间</button>
     </form>
@@ -406,6 +408,7 @@
         <text wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="lobby-chip">围观中</text>
         <button hover-class="none" wx:if="{{room.me.isHost}}" class="lobby-header-link lobby-settings" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}">房间设置 <text aria-hidden="true">›</text></button>
       </view>
+      <view wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="small muted" role="status">{{room.phase==='ended' || room.phase==='terminated'?'本局已结束，你正在旁观；房主重开后可手动入座。':'本局进行中，你正在旁观；下一局可手动入座。'}}</view>
       <button hover-class="none" wx:if="{{reconnecting || !network || needsLogin}}" class="lobby-connection" bindtap="connectionInfo" aria-label="查看连接状态"><view class="connection-dot {{reconnecting?'pending':'offline'}}" /><text>{{reconnecting?'正在重连…':'连接断开，点击查看'}}</text></button>
     </view>
     <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">

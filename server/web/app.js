@@ -3850,6 +3850,10 @@ function roomListItems(rooms) {
         ? '<button type="button" class="room-rules-button" data-action="toggleRoomSettings">房间设置</button>'
         : "") +
       '<button type="button" class="room-rules-button" data-action="copyInviteLink">邀请</button></div>';
+    if (r.phase !== "lobby" && r.me.seat === null)
+      html += '<div class="small muted" role="status">' + (["ended", "terminated"].includes(r.phase)
+        ? "本局已结束，你正在旁观；房主重开后可手动入座。"
+        : "本局进行中，你正在旁观；下一局可手动入座。") + '</div>';
     if (state.showRoomRules) {
       html +=
         '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +

@@ -270,9 +270,11 @@ test("3次失败胜利及7人第4任务双失败阈值", () => {
     assert.equal(g.quests[3].threshold, 2);
   }
 });
-test("终止不揭露身份，可重开；开始后不能加入或移动座位", () => {
+test("终止不揭露身份，可重开；开始后新成员只能旁观且不可移动座位", () => {
   const r = setup();
-  assert.throws(() => enter(r, "x", "新玩家"), /已开始/);
+  enter(r, "x", "新玩家");
+  assert.equal(publicView(r, "x").me.seat, null);
+  assert.throws(() => privateView(r, "x"), /没有身份/);
   assert.throws(() => run(r, "p1", "seat", { seat: 2 }), /不可换座/);
   run(r, "p1", "terminate");
   assert.equal(r.result.winner, null);
