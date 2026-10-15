@@ -11,6 +11,7 @@
   const resultFlow = resultRegistration.flow;
   const publicHistory = window.shadowtablePublicHistory;
   const roomSwipe = window.shadowtableRoomSwipe;
+  const boardDetailPresentation = window.shadowtableBoardDetail;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -4352,82 +4353,43 @@ function roomListItems(rooms) {
       ? "<strong>" + esc(text.slice(0, split)) + "</strong>：" + esc(text.slice(split + 1))
       : esc(text);
   }
+  function viewBoardChapter(chapter, index) {
+    var expanded = chapter.expanded;
+    var html = '<section class="detail-chapter" id="board-section-' + index + '"><button type="button" class="detail-chapter-toggle" data-action="toggleBoardChapter" data-value="' + index + '" aria-expanded="' + expanded + '" aria-controls="board-chapter-' + index + '"><span class="detail-chapter-number">' + chapter.number + '</span><span class="detail-chapter-title">' + esc(chapter.displayTitle) + '</span><span class="detail-chevron' + (expanded ? ' up' : '') + '" aria-hidden="true"></span></button>';
+    if (expanded) {
+      html += '<div class="detail-chapter-body" id="board-chapter-' + index + '">';
+      if (chapter.decks) html += chapter.decks.map(function (deck) {
+        return '<div class="detail-deck"><div class="detail-deck-heading"><span class="detail-deck-name">' + deck.name + '</span><span class="detail-deck-purpose">' + esc(deck.purpose) + ' · ' + deck.count + ' 张</span><span class="detail-deck-count"><span class="tone-good">' + deck.good + ' 蓝</span> / <span class="tone-evil">' + deck.evil + ' 红</span></span></div>' +
+          (deck.factions || []).map(function (faction) { return '<div class="detail-deck-faction"><span class="tone-' + faction.tone + '">' + esc(faction.label) + '</span><span>' + esc(faction.roles) + '</span></div>'; }).join('') +
+          (deck.layers ? '<div class="detail-layer-hint">' + esc(deck.layerHint) + '</div><div class="detail-layers">' + deck.layers.map(function (layer) { return '<div class="detail-layer"><div>' + esc(layer.label) + '</div><span>' + esc(layer.text) + '</span></div>'; }).join('') + '</div>' : '') +
+          (deck.note ? '<div class="detail-deck-note">' + esc(deck.note) + '</div>' : '') + '</div>';
+      }).join('');
+      else if (chapter.kind === 'configuration') html += chapter.configuration.map(function (faction) {
+        return '<div class="detail-configuration"><div class="detail-configuration-heading"><span class="tone-' + esc(faction.faction) + '">' + esc(faction.label) + '</span><span>' + faction.count + ' 人</span></div><div>' + esc(faction.roles) + '</div></div>';
+      }).join('');
+      else html += chapter.items.map(function (text) { return '<p class="detail-paragraph">' + detailText(text) + '</p>'; }).join('');
+      html += '</div>';
+    }
+    return html + '</section>';
+  }
   function viewBoardDetails() {
-    if (!state.showBoardDetails) return "";
-    var b = state.boardDetail;
-    var html =
-      '<div class="dialog-backdrop"><div class="board-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="board-detail-title">' +
-      '<header class="detail-toolbar"><div id="board-detail-title">板子详情</div>' +
-      btn("detail-close", "closeBoardDetails", "关闭 ×") + "</header>";
-    if (b && b.detail) {
-      html += '<nav class="detail-nav" aria-label="章节目录">' + b.detail.sections.map(function (sec, index) {
-        return btn("detail-nav-item", "jumpBoardSection", sec.navTitle || sec.title, { value: index });
-      }).join("") + "</nav>";
-    }
-    html += '<div class="detail-scroll" tabindex="0" aria-label="板子规则正文">';
-    if (b)
-      html +=
-        '<div class="detail-board-name">' +
-        esc(b.name) +
-        (/[（(]\d+人[）)]/.test(b.name) ? "" : ' <span class="detail-capacity muted">· ' + b.capacity + '人</span>') + '</div>' +
-        (b.detail ? '<div class="detail-summary">' + esc(b.detail.summary) + "</div>" : "");
-    if (b && b.detail) {
-      b.detail.sections.forEach(function (sec, index) {
-        html += '<section class="detail-section" id="board-section-' + index + '"><h2 class="detail-section-title"><span class="detail-section-number">' + String(index + 1).padStart(2, "0") + "</span>" + esc(sec.title) + "</h2>";
-        if (sec.kind === "roles") {
-          html +=
-            '<div class="role-grid">' +
-            sec.items
-              .map(function (role, roleIndex) {
-                if (role.brief) {
-                  var key = index + ":" + roleIndex;
-                  var expanded = !!(state.expandedBoardRoles || {})[key];
-                  return '<div class="role-quick"><button type="button" class="role-quick-toggle" data-action="toggleBoardRole" data-value="' + key + '" aria-expanded="' + expanded + '"><span class="role-quick-name tone-' + esc(role.tone || "") + '">' + esc(role.name) + '</span><span class="role-quick-brief">' + esc(role.brief) + '</span><span class="role-quick-arrow" aria-hidden="true">' + (expanded ? "−" : "+") + "</span></button>" + (expanded ? '<div class="role-quick-detail">' + detailText(role.text) + "</div>" : "") + "</div>";
-                }
-                return (
-                  '<div class="role-card"><div class="role-card-heading"><span class="role-card-name tone-' + esc(role.tone || "") + '">' +
-                  esc(role.name) +
-                  "</span>" +
-                  "</div>" +
-                  '<div class="role-card-text">' +
-                  detailText(role.text) +
-                  "</div></div>"
-                );
-              })
-              .join("") +
-            "</div>";
-        } else if (sec.kind === "blocks") {
-          html += sec.items
-            .map(function (blk) {
-              return '<div class="detail-block">' + detailText(blk) + "</div>";
-            })
-            .join("");
-        } else {
-          html += sec.items
-            .map(function (line) {
-              return '<div class="detail-line">' + detailText(line) + "</div>";
-            })
-            .join("");
-        }
-        html += "</section>";
-      });
-    } else {
-      html +=
-        '<div class="configuration-roles">' +
-        ((b && b.roleConfiguration) || [])
-          .map(function (x) {
-            return (
-              '<div class="role-line">' + esc(x.label) + "：" + esc(x.roles) + "</div>"
-            );
-          })
-          .join("") +
-        '</div><div class="muted small detail-none">本板子暂无详细说明，以上为角色配置。</div>';
-    }
-    html +=
-      '<div class="dialog-actions">' +
-      btn("primary", "closeBoardDetails", "知道了") +
-      "</div></div></div></div>";
-    return html;
+    if (!state.showBoardDetails || !state.boardDetail) return '';
+    var b = state.boardDetail, chapters = state.boardChapters, tab = state.boardDetailTab;
+    var html = '<div class="dialog-backdrop board-detail-backdrop"><div class="board-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="board-detail-title"><div class="board-detail-main"' + (state.boardDirectory ? ' inert' : '') + '><header class="detail-toolbar"><div id="board-detail-title">板子详情</div>' + btn('detail-close', 'closeBoardDetails', '关闭') + '</header><div class="detail-scroll" tabindex="0" aria-label="板子规则正文"><div class="detail-hero"><div class="detail-eyebrow">' + esc(b.eyebrow) + '</div><div class="detail-title-line"><h1 class="detail-title">' + esc(b.title) + '</h1>' + (b.capacity ? '<span class="detail-capacity">' + b.capacity + ' 人</span>' : '') + '</div>' + (b.subtitle || b.summary ? '<div class="detail-subtitle">' + esc(b.subtitle || b.summary) + '</div>' : '') + '</div>';
+    html += '<div class="detail-tabs"><div class="detail-tab-list" role="tablist" aria-label="详情内容">' + (b.hasRoles ? '<button type="button" class="detail-tab' + (tab === 'roles' ? ' selected' : '') + '" data-action="boardDetailTab" data-value="roles" role="tab" aria-selected="' + (tab === 'roles') + '" aria-controls="detail-role-panel">角色速查</button>' : '') + '<button type="button" class="detail-tab' + (tab === 'rules' ? ' selected' : '') + '" data-action="boardDetailTab" data-value="rules" role="tab" aria-selected="' + (tab === 'rules') + '" aria-controls="detail-rule-panel">玩法规则</button></div>' + (chapters.length ? '<button type="button" class="detail-directory-button" data-action="openBoardDirectory" aria-expanded="' + !!state.boardDirectory + '"><img src="/assets/board-directory.svg" alt="" aria-hidden="true">目录</button>' : '') + '</div><div class="board-detail-content">';
+    if (tab === 'roles') {
+      var query = state.boardDetailQuery, rows = boardDetailPresentation.visibleRoles(b, state.boardDetailGroup, query, state.expandedBoardRoles);
+      html += '<section id="detail-role-panel" role="tabpanel" aria-label="角色速查"><label class="detail-search"><img src="/assets/board-search.svg" alt="" aria-hidden="true"><input type="search" data-input="boardDetailSearch" value="' + esc(query) + '" placeholder="搜索角色或技能" aria-label="搜索角色或技能"></label>';
+      if (b.groups.length > 1) html += '<div class="detail-filters' + (query ? ' searching' : '') + '">' + b.groups.map(function (group) { return '<button type="button" class="detail-filter' + (state.boardDetailGroup === group.id ? ' selected' : '') + (group.id === 'b-evil' ? ' filter-evil' : '') + '" data-action="boardDetailGroup" data-value="' + esc(group.id) + '" aria-pressed="' + (state.boardDetailGroup === group.id) + '">' + esc(group.label) + '</button>'; }).join('') + '</div>';
+      html += '<div class="detail-hint"><span class="detail-info-icon" aria-hidden="true">i</span><span>' + esc(query ? '搜索当前板子的全部角色与技能' : b.roleHint) + '</span></div><div class="detail-role-list">';
+      html += rows.map(function (role) {
+        return '<article class="detail-role' + (role.expanded ? ' expanded' : '') + '" id="board-role-' + role.id + '"><button type="button" class="detail-role-toggle" data-action="toggleBoardRole" data-value="' + role.id + '" aria-expanded="' + role.expanded + '" aria-controls="role-body-' + role.id + '"><span class="detail-role-copy"><span class="detail-role-heading"><span class="detail-role-name tone-' + esc(role.tone || '') + '">' + esc(role.name) + '</span><span class="detail-role-type">' + esc(role.showGroup ? role.groupLabel : role.type) + '</span></span>' + (!role.expanded ? '<span class="detail-role-brief">' + esc(role.brief) + '</span>' : '') + '</span><span class="detail-chevron' + (role.expanded ? ' up' : '') + '" aria-hidden="true"></span></button>' +
+          (role.expanded ? '<div class="detail-role-body" id="role-body-' + role.id + '">' + role.facts.map(function (fact) { return '<div class="detail-fact"><span class="detail-fact-label">' + esc(fact.label) + '</span><span class="detail-fact-text">' + esc(fact.text) + '</span></div>'; }).join('') + (role.exception ? '<div class="detail-exception"><div class="detail-exception-title">' + esc(role.exceptionTitle) + '</div><div>' + esc(role.exception) + '</div></div>' : '') + '</div>' : '') + '</article>';
+      }).join('') + '</div>' + (!rows.length ? '<div class="detail-empty" role="status">未找到匹配角色，请换个关键词。</div>' : '') + '</section>';
+    } else html += '<section id="detail-rule-panel" role="tabpanel" aria-label="玩法规则">' + (chapters.length ? '<div class="detail-rule-intro"><span>共 ' + chapters.length + ' 章 · 按需展开阅读</span>' + btn('detail-expand-all', 'toggleAllBoardChapters', chapters.every(c => c.expanded) ? '收起全部' : '展开全部') + '</div>' : '') + chapters.map(viewBoardChapter).join('') + (!b.hasDetail ? '<div class="detail-empty">本板子暂无详细说明，以上为角色配置。</div>' : '') + '</section>';
+    html += '</div></div></div>';
+    if (state.boardDirectory) html += '<div class="directory-backdrop" data-action="closeBoardDirectory"><div class="directory-panel" role="dialog" aria-modal="true" aria-label="章节目录" data-action="boardDirectoryContent"><div class="directory-header"><div>章节目录 <span class="directory-count">共 ' + chapters.length + ' 章</span></div>' + btn('directory-close', 'closeBoardDirectory', '关闭') + '</div><nav class="directory-list" aria-label="规则章节">' + chapters.map(function (chapter, index) { return '<button type="button" class="directory-item" data-action="jumpBoardSection" data-value="' + index + '"><span class="detail-chapter-number">' + chapter.number + '</span><span>' + esc(chapter.displayTitle) + '</span></button>'; }).join('') + '</nav></div></div>';
+    return html + '</div></div>';
   }
   // Keep option selection in a themed, keyboard-accessible modal above settings.
   var optionDialog = null;
@@ -4764,37 +4726,63 @@ function roomListItems(rooms) {
       var board = state.boards.find(function (b) {
         return b.id === state.room.board;
       });
+      var detail = boardDetailPresentation.presentBoard(board
+        ? { ...board, roleConfiguration: state.room.roleConfiguration }
+        : { name: state.room.boardName, roleConfiguration: state.room.roleConfiguration }, state.room.capacity);
       setState({
         showBoardDetails: true,
         expandedBoardRoles: {},
         showRoomRules: false,
-        boardDetail: board
-          ? {
-              name: board.name,
-              capacity: state.room.capacity,
-              detail: board.detail,
-              roleConfiguration:
-                state.room.roleConfiguration ||
-                (board.roleConfigurations || {})[state.room.capacity] ||
-                [],
-            }
-          : null,
+        boardDetail: detail, boardDetailTab: detail.defaultTab, boardDetailQuery: "",
+        boardDetailGroup: detail.groups[0]?.id || "", boardChapters: detail.chapters, boardDirectory: false,
       });
       var close = app.querySelector('[data-action="closeBoardDetails"]');
       if (close) close.focus();
     },
     toggleBoardRole: function (el) {
+      if (!state.boardDetail?.roles.some(role => role.id === el.dataset.value)) return;
       var expanded = Object.assign({}, state.expandedBoardRoles || {});
       expanded[el.dataset.value] = !expanded[el.dataset.value];
       setState({ expandedBoardRoles: expanded });
     },
+    boardDetailTab: function (el) {
+      var tab = el.dataset.value;
+      if (tab === 'rules' || tab === 'roles' && state.boardDetail?.hasRoles) setState({ boardDetailTab: tab });
+    },
+    boardDetailGroup: function (el) {
+      if (state.boardDetail?.groups.some(group => group.id === el.dataset.value))
+        setState({ boardDetailGroup: el.dataset.value, boardDetailQuery: '' });
+    },
+    toggleBoardChapter: function (el) {
+      var index = Number(el.dataset.value);
+      if (!state.boardChapters?.[index]) return;
+      setState({ boardChapters: state.boardChapters.map((chapter, i) => i === index ? { ...chapter, expanded: !chapter.expanded } : chapter) });
+    },
+    toggleAllBoardChapters: function () {
+      var expanded = !state.boardChapters.every(chapter => chapter.expanded);
+      setState({ boardChapters: state.boardChapters.map(chapter => ({ ...chapter, expanded })) });
+    },
+    boardDirectoryContent: function () {},
+    openBoardDirectory: function () {
+      setState({ boardDirectory: true });
+      app.querySelector('.directory-close')?.focus({ preventScroll: true });
+    },
+    closeBoardDirectory: function () {
+      setState({ boardDirectory: false });
+      app.querySelector('[data-action="openBoardDirectory"]')?.focus({ preventScroll: true });
+    },
     jumpBoardSection: function (el) {
-      var target = document.getElementById("board-section-" + Number(el.dataset.value));
+      var index = Number(el.dataset.value);
+      if (!Number.isInteger(index) || !state.boardChapters?.[index]) return;
+      setState({ boardDirectory: false, boardDetailTab: 'rules', boardChapters: state.boardChapters.map((chapter, i) => i === index ? { ...chapter, expanded: true } : chapter) });
+      var target = document.getElementById("board-section-" + index);
       var scroll = app.querySelector(".detail-scroll");
-      if (target && scroll) scroll.scrollTop += target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 16;
+      var tabs = app.querySelector('.detail-tabs');
+      if (target && scroll) scroll.scrollTop += target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - (tabs?.getBoundingClientRect().height || 0) - 12;
+      app.querySelector('#board-section-' + index + ' button')?.focus({ preventScroll: true });
     },
     closeBoardDetails: function () {
-      setState({ showBoardDetails: false, boardDetail: null });
+      setState({ showBoardDetails: false, boardDetail: null, boardDirectory: false });
       var trigger = app.querySelector('[data-action="openRoomRules"]');
       if (trigger) trigger.focus();
     },
@@ -5007,6 +4995,7 @@ function roomListItems(rooms) {
     },
   };
   var INPUTS = {
+    boardDetailSearch: function (el) { setState({ boardDetailQuery: el.value }); },
     profileName: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.nickname = el.value; state.profileNicknameError = ''; state.profileError = ''; profileDirty(); } },
     roomNote: function (el) { state.roomNoteDraft = el.value; },
     name: function (el) {
@@ -5174,11 +5163,12 @@ function roomListItems(rooms) {
     if (!state.showBoardDetails || !modal.hidden) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      ACTIONS.closeBoardDetails();
+      if (state.boardDirectory) ACTIONS.closeBoardDirectory();
+      else ACTIONS.closeBoardDetails();
     } else if (event.key === "Tab") {
-      var dialog = app.querySelector(".board-detail-dialog");
+      var dialog = app.querySelector(state.boardDirectory ? ".directory-panel" : ".board-detail-dialog");
       if (!dialog) return;
-      var controls = Array.from(dialog.querySelectorAll('button:not(:disabled), [tabindex="0"]'));
+      var controls = Array.from(dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]'));
       var first = controls[0], last = controls[controls.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }

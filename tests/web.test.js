@@ -197,6 +197,14 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   assert.equal(registration.status, 200);
   vm.runInNewContext(registration.text, registrationContext);
   assert.equal(typeof registrationContext.window.shadowtableResultRegistration.flow, 'function');
+  assert.ok(home.text.indexOf('/board-detail.js') < home.text.indexOf('/app.js'));
+  const boardDetail = await a.raw('/board-detail.js'), detailContext = { window: {} };
+  assert.equal(boardDetail.status, 200);
+  vm.runInNewContext(boardDetail.text, detailContext);
+  assert.equal(detailContext.window.shadowtableBoardDetail.presentBoard({ name: '测试' }).title, '测试');
+  assert.match((await a.raw('/board-detail.css')).headers['content-type'], /text\/css/);
+  assert.match((await a.raw('/assets/board-search.svg')).headers['content-type'], /image\/svg\+xml/);
+  assert.match((await a.raw('/assets/board-directory.svg')).headers['content-type'], /image\/svg\+xml/);
   assert.ok(home.text.indexOf('/public-history.js') < home.text.indexOf('/app.js'));
   const history = await a.raw('/public-history.js'), historyContext = { window: {} };
   assert.equal(history.status, 200);

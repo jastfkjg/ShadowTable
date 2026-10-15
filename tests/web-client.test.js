@@ -31,12 +31,13 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
+  context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
-      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager,
+      navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
       getWebSessionTag() { return webSessionTag; },
@@ -48,6 +49,32 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页各板子详情自适应技能和规则模式，搜索不受牌组限制，目录跳转先展开目标', () => {
+  const c = client(async () => response({}));
+  c.state.boards = BOARDS.map(board => ({...board,detail:require('../server/board-info')[board.id]}));
+  for (const source of c.state.boards.filter(b=>b.available)) for (const capacity of source.counts) {
+    c.state.room = { board:source.id, boardName:source.name, capacity };
+    c.ACTIONS.openBoardDetails();
+    let html = c.viewBoardDetails();
+    assert.match(html,/角色配置|角色速查/);
+    assert.match(html,new RegExp(capacity+' 人'));
+    if (c.state.boardDetail.hasRoles) {
+      c.INPUTS.boardDetailSearch({value:'女巫'});
+      assert.match(c.viewBoardDetails(),/>女巫</);
+      c.ACTIONS.boardDetailGroup({dataset:{value:'b-evil'}});
+      assert.equal(c.state.boardDetailQuery,'');
+      assert.match(c.viewBoardDetails(),/>石像鬼</);
+      c.ACTIONS.toggleBoardRole({dataset:{value:'1:4'}});
+      assert.match(c.viewBoardDetails(),/detail-role-body/);
+    } else assert.doesNotMatch(html,/搜索角色或技能/);
+    c.ACTIONS.openBoardDirectory();assert.match(c.viewBoardDetails(),/aria-label="章节目录"/);
+    c.ACTIONS.jumpBoardSection({dataset:{value:'1'}});
+    assert.equal(c.state.boardDirectory,false);assert.equal(c.state.boardDetailTab,'rules');assert.equal(c.state.boardChapters[1].expanded,true);
+    c.ACTIONS.toggleAllBoardChapters();assert.ok(c.state.boardChapters.every(ch=>ch.expanded));
+    c.ACTIONS.closeBoardDetails();assert.equal(c.viewBoardDetails(),'');
+  }
+  c.stop();
+});
 test('网页通过房间码在进行中和终局加入旁观，提示手动入座且不展示身份入口', async () => {
   for (const phase of ['identity', 'ended', 'terminated']) {
     const room = newRoom('123456', 'host', '房主'); room.phase = phase;

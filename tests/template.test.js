@@ -982,7 +982,8 @@ test("房间设置仅在可移出阶段开放成员选择，对局中说明原�
 test("创建页提供板子详情入口，目录采用文字链接", () => {
   const tree = render({ ...base, entryMode: "create", entrySheet: true, availableBoards: [{ id: "classic", name: "经典" }] });
   assert.ok(byHandler(tree, "openBoardDetails"));
-  const detail = factory("pages/board-details/board-details.wxml")({ loading: false, hasDetail: true, directoryExpanded: true, sections: [{ title: "角色技能", navTitle: "B牌 · 蓝方", kind: "roles", items: [] }] });
+  const board = require('../miniprogram/board-detail').presentBoard({ name: '测试板子', detail: { sections: [{ title: '规则说明', kind: 'lines', items: ['完整规则'] }] } }, 12);
+  const detail = factory("pages/board-details/board-details.wxml")({ loading: false, board, tab: 'rules', directoryExpanded: true, chapters: board.chapters });
   const link = byHandler(detail, "jumpSection");
   assert.equal(link.tag, "wx-view");
   assert.equal(link.attr.role, "link");
