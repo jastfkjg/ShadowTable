@@ -189,7 +189,7 @@ function leaderboardCard(profile, board) {
   else if (me.status === "unsupported") notes.push("当前账号不参与排行榜");
   else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? board.sort === "rate" ? " 次有效机会" : " 次" : " 局") : ""));
   return { kind: "rank", ...identity(profile), title, context: period,
-    scope: board.fun ? [board.metric === "fun_good_shield" ? "" : clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role || board.roleLabel)].filter(Boolean).join(" · ") : "",
+    scope: board.fun ? [clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role || board.roleLabel)].filter(Boolean).join(" · ") : "",
     hero: board.fun ? board.sort === "rate" ? decimal(me.rate) : number(me.count) : points ? number(me.points) : games ? number(me.total) : decimal(me.winRate),
     unit: board.fun ? clean(board.unit) : points ? "分" : games ? "局" : "%",
     label: board.fun ? clean(board.metricLabel) : points ? "我的积分" : games ? "有效局数" : title.replace(/榜$/, ""),

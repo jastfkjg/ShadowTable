@@ -260,7 +260,8 @@ test("趣味分享接收小程序编码和未编码的卡片参数，并完成�
     assert.equal(p.data.error, '');
     assert.ok(p.data.imagePath);assert.equal(renderCount(), 1);
     assert.match(p.data.description, /成功挡刀|刀客刀法/);
-    assert.doesNotMatch(p.data.description, /好人/);
+    if(card.id.endsWith(':shield'))assert.match(p.data.description,/金牌替身 · 非梅林好人/);
+    else assert.doesNotMatch(p.data.description, /好人/);
     assert.doesNotMatch(p.data.description, /十二骑士/);
   }
   for (const card of ['knights%3', 'knights%253Ashield', '../shield', 'knights:shield?uid=other']) {
@@ -272,9 +273,9 @@ test("分享榜单突出标题，全部时间及全部玩法不输出，未知�
   const card = cards.leaderboardCard(fixtures.profile, { ...fixtures.board, period: 'all', fun: true, metric: 'fun_good_shield', title: '好人', metricLabel: '成功挡刀次数', mode: 'all', sort: 'count', unit: '次',
     me: { status: 'ranked', rank: 1, count: 1, rate: 100, opportunities: 1, knownGames: 1, unknownGames: 2 },
     nearby: [{rank:1,isSelf:true,nickname:'小林',count:1}] });
-  assert.equal(card.title, '成功挡刀次数榜');assert.equal(card.context, '');assert.equal(card.scope, '');
+  assert.equal(card.title, '成功挡刀次数榜');assert.equal(card.context, '');assert.equal(card.scope, '金牌替身 · 非梅林好人');
   assert.deepEqual(card.notes, []);
-  assert.doesNotMatch(cards.describe(card), /全部时间|全部玩法|好人|非梅林|我的附近|另有.*未记录/);
+  assert.doesNotMatch(cards.describe(card), /全部时间|全部玩法|我的附近|另有.*未记录/);
   assert.equal(card.metrics[2].value, '1');
 });
 

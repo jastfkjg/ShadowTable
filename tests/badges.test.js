@@ -29,12 +29,37 @@ function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
 }
-test('17 枚徽章涵盖全部趣味称号与三种常规榜，零数据不颁发', () => {
+test('18 枚徽章涵盖全部趣味称号与三种常规榜，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,17);assert.equal(new Set(catalogue.map(b=>b.id)).size,17);
+    assert.equal(catalogue.length,18);assert.equal(new Set(catalogue.map(b=>b.id)).size,18);
     for (const id of Object.keys(require('../miniprogram/fun-copy').honors)) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
+  } finally {store.close();}
+});
+test('金牌替身按本月公开挡刀次数颁发，并列持有、摘戴及跨月重算沿用现有体系', () => {
+  let now=NOW;const store=new Store(':memory:',{clock:()=>now});
+  try {
+    metric(store,'wx:double-a','good_shield',3,6);
+    metric(store,'wx:double-b','good_shield',3,8);
+    metric(store,'wx:rate','good_shield',1,1);
+    metric(store,'wx:zero','good_shield',0,3);
+    metric(store,'wx:hidden','good_shield',9,9);
+    const profile=readProfile(store,'wx:hidden');
+    saveProfile(store,'wx:hidden',{nickname:'隐藏玩家',version:profile.version,leaderboardVisible:false});
+    for(const uid of ['wx:double-a','wx:double-b']) {
+      const badge=readBadges(store,uid).badges.find(b=>b.id==='good_shield');
+      assert.equal(badge.title,'金牌替身');assert.equal(badge.metric,'fun_good_shield');
+      assert.equal(badge.imageUrl,'/assets/badges/good_shield.png');
+      assert.match(badge.description,/本月「金牌替身」次数榜第一/);
+    }
+    for(const uid of ['wx:rate','wx:zero','wx:hidden'])assert.ok(!ids(store,uid).includes('good_shield'));
+    for(const badge of readBadges(store,'wx:double-a').badges.filter(b=>b.equipped))wear(store,'wx:double-a',badge.id,false);
+    wear(store,'wx:double-a','good_shield',true);
+    assert.deepEqual(equippedBadges(store,'wx:double-a').map(b=>b.id),['good_shield']);
+    wear(store,'wx:double-a','good_shield',false);
+    assert.deepEqual(equippedBadges(store,'wx:double-a'),[]);
+    now=NEXT;assert.ok(!ids(store,'wx:double-a').includes('good_shield'));
   } finally {store.close();}
 });
 test('北京时间月榜独立于总榜，并列榜首全员获授，新月撤销且默认重新佩戴', () => {

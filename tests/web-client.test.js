@@ -1657,7 +1657,8 @@ test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应�
     const group=c.viewLeaderboard();html+=group;
     assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,category==='all'?options.length:options.filter(item=>item.category===category).length);
   }
-  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 14 项/);
+  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 15 项/);
+  assert.match(html,/金牌替身，非梅林好人，作为非梅林好人，最终刀落到本人身上的次数/);
   assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);
   c.ACTIONS.rankToggleMetrics();
   await c.ACTIONS.funRankMetric({dataset:{value:'fun_defense_ally'}});assert.match(urls.at(-1),/metric=fun_defense_ally.*mode=all&sort=rate$/);
@@ -1970,11 +1971,12 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.match(c.viewMe(),/data-page="badges"/); assert.doesNotMatch(c.viewMe(),/toggleBadgeManager/);
   await c.applyRoute('#/badges');
   assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,17);
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,18);
+  assert.match(c.viewBadgeManager(),/<span> \/ 18<\/span>/);assert.match(c.viewBadgeManager(),/金牌替身/);
   c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
   c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,16);
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,17);
   c.ACTIONS.showBadgeDetail({dataset:{id:'points'}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
   assert.match(detail,/积分王者/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);

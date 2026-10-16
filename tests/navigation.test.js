@@ -1979,11 +1979,13 @@ test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作�
   } });
   p.onLoad(); await p.onShow();
   assert.equal(p.data.badgeCollection.monthLabel,'2026年10月');
-  assert.equal(p.data.badgeCollection.items.length,17);
+  assert.equal(p.data.badgeCollection.items.length,18);
+  assert.equal(p.data.badgeTotalCount,18);
+  assert.equal(p.data.badgeCollection.items.find(b=>b.id==='good_shield').title,'金牌替身');
   assert.equal(p.data.badgeCollection.ownedCount,2);
   assert.equal(p.data.badgeCollection.slots.filter(b => b.empty).length,1);
   const event = id => ({currentTarget:{dataset:{id}}});
-  p.chooseBadgeFilter(event('unowned')); assert.equal(p.data.badgeCollection.visibleBadges.length,15);
+  p.chooseBadgeFilter(event('unowned')); assert.equal(p.data.badgeCollection.visibleBadges.length,16);
   p.showBadgeDetail(event('points')); assert.equal(p.data.selectedBadge.owned,false);
   await p.toggleOwnedBadge(event('points')); assert.equal(writes.length,0);
   p.chooseBadgeFilter(event('owned')); p.showBadgeDetail(event('games'));

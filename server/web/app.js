@@ -938,7 +938,7 @@
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;
     const busy = state.badgeManagerLoading || state.badgeManagerSaving;
     let html = '<div class="badge-page"' + (state.selectedBadgeId ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1>' + btn('badge-rules', 'badgeRules', '规则') + '</header>';
-    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span></div><div class="badge-hero"><div><div class="badge-title">本月荣誉</div><div class="badge-caption">榜首荣誉，每月更新。</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / 17</span></div><span class="badge-caption">已拥有</span></div></div>';
+    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span></div><div class="badge-hero"><div><div class="badge-title">本月荣誉</div><div class="badge-caption">榜首荣誉，每月更新。</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
     if (state.badgeManagerLoading) html += '<div class="status" role="status">正在读取徽章…</div>';
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';

@@ -1,6 +1,6 @@
 const api = require('./api');
-const { presentCollection, MAX_EQUIPPED } = require('./badges');
-const initialBadgeManager = { badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '' };
+const { catalogue, presentCollection, MAX_EQUIPPED } = require('./badges');
+const initialBadgeManager = { badgeCollection: null, badgeTotalCount: catalogue.length, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '' };
 function badgeManagerMethods() {
   return {
     async loadBadgeManager() {

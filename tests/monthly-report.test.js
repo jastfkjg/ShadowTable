@@ -89,6 +89,7 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     funRecord(store, c, "wx:c", "merlin_evade", 1, 1);
     funRecord(store, a, "wx:a", "assassin_hit", 2, 5); funRecord(store, b, "wx:b", "defense_ally", 1, 5);
     funRecord(store, b, "wx:b", "assassin_miss", 4, 5);
+    funRecord(store, a, "wx:a", "good_shield", 2, 5);
     const unknown = match(store, [{ uid: "wx:a" }]); funRecord(store, unknown, "wx:a", "merlin_evade", 100, 100, "unknown");
     const response = read(reports), report = presentation.presentReport(response);
     assert.deepEqual(report.featured.map(board => board.id), ["merlin_evade:count", "assassin_hit:count", "defense_ally:count"]);
@@ -99,6 +100,9 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     assert.equal(rate.threshold, 5);
     assert.equal(presentation.detailBoards(report, "count", true).find(board => board.metric === "assassin_miss").rows[0].count, 4);
     assert.ok(presentation.detailBoards(report, "rate", false).every(board => board.positive && board.sort === "rate"));
+    const standin=report.funBoards.find(board=>board.id==='good_shield:count');
+    assert.equal(standin.title,'金牌替身');assert.equal(standin.rows[0].count,2);
+    assert.ok(presentation.detailBoards(report,'count',false).some(board=>board.metric==='good_shield'));
     const standard = JSON.stringify(cardRenderer.cards(response)), entertainment = JSON.stringify(cardRenderer.cards(response, true));
     assert.doesNotMatch(standard, /歪刀/); assert.match(entertainment, /背锅侠/);
   } finally { store.close(); }

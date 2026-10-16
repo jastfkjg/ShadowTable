@@ -6,7 +6,7 @@
 })(typeof window === "object" ? window : this, function (funCopy) {
   const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "other", label: "其他" }];
   function funOptions(definitions = [], { includeFinal = false } = {}) {
-    const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
+    const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_good_shield", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(funCopy.metric).map(item => {
       const title = item.honorTitle || item.title;
       const category = /^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
@@ -55,7 +55,7 @@
       if (selected?.roleDetail) ruleLines.push("适用身份：" + selected.roleDetail + "。");
       ruleLines.push("次数榜按对应记录排名；" + rateLabel + "榜按有效机会统计。",
         "次数相同则并列；比例按未舍入值排序，相同比例时机会数多者优先，两者相同则并列。",
-        board.metric?.startsWith("fun_defense_") ? "守卫按实际挡下伤害计数；魔术师换号使原攻击目标实际避开伤害时计一次，按该目标在技能发生时的阵营区分友方与对方。比例分母为实际保护总次数。" : board.metric?.startsWith("fun_kill_") ? "合并刀、枪、决斗造成的实际出局，按技能发生时实际承受者的阵营统计。缴械及未生效不计击杀，最终刺杀单独统计。" : board.metric === "fun_good_shield" ? "挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。空刀单列，缺失记录不按零次计算。" : "只统计已完整记录的对应机会；缺失记录不按零次计算。");
+        board.metric?.startsWith("fun_defense_") ? "守卫按实际挡下伤害计数；魔术师换号使原攻击目标实际避开伤害时计一次，按该目标在技能发生时的阵营区分友方与对方。比例分母为实际保护总次数。" : board.metric?.startsWith("fun_kill_") ? "合并刀、枪、决斗造成的实际出局，按技能发生时实际承受者的阵营统计。缴械及未生效不计击杀，最终刺杀单独统计。" : board.metric === "fun_good_shield" ? "按终局时的身份、阵营和存活状态统计，非梅林好人包含派西维尔，一局最多一次。挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。空刀不形成机会，缺失记录不按零次计算。" : "只统计已完整记录的对应机会；缺失记录不按零次计算。");
     } else {
       ruleLines.push(points ? "积分包含有效计分局成绩和积分调整；至少有 1 场有效计分局才参与排名。积分相同则并列。"
         : games ? "只统计已登记胜负的有效对局；有效局数相同则并列。"

@@ -1,7 +1,7 @@
 <app-nav title="荣誉徽章" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page badge-page">
   <view class="badge-period-row"><text class="badge-caption">{{badgeCollection ? badgeCollection.monthLabel : '本月荣誉'}}</text><button class="badge-rules" bindtap="showBadgeRules" hover-class="badge-pressed">规则</button></view>
-  <view class="badge-hero"><view><view class="badge-title">本月荣誉</view><view class="badge-caption">榜首荣誉，每月更新。</view></view><view class="badge-total"><view class="badge-total-value">{{badgeCollection ? badgeCollection.ownedCount : '—'}}<text> / 17</text></view><text class="badge-caption">已拥有</text></view></view>
+  <view class="badge-hero"><view><view class="badge-title">本月荣誉</view><view class="badge-caption">榜首荣誉，每月更新。</view></view><view class="badge-total"><view class="badge-total-value">{{badgeCollection ? badgeCollection.ownedCount : '—'}}<text> / {{badgeCollection ? badgeCollection.totalCount : badgeTotalCount}}</text></view><text class="badge-caption">已拥有</text></view></view>
   <view wx:if="{{badgeManagerLoading}}" class="status" role="status">正在读取徽章…</view>
   <view wx:if="{{badgeManagerError}}" class="inline-error" role="alert"><text>{{badgeManagerError}}</text><button class="secondary" bindtap="loadBadgeManager" disabled="{{badgeManagerLoading || badgeManagerSaving}}" hover-class="badge-pressed">刷新徽章</button></view>
   <block wx:if="{{badgeCollection}}">

@@ -9,6 +9,7 @@
     honor_mvp: "胜方最佳", honor_svp: "败方最佳",
     percival_green: "三蓝并保护梅林", percival_bust: "三红或梅林被刺",
     merlin_evade: "成功躲刀", merlin_hit: "被刺中",
+    good_shield: "成功挡刀",
     assassin_hit: "刺中梅林", assassin_miss: "刺错梅林",
     defense_ally: "保护友方", defense_enemy: "保护对方",
     kill_enemy: "击杀对方", kill_ally: "击杀友方",
@@ -25,6 +26,7 @@
     percival_bust: { title: "竭尽全力", description: "派西玩家带3红车或梅林被刺次数最多" },
     merlin_evade: { title: "闪身步大神", description: "梅林玩家成功躲刀次数最多" },
     merlin_hit: { title: "舍我其谁", description: "梅林玩家被刺中次数最多" },
+    good_shield: { title: "金牌替身", description: "终局时存活的非梅林好人被最终刀选中的次数最多，包含派西维尔" },
     assassin_hit: { title: "职业刺客", description: "刺客玩家刺中梅林次数最多" },
     assassin_miss: { title: "背锅侠", description: "刺客玩家刺错梅林次数最多" },
     defense_ally: { title: "绝对防御", description: "玩家有防御技能（适用于守卫、魔术师）并保护友方阵营次数最多" },
@@ -33,7 +35,7 @@
     kill_ally: { title: "痛击队友", description: "玩家有击杀技能并击杀友方阵营次数最多" },
   };
   const identities = { survival: "十二骑士全体玩家", honor: "玩家票选",
-    percival: "派西维尔", merlin: "梅林", assassin: "刺客",
+    percival: "派西维尔", merlin: "梅林", good: "非梅林好人", assassin: "刺客",
     defense: "蓝守卫／魔术师", kill: "刀客／骑士／猎人等",
   };
   const conditions = {
@@ -41,6 +43,7 @@
     honor_mvp: "获得胜方最佳玩家的次数", honor_svp: "获得败方最佳玩家的次数",
     percival_green: "三蓝且梅林未被刺的局数", percival_bust: "三红或梅林被刺的局数",
     merlin_evade: "成功躲过最终刺杀的次数", merlin_hit: "最终被刺中的次数",
+    good_shield: "作为非梅林好人，最终刀落到本人身上的次数",
     assassin_hit: "最终刺中梅林的次数", assassin_miss: "最终刺杀未命中梅林的次数",
     defense_ally: "成功保护友方的次数", defense_enemy: "成功保护对方的次数",
     kill_enemy: "成功击杀对方的次数", kill_ally: "成功击杀友方的次数",

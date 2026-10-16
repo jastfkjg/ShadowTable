@@ -95,10 +95,10 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
-test("十四项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
+test("十五项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
   const fun = require("../server/fun");
   assert.deepEqual(fun.publicMetrics().map(m => m.honorTitle), [
-    "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "职业刺客", "背锅侠",
+    "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "金牌替身", "职业刺客", "背锅侠",
     "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "我在阿瓦隆玩重生", "全民公敌", "最强 MVP", "最强 SVP",
   ]);
   for (const [reason, target, green, bust] of [
@@ -406,7 +406,9 @@ test("挡刀榜跨板子合并次数和原始分母，少量样本可参与成�
       0,
     );
     assert.ok(all.availableFunMetrics.some((m) => m.key === "fun_defense_ally"));
-    assert.ok(!all.availableFunMetrics.some((m) => m.key === "fun_good_shield"));
+    assert.equal(all.availableFunMetrics.find((m) => m.key === "fun_good_shield").honorTitle, "金牌替身");
+    assert.equal(all.title, "金牌替身");
+    assert.equal(require('../miniprogram/fun-copy').leaderboard(all).roleLabel, "非梅林好人");
     assert.doesNotMatch(JSON.stringify(all), /wx:|"uid"|target|events/);
     assert.throws(
       () => read("metric=fun_good_shield&role=servant"),
