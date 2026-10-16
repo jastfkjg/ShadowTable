@@ -7,47 +7,48 @@
       <view class="me-profile-main">
         <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" aria-label="我的头像" />
         <view wx:else class="profile-avatar avatar-fallback" aria-hidden="true">{{profile.initial}}</view>
-        <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="me-profile-caption">桌边助手</view></view>
-        <view class="me-profile-action"><text>编辑</text><view class="me-chevron" aria-hidden="true"></view></view>
+        <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="me-profile-caption">编辑资料<view class="me-chevron" aria-hidden="true"></view></view></view>
       </view>
     </navigator>
     <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
     <view class="me-overview">
       <navigator class="me-results" url="/pages/stats/stats" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看详细战绩统计">
-        <view class="me-results-heading"><text>战绩概览</text><view class="me-results-detail"><text>详情</text><view class="me-chevron" aria-hidden="true"></view></view></view>
-        <view class="me-stats-panel" aria-label="{{!stats && loading ? '正在读取战绩' : '战绩概览'}}">
-          <view class="personal-metrics">
-            <view class="me-metric"><view class="metric-value {{stats && stats.total >= 10000 ? 'me-value-compact' : ''}}">{{stats ? stats.total : '—'}}</view><text class="small muted">总局数</text></view>
-            <view class="me-metric"><view class="metric-value {{stats && stats.wins >= 10000 ? 'me-value-compact' : ''}}">{{stats ? stats.wins : '—'}}</view><text class="small muted">胜场</text></view>
-            <view class="me-metric"><view class="metric-value {{stats && stats.total ? 'accent' : 'muted'}}">{{stats ? stats.rateLabel : '—'}}</view><text class="small muted">胜率</text></view>
-          </view>
+        <view class="personal-metrics me-stats-panel">
+          <view class="me-metric"><view class="metric-value {{stats && stats.total >= 10000 ? 'me-value-compact' : ''}}">{{stats ? stats.total : '—'}}</view><text class="small muted">总局数</text></view>
+          <view class="me-metric"><view class="metric-value {{stats && stats.total ? '' : 'muted'}}">{{stats ? stats.rateLabel : '—'}}</view><text class="small muted">胜率</text></view>
         </view>
       </navigator>
       <view class="me-points">
-        <view class="me-points-summary">
-          <view class="me-points-item"><text>总积分</text><text class="me-points-value accent">{{stats ? stats.score.total : '—'}}</text></view>
-          <view class="me-points-item"><text>本月</text><text class="me-points-value">{{stats ? stats.score.month : '—'}}</text></view>
-        </view>
         <navigator class="me-points-link" url="/pages/scores/scores" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看积分明细">
-          <text>积分明细</text><view class="me-chevron" aria-hidden="true"></view>
+          <view class="metric-value {{stats && (stats.score.total >= 10000 || stats.score.total <= -1000) ? 'me-value-compact' : ''}}">{{stats ? stats.score.total : '—'}}</view><text class="small muted">总积分</text>
         </navigator>
       </view>
+      <view class="me-overview-note"><text>{{stats ? stats.wins + ' 胜 · ' + stats.losses + ' 负' : '战绩读取中…'}}</text><text>本月积分 {{stats ? stats.score.month : '—'}}</text></view>
     </view>
+    <navigator wx:if="{{currentRoom}}" class="me-current-room" url="{{'/pages/table/table?code='+currentRoom.code+'&resume=1'}}" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="{{'返回牌桌，房间'+currentRoom.code+'，'+currentRoom.statusLabel+'，'+currentRoom.relationLabel}}">
+      <view class="me-room-icon" aria-hidden="true"></view>
+      <view class="me-room-copy"><view class="me-room-title"><text>当前牌桌</text><text class="me-room-state {{currentRoom.status==='playing'?'playing':''}}">{{currentRoom.statusLabel}}</text></view><view class="me-room-caption">{{currentRoom.boardLabel}} · {{currentRoom.capacity}}人 · {{currentRoom.relationLabel}}</view></view>
+      <view class="me-room-return"><text>返回</text><view class="me-chevron" aria-hidden="true"></view></view>
+    </navigator>
     <view class="personal-links me-links me-links-primary">
       <view class="me-section-label">我的记录</view>
-      <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-history" aria-hidden="true"></view><view class="me-link-copy">对局记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-spark" aria-hidden="true"></view><view class="me-link-copy">趣味记录</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/badges/badges" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-medal" aria-hidden="true"></view><view class="me-link-copy">荣誉徽章</view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <view class="me-link-group">
+        <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-blue"><view class="me-icon me-icon-history" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">对局记录</view><view class="me-link-caption">回看身份、胜负与对局过程</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+        <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-purple"><view class="me-icon me-icon-spark" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">趣味记录</view><view class="me-link-caption">刀法、挡刀，还有那些名场面</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+        <navigator class="personal-link" url="/pages/badges/badges" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-gold"><view class="me-icon me-icon-medal" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">荣誉徽章</view><view class="me-link-caption">查看本月荣誉，佩戴你的徽章</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      </view>
     </view>
     <view class="personal-links me-links me-links-community">
       <view class="me-section-label">一起看看</view>
-      <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-rank" aria-hidden="true"></view><view class="me-link-copy">排行榜</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/monthly/monthly" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-calendar" aria-hidden="true"></view><view class="me-link-copy">月度战报</view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <view class="me-link-group">
+        <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-green"><view class="me-icon me-icon-rank" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">排行榜</view><view class="me-link-caption">看看同桌朋友的表现</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+        <navigator class="personal-link" url="/pages/monthly/monthly" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-orange"><view class="me-icon me-icon-calendar" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">月度战报</view><view class="me-link-caption">回顾这个月一起打过的局</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      </view>
     </view>
-    <view class="personal-links me-links me-links-secondary">
-      <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon me-icon-book" aria-hidden="true"></view><view class="me-link-copy">帮助与规则</view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon me-icon-info" aria-hidden="true"></view><view class="me-link-copy">关于桌边助手</view><view class="me-chevron" aria-hidden="true"></view></button>
-    </view>
+    <view class="personal-links me-links me-links-secondary"><view class="me-link-group">
+      <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-book" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">帮助与规则</view><view class="me-link-caption">流程、角色与板子说明</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-info" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">关于桌边助手</view></view><view class="me-chevron" aria-hidden="true"></view></button>
+    </view></view>
   </block>
 </view>
 </template>

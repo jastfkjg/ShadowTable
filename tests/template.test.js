@@ -15,6 +15,12 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发放身份操作', () => {
+  const room = { code:'123456', phase:'lobby', capacity:6, boardName:'经典基础', players:[], team:[], history:[], me:{seat:1,isHost:true,ready:false} };
+  const text = JSON.stringify(renderTable({ ...base, isLobby:false, room }));
+  assert.match(text, /发放身份/);
+  assert.doesNotMatch(text, /home-brand-symbol|home-table-blue|home-action-symbol|home-clock/);
+});
 test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
   const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌', skillHistory: [{ id: 0, round: 2, text: '刀8号' }] },
     { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌', skillHistory: [{ id: 0, round: 1, text: '刀9号' }] }];
@@ -192,7 +198,7 @@ test('战绩区分未计分与零分计分局，没有计分局也保留独立�
   const score = { total: 0, games: 0, average: null, current: 0, best: 0 };
   const role = { role: '派西维尔', total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—' };
   const faction = { faction: 'good', label: '好人阵营', ...role, expanded: true, roles: [role] };
-  const stats = { total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—', byFaction: [faction] };
+  const stats = { total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—', byFaction: [faction], byRole: [role] };
   const show = value => text(renderStats({ loading: false, tab: 'records', stats: value }));
   const unscored = show(stats);
   assert.match(unscored, /暂无计分对局/);
@@ -203,7 +209,10 @@ test('战绩区分未计分与零分计分局，没有计分局也保留独立�
   const zeroPoints = show({ ...stats, score: scored, scoreAverageLabel: '0.00', byFaction: [{ ...faction, score: scored, scoreAverageLabel: '0.00', roles: [{ ...role, score: scored, scoreAverageLabel: '0.00' }] }] });
   assert.doesNotMatch(zeroPoints, /暂无计分对局/);
   assert.doesNotMatch(zeroPoints, /连胜/);
-  assert.match(zeroPoints, /0 分 · 场均 0.00/);
+  assert.match(zeroPoints, /1 局计分.*场均 0.00/);
+  const details = text(renderStats({loading:false,tab:'records',stats,statsDetail:{...role,kind:'role',title:role.role,score:scored,scoreAverageLabel:'0.00'}}));
+  assert.match(details,/累计积分 0 分/);
+  assert.match(details,/场均积分 0.00/);
 
   for (const total of [-5, 5]) {
     const adjusted = show({ ...stats, score: { ...score, total } });

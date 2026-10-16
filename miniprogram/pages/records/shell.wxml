@@ -3,13 +3,13 @@
 <import src="../matches/panel.wxml" />
 <view class="records-shell">
   <app-nav title="我的战绩" back="{{true}}" backLabel="{{tab==='matches' && historyFromFun ? '返回趣味记录' : '返回'}}" bindback="back" />
-  <view class="records-tabs" aria-label="战绩分类" aria-hidden="{{history.filtersExpanded}}">
+  <view class="records-tabs" aria-label="战绩分类" aria-hidden="{{history.filtersExpanded || !!statistics.statsDetail}}">
     <button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}"><text>统计</text></button>
     <button hover-class="none" bindtap="chooseTab" data-id="matches" class="{{tab==='matches'?'selected':''}}" aria-pressed="{{tab==='matches'}}"><text>对局记录</text></button>
     <button hover-class="none" bindtap="chooseTab" data-id="fun" class="{{tab==='fun'?'selected':''}}" aria-pressed="{{tab==='fun'}}"><text>趣味记录</text></button>
   </view>
-  <view class="records-body" aria-hidden="{{history.filtersExpanded}}">
-    <scroll-view class="records-pane" hidden="{{tab!=='records'}}" scroll-y="{{true}}" scroll-top="{{scrollTops.records}}" show-scrollbar="{{false}}" data-tab="records" bindscroll="rememberScroll" aria-label="战绩统计">
+  <view class="records-body" aria-hidden="{{history.filtersExpanded || !!statistics.statsDetail}}">
+    <scroll-view class="records-pane" hidden="{{tab!=='records'}}" scroll-y="{{!statistics.statsDetail}}" scroll-top="{{scrollTops.records}}" show-scrollbar="{{false}}" data-tab="records" bindscroll="rememberScroll" aria-label="战绩统计">
       <template is="statisticsPanel" data="{{...statistics}}" />
     </scroll-view>
     <scroll-view class="records-pane" hidden="{{tab!=='matches'}}" scroll-y="{{!history.filtersExpanded}}" scroll-top="{{scrollTops.matches}}" show-scrollbar="{{false}}" data-tab="matches" bindscroll="rememberScroll" aria-label="对局记录">
@@ -20,4 +20,5 @@
     </scroll-view>
   </view>
   <template wx:if="{{tab==='matches' && history.filtersExpanded}}" is="historyFilterSheet" data="{{...history}}" />
+  <template wx:if="{{statistics.statsDetail}}" is="statsDetailSheet" data="{{...statistics}}" />
 </view>

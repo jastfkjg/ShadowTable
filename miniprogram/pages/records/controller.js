@@ -47,6 +47,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
     switchPanel(tab) {
       if (!this.alive || !["records", "matches", "fun"].includes(tab) || tab === this.data.tab) return;
       if (this.data.history.filtersExpanded) this.historyController.closeFilters();
+      if (this.data.statistics.statsDetail) this.statisticsController.closeStatsDetails();
       this.setData({ tab, ["scrollTops." + tab]: this.scrollPositions[tab] });
       return this.ensurePanel(tab);
     },
@@ -95,6 +96,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
       this.historyController.setData({ records: this.historyController.data.records.map(record => ({ ...record, honors: withoutAvatar(record.honors, url) })) });
     },
     back() {
+      if (this.data.statistics.statsDetail) return this.statisticsController.closeStatsDetails();
       if (this.data.history.filtersExpanded) return this.historyController.closeFilters();
       if (this.data.tab === "matches" && this.data.historyFromFun) return this.switchPanel("fun");
       return backToMe();

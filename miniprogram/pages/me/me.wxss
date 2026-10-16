@@ -1,112 +1,54 @@
-.me-page {
-  --me-divider: rgba(177, 191, 198, .2);
-  padding: 48rpx 40rpx calc(48rpx + 50px + env(safe-area-inset-bottom));
-}
-
-.me-profile,
-.me-results,
-.me-results-heading,
-.me-points-link,
-.me-links .personal-link { box-sizing: border-box; color: var(--text); line-height: 1.5; }
-.me-page .me-pressed { opacity: .72; }
-.me-page .inline-error button { min-height: 44px; }
-
-.me-profile {
-  display: block;
-  width: 100%;
-  min-height: 124rpx;
-  margin: 0;
-  padding: 0;
-  text-align: left;
-}
-.me-profile-main { display: flex; align-items: center; gap: 28rpx; min-width: 0; }
-.me-profile .profile-avatar { width: 124rpx; height: 124rpx; border: 0; border-radius: 40rpx; }
-.me-profile .avatar-fallback { font-size: 48rpx; font-weight: 500; }
-.me-profile .profile-identity { min-width: 0; flex: 1; }
-.me-profile .profile-name { font-size: 44rpx; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
-.me-profile-caption { margin-top: 4rpx; color: var(--muted); font-size: 24rpx; }
-.me-profile-action { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-width: 44px; min-height: 44px; color: var(--accent); font-size: 24rpx; }
-.me-page .account-note { margin: 20rpx 0 0; }
-
-.me-overview { margin-top: 44rpx; padding: 0 36rpx; background: var(--surface); border-radius: 32rpx; }
-.me-results { display: block; margin: 0; padding: 24rpx 0; }
-.me-results-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24rpx;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  text-align: left;
-  font-size: 36rpx;
-  font-weight: 600;
-}
-.me-results-detail { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-width: 44px; min-height: 44px; color: var(--accent); font-size: 24rpx; font-weight: 400; }
-.me-stats-panel { padding-top: 20rpx; }
-.me-overview .personal-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 16rpx; padding: 0; text-align: left; }
-.me-overview .me-metric { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; gap: 6rpx; }
-.me-overview .metric-value { font-size: 56rpx; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.me-overview .me-value-compact { font-size: 36rpx; }
-.me-overview .me-metric .small { display: block; font-size: 24rpx; line-height: 1.4; }
-.me-points { display: flex; align-items: center; gap: 16rpx; padding: 12rpx 0 20rpx; border-top: 1rpx solid var(--me-divider); font-size: 24rpx; line-height: 1.5; }
-.me-points-summary { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 4rpx 16rpx; min-width: 0; color: var(--muted); }
-.me-points-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6rpx; min-width: 0; }
-.me-points-item > text:first-child { flex-shrink: 0; }
-.me-points-value { min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.me-points-link { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8rpx; min-height: 44px; color: var(--accent); }
-
-.me-links { margin-top: 44rpx; border-top: 0; }
-.me-section-label { margin-bottom: 4rpx; color: var(--muted); font-size: 24rpx; line-height: 1.5; }
-.me-links .personal-link {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24rpx;
-  width: 100%;
-  min-height: 116rpx;
-  min-height: max(48px, 116rpx);
-  margin: 0;
-  padding: 24rpx 0;
-  border: 0;
-  border-radius: 0;
-  text-align: left;
-  font-size: 30rpx;
-  font-weight: 400;
-}
-.me-links .personal-link::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1rpx;
-  background: var(--me-divider);
-}
-.me-links-secondary { margin-top: 32rpx; }
-.me-links-secondary .personal-link:last-child::before { display: none; }
-.me-link-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.me-chevron {
-  box-sizing: border-box;
-  flex-shrink: 0;
-  width: 12rpx;
-  height: 12rpx;
-  margin: 0 4rpx 0 0;
-  border-top: 2rpx solid var(--muted);
-  border-right: 2rpx solid var(--muted);
-  transform: rotate(45deg);
-}
-.me-profile-action .me-chevron,
-.me-results-detail .me-chevron,
-.me-points-link .me-chevron { border-color: var(--accent); }
+.me-page { --me-divider: rgba(177,191,198,.13); max-width:600px; padding:24px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
+.me-page .me-pressed { opacity:.72; }
+.me-page .inline-error button { min-height:44px; }
+.me-profile { display:block; padding:0 8px; color:var(--text); }
+.me-profile-main { display:flex; align-items:center; gap:16px; min-width:0; }
+.me-profile .profile-avatar { width:64px; height:64px; border:0; border-radius:21px; flex-shrink:0; }
+.me-profile .avatar-fallback { font-size:28px; font-weight:500; }
+.me-profile .profile-identity { min-width:0; flex:1; }
+.me-profile .profile-name { font-size:24px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.me-profile-caption { display:flex; align-items:center; gap:8px; margin-top:6px; color:var(--muted); font-size:12px; }
+.me-page .account-note { margin:18px 8px 0; }
+.me-overview { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); margin:24px 0 28px; padding:0 8px; }
+.me-results { display:block; padding:0; color:var(--text); }
+.me-overview .personal-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; padding:0; }
+.me-metric,.me-points-link { position:relative; display:flex; min-width:0; min-height:64px; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--text); }
+.me-metric+.me-metric::before,.me-points::before { content:""; position:absolute; left:0; top:12px; width:1px; height:30px; background:var(--me-divider); }
+.me-overview .metric-value { font-size:28px; font-weight:600; line-height:1.25; letter-spacing:-.5px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.me-overview .me-value-compact { font-size:21px; letter-spacing:0; }
+.me-overview .small { font-size:12px; line-height:1.5; }
+.me-points { position:relative; min-width:0; }
+.me-overview-note { grid-column:1/-1; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin:14px 12px 0; color:var(--muted); font-size:12px; }
+.me-current-room { display:flex; align-items:center; gap:12px; padding:18px 16px; border-radius:22px; background:var(--surface); color:var(--text); }
+.me-room-icon { flex-shrink:0; width:36px; height:40px; border-radius:12px; background:#34382f center / 22px 22px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5c68b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='3' width='16' height='18' rx='3'/%3E%3Cpath d='M9 3v18m3-13h5m-5 4h5m-5 4h3'/%3E%3C/svg%3E"); }
+.me-room-copy { flex:1; min-width:0; }
+.me-room-title { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:14px; font-weight:600; line-height:1.5; }
+.me-room-state { padding:1px 6px; border-radius:5px; background:#293e38; color:var(--good); font-size:11px; font-weight:400; }
+.me-room-state.playing { background:#3b372d; color:var(--accent); }
+.me-room-caption { margin-top:5px; color:var(--muted); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.me-room-return { flex-shrink:0; display:flex; align-items:center; gap:8px; color:var(--accent); font-size:12px; }
+.me-links { margin-top:24px; border-top:0; }
+.me-section-label { margin:0 8px 10px; color:var(--muted); font-size:12px; line-height:1.5; }
+.me-link-group { background:var(--surface); border-radius:22px; overflow:hidden; }
+.me-links .personal-link { position:relative; display:flex; align-items:center; justify-content:space-between; gap:13px; width:100%; min-height:77px; margin:0; padding:16px; border:0; border-radius:0; background:transparent; color:var(--text); line-height:1.5; text-align:left; font-size:16px; font-weight:400; box-sizing:border-box; }
+.me-links .personal-link+.personal-link::before { content:""; position:absolute; left:67px; right:16px; top:0; height:1px; background:var(--me-divider); }
+.me-link-copy { min-width:0; flex:1; overflow-wrap:anywhere; }
+.me-link-title { font-size:16px; font-weight:500; line-height:1.4; }
+.me-link-caption { margin-top:5px; color:var(--muted); font-size:12px; line-height:1.5; }
+.me-chevron { box-sizing:border-box; flex-shrink:0; width:6px; height:6px; margin-right:3px; border-top:1.5px solid var(--muted); border-right:1.5px solid var(--muted); transform:rotate(45deg); }
+.me-profile-caption .me-chevron { width:5px; height:5px; }
+.me-room-return .me-chevron { border-color:var(--accent); }
+.me-icon-well { display:flex; align-items:center; justify-content:center; width:38px; height:38px; flex-shrink:0; border-radius:12px; }
+.me-well-blue { background:#263e52; }.me-well-purple { background:#38354b; }.me-well-gold { background:#3b372d; }.me-well-green { background:#284039; }.me-well-orange { background:#42392f; }.me-well-slate { background:#2a3c4a; }
+.me-links-secondary { margin-top:18px; }
+@media(max-width:350px) { .me-page { padding-left:12px; padding-right:12px; }.me-overview .metric-value { font-size:25px; }.me-overview .me-value-compact { font-size:19px; }.me-links .personal-link { gap:10px; padding:14px; }.me-link-title { font-size:15px; } }
 
 /* Inline vectors share the tab icons' 24-unit canvas and 1.7-unit stroke. */
 .me-icon { width: 44rpx; height: 44rpx; flex-shrink: 0; background: center / contain no-repeat; }
-.me-icon-calendar { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M8 2v4m8-4v4M3 10h18M8 14h2m4 0h2m-8 4h2'/%3E%3C/svg%3E"); }
-.me-icon-rank { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21V7h8v14M2 21V12h6m8 3h6v6M1 21h22M10 3h4'/%3E%3C/svg%3E"); }
+.me-icon-calendar { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23efbf9f' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M8 2v4m8-4v4M3 10h18M8 14h2m4 0h2m-8 4h2'/%3E%3C/svg%3E"); }
+.me-icon-rank { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3dfbe' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21V7h8v14M2 21V12h6m8 3h6v6M1 21h22M10 3h4'/%3E%3C/svg%3E"); }
 .me-icon-history {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4v5h5M3 9a9 9 0 1 1 0 6M12 7v5l3 2'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2399c7f5' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4v5h5M3 9a9 9 0 1 1 0 6M12 7v5l3 2'/%3E%3C/svg%3E");
 }
 .me-icon-book {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5.5C9 3.5 5.5 3.5 2 4.5v15c3.5-1 7-1 10 1 3-2 6.5-2 10-1v-15c-3.5-1-7-1-10 1Zm0 0v15'/%3E%3C/svg%3E");
@@ -115,7 +57,7 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7h.01'/%3E%3C/svg%3E");
 }
 
-.me-icon-spark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z'/%3E%3C/svg%3E"); }
+.me-icon-spark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8b2ec' stroke-width='1.7' stroke-linejoin='round'%3E%3Cpath d='m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z'/%3E%3C/svg%3E"); }
 
 @media (max-width: 360px) {
   .me-profile-caption, .me-profile-action, .me-results-detail,
@@ -123,5 +65,5 @@
   .me-links .personal-link { font-size: 14px; }
 }
 
-.me-icon-medal { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b1bfc6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='m8 13-2 9 6-3 6 3-2-9M12 4.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2-1.6-1.6L11 6.5Z'/%3E%3C/svg%3E"); }
+.me-icon-medal { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5c68b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='m8 13-2 9 6-3 6 3-2-9M12 4.5l1 2 2.2.3-1.6 1.6.4 2.2-2-1-2 1 .4-2.2-1.6-1.6L11 6.5Z'/%3E%3C/svg%3E"); }
 .badge-equipped-count { margin: 12px 0; color: var(--accent, #e6c27a); font-weight: 600; }

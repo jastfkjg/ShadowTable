@@ -3,6 +3,7 @@ const funCopy = require("./fun-copy");
 const honorPresentation = require("./honors");
 const { canShareFun } = require("./share-card");
 const { switchHomeTab } = require("./tab-navigation");
+const { portrait } = require("./role-portraits");
 // Only reuse the immediately preceding personal page; never persist account data.
 function personalPreview(kind) {
   const pages = getCurrentPages();
@@ -22,14 +23,16 @@ function presentProfile(profile) {
 }
 function presentStats(stats) {
   stats = funCopy.response(stats);
-  const rate = row => ({ ...row, rateLabel: row.winRate === null ? "—" : row.winRate + "%",
+  const rate = row => ({ ...row, rateLabel: row.winRate == null ? "—" : row.winRate + "%",
     rateValue: row.winRate == null ? "—" : String(row.winRate), rateUnit: row.winRate == null ? "" : "%",
     scoreAverageLabel: row.score?.average == null ? "—" : row.score.average.toFixed(2) });
-  const byRole = (stats.byRole || []).map(rate);
   const factionOrder = { good: 0, evil: 1, third: 2, unknown: 3 };
+  const byRole = (stats.byRole || []).map(row => ({ ...rate(row), ...portrait(row.role, row.faction) }))
+    .sort((a, b) => (factionOrder[a.faction] ?? 9) - (factionOrder[b.faction] ?? 9) || b.total - a.total);
   return { ...rate(stats), fun: presentFun(stats.fun), score: stats.score || { total: 0, month: 0, games: 0, average: null }, byFaction: stats.byFaction.filter(row => row.total > 0)
     .sort((a, b) => (factionOrder[a.faction] ?? 9) - (factionOrder[b.faction] ?? 9))
-    .map(row => ({ ...rate(row), roles: byRole.filter(role => role.faction === row.faction), expanded: false })),
+    .map(row => ({ ...rate(row), shortLabel: ({ good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" })[row.faction] || row.label,
+      roles: byRole.filter(role => role.faction === row.faction), expanded: false })),
     byRole, roleCount: new Set(byRole.map(row => row.role)).size, byBoard: stats.byBoard.map(rate),
     recent: stats.recent.map(r => ({ ...r,
       dateLabel: new Date(r.endedAt).toLocaleString("zh-CN", { hour12: false }),
@@ -58,7 +61,21 @@ function presentFun(value) {
     const isDefense = card.id.endsWith(":defense");
     const isSurvival = card.id.endsWith(":survival");
     const isHonor = card.id.endsWith(":honor");
-    return { ...card, isHonor, metrics, roles, roleLabel: isDefense || card.id.endsWith(":kill") ? primary?.roleLabel || "" : "", icon: card.id.endsWith(":shield") ? "/assets/record-shield-good.svg" : card.id.endsWith(":knife") ? "/assets/record-sword.svg" : "",
+    // Presentation only: illustrations identify the skill family, never its recorded faction.
+    const visual = ({
+      survival: { icon: "/assets/record-heart.svg", iconTone: "purple" },
+      honor: { icon: "/assets/record-medal.svg", iconTone: "gold" },
+      shield: { icon: "/assets/record-shield-good.svg", iconTone: "green" },
+      kill: { icon: "/assets/record-swords.svg", iconTone: "blue" },
+      defense: { icon: "/assets/record-shield.svg", iconTone: "gold" },
+      merlin: { icon: portrait("梅林").portrait, iconTone: "portrait" },
+      percival: { icon: portrait("派西维尔").portrait, iconTone: "portrait" },
+      assassin: { icon: portrait("刺客").portrait, iconTone: "portrait" },
+      knife: { icon: portrait("蓝刀客·加雷斯").portrait, iconTone: "portrait" },
+      gun: { icon: portrait("猎人").portrait, iconTone: "portrait" },
+      duel: { icon: portrait("蓝骑士").portrait, iconTone: "portrait" },
+    })[card.id.split(":").pop()] || { icon: "/assets/record-spark.svg", iconTone: "purple" };
+    return { ...card, ...visual, isHonor, metrics, roles, roleLabel: isDefense || card.id.endsWith(":kill") ? primary?.roleLabel || "" : "",
       section: card.id.split(":")[0] + ":" + (isSurvival ? "survival" : isCombat || isDefense ? "combat" : "terminal"),
       sectionLabel: isSurvival ? "生存趣事" : isHonor ? "玩家票选" : isCombat || isDefense ? "轮内技能" : "终局表现",
       sampleNote: card.id.endsWith(":shield") ? "按最终刀统计" : "",
@@ -96,6 +113,7 @@ function presentMatches(records) {
         color: /_(ally|hit|bust|miss)$/.test(item.id) && !(item.positive ?? item.ranked) ? "evil" : "good" }));
     return {
       ...record,
+      rolePortrait: portrait(record.role, record.faction).portrait,
       honors: honorPresentation.present(record.honorResult, api.assetUrl),
       boardTitle: (record.boardName || "").replace(/\s*[（(]\s*(\d+)\s*人\s*[）)]\s*$/, (suffix, count) => Number(count) === Number(record.capacity) ? "" : suffix),
       expanded: false,

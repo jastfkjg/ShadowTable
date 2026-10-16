@@ -1,3 +1,4 @@
+const { portrait } = require("../../role-portraits");
 const signed = value => (value > 0 ? "+" : "") + value;
 function presentEntries(records) {
   return records.map(record => {
@@ -6,6 +7,8 @@ function presentEntries(records) {
     const valid = !Number.isNaN(date.getTime());
     const isMatch = record.type === "match";
     return { ...record, isMatch,
+      rolePortrait: isMatch && record.role ? portrait(record.role, record.faction).portrait : "",
+      pointsCompact: String(record.points).length > 6,
       title: isMatch ? record.boardName : "积分调整",
       pointsLabel: signed(record.points), negative: record.points < 0,
       dayKey: valid ? `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` : "unknown",

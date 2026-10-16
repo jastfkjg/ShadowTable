@@ -1,3 +1,4 @@
+const { portrait } = require("./role-portraits");
 const factions = { good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" };
 const actions = { knife: "出刀", duel: "决斗", detonate: "主动自爆并开枪", passiveGun: "预选被动枪",
   gun: "开枪", guard: "守护", substitute: "指定替死", swap: "换号", inspect: "查验", reflect: "反伤" };
@@ -7,6 +8,7 @@ const seats = list => list?.length ? list.map(n => n + "号").join("、") : "无
 const person = p => p ? p.seat + "号 " + (p.role || "身份未记录") : "未记录";
 const side = faction => factions[faction] || "未知";
 const player = (p, selfSeat) => ({ ...p, isSelf: p.seat === selfSeat,
+  rolePortrait: p.role ? portrait(p.role, p.faction).portrait : "",
   roleLabel: p.role || "未记录", factionLabel: side(p.faction) });
 const actorFields = p => ({ actorSeat: p?.seat || null, actorLabel: p?.role || "身份未记录" });
 const statistic = (id, value, label, tone = "neutral", unit = "张") => ({ id, value, label, tone, unit });

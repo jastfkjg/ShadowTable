@@ -110,6 +110,18 @@ test("生产 WXML 编译并显示真实复盘，个人视角和旧局不虚构�
   raw.status = "legacy"; raw.message = "旧对局未保存完整复盘"; raw.events = [];
   assert.match(JSON.stringify(render({ ...presentReplay(raw), loading: false })), /每轮过程未记录/);
 });
+test("复盘插画区分初始与最终身份，未知初始身份不根据最终角色补图或补阵营", () => {
+  const raw = fixture();
+  raw.initialPlayers[0] = { ...raw.initialPlayers[0], role: null, faction: "unknown" };
+  raw.finalPlayers[0] = { ...raw.finalPlayers[0], role: "刺客", faction: "good" };
+  const before = JSON.stringify(raw), shown = presentReplay(raw);
+  assert.equal(shown.initialPlayers[0].rolePortrait, "");
+  assert.equal(shown.initialPlayers[0].roleLabel, "未记录");
+  assert.equal(shown.initialPlayers[0].factionLabel, "未知");
+  assert.equal(shown.finalPlayers[0].rolePortrait, "/assets/roles/assassin.png");
+  assert.equal(shown.finalPlayers[0].factionLabel, "好人");
+  assert.equal(JSON.stringify(raw), before);
+});
 
 test("生产复盘展示线上投票和出牌明细、转换前后阵营、湖仙结果、抽牌及作废与盘刀结果", () => {
   const store = new Store(":memory:");

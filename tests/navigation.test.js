@@ -252,7 +252,7 @@ test('首页在同一窗口保留两个区域、表单和滚动位置，切回�
   p.onUnload();
 });
 
-test('我的入口首次只读个人数据，资料与记录预览仍从当前首页传给下一页', async () => {
+test('我的入口只读个人数据与牌桌摘要，资料与记录预览仍从当前首页传给下一页', async () => {
   const reads = [], pages = [];
   const api = { ...apiBase, request: async url => { reads.push(url); return url.endsWith('/profile') ? profile
     : url.endsWith('/stats') ? emptyStats : { records: [], total: 0, hasMore: false }; } };
@@ -260,7 +260,7 @@ test('我的入口首次只读个人数据，资料与记录预览仍从当前�
   p.route = 'pages/me/me'; pages.push(p); p.onLoad(); await p.onShow();
   assert.equal(p.data.activeTab, 1);
   assert.ok(!reads.includes('/api/boards'));
-  assert.ok(!reads.includes('/api/me/rooms'));
+  assert.equal(reads.filter(url => url === '/api/me/rooms').length, 1);
   const { p: editor } = page('profile', api, { pages: [p, {}] });
   const loading = editor.onLoad();
   assert.equal(editor.data.nickname, '林间');
@@ -1049,7 +1049,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|stats-pressed|stats-role-pressed|rank-pressed|rank-row-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -1074,8 +1074,8 @@ test('新页面模板编译，资料与战绩只出现在个人页面，牌桌�
   const editor=JSON.stringify(factory('pages/profile/profile.wxml')({profile:{},nickname:'林间',avatarPreview:'',initial:'林'}));
   assert.doesNotMatch(editor,/"openType":"chooseAvatar"|bindchooseavatar|avatar-canvas|上传头像/); assert.match(editor,/formType/);
   assert.match(editor,/选择头像/);
-  const expandedStats=JSON.stringify(renderStatsShell(factory)({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%',expanded:true,roles:[{role:'梅林',total:2,wins:1,rateLabel:'50%'}]}]}}));
-  assert.match(expandedStats,/梅林/); assert.match(expandedStats,/阵营与角色/);
+  const expandedStats=JSON.stringify(renderStatsShell(factory)({tab:'records',stats:{total:2,wins:1,rateLabel:'50%',excluded:0,byRole:[{role:'梅林',roleKey:'good:梅林',faction:'good',total:2,wins:1,rateLabel:'50%'}],byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,rateLabel:'50%'}]}}));
+  assert.match(expandedStats,/梅林/); assert.match(expandedStats,/角色战绩/);
   const matches=JSON.stringify(renderHistoryShell(factory)({records:[{id:'one',dateLabel:'今天',boardName:'经典',capacity:6,role:'梅林',factionLabel:'好人',outcomeLabel:'胜利',outcome:'win',expanded:true,membersExpanded:true,winner:'good',winnerLabel:'好人',sourceLabel:'房主登记',members:[{seat:1,name:'林间',isSelf:true}]}],total:1,hasMore:false}));
   assert.match(matches,/同桌成员/); assert.match(matches,/林间/);
   const emptyMatches=JSON.stringify(renderHistoryShell(factory)({loading:false,error:'',records:[],total:0}));
@@ -2010,4 +2010,51 @@ test('徽章页忽略离开后的响应，保存失败清空旧资格并可刷�
   await p.toggleOwnedBadge({currentTarget:{dataset:{id:'points'}}});
   assert.equal(p.data.badgeCollection,null); assert.match(p.data.badgeManagerError,/刷新/);
   await p.loadBadgeManager(); assert.equal(p.data.badgeCollection.ownedCount,1);
+});
+
+test('我的牌桌摘要不阻塞资料，优先已入座的进行中牌桌，忽略过期返回和失效房间', async () => {
+  const oldRooms=deferred(); let roomReads=0;
+  const room=(code,status,extra={})=>({code,status,available:true,isMember:true,capacity:12,boardName:'阿瓦隆 · 十二骑士',seat:null,lastEnteredAt:1,...extra});
+  const {p}=page('me',{...apiBase,request:async url=>{
+    if(url==='/api/me/rooms') return ++roomReads===1?oldRooms.promise:{rooms:[room('111111','playing'),room('222222','playing',{seat:4,lastEnteredAt:9}),room('333333','lobby',{seat:2,lastEnteredAt:99}),room('444444','playing',{seat:1,available:false,lastEnteredAt:999}),room('555555','playing',{seat:1,isMember:false,lastEnteredAt:999})]};
+    return url.endsWith('/profile')?profile:url.endsWith('/stats')?emptyStats:{records:[],total:0};
+  }});
+  await p.load(); assert.equal(p.data.loading,false); assert.equal(p.data.profile.displayName,'林间'); assert.equal(p.data.currentRoom,null);
+  await p.load(); await new Promise(setImmediate);
+  assert.equal(p.data.currentRoom.code,'222222'); assert.equal(p.data.currentRoom.relationLabel,'我在 4 号');
+  oldRooms.resolve({rooms:[room('666666','playing',{seat:1,lastEnteredAt:9999})]}); await new Promise(setImmediate);
+  assert.equal(p.data.currentRoom.code,'222222');
+  p.onUnload();
+});
+
+test('统计角色按最终阵营筛选，详情保留零分、负分与完整角色名称，刷新重读详情', async () => {
+  let version=0;
+  const data=()=>({...emptyStats,total:3,wins:1,winRate:33.3,
+    byFaction:[{faction:'good',label:'好人阵营',total:2,wins:1,losses:1,winRate:50},{faction:'evil',label:'坏人阵营',total:1,wins:0,losses:1,winRate:0}],
+    byRole:[{role:'蓝刀客·加赫雷斯',faction:'good',total:2,wins:1,winRate:50,score:{total:version?-2:0,games:1,average:version?-2:0}},
+      {role:'蓝刀客·加赫雷斯',faction:'evil',total:1,wins:0,winRate:0}]});
+  const {p}=page('stats',{...apiBase,request:async()=>data()});
+  await p.load(); assert.equal(p.data.roleRows.length,2);
+  assert.notEqual(p.data.roleRows[0].roleKey,p.data.roleRows[1].roleKey);
+  p.filterRoles({currentTarget:{dataset:{faction:'evil'}}}); assert.equal(p.data.roleRows.length,1); assert.equal(p.data.roleRows[0].faction,'evil');
+  p.filterRoles({currentTarget:{dataset:{faction:'invalid'}}}); assert.equal(p.data.roleFilter,'evil');
+  p.filterRoles({currentTarget:{dataset:{faction:'good'}}});
+  p.openRoleDetails({currentTarget:{dataset:{key:p.data.roleRows[0].roleKey}}});
+  assert.equal(p.data.statsDetail.title,'蓝刀客·加赫雷斯'); assert.equal(p.data.statsDetail.score.total,0); assert.equal(p.data.statsDetail.scoreAverageLabel,'0.00');
+  version++; await p.load(); assert.equal(p.data.roleFilter,'good'); assert.equal(p.data.statsDetail.score.total,-2);
+  p.closeStatsDetails(); assert.equal(p.data.statsDetail,null);
+  p.openFactionDetails({currentTarget:{dataset:{faction:'good'}}}); assert.equal(p.data.statsDetail.rateLabel,'50%'); assert.equal(p.data.statsDetail.losses,1);
+});
+
+test('统计详情返回只关闭面板，切页保持筛选和浏览位置，角色被更正移除后关闭旧详情', async () => {
+  let empty=false;
+  const stats={...emptyStats,total:1,wins:1,winRate:100,byFaction:[{faction:'third',label:'盗贼阵营',total:1,wins:1,losses:0,winRate:100}],byRole:[{role:'蓝盗贼',faction:'third',total:1,wins:1,winRate:100}]};
+  const {p,navigations}=page('stats',{...apiBase,request:async url=>url.includes('/stats')?(empty?emptyStats:stats):{records:[],total:0,hasMore:false}},{home:true});
+  await p.onLoad();p.filterRoles({currentTarget:{dataset:{faction:'third'}}});
+  p.rememberScroll({currentTarget:{dataset:{tab:'records'}},detail:{scrollTop:260}});
+  const open=()=>p.openRoleDetails({currentTarget:{dataset:{key:p.data.statistics.roleRows[0].roleKey}}});
+  open();p.back();assert.equal(p.data.statistics.statsDetail,null);assert.equal(navigations.length,0);assert.equal(p.scrollPositions.records,260);
+  open();await p.switchPanel('matches');assert.equal(p.data.statistics.statsDetail,null);
+  await p.switchPanel('records');assert.equal(p.data.statistics.roleFilter,'third');assert.equal(p.data.scrollTops.records,260);
+  open();empty=true;await p.load();assert.equal(p.data.statistics.statsDetail,null);assert.equal(p.data.statistics.roleFilter,'all');assert.equal(p.data.statistics.roleRows.length,0);
 });
