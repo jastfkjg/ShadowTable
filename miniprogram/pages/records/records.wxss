@@ -1,4 +1,3 @@
-@import "../../share-entry.wxss";
 @import "../stats/panel.wxss";
 @import "../matches/panel.wxss";
 .records-shell { --records-line: rgba(177,191,198,.16); --records-selected: #30404a; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; }

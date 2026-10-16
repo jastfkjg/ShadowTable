@@ -324,17 +324,7 @@ test('独立页面通过原入口返回时指定目标区域，旧首页的选�
   assert.equal(appState.homeTabRequest, undefined);
   home.onUnload();
 });
-test('分享入口只传内容选择，拦截旧预览和读取失败，不传个人成绩或内部标识', () => {
-  const {p,navigations}=page('stats',apiBase);
-  p.setData({loading:true,stats:{total:10}});p.shareStats();assert.equal(navigations.length,0);
-  p.setData({loading:false,error:'网络错误'});p.shareStats();assert.equal(navigations.length,0);
-  p.setData({error:'',stats:{total:10,fun:{cards:[{id:'classic:merlin',shareMetric:'merlin_evade'}]}}});
-  p.shareStats();p.shareFun({currentTarget:{dataset:{card:'classic:merlin'}}});
-  assert.equal(navigations[0],'/pages/share/share?kind=stats');
-  const query=new URL('https://example.test'+navigations[1]).searchParams;
-  assert.equal(query.get('card'),'classic:merlin');assert.equal(query.get('metric'),'merlin_evade');
-  const rawOptions=Object.fromEntries(navigations[1].split('?')[1].split('&').map(item=>item.split('=')));
-  assert.equal(require('../miniprogram/share-card').parseSelection(rawOptions).card,'classic:merlin');
+test('榜单分享入口只传内容选择，拦截读取失败，不传个人成绩或内部标识', () => {
   const ranking=page('leaderboard',apiBase);
   ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_kill_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});
   ranking.p.shareLeaderboard();
@@ -1639,33 +1629,6 @@ test('小程序按刺客状态跳过带刀步骤，无刺客板子仍要求选�
   }
 });
 
-test('趣味记录页顶部分享入口生成完整分享，单项入口仍保留，未知或读取失败时禁止分享',()=>{
-  const {p,navigations}=page('stats',apiBase);
-  p.setData({tab:'fun',loading:false,error:'',stats:{fun:{shareable:true,cards:[{id:'knights:knife',shareMetric:'knife_enemy'}]}}});
-  p.shareStats();assert.equal(navigations[0],'/pages/share/share?kind=funSummary');
-  p.shareFun({currentTarget:{dataset:{card:'knights:knife'}}});assert.match(navigations[1],/kind=fun&card=knights%3Aknife&metric=knife_enemy/);
-  p.data.stats.fun.shareable=false;p.shareStats();assert.equal(navigations.length,2);
-  p.data.stats.fun.shareable=true;p.data.error='读取失败';p.shareStats();assert.equal(navigations.length,2);
-});
-
-test('趣味卡片更多菜单确认后才分享，取消、页面退出和读取失败均不跳转', () => {
-  const menus = [];
-  const { p, navigations } = page('stats', apiBase, { wx: { showActionSheet: options => menus.push(options) } });
-  const event = { currentTarget: { dataset: { card: 'knights:knife' } } };
-  p.setData({ loading: false, error: '', stats: { fun: { cards: [{ id: 'knights:knife', shareMetric: 'knife_enemy' }] } } });
-  p.openFunMenu(event); p.openFunMenu(event);
-  assert.equal(menus.length, 1); assert.equal(navigations.length, 0);
-  assert.equal(menus[0].itemList[0], '分享这张记录');
-  menus[0].complete(); // Native cancel only completes the action sheet.
-  assert.equal(navigations.length, 0);
-  p.openFunMenu(event); menus[1].success({ tapIndex: 0 }); menus[1].complete();
-  assert.match(navigations[0], /kind=fun&card=knights%3Aknife&metric=knife_enemy/);
-  p.openFunMenu(event); p.onUnload(); menus[2].success({ tapIndex: 0 }); menus[2].complete();
-  assert.equal(navigations.length, 1);
-  p.alive = true; p.data.error = '读取失败'; p.openFunMenu(event);
-  assert.equal(menus.length, 3);
-});
-
 test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠状态，只首次进入读取数据', async () => {
   const reads = [], legacy = require('./helpers/fun-copy-fixtures');
   const api = { ...apiBase, request: async url => {
@@ -1682,17 +1645,15 @@ test('战绩三个页签在同页保留筛选、详情、滚动位置和折叠�
   await p.historyConfirmFilters();
   p.historyToggleRecord({ currentTarget: { dataset: { id: legacy.match.id } } });
   p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 350 } });
-  p.shareStats(); assert.equal(navigations.length, 0);
-  await p.switchPanel('fun'); p.toggleFunRules();
+  await p.switchPanel('fun');
   p.rememberScroll({ currentTarget: { dataset: { tab: 'fun' } }, detail: { scrollTop: 90 } });
   await p.switchPanel('matches');
   assert.equal(p.data.history.filters.matchRole, '魔术师'); assert.equal(p.data.history.records[0].expanded, true);
   assert.equal(p.data.scrollTops.matches, 350);
   await p.switchPanel('records'); assert.equal(p.data.scrollTops.records, 180);
-  await p.switchPanel('fun'); assert.equal(p.data.scrollTops.fun, 90); assert.equal(p.data.statistics.funRulesExpanded, true);
+  await p.switchPanel('fun'); assert.equal(p.data.scrollTops.fun, 90);
   assert.equal(reads.filter(url => url.includes('/stats')).length, 1); assert.equal(reads.length, 3);
   assert.equal(navigations.length, 0);
-  p.shareStats(); assert.equal(navigations[0], '/pages/share/share?kind=funSummary');
   await p.switchPanel('matches'); p.historyToggleFilters(); p.back();
   assert.equal(p.data.tab, 'matches'); assert.equal(p.data.history.filtersExpanded, false);
   p.historyToggleFilters(); await p.switchPanel('records');

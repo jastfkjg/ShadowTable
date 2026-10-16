@@ -211,8 +211,11 @@ test('战绩区分未计分与零分计分局，没有计分局也保留独立�
   assert.doesNotMatch(zeroPoints, /连胜/);
   assert.match(zeroPoints, /1 局计分.*场均 0.00/);
   const details = text(renderStats({loading:false,tab:'records',stats,statsDetail:{...role,kind:'role',title:role.role,score:scored,scoreAverageLabel:'0.00'}}));
-  assert.match(details,/累计积分 0 分/);
-  assert.match(details,/场均积分 0.00/);
+  assert.doesNotMatch(details,/累计积分|场均积分|查看战绩与积分/);
+  assert.match(details,/派西维尔/);
+  const factionDetails = text(renderStats({loading:false,tab:'records',stats,statsDetail:{...faction,kind:'faction',title:faction.label,score:scored,scoreAverageLabel:'0.00'}}));
+  assert.match(factionDetails,/累计积分 0 分/);
+  assert.match(factionDetails,/场均积分 0.00/);
 
   for (const total of [-5, 5]) {
     const adjusted = show({ ...stats, score: { ...score, total } });
@@ -1377,15 +1380,18 @@ test('登记首页显示不计战绩，其他方式仅登记胜方，删去重�
   assert.ok(byHandler(otherFooter, 'toggleResultOther'));
 });
 
-test('趣味记录页顶部显示完整分享入口，暂无完整记录时隐藏，单项分享仍可使用',()=>{
-  const renderStats=renderStatsShell;
-  const data={tab:'fun',loading:false,error:'',stats:{total:0,fun:{available:true,shareable:true,cards:[{id:'knights:knife',title:'刀客刀法',metrics:[],roles:[],shareMetric:'knife_enemy',shareLabel:'刀中敌方'}]}}};
-  const ready=renderStats(data),nav=nodes(ready).find(node=>node.tag==='wx-app-nav');
-  assert.ok(!nav.attr.share);assert.equal(byHandler(ready,'shareStats').attr.ariaLabel,'分享完整趣味记录图片');
-  assert.ok(byHandler(ready,'openFunMenu'));
-  assert.ok(byHandler(ready,'toggleFunRules'));
-  const empty=renderStats({...data,stats:{...data.stats,fun:{...data.stats.fun,shareable:false}}});
-  assert.ok(!byHandler(empty,'shareStats'));
+test('统计与趣味记录页移除顶部说明、分享和卡片更多菜单，保留次数回查',()=>{
+  const { presentStats } = require('../miniprogram/profile');
+  const fixture = require('./helpers/fun-copy-fixtures');
+  const stats = presentStats(fixture.stats);
+  for (const tab of ['records', 'fun']) {
+    const tree = renderStatsShell({tab,loading:false,error:'',stats});
+    assert.ok(!byHandler(tree,'shareStats'));
+    assert.ok(!byHandler(tree,'openFunMenu'));
+    assert.ok(!byHandler(tree,'toggleFunRules'));
+    assert.ok(!nodes(tree).some(node=>node.attr?.class?.includes('records-scope')));
+    assert.ok(byHandler(tree,'openFunMatches'));
+  }
 });
 
 test('筛选弹层在滚动区域外，关闭时不渲染，展示时锁定列表滚动并显示草稿选项', () => {
@@ -1432,7 +1438,7 @@ test('趣味页按玩法和终局／轮内技能分组，保持全部指标与�
   assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-card').length,3);
 });
 
-test('趣味精简卡片保留称号与未知次数，释义仅在顶部说明展开后显示', () => {
+test('趣味精简卡片保留称号、未知次数和回查，移除释义说明', () => {
   const { presentFun } = require('../miniprogram/profile');
   const metric = { mode:'knights', unit:'次', count:0, opportunities:0, rate:null, knownGames:1, unknownGames:0, positive:true, ranked:true, byRole:[] };
   const fun = presentFun({ legacyGames:1, cards:[{ id:'knights:survival', metrics:[
@@ -1441,15 +1447,11 @@ test('趣味精简卡片保留称号与未知次数，释义仅在顶部说明�
   assert.equal(fun.cards[0].sectionTitle, '');
   assert.equal(fun.cards[0].headerNote, '');
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
-  const compact = renderStatsShell({ tab:'fun', stats:{fun}, funRulesExpanded:false });
+  const compact = renderStatsShell({ tab:'fun', stats:{fun} });
   assert.match(textOf(compact), /—我在阿瓦隆玩重生.*0全民公敌/);
   assert.doesNotMatch(textOf(compact), /复活按实际回场|缺失数据|按实际发生次数/);
-  const expanded = renderStatsShell({ tab:'fun', stats:{fun}, funRulesExpanded:true });
-  assert.equal(byHandler(expanded, 'toggleFunRules').attr.ariaExpanded, true);
-  assert.match(textOf(expanded), /复活按实际回场/);
-  assert.match(textOf(expanded), /我在阿瓦隆玩重生：复活/);
-  assert.match(textOf(expanded), /1 局旧对局/);
-  assert.equal(nodes(expanded).filter(n => n.attr?.bindtap === 'openFunMatches').length, 2);
+  assert.ok(!byHandler(compact, 'toggleFunRules'));
+  assert.equal(nodes(compact).filter(n => n.attr?.bindtap === 'openFunMatches').length, 2);
 });
 test('积分页只有真实空数据才显示空态，按北京日期分组，调整不可点，对局可点且零分不遗漏', () => {
   const { presentEntries } = require('../miniprogram/pages/scores/presentation');
@@ -1665,7 +1667,7 @@ test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示�
   const stats=presentStats({total:1,wins:1,byFaction:[],byRole:[],byBoard:[],recent:[],fun:fun.aggregate(rows)});
   const text=JSON.stringify(renderStatsShell({tab:'fun',stats}));
   assert.match(text,/最强 MVP/);assert.match(text,/最强 SVP/);assert.doesNotMatch(text,/按获奖局数统计/);
-  assert.match(JSON.stringify(renderStatsShell({tab:'fun',stats,funRulesExpanded:true})),/按获奖局数统计/);assert.doesNotMatch(text,/成功率/);
+  assert.doesNotMatch(text,/成功率/);
   const presentation=require('../miniprogram/leaderboard-presentation');
   for(const metric of ['fun_honor_mvp','fun_honor_svp']) {
     const board=presentation.presentBoard({fun:true,countOnly:true,metric,sort:'count',period:'all',unit:'次',availableFunMetrics:fun.publicMetrics(),rows:[],me:{knownGames:1,count:1,status:'ranked',rank:1}});

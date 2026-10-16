@@ -83,9 +83,6 @@ module.exports = function createRecordsPage(initialTab = "records") {
       if (this.data.statistics.loading || this.data.statistics.error) return;
       wx.navigateTo({ url: "/pages/scores/scores" });
     },
-    shareStats() {
-      if (this.data.tab !== "matches") return this.statisticsController.shareStats();
-    },
     historyClearFunFilter() {
       if (this.historyController.fetching) return;
       this.setData({ historyFromFun: false });
@@ -107,7 +104,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
       this.historyController?.onUnload();
     },
   };
-  const excluded = new Set(["onLoad", "onUnload", "back", "chooseTab", "shareStats"]);
+  const excluded = new Set(["onLoad", "onUnload", "back", "chooseTab"]);
   for (const name of Object.keys(statistics)) {
     if (typeof statistics[name] === "function" && !excluded.has(name))
       page[name] = function(...args) { return this.statisticsController[name](...args); };

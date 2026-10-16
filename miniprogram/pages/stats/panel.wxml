@@ -3,7 +3,6 @@
   <view wx:if="{{loading && !stats}}" class="status" role="status">正在读取战绩…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="stats-pressed" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
-    <view class="records-scope"><text>全部有效对局</text><button wx:if="{{stats.total}}" class="records-share" hover-class="stats-pressed" bindtap="shareStats" disabled="{{loading || !!error}}" aria-label="分享战绩图片"><image src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button></view>
     <view class="overview-card" aria-label="战绩概览">
       <view class="overview-metrics">
         <view class="overview-metric"><view class="overview-value {{stats.total >= 10000 ? 'stats-number-compact' : ''}}">{{stats.total}}</view><text class="overview-label">对局</text></view>
@@ -30,7 +29,7 @@
           </button>
         </view>
         <view wx:if="{{roleRows && !roleRows.length}}" class="stats-roles-empty">该阵营暂无角色战绩</view>
-        <view class="stats-role-hint">点击角色，查看战绩与积分</view>
+        <view class="stats-role-hint">点击角色，查看战绩</view>
       </view>
       <view class="stats-scope-note">胜率按结算时的角色与阵营统计</view>
     </view>
@@ -48,10 +47,10 @@
         <view class="stats-detail-identity"><view class="stats-detail-title">{{statsDetail.title}}</view><view class="stats-detail-caption"><block wx:if="{{statsDetail.kind==='role'}}">{{statsDetail.factionLabel}} · </block>全部有效对局</view></view>
         <button class="stats-detail-close" hover-class="stats-pressed" bindtap="closeStatsDetails" aria-label="关闭战绩详情">×</button>
       </view>
-      <scroll-view class="stats-detail-body" scroll-y="{{true}}" show-scrollbar="{{false}}">
+      <scroll-view class="stats-detail-body {{statsDetail.kind==='role'?'stats-detail-body-compact':''}}" scroll-y="{{true}}" show-scrollbar="{{false}}">
         <view class="stats-detail-metrics"><view><view class="stats-detail-number">{{statsDetail.total}}</view><text>对局</text></view><view><view class="stats-detail-number accent">{{statsDetail.rateLabel}}</view><text>胜率</text></view><view><view class="stats-detail-number">{{statsDetail.wins}}</view><text>胜场</text></view></view>
         <view class="stats-detail-record">{{statsDetail.wins}} 胜 · {{statsDetail.losses}} 负<text wx:if="{{statsDetail.excluded}}"> · {{statsDetail.excluded}} 局未计入</text></view>
-        <view class="stats-detail-score"><view class="stats-detail-score-row"><text>累计积分</text><text>{{statsDetail.score.total}} 分</text></view><block wx:if="{{statsDetail.score.games}}"><view class="stats-detail-score-row"><text>计分对局</text><text>{{statsDetail.score.games}} 局</text></view><view class="stats-detail-score-row"><text>场均积分</text><text>{{statsDetail.scoreAverageLabel}}</text></view></block><view wx:else class="stats-detail-caption">暂无计分对局</view></view>
+        <view wx:if="{{statsDetail.kind==='faction'}}" class="stats-detail-score"><view class="stats-detail-score-row"><text>累计积分</text><text>{{statsDetail.score.total}} 分</text></view><block wx:if="{{statsDetail.score.games}}"><view class="stats-detail-score-row"><text>计分对局</text><text>{{statsDetail.score.games}} 局</text></view><view class="stats-detail-score-row"><text>场均积分</text><text>{{statsDetail.scoreAverageLabel}}</text></view></block><view wx:else class="stats-detail-caption">暂无计分对局</view></view>
       </scroll-view>
       <button class="primary stats-detail-done" hover-class="stats-pressed" bindtap="closeStatsDetails">完成</button>
     </view>

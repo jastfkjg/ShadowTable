@@ -1,6 +1,5 @@
 const api = require("../../api");
 const { presentStats, presentFun, backToMe, personalPreview } = require("../../profile");
-const { queryString } = require("../../share-card");
 function preserveFactions(stats, previous) {
   return { ...stats, byFaction: stats.byFaction.map(row => {
     const old = previous?.byFaction?.find(item => item.faction === row.faction);
@@ -24,7 +23,7 @@ function detail(row, kind) {
     scoreAverageLabel: row.scoreAverageLabel || "—" };
 }
 module.exports = function createController() { return {
-  data: { loading: true, error: "", stats: null, funRulesExpanded: false, tab: "records", funRoles: {},
+  data: { loading: true, error: "", stats: null, tab: "records", funRoles: {},
     roleFilter: "all", roleRows: null, statsDetail: null },
   onLoad(options = {}) {
     this.alive = true;
@@ -52,32 +51,6 @@ module.exports = function createController() { return {
     catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
-  shareStats() {
-    if (this.data.tab === "fun") return this.shareFunSummary();
-    if (this.data.loading || this.data.error || !this.data.stats?.total) return;
-    wx.navigateTo({ url: "/pages/share/share?kind=stats" });
-  },
-  shareFunSummary() {
-    if (this.data.loading || this.data.error || !this.data.stats?.fun?.shareable) return;
-    wx.navigateTo({ url: "/pages/share/share?kind=funSummary" });
-  },
-  shareFun(event) {
-    if (this.data.loading || this.data.error) return;
-    const card = this.data.stats?.fun.cards.find(row => row.id === event.currentTarget.dataset.card);
-    if (card?.shareMetric) wx.navigateTo({ url: "/pages/share/share?" + queryString({ kind: "fun", card: card.id, metric: card.shareMetric }) });
-  },
-  openFunMenu(event) {
-    if (this.data.loading || this.data.error || this.funMenuOpen) return;
-    const card = this.data.stats?.fun.cards.find(row => row.id === event.currentTarget.dataset.card);
-    if (!card?.shareMetric) return;
-    this.funMenuOpen = true;
-    wx.showActionSheet({
-      itemList: ["分享这张记录"],
-      success: result => { if (this.alive && result.tapIndex === 0) this.shareFun(event); },
-      complete: () => { this.funMenuOpen = false; },
-    });
-  },
-  toggleFunRules() { this.setData({ funRulesExpanded: !this.data.funRulesExpanded }); },
   filterRoles(event) {
     const filter = event.currentTarget.dataset.faction;
     if (filter !== "all" && !this.data.stats?.byFaction.some(row => row.faction === filter)) return;
