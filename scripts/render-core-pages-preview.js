@@ -9,15 +9,17 @@ const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures
 const { presentReplay, trajectory } = require("../miniprogram/replay");
 const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
+const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
+const { presentRoleGroups, fitBody } = require("../miniprogram/room-sheet-presentation");
 const root = path.resolve(__dirname, "../miniprogram");
-const output = path.resolve(__dirname, "../output/playwright/core-pages-implemented");
+const output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/core-pages-implemented"));
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
 const safe = value => String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const css = file => fs.readFileSync(path.join(root, file), "utf8")
   .replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name))))
-  .replace(/(^|[\s>+~])(text|image|picker)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + ({ text: "span", image: "img", picker: "div" })[tag])
+  .replace(/(^|[\s>+~])(text|image|picker|scroll-view|view)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + ({ text: "span", image: "img", picker: "div", view: "div", "scroll-view": "div" })[tag])
   .replace(/^page\s*\{/m, "body {").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
@@ -46,6 +48,8 @@ function write(name, file, data, styles, extra = "") {
   fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>桌边助手 · ${name} · 实际模板</title><style>${projection}${common}${styles}</style>${rendered}${extra}<div class="preview-homebar"></div></html>`);
   scenes.push(name);
 }
+// Browser projection of the native selector-query measurement, not app behavior.
+const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
 const store = new Store(":memory:");
 let raw, online;
 try {
@@ -102,14 +106,48 @@ const homeScenes = {
   "home-keyboard": { entrySheet: true, entryMode: "join", entryKeyboardHeight: 320, entryFocusedField: "code", code: "2013", name: "子龙", nicknameSetup: false },
   "home-long": { memberRooms: [...rooms, ...rooms], visibleMemberRooms: [room("201375", "playing", "12/12 人已入座 · 3人准备", "房主：昵称较长的玩家名字测试 · 我在12号", "2026/10/16 15:50", { note: "这是一个用于检查窄屏长备注换行的牌桌记录", boardName: "阿瓦隆 · 十二骑士与扩展角色配置测试（12人）" })] },
 };
+function entryScene(capacity, boardId, extra = {}) {
+  const page = createTable({ lobby: true });
+  page.data = { ...page.data, boards: BOARDS };
+  page.setData = (values, callback) => { Object.assign(page.data, values); callback?.(); };
+  page.selectCapacity(capacity);
+  page.pickBoard({ currentTarget: { dataset: { index: page.data.availableBoards.findIndex(board => board.id === boardId) } } });
+  return { ...page.data, loading:false, serverConnected:true, entrySheet:true, entryMode:'create', nicknameSetup:false,
+    name:'子龙', entryAvatarUrl:'/pages/profile/assets/avatars/crayon-07.jpg', ...extra };
+}
+Object.assign(homeScenes, {
+  'entry-join': entryScene(6,'classic',{entryMode:'join'}),
+  'entry-code': entryScene(6,'classic',{entryMode:'join',code:'062819',entryFocusedField:'code'}),
+  'entry-join-error': entryScene(6,'classic',{entryMode:'join',code:'062',entryCodeError:'请输入完整的 6 位数字房间码'}),
+  'entry-new-player': entryScene(6,'classic',{entryMode:'join',name:'',nicknameSetup:true,entryNameError:'请填写昵称'}),
+  'entry-create6': entryScene(6,'classic'), 'entry-create12': entryScene(12,'knights'),
+  'entry-classic12': entryScene(12,'classic-court'), 'entry-chaos12': entryScene(12,'chaos'),
+  'entry-create13': entryScene(13,'knights-13'),
+  'entry-keyboard': entryScene(12,'knights',{entryKeyboardHeight:320,entryFocusedField:'nickname'}),
+  'entry-pending': entryScene(12,'knights',{hasPendingRequest:true,entryError:'请求尚未确认，请等待连接恢复'}),
+  'entry-long': entryScene(12,'knights',{name:'昵称较长的玩家名字测试',entryNameError:'昵称未能保存，请检查网络后重试'}),
+});
 for (const [name, data] of Object.entries(homeScenes)) {
   const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...data };
   const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, entrySheetVisible: lobby.entrySheet, list: [
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
     { pagePath: "pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },
   ] }));
-  write(name, "pages/lobby/lobby.wxml", { activeTab: 0, lobby, personal: {} }, css("pages/lobby/lobby.wxss") + css("custom-tab-bar/index.wxss") + ".tab-bar{height:78px;padding-bottom:28px}", tabs);
+  write(name, "pages/lobby/lobby.wxml", { activeTab: 0, lobby, personal: {} }, css("pages/lobby/lobby.wxss") + css("custom-tab-bar/index.wxss") + ".tab-bar{height:78px;padding-bottom:28px}.entry-sheet-footer{padding-bottom:40px}.entry-sheet.has-keyboard .entry-sheet-footer{padding-bottom:12px}.preview-homebar{z-index:1200}", tabs + sheetProjection);
 }
+for (const [name, boardId, capacity, extra] of [
+  ['configuration','knights',12,{}], ['configuration-classic','classic',6,{}],
+  ['configuration-chaos','chaos',12,{}], ['configuration-unscored','classic',6,{testRoom:false,scoreSettings:{enabled:false},scoreNotice:'本局未开启计分'}],
+  ['configuration-notice','knights',12,{scoreNotice:'本局为测试房间；陪测仅用于验证流程，不计入个人战绩、积分及排行榜。'}],
+]) {
+  const source = newRoom('201375','host','子龙',boardId,capacity);
+  for (let i=2;i<=capacity;i++) enter(source,'player-'+i,'陪测'+(i-1));
+  const room = {...publicView(source,'host'),testRoom:true,scoreSettings:{enabled:true},...extra};
+  const page = {...createTable().data,loading:false,room,showRoomRules:true,roomRoleGroups:presentRoleGroups(room.roleConfiguration),
+    seats:room.players.map(player=>({...player,occupied:true,mine:player.seat===1,host:player.seat===1,avatarInitial:player.name[0]})),seatOccupiedCount:capacity,seatReadyCount:0};
+  write(name,'pages/table/table.wxml',page,'.room-rules-sheet-footer{padding-bottom:40px}.preview-homebar{z-index:1200}',sheetProjection);
+}
+fs.writeFileSync(path.join(output,'room-sheets-gallery.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><title>桌边助手 · 房间弹层实际模板</title><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:32px 44px 24px;width:1632px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:26px}header strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;font-weight:500;margin:0 0 13px}h2 span{color:#e5c68b;margin-right:10px;font-size:12px}iframe{display:block;width:390px;height:1100px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色弹层 · 实际页面模板</span></header><div class="screens">${[['entry-join','加入房间'],['entry-create6','创建房间 · 6 人'],['entry-create12','创建房间 · 12 人'],['configuration','角色配置']].map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>紧凑人数选择 · 按阵营展示角色 · 底部操作固定 · 示例数据</p></main></html>`);
 fs.writeFileSync(path.join(output, "scenes.json"), JSON.stringify(scenes, null, 2));
 fs.writeFileSync(path.join(output, "gallery.html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><title>桌边助手 · 实际页面</title><style>body{margin:0;background:#09141c;color:#f2eee5;font:15px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}.board{width:1230px;padding:32px 48px 24px}.heading{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}.heading strong{font-size:25px}.heading span{font-size:12px;color:#b1bfc6}.screens{display:flex;gap:28px}h2{margin:0 0 12px;font-size:14px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px;font-size:12px}iframe{display:block;width:390px;height:1135px;border:1px solid #344752;border-radius:28px;background:#101c24}.note{margin-top:20px;color:#b1bfc6;font-size:11px}</style><main class="board"><header class="heading"><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${[["replay", "对局复盘"], ["scores", "积分明细"], ["home", "首页"]].map(([name, title], index) => `<section><h2><span>0${index + 1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join("")}</div><p class="note">保留现有功能与统计口径 · 示例数据 · 牌桌页面保持原样</p></main></html>`);
 console.log("Production WXML projections: " + output + " (" + scenes.length + " scenes)");

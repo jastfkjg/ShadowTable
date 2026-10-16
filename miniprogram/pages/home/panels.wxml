@@ -1,3 +1,4 @@
+<import src="./role-groups.wxml" />
 <import src="../table/shared.wxml" />
 <template name="lobbyPanel">
   <include src="../table/shared.wxml" />

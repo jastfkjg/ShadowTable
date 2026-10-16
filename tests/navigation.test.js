@@ -1060,7 +1060,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   assert.ok(disclosures>=10);
   const styles=fs.readFileSync(path.join(root,'app.wxss'),'utf8');
   assert.match(styles,/button\.disclosure-button:not\(\[disabled\]\):active\s*\{\s*opacity:\s*1;/);
-  const homeStyles=fs.readFileSync(path.join(root,'pages/home/home.wxss'),'utf8');
+  const homeStyles=fs.readFileSync(path.join(root,'pages/home/home.wxss'),'utf8')+fs.readFileSync(path.join(root,'pages/home/room-sheets.wxss'),'utf8');
   assert.match(homeStyles,/\.entry-option-pressed\s*\{\s*opacity:\s*\.78;/);
 });
 test('新页面模板编译，资料与战绩只出现在个人页面，牌桌无底部导航内容', () => {
@@ -1831,6 +1831,36 @@ test('首页入口按需展开，关闭保留草稿且清理键盘；原生键�
   assert.equal(p.data.entryFocusedField, '');
 });
 
+test('创建和加入面板的昵称编辑按钮聚焦原生输入框，保留草稿并遵守请求和页面状态', () => {
+  const { p } = page('lobby', apiBase);
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false, code: '062819' });
+  for (const mode of ['create', 'join']) {
+    p.switchEntry({ currentTarget: { dataset: { mode } } });
+    p.editEntryName();
+    assert.equal(p.data.entryFocusedField, 'nickname');
+    assert.equal(p.data.entryScrollTarget, 'entry-name-block');
+    assert.equal(p.data.name, '子龙');
+    assert.equal(p.data.code, '062819');
+    p.entryInputBlur({ currentTarget: { dataset: { field: 'nickname' } }, detail: { value: '子龙' } });
+    p.editEntryName();
+    assert.equal(p.data.entryFocusedField, 'nickname');
+    p.closeEntry();
+  }
+  for (const blocked of [{ entrySheet: false }, { busy: true }, { hasPendingRequest: true }]) {
+    p.setData({ entrySheet: true, busy: false, hasPendingRequest: false, entryFocusedField: '', ...blocked });
+    p.editEntryName();
+    assert.equal(p.data.entryFocusedField, '');
+  }
+  p.setData({ entrySheet: true, hasPendingRequest: false });
+  p.pending = {};
+  p.editEntryName();
+  assert.equal(p.data.entryFocusedField, '');
+  p.pending = null;
+  p.foreground = false;
+  p.editEntryName();
+  assert.equal(p.data.entryFocusedField, '');
+});
+
 test('粘贴只接受完整六码、保留前导零，关闭或切换面板后忽略剪贴板回调', () => {
   const callbacks = [];
   const { p } = page('lobby', apiBase, { wx: { getClipboardData(options) { callbacks.push(options); } } });
@@ -2057,4 +2087,30 @@ test('统计详情返回只关闭面板，切页保持筛选和浏览位置，�
   open();await p.switchPanel('matches');assert.equal(p.data.statistics.statsDetail,null);
   await p.switchPanel('records');assert.equal(p.data.statistics.roleFilter,'third');assert.equal(p.data.scrollTops.records,260);
   open();empty=true;await p.load();assert.equal(p.data.statistics.statsDetail,null);assert.equal(p.data.statistics.roleFilter,'all');assert.equal(p.data.statistics.roleRows.length,0);
+});
+
+test('原生弹层测量使用最新键盘高度，关闭后或切换模式后忽略过期回调', () => {
+  const callbacks=[];
+  const {p}=page('lobby',apiBase,{wx:{createSelectorQuery(){
+    const query={select(){return query;},boundingClientRect(){return query;},exec(callback){callbacks.push(callback);}};
+    return query;
+  }}});
+  p.setData({loading:false,name:'子龙',nicknameSetup:false});
+  const open=mode=>p.switchEntry({currentTarget:{dataset:{mode}}});
+  const rects=[{width:390,height:844},{height:86},{height:800},{height:100}];
+  open('join');
+  const old=callbacks.pop();
+  p.entryKeyboardChange({detail:{height:320}});
+  callbacks.pop()(rects);
+  assert.equal(p.data.entryBodyHeight,250);
+  old([{...rects[0]},{height:86},{height:100},{height:100}]);
+  assert.equal(p.data.entryBodyHeight,250);
+  p.entryKeyboardChange({detail:{height:0}});
+  const closed=callbacks.pop();p.closeEntry();open('create');
+  closed(rects);
+  assert.equal(p.data.entryBodyHeight,0);
+  callbacks.pop()(rects);
+  assert.equal(p.data.entryBodyHeight,570);
+  p.onHide();
+  assert.equal(p.data.entryKeyboardHeight,0);
 });

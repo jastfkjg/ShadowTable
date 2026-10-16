@@ -1,5 +1,7 @@
 <import src="./public-history.wxml" />
 <include src="./public-history.wxml" />
+<import src="../home/role-groups.wxml" />
+
 <template name="tablePhase">
     <view class="phase-strip">
       <view class="phase-heading">
@@ -412,19 +414,15 @@
       <view wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="small muted" role="status">{{room.phase==='ended' || room.phase==='terminated'?'本局已结束，你正在旁观；房主重开后可手动入座。':'本局进行中，你正在旁观；下一局可手动入座。'}}</view>
       <button hover-class="none" wx:if="{{reconnecting || !network || needsLogin}}" class="lobby-connection" bindtap="connectionInfo" aria-label="查看连接状态"><view class="connection-dot {{reconnecting?'pending':'offline'}}" /><text>{{reconnecting?'正在重连…':'连接断开，点击查看'}}</text></button>
     </view>
-    <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-      <view class="error-dialog" role="dialog" aria-modal="true" aria-label="角色配置">
-        <view class="dialog-title">角色配置</view>
-        <view class="small muted">{{room.boardName}} · {{room.capacity}}人</view>
-        <view class="configuration-roles">
-          <view wx:for="{{room.roleConfiguration}}" wx:key="faction" class="role-line">{{item.label}}：{{item.roles}}</view>
-        </view>
-        <view wx:if="{{room.scoreSettings}}" class="small muted">{{room.scoreNotice || (room.scoreSettings.enabled?'本局计分已开启':'本局未开启计分')}}</view>
-        <view wx:if="{{room.testRoom}}" class="small muted">测试房间 · 陪测已开启</view>
-        <view class="dialog-actions">
-          <button hover-class="none" class="secondary" bindtap="openBoardDetails">板子详情</button>
-          <button hover-class="none" class="primary" bindtap="closeRoomRules">知道了</button>
-        </view>
+    <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop room-rules-backdrop" catchtouchmove="blockScroll">
+      <view class="error-dialog room-rules-sheet {{roomRulesBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="角色配置">
+        <view class="room-rules-sheet-top"><view class="entry-sheet-handle" aria-hidden="true" /><view class="entry-sheet-heading"><view class="entry-sheet-title"><view class="room-sheet-symbol" aria-hidden="true"><image src="/assets/sheet-shield.svg" /></view><text>角色配置</text></view><button class="room-rules-close" hover-class="entry-option-pressed" bindtap="closeRoomRules" aria-label="关闭角色配置"><view class="room-sheet-close-icon" aria-hidden="true" /></button></view></view>
+        <scroll-view class="room-rules-body" style="{{roomRulesBodyHeight?'height:'+roomRulesBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="room-rules-sheet-fields">
+          <view class="room-rules-summary"><view><image src="/assets/home-table-blue.svg" aria-hidden="true" /><text>{{room.boardName}}</text></view><text class="room-rules-capacity">{{room.capacity}} 人</text></view>
+          <template is="roomRoleGroups" data="{{groups:roomRoleGroups.length?roomRoleGroups:room.roleConfiguration, compact:false}}" />
+          <view class="room-rules-options"><view wx:if="{{room.scoreSettings}}" class="room-rules-option {{room.scoreSettings.enabled?'is-enabled':''}}"><image src="/assets/record-coin.svg" aria-hidden="true" /><text>本局计分</text><text>{{room.scoreSettings.enabled?'已开启':'未开启'}}</text></view><view wx:if="{{room.scoreNotice}}" class="room-rules-notice">{{room.scoreNotice}}</view><view wx:if="{{room.testRoom}}" class="room-rules-option"><image src="/assets/sheet-flask.svg" aria-hidden="true" /><text>测试房间 · 陪测</text><text>已开启</text></view></view>
+        </view></scroll-view>
+        <view class="room-rules-sheet-footer"><button hover-class="entry-option-pressed" class="secondary" bindtap="openBoardDetails"><image src="/assets/sheet-book.svg" aria-hidden="true" /><text>板子详情</text></button><button hover-class="entry-option-pressed" class="primary" bindtap="closeRoomRules">知道了</button></view>
       </view>
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">

@@ -6,6 +6,7 @@ const roomShare = require("../../room-share");
 const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
+const roomSheet = require("../../room-sheet-presentation");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
 function roomListItems(rooms) {
@@ -255,6 +256,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     entryFocusedField: "",
     entryScrollTarget: "",
     entryKeyboardHeight: 0,
+    entryBodyHeight: 0,
+    entryAvatarUrl: "",
+    entryAvatarFailed: false,
+    codeSlots: [0, 1, 2, 3, 4, 5],
     entryNameError: "",
     entryCodeError: "",
     entryError: "",
@@ -263,6 +268,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     invitationNeedsName: false,
     invitationRetry: false,
     showRoomRules: false,
+    roomRulesBodyHeight: 0,
+    roomRoleGroups: [],
     actionDialog: false,
     actionSecret: null,
     dealtIdentityDialog: false,
@@ -358,6 +365,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.isLobby) selectTab(this, 0);
     this.returningHome = false;
     this.foreground = true;
+    this.syncRoomSheetLayout("entry");
+    this.syncRoomSheetLayout("rules");
     if (this.alive) {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
       else if (this.data.isLobby && !this.data.loading) this.refreshLobby();
@@ -380,6 +389,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   onResize() {
     this.dismissRoomSwipe();
     this.showIdentityHintWhenVisible();
+    this.syncRoomSheetLayout("entry");
+    this.syncRoomSheetLayout("rules");
   },
   onUnload() {
     this.alive = false;
@@ -567,12 +578,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       // entered during this refresh and avatar-only edits retain the user's name.
       if (profile) {
         const confirmed = profile.nicknameConfirmed ?? !!(profile.nickname && profile.nickname !== "新朋友");
-        const values = { nicknameSetup: !confirmed, nicknameVersion: profile.version };
+        const avatarUrl = profile.avatarUrl ? api.assetUrl(profile.avatarUrl) : "";
+        const values = { nicknameSetup: !confirmed, nicknameVersion: profile.version,
+          entryAvatarUrl: avatarUrl, entryAvatarFailed: this.data.entryAvatarUrl === avatarUrl && this.data.entryAvatarFailed };
         if (!preserveName && this.lobbyProfileNickname !== undefined && this.lobbyProfileNickname !== profile.nickname &&
             nameInputRevision === (this.nameInputRevision || 0)) this.nameEdited = false;
         this.lobbyProfileNickname = profile.nickname;
         if (!this.nameEdited) values.name = (confirmed ? profile.nickname : "") || wx.getStorageSync("nickname") || "";
         this.updateChangedData(values);
+        this.syncRoomSheetLayout("entry");
       }
       const held = typeof getApp === "function" && getApp().pendingTableRequest;
       this.updateChangedData({ pendingTableCode: held ? held.code : "" });
@@ -849,6 +863,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           ? ""
           : this.data.notice,
       room,
+      roomRoleGroups: roomSheet.presentRoleGroups(room.roleConfiguration),
       canStart:
         room.players.length === room.capacity &&
         room.players.every((p) => p.ready),
@@ -1211,12 +1226,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       entrySheet: true,
       entryFocusedField: "",
       entryKeyboardHeight: 0,
+      entryBodyHeight: 0,
       entryNameError: "", entryCodeError: "", entryError: "",
       error: "",
       notice: "",
     }, () => {
       if (mode === "join" && this.data.entrySheet && this.foreground)
         this.setData({ entryFocusedField: this.data.nicknameSetup || !this.data.name.trim() ? "nickname" : "code" });
+      this.syncRoomSheetLayout("entry");
     });
   },
   resetEntryFocus() {
@@ -1230,6 +1247,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending) return;
     this.setData({ entrySheet: false });
     this.resetEntryFocus();
+  },
+  editEntryName() {
+    if (!this.data.entrySheet || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
+    this.setData({ entryFocusedField: "nickname", entryScrollTarget: "entry-name-block" });
   },
   entryInputFocus(e) {
     if (!this.data.entrySheet || !this.foreground) return;
@@ -1245,7 +1266,29 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({ entryKeyboardHeight: Math.max(0, e.detail.height), entryScrollTarget: "" }, () => {
       if (this.data.entrySheet && this.foreground && this.data.entryFocusedField)
         this.setData({ entryScrollTarget: this.data.entryFocusedField === "code" ? "entry-code-block" : "entry-name-block" });
+      this.syncRoomSheetLayout("entry");
     });
+  },
+  entryAvatarError() { this.setData({ entryAvatarFailed: true }); },
+  syncRoomSheetLayout(kind) {
+    const entry = kind === "entry", openKey = entry ? "entrySheet" : "showRoomRules";
+    if (!this.data[openKey] || !this.foreground || !wx.createSelectorQuery) return;
+    this.sheetLayoutRevisions = this.sheetLayoutRevisions || {};
+    const revision = this.sheetLayoutRevisions[kind] = (this.sheetLayoutRevisions[kind] || 0) + 1;
+    const entryRevision = this.entrySheetRevision;
+    const run = () => {
+      if (!this.alive || !this.foreground || !this.data[openKey]) return;
+      const query = wx.createSelectorQuery();
+      const prefix = entry ? ".entry" : ".room-rules";
+      for (const suffix of ["-backdrop", "-sheet-top", "-sheet-fields", "-sheet-footer"]) query.select(prefix + suffix).boundingClientRect();
+      query.exec(rects => {
+        if (!this.alive || !this.foreground || !this.data[openKey] || revision !== this.sheetLayoutRevisions[kind] || entry && entryRevision !== this.entrySheetRevision) return;
+        const height = roomSheet.fitBody(rects, entry ? this.data.entryKeyboardHeight : 0);
+        const key = entry ? "entryBodyHeight" : "roomRulesBodyHeight";
+        if (height !== null && this.data[key] !== height) this.setData({ [key]: height });
+      });
+    };
+    if (wx.nextTick) wx.nextTick(run); else run();
   },
   pasteRoomCode() {
     if (this.data.busy || this.pending || !this.data.entrySheet) return;
@@ -1317,7 +1360,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     wx.navigateTo({ url: "/pages/help/help" });
   },
   openRoomRules() {
-    this.setData({ showRoomRules: true });
+    this.setData({ showRoomRules: true, roomRulesBodyHeight: 0,
+      roomRoleGroups: roomSheet.presentRoleGroups(this.data.room?.roleConfiguration) }, () => this.syncRoomSheetLayout("rules"));
   },
   openBoardDetails() {
     this.setData({ showRoomRules: false });
@@ -1364,10 +1408,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       availableBoards,
       boardId: b.id,
       boardName: b.namesByCapacity?.[capacity] || b.name,
-      boardRoleConfiguration: b.roleConfigurations?.[capacity] || [],
+      boardRoleConfiguration: roomSheet.presentRoleGroups(b.roleConfigurations?.[capacity]),
       boardIndex: availableBoards.indexOf(b),
       boardAssisted: b.mode === "assisted",
-      });
+      }, () => this.syncRoomSheetLayout("entry"));
   },
   pickBoard(e) {
     if (this.data.busy) return;
@@ -1377,10 +1421,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({
       boardId: b.id,
       boardName: b.namesByCapacity?.[this.data.capacity] || b.name,
-      boardRoleConfiguration: b.roleConfigurations?.[this.data.capacity] || [],
+      boardRoleConfiguration: roomSheet.presentRoleGroups(b.roleConfigurations?.[this.data.capacity]),
       boardIndex: index,
       boardAssisted: b.mode === "assisted",
-      });
+      }, () => this.syncRoomSheetLayout("entry"));
   },
   pickCapacity(e) {
     if (this.data.busy) return;

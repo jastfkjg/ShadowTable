@@ -1468,6 +1468,20 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   assert.equal(nodes(sheet).filter(n => n.attr?.role === 'alert').length, 1);
 });
 
+test('创建和加入表单的铅笔为可点击按钮，昵称焦点绑定生效，请求期间禁用', () => {
+  for (const entryMode of ['create', 'join']) {
+    for (const state of [{}, { busy: true }, { hasPendingRequest: true }]) {
+      const tree = render({ ...base, entryMode, entrySheet: true, entryFocusedField: 'nickname', ...state });
+      const edit = byHandler(tree, 'editEntryName');
+      assert.equal(edit.tag, 'wx-button');
+      assert.equal(edit.attr.ariaLabel, '修改昵称');
+      assert.equal(edit.attr.disabled, !!(state.busy || state.hasPendingRequest));
+      assert.equal(edit.attr.formType, undefined);
+      assert.equal(nodes(tree).find(n => n.tag === 'wx-input' && n.attr.name === 'nickname').attr.focus, true);
+    }
+  }
+});
+
 test('创建表单在原生 form 包装层内用普通 view 分配高度，提交按钮位于滚动区之外', () => {
   const tree = render({ ...base, entryMode: 'create', entrySheet: true, name: '子龙', entryKeyboardHeight: 280 });
   const form = nodes(tree).find(n => n.tag === 'wx-form');
@@ -1604,4 +1618,16 @@ test('票选趣味记录展示两个称号和获奖局数，排行榜仅显示�
     assert.equal(nodes(tree).filter(n=>n.attr?.bindtap==='chooseFunSort' && n.attr['data-id']==='rate').length,0);
     assert.match(board.ruleLines.join(),/每局每项荣誉最多增加一次/);
   }
+});
+
+test('六位分格只展示原生数字输入框的值，前导零可见且表单保留昵称与粘贴入口', () => {
+  const tree=render({...base,entrySheet:true,entryMode:'join',code:'062819',codeSlots:[0,1,2,3,4,5],nicknameSetup:false,name:'子龙'});
+  const inputs=nodes(tree).filter(n=>n.tag==='wx-input');
+  assert.equal(inputs.length,2);
+  assert.equal(inputs.find(n=>n.attr.name==='code').attr.type,'number');
+  const slots=nodes(tree).filter(n=>n.attr?.class==='entry-code-slot');
+  const plain=n=>typeof n==='string'?n:(n.children||[]).map(plain).join('');
+  assert.deepEqual(slots.map(plain),['0','6','2','8','1','9']);
+  assert.ok(byHandler(tree,'pasteRoomCode'));
+  assert.equal(nodes(tree).find(n=>n.tag==='wx-form').attr.bindsubmit,'submitEntry');
 });

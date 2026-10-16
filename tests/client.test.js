@@ -38,6 +38,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../room-share') return require('../miniprogram/room-share');
         if (name === '../../public-history') return require('../miniprogram/public-history');
         if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
+        if (name === '../../room-sheet-presentation') return require('../miniprogram/room-sheet-presentation');
         if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -1520,7 +1521,7 @@ test("行动入口按公开阶段命名，特殊技能不暴露角色", async ()
 test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
   let definition, url;
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8") + "\nPage(module.exports());", {
-    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : name === '../../public-history' ? require('../miniprogram/public-history') : {}, Page: p => definition = p,
+    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : name === '../../public-history' ? require('../miniprogram/public-history') : name === '../../room-sheet-presentation' ? require('../miniprogram/room-sheet-presentation') : {}, Page: p => definition = p,
     wx: { navigateTo: o => url = o.url },
   });
   const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };

@@ -1,0 +1,9 @@
+<template name="roomRoleGroups">
+  <view class="room-role-groups {{compact?'is-compact':''}}">
+    <view wx:for="{{groups}}" wx:key="faction" class="room-role-group">
+      <view class="room-role-faction"><view><view class="room-role-dot is-{{item.faction}}" aria-hidden="true" /><text>{{item.label}}</text></view><text wx:if="{{item.count}}">{{item.count}} 人</text></view>
+      <view wx:if="{{item.entries.length}}" class="room-role-grid"><view wx:for="{{item.entries}}" wx:for-item="role" wx:key="key" class="room-role"><image src="{{role.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="room-role-name"><block wx:if="{{compact}}"><text>{{role.name}}</text></block><block wx:else><view>{{role.roleTitle}}</view><view wx:if="{{role.roleSubtitle}}">{{role.roleSubtitle}}</view></block><text wx:if="{{role.countLabel}}" class="room-role-count">{{role.countLabel}}</text></view></view></view>
+      <view wx:else class="room-role-text">{{item.roles}}</view>
+    </view>
+  </view>
+</template>
