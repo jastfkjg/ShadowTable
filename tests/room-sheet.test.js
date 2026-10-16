@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { BOARDS } = require('../server/engine');
-const { presentRoleGroups, fitBody } = require('../miniprogram/room-sheet-presentation');
+const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require('../miniprogram/room-sheet-presentation');
 
 test('公开角色配置添加插画，所有板子人数、原始文本和阵营保持一致', () => {
   for (const board of BOARDS.filter(b => b.available)) for (const [capacity, groups] of Object.entries(board.roleConfigurations)) {
@@ -30,4 +30,25 @@ test('原生滚动区按内容收紧，键盘和变高的底栏占用可用空�
   assert.equal(fitBody([{...rects[0]},{height:86},{height:800},{height:150}],320),200);
   assert.equal(fitBody([{width:844,height:390},{height:56},{height:800},{height:80}]),234);
   assert.equal(fitBody([null,...rects.slice(1)]),null);
+});
+test('新身份展示仅拆分明确的无视野前缀，其余服务端说明及技能状态完整保留', () => {
+  const input={role:'红猎人',information:'没有视野。 主动与被动共用一次技能。替女巫出局不触发被动开枪。',skillStatus:{title:'尚未启用',detail:'下次技能环节可用。'}};
+  const before=JSON.stringify(input),result=presentPrivateIdentity(input,'evil');
+  assert.equal(JSON.stringify(input),before);
+  assert.equal(result.visionText,'没有视野。');
+  assert.equal(result.abilityText,'主动与被动共用一次技能。替女巫出局不触发被动开枪。');
+  assert.deepEqual(result.skillStatus,input.skillStatus);
+  for(const information of ['你能看到3号与7号。','没有视野。','未来角色的完整说明。']) {
+    const row=presentPrivateIdentity({role:'未来角色',information},'unknown');
+    assert.equal(row.visionText,information);assert.equal(row.abilityText,'');
+  }
+});
+test('查验结果只装饰确定的座位与阵营，未知格式保留原文，不推断角色', () => {
+  for(const [label,tone] of [['好人','good'],['坏人','evil'],['盗贼阵营','third']]) {
+    const input={revision:2,summary:'7号 · '+label,information:'7号查验结果：'+label+'（第2轮）'};
+    const row=presentFairyResult(input);assert.equal(row.displaySeat,7);assert.equal(row.displayFaction,label);assert.equal(row.factionTone,tone);
+    assert.equal(row.information,input.information);assert.equal(row.revision,2);
+  }
+  const future=presentFairyResult({information:'未知扩展结果，7号拥有特殊状态。'});
+  assert.equal(future.displaySeat,null);assert.equal(future.displayFaction,'');assert.equal(future.information,'未知扩展结果，7号拥有特殊状态。');
 });

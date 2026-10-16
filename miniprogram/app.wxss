@@ -1949,3 +1949,5 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 .badge-manager-empty { padding: 32rpx 0; }
 .player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 140rpx); }
 .player-card-identity.is-long-name .player-card-badges { flex-basis: calc(100% - 136rpx); width: calc(100% - 136rpx); margin-left: 136rpx; }
+@import "pages/table/presentation.wxss";
+@import "pages/table/game-dialogs.wxss";

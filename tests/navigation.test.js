@@ -1137,7 +1137,9 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['badges','leaderboard','monthly','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/stats/stats','/pages/scores/scores','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['badges','leaderboard','monthly','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.equal(nodes(tree).find(n => n.attr?.class === 'me-results-detail').attr.url, '/pages/stats/stats');
+  assert.equal(nodes(tree).find(n => n.attr?.class === 'me-score-detail').attr.url, '/pages/scores/scores');
   const points = nodes(tree).find(n => n.attr?.class === 'me-points');
   assert.deepEqual(Array.from(points.children).filter(n => n.tag === 'wx-navigator').map(n => n.attr.url), ['/pages/scores/scores']);
   assert.ok(links.every(n => !nodes(n).slice(1).some(child => child.tag === 'wx-navigator')));

@@ -21,8 +21,9 @@ function playerCardMethods(api) {
           throw new Error("战绩暂时无法读取，请稍后重试");
         if (result.player.id !== card.id || card.seat != null && result.player.seat !== card.seat) return this.closePlayerCard();
         const rateLabel = value => value == null ? "—" : value.toFixed(1) + "%";
-        const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
-          byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
+        const rateValue = value => value == null ? "—" : value.toFixed(1);
+        const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate), rateValue: rateValue(result.stats.winRate),
+          byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate), rateValue: rateValue(row.winRate) })) } : null;
         let playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
         // Badge artwork ships in the mini-program; it also works when web hosting is disabled.

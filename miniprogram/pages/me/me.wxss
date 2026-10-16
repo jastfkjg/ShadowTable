@@ -1,25 +1,35 @@
-.me-page { --me-divider: rgba(177,191,198,.13); max-width:600px; padding:24px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
+.me-page { --me-divider: rgba(177,191,198,.13); max-width:600px; padding:20px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
+.me-page, .me-page view, .me-page text, .me-page navigator { box-sizing:border-box; }
 .me-page .me-pressed { opacity:.72; }
 .me-page .inline-error button { min-height:44px; }
 .me-profile { display:block; padding:0 8px; color:var(--text); }
-.me-profile-main { display:flex; align-items:center; gap:16px; min-width:0; }
-.me-profile .profile-avatar { width:64px; height:64px; border:0; border-radius:21px; flex-shrink:0; }
+.me-profile-main { display:flex; align-items:center; gap:14px; min-width:0; min-height:60px; }
+.me-profile .profile-avatar { width:52px; height:52px; border:0; border-radius:17px; flex-shrink:0; }
 .me-profile .avatar-fallback { font-size:28px; font-weight:500; }
 .me-profile .profile-identity { min-width:0; flex:1; }
-.me-profile .profile-name { font-size:24px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.me-profile .profile-name { font-size:22px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
 .me-profile-caption { display:flex; align-items:center; gap:8px; margin-top:6px; color:var(--muted); font-size:12px; }
 .me-page .account-note { margin:18px 8px 0; }
-.me-overview { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); margin:24px 0 28px; padding:0 8px; }
+.me-overview { margin:20px 0 14px; padding:12px 16px 0; border-radius:22px; background:var(--surface); }
+.me-overview-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 8px; min-height:44px; }
+.me-overview-title { display:flex; align-items:center; gap:8px; min-width:0; font-size:15px; font-weight:600; line-height:1.5; }
+.me-overview-title .me-icon { width:20px; height:20px; }
+.me-results-detail { display:flex; align-items:center; justify-content:flex-end; flex-shrink:0; min-height:44px; min-width:88px; color:var(--accent); font-size:12px; line-height:1.5; }
+.me-overview-action { display:flex; align-items:center; justify-content:center; gap:8px; min-height:30px; padding:5px 10px; border-radius:9px; background:rgba(229,198,139,.10); font-weight:500; }
+.me-overview-action .me-chevron, .me-score-detail .me-chevron { border-color:var(--accent); }
+.me-overview-metrics { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); margin:8px 0 10px; }
 .me-results { display:block; padding:0; color:var(--text); }
 .me-overview .personal-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; padding:0; }
 .me-metric,.me-points-link { position:relative; display:flex; min-width:0; min-height:64px; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--text); }
 .me-metric+.me-metric::before,.me-points::before { content:""; position:absolute; left:0; top:12px; width:1px; height:30px; background:var(--me-divider); }
-.me-overview .metric-value { font-size:28px; font-weight:600; line-height:1.25; letter-spacing:-.5px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.me-overview .metric-value { min-width:0; max-width:100%; font-size:28px; font-weight:600; line-height:1.25; letter-spacing:-.5px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; text-align:center; }
+.me-points-link .metric-value { color:var(--accent); }
 .me-overview .me-value-compact { font-size:21px; letter-spacing:0; }
 .me-overview .small { font-size:12px; line-height:1.5; }
 .me-points { position:relative; min-width:0; }
-.me-overview-note { grid-column:1/-1; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin:14px 12px 0; color:var(--muted); font-size:12px; }
-.me-current-room { display:flex; align-items:center; gap:12px; padding:18px 16px; border-radius:22px; background:var(--surface); color:var(--text); }
+.me-overview-note { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 12px; min-height:49px; margin:0; padding:2px 0; border-top:1px solid var(--me-divider); color:var(--muted); font-size:12px; line-height:1.5; }
+.me-score-detail { display:flex; align-items:center; justify-content:flex-end; gap:8px; min-height:44px; margin-left:auto; color:var(--accent); font-size:12px; }
+.me-current-room { display:flex; align-items:center; gap:12px; padding:16px; border-radius:22px; background:var(--surface); color:var(--text); }
 .me-room-icon { flex-shrink:0; width:36px; height:40px; border-radius:12px; background:#34382f center / 22px 22px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5c68b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='3' width='16' height='18' rx='3'/%3E%3Cpath d='M9 3v18m3-13h5m-5 4h5m-5 4h3'/%3E%3C/svg%3E"); }
 .me-room-copy { flex:1; min-width:0; }
 .me-room-title { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:14px; font-weight:600; line-height:1.5; }
@@ -45,6 +55,7 @@
 
 /* Inline vectors share the tab icons' 24-unit canvas and 1.7-unit stroke. */
 .me-icon { width: 44rpx; height: 44rpx; flex-shrink: 0; background: center / contain no-repeat; }
+.me-icon-stats { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5c68b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 3v18h17M9 16v-5m5 5V6m5 10v-7'/%3E%3C/svg%3E"); }
 .me-icon-calendar { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23efbf9f' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M8 2v4m8-4v4M3 10h18M8 14h2m4 0h2m-8 4h2'/%3E%3C/svg%3E"); }
 .me-icon-rank { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3dfbe' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 21V7h8v14M2 21V12h6m8 3h6v6M1 21h22M10 3h4'/%3E%3C/svg%3E"); }
 .me-icon-history {

@@ -7,6 +7,7 @@ const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
 const roomSheet = require("../../room-sheet-presentation");
+const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
 function roomListItems(rooms) {
@@ -243,6 +244,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     room: null,
     ...initialPlayerCardData,
     latestResult: null,
+    processBodyHeight: 0,
     ...publicHistory.initialData(),
     seatsExpanded: true,
     seatOccupiedCount: 0,
@@ -391,6 +393,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.showIdentityHintWhenVisible();
     this.syncRoomSheetLayout("entry");
     this.syncRoomSheetLayout("rules");
+    this.syncProcessSheetLayout();
   },
   onUnload() {
     this.alive = false;
@@ -1290,6 +1293,37 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     };
     if (wx.nextTick) wx.nextTick(run); else run();
   },
+  processSheetKey() {
+    const d = this.data;
+    if (d.error) return "";
+    const stage = d.room?.code + ":" + d.room?.stage;
+    if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
+    if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
+    if (d.fairyResult) return stage + ":fairy:" + d.fairyResult.revision + ":" + d.fairyResultRevealed;
+    if (d.actionDialog && d.room?.needsSubmission && !d.room.me.submitted)
+      return stage + ":action:" + d.skillTargetMode + ":" + (d.actionChoices?.length || 0);
+    if (d.toolType && d.room?.canUseTools) return stage + ":tool:" + d.toolType;
+    return "";
+  },
+  setProcessData(values, callback) {
+    this.setData(values, () => { if (callback) callback(); this.syncProcessSheetLayout(); });
+  },
+  syncProcessSheetLayout() {
+    const key = this.processSheetKey();
+    if (!key || !this.alive || !this.foreground || !wx.createSelectorQuery) return;
+    const revision = this.processLayoutRevision = (this.processLayoutRevision || 0) + 1;
+    const run = () => {
+      if (!this.alive || !this.foreground || key !== this.processSheetKey()) return;
+      const query = wx.createSelectorQuery().in(this);
+      for (const selector of [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"]) query.select(selector).boundingClientRect();
+      query.exec(rects => {
+        if (!this.alive || !this.foreground || revision !== this.processLayoutRevision || key !== this.processSheetKey()) return;
+        const height = roomSheet.fitBody(rects);
+        if (height !== null && height !== this.data.processBodyHeight) this.setData({ processBodyHeight: height });
+      });
+    };
+    if (wx.nextTick) wx.nextTick(run); else run();
+  },
   pasteRoomCode() {
     if (this.data.busy || this.pending || !this.data.entrySheet) return;
     const revision = this.entrySheetRevision;
@@ -1700,7 +1734,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       ? [...room.team]
       : [];
     this.toolStage = room.stage;
-    this.setData({
+    this.setProcessData({
       toolType,
       toolTitle:
         {
@@ -1737,7 +1771,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         : this.data.toolSeats.includes(seat)
           ? this.data.toolSeats.filter((s) => s !== seat)
           : [...this.data.toolSeats, seat];
-    this.setData({
+    this.setProcessData({
       toolSeats,
       toolPlayers: this.data.toolPlayers.map((p) => ({
         ...p,
@@ -1748,7 +1782,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   pickToolThreshold(e) {
     if (this.data.busy) return;
     const value = Number(e.currentTarget.dataset.value);
-    if ([1, 2].includes(value)) this.setData({ toolThreshold: value });
+    if ([1, 2].includes(value)) this.setProcessData({ toolThreshold: value });
   },
   async launchTool() {
     if (this.data.busy || this.pending) return;
@@ -2043,7 +2077,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       return;
     this.mask();
     const generation = this.actionGeneration;
-    this.setData({ actionLoading: true });
+    this.setProcessData({ actionLoading: true });
     try {
       const response = await api.request(
         "/api/rooms/" + this.roomCode + "/private",
@@ -2078,7 +2112,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
               CHOICES[value] ||
               value,
           }));
-      this.setData({
+      this.setProcessData({
         actionDialog: true,
         actionLabel: response.action.label,
         hunterModes: !!response.action.hunterModes,
@@ -2101,12 +2135,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.handleError(e);
     } finally {
       if (generation === this.actionGeneration)
-        this.setData({ actionLoading: false });
+        this.setProcessData({ actionLoading: false });
     }
   },
   async revealActionIdentity() {
     if (this.data.actionSecret) {
-      this.setData({ actionSecret: null });
+      this.setProcessData({ actionSecret: null });
       return;
     }
     const room = this.data.room;
@@ -2120,7 +2154,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     )
       return;
     const generation = this.actionGeneration;
-    this.setData({ busy: true, busyAction: "actionIdentity" });
+    this.setProcessData({ busy: true, busyAction: "actionIdentity" });
     try {
       const secret = await api.request(
         "/api/rooms/" + this.roomCode + "/private",
@@ -2134,7 +2168,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         secret.stage === room.stage &&
         !this.data.room.me.submitted
       ) {
-        this.setData({
+        this.setProcessData({
           actionSecret: {
             role: secret.role,
             faction: secret.faction,
@@ -2148,7 +2182,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (generation === this.actionGeneration && this.foreground)
         this.handleError(e);
     } finally {
-      this.setData({ busy: false, busyAction: "" });
+      this.setProcessData({ busy: false, busyAction: "" });
     }
   },
   identityDealKey() {
@@ -2198,6 +2232,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.rememberDealtIdentity();
       this.setData({ dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
+        portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information, skillStatus: secret.skillStatus,
       } });
     } catch (e) {
@@ -2255,8 +2290,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.room.stage === stage
       ) {
         secret.factionTone = factionTone(secret.faction);
+        secret.portrait = portrait(secret.role, secret.factionTone).portrait;
         secret.identityHistory = (secret.identityHistory || []).map(record => ({
-          ...record, factionTone: factionTone(record.faction),
+          ...record, factionTone: factionTone(record.faction), portrait: portrait(record.role, factionTone(record.faction)).portrait,
         }));
         this.rememberDealtIdentity();
         this.setData({
@@ -2282,7 +2318,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const history = this.data.secret?.identityHistory || [];
     if (!this.data.revealed || history.length < 2 || this.identityOverlayBlocked()) return;
     this.closePlayerCard();
-    this.setData({ identityHistoryOpen: true, identityHistoryExpandedId: history.find(record => !record.current)?.id ?? null });
+    this.setProcessData({ identityHistoryOpen: true, identityHistoryExpandedId: history.find(record => !record.current)?.id ?? null });
   },
   closeIdentityHistory() {
     this.setData({ identityHistoryOpen: false, identityHistoryExpandedId: null });
@@ -2290,7 +2326,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   toggleIdentityHistory(event) {
     const id = Number(event.currentTarget.dataset.id);
     if (!this.data.identityHistoryOpen || !this.data.secret?.identityHistory?.some(record => record.id === id && !record.current)) return;
-    this.setData({ identityHistoryExpandedId: this.data.identityHistoryExpandedId === id ? null : id });
+    this.setProcessData({ identityHistoryExpandedId: this.data.identityHistoryExpandedId === id ? null : id });
   },
   hideIdentityHistory() {
     this.mask();
@@ -2313,8 +2349,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         secret.fairyResult
       ) {
         this.closeAction();
-        this.setData({
-          fairyResult: secret.fairyResult,
+        this.setProcessData({
+          fairyResult: roomSheet.presentFairyResult(secret.fairyResult),
           fairyResultRevealed: false,
           revealed: false,
           secret: null,
@@ -2329,11 +2365,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   hidePrivatePreview() {
-    this.setData({ fairyResultRevealed: false, identityChangeRevealed: false });
+    this.setProcessData({ fairyResultRevealed: false, identityChangeRevealed: false });
   },
   revealFairyResult() {
     if (this.data.busy || !this.foreground || !this.data.fairyResult) return;
-    this.setData({ fairyResultRevealed: true });
+    this.setProcessData({ fairyResultRevealed: true });
   },
   async acknowledgeFairyResult() {
     if (
@@ -2371,8 +2407,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       ) {
         this.closeAction();
         secret.factionTone = factionTone(secret.faction);
-        this.setData({
-          identityChange: secret,
+        this.setProcessData({
+          identityChange: roomSheet.presentPrivateIdentity(secret, secret.factionTone),
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
@@ -2388,7 +2424,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   revealChangedIdentity() {
     if (this.data.busy || !this.foreground || !this.data.identityChange) return;
-    this.setData({ identityChangeRevealed: true });
+    this.setProcessData({ identityChangeRevealed: true });
   },
   acknowledgeIdentity() {
     if (this.data.busy || !this.data.identityChangeRevealed) return;
@@ -2417,7 +2453,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         : this.data.swapSeats;
     const pair = selected.slice().sort((a, b) => a - b).join(":");
     const draft = this.data.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
-    this.setData({
+    this.setProcessData({
       ...(this.data.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
       ...skillSelectionView(this.data.room, draft || "", this.data.skillTargetMode, selected),
       swapSeats: selected,
@@ -2480,7 +2516,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (!this.data.actionChoices.some(c => c.value === value)) return;
       const mode = value.split(":")[1];
       const actionChoices = mode ? this.data.hunterChoices.filter((o) => o.value.startsWith(mode + ":")).concat([{value: "mode:", label: "返回选择技能方式"}]) : [{value: "mode:detonate", label: "主动技能"}, {value: "mode:passive", label: "被动技能"}, {value: "pass", label: "本轮不开枪"}];
-      this.setData({ hunterMode: mode, actionChoices, draftChoice: "", draftLabel: "",
+      this.setProcessData({ hunterMode: mode, actionChoices, draftChoice: "", draftLabel: "",
         ...skillView(this.data.room, actionChoices, true, mode, this.data.swapOptions) });
       return;
     }
@@ -2497,7 +2533,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         return;
       const choice = this.data.actionChoices.find((c) => c.value === value);
       if (choice)
-        this.setData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes, this.data.skillTargetMode) : choice.label,
+        this.setProcessData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes, this.data.skillTargetMode) : choice.label,
           swapSeats: [], swapPlayers: this.data.swapPlayers.map(p => ({ ...p, selected: false })),
           ...skillSelectionView(this.data.room, value, this.data.skillTargetMode) });
       return;

@@ -1,6 +1,6 @@
 <template name="publicHistoryEntry">
   <button hover-class="none" class="public-history-entry" bindtap="openHistory" aria-haspopup="dialog" aria-label="{{'查看公开记录，共'+history.length+'条'+(historyUnreadCount?'，'+historyUnreadCount+'条新记录':'')}}">
-    <view class="public-history-icon" aria-hidden="{{true}}" />
+    <view class="public-history-icon" aria-hidden="{{true}}"><image src="/assets/home-clock.svg" mode="aspectFit" /></view>
     <view class="public-history-entry-copy">
       <view class="public-history-entry-title"><text>公开记录</text><text class="public-history-total">{{history.length || 0}}</text></view>
       <view class="public-history-preview {{historyLatest.resultTone}}">{{historyLatest?(historyLatest.historyText || historyLatest.text)+(historyLatest.timeLabel?' · '+historyLatest.timeLabel:''):'本局暂无公开记录'}}</view>

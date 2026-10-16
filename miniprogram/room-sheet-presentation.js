@@ -22,4 +22,19 @@ function fitBody(rects, keyboardHeight = 0) {
   return Math.max(1, Math.floor(Math.min(fields.height, backdrop.height - keyboardHeight - clearance - top.height - footer.height)));
 }
 
-module.exports = { presentRoleGroups, fitBody };
+function presentPrivateIdentity(secret, factionTone) {
+  const information = String(secret.information || "");
+  // Split only the existing explicit no-vision prefix; never infer hidden roles
+  // or skill rules. Other server descriptions stay intact in the vision block.
+  const split = information.match(/^(没有视野。)\s*([\s\S]+)$/);
+  const timingNote = secret.passiveVision ? "视野随技能结算自动更新" : /下次技能环节可用|下一轮可用/.test(secret.skillStatus?.detail || "") ? "" : "新技能下一轮可用";
+  return { ...secret, factionTone, portrait: portrait(secret.role, factionTone).portrait, timingNote,
+    visionText: split ? split[1] : information, abilityText: split ? split[2] : "" };
+}
+function presentFairyResult(result) {
+  const summary = result.summary || result.information || "";
+  const match = summary.match(/^(\d+)号(?: · |查验结果：)(好人|坏人|盗贼阵营)(?:（第\d+轮）)?$/);
+  return { ...result, displaySeat: match ? Number(match[1]) : null,
+    displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
+}
+module.exports = { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult };

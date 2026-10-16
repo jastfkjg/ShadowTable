@@ -427,6 +427,46 @@ test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份�
   const covered = render({ ...data, identityHintVisible: true });
   assert.equal(byHandler(covered, "dismissIdentityHint"), undefined);
 });
+test('身份插画与视野一起受主动查看和关闭状态保护', () => {
+  const room = {phase:'tools',code:'123456',capacity:12,team:[],me:{seat:1}};
+  const secret = {role:'梅林',faction:'好人阵营',portrait:'/assets/roles/merlin.png',information:'秘密视野'};
+  const data = {...base,room,secret,dealtIdentityDialog:true};
+  const hidden = JSON.stringify(render(data));
+  assert.doesNotMatch(hidden,/merlin\.png|秘密视野/);
+  const revealed = JSON.stringify(render({...data,dealtIdentitySecret:secret}));
+  assert.match(revealed,/merlin\.png/);
+  assert.match(revealed,/秘密视野/);
+  for (const state of [{dealtIdentityDialog:false,dealtIdentitySecret:secret},{dealtIdentitySecret:secret,error:'连接需要恢复'}])
+    assert.doesNotMatch(JSON.stringify(render({...data,...state})),/merlin\.png|秘密视野/);
+  const inline = JSON.stringify(render({...data,dealtIdentityDialog:false,revealed:true}));
+  assert.match(inline,/merlin\.png/);
+  assert.doesNotMatch(JSON.stringify(render({...data,dealtIdentityDialog:false,revealed:false})),/merlin\.png/);
+});
+test('任务牌只展示当前允许选项，先选后确认且固定操作在滚动内容之外', () => {
+  const room = {phase:'quest',code:'123456',capacity:12,team:[1,6,8],needsSubmission:true,me:{seat:1,submitted:false}};
+  const data = {...base,room,actionDialog:true,stagedChoice:true,actionChoices:[{value:'success',label:'任务成功'}]};
+  const tree = render(data);
+  const choices = nodes(tree).filter(n=>n.attr?.bindtap==='submitChoice');
+  assert.equal(choices.length,1);
+  assert.equal(choices[0].attr['data-value'],'success');
+  assert.equal(choices[0].attr.ariaPressed,false);
+  assert.equal(byHandler(tree,'confirmChoice').attr.disabled,true);
+  const scroll = nodes(tree).find(n=>n.attr?.class?.split(' ').includes('task-choice-body'));
+  assert.ok(scroll);
+  assert.equal(byHandler(scroll,'confirmChoice'),undefined);
+  const selected = render({...data,draftChoice:'success',draftLabel:'任务成功'});
+  assert.equal(byHandler(selected,'confirmChoice').attr.disabled,false);
+  assert.equal(byHandler(selected,'submitChoice').attr.ariaPressed,true);
+  assert.match(JSON.stringify(selected),/确认提交后不可更改/);
+  for(const blocked of [{network:false},{busy:true},{hasPendingRequest:true}]) {
+    const disabled=render({...data,draftChoice:'success',...blocked});
+    assert.equal(byHandler(disabled,'confirmChoice').attr.disabled,true);
+    assert.equal(byHandler(disabled,'submitChoice').attr.disabled,true);
+  }
+  const evil=render({...data,actionChoices:[...data.actionChoices,{value:'fail',label:'任务失败'}]});
+  assert.deepEqual(nodes(evil).filter(n=>n.attr?.bindtap==='submitChoice').map(n=>n.attr['data-value']),['success','fail']);
+  assert.equal(byHandler(render({...data,room:{...room,me:{...room.me,submitted:true}}}),'confirmChoice'),undefined);
+});
 test("WXML入口加载/错误/禁用绑定为真实布尔条件", () => {
   const tree = render(base),
     text = JSON.stringify(tree);
@@ -883,6 +923,22 @@ test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显�
   assert.ok(byHandler(shown, "acknowledgeFairyResult"));
   assert.ok(byHandler(shown, "hidePrivatePreview"));
 });
+test('新身份的派生插画、能力说明及结构化查验结果均受主动查看保护，确认在滚动区之外', () => {
+  const {presentPrivateIdentity,presentFairyResult}=require('../miniprogram/room-sheet-presentation');
+  const identity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 私密角色能力说明。',skillStatus:{title:'尚未启用',detail:'下一轮可用。'}},'evil');
+  const data={...base,room:{phase:'tools',code:'123456',team:[],me:{seat:1}},identityChange:identity};
+  assert.doesNotMatch(JSON.stringify(render(data)),/hunter\.png|红猎人|私密角色能力说明/);
+  const shown=render({...data,identityChangeRevealed:true});
+  assert.match(JSON.stringify(shown),/hunter\.png|私密角色能力说明/);
+  const body=nodes(shown).find(n=>n.attr?.class==='process-sheet-body');
+  assert.equal(byHandler(body,'acknowledgeIdentity'),undefined);
+  assert.ok(byHandler(shown,'acknowledgeIdentity'));assert.ok(byHandler(shown,'hidePrivatePreview'));
+  const fairy={...data,identityChange:null,fairyResult:presentFairyResult({revision:1,summary:'7号 · 盗贼阵营'})};
+  assert.doesNotMatch(JSON.stringify(render(fairy)),/盗贼阵营|process-shield-third/);
+  const result=render({...fairy,fairyResultRevealed:true});
+  assert.match(JSON.stringify(result),/盗贼阵营|process-shield-third/);
+  assert.equal(byHandler(nodes(result).find(n=>n.attr?.class==='process-sheet-body'),'acknowledgeFairyResult'),undefined);
+});
 
 test("拓展板子不显示线下辅助提示，身份确认使用线上视野文案", () => {
   const tree = render({
@@ -1261,7 +1317,7 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
     assert.equal(seats.length, 12, role);
     assert.ok(seats.some(n => n.attr.disabled && n.attr.ariaLabel.includes("已出局")), role);
     assert.equal(byHandler(initial, "confirmChoice").attr.disabled, true);
-    assert.ok(nodes(initial).some(n => n.attr?.class?.split(" ").includes("skill-target-dialog")));
+    assert.ok(nodes(initial).some(n => n.attr?.class?.split(" ").includes("process-skill")));
     if (secret.action.hunterModes) {
       const back = nodes(initial).find(n => n.attr?.["data-value"] === "mode:");
       assert.ok(back.attr.class.includes("skill-navigation"));

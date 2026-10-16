@@ -20,7 +20,10 @@ function page(api, storage = new Map(), layout, lobby = false) {
     const query = {
       in() { return query; }, select() { return query; }, selectViewport() { return query; },
       boundingClientRect() { return query; },
-      exec(callback) { callback([layout.anchor, { height: layout.height }]); },
+      exec(callback) {
+        if (layout.callbacks) layout.callbacks.push(callback);
+        else callback(layout.rects || [layout.anchor, { height: layout.height }]);
+      },
     };
     return query;
   };
@@ -39,6 +42,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../public-history') return require('../miniprogram/public-history');
         if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
         if (name === '../../room-sheet-presentation') return require('../miniprogram/room-sheet-presentation');
+        if (name === '../../role-portraits') return require('../miniprogram/role-portraits');
         if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -105,6 +109,23 @@ async function server() {
     },
   };
 }
+test('游戏弹层原生测量随展开状态更新，关闭、换阶段和后台后的旧回调不再写入高度', () => {
+  const layout={callbacks:[]},p=page({},new Map(),layout);
+  const rects=[{width:390,height:844},{height:76},{height:900},{height:100}];
+  p.data.room={code:'123456',stage:'stage1',me:{seat:1}};
+  p.data.identityChange={identityRevision:1};
+  p.syncProcessSheetLayout();
+  p.setProcessData({identityChangeRevealed:true});
+  assert.equal(layout.callbacks.length,2);
+  layout.callbacks[0](rects);assert.equal(p.data.processBodyHeight,0);
+  layout.callbacks[1](rects);assert.equal(p.data.processBodyHeight,580);
+  p.syncProcessSheetLayout();p.data.identityChange=null;
+  layout.callbacks[2]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
+  p.data.identityChange={identityRevision:2};p.syncProcessSheetLayout();p.data.room.stage='stage2';
+  layout.callbacks[3](rects);assert.equal(p.data.processBodyHeight,580);
+  p.syncProcessSheetLayout();p.foreground=false;
+  layout.callbacks[4]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
+});
 async function settle(p) {
   while (p.data.busy) await new Promise((r) => setTimeout(r, 1));
   assert.equal(p.data.error, "");
@@ -1521,7 +1542,7 @@ test("行动入口按公开阶段命名，特殊技能不暴露角色", async ()
 test("板子详情导航同时支持创建页与牌桌并携带返回来源", () => {
   let definition, url;
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8") + "\nPage(module.exports());", {
-    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : name === '../../public-history' ? require('../miniprogram/public-history') : name === '../../room-sheet-presentation' ? require('../miniprogram/room-sheet-presentation') : {}, Page: p => definition = p,
+    module: { exports: {} }, require: name => name === '../../player-card' ? require('../miniprogram/player-card') : name === '../../public-history' ? require('../miniprogram/public-history') : name === '../../room-sheet-presentation' ? require('../miniprogram/room-sheet-presentation') : name === '../../role-portraits' ? require('../miniprogram/role-portraits') : {}, Page: p => definition = p,
     wx: { navigateTo: o => url = o.url },
   });
   const p = { ...definition, data: { room: null, boardId: "knights-11", capacity: 11 }, setData: values => Object.assign(p.data, values) };

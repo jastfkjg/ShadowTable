@@ -12,6 +12,11 @@
     </navigator>
     <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
     <view class="me-overview">
+      <view class="me-overview-heading">
+        <view class="me-overview-title"><view class="me-icon me-icon-stats" aria-hidden="true"></view><text>我的战绩</text></view>
+        <navigator class="me-results-detail" url="/pages/stats/stats" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看完整战绩统计"><view class="me-overview-action"><text>查看战绩</text><view class="me-chevron" aria-hidden="true"></view></view></navigator>
+      </view>
+      <view class="me-overview-metrics">
       <navigator class="me-results" url="/pages/stats/stats" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看详细战绩统计">
         <view class="personal-metrics me-stats-panel">
           <view class="me-metric"><view class="metric-value {{stats && stats.total >= 10000 ? 'me-value-compact' : ''}}">{{stats ? stats.total : '—'}}</view><text class="small muted">总局数</text></view>
@@ -23,7 +28,8 @@
           <view class="metric-value {{stats && (stats.score.total >= 10000 || stats.score.total <= -1000) ? 'me-value-compact' : ''}}">{{stats ? stats.score.total : '—'}}</view><text class="small muted">积分</text>
         </navigator>
       </view>
-      <view class="me-overview-note"><text>{{stats ? stats.wins + ' 胜 · ' + stats.losses + ' 负' : '战绩读取中…'}}</text></view>
+      </view>
+      <view class="me-overview-note"><text>{{stats ? stats.wins + ' 胜 · ' + stats.losses + ' 负' : '战绩读取中…'}}</text><navigator class="me-score-detail" url="/pages/scores/scores" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看积分明细"><text>积分明细</text><view class="me-chevron" aria-hidden="true"></view></navigator></view>
     </view>
     <navigator wx:if="{{currentRoom}}" class="me-current-room" url="{{'/pages/table/table?code='+currentRoom.code+'&resume=1'}}" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="{{'返回牌桌，房间'+currentRoom.code+'，'+currentRoom.statusLabel+'，'+currentRoom.relationLabel}}">
       <view class="me-room-icon" aria-hidden="true"></view>

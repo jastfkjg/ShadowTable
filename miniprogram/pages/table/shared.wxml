@@ -5,8 +5,11 @@
 <template name="tablePhase">
     <view class="phase-strip">
       <view class="phase-heading">
+        <view class="table-symbol blue" aria-hidden="true"><image src="/assets/table-cards.svg" /></view>
+        <view class="phase-heading-copy">
         <text class="phase-label">当前阶段</text>
         <text class="phase-name">{{room.phaseName}}</text>
+        </view>
       </view>
       <view wx:if="{{!room.flexible && (room.round || room.leader)}}" class="phase-detail">
         <text wx:if="{{room.round}}">任务 {{room.round}}</text>
@@ -27,34 +30,35 @@
     </view>
 </template>
 <block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !historyOpen}}"><include src="../../player-card.wxml" /></block>
-<view wx:if="{{identityHistoryOpen && revealed && secret.identityHistory.length > 1 && !error}}" class="dialog-backdrop identity-history-backdrop" catchtap="closeIdentityHistory" catchtouchmove="blockScroll">
-  <view class="identity-history-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局身份历程">
-    <view class="identity-history-handle" aria-hidden="{{true}}" />
-    <view class="identity-history-heading">
-      <view><view class="identity-history-title">身份历程</view><view class="small muted">本局 · {{room.me.seat}}号</view></view>
+<view wx:if="{{identityHistoryOpen && revealed && secret.identityHistory.length > 1 && !error}}" class="dialog-backdrop identity-history-backdrop table-sheet-backdrop process-backdrop" catchtap="closeIdentityHistory" catchtouchmove="blockScroll">
+  <view class="identity-history-sheet table-sheet process-sheet process-history {{processBodyHeight?'has-measured-body':''}}" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局身份历程">
+    <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="{{true}}" />
+    <view class="identity-history-heading table-sheet-heading">
+      <view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/home-clock.svg" aria-hidden="true" /></view><view class="identity-history-title">身份历程</view></view>
       <button hover-class="none" class="identity-history-close" bindtap="closeIdentityHistory" aria-label="关闭身份历程">×</button>
-    </view>
-    <scroll-view scroll-y="{{true}}" class="identity-history-body">
+    </view></view>
+    <scroll-view scroll-y="{{true}}" enhanced show-scrollbar="{{false}}" class="identity-history-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
+      <view class="process-context"><text>本局 · {{room.me.seat}}号</text><view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view></view>
       <view class="identity-history-timeline">
         <view wx:for="{{secret.identityHistory}}" wx:key="id" class="identity-history-event">
           <view class="identity-history-dot {{item.current?'is-current':''}}" aria-hidden="{{true}}" />
-          <view wx:if="{{item.current}}" class="identity-history-record-heading"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge is-current">当前</text></view>
-          <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
+          <view wx:if="{{item.current}}" class="identity-history-record-heading"><image wx:if="{{item.portrait}}" class="process-history-art" src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge is-current">当前</text></view>
+          <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><image wx:if="{{item.portrait}}" class="process-history-art" src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
           <view class="identity-history-meta small muted">{{item.sinceLabel}}</view>
           <view wx:if="{{item.current}}" class="identity-history-summary small muted">{{item.faction}}{{item.skillStatus?' · '+item.skillStatus.title:''}}</view>
           <view wx:if="{{item.skillHistory.length}}" class="identity-skill-history"><view class="small muted">技能记录</view><view wx:for="{{item.skillHistory}}" wx:for-item="skill" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{skill.round}}轮</text><text class="identity-skill-text">{{skill.text}}</text></view></view>
           <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="small muted">{{item.faction}}</view><view class="identity-history-information">{{item.detailAvailable?item.information:'旧对局未记录当时视野，仅保留初始身份。'}}</view><view class="identity-history-readonly small muted">曾用身份 · 仅供回看</view></view>
         </view>
       </view>
-    </scroll-view>
-    <view class="identity-history-footer"><view class="small muted">本局记录 · 仅你可见</view><button hover-class="none" class="secondary" bindtap="hideIdentityHistory">立即遮盖</button></view>
+    </view></scroll-view>
+    <view class="identity-history-footer process-sheet-footer table-sheet-footer"><button hover-class="none" class="primary" bindtap="hideIdentityHistory">立即遮盖</button></view>
   </view>
 </view>
 <import src="../../honors.wxml" />
 <template is="honorBallot" data="{{honorDialog:honorDialog && !error,honorGroups,honorReady,honorSelected,honorRequired,honors,busy:busy || hasPendingRequest || !network}}" />
 <template name="tableResult">
     <view wx:if="{{latestResult && (room.phase==='tools' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
-      <view class="result-summary-heading"><text class="small muted">最近结果</text><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
+      <view class="result-summary-heading"><view class="table-result-label"><image src="/assets/home-clock.svg" aria-hidden="true" /><text class="small muted">最近结果</text></view><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
       <view class="latest-result-title result-heading"><text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text><text>{{latestResult.resultRows ? '技能最终结果' : latestResult.text}}</text><text wx:if="{{latestResult.resultTeam}}" class="result-team">队伍 {{latestResult.resultTeam}}</text></view>
       <view wx:if="{{latestResult.resultRows}}">
         <view wx:if="{{latestResult.historyNote}}" class="latest-result-note small muted">{{latestResult.historyNote}}</view>
@@ -97,56 +101,54 @@
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
-<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-  <view class="error-dialog dealt-identity-dialog" role="dialog" aria-modal="true" aria-label="身份已发放">
-    <view class="dialog-title">身份已发放</view>
-    <view class="small muted identity-privacy-note">仅供本人查看</view>
-    <block wx:if="{{dealtIdentitySecret}}">
-      <view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view>
-      <view class="muted">{{dealtIdentitySecret.faction}}</view>
-      <view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view>
-      <view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view>
-      <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
-      <button hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
-    </block>
-    <block wx:else>
-      <view class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</view>
-      <button hover-class="none" class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button>
-      <button hover-class="none" class="text-button" bindtap="closeDealtIdentity">稍后查看</button>
-    </block>
+<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop table-sheet-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog dealt-identity-dialog table-sheet {{dealtIdentitySecret?'is-revealed':'is-covered'}}" role="dialog" aria-modal="true" aria-label="身份已发放">
+    <view class="table-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/table-cards.svg" /></view><text>身份已发放</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeDealtIdentity" aria-label="关闭并遮盖身份">×</button></view></view>
+    <scroll-view class="table-sheet-body dealt-identity-body" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="table-sheet-fields">
+        <view class="small muted identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
+        <block wx:if="{{dealtIdentitySecret}}">
+          <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view>
+          <view class="private-info-group"><view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view><view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view></view>
+          <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
+        </block>
+        <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
+      </view>
+    </scroll-view>
+    <view class="table-sheet-footer">
+      <button wx:if="{{dealtIdentitySecret}}" hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
+      <block wx:else><button hover-class="none" class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button><button hover-class="none" class="text-button" bindtap="closeDealtIdentity">稍后查看</button></block>
+    </view>
   </view>
 </view>
-<view wx:if="{{fairyResult && !identityChange && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-  <view class="error-dialog" role="dialog" aria-modal="true" aria-label="仙女查验结果">
-    <view class="dialog-title">仙女查验结果</view>
-    <view class="small muted">仅供本人查看</view>
-    <block wx:if="{{fairyResultRevealed}}">
-      <view class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
-      <button hover-class="none" class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
-      <button hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button>
-    </block>
-    <block wx:else>
-      <view class="private-info muted">结果已遮盖，请确认周围无人查看。</view>
-      <button hover-class="none" class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button>
-    </block>
+<view wx:if="{{fairyResult && !identityChange && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog table-sheet process-sheet process-inspection {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="仙女查验结果">
+    <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/process-eye.svg" aria-hidden="true" /></view><text>仙女查验结果</text></view><button wx:if="{{fairyResultRevealed}}" hover-class="none" class="table-sheet-close process-private-hide" bindtap="hidePrivatePreview" aria-label="立即遮盖查验结果"><image src="/assets/process-eyeoff.svg" aria-hidden="true" /></button></view></view>
+    <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
+      <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
+      <block wx:if="{{fairyResultRevealed}}">
+        <view wx:if="{{fairyResult.displaySeat}}" class="process-inspection-result" aria-label="{{fairyResult.summary || fairyResult.information}}"><view><text class="small muted">查验对象</text><view class="process-inspection-seat">{{fairyResult.displaySeat}}<text>号</text></view></view><view class="process-inspection-faction"><view class="player-card-faction-symbol faction-{{fairyResult.factionTone}}"><image src="/assets/{{fairyResult.factionTone==='good'?'record-shield-good':fairyResult.factionTone==='evil'?'process-shield-evil':'process-shield-third'}}.svg" aria-hidden="true" /></view><view><text class="small muted">查验结果</text><view class="faction-{{fairyResult.factionTone}}">{{fairyResult.displayFaction}}</view></view></view></view>
+        <view wx:else class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
+      </block>
+      <view wx:else class="process-sealed"><view class="table-symbol blue"><image src="/assets/table-lock.svg" aria-hidden="true" /></view><view>查验结果已遮盖</view><text class="small muted">请确认周围无人查看。</text></view>
+    </view></scroll-view>
+    <view class="process-sheet-footer table-sheet-footer"><button wx:if="{{fairyResultRevealed}}" hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button><button wx:else hover-class="none" class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button></view>
   </view>
 </view>
-<view wx:if="{{identityChange && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-  <view class="error-dialog" role="dialog" aria-modal="true" aria-label="你的新身份">
-    <view class="dialog-title">你已获得新身份</view>
-    <view class="small muted">仅供本人查看 · {{identityChange.passiveVision?'视野随技能结算自动更新':'新技能下一轮可用'}}</view>
-    <block wx:if="{{identityChangeRevealed}}">
-      <view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view>
-      <view class="muted">{{identityChange.faction}}</view>
-      <view class="private-info">{{identityChange.information}}</view>
-<view wx:if="{{identityChange.skillStatus}}" class="private-info"><view class="label">技能状态 · {{identityChange.skillStatus.title}}</view>{{identityChange.skillStatus.detail}}</view>
-      <button hover-class="none" class="text-button" bindtap="hidePrivatePreview">立即遮盖</button>
-      <button hover-class="none" class="primary" bindtap="acknowledgeIdentity" disabled="{{hasPendingRequest || busy}}">记住了，遮盖身份</button>
-    </block>
-    <block wx:else>
-      <view class="private-info muted">身份已遮盖，请确认周围无人查看。</view>
-      <button hover-class="none" class="primary" bindtap="revealChangedIdentity" disabled="{{busy}}">查看新身份</button>
-    </block>
+<view wx:if="{{identityChange && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog table-sheet process-sheet process-new-identity {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="你的新身份">
+    <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/table-cards.svg" aria-hidden="true" /></view><text>你已获得新身份</text></view><button wx:if="{{identityChangeRevealed}}" hover-class="none" class="table-sheet-close process-private-hide" bindtap="hidePrivatePreview" aria-label="立即遮盖新身份"><image src="/assets/process-eyeoff.svg" aria-hidden="true" /></button></view></view>
+    <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
+      <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
+      <block wx:if="{{identityChangeRevealed}}">
+        <view class="dealt-role-heading"><image wx:if="{{identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view>
+        <view class="private-info-group"><view class="private-info"><view class="label"><image src="/assets/process-eye.svg" aria-hidden="true" />你的视野</view>{{identityChange.visionText || identityChange.information}}</view><view wx:if="{{identityChange.abilityText}}" class="private-info"><view class="label"><image src="/assets/record-spark.svg" aria-hidden="true" />角色能力</view>{{identityChange.abilityText}}</view></view>
+        <view wx:if="{{identityChange.skillStatus}}" class="process-skill-status"><image src="/assets/home-clock.svg" aria-hidden="true" /><view><view>{{identityChange.skillStatus.title}}</view><view wx:if="{{identityChange.skillStatus.detail}}" class="small muted">{{identityChange.skillStatus.detail}}</view></view></view>
+        <view wx:if="{{identityChange.timingNote}}" class="process-private-note small muted">{{identityChange.timingNote}}</view>
+      </block>
+      <view wx:else class="process-sealed"><view class="table-symbol blue"><image src="/assets/table-lock.svg" aria-hidden="true" /></view><view>新身份已遮盖</view><text class="small muted">请确认周围无人查看，再查看新身份。</text></view>
+    </view></scroll-view>
+    <view class="process-sheet-footer table-sheet-footer"><button wx:if="{{identityChangeRevealed}}" hover-class="none" class="primary" bindtap="acknowledgeIdentity" disabled="{{hasPendingRequest || busy}}">记住了，遮盖身份</button><button wx:else hover-class="none" class="primary" bindtap="revealChangedIdentity" disabled="{{busy}}">查看新身份</button></view>
   </view>
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
@@ -176,44 +178,43 @@
       </view>
     </view>
   </view>
-  <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop {{skillTargetMode?'skill-target-backdrop':''}}" catchtouchmove="blockScroll">
-    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog {{skillTargetMode?'skill-target-dialog':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
-      <view class="skill-header">
-        <view wx:if="{{skillTargetMode}}" class="skill-meta">{{skillTargetMeta}}</view>
-        <view class="skill-title">{{skillTitle}}</view>
-        <view class="skill-hint">{{skillHint}}</view>
-      </view>
-      <scroll-view wx:if="{{skillTargets.length || swapPlayers.length}}" scroll-y class="skill-body" style="height: {{skillBodyHeight}}{{skillTargetMode?'px':'rpx'}}; max-height: {{skillTargetMode?'52vh':'42vh'}};">
+  <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
+    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
+      <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{skillTargetMode==='fairy' || skillTargetMode==='inspect'?'process-eye':skillTargetMode==='sword' || skillTargetMode==='attack'?'record-swords':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{skillTitle}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择技能">×</button></view></view>
+      <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="skill-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
+        <view class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
+        <view class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
         <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
         <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
-          <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}">
-            <view class="skill-seat">{{item.seat}}<text class="skill-seat-unit"> 号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="{{true}}">✓</text>
-          </button>
+          <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view>
-        <block wx:if="{{swapOptions.length}}">
-          <view class="skill-context">已选 {{swapSeats.length}} / 2</view>
-          <view class="skill-target-grid">
-            <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-label="{{item.seat+'号 '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(item.selected?'，已选':'')}}">
-              <view class="skill-seat">{{item.seat}}<text class="skill-seat-unit"> 号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="{{true}}">✓</text>
-            </button>
-          </view>
-        </block>
+        <block wx:if="{{swapOptions.length}}"><view class="skill-context">已选 {{swapSeats.length}} / 2</view><view class="skill-target-grid">
+          <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-pressed="{{item.selected}}" aria-label="{{item.seat+'号 '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(item.selected?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="true">✓</text></button>
+        </view></block>
         <view wx:if="{{skillEligibility}}" class="skill-eligibility">{{skillEligibility}}</view>
-      </scroll-view>
         <view wx:if="{{skillOtherChoices.length}}" class="skill-other-choices">
-          <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{item.value==='mode:'?'skill-navigation':''}} {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><text wx:if="{{!skillTargetMode}}" class="skill-other-mark" aria-hidden="{{true}}">{{draftChoice===item.value?'✓':item.value==='pass'?'○':'›'}}</text><text>{{item.label}}</text><view wx:if="{{skillTargetMode && item.value!=='mode:'}}" class="skill-pass-mark" aria-hidden="{{true}}" /></button>
+          <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{item.value==='mode:'?'skill-navigation':''}} {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><view class="process-choice-symbol"><image src="/assets/{{item.value==='pass'?'process-skip':item.value==='mode:'?'record-list':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{item.label}}</text><view class="process-choice-radio" aria-hidden="true">{{draftChoice===item.value?'✓':''}}</view></button>
         </view>
-      <view class="skill-footer">
+      </view></scroll-view>
+      <view class="skill-footer process-sheet-footer table-sheet-footer">
         <view class="skill-summary" aria-live="polite">{{skillTargetMode?skillSummary:draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
         <view wx:if="{{skillTargetMode}}" class="skill-consequence">{{skillConsequence}}</view>
         <view wx:if="{{hunterModes && draftChoice==='pass'}}" class="small">本轮若出局，将不会触发被动开枪。是否确认？</view>
-        <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':skillTargetMode?skillConfirmLabel:draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button>
-        <button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
+        <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':skillTargetMode?skillConfirmLabel:draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button><button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
       </view>
     </view>
-    <view wx:else class="error-dialog action-dialog" role="dialog" aria-modal="true" aria-label="当前操作">
-      <view class="dialog-title">{{room.phase==='identity'?'查看身份':actionLabel}}</view>
+    <view wx:elif="{{stagedChoice && (room.phase==='quest' || room.phase==='teamVote')}}" class="error-dialog table-sheet task-choice-sheet process-sheet process-vote {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{room.phase==='teamVote'?'队伍表决':'选择本轮任务牌'}}">
+      <view class="table-sheet-top process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/{{room.phase==='teamVote'?'process-vote':'table-cards'}}.svg" /></view><text>{{room.phase==='teamVote'?'队伍表决':'选择本轮任务牌'}}</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择任务牌">×</button></view></view>
+      <scroll-view class="table-sheet-body task-choice-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':'height:'+(62+actionChoices.length*108)+'px;'}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="table-sheet-fields process-sheet-fields">
+        <view class="task-choice-context muted">{{room.team.length?'任务队伍 '+teamText+' 号':room.phase==='teamVote'?'本次为全员表决（未指定任务队伍）':'本轮任务出牌'}}<text>{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text></view>
+        <view class="action-choice-list"><button hover-class="none" wx:for="{{actionChoices}}" wx:key="value" class="quest-choice {{draftChoice===item.value?'is-selected':''}} {{item.value==='reject' || item.value==='fail' || item.value==='thiefFail'?'is-fail':item.value==='magic'?'is-magic':''}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}" aria-pressed="{{draftChoice===item.value}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="quest-choice-symbol" aria-hidden="true"><image src="/assets/{{item.value==='approve'?'process-up':item.value==='reject'?'process-down':item.value==='fail' || item.value==='thiefFail'?'record-swords':item.value==='magic'?'record-spark':'record-shield-good'}}.svg" /></view><view class="quest-choice-copy"><view>{{item.label}}</view><text>{{room.phase==='teamVote'?(item.value==='approve'?'同意这支队伍出发':item.value==='reject'?'不同意这支队伍出发':'选择后再确认提交'):'本轮任务牌 · 点击选择'}}</text></view><view class="quest-choice-radio" aria-hidden="true">{{draftChoice===item.value?'✓':''}}</view></button></view>
+      </view></scroll-view>
+      <view class="table-sheet-footer process-sheet-footer"><view class="task-choice-hint muted" aria-live="polite">{{draftChoice?'已选：'+draftLabel+'，确认提交后不可更改':'请先选择，再确认提交'}}</view><button hover-class="none" class="primary" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">确认提交</button><button hover-class="none" class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button></view>
+    </view>
+    <view wx:else class="error-dialog action-dialog table-sheet process-sheet process-generic {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="当前操作">
+      <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/table-cards.svg" aria-hidden="true" /></view><text>{{room.phase==='identity'?'查看身份':actionLabel}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后完成当前操作">×</button></view></view>
+      <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
       <view wx:if="{{room.phase==='teamVote'}}" class="action-team">{{room.team.length?'任务队伍：'+teamText+'号':'本次为全员表决（未指定任务队伍）'}}</view>
       <view wx:if="{{room.phase==='identity'}}" class="action-identity">
         <view wx:if="{{actionSecret}}" class="action-identity-details">
@@ -236,42 +237,31 @@
         </view>
         <button hover-class="none" class="primary" bindtap="confirmSwap" disabled="{{hasPendingRequest || busy || !network || swapSeats.length!==2}}">确认换号</button>
       </block>
+      <view wx:if="{{actionTargets.length}}" class="process-action-targets">
+        <button hover-class="none" wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
+      </view>
+      </view></scroll-view><view class="process-sheet-footer table-sheet-footer">
       <block wx:if="{{stagedChoice}}">
         <view class="small muted">{{draftChoice?'已选：'+draftLabel+'，确认提交后不可更改':'请先选择，再确认提交'}}</view>
         <button hover-class="none" class="primary" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">确认提交</button>
       </block>
-      <scroll-view wx:if="{{actionTargets.length}}" scroll-y class="action-target-scroll">
-        <button hover-class="none" wx:for="{{actionTargets}}" wx:key="seat" class="secondary" bindtap="submitTarget" data-seat="{{item.seat}}" disabled="{{hasPendingRequest || busy || !network}}">{{item.seat}}号 · {{item.name}}</button>
-      </scroll-view>
-      <button hover-class="none" class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button>
+      <button hover-class="none" class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button></view>
     </view>
   </view>
-  <view wx:if="{{toolType && room.canUseTools && !error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
-    <view class="error-dialog" role="dialog" aria-modal="true" aria-label="发起操作">
-      <view class="dialog-title">{{toolTitle?toolTitle:toolType==='vote'?'发起投票':toolType==='quest'?'发起任务':toolType==='reverseStrike'?'刀逆仆':toolType==='offline'?'线下刀人':'刀梅林'}}</view>
-      <block wx:if="{{toolType==='vote' || toolType==='quest' || (room.knights && toolType==='assassination')}}">
-        <view class="small muted">{{room.knights && toolType==='assassination'?'选择线下多数决议的红方带刀人（平票先猜拳）；由本人录入目标或空刀。提前起刀只能在发言环节。':toolType==='vote'?'可选队伍，也可直接发起全员投票。':'选择任务队员。'}}</view>
-        <scroll-view scroll-y class="tool-seat-scroll" style="height: {{toolPlayers.length>6?400:296}}rpx;">
-        <view class="tool-seat-grid">
-          <button hover-class="none" wx:for="{{toolPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleToolSeat" data-seat="{{item.seat}}" disabled="{{busy}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}">{{item.seat}}号 · {{item.name}}</button>
-        </view>
-        </scroll-view>
-        <view class="small muted">已选 {{toolSeats.length}} 人</view>
-        <view wx:if="{{toolType==='quest'}}" class="quest-threshold">
-          <view class="label">失败票门槛</view>
-          <view class="threshold-options">
-            <button hover-class="none" class="tool-seat-option {{toolThreshold===1?'active':''}}" bindtap="pickToolThreshold" data-value="1" disabled="{{busy}}" aria-label="{{'1 张失败票'+(toolThreshold===1?'，已选':'')}}">{{toolThreshold===1?'✓ ':''}}1 张</button>
-            <button hover-class="none" class="tool-seat-option {{toolThreshold===2?'active':''}}" bindtap="pickToolThreshold" data-value="2" disabled="{{busy}}" aria-label="{{'2 张失败票'+(toolThreshold===2?'，已选':'')}}">{{toolThreshold===2?'✓ ':''}}2 张</button>
-          </view>
-          <view class="small muted">至少 {{toolThreshold}} 张失败票，任务才失败</view>
-          <view wx:if="{{toolSeats.length>0 && toolSeats.length<toolThreshold}}" class="small threshold-hint">请至少选择 {{toolThreshold}} 名任务队员</view>
-        </view>
-      </block>
-      <view wx:else class="dialog-message">{{toolDescription?toolDescription:toolType==='offline'?'线下刀人后，由房主记录完成。':toolType==='reverseStrike'?'刺客选择逆仆，结果私密。':'刺客选择梅林，结算后公开是否命中。'}}</view>
-      <view class="dialog-actions">
-        <button hover-class="none" class="secondary" bindtap="closeTool" disabled="{{busy}}">取消</button>
-        <button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">发起</button>
-      </view>
+  <view wx:if="{{toolType && room.canUseTools && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
+    <view class="error-dialog table-sheet process-sheet process-tool {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="发起操作">
+      <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{toolType==='vote'?'process-vote':toolType==='quest'?'table-cards':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{toolTitle?toolTitle:toolType==='vote'?'发起投票':toolType==='quest'?'发起任务':toolType==='reverseStrike'?'刀逆仆':toolType==='offline'?'线下刀人':'刀梅林'}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeTool" disabled="{{busy}}" aria-label="取消发起操作">×</button></view></view>
+      <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
+        <view wx:if="{{toolType==='vote' || toolType==='quest'}}" class="process-tool-tabs" role="tablist" aria-label="房主操作"><button class="{{toolType==='vote'?'is-selected':''}}" hover-class="none" role="tab" aria-selected="{{toolType==='vote'}}" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">发起投票</button><button class="{{toolType==='quest'?'is-selected':''}}" hover-class="none" role="tab" aria-selected="{{toolType==='quest'}}" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">发起任务</button></view>
+        <block wx:if="{{toolType==='vote' || toolType==='quest' || (room.knights && toolType==='assassination')}}">
+          <view class="process-target-title"><text>{{toolType==='quest'?'选择任务队员':toolType==='vote'?'选择投票队伍':'选择带刀人'}}</text><text class="small muted">已选 {{toolSeats.length}} 人</text></view>
+          <view class="tool-seat-grid process-team-grid"><button hover-class="none" wx:for="{{toolPlayers}}" wx:key="seat" class="tool-seat-option {{item.selected?'active':''}}" bindtap="toggleToolSeat" data-seat="{{item.seat}}" disabled="{{busy}}" aria-pressed="{{item.selected}}" aria-label="{{item.seat+'号 '+item.name+(item.selected?'，已选':'')}}"><view class="process-team-number">{{item.seat}}<text>号</text></view><view>{{item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="true">✓</text></button></view>
+          <view class="process-help small muted">{{room.knights && toolType==='assassination'?'选择线下多数决议的红方带刀人（平票先猜拳）；由本人录入目标或空刀。提前起刀只能在发言环节。':toolType==='vote'?'可选队伍，也可直接发起全员投票。':'再次点击可取消选择。'}}</view>
+          <view wx:if="{{toolType==='quest'}}" class="quest-threshold"><view class="label">失败票门槛</view><view class="threshold-options"><button hover-class="none" class="tool-seat-option {{toolThreshold===1?'active':''}}" bindtap="pickToolThreshold" data-value="1" disabled="{{busy}}" aria-pressed="{{toolThreshold===1}}" aria-label="{{'1 张失败票'+(toolThreshold===1?'，已选':'')}}">1 张<text wx:if="{{toolThreshold===1}}" aria-hidden="true">✓</text></button><button hover-class="none" class="tool-seat-option {{toolThreshold===2?'active':''}}" bindtap="pickToolThreshold" data-value="2" disabled="{{busy}}" aria-pressed="{{toolThreshold===2}}" aria-label="{{'2 张失败票'+(toolThreshold===2?'，已选':'')}}">2 张<text wx:if="{{toolThreshold===2}}" aria-hidden="true">✓</text></button></view><view class="small muted">至少 {{toolThreshold}} 张失败票，任务才失败</view><view wx:if="{{toolSeats.length>0 && toolSeats.length<toolThreshold}}" class="small threshold-hint">请至少选择 {{toolThreshold}} 名任务队员</view></view>
+        </block>
+        <view wx:else class="dialog-message">{{toolDescription?toolDescription:toolType==='offline'?'线下刀人后，由房主记录完成。':toolType==='reverseStrike'?'刺客选择逆仆，结果私密。':'刺客选择梅林，结算后公开是否命中。'}}</view>
+      </view></scroll-view>
+      <view class="process-sheet-footer table-sheet-footer"><view wx:if="{{toolType==='vote' || toolType==='quest' || (room.knights && toolType==='assassination')}}" class="process-selection-summary small muted">已选 {{toolSeats.length}} 人{{toolType==='vote' && !toolSeats.length?' · 全员投票':''}}</view><button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">{{toolType==='quest'?'发起任务':toolType==='vote'?(toolSeats.length?'发起投票':'发起全员投票'):'发起'}}</button><button hover-class="none" class="text-button" bindtap="closeTool" disabled="{{busy}}">取消</button></view>
     </view>
   </view>
   <view wx:if="{{reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button hover-class="none" class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
@@ -427,13 +417,14 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open">
-        <view wx:if="{{secret.identityHistory.length > 1}}" class="identity-card-topline"><text class="small muted">当前身份</text><button hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
-        <view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view>
-        <text class="muted">{{secret.faction}}</text>
-        <view class="private-info">{{secret.information}}<text wx:if="{{secret.outcome}}" class="label">{{secret.outcome}}</text></view>
-<view wx:if="{{secret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{secret.skillStatus.title}}</view>{{secret.skillStatus.detail}}</view>
+        <view class="inline-privacy-row"><view class="identity-privacy-note muted"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button inline-hide" bindtap="reveal">立即遮盖</button></view>
+        <view class="identity-card-topline"><text class="small muted">当前身份</text><button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
+        <view class="inline-role-heading"><image wx:if="{{secret.portrait}}" class="private-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="inline-role-copy"><view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="private-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view><text wx:if="{{secret.outcome}}" class="inline-role-outcome {{secret.outcome==='本局你获胜'?'is-win':secret.outcome==='本局你失败'?'is-loss':''}}">{{secret.outcome}}</text></view>
+        <view class="inline-private-details">
+          <view class="private-info"><view class="label">你的视野</view>{{secret.information}}</view>
+          <view wx:if="{{secret.skillStatus}}" class="inline-skill-status"><view class="inline-skill-heading"><image src="/assets/record-spark.svg" aria-hidden="true" /><text class="inline-skill-label">技能状态</text><text class="inline-skill-value">{{secret.skillStatus.title}}</text></view><view wx:if="{{secret.skillStatus.detail}}" class="inline-skill-detail">{{secret.skillStatus.detail}}</view></view>
+        </view>
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
-        <button hover-class="none" class="secondary" bindtap="reveal">立即遮盖</button>
       </view>
     </block>
     <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : room.phase==='tools' || room.phase==='ended'?'result-first':'operation-first'}}">
