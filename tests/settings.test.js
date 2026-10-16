@@ -44,8 +44,8 @@ const room = () => ({
   me: { isHost: true },
   showSkillDetails: false,
 });
-test('计分开关自动保存且使用服务端默认人数，发牌后锁定，旧服务不发送新字段',async()=>{
-  let r={...room(),phase:'lobby',board:'classic',capacity:6,scoreSettings:{enabled:false,editable:true,defaultEnabledMinPlayers:10,unavailableReason:null}};
+test('计分开关自动保存且按服务端板子与人数应用默认值，同人数换板重设，发牌后锁定',async()=>{
+  let r={...room(),phase:'lobby',board:'classic',capacity:6,scoreSettings:{enabled:false,editable:true,defaultEnabledBoards:structuredClone(require('../server/scoring-rules.json').defaultEnabledBoards),unavailableReason:null}};
   const writes=[];
   const p=page({login:async()=>{},requestId:()=> 'score-setting',request:async(url,method,data)=>{
     if(method==='POST'){writes.push(data);r={...r,board:data.board,capacity:data.capacity,scoreSettings:{...r.scoreSettings,enabled:data.scoreEnabled}};return {ok:true};}
@@ -53,9 +53,19 @@ test('计分开关自动保存且使用服务端默认人数，发牌后锁定�
   }});
   await p.load();assert.equal(p.data.scoreEnabled,false);
   await p.toggleScoring({detail:{value:true}});assert.equal(writes[0].scoreEnabled,true);assert.equal(p.data.dirty,false);
-  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(12)}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(12)}});assert.equal(p.data.scoreEnabled,false);assert.equal(writes.at(-1).scoreEnabled,false);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,true);
   await p.toggleScoring({detail:{value:false}});assert.equal(p.data.scoreEnabled,false);
-  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(10)}});assert.equal(p.data.scoreEnabled,true);
+  await p.load();assert.equal(p.data.scoreEnabled,false);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='classic-court')}});assert.equal(p.data.scoreEnabled,false);
+  await p.toggleScoring({detail:{value:true}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='chaos')}});assert.equal(p.data.scoreEnabled,false);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(10)}});assert.equal(p.data.scoreEnabled,false);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-10')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(11)}});assert.equal(p.data.scoreEnabled,false);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-11')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(13)}});assert.equal(p.data.scoreEnabled,true);
   await p.pickCapacity({detail:{value:p.data.capacities.indexOf(6)}});assert.equal(p.data.scoreEnabled,false);
   r.phase='tools';r.scoreSettings.editable=false;await p.load();const count=writes.length;
   await p.toggleScoring({detail:{value:true}});assert.equal(writes.length,count);

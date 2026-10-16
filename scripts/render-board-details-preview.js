@@ -6,6 +6,7 @@ const { wxmlToJs } = require("miniprogram-compiler");
 const { BOARDS } = require("../server/engine");
 const details = require("../server/board-info");
 const presentation = require("../miniprogram/board-detail");
+const { decorateBoard } = require("../miniprogram/board-detail-art");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(
   __dirname,
@@ -89,10 +90,10 @@ const styles =
 const scenes = {};
 for (const source of BOARDS.filter((b) => b.available))
   for (const capacity of source.counts) {
-    const board = presentation.presentBoard(
+    const board = decorateBoard(presentation.presentBoard(
         { ...source, detail: details[source.id] },
         capacity,
-      ),
+      )),
       selectedGroup = board.groups[0]?.id || "";
     scenes[source.id + "-" + capacity] = {
       board,

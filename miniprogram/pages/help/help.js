@@ -1,5 +1,20 @@
 const api = require("../../api");
 const { switchHomeTab } = require("../../tab-navigation");
+const guideSteps = {
+  player: [
+    { title: "加入牌桌", text: "打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。", flow: "打开邀请 / 输入房间码", icon: "home-join-gold" },
+    { title: "入座并准备", text: "选择座位后点击准备，等待房主发牌。满座时可以先围观。", flow: "选择座位 → 点击准备", icon: "record-users" },
+    { title: "私下查看身份", text: "记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。", flow: "查看身份 → 记住并遮盖", icon: "process-eye" },
+    { title: "线下讨论，按提示操作", text: "需要你投票、出任务牌或使用技能时，页面会提示；确认提交后等待结算。", flow: "选择 → 确认提交 → 等待结算", icon: "process-vote" },
+  ],
+  host: [
+    { title: "建桌与邀请", text: "选择人数、板子和桌上昵称，创建房间后邀请朋友，或分享 6 位房间码。", flow: "选择人数与板子 → 邀请朋友", icon: "home-join-gold" },
+    { title: "入座与发牌", text: "座位坐满、入座玩家全员准备后，房主才能发牌。每位玩家用自己的手机确认身份。", flow: "全员准备 → 发放身份", icon: "record-users" },
+    { title: "按现场进度发起", text: "线下讨论后，由房主发起投票、任务或技能。任务需要选择队伍和失败票门槛；提交收齐后自动结算。", flow: "发起操作 → 全员提交 → 结算", icon: "process-vote" },
+    { title: "登记结果与重开", text: "最终行刺在线下完成，由房主手动结束对局并登记胜方。结束后可在同一房间重新准备。", flow: "结束对局 → 登记胜方 → 再开一局", icon: "record-cup" },
+  ],
+};
+const stepsFor = mode => guideSteps[mode].map((step, index) => ({ ...step, number: String(index + 1).padStart(2, "0"), expanded: index === 0 }));
 
 Page({
   data: {
@@ -9,6 +24,10 @@ Page({
     boardsExpanded: false,
     loadingBoards: true,
     boardError: "",
+    guideMode: "player",
+    guideSteps: stepsFor("player"),
+    helpQuery: "",
+    references: [],
     sections: [
       { id: "host", title: "我是房主", subtitle: "从建桌到再开一局", expanded: false, items: [
         { title: "1. 建桌与邀请", text: "选择人数和板子，填写桌上昵称。朋友可通过邀请或 6 位房间码加入；满座后加入的人会先围观。" },
@@ -41,6 +60,7 @@ Page({
     this.alive = true;
     const scoringOnly = options.section === "scoring";
     this.setData({ scoringOnly, scoringExpanded: scoringOnly });
+    this.refreshReferences();
     if (!scoringOnly) this.loadBoards();
     this.loadScoreRules();
   },
@@ -83,6 +103,7 @@ Page({
     } finally {
       this.fetchingBoards = false;
       if (this.alive) this.setData({ loadingBoards: false });
+      if (this.alive) this.refreshReferences();
     }
   },
   async loadScoreRules() {
@@ -91,16 +112,66 @@ Page({
       const rules = await api.request("/api/scoring/rules");
       if (this.alive) this.setData({ scoringRules: rules });
     } catch (e) { if (this.alive) this.setData({ scoringError: "计分规则暂未加载，请重试。" }); }
-    finally { if (this.alive) this.setData({ scoringLoading: false }); }
+    finally { if (this.alive) { this.setData({ scoringLoading: false }); this.refreshReferences(); } }
   },
-  toggleScoring() { this.setData({ scoringExpanded: !this.data.scoringExpanded }); },
+  setGuideMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    if (!guideSteps[mode] || mode === this.data.guideMode) return;
+    this.setData({ guideMode: mode, guideSteps: stepsFor(mode) });
+  },
+  toggleStep(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    if (!Number.isInteger(index) || !this.data.guideSteps[index]) return;
+    this.setData({ guideSteps: this.data.guideSteps.map((step, i) => i === index ? { ...step, expanded: !step.expanded } : step) });
+  },
+  searchHelp(e) { this.setData({ helpQuery: String(e.detail.value || "") }); this.refreshReferences(); },
+  clearSearch() { this.searchHelp({ detail: { value: "" } }); },
+  refreshReferences() {
+    const tokens = this.data.helpQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const matches = text => tokens.every(token => String(text).toLocaleLowerCase().includes(token));
+    const entries = [
+      { ...this.data.sections[1], icon: "sheet-book", index: 1 },
+      { id: "scoring", title: "计分规则", subtitle: "计分范围与加分项目", icon: "record-cup", expanded: this.data.scoringExpanded },
+      { id: "boards", title: "板子与角色", subtitle: "按人数和玩法查阅", icon: "sheet-shield", expanded: this.data.boardsExpanded },
+      { ...this.data.sections[0], title: "房主操作详解", icon: "sheet-user", index: 0 },
+      { ...this.data.sections[2], icon: "record-info", index: 2 },
+    ];
+    const references = entries.flatMap(entry => {
+      const headingMatches = matches(entry.title + " " + entry.subtitle);
+      let body;
+      if (entry.id === "scoring") body = JSON.stringify(this.data.scoringRules || {});
+      else if (entry.id === "boards") body = JSON.stringify(this.data.boards);
+      else body = entry.items.map(item => item.title + " " + item.text).join(" ");
+      if (tokens.length && !headingMatches && !matches(body)) return [];
+      const items = entry.items?.filter(item => headingMatches || matches(item.title + " " + item.text)) || [];
+      if (tokens.length && entry.items && !items.length) return [];
+      return [{ ...entry, expanded: tokens.length > 0 || entry.expanded,
+        items,
+        boards: entry.id === "boards" ? this.data.boards.filter(board => headingMatches || matches(JSON.stringify(board))) : [],
+      }];
+    });
+    this.setData({ references });
+  },
+  toggleReference(e) {
+    const { id, index } = e.currentTarget.dataset;
+    if (this.data.helpQuery.trim()) {
+      this.setData({ references: this.data.references.map(reference => reference.id === id ? { ...reference, expanded: !reference.expanded } : reference) });
+      return;
+    }
+    if (id === "scoring") this.toggleScoring();
+    else if (id === "boards") this.toggleBoards();
+    else this.toggleSection({ currentTarget: { dataset: { index } } });
+  },
+  toggleScoring() { this.setData({ scoringExpanded: !this.data.scoringExpanded }); this.refreshReferences(); },
   toggleBoards() {
     this.setData({ boardsExpanded: !this.data.boardsExpanded });
+    this.refreshReferences();
   },
   toggleSection(e) {
     const index = Number(e.currentTarget.dataset.index);
     if (!Number.isInteger(index) || !this.data.sections[index]) return;
     this.setData({ [`sections[${index}].expanded`]: !this.data.sections[index].expanded });
+    this.refreshReferences();
   },
   openBoard(e) {
     const { board, capacity } = e.currentTarget.dataset;

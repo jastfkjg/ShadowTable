@@ -63,6 +63,28 @@ test("时间筛选采用北京时间自然日边界，含当日，月底跨时�
   } finally { store.close(); }
 });
 
+test("按对局定位直接返回其所在位置，分页排序及权限与正常列表一致", () => {
+  const store = new Store(":memory:");
+  try {
+    for (let i = 0; i < 45; i++) archive(store, "game-" + String(i).padStart(2, "0"), { endedAt: now - Math.floor(i / 3), scored: true });
+    archive(store, "private", { uid: "wx:other" });
+    archive(store, "deleted");
+    store.db.prepare("INSERT INTO match_controls(match_id,state,updated) VALUES(?,'deleted',?)").run("deleted", now);
+    const all = store.matchesFor("wx:me", 0, 100).records;
+    const target = all[26];
+    const page = store.matchesFor("wx:me", 0, 7, true, null, parse("outcome=win"), target.id);
+    assert.equal(page.offset, 26); assert.equal(page.total, 45); assert.equal(page.hasMore, true);
+    assert.deepEqual(page.records.map(row => row.id), all.slice(26, 33).map(row => row.id));
+    const next = store.matchesFor("wx:me", page.offset + page.records.length, 20, true);
+    assert.deepEqual([...page.records, ...next.records].map(row => row.id), all.slice(26).map(row => row.id));
+    assert.equal(next.hasMore, false);
+    for (const id of ["private", "deleted", "missing"])
+      assert.throws(() => store.matchesFor("wx:me", 0, 20, false, null, {}, id), error => error.status === 404);
+    assert.throws(() => store.matchesFor("wx:me", 0, 20, false, null, parse("outcome=loss"), target.id), error => error.status === 404);
+    assert.doesNotMatch(JSON.stringify(page), /wx:|uid|private|deleted/);
+  } finally { store.close(); }
+});
+
 test("HTTP筛选兼容计分与趣味角色回查，拒绝重复和越权参数", async () => {
   const app = createApp({ database: ":memory:", clock: () => now, exchangeCode: async code => code });
   await new Promise(resolve => app.server.listen(0, "127.0.0.1", resolve));
@@ -84,7 +106,17 @@ test("HTTP筛选兼容计分与趣味角色回查，拒绝重复和越权参数"
     assert.equal(result.body.records[0].role, "魔术师"); assert.equal(result.body.filterOptions.roles[0].id, "魔术师");
     assert.equal(result.body.adjustments, undefined);
     assert.equal((await get("offset=0")).status, 200);
+    for (let i = 0; i < 30; i++) archive(app.store, "newer-" + i, { uid, endedAt: now + i + 1 });
+    const focus = await get("offset=0&focus=fun");
+    assert.equal(focus.status, 200); assert.equal(focus.body.offset, 30);
+    assert.equal(focus.body.records[0].id, "fun"); assert.ok(focus.body.filterOptions);
+    archive(app.store, "private", { uid: "wx:other" });
+    assert.equal((await get("focus=private")).status, 404);
+    assert.equal((await get("focus=missing")).status, 404);
+    assert.equal((await get("focus=fun&outcome=loss")).status, 404);
     for (const invalid of ["period=month&period=7d", "outcome=draw", "uid=wx:other", "role=gaheris", "board=../other"])
+      assert.equal((await get(invalid)).status, 400, invalid);
+    for (const invalid of ["focus=", "focus=fun&focus=fun", "offset=1&focus=fun", "focus=%00", "focus=" + "a".repeat(129)])
       assert.equal((await get(invalid)).status, 400, invalid);
   } finally { await new Promise(resolve => app.server.close(resolve)); app.store.close(); }
 });

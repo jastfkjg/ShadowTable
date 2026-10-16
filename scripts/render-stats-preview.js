@@ -81,6 +81,12 @@ const compactStats = presentStats({ total: 3, wins: 1, winRate: 33.3, byFaction:
   { id: 'knights:knife', metrics: knife },
 ] } });
 const stressRecords = presentMatches([{...match,id:'long',role:'觉醒蓝刀客·加赫雷斯',boardName:'阿瓦隆 · 十二骑士与扩展角色（12人）',faction:'good',outcome:'loss',endedAt:new Date(2026,9,11,23,33).getTime(),score:{status:'scored',total:-12},fun:{highlights:[{id:'good_shield',label:'成功挡刀',count:1},{id:'knife_enemy',label:'刀中敌方',count:12}]}}]);
+const timelineEvents = [
+  ...[1,2,3].map(round=>({id:'revive-'+round,round,kind:'revive',label:'复活',detail:'抽取新身份复活'})),
+  ...[1,2,3].map(round=>({id:'received-'+round,round,kind:'receivedKnife',label:'被刀',detail:["2号出刀 · 目标出局","4号出刀 · 目标出局","5号出刀 · 目标已出局"][round-1]})),
+  ...[1,2,3].map(round=>({id:'attack-'+round,round,kind:round===3?'duel':'knife',role:['蓝刀客·加雷斯','觉醒蓝刀客','红骑士'][round-1],label:round===3?'未生效':'刀中友方',detail:round===3?'5号同阵营 · 决斗失败':(round+1)+'号同阵营 · 目标出局'})),
+];
+const timelineRecord = {...presentMatches([{...match,id:'timeline',role:'红骑士',faction:'evil',outcome:'loss',winner:'good',endedAt:new Date(2026,9,16,20,38).getTime(),score:{status:'scored',total:0,breakdown:[]},fun:{status:'recorded',initialRole:'蓝刀客·加雷斯',events:timelineEvents},members:Array.from({length:12},(_,i)=>({seat:i+1,name:i?'同桌玩家'+(i+1):'林间'}))}])[0],expanded:true};
 const scenes = {
   overview: {tab:'records',statistics:{stats}}, fun: {tab:'fun',statistics:{stats}},
   'fun-compact': {tab:'fun',statistics:{stats:compactStats}},
@@ -94,6 +100,8 @@ const scenes = {
   empty: {tab:'records',statistics:{stats:presentStats({total:0,wins:0,winRate:null,byFaction:[],byRole:[],byBoard:[],recent:[]})}},
   history: {tab:'matches',historyStarted:true,history},
   'history-expanded': {tab:'matches',historyStarted:true,history:{...history,records:matchRecords.map((record,index)=>({...record,expanded:index<2,membersExpanded:index===1}))}},
+  'history-timeline': {tab:'matches',historyStarted:true,history:{...history,records:[timelineRecord],total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},
+  'history-timeline-long': {tab:'matches',historyStarted:true,history:{...history,records:[{...timelineRecord,fun:require('../miniprogram/fun-copy').story({...timelineRecord.fun,events:[...timelineEvents,{id:'long',round:1,kind:'knife',role:'觉醒蓝刀客·加赫雷斯',label:'刀中友方',detail:'9号同阵营 · 目标因魔术师换号避开伤害 · 实际承受者12号'},{id:'final',role:'红骑士',label:'未生效',detail:'本局最终结果未记录'}]})}],total:1,outcomeSummary:''}},
   'history-filters': {tab:'matches',historyStarted:true,history:{...history,filtersExpanded:true}},
   'history-empty': {tab:'matches',historyStarted:true,history:{...history,records:[],total:0,outcomeSummary:'',outcomeCounts:null}},
   'history-long': {tab:'matches',historyStarted:true,history:{...history,records:stressRecords,total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},

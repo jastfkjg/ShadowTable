@@ -5,8 +5,15 @@ const { avatarStyles, avatarPreset, avatarLibrary } = require("../../avatar-libr
 function presetId(url) {
   return avatarPreset(url)?.id || "";
 }
+function avatarLabel(url) {
+  const preset = avatarPreset(url);
+  if (!preset) return url ? "自选头像" : "默认头像";
+  const style = avatarStyles.find(item => item.id === preset.style);
+  const name = preset.label.split(" · ").slice(1).join(" · ") || preset.label;
+  return `${style.shortLabel} · ${name}`;
+}
 Page({
-  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", selectedAvatar: "", canUpload: false, uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0, ...avatarLibrary(), initial: "友", profile: null },
+  data: { loading: true, busy: false, error: "", conflict: false, dirty: false, pendingSave: false, nickname: "", editingNickname: false, nicknameError: "", keyboardHeight: 0, avatarPreview: "", avatarLabel: "默认头像", selectedAvatar: "", canUpload: false, uploadBusy: false, uploadStatus: "", uploadError: "", uploadProgress: 0, ...avatarLibrary(), initial: "友", profile: null },
   onLoad() {
     this.alive = true;
     const pages = getCurrentPages();
@@ -14,7 +21,7 @@ Page({
     const preview = personalPreview("profile");
     if (preview) {
       this.original = preview;
-      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
+      this.setData({ profile: preview, nickname: preview.nickname, avatarPreview: preview.avatarUrl, avatarLabel: avatarLabel(preview.avatarUrl), selectedAvatar: presetId(preview.avatarUrl), ...avatarLibrary(avatarPreset(preview.avatarUrl)?.style), initial: preview.initial });
     }
     const loading = this.load({ preserveEdits: true });
     this.loadUploadCapability();
@@ -45,7 +52,7 @@ Page({
     if (!this.alive || !path || !this.original || !this.data.canUpload || this.data.busy || this.pending) return;
     this.clearCustomAvatar();
     this.customAvatarPath = path; this.avatar = "local";
-    this.setData({ avatarPreview: path, selectedAvatar: "", error: "" }); this.markDirty();
+    this.setData({ avatarPreview: path, avatarLabel: avatarLabel(path), selectedAvatar: "", error: "" }); this.markDirty();
     await this.retryAvatarUpload();
   },
   async retryAvatarUpload() {
@@ -118,7 +125,7 @@ Page({
       this.original = profile; this.avatar = undefined; this.pending = null;
       const shown = presentProfile(profile);
       const style = preserveEdits && this.avatarStyleTouched ? this.data.avatarStyle : avatarPreset(profile.avatarUrl)?.style;
-      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, selectedAvatar: presetId(profile.avatarUrl), ...avatarLibrary(style), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
+      this.setData({ profile: shown, nickname: profile.nickname, avatarPreview: shown.avatarUrl, avatarLabel: avatarLabel(profile.avatarUrl), selectedAvatar: presetId(profile.avatarUrl), ...avatarLibrary(style), initial: shown.initial, dirty: false, pendingSave: false, editingNickname: false, nicknameError: "", keyboardHeight: 0 });
       wx.disableAlertBeforeUnload?.();
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { if (this.alive) this.setData({ loading: false }); }
@@ -165,14 +172,14 @@ Page({
     if (!preset) return;
     this.clearCustomAvatar();
     this.avatar = presetId(this.original.avatarUrl) === preset.id ? undefined : "builtin:" + preset.id;
-    this.setData({ avatarPreview: preset.path, selectedAvatar: preset.id, ...avatarLibrary(preset.style), error: "" });
+    this.setData({ avatarPreview: preset.path, avatarLabel: avatarLabel(preset.path), selectedAvatar: preset.id, ...avatarLibrary(preset.style), error: "" });
     this.markDirty();
   },
   removeAvatar() {
     if (this.data.busy || this.pending) return;
     this.clearCustomAvatar();
     this.avatar = this.original?.avatarUrl ? null : undefined;
-    this.setData({ avatarPreview: "", selectedAvatar: "", error: "" }); this.markDirty();
+    this.setData({ avatarPreview: "", avatarLabel: avatarLabel(""), selectedAvatar: "", error: "" }); this.markDirty();
   },
   async save(e) {
     if (this.data.busy || this.data.loading || this.data.conflict) return;

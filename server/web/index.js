@@ -8,6 +8,7 @@ const CSP =
 const assets = {
   "/badges.js": ["../../miniprogram/badges.js", "text/javascript; charset=utf-8"],
   "/badges.css": ["../../miniprogram/pages/badges/badges.wxss", "text/css; charset=utf-8"],
+  "/match-story.css": ["../../miniprogram/match-story.wxss", "text/css; charset=utf-8"],
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/board-detail.js": ["../../miniprogram/board-detail.js", "text/javascript; charset=utf-8"],
@@ -36,6 +37,8 @@ for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
+for (const name of ['info','heart','sword','swords','shield','spark','medal','users'])
+  assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
 function serve(req, res, path) {
   const asset = Object.hasOwn(assets, path) ? assets[path] : null;

@@ -1,33 +1,16 @@
-const api = require("../../api");
-const { presentMatches, backToMe } = require("../../profile");
-const { withoutAvatar } = require("../../honors");
+const { backToMe } = require("../../profile");
+// Keep old links working while all match details use the retained records UI.
 Page({
-  data: { loading: true, error: "", record: null },
-  onLoad(options = {}) { this.alive = true; this.id = options.id || ""; return this.load(); },
+  data: { error: "" },
+  onLoad(options = {}) { this.alive = true; this.id = options.id || ""; return this.openRecords(); },
   onUnload() { this.alive = false; },
-  async load() {
-    if (this.fetching) return;
-    if (!this.id) { this.setData({ loading: false, error: "对局记录不存在或已移除" }); return; }
-    this.fetching = true; this.setData({ loading: true, error: "" });
-    try {
-      await api.login();
-      const result = await api.request("/api/me/matches/" + encodeURIComponent(this.id));
-      if (this.alive) this.setData({ record: presentMatches([result.record])[0] });
-    } catch (error) { if (this.alive) this.setData({ error: error.message }); }
-    finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
-  },
-  historyToggleMembers() {
-    if (this.data.record) this.setData({ record: { ...this.data.record, membersExpanded: !this.data.record.membersExpanded } });
-  },
-  honorAvatarError(event) {
-    if (this.data.record) this.setData({ record: { ...this.data.record, honors: withoutAvatar(this.data.record.honors, event.currentTarget.dataset.url) } });
-  },
-  openReplay() {
-    if (!this.data.record?.replayAvailable || this.openingReplay) return;
-    this.openingReplay = true;
-    wx.navigateTo({ url: "/pages/replay/replay?id=" + encodeURIComponent(this.data.record.id),
-      fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
-      complete: () => { this.openingReplay = false; } });
+  openRecords() {
+    if (this.opening || !this.alive) return;
+    if (!this.id) { this.setData({ error: "对局记录不存在或已移除" }); return; }
+    this.opening = true; this.setData({ error: "" });
+    wx.redirectTo({ url: "/pages/matches/matches?match=" + encodeURIComponent(this.id),
+      fail: () => { if (this.alive) this.setData({ error: "暂时无法打开，请重试" }); },
+      complete: () => { this.opening = false; } });
   },
   back: backToMe,
 });

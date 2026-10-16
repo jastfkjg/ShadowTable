@@ -1,5 +1,6 @@
 const api = require("../../api");
 const presentation = require("../../board-detail");
+const { decorateBoard } = require("../../board-detail-art");
 const { switchHomeTab } = require("../../tab-navigation");
 Page({
   data: {
@@ -14,6 +15,7 @@ Page({
     chapters: [],
     allExpanded: false,
     navTop: 64,
+    currentChapter: 0,
   },
   onLoad(query) {
     this.alive = true;
@@ -39,7 +41,7 @@ Page({
       if (!this.alive) return;
       const source = (boards || []).find((board) => board.id === this.boardId);
       if (!source) throw new Error("未找到该板子");
-      const board = presentation.presentBoard(source, this.capacity);
+      const board = decorateBoard(presentation.presentBoard(source, this.capacity));
       this.expandedRoles = {};
       const selectedGroup = board.groups[0]?.id || "";
       wx.setNavigationBarTitle({ title: board.name });
@@ -120,6 +122,7 @@ Page({
     );
     this.setData({
       chapters,
+      currentChapter: chapters[index].expanded ? index : this.data.currentChapter,
       allExpanded: chapters.every((chapter) => chapter.expanded),
     });
   },
@@ -151,6 +154,7 @@ Page({
         directoryExpanded: false,
         tab: "rules",
         chapters,
+        currentChapter: index,
         allExpanded: chapters.every((chapter) => chapter.expanded),
       },
       () => {

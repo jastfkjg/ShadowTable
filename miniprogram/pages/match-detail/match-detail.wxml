@@ -1,15 +1,5 @@
-<import src="../matches/detail.wxml" />
-<app-nav title="对局详情" back="{{true}}" bindback="back" />
-<view class="page match-detail-page">
-  <view wx:if="{{loading}}" class="status">正在读取对局详情…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
-  <block wx:if="{{record && !loading && !error}}">
-    <view class="match-detail-heading">
-      <view class="match-day">{{record.dayLabel}} · {{record.timeLabel}}</view>
-      <view class="match-top"><text class="match-board">{{record.boardName}}</text><text class="match-outcome {{record.outcome}}">{{record.outcomeLabel}}</text></view>
-      <view class="match-secondary">{{record.role}} · {{record.factionLabel}} · {{record.capacity}}人</view>
-    </view>
-    <template is="matchDetails" data="{{item:record}}" />
-    <button wx:if="{{record.replayAvailable}}" class="match-replay-entry" bindtap="openReplay" hover-class="none"><text>查看复盘</text><view class="match-arrow" aria-hidden="true"></view></button>
-  </block>
+<app-nav title="对局记录" back="{{true}}" bindback="back" />
+<view class="page">
+  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="openRecords" hover-class="none">重新打开</button></view>
+  <view wx:else class="status">正在打开对局记录…</view>
 </view>

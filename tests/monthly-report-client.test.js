@@ -14,6 +14,23 @@ function page(file, api, wx = {}, renderer) {
     require: name => name === "../../api" ? api : name === "../../share-image" && renderer ? { renderImage: renderer } : realRequire(name) });
   return { ...definition, data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
 }
+test("月报分类保留所有并列玩家与门槛，切换后分享版式和规则弹层保持一致", async () => {
+  const response = monthlyFixture(), links = [];
+  response.mainBoards[0].rows.push({ ...response.mainBoards[0].rows[2], publicId: "tie-3", tied: true });
+  response.mainBoards[0].rows[2].tied = true;
+  const original = JSON.stringify(response);
+  const p = page("pages/monthly/monthly.js", { login: async () => {}, request: async () => response }, { navigateTo: options => { links.push(options.url); options.complete(); } });
+  p.onLoad({ month: "2026-09" }); await p.onShow();
+  assert.equal(p.data.category, "overall"); assert.equal(p.data.report.coreBoards[0].rows.length, 4);
+  assert.equal(p.data.report.mainBoards.find(b => b.id === "overall").threshold, 10);
+  p.chooseCategory({ currentTarget: { dataset: { id: "honors" } } });
+  assert.ok(p.data.detailBoards.every(board => board.positive && board.sort === "count"));
+  p.chooseCategory({ currentTarget: { dataset: { id: "fun" } } }); p.share(); assert.match(links.at(-1), /edition=fun/);
+  p.chooseCategory({ currentTarget: { dataset: { id: "overall" } } }); p.share(); assert.doesNotMatch(links.at(-1), /edition=fun/);
+  p.openRules(); assert.equal(p.data.rulesExpanded, true); p.onHide(); assert.equal(p.data.rulesExpanded, false);
+  assert.equal(p.data.report.funBoards.find(board => board.metric === "merlin_evade").portrait, "/assets/roles/merlin.png");
+  assert.equal(JSON.stringify(response), original);
+});
 test("月报切换月份和回前台拒绝旧响应，失败能重试，娱乐分享保留所选月份", async () => {
   const pending = [], urls = [], response = monthlyFixture(), links = [];
   const api = { login: async () => {}, request: url => { urls.push(url); return new Promise((resolve, reject) => pending.push({ resolve, reject })); } };

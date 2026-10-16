@@ -130,6 +130,8 @@ function mini(request) {
           ? { request }
           : name === "../../board-detail"
             ? presentation
+            : name === "../../board-detail-art"
+              ? require("../miniprogram/board-detail-art")
             : { switchHomeTab() {} },
       wx: {
         setNavigationBarTitle: (value) => {
@@ -172,6 +174,27 @@ function mini(request) {
   return { page, title: () => title, scrollTop: () => scrollTop };
 }
 const tap = (data) => ({ currentTarget: { dataset: data } });
+test("角色插画覆盖各人数配置，数量与阵营不变，牌堆示意保持原始规则文字", () => {
+  const { decorateBoard } = require("../miniprogram/board-detail-art");
+  for (const source of BOARDS.filter(b => b.available)) for (const capacity of source.counts) {
+    const original = board(source.id, capacity), snapshot = JSON.stringify(original), decorated = decorateBoard(original);
+    assert.equal(JSON.stringify(original), snapshot);
+    for (const role of decorated.roles) {
+      assert.equal(role.text, original.roles.find(r => r.id === role.id).text);
+      assert.ok(fs.existsSync(require("node:path").resolve(__dirname, "../miniprogram" + role.portrait)));
+    }
+    for (const chapter of decorated.chapters) {
+      for (const faction of chapter.configuration || []) {
+        assert.equal(faction.members.reduce((sum, member) => sum + member.count, 0), faction.count);
+        for (const member of faction.members) assert.ok(fs.existsSync(require("node:path").resolve(__dirname, "../miniprogram" + member.portrait)));
+      }
+      for (const deck of chapter.decks || []) for (const layer of deck.layers || []) {
+        assert.equal(layer.cards.filter(c => c.tone === "evil").length, Number(layer.text.match(/^(\d+)/)[1]));
+        assert.equal(layer.cards.filter(c => c.tone === "good").length, Number(layer.text.match(/(\d+) 蓝$/)[1]));
+      }
+    }
+  }
+});
 test("小程序搜索、切换、目录展开后定位和折叠状态一致；卸载与重试处理正常", async () => {
   const source = BOARDS.find((b) => b.id === "knights");
   const result = { boards: [{ ...source, detail: details.knights }] };

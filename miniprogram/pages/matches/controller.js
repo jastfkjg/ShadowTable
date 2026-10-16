@@ -32,11 +32,11 @@ function completeOutcomeSummary(records, total, hasMore) {
     outcomeCounts: { wins, losses, excluded } };
 }
 module.exports = function createController() { return {
-  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, outcomeSummary: "", outcomeCounts: null, scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters), ...draftState(defaultFilters) },
+  data: { loading: true, loadingMore: false, loaded: false, loadMoreError: false, error: "", records: [], total: 0, hasMore: false, startOffset: 0, focusId: "", scrollTarget: "", highlightedId: "", outcomeSummary: "", outcomeCounts: null, scoredOnly: false, funFilter: null, filtersAvailable: false, filtersExpanded: false, ...filterState(defaultFilters), ...draftState(defaultFilters) },
   onLoad(options = {}) {
     this.alive = true;
-    this.setData({ scoredOnly: options.scored === "1", funFilter: options.fun ? { metric: options.fun, mode: options.mode || "classic", role: options.role || "" } : null });
-    const preview = !this.data.scoredOnly && !this.data.funFilter && personalPreview("matches");
+    this.setData({ focusId: typeof options.match === "string" ? options.match : "", scoredOnly: options.scored === "1", funFilter: options.fun ? { metric: options.fun, mode: options.mode || "classic", role: options.role || "" } : null });
+    const preview = !this.data.focusId && !this.data.scoredOnly && !this.data.funFilter && personalPreview("matches");
     if (preview) this.setData({ records: presentMatches(preview.records), total: preview.total, hasMore: preview.hasMore, ...completeOutcomeSummary(preview.records, preview.total, preview.hasMore), loaded: true });
     return this.load();
   },
@@ -46,12 +46,12 @@ module.exports = function createController() { return {
     this.fetching = true; this.setData({ loading: true, error: "", loadMoreError: false });
     try {
       await api.login();
-      const result = await api.request(this.query(0));
+      const result = await api.request(this.query(0, true));
       if (this.alive && result.filterOptions) this.filterOptions = result.filterOptions;
       if (this.alive) this.setData({ records: presentMatches(result.records).map(row => {
         const previous = this.data.records.find(old => old.id === row.id);
-        return { ...row, expanded: !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
-      }), total: result.total, hasMore: result.hasMore, ...completeOutcomeSummary(result.records, result.total, result.hasMore), loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) });
+        return { ...row, expanded: row.id === this.data.focusId || !!previous?.expanded, membersExpanded: !!previous?.membersExpanded };
+      }), total: result.total, startOffset: result.offset || 0, hasMore: result.hasMore, scrollTarget: "", highlightedId: "", ...completeOutcomeSummary(result.records, result.total, result.hasMore), loaded: true, filtersAvailable: !!result.filterOptions, ...filterState(this.data.filters, this.filterOptions, this.data.filterGroups) }, () => this.revealFocus());
     } catch (e) { if (this.alive) this.setData({ error: e.message }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
@@ -59,7 +59,7 @@ module.exports = function createController() { return {
     if (this.fetching || !this.data.hasMore) return;
     this.fetching = true; this.setData({ loadingMore: true, error: "", loadMoreError: true });
     try {
-      const result = await api.request(this.query(this.data.records.length));
+      const result = await api.request(this.query(this.data.startOffset + this.data.records.length));
       if (this.alive) {
         const records = this.data.records.concat(presentMatches(result.records));
         this.setData({ records, total: result.total, hasMore: result.hasMore, ...completeOutcomeSummary(records, result.total, result.hasMore) });
@@ -68,12 +68,24 @@ module.exports = function createController() { return {
     finally { this.fetching = false; if (this.alive) this.setData({ loadingMore: false }); }
   },
   retry() { return this.data.loadMoreError ? this.loadMore() : this.load(); },
-  query(offset) {
+  query(offset, locate = false) {
     const f = this.data.funFilter;
     const filters = Object.entries(this.data.filters).filter(([key, value]) => value !== defaultFilters[key])
       .map(([key, value]) => "&" + key + "=" + encodeURIComponent(value)).join("");
     return "/api/me/matches?offset=" + offset + (this.data.scoredOnly ? "&scored=1" : "")
-      + (f ? "&fun=" + encodeURIComponent(f.metric) + "&mode=" + encodeURIComponent(f.mode) + (f.role ? "&role=" + encodeURIComponent(f.role) : "") : "") + filters;
+      + (f ? "&fun=" + encodeURIComponent(f.metric) + "&mode=" + encodeURIComponent(f.mode) + (f.role ? "&role=" + encodeURIComponent(f.role) : "") : "") + filters
+      + (locate && this.data.focusId ? "&focus=" + encodeURIComponent(this.data.focusId) : "");
+  },
+  revealFocus() {
+    if (!this.alive || !this.data.focusId) return;
+    const index = this.data.records.findIndex(record => record.id === this.data.focusId);
+    if (index >= 0) this.setData({ scrollTarget: "match-record-" + index, highlightedId: this.data.focusId });
+  },
+  clearScrollTarget() { if (this.data.scrollTarget) this.setData({ scrollTarget: "" }); },
+  clearFocus() {
+    if (this.fetching) return;
+    this.setData({ focusId: "", scrollTarget: "", highlightedId: "", startOffset: 0, records: [], loaded: false, total: 0, hasMore: false });
+    return this.load();
   },
   toggleFilters() {
     if (this.data.filtersExpanded) return this.closeFilters();
@@ -105,14 +117,14 @@ module.exports = function createController() { return {
     return this.applyFilters({ ...defaultFilters });
   },
   applyFilters(filters) {
-    this.setData({ ...filterState(filters, this.filterOptions, this.data.filterGroups), records: [], loaded: false, total: 0, hasMore: false });
+    this.setData({ ...filterState(filters, this.filterOptions, this.data.filterGroups), focusId: "", scrollTarget: "", highlightedId: "", startOffset: 0, records: [], loaded: false, total: 0, hasMore: false });
     return this.load();
   },
-  clearFunFilter() { if (this.fetching) return; this.setData({ funFilter: null, records: [], loaded: false, total: 0, hasMore: false }); return this.load(); },
+  clearFunFilter() { if (this.fetching) return; this.setData({ funFilter: null, focusId: "", scrollTarget: "", highlightedId: "", startOffset: 0, records: [], loaded: false, total: 0, hasMore: false }); return this.load(); },
   filterScores(e) {
     const scoredOnly = String(e.currentTarget.dataset.scored) === "1";
     if (this.fetching || scoredOnly === this.data.scoredOnly) return;
-    this.setData({ scoredOnly, records: [], loaded: false, total: 0, hasMore: false });
+    this.setData({ scoredOnly, focusId: "", scrollTarget: "", highlightedId: "", startOffset: 0, records: [], loaded: false, total: 0, hasMore: false });
     return this.load();
   },
   toggleRecord(e) {

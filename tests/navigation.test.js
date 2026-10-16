@@ -1743,7 +1743,7 @@ test('积分明细统一分页，失败保留记录可重试，重复触底和�
   assert.equal(p.data.records.length, 1);
 });
 
-test('积分分页期间分数变化会重新读取，零分与只有调整均保留，点对局进入详情后正常返回', async () => {
+test('积分分页期间分数变化会重新读取，零分与只有调整均保留，点对局跳到对应记录', async () => {
   const match = { id: 'match:m', type: 'match', matchId: 'm', occurredAt: 1, points: 0, boardName: '经典', role: '梅林', outcome: 'loss' };
   let reads = 0, fail = true, scrolling = 0, stopped = 0;
   const result = { records: [match], total: 2, hasMore: true, revision: 1, summary: { total: 2, matchPoints: 0, adjustmentPoints: 2, games: 1, adjustments: 1 } };
@@ -1755,18 +1755,94 @@ test('积分分页期间分数变化会重新读取，零分与只有调整均�
   await p.onLoad(); assert.equal(p.data.loaded, false); assert.equal(p.data.error, '暂时离线');
   await p.load(); assert.equal(p.data.records[0].pointsLabel, '0');
   p.openMatch({ currentTarget: { dataset: { id: 'match:m' } } });
-  assert.equal(navigations[0], '/pages/match-detail/match-detail?id=m');
+  assert.equal(navigations[0], '/pages/matches/matches?match=m');
   await p.onReachBottom(); assert.equal(scrolling, 1); assert.equal(p.data.records.length, 1);
   assert.equal(p.data.records[0].type, 'adjustment'); assert.match(p.data.notice, /有更新/);
   p.openMatch({ currentTarget: { dataset: { id: 'adjustment:a' } } }); assert.equal(navigations.length, 1);
   await p.onPullDownRefresh(); assert.equal(stopped, 1); p.back(); assert.equal(navigations.at(-1), 'back');
-  const row = require('./helpers/fun-copy-fixtures').match;
-  const detail = page('match-detail', { ...apiBase, request: async url => { assert.equal(url, '/api/me/matches/m'); return { record: row }; } });
-  await detail.p.onLoad({ id: 'm' }); assert.equal(detail.p.data.record.id, row.id);
-  detail.p.historyToggleMembers(); assert.equal(detail.p.data.record.membersExpanded, true);
-  detail.p.back(); assert.equal(detail.navigations[0], 'back');
-  const removed = page('match-detail', { ...apiBase, request: async () => { throw Error('对局记录不存在或已移除'); } }).p;
-  await removed.onLoad({ id: 'gone' }); assert.equal(removed.data.record, null); assert.match(removed.data.error, /已移除/);
+});
+
+test('积分跳转直接定位旧分页并展开，继续分页无遗漏，返回保留积分列表和位置', async () => {
+  const match = require('./helpers/fun-copy-fixtures').match;
+  const ledgerReads = [], historyReads = [];
+  const scores = page('scores', { ...apiBase, request: async url => {
+    ledgerReads.push(url);
+    return { records: [{ id: 'match:old/id', type: 'match', matchId: 'old/id', occurredAt: 1, points: 1 }],
+      total: 1, hasMore: false, revision: 8, summary: { total: 1 } };
+  } });
+  await scores.p.onLoad();
+  const ledgerBefore = JSON.stringify(scores.p.data);
+  // Native navigateTo keeps this exact page instance, including its scroll position.
+  const stack = [{ route: 'pages/me/me' }, { route: 'pages/scores/scores', ...scores.p, scrollTop: 480 }, {}];
+  scores.p.openMatch({ currentTarget: { dataset: { id: 'match:old/id' } } });
+  assert.equal(scores.navigations[0], '/pages/matches/matches?match=old%2Fid');
+  const history = page('matches', { ...apiBase, request: async url => {
+    historyReads.push(url);
+    return url.includes('focus=')
+      ? { records: [{ ...match, id: 'old/id' }, { ...match, id: 'older' }], offset: 40, total: 43, hasMore: true }
+      : { records: [{ ...match, id: 'last' }], offset: 42, total: 43, hasMore: false };
+  } }, { home: true, pages: stack });
+  await history.p.onLoad({ match: 'old/id' });
+  assert.equal(history.p.data.tab, 'matches');
+  assert.equal(history.p.data.history.startOffset, 40);
+  assert.equal(history.p.data.history.records[0].expanded, true);
+  assert.equal(history.p.data.history.records[1].expanded, false);
+  assert.equal(history.p.data.history.scrollTarget, 'match-record-0');
+  assert.equal(history.p.data.history.highlightedId, 'old/id');
+  assert.equal(history.p.statisticsStarted, false);
+  history.p.rememberScroll({ currentTarget: { dataset: { tab: 'matches' } }, detail: { scrollTop: 230 } });
+  assert.equal(history.p.data.history.scrollTarget, '');
+  await history.p.historyLoadMore();
+  assert.deepEqual(historyReads, ['/api/me/matches?offset=0&focus=old%2Fid', '/api/me/matches?offset=42']);
+  assert.deepEqual(Array.from(history.p.data.history.records, row => row.id), ['old/id', 'older', 'last']);
+  assert.equal(history.p.data.history.outcomeSummary, '');
+  history.p.back(); assert.equal(history.navigations.at(-1), 'back');
+  assert.equal(stack[1].scrollTop, 480);
+  assert.equal(JSON.stringify(scores.p.data), ledgerBefore);
+  assert.equal(ledgerReads.length, 1);
+  history.p.onUnload();
+});
+
+test('定位失败可重试或返回全部，改变筛选不再携带旧对局，卸载后的定位响应失效', async () => {
+  const match = require('./helpers/fun-copy-fixtures').match;
+  const reads = [];
+  let fail = true;
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    reads.push(url);
+    if (fail) throw Error('对局记录不存在或已移除');
+    return { records: [{ ...match, id: 'target' }], offset: url.includes('focus=') ? 20 : 0, total: 21, hasMore: false };
+  } });
+  await p.onLoad({ match: 'target' });
+  assert.match(p.data.error, /已移除/); assert.equal(p.data.records.length, 0);
+  fail = false; await p.retry();
+  assert.equal(p.data.records[0].expanded, true);
+  assert.equal(reads[1], reads[0]);
+  await p.filterScores({ currentTarget: { dataset: { scored: '1' } } });
+  assert.equal(reads.at(-1), '/api/me/matches?offset=0&scored=1');
+  assert.equal(p.data.focusId, ''); assert.equal(p.data.highlightedId, ''); assert.equal(p.data.startOffset, 0);
+  assert.equal(p.data.records[0].expanded, false);
+  await p.onLoad({ match: 'target' }); await p.clearFocus();
+  assert.equal(reads.at(-1), '/api/me/matches?offset=0'); assert.equal(p.data.focusId, '');
+  p.onUnload();
+  const late = deferred();
+  const gone = page('matches', { ...apiBase, request: () => late.promise }, { home: true }).p;
+  const loading = gone.onLoad({ match: 'target' }); await Promise.resolve();
+  gone.onUnload(); late.resolve({ records: [{ ...match, id: 'target' }], offset: 20, total: 21, hasMore: false });
+  await loading;
+  assert.equal(gone.data.history.records.length, 0); assert.equal(gone.data.history.scrollTarget, '');
+});
+
+test('旧详情链接替换当前页到同一对局记录，跳转失败可重试且不重复叠加详情页', () => {
+  const redirects = [];
+  const { p, navigations } = page('match-detail', apiBase, { wx: { redirectTo: options => redirects.push(options) } });
+  p.onLoad({ id: 'old/id' }); p.openRecords();
+  assert.equal(redirects.length, 1); assert.equal(redirects[0].url, '/pages/matches/matches?match=old%2Fid');
+  redirects[0].fail(); redirects[0].complete(); assert.match(p.data.error, /重试/);
+  p.openRecords(); assert.equal(redirects.length, 2);
+  p.onUnload(); redirects[1].fail(); assert.equal(p.data.error, '');
+  p.back(); assert.equal(navigations[0], 'back');
+  const missing = page('match-detail', apiBase).p;
+  missing.onLoad(); assert.match(missing.data.error, /不存在/);
 });
 
 test('首页入口按需展开，关闭保留草稿且清理键盘；原生键盘晚到的事件不会复活面板', () => {
@@ -2108,4 +2184,18 @@ test('积分榜仅显示本月入口，其他榜默认本月且保留全部，�
   await p.chooseMetric({ currentTarget: { dataset: { id: 'games' } } }); assert.match(urls.at(-1), /period=month/);
   await p.choosePeriod({ currentTarget: { dataset: { id: 'all' } } }); assert.match(urls.at(-1), /period=all/);
   await p.chooseMetric({ currentTarget: { dataset: { id: 'points' } } }); assert.match(urls.at(-1), /metric=points&period=month/);
+});
+
+test('徽章详情按内容测量高度并适配窗口，忽略关闭后的测量结果', async () => {
+  const {catalogue}=require('../miniprogram/badges');
+  const {p}=page('badges',{...apiBase,request:async()=>({badges:[{...catalogue[1],equipped:true}],periodStart:1})},{wx:{getWindowInfo:()=>({windowHeight:600})}});
+  p.onLoad();await p.onShow();
+  let measure;
+  p.createSelectorQuery=()=>({select:()=>({boundingClientRect:callback=>{measure=callback;return {exec(){}};}})});
+  const open=()=>p.showBadgeDetail({currentTarget:{dataset:{id:catalogue[1].id}}});
+  p.manageBadges();assert.equal(p.data.badgeManaging,true);
+  open();measure({height:420});assert.equal(p.data.badgeDetailHeight,420);
+  p.onResize();measure({height:900});assert.equal(p.data.badgeDetailHeight,540);
+  open();const stale=measure;p.closeBadgeDetail();stale({height:420});assert.equal(p.data.badgeDetailHeight,0);
+  p.onHide();assert.equal(p.data.badgeManaging,false);
 });

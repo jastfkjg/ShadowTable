@@ -95,18 +95,44 @@
       ...(value.metrics ? { metrics: value.metrics.filter(row => !row.id.startsWith("final_")).map(metric) } : {}),
       cards };
   }
+  function groupEvents(events = []) {
+    const groups = new Map();
+    for (const [index, event] of events.entries()) {
+      const round = Number(event.round);
+      const numbered = Number.isInteger(round) && round > 0;
+      const terminal = /^(final|task-outcome)/.test(event.id || "");
+      const id = numbered ? "round-" + round : terminal ? "final" : "other";
+      if (!groups.has(id)) groups.set(id, {
+        id, round: numbered ? round : null,
+        label: numbered ? `第 ${round} 轮` : terminal ? "终局记录" : "本局记录",
+        marker: numbered ? String(round).padStart(2, "0") : terminal ? "终" : "记",
+        events: [],
+      });
+      const icon = event.kind === "revive" || event.label?.includes("复活") ? "heart"
+        : event.kind === "receivedKnife" || event.label === "被刀" ? "sword"
+        : event.kind === "defense" || /保护|挡刀/.test(event.label || "") ? "shield"
+        : /^honor_/.test(event.id || "") ? "medal"
+        : ["knife", "duel", "gun"].includes(event.kind) ? "swords" : "spark";
+      groups.get(id).events.push({ ...event, id: event.id || "event-" + index, icon: "/assets/record-" + icon + ".svg" });
+    }
+    return [...groups.values()].sort((a, b) => (a.round ?? Infinity) - (b.round ?? Infinity)).map(group => {
+      const roles = [...new Set(group.events.map(event => event.role).filter(Boolean))];
+      return { ...group, role: roles.length === 1 ? roles[0] : "", showEventRoles: roles.length > 1 };
+    });
+  }
   function story(value) {
     if (!value) return value;
     const types = [...new Set((value.metrics || []).map(row => row.id.split("_")[0])
       .filter(type => ["knife", "gun", "duel"].includes(type)))];
-    return { ...value,
+    const events = (value.events || []).map(event => ({ ...event,
+      label: legacyLabel(event.label, event.kind || event.type || (types.length === 1 ? types[0] : "")),
+      ...(typeof event.detail === "string" ? { detail: event.detail.replace(/(\d+号)非梅林好人/g, "$1") } : {}) }));
+    return { ...value, eventGroups: groupEvents(events),
       hasEffectiveHighlights: (value.highlights || []).some(row =>
         row.count > 0 && !row.id.endsWith("_failed") && !row.id.endsWith("_aim_enemy")),
       ...(value.metrics ? { metrics: value.metrics.map(metric) } : {}),
       ...(value.highlights ? { highlights: value.highlights.map(metric) } : {}),
-      ...(value.events ? { events: value.events.map(event => ({ ...event,
-        label: legacyLabel(event.label, event.kind || event.type || (types.length === 1 ? types[0] : "")),
-        ...(typeof event.detail === "string" ? { detail: event.detail.replace(/(\d+号)非梅林好人/g, "$1") } : {}) })) } : {}) };
+      ...(value.events ? { events } : {}) };
   }
   function leaderboard(value) {
     const id = value.metric?.replace(/^fun_/, "");
@@ -132,5 +158,5 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, metric, summary, story, leaderboard, response };
+  return { labels, titles, honors, metric, summary, story, groupEvents, leaderboard, response };
 });

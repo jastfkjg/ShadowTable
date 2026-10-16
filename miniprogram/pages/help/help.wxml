@@ -1,46 +1,39 @@
+<template name="help-scoring">
+  <view wx:if="{{scoringLoading && !scoringRules}}" class="help-copy" role="status">正在读取计分规则…</view>
+  <view wx:if="{{scoringError}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
+  <block wx:if="{{scoringRules}}">
+    <view class="help-score-scope"><view wx:if="{{scoringOnly}}" class="help-heading">计分范围</view><view class="help-copy">{{scoringRules.scopeLabel}}</view></view>
+    <view wx:if="{{scoringOnly}}" class="help-heading help-score-heading">加分项目</view>
+    <view wx:for="{{scoringRules.items}}" wx:key="id" class="help-answer"><view class="help-step-title">{{item.label}}</view><view class="help-copy">{{item.text}}</view></view>
+    <view wx:if="{{scoringOnly && scoringRules.notes.length}}" class="help-heading help-score-heading">补充说明</view>
+    <view wx:for="{{scoringRules.notes}}" wx:key="*this" class="help-copy help-note">{{item}}</view>
+  </block>
+</template>
 <app-nav title="{{scoringOnly ? '计分规则' : '使用帮助'}}" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page help-page {{scoringOnly ? 'help-scoring-page' : ''}}">
-  <view wx:if="{{!scoringOnly}}" class="help-quick">
-    <view class="help-heading">第一次使用</view>
-    <view class="help-step"><text class="help-number">01</text><view><view class="help-step-title">加入牌桌</view><view class="help-copy">打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。</view></view></view>
-    <view class="help-step"><text class="help-number">02</text><view><view class="help-step-title">入座并准备</view><view class="help-copy">选择座位、点击准备，等待房主发牌。满座时会先进入围观。</view></view></view>
-    <view class="help-step"><text class="help-number">03</text><view><view class="help-step-title">私下查看身份</view><view class="help-copy">记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。</view></view></view>
-    <view class="help-step"><text class="help-number">04</text><view><view class="help-step-title">线下讨论，按提示操作</view><view class="help-copy">需要你投票、出任务牌或使用技能时，页面会提示；提交后等待结算。</view></view></view>
-  </view>
-  <view class="help-section" id="scoring-rules">
-    <button wx:if="{{!scoringOnly}}" hover-class="none" class="disclosure-button help-toggle" bindtap="toggleScoring" aria-expanded="{{scoringExpanded}}"><view class="help-toggle-copy"><view class="help-heading">计分规则</view><view class="help-caption">查看当前计分范围与加分项目</view></view><text aria-hidden="true">{{scoringExpanded?'−':'+'}}</text></button>
-    <view wx:if="{{scoringOnly || scoringExpanded}}" class="help-answers">
-      <view wx:if="{{scoringLoading && !scoringRules}}" class="help-copy" role="status">正在读取计分规则…</view>
-      <view wx:if="{{scoringError}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
-      <block wx:if="{{scoringRules}}"><view class="help-score-scope"><view wx:if="{{scoringOnly}}" class="help-heading">计分范围</view><view class="help-copy">{{scoringRules.scopeLabel}}</view></view><view wx:if="{{scoringOnly}}" class="help-heading help-score-heading">加分项目</view><view wx:for="{{scoringRules.items}}" wx:key="id" class="help-answer"><view class="help-step-title">{{item.label}}</view><view class="help-copy">{{item.text}}</view></view><view wx:if="{{scoringOnly && scoringRules.notes.length}}" class="help-heading help-score-heading">补充说明</view><view wx:for="{{scoringRules.notes}}" wx:key="*this" class="help-copy">{{item}}</view></block>
-    </view>
-  </view>
   <block wx:if="{{!scoringOnly}}">
-  <block wx:for="{{sections}}" wx:key="id">
-    <view wx:if="{{item.id !== 'faq'}}" class="help-section">
-      <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
-      <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
+    <view class="help-intro"><view class="help-intro-copy"><view class="help-eyebrow">新人上手</view><view class="help-title">{{guideMode === 'host' ? '四步组织一场对局' : '四步加入一场对局'}}</view><view class="help-intro-caption">{{guideMode === 'host' ? '从建桌到登记，按流程进行。' : '先看流程，边玩边熟悉。'}}</view></view><image class="help-intro-art" src="/assets/roles/merlin.png" mode="aspectFit" aria-hidden="true" /></view>
+    <view class="help-modes" aria-label="引导身份"><button hover-class="none" bindtap="setGuideMode" data-mode="player" class="{{guideMode === 'player' ? 'selected' : ''}}" aria-pressed="{{guideMode === 'player'}}"><image src="/assets/record-users.svg" aria-hidden="true" />我是玩家</button><button hover-class="none" bindtap="setGuideMode" data-mode="host" class="{{guideMode === 'host' ? 'selected' : ''}}" aria-pressed="{{guideMode === 'host'}}"><image src="/assets/sheet-shield.svg" aria-hidden="true" />我是房主</button></view>
+    <view class="help-steps"><view wx:for="{{guideSteps}}" wx:key="number" class="help-step {{item.expanded ? 'expanded' : ''}}"><button hover-class="none" class="disclosure-button help-step-toggle" bindtap="toggleStep" data-index="{{index}}" aria-expanded="{{item.expanded}}" aria-controls="{{'help-step-'+index}}"><text class="help-number">{{item.number}}</text><text class="help-step-label">{{item.title}}</text><view class="help-chevron" aria-hidden="true" /></button><view wx:if="{{item.expanded}}" id="{{'help-step-'+index}}" class="help-step-body"><view class="help-copy">{{item.text}}</view><view class="help-flow"><image src="{{'/assets/'+item.icon+'.svg'}}" aria-hidden="true" /><text>{{item.flow}}</text><text class="help-flow-caption">示意</text></view></view></view></view>
+    <view class="help-reference-heading"><view class="help-heading">随用随查</view><text>规则与常见问题</text></view>
+    <view class="help-search"><image src="/assets/board-search.svg" aria-hidden="true" /><input value="{{helpQuery}}" bindinput="searchHelp" placeholder="搜索问题或规则" placeholder-class="help-search-placeholder" aria-label="搜索帮助问题或规则" confirm-type="search" /><button wx:if="{{helpQuery}}" hover-class="none" bindtap="clearSearch" aria-label="清空帮助搜索">×</button></view>
+    <view wx:if="{{helpQuery}}" class="help-search-status" role="status">{{references.length ? '已展开匹配内容' : '未找到匹配内容，试试“发牌”或“计分”。'}}</view>
+    <view class="help-references">
+      <view wx:for="{{references}}" wx:key="id" wx:for-item="reference" class="help-section">
+        <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleReference" data-id="{{reference.id}}" data-index="{{reference.index}}" aria-expanded="{{reference.expanded}}" aria-controls="{{'help-reference-'+reference.id}}"><image class="help-reference-icon" src="{{'/assets/'+reference.icon+'.svg'}}" aria-hidden="true" /><view class="help-toggle-copy"><view class="help-heading">{{reference.title}}</view><view class="help-caption">{{reference.subtitle}}</view></view><view class="help-chevron {{reference.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
+        <view wx:if="{{reference.expanded}}" class="help-answers" id="{{'help-reference-'+reference.id}}">
+          <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError}}" />
+          <block wx:elif="{{reference.id === 'boards'}}">
+            <view wx:if="{{loadingBoards}}" class="help-copy" role="status">正在加载板子介绍…</view>
+            <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
+            <view wx:elif="{{!reference.boards.length}}" class="help-copy">暂无匹配的可用板子。</view>
+            <view wx:for="{{reference.boards}}" wx:key="id" wx:for-item="board" class="help-board"><view class="help-step-title">{{board.name}}</view><view class="help-copy">{{board.description}}</view><view class="help-caption">选择人数，查看规则</view><view class="help-board-links {{board.choices.length === 1 ? 'help-board-links-single' : ''}}"><button hover-class="none" wx:for="{{board.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{board.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view></view>
+          </block>
+          <block wx:else><view wx:for="{{reference.items}}" wx:key="title" wx:for-item="answer" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></block>
+        </view>
+      </view>
     </view>
+    <view class="help-footnote">线下讨论，线上辅助记录与操作。</view>
   </block>
-  <view class="help-section help-boards">
-    <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleBoards" aria-expanded="{{boardsExpanded}}"><view class="help-toggle-copy"><view class="help-heading">板子与角色</view><view class="help-caption">按玩法与人数，查看角色和规则</view></view><text aria-hidden="true">{{boardsExpanded?'−':'+'}}</text></button>
-    <view wx:if="{{boardsExpanded}}" class="help-board-content">
-    <view wx:if="{{loadingBoards}}" class="help-caption" role="status">正在加载板子介绍…</view>
-    <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
-    <view wx:elif="{{!boards.length}}" class="help-copy">暂无可用板子。</view>
-    <view wx:for="{{boards}}" wx:key="id" class="help-board">
-      <view class="help-step-title">{{item.name}}</view>
-      <view class="help-copy">{{item.description}}</view>
-      <view class="help-caption">选择人数，查看规则 ›</view>
-      <view class="help-board-links {{item.choices.length === 1 ? 'help-board-links-single' : ''}}"><button hover-class="none" wx:for="{{item.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{item.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view>
-    </view>
-    </view>
-  </view>
-  <block wx:for="{{sections}}" wx:key="id">
-    <view wx:if="{{item.id === 'faq'}}" class="help-section">
-      <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleSection" data-index="{{index}}" aria-expanded="{{item.expanded}}"><view class="help-toggle-copy"><view class="help-heading">{{item.title}}</view><view class="help-caption">{{item.subtitle}}</view></view><text aria-hidden="true">{{item.expanded?'−':'+'}}</text></button>
-      <view wx:if="{{item.expanded}}" class="help-answers"><view wx:for="{{item.items}}" wx:for-item="answer" wx:key="title" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></view>
-    </view>
-  </block>
-  </block>
+  <template wx:else is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,scoringOnly}}" />
 </view>

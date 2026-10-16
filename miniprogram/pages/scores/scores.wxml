@@ -34,7 +34,7 @@
     <block wx:for="{{records}}" wx:key="id">
       <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="ledger-day"><image src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{item.dayLabel}}</text></view>
       <view class="ledger-entry {{index===0 || item.dayKey!==records[index-1].dayKey?'ledger-day-first':''}} {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'ledger-day-last':''}}">
-        <button wx:if="{{item.isMatch}}" class="ledger-record" bindtap="openMatch" data-id="{{item.id}}" hover-class="ledger-pressed" aria-label="{{item.title+'，'+item.timeLabel+'，'+item.detail+'，'+item.pointsLabel+'分，查看对局详情'}}">
+        <button wx:if="{{item.isMatch}}" class="ledger-record" bindtap="openMatch" data-id="{{item.id}}" hover-class="ledger-pressed" aria-label="{{item.title+'，'+item.timeLabel+'，'+item.detail+'，'+item.pointsLabel+'分，在对局记录中查看详情'}}">
           <template is="ledgerContent" data="{{item}}" />
         </button>
         <view wx:else class="ledger-record">

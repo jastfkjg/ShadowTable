@@ -55,6 +55,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
       const tab = event.currentTarget.dataset.tab;
       if (this.alive && tab === this.data.tab) {
         this.scrollPositions[tab] = event.detail.scrollTop;
+        if (tab === "matches") this.historyController.clearScrollTarget();
       }
     },
     async openHistory(options, fromFun = false) {

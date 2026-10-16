@@ -32,7 +32,7 @@ for (const board of [...fixture.mainBoards, ...fixture.funBoards]) for (const ro
   if (avatar) { row.avatarUrl = "/api/avatars/" + avatar.hash; row.avatarSrc = avatar.path; }
 }
 const report = monthly.presentReport(fixture);
-const data = { month: report.month, report, loading: false, error: "", entertainment: false, detailBoards: monthly.detailBoards(report), shareOpening: false };
+const data = { month: report.month, report, loading: false, error: "", category: "overall", navTop: 68, entertainment: false, detailBoards: monthly.detailBoards(report), shareOpening: false };
 const sparseFixture = structuredClone(fixture);
 sparseFixture.month = "2026-10"; sparseFixture.overview = { games: 8, players: 18, activeDays: 2 };
 sparseFixture.mainBoards[0].rows = [["阿伟",19,6,1],["wyc",12,6,2],["元",11,6,3],["橙C",11,4,3]].map(([nickname,points,scoredGames,rank],i) => ({ ...fixture.mainBoards[0].rows[0], publicId: "sparse"+i, avatarUrl: null, avatarSrc: "", nickname, points, scoredGames, rank, tied: rank===3 }));
@@ -42,7 +42,7 @@ sparseFixture.funBoards.forEach(board => { board.rows = board.sort === "count" &
 const scenes = {
   summary: data,
   sparse: { ...data, month: sparseFixture.month, report: monthly.presentReport(sparseFixture), detailBoards: monthly.detailBoards(monthly.presentReport(sparseFixture)) },
-  entertainment: { ...data, entertainment: true, detailBoards: monthly.detailBoards(report, "count", true) },
+  entertainment: { ...data, category: "fun", entertainment: true, detailBoards: monthly.detailBoards(report, "count", true) },
   empty: { ...data, report: monthly.presentReport({ ...fixture, overview: { games: 0, players: 0, activeDays: 0 }, mainBoards: fixture.mainBoards.map(board => ({ ...board, rows: [] })), featuredIds: [], highlights: [] }) },
   long: { ...data, report: monthly.presentReport({ ...fixture, mainBoards: fixture.mainBoards.map((board, index) => index ? board : { ...board, rows: [{ ...board.rows[0], nickname: "非常非常长的玩家昵称用于检查换行", points: -123456789, rank: 1, tied: true }] }) }) },
 };

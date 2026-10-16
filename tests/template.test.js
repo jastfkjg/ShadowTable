@@ -1470,9 +1470,24 @@ test('积分页只有真实空数据才显示空态，按北京日期分组，�
   assert.match(JSON.stringify(render({ ...ready, records: [], total: 0 })), /暂无积分记录/);
   assert.doesNotMatch(JSON.stringify(render({ loading: true })), /暂无积分记录|当前总积分/);
   const error = render({ error: '断网', loading: false }); assert.ok(byHandler(error, 'load')); assert.doesNotMatch(JSON.stringify(error), /暂无积分记录/);
-  const record = { ...require('../miniprogram/profile').presentMatches([require('./helpers/fun-copy-fixtures').match])[0], members: [{ seat: 1, name: '甲' }], score: { status: 'scored', total: 8, breakdown: [{ id: 'bonus', label: '挡刀奖励', points: 8 }], manualOverride: { reason: '本局核对' } } };
-  const detail = JSON.stringify(factory('pages/match-detail/match-detail.wxml')({ record }));
+  const record = { ...require('../miniprogram/profile').presentMatches([require('./helpers/fun-copy-fixtures').match])[0], expanded: true, members: [{ seat: 1, name: '甲' }], score: { status: 'scored', total: 8, breakdown: [{ id: 'bonus', label: '挡刀奖励', points: 8 }], manualOverride: { reason: '本局核对' } } };
+  const detail = JSON.stringify(renderHistoryShell({ records: [record], loaded: true, total: 1 }));
   assert.match(detail, /挡刀奖励/); assert.match(detail, /本局核对/); assert.match(detail, /同桌成员/);
+});
+
+test('定位目标使用列表现有详情模板，滚动锚点有效且只高亮所选对局', () => {
+  const record = require('../miniprogram/profile').presentMatches([require('./helpers/fun-copy-fixtures').match])[0];
+  const tree = renderHistoryShell({ records: [{ ...record, id: 'target/id', expanded: true }, { ...record, id: 'other' }],
+    focusId: 'target/id', highlightedId: 'target/id', scrollTarget: 'match-record-0', startOffset: 40, total: 42, loaded: true });
+  const entries = nodes(tree).filter(node => node.attr?.class?.startsWith('match-entry '));
+  assert.equal(entries[0].attr.id, 'match-record-0');
+  assert.match(entries[0].attr.class, /match-focused/); assert.doesNotMatch(entries[1].attr.class, /match-focused/);
+  assert.match(JSON.stringify(entries[0]), /match-details/); assert.doesNotMatch(JSON.stringify(entries[1]), /match-details/);
+  const pane = nodes(tree).find(node => node.attr?.['data-tab'] === 'matches');
+  assert.equal(pane.attr.scrollIntoView, 'match-record-0');
+  assert.ok(byHandler(tree, 'historyClearFocus'));
+  assert.match(JSON.stringify(tree), /没有更早的对局了/);
+  assert.doesNotMatch(JSON.stringify(tree), /已显示全部 42/);
 });
 
 test('排行榜有图与无图头像均为可点击入口，并复用无座位标记的战绩卡', () => {
@@ -1688,4 +1703,44 @@ test('六位分格只展示原生数字输入框的值，前导零可见且表�
   assert.deepEqual(slots.map(plain),['0','6','2','8','1','9']);
   assert.ok(byHandler(tree,'pasteRoomCode'));
   assert.equal(nodes(tree).find(n=>n.tag==='wx-form').attr.bindsubmit,'submitEntry');
+});
+
+test('对局趣味时间线按轮次归组，保留同轮多身份、长详情及无轮次记录', () => {
+  const copy = require('../miniprogram/fun-copy');
+  const events = [
+    {id:'r2',round:2,kind:'revive',label:'复活',detail:'抽取新身份复活'},
+    {id:'r1',round:1,kind:'receivedKnife',label:'被刀',detail:'2号出刀 · 目标出局'},
+    {id:'a1',round:1,role:'蓝刀客·加雷斯',kind:'knife',label:'命中同伴',detail:'3号同阵营 · 实际承受者5号'},
+    {id:'a2',round:1,role:'红骑士',kind:'duel',label:'未生效',detail:'决斗失败'},
+    {id:'final',role:'梅林',label:'成功躲刀',detail:'最终目标：4号'},
+    {id:'unknown',label:'新增事件',detail:'保留旧记录的说明'},
+  ];
+  const before = JSON.stringify(events), story = copy.story({events});
+  assert.deepEqual(story.eventGroups.map(g=>g.id),['round-1','round-2','final','other']);
+  assert.deepEqual(story.eventGroups[0].events.map(e=>e.id),['r1','a1','a2']);
+  assert.equal(story.eventGroups[0].showEventRoles,true);
+  assert.equal(story.eventGroups[0].role,'');
+  assert.equal(story.eventGroups[0].events[1].label,'刀中友方');
+  assert.equal(JSON.stringify(events),before);
+  assert.equal(story.eventGroups.flatMap(g=>g.events).length,events.length);
+  assert.deepEqual(copy.story(story).eventGroups,story.eventGroups);
+  const record={...require('../miniprogram/profile').presentMatches([{endedAt:1,members:[],fun:{events}}])[0],expanded:true};
+  const text=JSON.stringify(renderHistoryShell({records:[record],loaded:true,total:1}));
+  for(const value of ['第 1 轮','第 2 轮','蓝刀客·加雷斯','红骑士','实际承受者5号','最终目标：4号','保留旧记录的说明']) assert.ok(text.includes(value),value);
+});
+
+test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情不含冗余说明', () => {
+  const {catalogue,presentCollection}=require('../miniprogram/badges');
+  const badgeCollection=presentCollection({badges:[{...catalogue.find(b=>b.id==='games'),equipped:true}],periodStart:Date.UTC(2026,8,30,16)});
+  const render=factory('pages/badges/badges.wxml'),data={badgeCollection,badgeFilter:'all'};
+  assert.equal(byHandler(render(data),'toggleOwnedBadge'),undefined);
+  assert.ok(byHandler(render(data),'manageBadges'));
+  assert.ok(byHandler(render({...data,badgeManaging:true}),'toggleOwnedBadge'));
+  const detail=render({...data,selectedBadge:badgeCollection.items.find(b=>b.id==='games')});
+  const text=JSON.stringify(detail);
+  assert.match(text,/获取条件|持有规则|常驻牌桌/);
+  assert.doesNotMatch(text,/按北京时间本月|摘下后仍保留/);
+  assert.match(byHandler(detail,'toggleOwnedBadge').attr.class,/secondary/);
+  const locked=render({...data,selectedBadge:badgeCollection.items.find(b=>!b.owned)});
+  assert.equal(byHandler(locked,'toggleOwnedBadge'),undefined);
 });

@@ -202,7 +202,7 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     host: uid,
     board: boardId,
     capacity,
-    scoreEnabled: scoring.defaultEnabled(capacity),
+    scoreEnabled: scoring.defaultEnabled(boardId, capacity),
     recordPurpose: "normal",
     fairyEnabled: capacity >= 8,
     phase: "lobby",
@@ -1703,8 +1703,9 @@ function applyCommand(room, uid, input) {
     );
     if (room.capacity !== input.capacity) {
       room.fairyEnabled = input.capacity >= 8;
-      room.scoreEnabled = scoring.defaultEnabled(input.capacity);
     }
+    if (room.board !== input.board || room.capacity !== input.capacity)
+      room.scoreEnabled = scoring.defaultEnabled(input.board, input.capacity);
     room.board = input.board;
     room.capacity = input.capacity;
     room.players.forEach((p) => (p.ready = false));

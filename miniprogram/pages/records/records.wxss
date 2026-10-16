@@ -17,3 +17,7 @@
 
 /* Keep the accepted mobile gutters for records while retaining each tab's scroll. */
 .records-pane .page.matches-page, .records-pane .page.fun-page { padding-left:16px; padding-right:16px; }
+.matches-focus-reset { width: 100%; min-height: 44px; margin: 12px 0 0; color: var(--accent); font-size: 13px; }
+.match-entry.match-focused { animation: match-focus-fade 2.4s ease-out both; }
+@keyframes match-focus-fade { from { box-shadow: inset 3px 0 0 var(--accent); } to { box-shadow: inset 3px 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .match-entry.match-focused { animation: none; } }

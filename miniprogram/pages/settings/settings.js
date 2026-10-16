@@ -91,10 +91,14 @@ Page({
       (b) => b.available && b.counts.includes(capacity),
     );
     const selected = choices.find((b) => b.id === boardId) || choices[0];
+    const scoreSettings = this.data.room?.scoreSettings;
     this.setData({
       fairyEnabled: capacity !== this.data.capacity ? capacity >= 8 : this.data.fairyEnabled,
-      scoreEnabled: capacity !== this.data.capacity && this.data.room?.scoreSettings
-        ? capacity >= this.data.room.scoreSettings.defaultEnabledMinPlayers : this.data.scoreEnabled,
+      scoreEnabled: scoreSettings && (capacity !== this.data.capacity || selected.id !== this.data.boardId)
+        ? scoreSettings.defaultEnabledBoards
+          ? scoreSettings.defaultEnabledBoards[selected.id]?.includes(capacity) === true
+          : capacity >= scoreSettings.defaultEnabledMinPlayers
+        : this.data.scoreEnabled,
       capacity,
       boardId: selected.id,
       choices,

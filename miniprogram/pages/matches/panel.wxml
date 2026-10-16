@@ -15,12 +15,13 @@
     <view wx:elif="{{loaded && outcomeSummary}}" class="matches-outcome-summary"><block wx:if="{{outcomeCounts}}"><text class="win">{{outcomeCounts.wins}} 胜</text><text aria-hidden="true">·</text><text class="loss">{{outcomeCounts.losses}} 负</text><block wx:if="{{outcomeCounts.excluded}}"><text aria-hidden="true">·</text><text>{{outcomeCounts.excluded}} 未计入</text></block></block><text wx:else>{{outcomeSummary}}</text></view>
   </view>
   <view wx:if="{{loading && !loaded && !records.length}}" class="status">正在读取对局记录…</view>
+  <button wx:if="{{focusId}}" class="matches-focus-reset" bindtap="historyClearFocus" disabled="{{loading || loadingMore}}" hover-class="none">查看全部对局</button>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="historyRetry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>
   <block wx:if="{{records.length}}">
     <block wx:for="{{records}}" wx:key="id">
       <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="match-day"><image class="match-calendar-icon" src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{item.dayShortLabel || item.dayLabel}}</text><text wx:if="{{item.yearLabel}}" class="match-year">{{item.yearLabel}}</text></view>
-      <view class="match-entry {{index===0 || item.dayKey!==records[index-1].dayKey?'match-day-first':''}} {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}} {{item.expanded?'match-expanded':''}}">
+      <view id="match-record-{{index}}" class="match-entry {{index===0 || item.dayKey!==records[index-1].dayKey?'match-day-first':''}} {{index===records.length-1 || item.dayKey!==records[index+1].dayKey?'match-day-last':''}} {{item.expanded?'match-expanded':''}} {{item.id===highlightedId?'match-focused':''}}">
         <view class="match-summary">
           <button hover-class="none" class="disclosure-button match-toggle" bindtap="historyToggleRecord" data-id="{{item.id}}" aria-expanded="{{item.expanded}}" aria-label="{{item.boardName}}，{{item.outcomeLabel}}，{{item.role}}，{{item.factionLabel}}，{{item.capacity}}人，{{item.dateLabel}}，{{item.scoreLabel}}，{{item.expanded?'收起详情':'展开详情'}}">
             <view class="match-heading">
@@ -42,7 +43,7 @@
       </view>
     </block>
     <button hover-class="none" wx:if="{{hasMore && !error}}" class="matches-more" bindtap="historyLoadMore" disabled="{{loadingMore}}" loading="{{loadingMore}}">{{loadingMore?'正在加载…':'加载更多'}}</button>
-    <view wx:elif="{{loaded && !error}}" class="matches-end">已显示全部 {{total}} 场对局</view>
+    <view wx:elif="{{loaded && !error}}" class="matches-end">{{startOffset?'没有更早的对局了':'已显示全部 '+total+' 场对局'}}</view>
   </block>
 </view>
 </template>

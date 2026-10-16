@@ -13,7 +13,9 @@
   const catalogue = standard.concat(Object.entries(copy.honors).map(([id, honor]) => ({
     id, title: honor.title, metric: 'fun_' + id,
     description: '本月「' + honor.title + '」次数榜第一。' + honor.description + '。',
-  }))).map(badge => ({ ...badge, imageUrl: '/assets/badges/' + badge.id + '.png', rules }));
+  }))).map(badge => ({ ...badge, imageUrl: '/assets/badges/' + badge.id + '.png', rules,
+    category: ({ points: '积分荣誉', games: '场次荣誉', overall: '胜率荣誉' })[badge.id] || '趣味荣誉',
+    flavor: badge.description.split('。').slice(1).join('。') }));
   const MAX_EQUIPPED = 3;
   function presentCollection(value, filter = 'all') {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));

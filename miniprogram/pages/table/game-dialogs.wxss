@@ -134,32 +134,49 @@
 .process-inspection-faction > view { min-width: 0; }
 .process-inspection-faction > view > view { margin-top: 8px; font-size: 25px; font-weight: 600; line-height: 1.4; }
 .process-inspection .fairy-result-summary { margin: 22px 0; font-size: 25px; line-height: 1.6; overflow-wrap: anywhere; }
-.process-history .identity-history-title { font-size: 20px; margin: 0; }
+.process-history .identity-history-title { font-size: 22px; margin: 0; }
 .table-sheet-backdrop .process-history { height: auto; padding: 0; }
+.process-history .process-sheet-top { padding: 10px 20px 0; }
+.process-history .table-sheet-handle { margin-bottom: 14px; }
 .process-history .identity-history-heading { padding: 0; margin: 0; align-items: center; }
 .process-history button.identity-history-close { flex-shrink: 0; width: 44px; min-height: 44px; padding: 0; margin: 0 -8px 0 0; font-size: 27px; }
+.process-history .identity-history-context { margin: 18px 0 0; padding-bottom: 13px; border-bottom: 1px solid rgba(177,191,198,.15); }
 .process-history .identity-history-body { padding: 0; height: 360px; max-height: calc(100vh - 248px - env(safe-area-inset-bottom)); }
-.process-history .identity-history-timeline { margin: 22px 0 3px 7px; padding-left: 0; border-left: 1px solid #50646e; }
-.process-history .identity-history-timeline::before { display: none; }
-.process-history .identity-history-event { padding: 0 0 25px 20px; }
+.process-history .process-sheet-fields { padding: 21px 20px 12px; }
+.process-history .identity-history-timeline { margin: 0 0 0 6px; padding-left: 22px; }
+.process-history .identity-history-timeline::before { display: block; top: 25px; bottom: 35px; left: 0; width: 1px; background: #40525d; }
+.process-history .identity-history-event { padding: 0 0 22px; }
+.process-history .identity-history-event + .identity-history-event { padding-top: 22px; }
+.process-history .identity-history-event:not(:last-child)::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: rgba(177,191,198,.15); }
 .process-history .identity-history-event:last-child { padding-bottom: 0; }
-.process-history .identity-history-dot { top: 19px; left: -4px; width: 7px; height: 7px; border-width: 1px; }
-.process-history-art { display: block; width: 45px; height: 45px; object-fit: contain; flex-shrink: 0; }
-.process-history .identity-history-record-heading { min-height: 45px; gap: 8px; flex-wrap: wrap; }
-.process-history .identity-history-role { min-width: 0; font-size: 19px; line-height: 1.6; }
-.process-history .identity-history-badge { padding: 1px 5px; border: 0; border-radius: 5px; background: rgba(177,191,198,.07); color: var(--muted); font-size: 10px; line-height: 1.7; }
+.process-history .identity-history-dot { top: 22px; left: -25px; width: 7px; height: 7px; border-width: 1px; }
+.process-history .identity-history-event + .identity-history-event .identity-history-dot { top: 44px; }
+.process-history-art { display: block; width: 46px; height: 50px; object-fit: contain; flex-shrink: 0; }
+.process-history .identity-history-record-heading, .process-history button.identity-history-toggle { min-height: 52px; gap: 10px; flex-wrap: nowrap; }
+.process-history .identity-history-role-copy { flex: 1; min-width: 0; }
+.process-history .identity-history-role { display: block; font-size: 18px; line-height: 1.45; }
+.process-history .identity-history-badge { padding: 1px 5px; border: 1px solid rgba(177,191,198,.15); border-radius: 5px; background: rgba(177,191,198,.07); color: var(--muted); font-size: 10px; line-height: 1.7; white-space: nowrap; }
 .process-history .identity-history-badge.is-current { color: var(--accent); background: rgba(229,198,139,.09); }
-.process-history .identity-history-meta { margin: 4px 0 0; font-size: 12px; }
+.process-history .identity-history-meta { margin: 3px 0 0; font-size: 12px; }
 .process-history .identity-history-summary { margin-top: 10px; font-size: 12px; }
-.process-history button.identity-history-toggle { min-height: 60px; padding: 0; margin: 0; gap: 8px; }
-.process-history button.identity-history-toggle .identity-history-role { flex: 1; font-size: 17px; }
+.process-history button.identity-history-toggle { padding: 0; margin: 0; }
 .process-history .identity-history-chevron { width: 7px; height: 7px; margin: 0 3px; }
-.process-history .identity-history-detail { margin-top: 13px; padding: 13px; border-radius: 13px; background: var(--control-bg, #14232c); }
-.process-history .identity-history-information { margin-top: 8px; font-size: 13px; line-height: 1.75; }
-.process-history .identity-history-readonly { margin-top: 14px; font-size: 12px; }
-.process-history .identity-skill-record { display: block; margin-top: 12px; font-size: 13px; line-height: 1.75; }
-.process-history .identity-skill-round { display: block; font-size: 11px; }
-.process-history .identity-skill-text { display: block; }
+.process-history .identity-skill-history { margin-top: 9px; }
+.process-history .identity-skill-record { display: flex; align-items: baseline; gap: 10px; margin: 0; padding: 7px 0; font-size: 14px; line-height: 1.6; }
+.process-history .identity-skill-label { flex: 0 0 48px; white-space: nowrap; }
+.process-history .identity-skill-value { display: flex; align-items: baseline; gap: 9px; flex: 1; min-width: 0; }
+.process-history .identity-skill-round { font-size: 12px; white-space: nowrap; }
+.process-history .identity-skill-separator { flex-shrink: 0; font-size: 12px; }
+.process-history .identity-skill-text { min-width: 0; font-weight: 500; }
+.process-history .identity-history-detail { margin-top: 7px; padding: 13px 14px 12px; border-radius: 12px; background: var(--control-bg, #14232c); }
+.process-history .identity-history-faction { display: flex; align-items: center; gap: 6px; }
+.process-history .identity-history-faction-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.process-history .identity-history-information { margin-top: 7px; font-size: 14px; line-height: 1.85; }
+.process-history .identity-history-readonly { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 11px; }
+.process-history .identity-history-readonly image { width: 12px; height: 12px; }
+.process-history .identity-history-footer { padding: 13px 20px calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(177,191,198,.15); }
+.process-history .identity-history-footer button { gap: 9px; margin: 0; }
+.process-history .identity-history-footer image { width: 19px; height: 19px; }
 .process-sheet.has-measured-body .process-sheet-body { max-height: none; }
 
 @media (max-width: 350px) {
@@ -171,8 +188,10 @@
   .player-card-record-line { padding-left: 11px; padding-right: 11px; gap: 3px 7px; font-size: 12px; }
   .process-skill .skill-target-grid, .process-team-grid { gap: 6px; }
   .process-skill button.skill-option, .process-tool .process-team-grid button.tool-seat-option { min-height: 64px; }
-  .process-history .identity-history-role { font-size: 17px; }
-  .process-history button.identity-history-toggle .identity-history-role { font-size: 15px; }
+  .process-history .process-sheet-top, .process-history .process-sheet-fields, .process-history .identity-history-footer { padding-left: 14px; padding-right: 14px; }
+  .process-history .identity-history-role { font-size: 16px; }
+  .process-history .identity-history-record-heading, .process-history button.identity-history-toggle { gap: 8px; }
+  .process-history-art { width: 42px; }
   .process-inspection-result { padding: 20px 16px; gap: 14px; }
   .process-inspection-faction { gap: 8px; }
 }

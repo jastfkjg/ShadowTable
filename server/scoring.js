@@ -6,7 +6,9 @@ const conditionKeys = new Set(["faction", "outcome", "roleId", "roleIdNot", "rea
 function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
     || !Array.isArray(rules.endReasons)) throw Error("积分规则配置不完整");
-  if (!Number.isSafeInteger(rules.defaultEnabledMinPlayers) || rules.defaultEnabledMinPlayers < 0) throw Error("积分默认人数配置无效");
+  if (!rules.defaultEnabledBoards || typeof rules.defaultEnabledBoards !== "object" || Array.isArray(rules.defaultEnabledBoards)
+    || Object.entries(rules.defaultEnabledBoards).some(([board, counts]) => !Array.isArray(counts) || !counts.length
+      || counts.some(count => !Number.isSafeInteger(count) || !rules.boards[board]?.includes(count)))) throw Error("积分默认板子配置无效");
   if (rules.targetModes && Object.values(rules.targetModes).some(mode => mode !== "living_merlin")) throw Error("积分刺杀判定配置无效");
   if (rules.notes && (!Array.isArray(rules.notes) || rules.notes.some(note => typeof note !== "string"))) throw Error("积分说明配置无效");
   const ids = new Set();
@@ -32,11 +34,11 @@ function policy() {
   rules.fingerprint = createHash("sha256").update(JSON.stringify(configured)).digest("hex");
   return rules;
 }
-function defaultEnabled(capacity) { return capacity >= configured.defaultEnabledMinPlayers; }
+function defaultEnabled(board, capacity) { return configured.defaultEnabledBoards[board]?.includes(capacity) === true; }
 function enabled(room) {
   if (typeof room.scoreEnabled === "boolean") return room.scoreEnabled;
   // Existing games keep the scoring behavior they had when dealt.
-  return room.phase !== "lobby" && !!room.scorePolicy || defaultEnabled(room.capacity);
+  return room.phase !== "lobby" && !!room.scorePolicy || defaultEnabled(room.board, room.capacity);
 }
 function scopeExclusion(room, rules) {
   if (!rules) return "积分功能启用前开局";
@@ -49,7 +51,7 @@ function exclusion(room, rules = room.scorePolicy) {
 function settings(room) {
   const rules = room.phase === "lobby" ? configured : room.scorePolicy;
   return { enabled: enabled(room), editable: room.phase === "lobby",
-    defaultEnabledMinPlayers: rules?.defaultEnabledMinPlayers ?? configured.defaultEnabledMinPlayers,
+    defaultEnabledBoards: clone(configured.defaultEnabledBoards),
     unavailableReason: scopeExclusion(room, rules) };
 }
 function settlementOptions(room) {
@@ -93,7 +95,7 @@ function publicRules(rules = policy()) {
       }).join(" · ") || "所有计分玩家";
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
-    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
+    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", "房主可在准备阶段开启或关闭计分；更换板子或人数时应用默认值，同房重开保留选择。发牌后固定。", "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
       "测试房间及有陪测参与的对局中，真实玩家和开发账号正常计分；陪测账号不保存个人战绩、积分及趣味记录。终止及缺少计分依据的对局不计积分。", ...(rules.notes || [])] };
 }
 module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

@@ -1013,7 +1013,7 @@ test("网页普通玩家看到湖仙座位标记，传递刷新后移动，关�
   assert.doesNotMatch(c.viewRoom(), /seat-fairy/);
 });
 
-test('网页房主计分开关自动保存，人数默认值及发牌锁定与服务端一致',async()=>{
+test('网页房主计分开关自动保存，板子与人数默认值及发牌锁定与服务端一致',async()=>{
   const room=newRoom('123456','host','房主','classic',6),writes=[];
   const c=client(async(path,options)=>{
     if(options?.method==='POST'){const data=JSON.parse(options.body);writes.push(data);command(room,'host',data);return response({accepted:true});}
@@ -1022,9 +1022,19 @@ test('网页房主计分开关自动保存，人数默认值及发牌锁定与�
   c.state.showRoomSettings=true;c.state.settings={busy:false};await c.loadSettings();
   assert.equal(c.state.settings.scoreEnabled,false);assert.match(c.viewSettingsDialog(),/aria-label="本局计分"/);
   await c.CHANGES.settingsScoring({checked:true});assert.equal(room.scoreEnabled,true);assert.equal(writes[0].scoreEnabled,true);
-  await c.CHANGES.settingsCapacity({value:'12'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'12'});assert.equal(room.scoreEnabled,false);assert.equal(writes.at(-1).scoreEnabled,false);
+  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,true);
   await c.CHANGES.settingsScoring({checked:false});assert.equal(room.scoreEnabled,false);
-  await c.CHANGES.settingsCapacity({value:'10'});assert.equal(room.scoreEnabled,true);
+  await c.loadSettings();assert.equal(c.state.settings.scoreEnabled,false);
+  await c.CHANGES.settingsBoard({value:'classic-court'});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsScoring({checked:true});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsBoard({value:'chaos'});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'10'});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsBoard({value:'knights-10'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'11'});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsBoard({value:'knights-11'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsCapacity({value:'13'});assert.equal(room.scoreEnabled,true);
   await c.CHANGES.settingsCapacity({value:'6'});assert.equal(room.scoreEnabled,false);
   for(let i=2;i<=6;i++)enter(room,'p'+i,'玩家'+i);room.players.forEach(p=>p.ready=true);
   command(room,'host',{type:'start',stage:room.stage,flexible:true});await c.loadSettings();const count=writes.length;
@@ -2010,4 +2020,17 @@ test('网页月初提醒只在我的页出现，确认失败可重试且服务�
   fail = false; await c.ACTIONS.monthlyResetDismiss(); assert.equal(c.state.monthlyReset, null);
   await c.applyRoute('#/stats'); assert.equal(c.state.monthlyReset, null);
   await c.applyRoute('#/me'); assert.equal(c.state.monthlyReset, null);
+});
+
+test('网页徽章管理按需显示摘下，详情精简说明且保留获取条件', () => {
+  const {catalogue}=require('../miniprogram/badges');
+  const c=client(async()=>response({}));
+  Object.assign(c.state,{page:'badges',badgeFilter:'all',badgeCollection:{badges:[{...catalogue[1],equipped:true}],periodStart:1}});
+  assert.doesNotMatch(c.viewBadgeManager(),/class="badge-remove"/);
+  c.ACTIONS.badgeManage();assert.match(c.viewBadgeManager(),/class="badge-remove"/);
+  c.ACTIONS.badgeManage();c.ACTIONS.showBadgeDetail({dataset:{id:catalogue[1].id}});
+  const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
+  assert.match(detail,/获取条件/);assert.match(detail,/持有规则/);
+  assert.doesNotMatch(detail,/按北京时间本月|摘下后仍保留/);
+  assert.match(detail,/secondary badge-detail-action/);
 });

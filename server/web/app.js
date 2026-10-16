@@ -585,7 +585,7 @@
     hasPendingRequest: false,
     notice: "",
     room: null,
-    badgeFilter: 'all', selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
+    badgeFilter: 'all', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
     playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "", playerCardBadge: null,
     boards: [],
     availableBoards: [],
@@ -735,7 +735,7 @@
     setState({ page: route.page, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
-      badgeFilter: 'all', selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
+      badgeFilter: 'all', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
       ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
       monthlyReset: null, resetSaving: false, resetError: '',
@@ -927,7 +927,7 @@
     if (state.badgeManagerSaving) return;
     const sequence = ++badgeManagerSequence, route = routeSequence;
     const active = () => alive && state.page === 'badges' && sequence === badgeManagerSequence && route === routeSequence;
-    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '' });
+    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '', badgeManaging: false });
     try {
       const value = await request('/api/me/badges');
       if (active()) setState({ badgeCollection: value });
@@ -960,26 +960,26 @@
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;
     const busy = state.badgeManagerLoading || state.badgeManagerSaving;
-    let html = '<div class="badge-page"' + (state.selectedBadgeId ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1>' + btn('badge-rules', 'badgeRules', '规则') + '</header>';
-    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span></div><div class="badge-hero"><div><div class="badge-title">本月荣誉</div><div class="badge-caption">榜首荣誉，每月更新。</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
+    let html = '<div class="badge-page"' + (state.selectedBadgeId ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1><span></span></header>';
+    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span><button type="button" class="badge-rules" data-action="badgeRules">规则<img class="badge-info-icon" src="/assets/record-info.svg" alt="" /></button></div><div class="badge-hero"><div><div class="badge-title">本月荣誉</div><div class="badge-caption">榜首荣誉，每月更新</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
     if (state.badgeManagerLoading) html += '<div class="status" role="status">正在读取徽章…</div>';
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';
-    html += '<section class="badge-equipment" aria-label="当前佩戴"><div class="badge-section-heading"><span>当前佩戴</span><span>' + c.equippedCount + '/3</span></div><div class="badge-slots">';
+    html += '<section class="badge-equipment" aria-label="当前佩戴"><div class="badge-section-heading"><div><span>当前佩戴</span><span class="badge-equipped-count">' + c.equippedCount + ' / 3</span></div><button type="button" class="badge-manage" data-action="badgeManage" aria-expanded="' + !!state.badgeManaging + '"' + (busy || !c.ownedCount ? ' disabled' : '') + '>' + (state.badgeManaging ? '完成' : '管理<span class="badge-chevron" aria-hidden="true"></span>') + '</button></div><div class="badge-slots">';
     for (const b of c.slots) html += '<div class="badge-slot">' + (b.empty
       ? '<button type="button" class="badge-slot-open badge-slot-empty" data-action="badgeFilter" data-id="owned" aria-label="查看已拥有徽章以选择佩戴"><span class="badge-empty-ring" aria-hidden="true">＋</span><span class="badge-slot-title">待佩戴</span></button>'
-      : '<button type="button" class="badge-slot-open" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="查看' + esc(b.title) + '"><img class="badge-slot-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-slot-title">' + esc(b.title) + '</span></button><button type="button" class="badge-remove" data-action="toggleOwnedBadge" data-id="' + esc(b.id) + '" aria-label="摘下' + esc(b.title) + '"' + (busy ? ' disabled' : '') + '>摘下</button>') + '</div>';
-    html += '</div><div class="badge-caption badge-equipment-note">最多佩戴3枚，将展示在玩家名片中。</div></section><div class="badge-filters" role="group" aria-label="筛选徽章">';
-    for (const [id, title, count] of [['all','全部',c.totalCount],['owned','已拥有',c.ownedCount],['unowned','未拥有',c.unownedCount]]) html += '<button type="button" class="' + (state.badgeFilter === id ? 'selected' : '') + '" data-action="badgeFilter" data-id="' + id + '" aria-pressed="' + (state.badgeFilter === id) + '">' + title + ' ' + count + '</button>';
+      : '<button type="button" class="badge-slot-open" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="查看' + esc(b.title) + '"><img class="badge-slot-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-slot-title">' + esc(b.title) + '</span></button>' + (state.badgeManaging ? '<button type="button" class="badge-remove" data-action="toggleOwnedBadge" data-id="' + esc(b.id) + '" aria-label="摘下' + esc(b.title) + '"' + (busy ? ' disabled' : '') + '>摘下</button>' : '')) + '</div>';
+    html += '</div><div class="badge-caption badge-equipment-note">佩戴的徽章将展示在玩家名片中</div></section><div class="badge-filters" role="group" aria-label="筛选徽章">';
+    for (const [id, title, count] of [['all','全部',c.totalCount],['owned','已拥有',c.ownedCount],['unowned','未拥有',c.unownedCount]]) html += '<button type="button" class="' + (state.badgeFilter === id ? 'selected' : '') + '" data-action="badgeFilter" data-id="' + id + '" aria-pressed="' + (state.badgeFilter === id) + '">' + title + '<span>' + count + '</span></button>';
     html += '</div>';
     if (!c.visibleBadges.length) html += '<div class="badge-empty-message">' + (state.badgeFilter === 'owned' ? '本月暂无徽章，登上月榜第一即可获得。' : '本月已拥有全部徽章。') + '</div>';
     html += '<div class="badge-grid">';
-    for (const b of c.visibleBadges) html += '<button type="button" class="badge-tile ' + (b.owned ? 'is-owned' : 'is-locked') + '" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="' + esc(b.title + '，' + b.status + '，查看详情') + '"><span class="badge-tile-status">' + (!b.owned ? '<span class="badge-lock" aria-hidden="true"></span>' : '') + esc(b.status) + '</span><img class="badge-tile-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-tile-copy"><span class="badge-tile-title">' + esc(b.title) + '</span><span class="badge-caption">' + esc(b.condition) + '</span></span></button>';
+    for (const b of c.visibleBadges) html += '<button type="button" class="badge-tile ' + (b.owned ? 'is-owned' : 'is-locked') + '" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="' + esc(b.title + '，' + b.status + '，查看详情') + '"><span class="badge-tile-status">' + (!b.owned ? '<span class="badge-lock" aria-hidden="true"></span>' : b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</span><img class="badge-tile-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-tile-copy"><span class="badge-tile-title">' + esc(b.title) + '</span><span class="badge-caption">' + esc(b.condition) + '</span></span></button>';
     html += '</div><div class="badge-caption badge-footer">点击徽章，查看详情与获取条件</div></div>';
     const b = c.items.find(b => b.id === state.selectedBadgeId);
     if (b) {
       const full = !b.equipped && c.equippedCount >= c.maxEquipped;
-      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-caption">' + b.status + '</div><p class="badge-detail-description">' + esc(b.description) + '</p><p class="badge-caption">' + esc(b.rules) + '</p>' + (b.owned && full ? '<div class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</div>' : '') + (b.owned ? btn('primary badge-detail-action','toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : '佩戴徽章',{id:b.id},busy || full) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</section></div>';
+      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content"><div class="badge-detail-handle" aria-hidden="true"></div><div class="badge-detail-header"><span>徽章详情</span><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button></div><div class="badge-detail-art"><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /></div><div class="badge-detail-category">' + esc(c.monthLabel + ' · ' + b.category) + '</div><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-detail-status">' + (b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</div>' + (b.flavor ? '<p class="badge-detail-description">' + esc(b.flavor) + '</p>' : '') + '<div class="badge-detail-criteria"><div class="badge-detail-row"><span>获取条件</span><span>' + esc(b.condition) + '</span></div><div class="badge-detail-row"><span>持有规则</span><span>榜首持有，含并列第一</span></div></div>' + (b.owned && full ? '<div class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</div>' : '') + (b.owned ? btn((b.equipped ? 'secondary' : 'primary') + ' badge-detail-action','toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : '佩戴徽章',{id:b.id},busy || full) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</div></section></div>';
     }
     return html;
   }
@@ -1941,8 +1941,9 @@ function roomListItems(rooms) {
   function viewScoreOverview(score) {
     return '<section class="personal-section score-overview" aria-label="我的积分"><button type="button" class="me-overview-link me-points-link" data-action="scoreRecords" aria-label="查看积分明细"><span class="section-title history-heading"><span>积分</span><span class="me-results-detail" aria-hidden="true">明细<span class="me-chevron"></span></span></span><span class="personal-metrics"><span class="me-metric"><span class="metric-value accent">' + (score?.total ?? '—') + '</span><span class="small muted">积分</span></span></span></button><button type="button" class="me-rules-trigger" data-action="navigate" data-page="help" aria-label="查看积分规则"><svg class="me-rules-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity=".08"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.6-2.5 2-2.5 3.7M12 16h.01"/></svg></button></section>';
   }
-  function viewScoreBreakdown(score) {
+  function viewScoreBreakdown(score, expanded = false) {
     if (!score || score.status !== 'scored') return '<div class="small muted">' + esc(score?.reason || '积分功能启用前的记录') + '</div>';
+    if (expanded) return '<div class="score-breakdown"><div class="match-detail-row score-total"><span>本局积分</span><span class="match-score-value">' + (score.total >= 0 ? '+' : '') + score.total + '<span class="match-score-unit">分</span></span></div>' + (score.breakdown || []).map(award => '<div class="match-detail-row"><span>' + esc(award.label) + '</span><span>' + (award.points >= 0 ? '+' : '') + award.points + '分</span></div>').join('') + (score.manualOverride ? '<div class="match-detail-row"><span>管理员调整原因</span><span>' + esc(score.manualOverride.reason) + '</span></div>' : '') + '</div>';
     return '<details class="score-breakdown"><summary class="accent">本局 ' + (score.total >= 0 ? '+' : '') + score.total + ' 分 · 查看明细</summary>' + score.breakdown.map(award => '<div class="score-award"><span>' + esc(award.label) + '</span><span>' + (award.points >= 0 ? '+' : '') + award.points + '分</span></div>').join('') + (score.manualOverride ? '<p class="small muted">管理员调整原因：'+esc(score.manualOverride.reason)+'</p>' : '') + '</details>';
   }
   var matchSequence = 0;
@@ -1962,12 +1963,27 @@ function roomListItems(rooms) {
   }
   function viewFunStory(record) {
     if (!record) return '';
-    let html = '<section class="match-fun"><div class="field-title">我的趣味记录</div>';
-    if (record.initialRole) html += '<div class="small muted">初始身份：' + esc(record.initialRole) + '</div>';
-    if (record.reason) html += '<div class="small muted">' + esc(record.reason) + '</div>';
-    for (const event of record.events) html += '<div class="fun-event"><div>' + (event.round ? '第 ' + event.round + ' 轮 · ' : '') + esc(event.role) + ' · ' + esc(event.label) + '</div><div class="small muted">' + esc(event.detail) + '</div></div>';
-    if (!record.events.length && !record.reason) html += '<div class="small muted">本局没有适用的趣味事件。</div>';
-    return html + '</section>';
+    record = funCopy.story(record);
+    const events = record.events || [];
+    let html = '<section class="match-fun"><div class="match-story-heading"><span class="match-section-label">我的趣味记录</span><span class="match-story-count">共 ' + events.length + ' 条</span></div>';
+    if (record.initialRole) html += '<div class="match-note muted">初始身份：' + esc(record.initialRole) + '</div>';
+    if (record.reason) html += '<div class="match-note muted">' + esc(record.reason) + '</div>';
+    html += '<div class="match-timeline">';
+    for (const group of record.eventGroups) {
+      html += '<div class="match-round"><div class="match-round-marker">' + esc(group.marker) + '</div><div class="match-round-body"><div class="match-round-heading"><span>' + esc(group.label) + '</span>' + (group.role ? '<span class="match-round-role">' + esc(group.role) + '</span>' : '') + '</div>';
+      for (const event of group.events) html += '<div class="fun-event"><img class="match-event-icon" src="' + esc(event.icon) + '" alt="" /><div class="match-event-label"><span>' + esc(event.label) + '</span>' + (group.showEventRoles && event.role ? '<span class="match-event-role">' + esc(event.role) + '</span>' : '') + '</div>' + (event.detail ? '<span class="match-event-detail">' + esc(event.detail) + '</span>' : '') + '</div>';
+      html += '</div></div>';
+    }
+    if (!events.length && !record.reason) html += '<div class="small muted">本局没有适用的趣味事件。</div>';
+    return html + '</div></section>';
+  }
+  function viewMatchDetails(record) {
+    const winner = ({good:'好人',evil:'坏人',third:'盗贼'})[record.winner];
+    let html = '<div class="match-details"><div class="match-result"><span>' + (winner ? winner + '获胜' : '胜方未登记') + '</span><span class="match-source muted">' + ({manual:'房主登记',system:'系统判定'}[record.source] || '未判定') + '</span></div>';
+    for (const [label, value] of [['不计入原因',record.excludedReason],['结束原因',record.scoreEndReason]]) if (value) html += '<div class="match-detail-row"><span>' + label + '</span><span>' + esc(value) + '</span></div>';
+    html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun) + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures));
+    if (record.members?.length) html += '<details class="match-members-section"><summary class="match-members-toggle"><img class="match-members-icon" src="/assets/record-users.svg" alt="" /><span>同桌成员 <span class="match-member-count">' + record.members.length + '人</span></span></summary><div class="match-members">' + record.members.map(member => '<div class="match-member"><span class="match-seat">' + member.seat + '号</span><span class="match-member-name">' + esc(member.name) + (member.seat === record.seat ? '（我）' : '') + '</span></div>').join('') + '</div></details>';
+    return html + '</div>';
   }
   function honorAvatar(player) {
     return player.avatarUrl ? '<img class="honor-avatar" src="' + esc(player.avatarUrl) + '" alt="" data-honor-avatar />'
@@ -2057,7 +2073,7 @@ function roomListItems(rooms) {
     if (!state.matches.length) html += '<div class="muted" role="status">' + (state.matchesLoading ? '正在读取对局…' : '暂无对局记录') + '</div>';
     else html += '<div class="small muted">共 ' + state.matchesTotal + ' 场对局</div>';
     state.matches.forEach(record => {
-      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (record.fun?.highlights?.length ? '<div class="match-fun-label">' + record.fun.highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewScoreBreakdown(record.score) + viewFunStory(record.fun) + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures)) + '<div class="small muted">同桌成员：' + record.members.map(member => esc(member.seat + '号 ' + member.name)).join('、') + '</div></details>';
+      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (record.fun?.highlights?.length ? '<div class="match-fun-label">' + record.fun.highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewMatchDetails(record) + '</details>';
     });
     if (state.matchesMore) html += btn('secondary','moreMatches',state.matchesLoading ? '正在加载…' : '加载更多',null,state.matchesLoading);
     if(scoreAdjustmentRecords.length && !state.matchFun) {
@@ -3173,9 +3189,14 @@ function roomListItems(rooms) {
         return b.id === boardId;
       })[0] || choices[0];
     if (!selected) return;
+    var scoreSettings = s.room?.scoreSettings;
     setSettings({
       fairyEnabled: capacity !== s.capacity ? capacity >= 8 : s.fairyEnabled,
-      scoreEnabled: capacity !== s.capacity && s.room?.scoreSettings ? capacity >= s.room.scoreSettings.defaultEnabledMinPlayers : s.scoreEnabled,
+      scoreEnabled: scoreSettings && (capacity !== s.capacity || selected.id !== s.boardId)
+        ? scoreSettings.defaultEnabledBoards
+          ? scoreSettings.defaultEnabledBoards[selected.id]?.includes(capacity) === true
+          : capacity >= scoreSettings.defaultEnabledMinPlayers
+        : s.scoreEnabled,
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
@@ -4601,6 +4622,7 @@ function roomListItems(rooms) {
     openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,
+    badgeManage: () => { if (!state.badgeManagerLoading && !state.badgeManagerSaving) setState({ badgeManaging: !state.badgeManaging }); },
     badgeFilter: el => { if (['all', 'owned', 'unowned'].includes(el.dataset.id)) { setState({ badgeFilter: el.dataset.id }); app.querySelector('.badge-filters .selected')?.focus({ preventScroll: true }); } },
     showBadgeDetail: el => { if (state.badgeCollection && badgePresentation.catalogue.some(b => b.id === el.dataset.id)) { setState({ selectedBadgeId: el.dataset.id }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); } },
     closeBadgeDetail,

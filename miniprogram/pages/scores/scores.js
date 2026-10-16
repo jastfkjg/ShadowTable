@@ -53,7 +53,7 @@ Page({
     const record = this.data.records.find(row => row.id === event.currentTarget.dataset.id && row.isMatch);
     if (!record) return;
     this.opening = true;
-    wx.navigateTo({ url: "/pages/match-detail/match-detail?id=" + encodeURIComponent(record.matchId),
+    wx.navigateTo({ url: "/pages/matches/matches?match=" + encodeURIComponent(record.matchId),
       fail: () => { if (this.alive) wx.showToast({ title: "暂时无法打开，请重试", icon: "none" }); },
       complete: () => { this.opening = false; } });
   },

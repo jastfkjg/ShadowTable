@@ -383,16 +383,18 @@ function createApp({
         return send(200,store.scoreAdjustments(uid,Number(offset)));
       }
       if (req.method === "GET" && path === "/api/me/matches") {
-        for (const key of requestUrl.searchParams.keys()) check(["offset","scored","fun","mode","role","period","board","matchRole","outcome"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "对局记录筛选无效");
+        for (const key of requestUrl.searchParams.keys()) check(["offset","scored","fun","mode","role","period","board","matchRole","outcome","focus"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "对局记录筛选无效");
         const rawOffset = requestUrl.searchParams.get("offset") || "0";
         check(/^(0|[1-9]\d{0,6})$/.test(rawOffset), "对局记录页码无效");
+        const focus = requestUrl.searchParams.get("focus");
+        check(focus === null || focus.length > 0 && focus.length <= 128 && !/[\u0000-\u001f]/.test(focus) && rawOffset === "0", "定位对局参数无效");
         const scored = requestUrl.searchParams.get("scored") || "0";
         check(["0", "1"].includes(scored), "对局记录筛选无效");
         const metric = requestUrl.searchParams.get("fun"), mode = requestUrl.searchParams.get("mode") || "classic", role = requestUrl.searchParams.get("role") || null;
         check(!metric || Object.hasOwn(fun.metrics,metric) && Object.hasOwn(fun.modes,mode) && (!role || /^[A-Za-z]{1,32}$/.test(role)), "趣味记录筛选无效");
         check(metric || !requestUrl.searchParams.has("mode") && !role, "趣味记录筛选无效");
         const filters = require("./match-filters").parseMatchFilters(requestUrl.searchParams, store.clock());
-        const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null, filters);
+        const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null, filters, focus);
         if (rawOffset==="0") {
           result.filterOptions=store.matchFilterOptions(uid);
           // Keep adjustment payloads for older clients; the current UI uses score-ledger.

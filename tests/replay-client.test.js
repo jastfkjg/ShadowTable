@@ -60,14 +60,12 @@ test("读取失败可重试、无对局编号不请求、重复读取和卸载�
   const load = pending.onLoad({ id: raw.id }); await Promise.resolve(); await pending.load(); assert.equal(calls, 1);
   pending.onUnload(); resolve({ replay: raw }); await load; assert.equal(pending.data.replay, null);
 });
-test("列表和详情的复盘入口只接受已有受支持记录，原有展开和返回行为保持不变", () => {
+test("对局列表的复盘入口只接受已有受支持记录，原有展开和返回行为保持不变", () => {
   const history = page({}, "matches"); history.p.alive = true;
   history.p.setData({ records: [{ id: "a/b", replayAvailable: true, expanded: false }, { id: "classic", replayAvailable: false }] });
   history.p.openReplay(tap({ id: "classic" })); history.p.openReplay(tap({ id: "missing" })); assert.equal(history.navigations.length, 0);
   history.p.openReplay(tap({ id: "a/b" })); assert.equal(history.navigations[0], "/pages/replay/replay?id=a%2Fb");
   history.p.toggleRecord(tap({ id: "a/b" })); assert.equal(history.p.data.records[0].expanded, true);
-  const detail = page({}, "match-detail"); detail.p.setData({ record: { id: "m", replayAvailable: true } });
-  detail.p.openReplay(); assert.equal(detail.navigations[0], "/pages/replay/replay?id=m");
 });
 test("牌桌复盘按本局编号跳转，防止重复进入，失败后可重试并保留牌桌", () => {
   const { p, wx, navigations, toasts } = page({}, "table");

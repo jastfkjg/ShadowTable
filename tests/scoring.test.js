@@ -5,7 +5,7 @@ const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { randomUUID, createHash } = require("node:crypto");
 const { createApp } = require("../server/app");
-const { newRoom, enter, command, publicView } = require("../server/engine");
+const { newRoom, enter, command, publicView, BOARDS } = require("../server/engine");
 const { Store } = require("../server/store");
 const { Leaderboard, periodRange } = require("../server/leaderboard");
 const { saveProfile } = require("../server/profile");
@@ -107,11 +107,18 @@ test('十二骑士积分进入明细榜单和跨板汇总，关闭仍排除，�
     assert.match(publicRules().scopeLabel,/十二骑士/);assert.match(publicRules().notes.join(''),/结束时的角色与阵营/);
   }finally {store.close();}
 });
-test('计分开关按服务端人数默认，房主可修改，切换人数重设默认并让全员重新准备',()=>{
-  for(const [board,capacity,expected] of [['classic',6,false],['classic',9,false],['classic-court',10,true],['classic-court',12,true],['knights-13',13,true]]) {
-    const room=newRoom('123456','wx:host','房主',board,capacity);
+test('仅十二骑士10到13人默认计分，其他板子默认关闭；旧准备房间采用同一默认值',()=>{
+  const knights=new Set(['knights-10','knights-11','knights','knights-13']);
+  for(const board of BOARDS.filter(board=>board.available)) for(const capacity of board.counts) {
+    const expected=knights.has(board.id);
+    const room=newRoom('123456','wx:host','房主',board.id,capacity);
     assert.equal(room.scoreEnabled,expected);assert.equal(publicView(room,room.host).scoreSettings.enabled,expected);
+    delete room.scoreEnabled;
+    assert.equal(publicView(room,room.host).scoreSettings.enabled,expected);
   }
+  assert.match(publicRules().notes.join(''),/仅十二骑士 10、11、12、13 人默认开启计分；其他板子默认关闭，房主可手动开启/);
+});
+test('房主可手动修改计分；切换板子或人数重设默认并让全员重新准备，相同配置保留选择',()=>{
   const room=newRoom('123456','wx:1','房主');enter(room,'wx:2','朋友');room.players.forEach(p=>p.ready=true);
   const initial=structuredClone(room);
   assert.throws(()=>run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true},'wx:2'),e=>e.status===403);
@@ -120,24 +127,46 @@ test('计分开关按服务端人数默认，房主可修改，切换人数重�
   assert.deepEqual(room,initial);
   run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true});
   assert.equal(room.scoreEnabled,true);assert.ok(room.players.every(p=>!p.ready));assert.notEqual(room.stage,initial.stage);
-  run(room,'configure',{board:'classic-court',capacity:10});assert.equal(room.scoreEnabled,true);
-  run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:false});
+  run(room,'configure',{board:'classic-court',capacity:10});assert.equal(room.scoreEnabled,false);
+  run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:true});
+  run(room,'configure',{board:room.board,capacity:room.capacity});assert.equal(room.scoreEnabled,true);
   run(room,'configure',{board:'classic',capacity:6});assert.equal(room.scoreEnabled,false);
-  run(room,'configure',{board:'classic-court',capacity:12});assert.equal(room.scoreEnabled,true);
+  for(const [board,capacity,other] of [['knights-10',10,'classic-court'],['knights-11',11,'classic-11'],['knights',12,'classic-court']]) {
+    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,true);
+    run(room,'updateSettings',{board,capacity,visible:false,scoreEnabled:false});
+    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,false);
+    room.players.forEach(p=>p.ready=true);
+    run(room,'configure',{board:other,capacity});assert.equal(room.scoreEnabled,false);assert.ok(room.players.every(p=>!p.ready));
+    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,true);
+  }
+  run(room,'configure',{board:'knights-13',capacity:13});assert.equal(room.scoreEnabled,true);
+  run(room,'configure',{board:'chaos',capacity:12});assert.equal(room.scoreEnabled,false);
 });
-test('开关默认阈值可仅改服务端；发牌后锁定，旧进行中牌局兼容且重开保留房主选择',()=>{
-  const original=configured.defaultEnabledMinPlayers;
-  try {configured.defaultEnabledMinPlayers=6;assert.equal(newRoom('123456','wx:host','房主').scoreEnabled,true);assert.match(publicRules().notes.join(''),/6人及以上默认开启/);}
-  finally {configured.defaultEnabledMinPlayers=original;}
+test('计分默认板子与人数由服务端配置并下发，拒绝无效范围',()=>{
+  const original=configured.defaultEnabledBoards;
+  try {
+    configured.defaultEnabledBoards={classic:[6]};
+    const room=newRoom('123456','wx:host','房主');assert.equal(room.scoreEnabled,true);
+    assert.equal(newRoom('123456','wx:host','房主','classic',8).scoreEnabled,false);
+    assert.equal(newRoom('123456','wx:host','房主','knights',12).scoreEnabled,false);
+    const settings=publicView(room,room.host).scoreSettings;assert.deepEqual(settings.defaultEnabledBoards,{classic:[6]});
+    settings.defaultEnabledBoards.classic.push(8);assert.deepEqual(configured.defaultEnabledBoards,{classic:[6]});
+  } finally {configured.defaultEnabledBoards=original;}
+  for(const defaults of [null,[],{unknown:[10]},{knights:[10]},{knights:[]},{knights:'12'},{knights:[NaN]}]) {
+    const rules=policy();rules.defaultEnabledBoards=defaults;assert.throws(()=>validateRules(rules),/默认板子/);
+  }
+});
+test('发牌后锁定，旧进行中牌局兼容且重开保留房主选择',()=>{
   const room=deal();const snapshot=structuredClone(room);
   assert.equal(publicView(room,room.host).scoreSettings.editable,false);
   assert.throws(()=>run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:false}),e=>e.status===409);
   assert.deepEqual(room,snapshot);
-  delete room.scoreEnabled;delete room.scorePolicy.defaultEnabledMinPlayers;
+  delete room.scoreEnabled;delete room.scorePolicy.defaultEnabledBoards;room.scorePolicy.defaultEnabledMinPlayers=10;
   assert.equal(publicView(room,room.host).scoreSettings.enabled,true);assert.equal(finish(room)[2],4);
   run(room,'rematch');assert.equal(room.scorePolicy,undefined);assert.equal(room.scoringFacts,undefined);
   assert.equal(publicView(room,room.host).scoreSettings.enabled,false);
   const enabledRoom=deal();finish(enabledRoom);run(enabledRoom,'rematch');assert.equal(enabledRoom.scoreEnabled,true);
+  const disabledKnights=knightDeal({scoreEnabled:false});run(disabledKnights,'terminate');run(disabledKnights,'rematch');assert.equal(disabledKnights.scoreEnabled,false);
 });
 test('房主关闭只排除积分，胜负仍归档，不改变已有积分；开启不能绕过板子范围',()=>{
   const store=new Store(':memory:');

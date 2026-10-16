@@ -179,7 +179,7 @@ test("审核拒绝和状态查询失败保留编辑并提供恢复；过期可�
   assert.match(client.p.data.uploadError, /已过期/); client.p.onUnload();
 });
 
-test("头像本身可更换，准备时禁用保存但允许重新选图，成功后没有常驻说明，错误可恢复", () => {
+test("独立更换头像入口保留原生选择，准备时禁用保存但允许重新选图，错误可恢复", () => {
   const context = vm.createContext({ window: {}, global: {}, console });
   const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
   const render = factory("pages/profile/profile.wxml"), data = page().p.data;
@@ -207,7 +207,12 @@ test("头像本身可更换，准备时禁用保存但允许重新选图，成�
   const approved = render({ ...base, uploadStatus: "approved" });
   assert.equal(nodes(approved).find(node => node.attr?.formType === "submit").attr.disabled, false);
   const visibleText = tree => typeof tree === "string" || typeof tree === "number" ? String(tree) : (tree.children || []).map(visibleText).join(" ");
-  assert.doesNotMatch(visibleText(approved), /更换头像|撤销更换|使用微信头像|审核|JPG|PNG|2MB|保存资料即可使用|重新选择图片|上传自己的图片/);
+  assert.match(visibleText(approved), /更换头像/);
+  assert.doesNotMatch(visibleText(approved), /撤销更换|使用微信头像|审核|JPG|PNG|2MB|保存资料即可使用|重新选择图片|上传自己的图片|新牌桌的默认昵称|已加入的牌桌和历史记录/);
+  assert.match(visibleText(approved), /个人昵称/);
+  const keyboard = render({ ...base, editingNickname: true, keyboardHeight: 300 });
+  assert.equal(nodes(keyboard).find(node => node.attr?.formType === "submit"), undefined);
+  assert.equal(nodes(keyboard).find(node => node.attr?.id === "profile-nickname").attr.confirmType, "done");
   const uploading = render({ ...base, uploadStatus: "uploading", uploadProgress: 42 });
   const progress = nodes(uploading).find(node => node.attr?.role === "progressbar");
   assert.equal(progress.attr.ariaValuenow, 42);
@@ -219,6 +224,21 @@ test("头像本身可更换，准备时禁用保存但允许重新选图，成�
   assert.ok(nodes(rejected).some(node => node.attr?.role === "alert"));
   assert.equal(nodes(rejected).find(node => node.attr?.bindtap === "retryAvatarUpload"), undefined);
   assert.equal(nodes(rejected).filter(node => node.attr?.bindtap === "chooseBuiltinAvatar").length, 32);
+});
+
+test("头像预览名称跟随当前选择，浏览其他风格不会改变头像或预览名称", async () => {
+  const client = page(); await ready(client);
+  const preset = require("../miniprogram/builtin-avatars").find(item => item.id === "sketch-08");
+  client.p.chooseBuiltinAvatar({ currentTarget: { dataset: { id: preset.id } } });
+  assert.equal(client.p.data.avatarLabel, "简笔 · 羽冠骑士");
+  client.p.chooseAvatarStyle({ currentTarget: { dataset: { style: "pixel" } } });
+  assert.equal(client.p.data.avatarLabel, "简笔 · 羽冠骑士");
+  assert.equal(client.p.data.avatarPreview, preset.path);
+  await choose(client.p);
+  assert.equal(client.p.data.avatarLabel, "自选头像");
+  client.p.removeAvatar();
+  assert.equal(client.p.data.avatarLabel, "默认头像");
+  client.p.onUnload();
 });
 
 test("wx.uploadFile携带会话与幂等编号，解析字符串响应，401只清除当前会话", async () => {
