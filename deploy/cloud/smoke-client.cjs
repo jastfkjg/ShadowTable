@@ -41,6 +41,7 @@ async function main() {
     if (!assets.size) throw new Error("Web entry has no assets");
     // These images are referenced by rendered views rather than the HTML shell.
     for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg",
+      ...["info", "heart", "sword", "swords", "shield", "spark", "medal", "users"].map(name => "/assets/record-" + name + ".svg"),
       ...["merlin", "percival", "assassin"].map(name => "/assets/roles/" + name + ".png"),
       ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {

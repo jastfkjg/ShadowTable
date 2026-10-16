@@ -11,11 +11,13 @@ COPY --chown=node:node miniprogram/badges.js ./miniprogram/badges.js
 COPY --chown=node:node miniprogram/board-detail.js ./miniprogram/board-detail.js
 COPY --chown=node:node miniprogram/pages/badges/badges.wxss ./miniprogram/pages/badges/badges.wxss
 COPY --chown=node:node miniprogram/honors.js miniprogram/honors.wxss ./miniprogram/
+COPY --chown=node:node miniprogram/match-story.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/result-registration.js miniprogram/leaderboard-presentation.js miniprogram/public-history.js ./miniprogram/
 COPY --chown=node:node miniprogram/room-swipe.js miniprogram/monthly-report.js miniprogram/monthly-report-card.js miniprogram/poster-canvas.js ./miniprogram/
 COPY --chown=node:node miniprogram/assets/roles/merlin.png miniprogram/assets/roles/percival.png miniprogram/assets/roles/assassin.png ./miniprogram/assets/roles/
 COPY --chown=node:node miniprogram/assets/monthly-report-background.jpg ./miniprogram/assets/monthly-report-background.jpg
 COPY --chown=node:node miniprogram/assets/monthly-*.svg miniprogram/assets/board-search.svg miniprogram/assets/board-directory.svg ./miniprogram/assets/
+COPY --chown=node:node miniprogram/assets/record-info.svg miniprogram/assets/record-heart.svg miniprogram/assets/record-sword.svg miniprogram/assets/record-swords.svg miniprogram/assets/record-shield.svg miniprogram/assets/record-spark.svg miniprogram/assets/record-medal.svg miniprogram/assets/record-users.svg ./miniprogram/assets/
 COPY --chown=node:node miniprogram/assets/badges ./miniprogram/assets/badges
 COPY --chown=node:node miniprogram/pages/profile/assets/avatars ./miniprogram/pages/profile/assets/avatars
 RUN mkdir /data && chown node:node /data

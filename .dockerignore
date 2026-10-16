@@ -12,6 +12,7 @@
 !miniprogram/board-detail.js
 !miniprogram/honors.js
 !miniprogram/honors.wxss
+!miniprogram/match-story.wxss
 !miniprogram/result-registration.js
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
@@ -28,6 +29,14 @@
 !miniprogram/assets/monthly-*.svg
 !miniprogram/assets/board-search.svg
 !miniprogram/assets/board-directory.svg
+!miniprogram/assets/record-info.svg
+!miniprogram/assets/record-heart.svg
+!miniprogram/assets/record-sword.svg
+!miniprogram/assets/record-swords.svg
+!miniprogram/assets/record-shield.svg
+!miniprogram/assets/record-spark.svg
+!miniprogram/assets/record-medal.svg
+!miniprogram/assets/record-users.svg
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
