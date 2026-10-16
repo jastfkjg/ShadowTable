@@ -39,6 +39,9 @@ async function main() {
     // Fetch the dependencies from the actual image, not the source checkout.
     const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
     if (!assets.size) throw new Error("Web entry has no assets");
+    // These images are referenced by rendered views rather than the HTML shell.
+    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg",
+      ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {
       const url = new URL(asset, origin);
       if (url.origin !== origin) throw new Error(`Unexpected external web asset: ${asset}`);

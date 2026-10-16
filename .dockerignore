@@ -9,6 +9,9 @@
 !miniprogram/avatar-library.js
 !miniprogram/fun-copy.js
 !miniprogram/badges.js
+!miniprogram/board-detail.js
+!miniprogram/honors.js
+!miniprogram/honors.wxss
 !miniprogram/result-registration.js
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
@@ -17,9 +20,14 @@
 !miniprogram/monthly-report-card.js
 !miniprogram/assets/
 !miniprogram/assets/monthly-report-background.jpg
+!miniprogram/assets/monthly-*.svg
+!miniprogram/assets/board-search.svg
+!miniprogram/assets/board-directory.svg
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
+!miniprogram/pages/badges/
+!miniprogram/pages/badges/badges.wxss
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/
 !miniprogram/pages/profile/assets/avatars/
