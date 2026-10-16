@@ -1040,12 +1040,12 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
     const board = new Leaderboard(store),
       read = (q) =>
         board.read("wx:rank-0", new URLSearchParams(q), boundary + 10000);
-    const first = read("metric=fun_merlin_evade");
+    const first = read("metric=fun_merlin_evade&period=all");
     assert.equal(first.rows.length, 20);
     assert.equal(first.nextOffset, 20);
     assert.equal(first.rows[0].rank, 1);
     const next = read(
-      "metric=fun_merlin_evade&offset=20&version=" + first.version,
+      "metric=fun_merlin_evade&period=all&offset=20&version=" + first.version,
     );
     assert.equal(next.rows.length, 2);
     assert.equal(
@@ -1064,14 +1064,14 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
         throw Error("rollback");
       }),
     );
-    assert.equal(read("metric=fun_merlin_evade").version, first.version);
+    assert.equal(read("metric=fun_merlin_evade&period=all").version, first.version);
     const r = deal(true);
     configure(r, { "wx:1": "gareth", "wx:2": "redSwordsman" });
     skills(r, { "wx:1": "target:2" });
     finish(r, { winner: "good" });
     store.transaction(() => store.save(r));
     assert.throws(
-      () => read("metric=fun_merlin_evade&offset=20&version=" + first.version),
+      () => read("metric=fun_merlin_evade&period=all&offset=20&version=" + first.version),
       (e) => e.status === 409,
     );
     assert.equal(
@@ -1086,7 +1086,7 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
     assert.equal(
       board.read(
         "guest:1",
-        new URLSearchParams("metric=fun_merlin_evade"),
+        new URLSearchParams("metric=fun_merlin_evade&period=all"),
         boundary + 10000,
       ).me.status,
       "unsupported",

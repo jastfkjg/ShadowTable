@@ -82,9 +82,9 @@ const manage = (store, action, ...rooms) =>
 test("删除及恢复同步个人明细、各类榜单、趣味、月份，保留手动得分与独立调分；预览不写入", () => {
   const store = new Store(":memory:");
   try {
-    const first = game(store, { ended: 100 }),
-      second = game(store, { ended: 200 }),
-      third = game(store, { ended: 300 });
+    const first = game(store, { ended: Date.now() - 300 }),
+      second = game(store, { ended: Date.now() - 200 }),
+      third = game(store, { ended: Date.now() - 100 });
     store.transaction(() =>
       store.adjustMatchScores(second.matchId, {
         revision: 0,

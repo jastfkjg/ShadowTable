@@ -60,12 +60,12 @@ test('调整月份以操作时间计，单局积分归原月份，重启和原�
  try {
   const range=periodRange('month',Date.now()),room=game(store,{ended:range.start-1});
   adjust(store,'wx:3',7);store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:0,reason:'历史积分修正',scores:[{uid:'wx:3',points:8}]}));
-  assert.equal(store.statsFor('wx:3').score.month,7);assert.equal(store.statsFor('wx:3').score.total,15);
+  assert.equal(store.statsFor('wx:3').score.month,7);assert.equal(store.statsFor('wx:3').score.total,7);
   const board=new Leaderboard(store),month=board.read('wx:3',new URLSearchParams('metric=points&period=month'));
   assert.equal(month.me.points,7);assert.equal(month.me.status,'no_games');assert.ok(!month.rows.some(row=>row.isSelf));
   const revision=store.scoreRevision('wx:3');store.close();store=new Store(path);
-  assert.equal(store.playerScore('wx:3').points,15);assert.equal(store.scoreRevision('wx:3'),revision);
-  store.transaction(()=>store.correctMatch(room.matchId,{revision:1,scoreReason:'quest_fail'}));assert.equal(store.playerScore('wx:3').points,15);
+  assert.equal(store.playerScore('wx:3').points,7);assert.equal(store.scoreRevision('wx:3'),revision);
+  store.transaction(()=>store.correctMatch(room.matchId,{revision:1,scoreReason:'quest_fail'}));assert.equal(store.playerScore('wx:3').points,7);
  }finally{store.close();rmSync(directory,{recursive:true,force:true});}
 });
 test('更正早期胜负时其他对局保持原分，手动单局积分及独立玩家调整保持不变',()=>{

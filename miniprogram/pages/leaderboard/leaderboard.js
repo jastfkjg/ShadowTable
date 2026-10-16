@@ -5,7 +5,7 @@ const rankPresentation = require("../../leaderboard-presentation");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
 Page({
-  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funMetrics: [], funOptions: [], pointsAvailable: true, period: "all", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
+  data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funMetrics: [], funOptions: [], pointsAvailable: true, period: "month", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
@@ -45,14 +45,15 @@ Page({
     this.closePlayerCard();
     const sequence = this.sequence = (this.sequence || 0) + 1;
     let { metric } = { ...this.data, ...selection };
-    const { period, board } = { ...this.data, ...selection };
+    const { board } = this.data;
+    const period = metric === "points" ? "month" : (selection.period || this.data.period);
     const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
     const selected = { ...this.data, ...selection };
     const funMode = countOnly ? "all" : selected.funMode, funSort = countOnly ? "count" : selected.funSort;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     this.failedSelection = null;
     // Keep the rendered snapshot mounted until the replacement is ready.
-    this.setData({ ...selection, metricsExpanded: false, rulesExpanded: false, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "", shareNotice: "" });
+    this.setData({ ...selection, period, metricsExpanded: false, rulesExpanded: false, funSelected: metric.startsWith("fun_"), loading: !more, loadingMore: more, error: "", moreError: more, notice: "", shareNotice: "" });
     try {
       await api.login();
       const query = "?metric=" + metric + "&period=" + period + (metric.startsWith("fun_") ? "&mode=" + funMode + "&sort=" + funSort : "") + (more ? "&offset=" + board.nextOffset + "&version=" + board.version : "");
@@ -115,7 +116,7 @@ Page({
   chooseFunSort(e) { const funSort=e.currentTarget.dataset.id; if(!(this.data.board?.countOnly && funSort === "rate") && ["count","rate"].includes(funSort) && funSort!==this.data.funSort) return this.load(false,{funSort}); },
   choosePeriod(e) {
     const period = e.currentTarget.dataset.id;
-    if (!["all", "month"].includes(period) || period === this.data.period) return;
+    if (this.data.metric === "points" || !["all", "month"].includes(period) || period === this.data.period) return;
     return this.load(false, { period });
   },
   toggleMine() { this.closePlayerCard(); this.setData({ mineExpanded: !this.data.mineExpanded, metricsExpanded: false, rulesExpanded: false }); },

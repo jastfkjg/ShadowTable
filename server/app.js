@@ -7,6 +7,7 @@ const { readProfile, saveProfile, readAvatarUrls } = require("./profile");
 const { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats } = require("./player-stats");
 const { Leaderboard } = require("./leaderboard");
 const { MonthlyReport } = require("./monthly-report");
+const { readMonthlyReset, acknowledgeMonthlyReset } = require("./monthly-reset");
 const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const honors = require("./honors");
@@ -352,8 +353,15 @@ function createApp({
         });
         return send(200, result);
       }
-      if (req.method === "GET" && path === "/api/me/stats")
-        return send(200, store.statsFor(uid));
+      if (req.method === "GET" && path === "/api/me/stats") {
+        res.setHeader("Cache-Control", "no-store");
+        return send(200, { ...store.statsFor(uid), ...(!uid.startsWith("test:") ? { monthlyReset: readMonthlyReset(store, uid) } : {}) });
+      }
+      if (req.method === "POST" && path === "/api/me/monthly-reset") {
+        const b = await body(req);
+        check(b && Object.keys(b).length === 1 && typeof b.month === "string", "月份参数无效");
+        return send(200, acknowledgeMonthlyReset(store, uid, b.month));
+      }
       if (req.method === "GET" && path === "/api/me/score-ledger") {
         for (const key of requestUrl.searchParams.keys()) check(["offset", "revision"].includes(key) && requestUrl.searchParams.getAll(key).length === 1, "积分明细参数无效");
         const offset = requestUrl.searchParams.get("offset") || "0", revision = requestUrl.searchParams.get("revision");

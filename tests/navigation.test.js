@@ -1208,7 +1208,7 @@ test('新小程序连接旧服务时自动显示局数榜，周期和胜率可�
     return rankResult(metric,{period:params.get('period'),...(upgraded?{availableMetrics:['points','games','overall','good','evil']}:{})});
   }});
   await p.onShow();
-  assert.deepEqual(urls,['/api/leaderboard?metric=points&period=all','/api/leaderboard?metric=games&period=all']);
+  assert.deepEqual(urls,['/api/leaderboard?metric=points&period=month','/api/leaderboard?metric=games&period=month']);
   assert.equal(p.data.metric,'games');assert.equal(p.data.board.metric,'games');assert.equal(p.data.error,'');
   assert.equal(p.data.pointsAvailable,false);assert.match(p.data.notice,/尚未开放积分榜/);
   await p.chooseMetric({currentTarget:{dataset:{id:'points'}}});assert.equal(urls.length,2);
@@ -1242,7 +1242,7 @@ test('积分榜分页遇到旧服务后从局数榜第一页重新加载，不�
     return rankResult(url.includes('metric=points')?'points':'games',{hasMore:urls.length===1,nextOffset:20,version:'old'});
   }});
   await p.onShow();await p.loadMore();
-  assert.equal(urls.at(-1),'/api/leaderboard?metric=games&period=all');
+  assert.equal(urls.at(-1),'/api/leaderboard?metric=games&period=month');
   assert.equal(p.data.board.metric,'games');assert.equal(p.data.board.rows.length,1);assert.equal(p.data.error,'');
 });
 test('小程序切换周期保留榜单和底栏，完成后一次更新，失败可重试目标周期', async () => {
@@ -2113,4 +2113,36 @@ test('原生弹层测量使用最新键盘高度，关闭后或切换模式后�
   assert.equal(p.data.entryBodyHeight,570);
   p.onHide();
   assert.equal(p.data.entryKeyboardHeight,0);
+});
+
+test('我的页展示上月战绩，确认失败可重试，已确认和退后台时忽略过期提醒响应', async () => {
+  const notice = { month: '2026-10', previousMonth: '2026-09', previous: { total: 24, wins: 15, losses: 9, winRate: 62.5, points: 54, scoredGames: 20 } };
+  let fail = true, pendingStats = null, writes = 0;
+  const { p } = page('me', { ...apiBase, request: async (url, method, body) => {
+    if (method === 'POST') { writes++; assert.equal(url, '/api/me/monthly-reset'); assert.equal(body.month, notice.month); if (fail) throw Error('连接失败'); return { month: notice.month }; }
+    if (url === '/api/me/profile') return profile;
+    if (url === '/api/me/stats') return pendingStats ? pendingStats.promise : { ...emptyStats, monthlyReset: notice };
+    return { records: [], rooms: [] };
+  } });
+  await p.onShow(); assert.equal(p.data.monthlyReset.previous.rateLabel, '62.5%');
+  await p.dismissMonthlyReset(); assert.equal(p.data.resetError, '连接失败'); assert.ok(p.data.monthlyReset);
+  pendingStats = deferred(); const refresh = p.load(); await new Promise(resolve => setImmediate(resolve));
+  fail = false; await p.dismissMonthlyReset(); assert.equal(p.data.monthlyReset, null);
+  pendingStats.resolve({ ...emptyStats, monthlyReset: notice }); await refresh;
+  assert.equal(p.data.monthlyReset, null); assert.equal(writes, 2);
+  pendingStats = deferred(); const hiddenRead = p.load(); await new Promise(resolve => setImmediate(resolve)); p.onHide();
+  pendingStats.resolve({ ...emptyStats, monthlyReset: notice }); await hiddenRead; assert.equal(p.data.monthlyReset, null);
+});
+
+test('积分榜仅显示本月入口，其他榜默认本月且保留全部，切回积分强制本月', async () => {
+  const urls = [];
+  const { p } = page('leaderboard', { ...apiBase, request: async url => {
+    urls.push(url); const q = new URL('https://test.invalid' + url).searchParams;
+    return rankResult(q.get('metric'), { period: q.get('period'), availableMetrics: ['points','games','overall','good','evil'] });
+  } });
+  await p.onShow(); assert.match(urls[0], /metric=points&period=month/);
+  await p.choosePeriod({ currentTarget: { dataset: { id: 'all' } } }); assert.equal(urls.length, 1);
+  await p.chooseMetric({ currentTarget: { dataset: { id: 'games' } } }); assert.match(urls.at(-1), /period=month/);
+  await p.choosePeriod({ currentTarget: { dataset: { id: 'all' } } }); assert.match(urls.at(-1), /period=all/);
+  await p.chooseMetric({ currentTarget: { dataset: { id: 'points' } } }); assert.match(urls.at(-1), /metric=points&period=month/);
 });

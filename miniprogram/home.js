@@ -26,7 +26,7 @@ module.exports = function createHomePage(initialTab = 0) {
           host.setData(patch, callback);
           // The custom tab bar lives outside the page's stacking context.
           // Remove it while the sheet is open, even when the keyboard is closed.
-          if (key === "lobby" && "entrySheet" in values) selectTab(host, host.data.activeTab);
+          if (key === "lobby" && "entrySheet" in values || key === "personal" && "monthlyReset" in values) selectTab(host, host.data.activeTab);
         },
       });
       this.lobbyController = attach(lobby, "lobby");
@@ -99,6 +99,8 @@ module.exports = function createHomePage(initialTab = 0) {
     mask() { this.lobbyController?.mask(); },
     load() { return this.personalController.load(); },
     about() { return this.personalController.about(); },
+    dismissMonthlyReset() { return this.personalController.dismissMonthlyReset(); },
+    blockMonthlyResetScroll() {},
     onShareAppMessage() { return { title: "桌边助手 · ShadowTable", path: "/pages/lobby/lobby" }; },
   };
   const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);

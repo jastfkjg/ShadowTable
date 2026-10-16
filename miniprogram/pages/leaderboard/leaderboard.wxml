@@ -1,10 +1,11 @@
 <app-nav title="排行榜" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page leaderboard-page {{board.fun?'fun-leaderboard':''}} {{board.me.rank>99?'has-wide-rank':''}}">
   <view class="rank-toolbar">
-    <view class="rank-period" aria-label="统计周期">
+    <view wx:if="{{metric!=='points'}}" class="rank-period" aria-label="统计周期">
       <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
       <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
     </view>
+    <view wx:else class="rank-month-label"><text>本月积分</text><text class="rank-month-caption">每月 1 日清零</text></view>
     <view class="rank-tools">
       <button class="disclosure-button rank-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/record-info.svg" aria-hidden="true" /><text>规则</text></button>
       <button class="rank-tool" bindtap="shareLeaderboard" disabled="{{!board || loading || loadingMore || visibilitySaving || shareOpening}}" loading="{{loading || loadingMore || visibilitySaving || shareOpening}}" hover-class="none" aria-label="{{shareOpening?'正在打开分享页':visibilitySaving?'正在保存公开设置':loading || loadingMore?'正在读取榜单':'分享我的榜单成绩'}}"><image wx:if="{{!loading && !loadingMore && !visibilitySaving && !shareOpening}}" class="rank-tool-icon" src="/assets/share.svg" aria-hidden="true" /><text>分享</text></button>

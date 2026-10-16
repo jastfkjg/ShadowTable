@@ -93,7 +93,7 @@ function publicRules(rules = policy()) {
       }).join(" · ") || "所有计分玩家";
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
-    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，历史积分保留。",
+    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", `房主可在准备阶段开启或关闭计分；${rules.defaultEnabledMinPlayers}人及以上默认开启，其他默认关闭。发牌后固定。`, "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
       "测试房间及有陪测参与的对局中，真实玩家和开发账号正常计分；陪测账号不保存个人战绩、积分及趣味记录。终止及缺少计分依据的对局不计积分。", ...(rules.notes || [])] };
 }
 module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

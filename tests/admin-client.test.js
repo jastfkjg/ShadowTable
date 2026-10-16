@@ -433,14 +433,14 @@ test('积分标签支持键盘切换且保留草稿，增减和设置显示各�
   const c=scoringClient(async()=>{});
   c.player({uid:'wx:1',name:'林间',points:12,revision:0});
   c.$('player-score-points').value='-5';c.$('player-score-mode').value='delta';c.updatePlayerScorePreview();
-  assert.equal(c.$('player-score-preview').textContent,'总积分 12 → 7 分');
+  assert.equal(c.$('player-score-preview').textContent,'积分 12 → 7 分');
   c.$('score-tab-player').listeners.keydown({key:'ArrowRight',preventDefault(){}});
   assert.equal(c.$('score-tab-match').attributes['aria-selected'],'true');
   assert.equal(c.$('player-score-section').hidden,true);assert.equal(c.$('score-tab-match').focused,true);
   c.$('score-tab-match').listeners.keydown({key:'Home',preventDefault(){}});
   assert.equal(c.$('player-score-section').hidden,false);assert.equal(c.$('player-score-points').value,'-5');
   c.$('player-score-mode').value='set';c.updatePlayerScorePreview();
-  assert.equal(c.$('player-score-preview').textContent,'总积分 12 → -5 分');
+  assert.equal(c.$('player-score-preview').textContent,'积分 12 → -5 分');
 });
 test('玩家查询失败后清除旧编辑目标，不把改分提交给上一次玩家',async()=>{
   let writes=0;const c=scoringClient(async(path,body)=>{if(body)writes++;throw Error('读取失败');});

@@ -15,7 +15,7 @@
       </view>
     </view>
     <view class="stats-score">
-      <button class="stats-score-entry" hover-class="stats-pressed" bindtap="openScoreHistory" disabled="{{loading || !!error}}" aria-label="查看积分明细"><view class="stats-score-label"><view class="stats-coin-icon" aria-hidden="true"></view><text>总积分</text><text class="stats-score-value">{{stats.score.total}}</text></view><view class="stats-score-link"><text>积分明细</text><view class="stats-chevron" aria-hidden="true"></view></view></button>
+      <button class="stats-score-entry" hover-class="stats-pressed" bindtap="openScoreHistory" disabled="{{loading || !!error}}" aria-label="查看积分明细"><view class="stats-score-label"><view class="stats-coin-icon" aria-hidden="true"></view><text>积分</text><text class="stats-score-value">{{stats.score.total}}</text></view><view class="stats-score-link"><text>积分明细</text><view class="stats-chevron" aria-hidden="true"></view></view></button>
       <view class="stats-score-caption"><block wx:if="{{stats.score.games}}"><text>{{stats.score.games}} 局计分</text><text>场均 {{stats.scoreAverageLabel}}</text></block><block wx:else><text>暂无计分对局</text><text wx:if="{{stats.score.total}}">来自积分调整</text></block></view>
     </view>
     <view wx:if="{{stats.total}}" class="stats-breakdown">

@@ -9,7 +9,7 @@
     return date.getUTCFullYear() + "-" + pad(date.getUTCMonth() + 1);
   }
   function monthRange(month) {
-    if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month || "")) throw new Error("月份无效");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) throw new Error("月份无效");
     const [year, value] = month.split("-").map(Number);
     return { start: Date.UTC(year, value - 1, 1) - 28800000, end: Date.UTC(year, value, 1) - 28800000 };
   }

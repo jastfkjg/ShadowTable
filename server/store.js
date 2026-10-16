@@ -10,6 +10,7 @@ const funCopy = require("../miniprogram/fun-copy");
 const replay = require("./replay");
 const management = require("./match-management");
 const { migrate: migrateKnights } = require("./knights");
+const { monthAt, monthRange } = require("../miniprogram/monthly-report");
 const companion = player => player.uid.startsWith("test:");
 // Keep only the table context needed to correct real players' results.
 const companionContext = ({ uid, name, seat, role, roleId, alive, faction }) =>
@@ -51,6 +52,7 @@ class Store {
       CREATE INDEX IF NOT EXISTS match_fun_user ON match_fun_stats(uid,mode,metric,ended);
       CREATE INDEX IF NOT EXISTS match_fun_rank ON match_fun_stats(mode,metric,ended,uid) WHERE status='known';
       CREATE INDEX IF NOT EXISTS match_fun_metric ON match_fun_stats(metric,ended,uid);
+      CREATE TABLE IF NOT EXISTS monthly_reset_visits(uid TEXT PRIMARY KEY, month TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS score_versions(uid TEXT PRIMARY KEY, revision INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
@@ -294,9 +296,7 @@ class Store {
     const total = this.db.prepare(`SELECT ${counts} FROM visible_match_players WHERE uid=?`).get(uid);
     const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM visible_match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
       .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
-    const score = this.db.prepare("SELECT coalesce(sum(points),0) AS total FROM active_match_scores WHERE uid=? AND status='scored'").get(uid);
-    const adjustment = this.db.prepare("SELECT coalesce(sum(delta),0) AS total FROM score_adjustments WHERE uid=?").get(uid);
-    return { ...summary(total), byFaction, scoreTotal: score.total + adjustment.total };
+    return { ...summary(total), byFaction, scoreTotal: this.playerScore(uid).points };
   }
   statsFor(uid) {
     const counts = `sum(outcome='win') AS wins, sum(outcome='loss') AS losses, sum(outcome='excluded') AS excluded`;
@@ -323,16 +323,14 @@ class Store {
         const { roleId, ...player } = shown.player;
         return { ...game, ...player, fun: funCopy.story(player.fun) };
       });
+    const { start: monthStart, end: monthEnd } = monthRange(monthAt(this.clock()));
     const scoreRows = this.db.prepare(`SELECT p.faction,json_extract(p.snapshot,'$.role') AS role,s.points,s.ended
-      FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored'`).all(uid);
+      FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid WHERE s.uid=? AND s.status='scored' AND s.ended>=? AND s.ended<?`).all(uid, monthStart, monthEnd);
     const aggregate = rows => ({ total: rows.reduce((sum,row) => sum + row.points,0), games: rows.length,
       average: rows.length ? Math.round(rows.reduce((sum,row) => sum + row.points,0) / rows.length * 100) / 100 : null });
-    const now = new Date(Date.now() + 8 * 3600000);
-    const monthStart = Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1) - 8 * 3600000;
-    const monthEnd = Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1) - 8 * 3600000;
     for (const row of byFaction) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction));
     for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
-    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(CASE WHEN created>=? AND created<? THEN delta ELSE 0 END),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=?").get(monthStart,monthEnd,uid);
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(delta),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,monthStart,monthEnd);
     return { identityType: uid.split(":")[0], ...overview, byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
       score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual } };
   }
@@ -441,14 +439,22 @@ class Store {
     }
     this.touchScore(uid);
   }
-  scoreRevision(uid) { return this.db.prepare("SELECT revision FROM score_versions WHERE uid=?").get(uid)?.revision || 0; }
+  scoreRevision(uid) {
+    // Namespace revisions by month so stale pages cannot adjust the new month's balance.
+    return monthRange(monthAt(this.clock())).start + (this.db.prepare("SELECT revision FROM score_versions WHERE uid=?").get(uid)?.revision || 0);
+  }
   touchScore(uid) {
     this.db.prepare("INSERT INTO score_versions VALUES(?,1) ON CONFLICT(uid) DO UPDATE SET revision=revision+1").run(uid);
   }
+  scoreForMonth(uid, month = monthAt(this.clock())) {
+    const { start, end } = monthRange(month);
+    const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM active_match_scores WHERE uid=? AND status='scored' AND ended>=? AND ended<?").get(uid,start,end);
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).points;
+    return { points: matchPoints.points + manual, matchPoints: matchPoints.points, manualPoints: manual, games: matchPoints.games };
+  }
   playerScore(uid) {
-    const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM active_match_scores WHERE uid=? AND status='scored'").get(uid);
-    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM score_adjustments WHERE uid=?").get(uid).points;
-    return {uid,points:matchPoints.points+manual,matchPoints:matchPoints.points,manualPoints:manual,games:matchPoints.games,revision:this.scoreRevision(uid)};
+    const { points, matchPoints, manualPoints, games } = this.scoreForMonth(uid);
+    return {uid,points,matchPoints,manualPoints,games,revision:this.scoreRevision(uid)};
   }
   scoreAdjustments(uid, offset = 0, limit = 20) {
     const total = this.db.prepare("SELECT count(*) AS total FROM score_adjustments WHERE uid=?").get(uid).total;
@@ -456,20 +462,20 @@ class Store {
     return {records,total,hasMore:offset+records.length<total};
   }
   scoreLedger(uid, offset = 0, limit = 20, revision = null) {
-    const score = this.playerScore(uid);
+    const score = this.playerScore(uid), { start, end } = monthRange(monthAt(this.clock()));
     if (revision !== null && revision !== score.revision) throw new RuleError("积分明细已更新，请刷新查看", 409);
-    const adjustments = this.db.prepare("SELECT count(*) AS n FROM score_adjustments WHERE uid=?").get(uid).n;
+    const adjustments = this.db.prepare("SELECT count(*) AS n FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).n;
     // Merge before pagination; never combine independently paged source lists.
     const rows = this.db.prepare(`WITH entries AS (
       SELECT 'match:'||s.match_id AS id,'match' AS type,s.match_id AS matchId,s.ended AS occurredAt,s.points,
         json_extract(m.snapshot,'$.boardName') AS boardName,json_extract(p.snapshot,'$.role') AS role,p.outcome,
         NULL AS reason,NULL AS beforePoints,NULL AS afterPoints,NULL AS mode,s.rowid AS sequence
       FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
-      JOIN matches m ON m.id=s.match_id WHERE s.uid=? AND s.status='scored'
+      JOIN matches m ON m.id=s.match_id WHERE s.uid=? AND s.status='scored' AND s.ended>=? AND s.ended<?
       UNION ALL
       SELECT 'adjustment:'||id,'adjustment',NULL,created,delta,NULL,NULL,NULL,reason,before_points,after_points,mode,rowid
-      FROM score_adjustments WHERE uid=?
-    ) SELECT * FROM entries ORDER BY occurredAt DESC,type DESC,sequence DESC,id DESC LIMIT ? OFFSET ?`).all(uid, uid, limit, offset);
+      FROM score_adjustments WHERE uid=? AND created>=? AND created<?
+    ) SELECT * FROM entries ORDER BY occurredAt DESC,type DESC,sequence DESC,id DESC LIMIT ? OFFSET ?`).all(uid, start, end, uid, start, end, limit, offset);
     const records = rows.map(({ sequence, ...row }) => row);
     const total = score.games + adjustments;
     return { records, total, hasMore: offset + records.length < total, revision: score.revision,
@@ -495,7 +501,7 @@ class Store {
     if (!Number.isSafeInteger(input.revision) || input.revision!==before.revision) throw new RuleError("玩家积分已变化，请重新查询",409);
     const delta = input.mode==='set' ? input.points-before.points : input.points;
     if (!delta) throw new RuleError("积分没有变化");
-    const id=randomUUID(),created=Date.now(),after=before.points+delta;
+    const id=randomUUID(),created=this.clock(),after=before.points+delta;
     if (!Number.isSafeInteger(after)) throw new RuleError("积分超出有效范围");
     this.initializeLeaderboardProfile(input.uid);
     this.db.prepare("INSERT INTO score_adjustments VALUES(?,?,?,?,?,?,?,?)").run(id,input.uid,delta,input.mode,before.points,after,reason,created);

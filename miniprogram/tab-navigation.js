@@ -2,7 +2,7 @@
 function selectTab(page, selected) {
   const tabBar = page.getTabBar?.();
   if (!tabBar) return;
-  const entrySheetVisible = selected === 0 && !!(page.data?.lobby?.entrySheet || page.data?.entrySheet);
+  const entrySheetVisible = selected === 0 ? !!(page.data?.lobby?.entrySheet || page.data?.entrySheet) : !!(page.data?.personal?.monthlyReset || page.data?.monthlyReset);
   const patch = {};
   if (tabBar.data.selected !== selected) patch.selected = selected;
   if (!!tabBar.data.entrySheetVisible !== entrySheetVisible) patch.entrySheetVisible = entrySheetVisible;

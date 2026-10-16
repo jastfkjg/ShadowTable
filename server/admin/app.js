@@ -836,12 +836,12 @@ function renderPlayerScoreSummary() {
 }
 function updatePlayerScorePreview() {
   const set=$('player-score-mode').value==='set',raw=$('player-score-points').value,points=Number(raw);
-  $('player-score-points-label').textContent=set?'目标总积分':'调整分值';
-  $('player-score-points').placeholder=set?'输入新的总积分':'如 5 或 -5';
-  $('player-score-help').textContent=(set?'将总积分调整到指定数值；':'正数加分，负数扣分；')+'不改变胜负或场均积分。';
+  $('player-score-points-label').textContent=set?'目标积分':'调整分值';
+  $('player-score-points').placeholder=set?'输入新的积分':'如 5 或 -5';
+  $('player-score-help').textContent=(set?'将积分调整到指定数值；':'正数加分，负数扣分；')+'不改变胜负或场均积分。';
   $('player-score-preview').textContent=selectedScorePlayer && raw && Number.isSafeInteger(points) && Math.abs(points)<=1000000
-    ? `总积分 ${selectedScorePlayer.points} → ${set?points:selectedScorePlayer.points+points} 分`
-    : '输入分值，预览调整后的总积分。';
+    ? `积分 ${selectedScorePlayer.points} → ${set?points:selectedScorePlayer.points+points} 分`
+    : '输入分值，预览调整后的积分。';
 }
 async function searchScorePlayers(start=0) {
   if(scoreBusy || scoreWritePending || correctionBusy || correctionPending || correctionLoading || matchScoreLoading) return;
@@ -933,7 +933,7 @@ async function submitScoreWrite(kind) {
       if(!selectedScorePlayer)return;
       const raw=$('player-score-points').value,points=Number(raw);if(!raw || !Number.isSafeInteger(points) || Math.abs(points)>1000000){status.textContent='请输入 -1000000 至 1000000 之间的整数积分';return;}
       const mode=$('player-score-mode').value,after=mode==='set'?points:selectedScorePlayer.points+points;
-      const player=selectedScorePlayer,description=`调整 ${player.name} 的总积分：${player.points} → ${after} 分？`;
+      const player=selectedScorePlayer,description=`调整 ${player.name} 的积分：${player.points} → ${after} 分？`;
       if(!await (window.AdminUI ? window.AdminUI.confirm({title:'调整玩家积分',description}) : window.confirm(description)))return;
       if(scoreBusy || correctionBusy || correctionPending || correctionLoading || matchScoreLoading || scoreWritePending || selectedScorePlayer!==player)return;
       path='score-adjustments';data={uid:player.uid,revision:player.revision,mode,points};

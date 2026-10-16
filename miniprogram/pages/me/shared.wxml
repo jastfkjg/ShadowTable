@@ -20,10 +20,10 @@
       </navigator>
       <view class="me-points">
         <navigator class="me-points-link" url="/pages/scores/scores" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="查看积分明细">
-          <view class="metric-value {{stats && (stats.score.total >= 10000 || stats.score.total <= -1000) ? 'me-value-compact' : ''}}">{{stats ? stats.score.total : '—'}}</view><text class="small muted">总积分</text>
+          <view class="metric-value {{stats && (stats.score.total >= 10000 || stats.score.total <= -1000) ? 'me-value-compact' : ''}}">{{stats ? stats.score.total : '—'}}</view><text class="small muted">积分</text>
         </navigator>
       </view>
-      <view class="me-overview-note"><text>{{stats ? stats.wins + ' 胜 · ' + stats.losses + ' 负' : '战绩读取中…'}}</text><text>本月积分 {{stats ? stats.score.month : '—'}}</text></view>
+      <view class="me-overview-note"><text>{{stats ? stats.wins + ' 胜 · ' + stats.losses + ' 负' : '战绩读取中…'}}</text></view>
     </view>
     <navigator wx:if="{{currentRoom}}" class="me-current-room" url="{{'/pages/table/table?code='+currentRoom.code+'&resume=1'}}" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="{{'返回牌桌，房间'+currentRoom.code+'，'+currentRoom.statusLabel+'，'+currentRoom.relationLabel}}">
       <view class="me-room-icon" aria-hidden="true"></view>
@@ -50,5 +50,25 @@
       <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-info" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">关于桌边助手</view></view><view class="me-chevron" aria-hidden="true"></view></button>
     </view></view>
   </block>
+</view>
+<view wx:if="{{monthlyReset}}" class="monthly-reset-backdrop" catchtouchmove="blockMonthlyResetScroll">
+  <view class="monthly-reset-dialog" role="dialog" aria-modal="true" aria-label="新月积分提醒">
+    <view class="monthly-reset-mark" aria-hidden="true"><image src="/assets/record-calendar.svg" /></view>
+    <view class="monthly-reset-eyebrow">{{monthlyReset.monthLabel}} · 新的开始</view>
+    <view class="monthly-reset-title">新的一月，从零出发</view>
+    <view class="monthly-reset-copy">上月积分已清零，本月重新累计。一起把新的故事留在牌桌上。</view>
+    <view class="monthly-reset-report">
+      <view class="monthly-reset-period">{{monthlyReset.previousLabel}} · 我的战绩</view>
+      <view class="monthly-reset-stats">
+        <view><text class="monthly-reset-value">{{monthlyReset.previous.total}}</text><text class="monthly-reset-label">对局</text></view>
+        <view><text class="monthly-reset-value">{{monthlyReset.previous.rateLabel}}</text><text class="monthly-reset-label">胜率</text></view>
+        <view><text class="monthly-reset-value monthly-reset-points">{{monthlyReset.previous.points}}</text><text class="monthly-reset-label">积分</text></view>
+      </view>
+      <view class="monthly-reset-result">{{monthlyReset.previous.total ? monthlyReset.previous.wins + ' 胜 · ' + monthlyReset.previous.losses + ' 负' : '上月暂无有效对局'}}<text wx:if="{{monthlyReset.previous.scoredGames}}"> · {{monthlyReset.previous.scoredGames}} 场计分局</text></view>
+    </view>
+    <view class="monthly-reset-footnote">积分每月 1 日清零，历史战绩继续保留</view>
+    <view wx:if="{{resetError}}" class="monthly-reset-error" role="alert">{{resetError}}</view>
+    <button class="monthly-reset-confirm" bindtap="dismissMonthlyReset" loading="{{resetSaving}}" disabled="{{resetSaving}}" hover-class="me-pressed">{{resetError ? '重试并开启新一月' : '开启新一月'}}</button>
+  </view>
 </view>
 </template>

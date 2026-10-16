@@ -623,7 +623,8 @@
     showRoomSettings: false,
     showTransfer: false,
     statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
-    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'all', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    monthlyReset: null, resetSaving: false, resetError: '',
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
     monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
@@ -731,13 +732,14 @@
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
     if(route.page==='matches'){scoreAdjustmentRecords=[];scoreAdjustmentTotal=0;scoreAdjustmentMore=false;scoreAdjustmentError='';}
-    setState({ page: route.page, room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+    setState({ page: route.page, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
       ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
-      rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
+      monthlyReset: null, resetSaving: false, resetError: '',
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
     const heading = app.querySelector('[data-page-heading]');
     if (heading) heading.focus({ preventScroll: true });
@@ -883,6 +885,27 @@
   function viewProfileError() {
     return state.profileError ? '<div class="inline-error" role="alert">' + esc(state.profileError) + (state.page === 'profile' || state.profileConflict || !state.profile ? btn('secondary','reloadProfile','重新载入资料',null,state.profileLoading) : '') + '</div>' : '';
   }
+  function viewMonthlyReset() {
+    const notice = state.monthlyReset;
+    if (state.page !== "me" || !notice) return "";
+    const row = notice.previous, label = notice.previousMonth.replace("-", " 年 ") + " 月";
+    return '<div class="monthly-reset-backdrop"><section class="monthly-reset-dialog" role="dialog" aria-modal="true" aria-labelledby="monthly-reset-title"><div class="monthly-reset-eyebrow">' + Number(notice.month.slice(5)) + ' 月 · 新的开始</div><h2 class="monthly-reset-title" id="monthly-reset-title">新的一月，从零出发</h2><p class="monthly-reset-copy">上月积分已清零，本月重新累计。一起把新的故事留在牌桌上。</p><div class="monthly-reset-report"><div class="monthly-reset-period">' + esc(label) + ' · 我的战绩</div><div class="monthly-reset-stats">' + [[row.total,"对局"],[row.winRate == null ? "—" : row.winRate + "%","胜率"],[row.points,"积分"]].map(([value,title])=>'<div><span class="monthly-reset-value">'+esc(value)+'</span><span class="monthly-reset-label">'+title+'</span></div>').join("") + '</div><div class="monthly-reset-result">' + (row.total ? row.wins + " 胜 · " + row.losses + " 负" : "上月暂无有效对局") + '</div></div><p class="monthly-reset-footnote">积分每月 1 日清零，历史战绩继续保留</p>' + (state.resetError ? '<p class="monthly-reset-error" role="alert">'+esc(state.resetError)+'</p>' : "") + btn("monthly-reset-confirm","monthlyResetDismiss",state.resetSaving ? "正在确认…" : state.resetError ? "重试并开启新一月" : "开启新一月",null,state.resetSaving) + "</section></div>";
+  }
+  async function dismissMonthlyReset() {
+    const month = state.monthlyReset?.month;
+    if (!month || state.resetSaving) return;
+    const route = routeSequence;
+    setState({ resetSaving: true, resetError: "" });
+    try {
+      await request("/api/me/monthly-reset", "POST", { month });
+      state.resetEpoch = (state.resetEpoch || 0) + 1;
+      if (route === routeSequence && state.monthlyReset?.month === month) {
+        setState({ monthlyReset: null });
+        app.querySelector("[data-page-heading]")?.focus();
+      }
+    } catch (e) { if (route === routeSequence) setState({ resetError: e.message }); }
+    finally { setState({ resetSaving: false }); }
+  }
   function viewMe() {
     const profile = state.profile, stats = state.stats;
     let html = '<div class="me-overview-page">' + personalTitle('我的','',false) + viewProfileError();
@@ -1015,12 +1038,12 @@
     closePlayerCard(false);
     const sequence = ++rankSequence, route = routeSequence;
     let metric = selection.rankMetric || state.rankMetric;
-    const period = selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
+    const period = metric === 'points' ? 'month' : selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
     const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
     const funMode = countOnly ? "all" : selection.rankFunMode || state.rankFunMode, funSort = countOnly ? "count" : selection.rankFunSort || state.rankFunSort, funRole = countOnly ? "" : selection.rankFunRole ?? state.rankFunRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     rankFailedSelection = null;
-    setState({ ...selection, rankRulesExpanded: false, rankMetricsExpanded: false, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
+    setState({ ...selection, rankPeriod: period, rankRulesExpanded: false, rankMetricsExpanded: false, rankLoading: !more, rankMoreLoading: more, rankError: '', rankMoreError: more, rankNotice: '' });
     try {
       await login();
       let result;
@@ -1104,7 +1127,7 @@
     const locked = state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving;
     const overlay = state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded;
     let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜"><div class="rank-workspace"' + (overlay ? ' inert' : '') + '>';
-    html += '<div class="rank-toolbar"><div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div><div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
+    html += '<div class="rank-toolbar">' + (metric === 'points' ? '<div class="rank-month-label"><strong>本月积分</strong><span>每月 1 日清零</span></div>' : '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>') + '<div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
     html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => {
       const selected = metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric);
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
@@ -1874,11 +1897,14 @@ function roomListItems(rooms) {
 
   async function loadStats() {
     if (state.statsLoading && statsRequestRoute === routeSequence) return;
-    const sequence = ++statsSequence, route = statsRequestRoute = routeSequence;
+    const sequence = ++statsSequence, route = statsRequestRoute = routeSequence, resetEpoch = state.resetEpoch;
     setState({ statsLoading: true, statsError: "" });
     try {
       const stats = await request("/api/me/stats");
-      if (sequence === statsSequence && route === routeSequence) setState({ stats, serverConnected: true });
+      if (sequence === statsSequence && route === routeSequence) {
+        setState({ stats, serverConnected: true, ...(state.page === "me" && !state.resetSaving && resetEpoch === state.resetEpoch ? { monthlyReset: stats.monthlyReset || null } : {}) });
+        if (state.page === "me" && state.monthlyReset) app.querySelector("[data-action=monthlyResetDismiss]")?.focus();
+      }
     }
     catch (e) {
       if (sequence !== statsSequence || route !== routeSequence) return;
@@ -1913,7 +1939,7 @@ function roomListItems(rooms) {
   }
 
   function viewScoreOverview(score) {
-    return '<section class="personal-section score-overview" aria-label="我的积分"><button type="button" class="me-overview-link me-points-link" data-action="scoreRecords" aria-label="查看积分明细"><span class="section-title history-heading"><span>积分</span><span class="me-results-detail" aria-hidden="true">明细<span class="me-chevron"></span></span></span><span class="personal-metrics"><span class="me-metric"><span class="metric-value accent">' + (score?.total ?? '—') + '</span><span class="small muted">总积分</span></span><span class="me-metric"><span class="metric-value">' + (score?.month ?? '—') + '</span><span class="small muted">本月积分</span></span></span></button><button type="button" class="me-rules-trigger" data-action="navigate" data-page="help" aria-label="查看积分规则"><svg class="me-rules-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity=".08"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.6-2.5 2-2.5 3.7M12 16h.01"/></svg></button></section>';
+    return '<section class="personal-section score-overview" aria-label="我的积分"><button type="button" class="me-overview-link me-points-link" data-action="scoreRecords" aria-label="查看积分明细"><span class="section-title history-heading"><span>积分</span><span class="me-results-detail" aria-hidden="true">明细<span class="me-chevron"></span></span></span><span class="personal-metrics"><span class="me-metric"><span class="metric-value accent">' + (score?.total ?? '—') + '</span><span class="small muted">积分</span></span></span></button><button type="button" class="me-rules-trigger" data-action="navigate" data-page="help" aria-label="查看积分规则"><svg class="me-rules-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity=".08"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.6-2.5 2-2.5 3.7M12 16h.01"/></svg></button></section>';
   }
   function viewScoreBreakdown(score) {
     if (!score || score.status !== 'scored') return '<div class="small muted">' + esc(score?.reason || '积分功能启用前的记录') + '</div>';
@@ -2036,7 +2062,7 @@ function roomListItems(rooms) {
     if (state.matchesMore) html += btn('secondary','moreMatches',state.matchesLoading ? '正在加载…' : '加载更多',null,state.matchesLoading);
     if(scoreAdjustmentRecords.length && !state.matchFun) {
       html+='<section class="personal-section"><h2 class="page-subtitle">管理员积分调整 · '+scoreAdjustmentTotal+' 条</h2>';
-      for(const record of scoreAdjustmentRecords) html+='<div class="stats-match"><div class="stats-row"><span class="small muted">'+esc(new Date(record.created).toLocaleString('zh-CN',{hour12:false}))+'</span><span class="accent">'+(record.delta>=0?'+':'')+record.delta+' 分</span></div><p>'+esc(record.reason)+'</p><div class="small muted">总积分 '+record.beforePoints+' → '+record.afterPoints+'</div></div>';
+      for(const record of scoreAdjustmentRecords) html+='<div class="stats-match"><div class="stats-row"><span class="small muted">'+esc(new Date(record.created).toLocaleString('zh-CN',{hour12:false}))+'</span><span class="accent">'+(record.delta>=0?'+':'')+record.delta+' 分</span></div><p>'+esc(record.reason)+'</p><div class="small muted">积分 '+record.beforePoints+' → '+record.afterPoints+'</div></div>';
       if(scoreAdjustmentError)html+='<p role="alert">'+esc(scoreAdjustmentError)+'</p>';
       if(scoreAdjustmentMore)html+=btn('secondary','moreScoreAdjustments',scoreAdjustmentError?'重试加载调整记录':'加载更多调整记录',null,scoreAdjustmentLoading);
       html+='</section>';
@@ -3361,7 +3387,7 @@ function roomListItems(rooms) {
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
     else if (state.playerCardStatus === 'untracked') html += '<div class="player-card-message muted">陪测玩家不记录个人战绩</div>';
     else if (stats) {
-      html += '<div class="player-card-overview-title player-card-section-title">战绩概览</div><div class="player-card-summary">' + [[stats.scoreTotal,'总积分'],[stats.rateLabel,'总胜率'],[stats.total,'有效局数'],[stats.wins,'胜场']].map((row, index) => '<div class="player-card-stat"><span class="small muted">' + row[1] + '</span><span class="player-card-number' + (index === 0 ? ' player-card-score-value' : '') + '">' + esc(row[0]) + '</span></div>').join('') + '</div>';
+      html += '<div class="player-card-overview-title player-card-section-title">战绩概览</div><div class="player-card-summary">' + [[stats.scoreTotal,'积分'],[stats.rateLabel,'总胜率'],[stats.total,'有效局数'],[stats.wins,'胜场']].map((row, index) => '<div class="player-card-stat"><span class="small muted">' + row[1] + '</span><span class="player-card-number' + (index === 0 ? ' player-card-score-value' : '') + '">' + esc(row[0]) + '</span></div>').join('') + '</div>';
       html += stats.total ? '<div class="player-card-factions"><div class="player-card-factions-heading"><span class="player-card-section-title">阵营表现</span><span class="small muted">胜率</span></div>' + stats.byFaction.map(row => '<div class="player-card-faction"><div class="player-card-faction-info"><span class="player-card-faction-label faction-' + esc(row.faction) + '">' + esc(row.label) + '</span><span class="small muted">' + row.wins + '胜 / ' + row.total + '局</span><span class="player-card-faction-rate">' + esc(row.rateLabel) + '</span></div><div class="player-card-faction-track" aria-hidden="true"><div class="player-card-faction-fill faction-' + esc(row.faction) + '" style="width:' + esc(row.winRate || 0) + '%"></div></div></div>').join('') + '</div>' : '<div class="player-card-empty small muted">暂无有效战绩</div>';
     } else html += '<div class="player-card-message" role="alert">战绩暂时无法读取，请稍后重试' + btn('text-button','retryPlayerCard','重试') + '</div>';
     return html + '</div></section></div>';
@@ -4542,7 +4568,7 @@ function roomListItems(rooms) {
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
       (['profile', 'badges'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4554,7 +4580,7 @@ function roomListItems(rooms) {
       (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" +
       (state.page === 'table' ? viewHistorySheet() + viewHonorBallot() : '') + viewPlayerCard() + viewSettingsDialog() +
-      viewBoardDetails() + viewNavigation();
+      viewBoardDetails() + (state.page === "me" && state.monthlyReset ? "" : viewNavigation()) + viewMonthlyReset();
     enhanceSelects(next);
     patchDOM(app, next);
     updateFunOptionsScrollHint();
@@ -4564,6 +4590,7 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    monthlyResetDismiss: dismissMonthlyReset,
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
     monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
@@ -4621,7 +4648,7 @@ function roomListItems(rooms) {
       if (metric !== state.rankMetric) await loadLeaderboard(false, {rankMetric:metric,rankFunMode:'all',rankFunRole:''});
       app.querySelector('.fun-metric-toggle')?.focus({preventScroll:true});
     },
-    rankPeriod: el => { if (['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
+    rankPeriod: el => { if (state.rankMetric !== 'points' && ['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
     rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
     rankRetry: () => loadLeaderboard(state.rankMoreError, rankFailedSelection || {}),

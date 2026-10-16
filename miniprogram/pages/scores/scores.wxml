@@ -12,7 +12,7 @@
   </view>
   <block wx:if="{{!item.isMatch}}">
     <view wx:if="{{item.reason}}" class="ledger-reason">{{item.reason}}</view>
-    <view class="ledger-balance">操作时总积分 <text>{{item.beforePoints}} → {{item.afterPoints}}</text></view>
+    <view class="ledger-balance">操作时积分 <text>{{item.beforePoints}} → {{item.afterPoints}}</text></view>
   </block>
 </template>
 <app-nav title="积分明细" back="{{true}}" bindback="back" />
@@ -23,13 +23,13 @@
   <block wx:if="{{loaded}}">
     <view class="score-overview">
       <view class="score-overview-heading">
-        <view class="score-overview-label"><image src="/assets/record-coin.svg" aria-hidden="true" /><text>当前总积分</text></view>
+        <view class="score-overview-label"><image src="/assets/record-coin.svg" aria-hidden="true" /><text>当前积分</text></view>
         <button class="ledger-explain" bindtap="openScoringRules" hover-class="ledger-pressed" aria-label="查看计分规则"><image class="ledger-help-icon" src="/assets/record-info.svg" aria-hidden="true" /><text>计分规则</text></button>
       </view>
       <view class="score-balance {{summary.total>=1000000 || summary.total<=-100000?'score-balance-compact':''}}"><text>{{summary.total}}</text><text class="score-unit">分</text></view>
-      <view class="score-overview-note">含对局计分与积分调整</view>
+      <view class="score-overview-note">仅当月有效 · 每月 1 日清零</view>
     </view>
-    <view class="ledger-heading"><text>积分记录</text><text class="ledger-count">共 {{total}} 条</text></view>
+    <view class="ledger-heading"><text>本月积分记录</text><text class="ledger-count">共 {{total}} 条</text></view>
     <view wx:if="{{!records.length && !error}}" class="ledger-empty"><view class="ledger-empty-title">暂无积分记录</view><view>完成计分对局后，可在这里查看得分。</view></view>
     <block wx:for="{{records}}" wx:key="id">
       <view wx:if="{{index===0 || item.dayKey!==records[index-1].dayKey}}" class="ledger-day"><image src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{item.dayLabel}}</text></view>

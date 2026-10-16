@@ -30,13 +30,14 @@ function parseQuery(params) {
   const allowed = new Set(["metric", "period", "offset", "version", "mode", "role", "sort", "nearby"]);
   for (const key of params.keys())
     if (!allowed.has(key) || params.getAll(key).length !== 1) throw new RuleError("排行榜参数无效", 400);
-  const metric = params.get("metric") ?? "games", period = params.get("period") ?? "all";
+  const metric = params.get("metric") ?? "games", requestedPeriod = params.get("period") ?? "month";
+  const period = metric === "points" ? "month" : requestedPeriod;
   const offset = params.get("offset") ?? "0", version = params.get("version");
   const nearby = params.has("nearby");
   if (nearby && (params.get("nearby") !== "1" || offset !== "0")) throw new RuleError("排行榜参数无效", 400);
   const funMetric = metric.startsWith("fun_") ? fun.metrics[metric.slice(4)] : null;
   const mode = params.get("mode") || "all", role = params.get("role") || null, sort = params.get("sort") || "count";
-  if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !["all", "month"].includes(period) || !/^(0|20|40|60|80)$/.test(offset)
+  if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !["all", "month"].includes(requestedPeriod) || !/^(0|20|40|60|80)$/.test(offset)
     || (version !== null && !/^[a-f0-9-]{36}$/.test(version)) || (Number(offset) > 0 && !version))
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
   if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && !eligibleRole(funMetric, role) || role && !roleName(role)
@@ -67,6 +68,7 @@ function neighbors(eligible, uid, present) {
 class Leaderboard {
   constructor(store) { this.store = store; this.cache = new Map(); }
   snapshot(metric, period, now) {
+    if (metric === "points") period = "month";
     const range = periodRange(period, now), key = metric + ":" + period;
     const old = this.cache.get(key);
     if (old && old.revision === this.store.leaderboardRevision && old.start === range.start && now >= old.updatedAt && now - old.updatedAt < CACHE_MS) return old;

@@ -336,7 +336,7 @@ test("积分榜同分并列，零分可上榜，公开设置与北京时间月�
     assert.deepEqual(result.rows.map(row=>row.rank),[1,2,2,4,5,5]);assert.equal(result.me.points,0);assert.equal(result.me.rank,5);
     assert.doesNotMatch(JSON.stringify(result),/wx:|"uid"|breakdown|roleId/);
     const previous=board.read("wx:5",new URLSearchParams("metric=points"),range.start-1);
-    assert.equal(previous.me.total,1); // all-time includes any archived timestamp.
+    assert.equal(previous.me.total,0); // Points never include another month, even without a period parameter.
     store.transaction(()=>saveProfile(store,"wx:3",{nickname:"玩家3",version:1,leaderboardVisible:false}));
     assert.equal(board.read("wx:3",new URLSearchParams("metric=points"),now).me.status,"hidden");
     const nextMonth=board.read("wx:5",new URLSearchParams("metric=points&period=month"),range.end);

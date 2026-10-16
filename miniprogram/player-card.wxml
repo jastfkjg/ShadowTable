@@ -20,7 +20,7 @@
       <block wx:elif="{{playerCardStats}}">
         <view class="player-card-overview-title player-card-section-title">战绩概览</view>
         <view class="player-card-summary">
-          <view class="player-card-stat"><text class="small muted">总积分</text><text class="player-card-number player-card-score-value">{{playerCardStats.scoreTotal}}</text></view>
+          <view class="player-card-stat"><text class="small muted">积分</text><text class="player-card-number player-card-score-value">{{playerCardStats.scoreTotal}}</text></view>
           <view class="player-card-stat"><text class="small muted">总胜率</text><text class="player-card-number">{{playerCardStats.rateLabel}}</text></view>
           <view class="player-card-stat"><text class="small muted">有效局数</text><text class="player-card-number">{{playerCardStats.total}}</text></view>
           <view class="player-card-stat"><text class="small muted">胜场</text><text class="player-card-number">{{playerCardStats.wins}}</text></view>

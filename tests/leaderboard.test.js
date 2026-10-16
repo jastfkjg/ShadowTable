@@ -240,7 +240,7 @@ test('本月按上海时区结束时间取半开区间，月初缓存切换，�
     games(store,'wx:me',1,0,{endedAt:end-1}); games(store,'wx:me',1,1,{endedAt:end});
     const month=query(board,'wx:me','metric=overall&period=month');
     assert.equal(month.me.total,2); assert.equal(month.me.status,'ranked'); assert.equal(month.me.remaining,0);
-    assert.equal(query(board,'wx:me','metric=overall').me.total,23);
+    assert.equal(query(board,'wx:me','metric=overall&period=all').me.total,23);
     const last = board.read('wx:me',new URLSearchParams('period=month'),end-1);
     const next = board.read('wx:me',new URLSearchParams('period=month'),end);
     assert.notEqual(last.version,next.version); assert.equal(next.me.total,1);

@@ -419,7 +419,7 @@ test('网页显示本人积分调整和原因，分页重试不重复，切换�
   await c.ACTIONS.moreScoreAdjustments();assert.match(c.viewMatches(),/网络未确认|重试加载调整记录/);
   const pending=c.ACTIONS.moreScoreAdjustments();c.ACTIONS.moreScoreAdjustments();assert.equal(requests,2);
   await c.applyRoute('#/lobby');finish(response({records:[{...row,id:'stale'}],total:2,hasMore:false}));await pending;
-  await c.applyRoute('#/matches');assert.equal((c.viewMatches().match(/总积分 4/g)||[]).length,1);
+  await c.applyRoute('#/matches');assert.equal((c.viewMatches().match(/积分 4/g)||[]).length,1);
 });
 test('网页按风格筛选头像，切换分类保留草稿和预览并且不触发保存', async () => {
   const presets = require('../miniprogram/builtin-avatars');
@@ -1994,4 +1994,20 @@ test('网页徽章页离开后丢弃加载结果，失败刷新不误显示为�
   assert.equal(c.state.page,'help');assert.equal(c.state.badgeCollection,null);
   fail=true;await c.applyRoute('#/badges');assert.match(c.state.badgeManagerError,/网络/);
   assert.match(c.viewBadgeManager(),/刷新徽章/);assert.doesNotMatch(c.viewBadgeManager(),/未拥有 17/);
+});
+
+test('网页月初提醒只在我的页出现，确认失败可重试且服务端确认后不再显示', async () => {
+  const notice = { month: '2026-10', previousMonth: '2026-09', previous: { total: 8, wins: 3, losses: 5, winRate: 37.5, points: 9 } };
+  let fail = true, seen = false;
+  const c = client(async (url, options) => {
+    if (url === '/api/me/monthly-reset') { assert.equal(JSON.parse(options.body).month, '2026-10'); if (fail) throw Error('离线'); seen = true; return response({ month: '2026-10' }); }
+    if (url === '/api/me/stats') return response({ total: 8, wins: 3, winRate: 37.5, score: { total: 0 }, monthlyReset: seen ? null : notice });
+    if (url === '/api/me/profile') return response({ nickname: '月度玩家', identityType: 'wx' });
+    return response({});
+  });
+  await c.applyRoute('#/me'); assert.equal(c.state.monthlyReset.previous.points, 9);
+  await c.ACTIONS.monthlyResetDismiss(); assert.ok(c.state.monthlyReset); assert.match(c.state.resetError, /网络未确认/);
+  fail = false; await c.ACTIONS.monthlyResetDismiss(); assert.equal(c.state.monthlyReset, null);
+  await c.applyRoute('#/stats'); assert.equal(c.state.monthlyReset, null);
+  await c.applyRoute('#/me'); assert.equal(c.state.monthlyReset, null);
 });

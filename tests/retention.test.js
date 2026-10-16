@@ -41,7 +41,9 @@ test("清理仅删除过期临时数据，归档、积分、趣味记录和进�
     assert.equal(result.rooms, 1); assert.equal(result.sessions, 1); assert.equal(result.receipts, 1);
     assert.equal(store.get(ended.code), null); assert.equal(store.get(active.code).phase, "tools");
     assert.ok(store.session("fresh")); assert.equal(store.session("expired"), undefined);
+    const later = now; now -= 91 * DAY;
     assert.deepEqual(store.statsFor("wx:host"), stats); assert.deepEqual(store.matchesFor("wx:host"), matches);
+    now = later; assert.equal(store.statsFor("wx:host").score.total, 0);
     assert.throws(() => store.receipt("wx:host", "legacy-request-001"), e => e.status === 410);
   } finally { store.close(); }
 });
