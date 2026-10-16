@@ -626,7 +626,7 @@
     monthlyReset: null, resetSaving: false, resetError: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [], monthlyImageIndex: 0,
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -1154,7 +1154,7 @@
   }
   async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt()) {
     const sequence = ++monthlySequence, route = routeSequence;
-    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', monthlyReport: null, monthlyImages: [], monthlyImageIndex: 0, monthlySharing: false });
+    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', monthlyReport: null, monthlyImages: [], monthlySharing: false });
     try {
       const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
       if (sequence !== monthlySequence || route !== routeSequence || state.page !== 'monthly' || !foreground) return;
@@ -1186,9 +1186,8 @@
       }
       html += btn('monthly-share', 'monthlyShare', state.monthlySharing ? '正在生成图片…' : state.monthlyEntertainment ? '生成娱乐版分享图' : '生成月报分享图', null, state.monthlySharing);
       if (state.monthlyImages?.length) {
-        html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[state.monthlyImageIndex || 0] + '" alt="' + esc(report.monthLabel + '月度战报分享图，第' + ((state.monthlyImageIndex || 0) + 1) + '张') + '"></div>';
-        if (state.monthlyImages.length > 1) html += '<div class="monthly-pagination">' + btn('text-button', 'monthlyPreviousImage', '上一张', null, !state.monthlyImageIndex) + '<span>第 ' + ((state.monthlyImageIndex || 0) + 1) + ' / ' + state.monthlyImages.length + ' 张</span>' + btn('text-button', 'monthlyNextImage', '下一张', null, (state.monthlyImageIndex || 0) + 1 === state.monthlyImages.length) + '</div><p class="monthly-caption">内容较多，已自动分图。可逐张保存。</p>';
-        html += btn('secondary', 'monthlyDownload', '保存当前图片') + '</div>';
+        html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[0] + '" alt="' + esc(report.monthLabel + '月度战报完整长图') + '"></div>';
+        html += btn('secondary', 'monthlyDownload', '保存长图') + '</div>';
       }
     }
     return html + '</section>';
@@ -1209,8 +1208,15 @@
         image.onload = () => done(image.width && image.height ? image : null); image.onerror = () => done(null); image.src = path;
       }))));
       if (!active()) return;
-      const images = cards.map(card => { const canvas = document.createElement('canvas'); Object.assign(canvas, monthlyCard.dimensions(card)); monthlyCard.drawCard(canvas.getContext('2d'), card, avatars); return canvas.toDataURL('image/png'); });
-      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyImages: images, monthlyImageIndex: 0 });
+      const images = cards.map(card => {
+        const canvas = document.createElement('canvas'), { width, height, scale } = monthlyCard.renderDimensions(card);
+        Object.assign(canvas, { width, height });
+        const context = canvas.getContext('2d'); context.save();
+        try { if (scale !== 1) context.scale(scale, scale); monthlyCard.drawCard(context, card, avatars); }
+        finally { context.restore(); }
+        return canvas.toDataURL('image/png');
+      });
+      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyImages: images });
       app.querySelector('.monthly-image-result')?.scrollIntoView({ block: 'start' });
     } catch (error) { if (active()) setState({ monthlyError: error.message }); }
     finally { if (route === routeSequence && sequence === monthlySequence) setState({ monthlySharing: false }); }
@@ -1222,9 +1228,9 @@
     return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '', initial: row.initial }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats', () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly');
   }
   function downloadMonthlyImage() {
-    const path = state.monthlyImages?.[state.monthlyImageIndex || 0];
+    const path = state.monthlyImages?.[0];
     if (!path) return;
-    const link = document.createElement('a'); link.href = path; link.download = '桌边助手-月度战报-' + state.monthlyMonth + '-' + ((state.monthlyImageIndex || 0) + 1) + '.png';
+    const link = document.createElement('a'); link.href = path; link.download = '桌边助手-月度战报-' + state.monthlyMonth + '.png';
     document.body.appendChild(link); link.click(); link.remove();
   }
   function viewHelp() {
@@ -4617,8 +4623,6 @@ function roomListItems(rooms) {
     monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
     monthlyShare: shareMonthlyReport,
     monthlyDownload: downloadMonthlyImage,
-    monthlyPreviousImage: () => { if (state.monthlyImageIndex > 0) setState({ monthlyImageIndex: state.monthlyImageIndex - 1 }); },
-    monthlyNextImage: () => { if (state.monthlyImageIndex + 1 < state.monthlyImages?.length) setState({ monthlyImageIndex: state.monthlyImageIndex + 1 }); },
     openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,

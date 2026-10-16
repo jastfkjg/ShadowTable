@@ -107,7 +107,7 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     assert.doesNotMatch(standard, /歪刀/); assert.match(entertainment, /背锅侠/);
   } finally { store.close(); }
 });
-test("前三名保留超过100人的并列，长图自动分张，公开投影不携带原始数据", () => {
+test("前三名保留超过100人的并列，生成单张长图，公开投影不携带原始数据", () => {
   const store = new Store(":memory:");
   try {
     const reports = new MonthlyReport(store);
@@ -115,7 +115,8 @@ test("前三名保留超过100人的并列，长图自动分张，公开投影�
     const report = read(reports);
     assert.equal(report.mainBoards[0].rows.length, 105); assert.ok(report.mainBoards[0].rows.every(row => row.rank === 1 && row.tied));
     const pages = cardRenderer.cards({ ...report, uid: "secret", matches: [{ secret: "should-not-export" }] });
-    assert.ok(pages.length > 1); assert.ok(pages.every(page => cardRenderer.dimensions(page).height <= cardRenderer.MAX_HEIGHT));
+    assert.equal(pages.length, 1); assert.ok(cardRenderer.dimensions(pages[0]).height > 15000);
+    assert.ok(cardRenderer.renderDimensions(pages[0]).height <= 8192);
     assert.equal(pages.flatMap(page => page.sections).filter(section => section.title.startsWith("积分榜")).flatMap(section => section.rows).length, 105);
     assert.doesNotMatch(JSON.stringify(pages), /secret|should-not-export|uid|publicId|matches/);
     assert.match(cards.describe(pages[0]), /月度战报/); assert.deepEqual(cards.dimensions(pages[0]), cardRenderer.dimensions(pages[0]));
@@ -156,7 +157,11 @@ test("月报HTTP鉴权、查询白名单，静态共享模块可在网页加载"
     const response = await get("/api/monthly-report?month=2026-09"); assert.equal(response.status, 200); assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal((await response.json()).month, "2026-09");
     for (const query of ["month=2026-13", "month=2026-11", "month=2026-09&uid=other", "month=2026-09&month=2026-10"]) assert.equal((await get("/api/monthly-report?" + query)).status, 400);
-    for (const path of ["/monthly-report.js", "/monthly-report-card.js", "/monthly.css"]) assert.equal((await get(path, false)).status, 200);
+    for (const path of ["/monthly-report.js", "/poster-canvas.js", "/monthly-report-card.js", "/monthly.css"]) assert.equal((await get(path, false)).status, 200);
+    for (const role of ["merlin", "percival", "assassin"]) {
+      const portrait = await get("/assets/roles/" + role + ".png", false);
+      assert.equal(portrait.status, 200); assert.equal(portrait.headers.get("content-type"), "image/png");
+    }
     const artwork = await get("/assets/monthly-report-background.jpg", false);
     assert.equal(artwork.status, 200); assert.equal(artwork.headers.get("content-type"), "image/jpeg");
     assert.ok((await artwork.arrayBuffer()).byteLength > 1000);

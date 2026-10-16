@@ -18,7 +18,12 @@
 !miniprogram/room-swipe.js
 !miniprogram/monthly-report.js
 !miniprogram/monthly-report-card.js
+!miniprogram/poster-canvas.js
 !miniprogram/assets/
+!miniprogram/assets/roles/
+!miniprogram/assets/roles/merlin.png
+!miniprogram/assets/roles/percival.png
+!miniprogram/assets/roles/assassin.png
 !miniprogram/assets/monthly-report-background.jpg
 !miniprogram/assets/monthly-*.svg
 !miniprogram/assets/board-search.svg

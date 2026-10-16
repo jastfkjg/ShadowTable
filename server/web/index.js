@@ -28,6 +28,7 @@ const assets = {
   "/leaderboard.css": ["leaderboard.css", "text/css; charset=utf-8"],
   "/monthly-report.js": ["../../miniprogram/monthly-report.js", "text/javascript; charset=utf-8"],
   "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
+  "/poster-canvas.js": ["../../miniprogram/poster-canvas.js", "text/javascript; charset=utf-8"],
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
@@ -35,6 +36,8 @@ for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "lau
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
+for (const role of ["merlin", "percival", "assassin"])
+  assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
 for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
 for (const name of ['info','heart','sword','swords','shield','spark','medal','users'])

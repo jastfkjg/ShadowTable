@@ -242,22 +242,22 @@ test('图片预览准备完成后才能发送或保存；不支持发送与相�
   assert.ok(!nodes(ready).some(node=>node.attr?.bindtap==='chooseMode'));
   assert.doesNotMatch(JSON.stringify(ready),/榜单前三位/);
 });
-test('榜单分享入口在本人未上榜或暂无记录时均可点击，忙碌时显示等待状态', () => {
+test('榜单顶部移除分享入口，保留规则与忙碌状态提示', () => {
   const template=factory('pages/leaderboard/leaderboard.wxml');
   const renderRank=data=>template({loading:false,loadingMore:false,visibilitySaving:false,shareOpening:false,...data});
   const own=renderRank({board:{rows:[],metric:'games'}});
-  assert.equal(byHandler(own,'shareLeaderboard').attr.disabled,false);
+  assert.equal(byHandler(own,'shareLeaderboard'),undefined);
+  assert.ok(byHandler(own,'toggleRules'));
   assert.match(JSON.stringify(own),/暂无公开排名/);
   const board={rows:[],metric:'games'};
   const empty=renderRank({board,shareNotice:'当前榜单暂无本人成绩，完成相关对局后再来分享。'});
-  assert.equal(byHandler(empty,'shareLeaderboard').attr.disabled,false);
+  assert.equal(byHandler(empty,'shareLeaderboard'),undefined);
   assert.ok(nodes(empty).some(node=>node.attr?.role==='alert'));
   assert.match(JSON.stringify(empty),/暂无本人成绩/);
   for (const key of ['loading','loadingMore','visibilitySaving','shareOpening']) {
     const busy=renderRank({board,[key]:true});
     const entry=byHandler(busy,'shareLeaderboard');
-    assert.equal(entry.attr.disabled,true);assert.equal(entry.attr.loading,true);
-    assert.match(entry.attr.ariaLabel,/正在/);
+    assert.equal(entry,undefined);
     assert.ok(nodes(busy).some(node=>node.attr?.role==='status'));
   }
 });

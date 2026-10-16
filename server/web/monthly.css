@@ -55,8 +55,6 @@ button.monthly-share { width: 100%; min-height: 52px; margin: 0; background: var
 .monthly-image-result { margin-top: 24px; }
 .monthly-image-scroll { max-height: 75vh; overflow: auto; border-radius: 10px; }
 .monthly-image-preview { display: block; width: 100%; height: auto; }
-.monthly-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.monthly-pagination button { width: auto; min-height: 48px; margin: 0; }
 .monthly-row:hover { background-color: var(--surface); }
 .monthly-page button:focus-visible, .monthly-image-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .monthly-avatar img { object-fit: cover; }

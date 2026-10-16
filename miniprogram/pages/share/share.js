@@ -13,7 +13,7 @@ async function readLeaderboard(query) {
   }
 }
 Page({
-  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true, pageTitle: "分享成绩", monthly: false, pageIndex: 0, pageCount: 1 },
+  data: { loading: true, rendering: false, acting: false, error: "", actionError: "", imagePath: "", description: "", albumDenied: false, imageMenu: true, pageTitle: "分享成绩", monthly: false },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ imageMenu: typeof wx.showShareImageMenu === "function" && (!wx.canIUse || wx.canIUse("showShareImageMenu")) });
@@ -29,18 +29,16 @@ Page({
     this.fetching = true;
     const sequence = this.sequence = (this.sequence || 0) + 1;
     this.card = null;
-    this.imagePaths = []; this.cardPages = [];
-    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "", pageIndex: 0, pageCount: 1 });
+    this.setData({ loading: true, imagePath: "", error: "", actionError: "", description: "" });
     try {
       await api.login();
       const { kind, ...query } = this.selection;
       const [profile, result] = await Promise.all([kind === "monthly" ? Promise.resolve(null) : api.request("/api/me/profile"), kind === "monthly" ? api.request("/api/monthly-report?month=" + encodeURIComponent(query.month)) : kind === "leaderboard" ? readLeaderboard(query) : api.request("/api/me/stats")]);
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
-      this.cardPages = kind === "monthly" ? monthlyCards.cards(result, query.edition === "fun") : [];
-      this.card = kind === "monthly" ? this.cardPages[0] : kind === "leaderboard" ? cards.leaderboardCard(profile, result)
+      this.card = kind === "monthly" ? monthlyCards.cards(result, query.edition === "fun")[0] : kind === "leaderboard" ? cards.leaderboardCard(profile, result)
         : kind === "stats" ? cards.statsCard(profile, result, now) : kind === "funSummary" ? cards.funSummaryCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
-      this.setData({ description: cards.describe(this.card), pageCount: this.cardPages.length || 1 });
+      this.setData({ description: cards.describe(this.card) });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { this.fetching = false; if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }
     if (this.alive && sequence === this.sequence && this.card && this.canvasReady) await this.render();
@@ -51,21 +49,13 @@ Page({
     this.setData({ rendering: true, imagePath: "", error: "", actionError: "", albumDenied: false });
     try {
       const path = await renderImage(this, card);
-      if (this.alive && sequence === this.sequence && card === this.card) { this.imagePaths[this.data.pageIndex] = path; this.setData({ imagePath: path }); }
+      if (this.alive && sequence === this.sequence && card === this.card) this.setData({ imagePath: path });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }
     finally { if (this.alive) this.setData({ rendering: false }); }
   },
   retry() { return this.card ? this.render() : this.load(); },
-  async choosePage(e) {
-    if (this.data.loading || this.data.rendering || this.data.acting) return;
-    const pageIndex = this.data.pageIndex + Number(e.currentTarget.dataset.step);
-    if (pageIndex < 0 || pageIndex >= this.cardPages.length) return;
-    this.card = this.cardPages[pageIndex];
-    this.setData({ pageIndex, imagePath: this.imagePaths[pageIndex] || "", description: cards.describe(this.card), error: "", actionError: "" });
-    if (!this.data.imagePath) await this.render();
-  },
   preview() {
-    if (this.data.imagePath && !this.data.acting) wx.previewImage({ current: this.data.imagePath, urls: this.imagePaths.filter(Boolean) });
+    if (this.data.imagePath && !this.data.acting) wx.previewImage({ current: this.data.imagePath, urls: [this.data.imagePath] });
   },
   send() {
     if (!this.data.imagePath || this.data.acting || this.data.rendering) return;

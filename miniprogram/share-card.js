@@ -1,6 +1,7 @@
 // Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
 const funCopy = require("./fun-copy");
 const monthlyCards = require("./monthly-report-card");
+const leaderboardCards = require("./leaderboard-share-card");
 const SIZE = 1080;
 const COLORS = { background: "#101c24", surface: "#192c36", text: "#f2eee5", muted: "#b1bfc6", accent: "#e5c68b", border: "#3d515d", good: "#80b4d7", evil: "#d88f91", self: "#30352f" };
 const metricNames = { points: "积分榜", games: "局数榜", overall: "总胜率榜", good: "好人胜率榜", evil: "坏人胜率榜" };
@@ -188,7 +189,9 @@ function leaderboardCard(profile, board) {
   if (me.status === "hidden") notes.push("未公开排行榜 · 仅分享本人成绩");
   else if (me.status === "unsupported") notes.push("当前账号不参与排行榜");
   else if (!rank) notes.push("尚未达到上榜条件" + (me.remaining > 0 ? " · 还差 " + number(me.remaining) + (board.fun ? board.sort === "rate" ? " 次有效机会" : " 次" : " 局") : ""));
-  return { kind: "rank", ...identity(profile), title, context: period,
+  const performance = !board.fun && points && Number.isInteger(me.total) && Number.isInteger(me.wins) && me.wins >= 0 && me.wins <= me.total
+    ? { total: me.total, wins: me.wins, losses: me.total - me.wins, rate: percent(me.winRate) } : null;
+  return { kind: "rank", ...identity(profile), title, context: period, period: board.period, performance,
     scope: board.fun ? [clean(board.title), board.mode && board.mode !== "all" ? modeNames[board.mode] : "", clean(role || board.roleLabel)].filter(Boolean).join(" · ") : "",
     hero: board.fun ? board.sort === "rate" ? decimal(me.rate) : number(me.count) : points ? number(me.points) : games ? number(me.total) : decimal(me.winRate),
     unit: board.fun ? clean(board.unit) : points ? "分" : games ? "局" : "%",
@@ -232,11 +235,17 @@ function layout(card) {
   const footerTop = notesTop + card.notes.length * 42 + 24;
   return { heroTop, metricsTop, notesTop, footerTop, height: footerTop + 100 };
 }
-const dimensions = card => card.kind === "monthly" ? monthlyCards.dimensions(card) : ({ width: SIZE, height: layout(card).height });
+const dimensions = card => card.kind === "monthly" ? monthlyCards.dimensions(card) : card.kind === "rank" ? leaderboardCards.dimensions(card) : ({ width: SIZE, height: layout(card).height });
+const renderDimensions = card => card.kind === "monthly" ? monthlyCards.renderDimensions(card) : { ...dimensions(card), scale: 1 };
+const imagePaths = card => card.kind === "monthly" ? monthlyCards.imagePaths(card) : card.kind === "rank" ? leaderboardCards.imagePaths(card) : [...new Set([card.avatar, ...(card.nearby || []).map(row => row.avatar)].filter(Boolean))];
 
 // Same renderer runs on a native Canvas 2D node and in visual verification.
 function drawCard(ctx, card, avatar, nearbyAvatars = new Map()) {
   if (card.kind === "monthly") return monthlyCards.drawCard(ctx, card, nearbyAvatars);
+  if (card.kind === "rank") {
+    if (avatar && card.avatar) nearbyAvatars = new Map([...nearbyAvatars, [card.avatar, avatar]]);
+    return leaderboardCards.drawCard(ctx, card, nearbyAvatars);
+  }
   const box = layout(card), { heroTop, footerTop, height } = box;
   const font = (size, weight = 400) => { ctx.font = weight + " " + size + "px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif"; };
   const text = (value, x, y, size, color = COLORS.text, width = 936, align = "left", weight = 400) => {
@@ -442,4 +451,4 @@ function drawCard(ctx, card, avatar, nearbyAvatars = new Map()) {
   text("桌边助手", 72, footerTop + 57, 30, COLORS.muted, 220, "left", 500);
   text("截至 " + shanghaiTime(card.asOf), 1008, footerTop + 57, 28, COLORS.muted, 680, "right");
 }
-module.exports = { SIZE, COLORS, statsCard, funCard, funSummaryCard, canShareFun, leaderboardCard, canShareLeaderboard, leaderboardShareError, boardSelection, parseSelection, queryString, describe, drawCard, dimensions, shanghaiTime };
+module.exports = { SIZE, COLORS, statsCard, funCard, funSummaryCard, canShareFun, leaderboardCard, canShareLeaderboard, leaderboardShareError, boardSelection, parseSelection, queryString, describe, drawCard, dimensions, renderDimensions, imagePaths, shanghaiTime };

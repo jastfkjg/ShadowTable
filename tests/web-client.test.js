@@ -1916,6 +1916,21 @@ test('网页月报默认完整展示且不重复榜单，荣誉使用头像明�
   assert.match(empty, /有效对局/);
 });
 
+test('网页月报只导出一张完整长图，预览和下载无分页入口', async()=>{
+  const report=require('./helpers/monthly-fixtures').monthlyFixture(),rendered=[],downloads=[],labels=[];
+  const ctx=new Proxy({fillText:value=>labels.push(value)},{get:(target,key)=>key in target?target[key]:()=>{}});
+  const c=client(async()=>response(report),undefined,undefined,{Image:class{constructor(){this.width=64;this.height=64;}set src(value){this.onload();}}});
+  c.document.createElement=tag=>tag==='canvas'?{getContext:()=>ctx,toDataURL(){rendered.push({width:this.width,height:this.height});return 'data:image/png;base64,long-poster';}}:{click(){downloads.push({href:this.href,name:this.download});},remove(){}};
+  c.document.body={appendChild(){}};
+  Object.assign(c.state,{page:'monthly',monthlyMonth:report.month,monthlyReport:require('../miniprogram/monthly-report').presentReport(report)});
+  await c.ACTIONS.monthlyShare();
+  assert.equal(c.state.monthlyError,'');assert.equal(rendered.length,1);assert.ok(rendered[0].height>1920);
+  assert.equal(c.state.monthlyImages.length,1);assert.ok(labels.includes('绝对防御'));
+  assert.doesNotMatch(c.viewMonthlyReport(),/上一张|下一张|自动分图|第1张/);
+  assert.match(c.viewMonthlyReport(),/保存长图/);
+  c.ACTIONS.monthlyDownload();assert.deepEqual(downloads,[{href:'data:image/png;base64,long-poster',name:'桌边助手-月度战报-2026-09.png'}]);
+});
+
 test('网页最佳玩家票选不限时，支持房主未投名单、选择修改与全部并列获奖卡片', async()=>{
   const hp=require('../miniprogram/honors');const c=client(async()=>response({}));
   const h=hp.present({status:'open',matchId:'m',canVote:true,canClose:true,total:6,completed:0,required:3,pendingPlayers:[{seat:2,name:'<林间>'},{seat:5,name:'晚风'}],groups:[{key:'mvp',title:'最强 MVP',side:'胜方',players:[{seat:1,name:'我',disabled:true},{seat:2,name:'林间'}]},{key:'svp',title:'最强 SVP',side:'败方',players:[{seat:5,name:'晚风'}]}]});

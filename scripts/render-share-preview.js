@@ -10,8 +10,8 @@ const root = path.resolve(__dirname, "../miniprogram");
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
-const source = fs.readFileSync(path.join(root, "share-card.js"), "utf8").replace('require("./fun-copy")', 'window.shadowtableFunCopy').replace('require("./monthly-report-card")', 'window.shadowtableMonthlyCard');
-const browserDependencies = ["fun-copy.js", "monthly-report.js", "monthly-report-card.js"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+const source = fs.readFileSync(path.join(root, "share-card.js"), "utf8").replace('require("./fun-copy")', 'window.shadowtableFunCopy').replace('require("./monthly-report-card")', 'window.shadowtableMonthlyCard').replace('require("./leaderboard-share-card")', 'window.shadowtableLeaderboardCard');
+const browserDependencies = ["fun-copy.js", "monthly-report.js", "poster-canvas.js", "monthly-report-card.js", "leaderboard-share-card.js"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const safe = text => String(text).replace(/[&<>"']/g, value => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[value]);
 const css = file => fs.readFileSync(path.join(root, file), "utf8").replace(/^page\s*\{/m, "body {").replace(/([\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 function html(node) {

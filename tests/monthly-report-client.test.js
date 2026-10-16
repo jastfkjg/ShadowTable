@@ -52,19 +52,21 @@ test("月报切换月份和回前台拒绝旧响应，失败能重试，娱乐�
   assert.ok(urls.every(url => url.startsWith("/api/monthly-report?month=")));
   p.onUnload();
 });
-test("月报分享页只读取月报，分张切换复用已生成图片，保存发送始终对应当前页", async () => {
+test("月报分享页只读取月报，所有榜单生成一张长图，预览保存发送使用同一张图", async () => {
   const response = monthlyFixture();
   response.mainBoards[0].rows = Array.from({ length: 26 }, (_, index) => ({ ...response.mainBoards[0].rows[0], publicId: "p" + index, nickname: "玩家" + index, rank: 1, tied: true }));
-  const urls = [], sent = [], saved = [], render = [];
+  const urls = [], sent = [], saved = [], previews = [], render = [];
   const api = { login: async () => {}, request: async url => { urls.push(url); return response; } };
-  const p = page("pages/share/share.js", api, { showShareImageMenu: options => sent.push(options), saveImageToPhotosAlbum: options => saved.push(options) }, async (p, card) => { render.push(card.page); return "wxfile://monthly-" + card.page; });
+  const p = page("pages/share/share.js", api, { showShareImageMenu: options => sent.push(options), saveImageToPhotosAlbum: options => saved.push(options), previewImage: options => previews.push(options) }, async (p, card) => { render.push(card); return "wxfile://monthly-long"; });
   await p.onLoad({ kind: "monthly", month: "2026-09" }); await p.onReady();
-  assert.deepEqual(urls, ["/api/monthly-report?month=2026-09"]); assert.equal(p.data.pageTitle, "分享月报"); assert.ok(p.data.pageCount > 1);
-  await p.choosePage({ currentTarget: { dataset: { step: "1" } } });
-  assert.equal(p.data.imagePath, "wxfile://monthly-2"); p.send(); sent[0].complete(); p.save(); saved[0].complete();
-  assert.equal(sent[0].path, "wxfile://monthly-2"); assert.equal(saved[0].filePath, "wxfile://monthly-2");
-  await p.choosePage({ currentTarget: { dataset: { step: "-1" } } }); assert.equal(p.data.imagePath, "wxfile://monthly-1");
-  assert.deepEqual(render, [1, 2]);
+  assert.deepEqual(urls, ["/api/monthly-report?month=2026-09"]); assert.equal(p.data.pageTitle, "分享月报");
+  assert.equal(render.length, 1); assert.equal(render[0].sections[0].rows.length,26);
+  assert.ok(render[0].sections.some(section=>section.type==="honor"));
+  assert.equal(p.data.imagePath, "wxfile://monthly-long"); p.send(); sent[0].complete(); p.save(); saved[0].complete(); p.preview();
+  assert.equal(sent[0].path, "wxfile://monthly-long"); assert.equal(saved[0].filePath, "wxfile://monthly-long");
+  assert.deepEqual(Array.from(previews[0].urls),["wxfile://monthly-long"]);
+  assert.equal(p.choosePage,undefined); assert.equal(p.data.pageCount,undefined);
+  assert.doesNotMatch(fs.readFileSync(path.resolve(__dirname,"../miniprogram/pages/share/share.wxml"),"utf8"),/上一张|下一张|自动分图|pageCount/);
   p.onUnload();
 });
 test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会向外溢出", () => {
@@ -75,9 +77,10 @@ test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会�
   const context = new Proxy({ measureText: value => ({ width: Array.from(value).length * Number(/(\d+)px/.exec(context.font)?.[1] || 30) * .8 }), fillText: (value, x, y) => positions.push({ value, x, y }) }, { get(target, key) { return key in target ? target[key] : () => {}; } });
   renderer.drawCard(context, card);
   assert.ok(positions.every(({ x, y }) => x >= 0 && x <= size.width && y > 0 && y < size.height));
-  assert.ok(positions.some(({ value }) => value.endsWith("…"))); assert.ok(positions.some(({ value }) => value === "-123456789"));
+  assert.ok(positions.map(row => row.value).join("").includes("一个很长很长的玩家昵称🙂用于检查不会覆盖积分"));
+  assert.ok(positions.some(({ value }) => value === "-123456789"));
   assert.ok(positions.some(({ value }) => value === "分"));
-  assert.ok(size.height <= renderer.MAX_HEIGHT);
+  assert.ok(size.height > 1920);
 });
 test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分记录仍保留", () => {
   const presentation = require("../miniprogram/monthly-report"), renderer = require("../miniprogram/monthly-report-card");
@@ -94,7 +97,8 @@ test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分�
   const labels = [];
   const context = new Proxy({ measureText: value => ({ width: String(value).length * 25 }), fillText: value => labels.push(value) }, { get: (target, key) => key in target ? target[key] : () => {} });
   for (const card of renderer.cards(response)) renderer.drawCard(context, card);
-  assert.doesNotMatch(labels.join(" "), /战绩榜|好人胜率榜|坏人胜率榜|职业刺客|暂无|榜单仅展示|趣味榜仅统计|统计范围|截至/);
+  assert.doesNotMatch(labels.join(" "), /战绩榜|好人胜率榜|坏人胜率榜|职业刺客|暂无|榜单仅展示|趣味榜仅统计|统计范围/);
+  assert.ok(labels.includes("桌边常驻王"));
   assert.ok(labels.includes("闪身步大神"));
   for (const board of [...response.mainBoards, ...response.funBoards]) board.rows = [];
   const empty = presentation.presentReport(response);
@@ -104,15 +108,16 @@ test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分�
   response.overview.games = 0;
   assert.throws(() => renderer.cards(response), /没有有效对局/);
 });
-test("纵排趣味荣誉在大量并列时完整分页，重复标题计入画布高度", () => {
+test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重复且全部内容计入高度", () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
   response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));
   const pages = renderer.cards(response);
-  assert.ok(pages.length > 1);
-  assert.ok(pages.every(card => renderer.dimensions(card).height <= renderer.MAX_HEIGHT));
+  assert.equal(pages.length, 1);
+  assert.ok(renderer.dimensions(pages[0]).height > 15000);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
-  assert.ok(pages.slice(1).every(card => card.sections[0].showGroupTitle));
+  assert.equal(pages[0].sections.filter(section=>section.showGroupTitle).length,1);
+  assert.equal(pages[0].sections.filter(section=>section.id==="merlin_evade").length,1);
   const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
 });
@@ -128,11 +133,29 @@ test("原生月报等待本地背景与远程头像，头像失败仍绘制背�
   const filename = path.resolve(__dirname, "../miniprogram/share-image.js"), realRequire = createRequire(filename), module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(filename, "utf8"), { module, wx, setTimeout, clearTimeout, require: name => name === "./api" ? { assetUrl: path => "https://example.test" + path } : realRequire(name) });
   const rendering = module.exports.renderImage({ alive: true }, card); await tick();
-  assert.equal(loaded.length, 2); assert.equal(exported, undefined);
+  assert.equal(loaded.length, 4); assert.equal(exported, undefined);
   const background = loaded.find(image => image.path === renderer.BACKGROUND_PATH);
   assert.ok(background); loaded.find(image => image.path.endsWith(avatarPath)).onerror();
-  assert.equal(exported, undefined); background.onload();
+  assert.equal(exported, undefined);
+  loaded.filter(image=>image!==background&&!image.path.endsWith(avatarPath)).forEach(image=>image.onload());
+  background.onload();
   assert.equal(await rendering, "wxfile://monthly-artwork");
-  assert.equal(drawn.filter(image => image === background).length, 3);
+  assert.equal(drawn.filter(image => image === background).length, 1);
   assert.ok(labels.includes("北")); assert.equal(exported.destHeight, renderer.dimensions(card).height);
+});
+test("超长月报按比例控制原生画布尺寸，仍只导出一张包含末尾荣誉的 PNG", async () => {
+  const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
+  response.mainBoards[0].rows=Array.from({length:105},(_,i)=>({...response.mainBoards[0].rows[0],nickname:"并列玩家"+i,rank:1,tied:true}));
+  const [card]=renderer.cards(response),images=[],labels=[],scales=[],exports=[];
+  const context=new Proxy({fillText:value=>labels.push(value),scale:(...args)=>scales.push(args)},{get:(target,key)=>key in target?target[key]:()=>{}});
+  const canvas={getContext:()=>context,createImage(){const image={set src(value){images.push(this);}};return image;}};
+  const wx={createSelectorQuery(){const query={in:()=>query,select:()=>query,fields:()=>query,exec:fn=>fn([{node:canvas}])};return query;},canvasToTempFilePath(options){exports.push(options);options.success({tempFilePath:"wxfile://one-long-poster"});}};
+  const filename=path.resolve(__dirname,"../miniprogram/share-image.js"),realRequire=createRequire(filename),module={exports:{}};
+  vm.runInNewContext(fs.readFileSync(filename,"utf8"),{module,wx,setTimeout,clearTimeout,require:name=>name==="./api"?{assetUrl:path=>path}:realRequire(name)});
+  const rendering=module.exports.renderImage({alive:true},card);await tick();images.forEach(image=>image.onerror());
+  assert.equal(await rendering,"wxfile://one-long-poster");
+  assert.equal(exports.length,1);assert.equal(canvas.height,8192);assert.ok(canvas.width<1080);
+  assert.equal(exports[0].destHeight,canvas.height);assert.equal(exports[0].destWidth,canvas.width);
+  assert.ok(scales[0][0]>0&&scales[0][0]<1);assert.equal(scales[0][0],scales[0][1]);
+  assert.ok(labels.includes("并列玩家104"));assert.ok(labels.includes("绝对防御"));
 });

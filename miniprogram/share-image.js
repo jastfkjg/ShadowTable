@@ -1,6 +1,5 @@
 const api = require("./api");
-const { dimensions, drawCard } = require("./share-card");
-const monthlyCards = require("./monthly-report-card");
+const { renderDimensions, drawCard, imagePaths } = require("./share-card");
 
 function canvasFor(page) {
   return new Promise((resolve, reject) => {
@@ -26,13 +25,17 @@ function avatarFor(canvas, path) {
 }
 async function renderImage(page, card) {
   const canvas = await canvasFor(page);
-  const { width, height } = dimensions(card);
+  const { width, height, scale } = renderDimensions(card);
   canvas.width = width; canvas.height = height;
-  const paths = [...new Set([card.avatar, ...(card.nearby || []).map(row => row.avatar),
-    ...(card.kind === "monthly" ? monthlyCards.imagePaths(card) : [])].filter(Boolean))];
+  const paths = imagePaths(card);
   const avatars = new Map(await Promise.all(paths.map(async path => [path, await avatarFor(canvas, path)])));
   if (!page.alive) return null;
-  drawCard(canvas.getContext("2d"), card, avatars.get(card.avatar), avatars);
+  const context = canvas.getContext("2d");
+  context.save();
+  try {
+    if (scale !== 1) context.scale(scale, scale);
+    drawCard(context, card, avatars.get(card.avatar), avatars);
+  } finally { context.restore(); }
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("图片生成超时，请重试。")), 10000);
     wx.canvasToTempFilePath({ canvas, x: 0, y: 0, width, height, destWidth: width, destHeight: height, fileType: "png",
