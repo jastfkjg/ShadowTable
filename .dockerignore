@@ -17,6 +17,9 @@
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
 !miniprogram/room-swipe.js
+!miniprogram/room-list.js
+!miniprogram/room-list.wxss
+!miniprogram/room-menu.wxss
 !miniprogram/monthly-report.js
 !miniprogram/monthly-report-card.js
 !miniprogram/poster-canvas.js
@@ -37,6 +40,13 @@
 !miniprogram/assets/record-spark.svg
 !miniprogram/assets/record-medal.svg
 !miniprogram/assets/record-users.svg
+!miniprogram/assets/home-table-blue.svg
+!miniprogram/assets/home-refresh.svg
+!miniprogram/assets/home-clock.svg
+!miniprogram/assets/record-more.svg
+!miniprogram/assets/room-menu-remove.svg
+!miniprogram/assets/room-menu-leave.svg
+!miniprogram/assets/room-menu-delete.svg
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
