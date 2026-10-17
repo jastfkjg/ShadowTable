@@ -119,6 +119,25 @@ test("键盘弹出时收起底栏，关闭后恢复，卸载移除自己的键�
   assert.equal(removed, listener);
 });
 
+test('房间管理在底栏延迟挂载和重新显示时仍隐藏，隐藏期间不响应切换', () => {
+  for (const nested of [true, false]) for (const key of ['roomMenu', 'noteRoom']) {
+    const selections = [], panel = { [key]: { code: '273843' } };
+    const home = { route: 'pages/lobby/lobby', data: nested ? { activeTab: 0, lobby: panel } : panel,
+      ...(nested ? { switchMainTab: index => selections.push(index) } : {}) };
+    const { spec, instance } = tabBar([home], { switchTab: () => selections.push('native') });
+    spec.lifetimes.attached.call(instance);
+    assert.equal(instance.data.roomMenuVisible, true);
+    instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+    assert.equal(selections.length, 0);
+    spec.pageLifetimes.show.call(instance);
+    assert.equal(instance.data.roomMenuVisible, true);
+    panel[key] = null; instance.syncSelection();
+    assert.equal(instance.data.roomMenuVisible, false);
+    instance.switchTab({ currentTarget: { dataset: { index: 1 } } });
+    assert.equal(selections.length, 1);
+  }
+});
+
 test('表单打开时底栏独立于键盘保持隐藏，延迟挂载和重新显示均恢复表单状态', () => {
   let keyboard;
   const selections = [];

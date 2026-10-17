@@ -49,6 +49,54 @@ const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
 const swipeEvent = (code, x = 250, y = 400) => ({ currentTarget: { dataset: { code } }, touches: [{ clientX: x, clientY: y }] });
+test('小程序房间到期410清除当前牌桌，刷新列表并明确提示失效', async () => {
+  const {p}=page('table',{...apiBase,request:async url=>{
+    if(url==='/api/me/rooms')return {rooms:[{code:'123456',status:'unavailable',available:false}]};
+    throw Object.assign(Error('房间已失效'),{status:410});
+  }});
+  p.roomCode='123456';p.setData({room:{code:'123456'},loading:false});await p.refresh();
+  assert.equal(p.data.room,null);assert.match(p.data.notice,/房间已失效/);
+  assert.equal(p.data.unavailableRooms.length,1);p.onUnload();
+});
+test('小程序最近结束只显示三桌，历史与失效默认折叠并且可独立展开', async () => {
+  const now = Date.now(), rooms = [
+    {code:'111111',status:'playing',available:true,lastActivityAt:1},
+    ...Array.from({length:5},(_,i)=>({code:String(222220+i),status:'ended',available:true,lastActivityAt:now-i*1000})),
+    {code:'333333',status:'ended',available:true,lastActivityAt:now-3*86400000},
+    {code:'444444',status:'unavailable',available:false,lastActivityAt:now},
+  ];
+  const {p}=page('lobby',{...apiBase,request:async()=>({rooms,serverTime:now})});
+  p.setData({loading:false}); await p.loadRooms();
+  assert.equal(p.data.visibleMemberRooms.length,4); assert.equal(p.data.historyRooms.length,3);
+  assert.equal(p.data.unavailableRooms.length,1); assert.equal(p.data.historyExpanded,false); assert.equal(p.data.unavailableExpanded,false);
+  p.toggleRoomHistory(); assert.equal(p.data.historyExpanded,true);
+  p.toggleUnavailableRooms(); assert.equal(p.data.unavailableExpanded,true);
+  p.filterRooms({currentTarget:{dataset:{filter:'playing'}}});
+  assert.equal(p.data.visibleMemberRooms.length,1); assert.equal(p.data.showHistorySection,false);
+  assert.equal(p.data.showUnavailableSection,false); assert.equal(p.data.historyExpanded,false);
+});
+test('小程序批量清理只确认一次，取消或后台不写入；网络不确定时保留原编号及选择', async () => {
+  for (const mode of ['cancel','background','confirm','retry']) {
+    let hidden=false, fail=mode==='retry'; const writes=[],dialogs=[];
+    const expired={code:'123456',createdAt:123,status:'unavailable',available:false};
+    const valid={code:'234567',createdAt:234,status:'lobby',available:true};
+    const {p}=page('lobby',{...apiBase,request:async(path,method,data,id)=>{
+      if(method==='POST') {writes.push({path,data,id});if(fail){fail=false;throw new Error('网络中断');}hidden=true;return {removed:1};}
+      return {rooms:hidden?[valid]:[expired,valid]};
+    }},{wx:{showModal:o=>dialogs.push(o)}});
+    p.setData({loading:false}); await p.loadRooms();
+    const cleaning=p.cleanupUnavailableRooms(); await p.cleanupUnavailableRooms();
+    assert.equal(dialogs.length,1); assert.match(dialogs[0].title,/1 个失效房间/);
+    assert.equal(dialogs[0].confirmText,'清理'); assert.equal(writes.length,0);
+    if(mode==='background')p.onHide();
+    dialogs[0].success({confirm:mode!=='cancel'}); await cleaning;
+    if(mode==='retry') {assert.ok(p.pending);p.data.reconnecting=false;await p.executePending();assert.equal(writes.length,2);assert.equal(writes[0].id,writes[1].id);}
+    assert.equal(writes.length,mode==='retry'?2:mode==='confirm'?1:0);
+    if(hidden) {assert.equal(p.data.unavailableRooms.length,0);assert.match(p.data.notice,/已移除 1 个失效房间/);}
+    if(writes.length){assert.equal(writes[0].path,'/api/me/rooms/cleanup');assert.equal(JSON.stringify(writes[0].data),JSON.stringify({rooms:[{code:'123456',createdAt:123}]}));}
+    assert.equal(p.data.busy,false); p.onUnload();
+  }
+});
 test('小程序左滑不触发进入或删除，一次展开一条，点击卡片仅收起并保留菜单入口', async () => {
   const { p } = page('lobby', apiBase);
   const rooms = [{ code: '123456', status: 'lobby', isHost: true }, { code: '234567', status: 'playing', isHost: true }];
@@ -57,11 +105,11 @@ test('小程序左滑不触发进入或删除，一次展开一条，点击卡�
   p.mutate = async () => { writes++; };
   const drag = (code, x) => { p.startRoomSwipe(swipeEvent(code)); p.moveRoomSwipe(swipeEvent(code, x)); p.endRoomSwipe(); };
   drag('123456', 50);
-  assert.equal(p.data.roomSwipeCode, '123456'); assert.equal(p.data.roomSwipeOffset, -160);
+  assert.equal(p.data.roomSwipeCode, '123456'); assert.equal(p.data.roomSwipeOffset, -124);
   await p.openRoom(swipeEvent('123456'));
   assert.equal(writes, 0);
   drag('234567', 120);
-  assert.equal(p.data.roomSwipeCode, '234567'); assert.equal(p.data.roomSwipeOffset, -80);
+  assert.equal(p.data.roomSwipeCode, '234567'); assert.equal(p.data.roomSwipeOffset, -124);
   p.startRoomSwipe(swipeEvent('234567')); p.endRoomSwipe();
   await p.openRoom(swipeEvent('234567'));
   assert.equal(p.data.roomSwipeCode, ''); assert.equal(writes, 0);
@@ -87,6 +135,90 @@ test('小程序纵滑、取消和多指操作均不展开，滑动状态不会�
   assert.equal(p.data.roomSwipeCode, '');
   p.startRoomSwipe(swipeEvent('123456')); p.moveRoomSwipe(swipeEvent('123456', 50)); p.dismissRoomSwipe();
   assert.equal(p.consumeRoomSwipeTap(), true);
+});
+test('横滑松手后的滚动回调不收起操作区，首页容器和独立牌桌使用相同规则', () => {
+  for (const home of [false, true]) {
+    const { p } = page('lobby', apiBase, { home });
+    if (home) p.onLoad();
+    const controller = home ? p.lobbyController : p;
+    if (home) p.startedPanels[0] = true;
+    controller.setData({ loading: false, memberRooms: [{ code: '123456', status: 'lobby', isHost: true }] });
+    p.startRoomSwipe(swipeEvent('123456'));
+    p.moveRoomSwipe(swipeEvent('123456', 50, 404));
+    p.onPageScroll({ scrollTop: 1 });
+    p.endRoomSwipe();
+    p.onPageScroll({ scrollTop: 2 });
+    assert.equal(controller.data.roomSwipeCode, '123456');
+    assert.equal(controller.data.roomSwipeOffset, -124);
+    assert.equal(controller.data.roomSwipeDragging, false);
+    // A late native scroll notification must remain harmless after tap suppression expires.
+    controller.roomSwipeTapUntil = 0;
+    p.onPageScroll({ scrollTop: 3 });
+    assert.equal(controller.data.roomSwipeCode, '123456');
+  }
+});
+test('横滑尾随点击被忽略，新一次触摸仍能立即收起或使用快捷操作', async () => {
+  const { p } = page('lobby', apiBase);
+  const room = { code: '123456', status: 'lobby', isHost: true };
+  p.setData({ loading: false, memberRooms: [room] });
+  let writes = 0;
+  p.mutate = async () => { writes++; };
+  const drag = () => {
+    p.startRoomSwipe(swipeEvent(room.code));
+    p.moveRoomSwipe(swipeEvent(room.code, 50, 404));
+    p.endRoomSwipe();
+  };
+  drag();
+  await p.openRoom(swipeEvent(room.code));
+  p.tapRoomSwipePage();
+  assert.equal(p.data.roomSwipeCode, room.code);
+  assert.equal(writes, 0);
+  p.startRoomSwipePageTouch(swipeEvent());
+  assert.equal(p.data.roomSwipeCode, '');
+  assert.equal(p.consumeRoomSwipeTap(), false);
+  drag();
+  p.startRoomSwipe(swipeEvent(room.code));
+  p.startRoomSwipePageTouch(swipeEvent(room.code));
+  p.endRoomSwipe();
+  await p.openRoom(swipeEvent(room.code));
+  assert.equal(p.data.roomSwipeCode, '');
+  assert.equal(writes, 0);
+  drag();
+  p.startRoomSwipeAction();
+  p.startRoomSwipe(swipeEvent(room.code));
+  p.startRoomSwipePageTouch(swipeEvent(room.code));
+  p.endRoomSwipe();
+  await p.swipeRoomAction({ currentTarget: { dataset: { code: room.code, kind: 'hide' } } });
+  assert.equal(writes, 1);
+});
+test('展开后的纵滑和多指取消仍能收起，冒泡的多指触摸不解除误触保护', async () => {
+  const { p } = page('lobby', apiBase);
+  const room = { code: '123456', status: 'lobby', isHost: true };
+  p.setData({ loading: false, memberRooms: [room] });
+  let writes = 0;
+  p.mutate = async () => { writes++; };
+  const drag = () => {
+    p.startRoomSwipe(swipeEvent(room.code));
+    p.moveRoomSwipe(swipeEvent(room.code, 50));
+    p.endRoomSwipe();
+  };
+  drag();
+  p.startRoomSwipe(swipeEvent(room.code));
+  p.startRoomSwipePageTouch(swipeEvent(room.code));
+  assert.equal(p.data.roomSwipeCode, room.code);
+  p.moveRoomSwipe(swipeEvent(room.code, 246, 440));
+  p.endRoomSwipe();
+  assert.equal(p.data.roomSwipeCode, '');
+  drag();
+  p.startRoomSwipe(swipeEvent(room.code));
+  const multiTouch = { ...swipeEvent(room.code), touches: [{}, {}] };
+  p.startRoomSwipe(multiTouch);
+  p.startRoomSwipePageTouch(multiTouch);
+  p.endRoomSwipe();
+  assert.equal(p.data.roomSwipeCode, '');
+  assert.equal(p.consumeRoomSwipeTap(), true);
+  await p.openRoom(swipeEvent(room.code));
+  assert.equal(writes, 0);
 });
 test('小程序左滑和菜单移除均须确认，取消或切入后台不提交，阻止重复弹窗', async () => {
   for (const source of ['swipe', 'menu']) for (const result of ['cancel', 'confirm', 'background']) {
@@ -1900,6 +2032,36 @@ test('创建和加入面板的昵称编辑按钮聚焦原生输入框，保留�
   assert.equal(p.data.entryFocusedField, '');
 });
 
+test('房间码分格点击恢复末尾输入，输入和删除同步草稿，受页面与请求状态保护', () => {
+  const { p } = page('lobby', apiBase);
+  p.setData({ name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  for (const value of ['1', '14', '142', '1420', '14205', '142059', '14205', '1420', '142', '14', '1', '', '062819']) {
+    assert.equal(p.inputCode({ detail: { value } }), value);
+    assert.equal(p.data.code, value);
+  }
+  assert.equal(p.inputCode({ detail: { value: '06a28197' } }), '062819');
+  p.entryInputBlur({ currentTarget: { dataset: { field: 'code' } }, detail: { value: p.data.code } });
+  assert.equal(p.data.entryFocusedField, '');
+  p.editEntryCode();
+  assert.equal(p.data.entryFocusedField, 'code');
+  assert.equal(p.data.entryScrollTarget, 'entry-code-block');
+  assert.equal(p.data.code, '062819');
+  for (const blocked of [{ entrySheet: false }, { entryMode: 'create' }, { busy: true }, { hasPendingRequest: true }]) {
+    p.setData({ entrySheet: true, entryMode: 'join', busy: false, hasPendingRequest: false, entryFocusedField: '', ...blocked });
+    p.editEntryCode();
+    assert.equal(p.data.entryFocusedField, '');
+  }
+  p.setData({ hasPendingRequest: false });
+  p.pending = {};
+  p.editEntryCode();
+  assert.equal(p.data.entryFocusedField, '');
+  p.pending = null;
+  p.foreground = false;
+  p.editEntryCode();
+  assert.equal(p.data.entryFocusedField, '');
+});
+
 test('粘贴只接受完整六码、保留前导零，关闭或切换面板后忽略剪贴板回调', () => {
   const callbacks = [];
   const { p } = page('lobby', apiBase, { wx: { getClipboardData(options) { callbacks.push(options); } } });
@@ -2015,6 +2177,28 @@ test('首页表单打开立即收起底栏，关闭、成功进入房间和切�
   await p.switchMainTab(0);
   assert.equal(bar.data.entrySheetVisible, true);
   p.onUnload();
+});
+
+test('房间管理打开立即隐藏独立底栏，取消、关闭与前后台切换保持同步', async () => {
+  const bar = { data: { selected: 0 }, setData(patch) { Object.assign(this.data, patch); } };
+  const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [], total: 0 } };
+  const { p } = page('lobby', api, { home: true }); p.getTabBar = () => bar;
+  p.onLoad(); await p.onShow();
+  try {
+    for (const available of [true, false]) {
+      p.lobbyController.setData({ memberRooms: [{ code: '273843', available }] });
+      p.openRoomMenu({ currentTarget: { dataset: { code: '273843' } } });
+      assert.equal(bar.data.roomMenuVisible, true);
+      p.onHide(); await p.onShow(); assert.equal(bar.data.roomMenuVisible, true);
+      await p.switchMainTab(1); assert.equal(bar.data.roomMenuVisible, false);
+      await p.switchMainTab(0); assert.equal(bar.data.roomMenuVisible, true);
+      p.closeRoomMenu(); assert.equal(bar.data.roomMenuVisible, false);
+    }
+    p.lobbyController.setData({ noteRoom: { code: '273843' } });
+    assert.equal(bar.data.roomMenuVisible, true);
+    p.closeRoomMenu(); assert.equal(bar.data.roomMenuVisible, false);
+  } finally { p.onUnload(); }
 });
 
 test('趣味指标弹层取消不换榜，确认才请求，切分类保留草稿并关闭其他弹层',async()=>{

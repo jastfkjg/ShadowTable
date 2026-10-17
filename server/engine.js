@@ -1161,7 +1161,7 @@ function roomSummary(room, uid) {
     capacity: room.capacity,
     phaseName: phaseName(room),
     phase: room.phase,
-    status: room.phase === "lobby" ? "lobby" : room.phase === "ended" ? "ended" : "playing",
+    status: room.phase === "lobby" ? "lobby" : ["ended", "terminated"].includes(room.phase) ? "ended" : "playing",
     occupied: room.players.length,
     hostName: [...room.players, ...(room.spectators || [])].find(p => p.uid === room.host)?.name || "房主未入座",
     relation: room.host === uid ? "房主" : p?.seat != null ? "玩家" : "旁观者",

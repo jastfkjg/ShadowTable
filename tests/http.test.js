@@ -314,7 +314,7 @@ test("我的房间列表只返回本人成员关系，无他人房间、身份�
         "seat",
         "testRoom",
         "isHost",
-        "isMember", "phase", "status", "occupied", "hostName", "relation", "canLeave", "createdAt", "updatedAt", "note", "lastEnteredAt", "available",
+        "isMember", "phase", "status", "occupied", "hostName", "relation", "canLeave", "createdAt", "updatedAt", "lastActivityAt", "note", "lastEnteredAt", "available",
       ].sort(),
     );
     assert.deepEqual((await a.req("/api/me/rooms", outsider)).data.rooms, []);

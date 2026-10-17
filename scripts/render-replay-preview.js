@@ -14,19 +14,25 @@ const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(glob
 const safe = value => String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
+  if (!node.tag || node.tag === "wx-block") return (node.children || []).map(html).join("");
   if (node.tag === "wx-app-nav") return '<nav class="preview-nav"><button aria-label="返回">‹</button><strong>' + safe(node.attr.title) + '</strong></nav>';
   const tag = ({ "wx-text": "text", "wx-button": "button", "wx-image": "img", "wx-scroll-view": "section" })[node.tag] || "view";
   const attributes = Object.entries(node.attr || {}).flatMap(([key, value]) => {
     if (key === "disabled") return value ? ["disabled"] : [];
     if (key === "hidden") return value ? ["hidden"] : [];
     if (key.startsWith("aria")) key = key.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
-    return ["id", "class", "role", "aria-label", "aria-selected", "aria-expanded", "aria-modal", "aria-hidden"].includes(key)
+    if (key === "src" && value.startsWith("/")) {
+      const mime = value.endsWith(".svg") ? "image/svg+xml" : "image/png";
+      value = "data:" + mime + ";base64," + fs.readFileSync(path.join(root, value)).toString("base64");
+    }
+    return ["id", "class", "src", "role", "aria-label", "aria-selected", "aria-expanded", "aria-modal", "aria-hidden"].includes(key)
       ? [`${key}="${safe(value)}"`] : [];
   }).join(" ");
-  return `<${tag} ${attributes}>${(node.children || []).map(html).join("")}</${tag}>`;
+  return `<${tag} ${attributes}>${(node.children || []).map(html).join("")}${tag === "img" ? "" : `</${tag}>`}`;
 }
 const css = file => fs.readFileSync(path.join(root, file), "utf8")
   .replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name))))
+  .replace(/(^|[\s>+~])image(?=[\s.:#\[>+~,{])/gm, "$1img")
   .replace(/^page\s*\{/m, "body {").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
 const store = new Store(":memory:"); let raw, record, online;
 try {
@@ -43,6 +49,9 @@ const scenes = {
   overview: presentReplay(raw), round: presentReplay(raw, "global", ["round-2"]),
   mine: presentReplay(raw, "mine", ["round-1"]),
   player: { ...presentReplay(raw), playerDetail: trajectory(raw, 7) },
+  final: { ...presentReplay(raw), playersExpanded: true },
+  emptyKnife: presentReplay({ ...raw, final: { ...raw.final, targetSeat: 0, target: null, emptyWin: false, hit: null } }),
+  noKnife: presentReplay({ ...raw, winner: null, final: { ...raw.final, actor: null, target: null, targetSeat: null, hit: null } }),
   online: presentReplay(online, "global", ["round-1", "round-2", "round-3"]),
   onlineMine: presentReplay(online, "mine", ["round-1", "round-2", "round-3"]),
   longNames: presentReplay(longNames, "global", ["round-1", "round-2", "round-3"]),

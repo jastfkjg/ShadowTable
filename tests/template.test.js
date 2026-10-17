@@ -192,37 +192,37 @@ test('对局摘要合并板子人数阵营，角色旁保留有效表现，复�
   assert.match(replays[0].attr.ariaLabel, /查看.*复盘/);
   assert.doesNotMatch(text(tree), /最终歪刀|未生效/);
 });
-test('战绩区分未计分与零分计分局，没有计分局也保留独立调分', () => {
+test('统计页显示本月积分，阵营和角色弹层只展示战绩', () => {
   const renderStats = renderStatsShell;
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node.children || []).map(text).join(' ');
-  const score = { total: 0, games: 0, average: null, current: 0, best: 0 };
+  const score = { total: 30, month: 0, games: 0, average: null, current: 0, best: 0 };
   const role = { role: '派西维尔', total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—' };
   const faction = { faction: 'good', label: '好人阵营', ...role, expanded: true, roles: [role] };
   const stats = { total: 2, wins: 1, rateLabel: '50%', score, scoreAverageLabel: '—', byFaction: [faction], byRole: [role] };
   const show = value => text(renderStats({ loading: false, tab: 'records', stats: value }));
   const unscored = show(stats);
-  assert.match(unscored, /暂无计分对局/);
+  assert.match(unscored, /本月积分 0/);
   assert.match(unscored, /派西维尔/);
-  assert.doesNotMatch(unscored, /场均|计分局连胜|0 分/);
+  assert.doesNotMatch(unscored, /场均|局计分|暂无计分对局|来自积分调整|累计积分|本月积分 30/);
 
   const scored = { ...score, games: 1, average: 0 };
   const zeroPoints = show({ ...stats, score: scored, scoreAverageLabel: '0.00', byFaction: [{ ...faction, score: scored, scoreAverageLabel: '0.00', roles: [{ ...role, score: scored, scoreAverageLabel: '0.00' }] }] });
   assert.doesNotMatch(zeroPoints, /暂无计分对局/);
   assert.doesNotMatch(zeroPoints, /连胜/);
-  assert.match(zeroPoints, /1 局计分.*场均 0.00/);
+  assert.match(zeroPoints, /本月积分 0/);
+  assert.doesNotMatch(zeroPoints, /场均|局计分/);
   const details = text(renderStats({loading:false,tab:'records',stats,statsDetail:{...role,kind:'role',title:role.role,score:scored,scoreAverageLabel:'0.00'}}));
   assert.doesNotMatch(details,/累计积分|场均积分|查看战绩与积分/);
   assert.match(details,/派西维尔/);
   const factionDetails = text(renderStats({loading:false,tab:'records',stats,statsDetail:{...faction,kind:'faction',title:faction.label,score:scored,scoreAverageLabel:'0.00'}}));
-  assert.match(factionDetails,/累计积分 0 分/);
-  assert.match(factionDetails,/场均积分 0.00/);
+  assert.doesNotMatch(factionDetails,/累计积分|计分对局|场均积分/);
+  assert.match(factionDetails,/好人阵营.*全部有效对局/);
+  assert.match(factionDetails,/胜率仅统计有效对局/);
 
   for (const total of [-5, 5]) {
-    const adjusted = show({ ...stats, score: { ...score, total } });
-    assert.match(adjusted, new RegExp('积分\\s+' + total));
-    assert.match(adjusted, /暂无计分对局/);
-    assert.match(adjusted, /来自积分调整/);
-    assert.doesNotMatch(adjusted, /场均|计分局连胜/);
+    const adjusted = show({ ...stats, score: { ...score, total: 30, month: total } });
+    assert.match(adjusted, new RegExp('本月积分\\s+' + total));
+    assert.doesNotMatch(adjusted, /场均|局计分|来自积分调整|本月积分 30/);
   }
 });
 test('图片预览准备完成后才能发送或保存；不支持发送与相册拒绝均有明确出口', () => {
@@ -532,6 +532,21 @@ test("WXSS官方编译器封装可编译全局样式", () => {
   assert.ok(output.length > 100);
 });
 
+test("牌桌历史与失效折叠不渲染隐藏卡片，清理入口带数量且保留展开状态语义", () => {
+  const now = Date.now(), rooms = [{ code: "111111", status: "lobby", available: true },
+    { code: "222222", status: "ended", available: true, lastActivityAt: now - 4 * 86400000 },
+    { code: "333333", status: "unavailable", available: false }];
+  const data = { ...base, memberRooms: rooms, ...require("../miniprogram/room-list").present(rooms, "all", now), historyExpanded: false, unavailableExpanded: false };
+  let tree = render(data);
+  assert.equal(nodes(tree).filter(n => n.attr?.catchtap === "openRoomMenu").length, 1);
+  assert.equal(byHandler(tree, "toggleRoomHistory").attr.ariaExpanded, false);
+  assert.equal(byHandler(tree, "toggleUnavailableRooms").attr.ariaExpanded, false);
+  assert.match(JSON.stringify(byHandler(tree, "cleanupUnavailableRooms")), /清理1个失效房间/);
+  tree = render({ ...data, historyExpanded: true, unavailableExpanded: true });
+  assert.equal(nodes(tree).filter(n => n.attr?.catchtap === "openRoomMenu").length, 3);
+  assert.equal(byHandler(tree, "toggleRoomHistory").attr.ariaExpanded, true);
+  assert.equal(nodes(tree).find(n => n.attr?.class === "room-list-open" && n.attr.ariaLabel.includes("333333")).attr.disabled, true);
+});
 test("我的牌桌统一更多入口，只有房主菜单显示解散，非房主仍可移除记录", () => {
   const rooms = [{ code: "123456", isHost: true, available: true }, { code: "234567", isHost: false, available: true }];
   const data = { ...base, memberRooms: rooms, visibleMemberRooms: rooms };
@@ -548,6 +563,27 @@ test("我的牌桌统一更多入口，只有房主菜单显示解散，非房�
   }
   const empty = render({ ...base, memberRooms: [], visibleMemberRooms: [] });
   assert.ok(JSON.stringify(empty).includes("还没有牌桌"));
+});
+
+test("房间管理按有效性与权限显示操作，关闭入口可访问且不展示额外失效或战绩说明", () => {
+  for (const available of [true, false]) for (const isHost of [true, false]) for (const canLeave of [true, false, undefined]) {
+    const roomMenu = { code: "273843", boardName: "阿瓦隆 · 十二骑士", statusLabel: "已结束", available, isHost, isMember: true, canLeave };
+    const tree = render({ ...base, roomMenu });
+    const dialog = nodes(tree).find(n => n.attr?.class?.includes("room-menu-dialog"));
+    const text = JSON.stringify(dialog);
+    const kinds = nodes(dialog).filter(n => n.attr?.bindtap === "roomMenuAction").map(n => n.attr["data-kind"]);
+    assert.deepEqual(kinds, ["hide", ...(available && canLeave === true ? ["leave"] : []), ...(available && isHost ? ["delete"] : [])]);
+    assert.ok(text.includes(available ? "从列表移除" : "移除失效记录"));
+    assert.ok(text.includes(available ? "已结束" : "已失效"));
+    assert.doesNotMatch(text, /连续.*3.*天|战绩与复盘|当前状态暂不可离开|离开权限暂未同步/);
+    const closers = nodes(dialog).filter(n => n.attr?.bindtap === "closeRoomMenu");
+    assert.equal(closers.length, 2);
+    assert.equal(closers[0].attr.ariaLabel, "关闭房间管理");
+    const locked = render({ ...base, roomMenu, busy: true });
+    assert.ok(nodes(locked).filter(n => ["roomMenuAction", "closeRoomMenu"].includes(n.attr?.bindtap)).every(n => n.attr.disabled));
+  }
+  const guest = render({ ...base, roomMenu: { code: "273843", available: true, isMember: false, canLeave: true } });
+  assert.ok(!nodes(guest).some(n => n.attr?.["data-kind"] === "leave"));
 });
 
 test("业务错误居中弹窗只提供关闭，连接错误才提供重试", () => {
@@ -1263,9 +1299,9 @@ test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限�
   assert.ok(!text.includes("房主：未知"));
   assert.ok(!text.includes("最近活动"));
   assert.ok(!text.includes("对局中不能离开"));
-  assert.ok(text.includes("离开权限暂未同步"));
+  assert.ok(!text.includes("离开权限暂未同步"));
   const leave = nodes(tree).find(n => n.attr?.["data-kind"] === "leave");
-  assert.equal(leave.attr.disabled, true);
+  assert.equal(leave, undefined);
   const current = { ...legacy, hostName: "小王", isHost: false, compactRelation: "房主：小王 · 我在3号", updatedAt: 123, activityLabel: "9/22 11:10", canLeave: true };
   const fresh = render({ ...data, visibleMemberRooms: [current], roomMenu: current });
   assert.ok(JSON.stringify(fresh).includes("小王"));
@@ -1582,11 +1618,15 @@ test('小程序左滑按钮仅展开时出现，按房主状态提供解散且�
     assert.equal(buttons.length,room.canSwipeDissolve?2:1);
     assert.equal(buttons[0].attr['data-kind'],'hide');
     assert.equal(buttons[0].attr.disabled,false);
+    assert.deepEqual(nodes(tree).filter(n=>n.attr?.class==='room-swipe-label').map(n=>n.children.join('')),room.canSwipeDissolve?['移除记录','解散房间']:['移除记录']);
     assert.ok(byHandler(tree,'openRoomMenu'));
     const wrapper = nodes(tree).find(n=>n.attr?.bindtouchmove==='moveRoomSwipe');
     assert.equal(wrapper.attr.bindtouchstart,'startRoomSwipe');
     const card = nodes(tree).find(n=>n.attr?.class?.includes('room-swipe-content'));
-    assert.match(card.attr.style,/translateX\(-(?:160|80)px\)/);
+    assert.equal(card.attr.catchtap,'openRoom');
+    const page = nodes(tree).find(n=>n.attr?.bindtap==='tapRoomSwipePage');
+    assert.equal(page.attr.bindtouchstart,'startRoomSwipePageTouch');
+    assert.match(card.attr.style,/translateX\(-124px\)/);
     assert.equal(nodes(render({...data,roomSwipeCode:room.code,roomSwipeOffset:-20,roomSwipeDragging:true})).find(n=>n.attr?.catchtap==='swipeRoomAction').attr.disabled,true);
   }
 });
@@ -1631,13 +1671,15 @@ test('点击卡片标题、房间号文字和空白进入房间，仅复制图�
   assert.ok(!nodes(copy).some(n => n.tag === 'wx-text'));
 });
 
-test('表单和键盘任意一项打开时移除底栏节点，均关闭后恢复', () => {
+test('表单、房间管理和键盘任意一项打开时移除底栏节点，均关闭后恢复', () => {
   const renderTabBar = factory('custom-tab-bar/index.wxml');
   for (const entrySheetVisible of [false, true]) {
     for (const keyboardVisible of [false, true]) {
-      const tree = renderTabBar({ entrySheetVisible, keyboardVisible, selected: 0, list: [] });
-      const hasTabBar = nodes(tree).some(n => n.attr?.role === 'tablist');
-      assert.equal(hasTabBar, !entrySheetVisible && !keyboardVisible);
+      for (const roomMenuVisible of [false, true]) {
+        const tree = renderTabBar({ entrySheetVisible, keyboardVisible, roomMenuVisible, selected: 0, list: [] });
+        const hasTabBar = nodes(tree).some(n => n.attr?.role === 'tablist');
+        assert.equal(hasTabBar, !entrySheetVisible && !keyboardVisible && !roomMenuVisible);
+      }
     }
   }
 });
@@ -1703,6 +1745,30 @@ test('六位分格只展示原生数字输入框的值，前导零可见且表�
   assert.deepEqual(slots.map(plain),['0','6','2','8','1','9']);
   assert.ok(byHandler(tree,'pasteRoomCode'));
   assert.equal(nodes(tree).find(n=>n.tag==='wx-form').attr.bindsubmit,'submitEntry');
+});
+
+test('房间码光标随输入和删除落在下一格，满六码在末位之后，失焦后隐藏', () => {
+  const codeSlots = [0,1,2,3,4,5];
+  for (const code of ['', '1', '14', '142', '1420', '14205', '142059', '14205', '1420', '', '062819']) {
+    for (const entryFocusedField of ['code', '', 'nickname']) {
+      const tree = render({...base,entrySheet:true,entryMode:'join',code,codeSlots,entryFocusedField});
+      const slots = nodes(tree).filter(n=>n.attr?.class==='entry-code-slot');
+      const hasCaret = n=>nodes(n).some(child=>child.attr?.class?.includes('entry-code-caret'));
+      assert.deepEqual(slots.map(hasCaret), codeSlots.map(i=>entryFocusedField==='code' && i===Math.min(code.length,5)));
+      const input = nodes(tree).find(n=>n.tag==='wx-input' && n.attr.name==='code');
+      assert.equal(input.attr.cursor, code.length);
+      assert.equal(input.attr.selectionStart, code.length);
+      assert.equal(input.attr.selectionEnd, code.length);
+      assert.equal(input.attr.alwaysEmbed, true);
+      assert.equal(input.attr.value, code);
+      assert.ok(byHandler(tree,'editEntryCode'));
+      if (entryFocusedField==='code') {
+        const caret = nodes(tree).find(n=>n.attr?.class?.includes('entry-code-caret'));
+        assert.equal(caret.attr.class.includes('is-complete'), code.length===6);
+        if (code.length<6) assert.ok(!nodes(slots[code.length]).some(n=>n.attr?.class==='entry-code-dash'));
+      }
+    }
+  }
 });
 
 test('对局趣味时间线按轮次归组，保留同轮多身份、长详情及无轮次记录', () => {

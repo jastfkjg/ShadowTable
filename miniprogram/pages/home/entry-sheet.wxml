@@ -24,9 +24,9 @@
             </view>
             <view wx:if="{{entryMode==='join'}}" class="entry-code-section" id="entry-code-block">
               <view class="entry-field-heading"><label class="field-title" for="room-code">房间码</label><button class="entry-paste" hover-class="entry-option-pressed" bindtap="pasteRoomCode" disabled="{{busy || hasPendingRequest}}"><image src="/assets/sheet-copy.svg" aria-hidden="true" /><text>粘贴</text></button></view>
-              <view class="entry-code-field {{entryFocusedField==='code'?'is-focused':''}} {{entryCodeError?'has-error':''}}">
-                <view class="entry-code-slots" aria-hidden="true"><view wx:for="{{codeSlots}}" wx:key="*this" class="entry-code-slot"><text wx:if="{{code[item]}}">{{code[item]}}</text><view wx:else class="entry-code-dash" /></view></view>
-                <input class="room-input" id="room-code" name="code" type="number" maxlength="6" value="{{code}}" bindinput="inputCode" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="code" focus="{{entryFocusedField==='code'}}" adjust-position="{{false}}" aria-label="6 位房间码" disabled="{{busy || hasPendingRequest}}" />
+              <view class="entry-code-field {{entryFocusedField==='code'?'is-focused':''}} {{entryCodeError?'has-error':''}}" bindtap="editEntryCode">
+                <view class="entry-code-slots" aria-hidden="true"><view wx:for="{{codeSlots}}" wx:key="*this" class="entry-code-slot"><text wx:if="{{code[item]}}">{{code[item]}}</text><view wx:elif="{{entryFocusedField!=='code' || item!==code.length}}" class="entry-code-dash" /><view wx:if="{{entryFocusedField==='code' && item===(code.length<6?code.length:5)}}" class="entry-code-caret {{code.length===6?'is-complete':''}}" /></view></view>
+                <input class="room-input" id="room-code" name="code" type="number" maxlength="6" value="{{code}}" cursor="{{code.length}}" selection-start="{{code.length}}" selection-end="{{code.length}}" bindinput="inputCode" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="code" focus="{{entryFocusedField==='code'}}" always-embed="{{true}}" hold-keyboard="{{true}}" adjust-position="{{false}}" aria-label="6 位房间码" disabled="{{busy || hasPendingRequest}}" />
               </view>
               <view wx:if="{{entryCodeError}}" class="entry-field-error" role="alert">{{entryCodeError}}</view>
               <view wx:else class="entry-field-help">向房主获取 6 位房间码</view>

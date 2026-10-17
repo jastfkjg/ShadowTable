@@ -134,24 +134,40 @@ function displayEvents(events) {
 function trajectory(raw, seat) {
   const initial = raw.initialPlayers.find(p => p.seat === seat), final = raw.finalPlayers.find(p => p.seat === seat);
   if (!initial && !final) return null;
-  const steps = [{ id: "initial", label: "开局 · 初始身份", text: person(initial), detail: initial?.role ? side(initial.faction) + "阵营" : "初始身份未记录", tone: initial?.faction || "unknown" }];
+  const roleArt = p => p?.role ? portrait(p.role, p.faction).portrait : "";
+  const stage = round => Number.isInteger(round) && round > 0 ? "第" + round + "轮" : "过程";
+  const initialDetail = initial?.role ? side(initial.faction) + "阵营" : "初始身份未记录";
+  const steps = [{ id: "initial", label: "开局 · 初始身份", stageLabel: "开局", actionLabel: "初始身份",
+    text: person(initial), detail: initialDetail, contextLabel: initialDetail,
+    rolePortrait: roleArt(initial), tone: initial?.faction || "unknown" }];
   for (const e of raw.events) {
     if (e.kind === "conversion") for (const c of e.changes || []) if (c.seat === seat)
-      steps.push({ id: e.id, label: "第" + e.round + "轮 · 阵营转换", text: person(c.after), detail: side(c.before.faction) + " → " + side(c.after.faction), tone: c.after.faction });
+      steps.push({ id: e.id, label: stage(e.round) + " · 阵营转换", stageLabel: stage(e.round), actionLabel: "阵营转换",
+        text: person(c.after), detail: side(c.before.faction) + " → " + side(c.after.faction),
+        contextLabel: side(c.before.faction) + " → " + side(c.after.faction), rolePortrait: roleArt(c.after), tone: c.after.faction });
     if (e.kind === "skills") {
       for (const a of e.actions || []) if (a.actor?.seat === seat) {
         const row = actionRow(a, steps.length);
+        const target = a.targets?.length === 1 ? a.targets[0] : null;
         steps.push({ id: e.id + ":" + steps.length, label: (e.round ? "第" + e.round + "轮 · " : "") + row.action,
-          text: row.detail, detail: row.result, tone: row.tone });
+          stageLabel: stage(e.round), actionLabel: row.action, isAction: true,
+          text: row.detail, detail: row.result, contextLabel: row.result, tone: row.tone,
+          textTone: target?.faction || "neutral", rolePortrait: roleArt(target) });
       }
       for (const draw of e.draws || []) if (draw.after.seat === seat)
-        steps.push({ id: e.id + ":draw", label: "第" + e.round + "轮 · 抽牌复活", text: person(draw.after),
-          detail: (draw.armor ? "复活甲保留原身份 · " : "新身份 · ") + side(draw.after.faction) + "阵营", tone: draw.after.faction });
+        steps.push({ id: e.id + ":draw:" + steps.length, label: stage(e.round) + " · 抽牌复活", stageLabel: stage(e.round), actionLabel: "抽牌复活",
+          text: person(draw.after), rolePortrait: roleArt(draw.after),
+          detail: (draw.armor ? "复活甲保留原身份 · " : "新身份 · ") + side(draw.after.faction) + "阵营",
+          contextLabel: (draw.armor ? "复活甲保留原身份 · " : "新身份 · ") + side(draw.after.faction) + "阵营", tone: draw.after.faction });
     }
   }
-  steps.push({ id: "final", label: "对局结束 · 最终身份", text: person(final),
-    detail: final ? side(final.faction) + "阵营 · " + (final.alive ? "在场" : "已出局") : "最终身份未记录", tone: final?.faction || "unknown" });
-  return { seat, name: initial?.name || final?.name || "", steps };
+  const statusLabel = final ? final.alive ? "在场" : "已出局" : "";
+  steps.push({ id: "final", label: "对局结束 · 最终身份", stageLabel: "终局", actionLabel: "最终身份", text: person(final),
+    detail: final ? side(final.faction) + "阵营 · " + statusLabel : "最终身份未记录",
+    contextLabel: final ? side(final.faction) + "阵营" : "最终身份未记录", rolePortrait: roleArt(final),
+    statusLabel, alive: !!final?.alive, tone: final?.faction || "unknown" });
+  return { seat, name: initial?.name || final?.name || "", isSelf: seat === raw.self.seat,
+    finalPlayer: final ? player(final, raw.self.seat) : null, steps };
 }
 function presentReplay(raw, view = "global", expanded = []) {
   const selfSeat = raw.self.seat, initialPlayers = raw.initialPlayers.map(p => player(p, selfSeat));
@@ -180,7 +196,11 @@ function presentReplay(raw, view = "global", expanded = []) {
   }
   const quests = allEvents.filter(e => e.kind === "quest"), successes = quests.filter(e => e.success).length;
   const score = raw.self.score;
-  const final = { ...raw.final, actorLabel: raw.final.actor ? person(raw.final.actor) : "带刀人未记录",
+  const final = { ...raw.final, actor: raw.final.actor ? player(raw.final.actor, selfSeat) : null,
+    target: raw.final.target ? player(raw.final.target, selfSeat) : null,
+    hasKnife: Number.isInteger(raw.final.targetSeat) && raw.final.targetSeat >= 0,
+    summaryLabel: raw.final.reason === "assassination" ? "三次任务成功" : raw.final.label,
+    actorLabel: raw.final.actor ? person(raw.final.actor) : "带刀人未记录",
     targetLabel: raw.final.targetSeat === 0 ? "0号空刀" : raw.final.target ? person(raw.final.target) : "目标未记录" };
   final.resultLabel = raw.final.hit === true ? "刺中梅林" : raw.final.hit === false && raw.final.targetSeat !== 0 ? "未刺中梅林"
     : raw.final.targetSeat === 0 ? raw.final.emptyWin === true ? "空刀，场上没有梅林" : raw.final.emptyWin === false ? "空刀，场上仍有梅林" : "最终空刀" : "";

@@ -20,8 +20,10 @@ const adjustmentReason = (reason = "") => {
   return reason.trim();
 };
 class Store {
-  constructor(path, { clock = () => Date.now() } = {}) {
+  constructor(path, { clock = () => Date.now(), endedRoomRetentionDays = require("./retention").defaults.endedDays } = {}) {
     this.clock = clock;
+    if (!Number.isSafeInteger(endedRoomRetentionDays) || endedRoomRetentionDays < 1 || endedRoomRetentionDays > 3650) throw new Error("结束牌桌保留天数配置无效");
+    this.endedRoomRetentionDays = endedRoomRetentionDays;
     this.leaderboardRevision = 0;
     this.leaderboardDirty = false;
     this.inTransaction = false;
@@ -219,16 +221,26 @@ class Store {
     return this.db.prepare("SELECT * FROM room_entries WHERE uid=? AND code=?").get(uid, code);
   }
   visitRoom(uid, code) {
+    if (this.roomExpired(this.get(code))) throw new RuleError("房间已失效，请清理列表记录", 410);
     this.db.prepare("UPDATE room_entries SET hidden=0, entered=? WHERE uid=? AND code=?").run(this.clock(), uid, code);
     this.touchRoom(code);
   }
+  roomExpired(room, activity) {
+    if (!room || !["ended", "terminated"].includes(room.phase)) return false;
+    const last = activity ?? this.db.prepare("SELECT activity FROM room_lifecycle WHERE code=?").get(room.code)?.activity ?? room.updatedAt ?? room.createdAt ?? this.clock();
+    return last <= this.clock() - this.endedRoomRetentionDays * 86400000;
+  }
   personalRooms(uid) {
-    return this.db.prepare("SELECT * FROM room_entries WHERE uid=? AND hidden=0").all(uid).map(entry => {
+    return this.db.prepare(`SELECT room_entries.*, room_lifecycle.activity FROM room_entries
+      LEFT JOIN room_lifecycle ON room_lifecycle.code=room_entries.code
+      WHERE uid=? AND hidden=0`).all(uid).map(entry => {
       const snapshot = JSON.parse(entry.snapshot), room = this.get(entry.code);
       const member = room && (room.host === uid || [...room.players, ...(room.spectators || [])].some(p => p.uid === uid));
-      const available = !!member && (room.createdAt || 0) === snapshot.createdAt;
-      return { ...snapshot, note: entry.note, lastEnteredAt: entry.entered, available,
-        ...(available ? {} : { status: "unavailable", phaseName: room && member ? "房间已失效" : room ? "已离开或被移出" : "房间已解散", canLeave: false, isHost: false }) };
+      const expired = this.roomExpired(room, entry.activity);
+      const available = !!member && (room.createdAt || 0) === snapshot.createdAt && !expired;
+      return { ...snapshot, ...(available && room.phase === "terminated" ? { status: "ended" } : {}), note: entry.note, lastEnteredAt: entry.entered,
+        lastActivityAt: available ? entry.activity || snapshot.updatedAt || snapshot.createdAt || 0 : snapshot.updatedAt || snapshot.createdAt || 0, available,
+        ...(available ? {} : { status: "unavailable", phaseName: expired ? "连续 " + this.endedRoomRetentionDays + " 天无活动，房间已失效" : room && member ? "房间已失效" : room ? "已离开或被移出" : "房间已解散", canLeave: false, isHost: false }) };
     }).sort((a,b) => (["playing", "lobby", "ended", "unavailable"].indexOf(a.status) - ["playing", "lobby", "ended", "unavailable"].indexOf(b.status)) || b.lastEnteredAt - a.lastEnteredAt || a.code.localeCompare(b.code));
   }
   save(room) {
@@ -246,8 +258,8 @@ class Store {
     for (const uid of new Set([room.host, ...room.players.map(p => p.uid), ...(room.spectators || []).map(p => p.uid)])) this.trackRoom(room, uid);
   }
   touchRoom(code) {
-    // Polling keeps a viewed room active, but writes at most once per hour.
-    this.db.prepare("UPDATE room_lifecycle SET activity=?,pending_since=0 WHERE code=? AND (activity<=? OR pending_since>0)").run(this.clock(), code, this.clock() - 3600000);
+    // Explicit entry renews the room; reading/polling details does not.
+    this.db.prepare("UPDATE room_lifecycle SET activity=?,pending_since=0 WHERE code=?").run(this.clock(), code);
   }
   remove(code) {
     this.db.prepare("UPDATE room_entries SET unavailable_since=? WHERE code=? AND unavailable_since=0").run(this.clock(), code);

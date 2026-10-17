@@ -6,6 +6,7 @@ const roomShare = require("../../room-share");
 const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
+const roomList = require("../../room-list");
 const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
@@ -14,7 +15,7 @@ function roomListItems(rooms) {
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   return rooms.map(r => {
-    const time = r.updatedAt ? new Date(r.updatedAt) : null;
+    const time = roomList.activity(r) ? new Date(roomList.activity(r)) : null;
     const clock = time ? `${String(time.getHours()).padStart(2,"0")}:${String(time.getMinutes()).padStart(2,"0")}` : "";
     const day = time?.toDateString() === today.toDateString() ? "" : time?.toDateString() === yesterday.toDateString() ? "昨天 " : time ? `${time.getFullYear() === today.getFullYear() ? "" : time.getFullYear() + "/"}${time.getMonth()+1}/${time.getDate()} ` : "";
     return { ...r,
@@ -303,6 +304,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
+    historyRooms: [], unavailableRooms: [], historyExpanded: false, unavailableExpanded: false,
+    showHistorySection: true, showUnavailableSection: true, currentRoomCount: 0,
     roomListFilter: "all",
     roomSwipeCode: "",
     roomSwipeOffset: 0,
@@ -385,7 +388,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.mask();
   },
   onPageScroll() {
-    if (this.roomSwipeGesture?.axis !== "x") this.dismissRoomSwipe();
+    // Native scroll callbacks can arrive after a horizontal swipe has settled.
+    // Close on a new outside touch or an actual vertical gesture instead.
     this.showIdentityHintWhenVisible();
   },
   onResize() {
@@ -522,7 +526,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     } catch (e) {
       if (!this.alive) return;
       if (e.status === 404 || e.status === 410) {
-        this.showInvitationError(e.status === 404 ? "该房间已解散" : "该邀请已失效，请让朋友重新分享");
+        this.showInvitationError(e.status === 404 ? "该房间已解散" : (e.message.includes("房间已失效") ? "房间已失效，无法再进入" : "该邀请已失效，请让朋友重新分享"));
         return;
       }
       throw e;
@@ -617,12 +621,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async loadRooms() {
     const sequence = this.roomsReadSequence = (this.roomsReadSequence || 0) + 1;
-    const { rooms } = await api.request("/api/me/rooms");
+    const { rooms, serverTime } = await api.request("/api/me/rooms");
     if (this.alive && sequence === this.roomsReadSequence) {
       this.connectionRecovered();
       const items = roomListItems(rooms);
+      this.roomsServerTime = serverTime || Date.now();
       this.dismissRoomSwipe();
-      this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false), visibleMemberRooms: items.filter(r => this.data.roomListFilter === "all" || r.status === this.data.roomListFilter), serverConnected: true, network: true });
+      this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false),
+        ...roomList.present(items, this.data.roomListFilter, this.roomsServerTime), serverConnected: true, network: true });
     }
   },
   handleError(e) {
@@ -710,11 +716,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.clearRoom();
         if (this.inviteCode === code && !this.resumingRoom) {
           this.setData({ invitation: { code } });
-          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? "该邀请已失效，请让朋友重新分享" : e.message);
+          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? (e.message.includes("房间已失效") ? "房间已失效，无法再进入" : "该邀请已失效，请让朋友重新分享") : e.message);
           return;
         }
         this.setData({
-          notice: e.status === 404 ? "牌桌已删除或不存在" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
+          notice: e.status === 404 ? "牌桌已删除或不存在" : e.status === 410 ? "房间已失效，请清理列表记录" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
         await this.loadRooms();
         return;
@@ -990,7 +996,32 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const filter = e.currentTarget.dataset.filter;
     if (!this.data.roomFilters.some(f => f.id === filter)) return;
     this.dismissRoomSwipe();
-    this.setData({ roomListFilter: filter, visibleMemberRooms: this.data.memberRooms.filter(r => filter === "all" || r.status === filter) });
+    this.setData({ roomListFilter: filter, historyExpanded: false, unavailableExpanded: filter === "unavailable",
+      ...roomList.present(this.data.memberRooms, filter, this.roomsServerTime || Date.now()) });
+  },
+  toggleRoomHistory() {
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
+    this.dismissRoomSwipe();
+    this.setData({ historyExpanded: !this.data.historyExpanded });
+  },
+  toggleUnavailableRooms() {
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
+    this.dismissRoomSwipe();
+    this.setData({ unavailableExpanded: !this.data.unavailableExpanded });
+  },
+  async cleanupUnavailableRooms() {
+    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
+    const rooms = this.data.unavailableRooms.map(r => ({ code: r.code, createdAt: r.createdAt || 0 }));
+    if (!rooms.length) return;
+    this.dismissRoomSwipe();
+    this.setData({ busy: true, error: "" });
+    try {
+      if (!(await this.confirm("清理 " + rooms.length + " 个失效房间？",
+        "仅从你的牌桌列表移除这些失效记录，保留战绩和复盘，不影响其他用户。", "清理"))) return;
+      if (!this.alive || !this.foreground) return;
+      this.setData({ busy: false });
+      await this.mutate("/api/me/rooms/cleanup", { rooms }, "entryCleanup");
+    } finally { this.setData({ busy: false }); }
   },
   async refreshRooms() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
@@ -1008,6 +1039,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.consumeRoomSwipeTap()) return;
     this.dismissRoomSwipe();
     this.setData({ roomMenu: this.data.memberRooms.find(r => r.code === e.currentTarget.dataset.code) || null });
+  },
+  startRoomSwipePageTouch(e) {
+    // Card touchstart bubbles here after startRoomSwipe; keep that gesture alive.
+    if (e.touches?.length !== 1) return;
+    this.roomSwipeTapUntil = 0;
+    if (!this.roomSwipeGesture) this.dismissRoomSwipe();
+  },
+  tapRoomSwipePage() {
+    if (!this.consumeRoomSwipeTap()) this.dismissRoomSwipe();
   },
   dismissRoomSwipe() {
     if (this.roomSwipeGesture?.axis) this.roomSwipeTapUntil = Date.now() + 400;
@@ -1254,6 +1294,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   editEntryName() {
     if (!this.data.entrySheet || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
     this.setData({ entryFocusedField: "nickname", entryScrollTarget: "entry-name-block" });
+  },
+  editEntryCode() {
+    if (!this.data.entrySheet || this.data.entryMode !== "join" || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
+    this.setData({ entryFocusedField: "code", entryScrollTarget: "entry-code-block" });
   },
   entryInputFocus(e) {
     if (!this.data.entrySheet || !this.foreground) return;
@@ -1524,9 +1568,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           return;
         }
       }
-      if (["entryHide", "entryRestore", "entryNote"].includes(pending.after)) {
+      if (["entryHide", "entryRestore", "entryNote", "entryCleanup"].includes(pending.after)) {
         this.setData({ roomMenu: null, noteRoom: null,
-          notice: pending.after === "entryHide" ? "已从列表移除" : pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
+          notice: pending.after === "entryCleanup" ? roomList.cleanupNotice(result.removed) : pending.after === "entryHide" ? "已从列表移除" : pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
         await this.loadRooms();
       } else if (pending.after === "leave" || pending.after === "delete") {
         this.clearRoom();
@@ -1552,7 +1596,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.connectionRecovered();
         this.setData({ hasPendingRequest: false });
         if (e.status === 404 || e.status === 410 || /游戏已开始/.test(e.message))
-          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? "该邀请已失效，请让朋友重新分享" : "本局已开始，暂时无法加入，请等待房主开启下一局", e.status !== 404 && e.status !== 410);
+          this.showInvitationError(e.status === 404 ? "该房间已解散" : e.status === 410 ? (e.message.includes("房间已失效") ? "房间已失效，无法再进入" : "该邀请已失效，请让朋友重新分享") : "本局已开始，暂时无法加入，请等待房主开启下一局", e.status !== 404 && e.status !== 410);
         else if (e.status === 409) this.showInvitationError(e.message, true);
         else this.setData({ invitationNeedsName: true, entryError: e.message, error: "" });
         return;

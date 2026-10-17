@@ -16,6 +16,21 @@ function endedRoom() {
   run(room, "finishTools", { scoreReason: "assassination", scoreTarget: 0 });
   return room;
 }
+test("结束与终止牌桌满3天按默认策略回收，活跃访问续期，准备与进行中保持原规则", () => {
+  let now = Date.now(); const store = new Store(":memory:", { clock: () => now });
+  try {
+    const ended = endedRoom(); store.save(ended);
+    const terminated = newRoom("222222", "wx:host", "房主"); terminated.phase = "terminated"; store.save(terminated);
+    const renewed = endedRoom(); renewed.code = "333333"; store.save(renewed);
+    const lobby = newRoom("444444", "wx:host", "房主"); store.save(lobby);
+    const playing = newRoom("555555", "wx:host", "房主"); playing.phase = "tools"; store.save(playing);
+    now += 2 * DAY; store.visitRoom("wx:host", renewed.code);
+    now += DAY - 1; assert.equal(cleanup(store).rooms, 0);
+    now++; assert.equal(cleanup(store).rooms, 2);
+    assert.ok(store.get(renewed.code)); assert.ok(store.get(lobby.code)); assert.ok(store.get(playing.code));
+    now += 2 * DAY; assert.equal(cleanup(store).rooms, 1);
+  } finally { store.close(); }
+});
 test("缺少近期已验证备份时停止自动清理，恢复后继续分批执行", t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let now=Date.now(), ready=false;const store=new Store(':memory:',{clock:()=>now}), logs=[];

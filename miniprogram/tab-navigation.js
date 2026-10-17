@@ -1,11 +1,22 @@
+// The custom tab bar is outside the page stacking context, so page sheets must hide it.
+function tabBarVisibility(page, selected) {
+  const data = page.data || {};
+  const panel = (selected === 0 ? data.lobby : data.personal) || data;
+  return {
+    entrySheetVisible: selected === 0 ? !!panel.entrySheet : !!panel.monthlyReset,
+    roomMenuVisible: selected === 0 && !!(panel.roomMenu || panel.noteRoom),
+  };
+}
+
 // A custom tab bar belongs to each tab page. Update it before starting any reads.
 function selectTab(page, selected) {
   const tabBar = page.getTabBar?.();
   if (!tabBar) return;
-  const entrySheetVisible = selected === 0 ? !!(page.data?.lobby?.entrySheet || page.data?.entrySheet) : !!(page.data?.personal?.monthlyReset || page.data?.monthlyReset);
   const patch = {};
   if (tabBar.data.selected !== selected) patch.selected = selected;
-  if (!!tabBar.data.entrySheetVisible !== entrySheetVisible) patch.entrySheetVisible = entrySheetVisible;
+  for (const [key, value] of Object.entries(tabBarVisibility(page, selected))) {
+    if (!!tabBar.data[key] !== value) patch[key] = value;
+  }
   if (Object.keys(patch).length) tabBar.setData(patch);
 }
 
@@ -25,4 +36,4 @@ function switchHomeTab(selected, options = {}) {
   });
 }
 
-module.exports = { selectTab, switchHomeTab };
+module.exports = { selectTab, switchHomeTab, tabBarVisibility };

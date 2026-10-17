@@ -1,9 +1,10 @@
-const { switchHomeTab } = require("../tab-navigation");
+const { switchHomeTab, tabBarVisibility } = require("../tab-navigation");
 Component({
   data: {
     selected: 0,
     keyboardVisible: false,
     entrySheetVisible: false,
+    roomMenuVisible: false,
     list: [
       { pagePath: "/pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
       { pagePath: "/pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },
@@ -31,17 +32,18 @@ Component({
       const selected = typeof page?.switchMainTab === "function" ? page.data.activeTab
         : this.data.list.findIndex(item => item.pagePath === "/" + page?.route);
       if (selected >= 0) {
-        const entrySheetVisible = selected === 0 && !!(page.data?.lobby?.entrySheet || page.data?.entrySheet);
         const patch = {};
         if (selected !== this.data.selected) patch.selected = selected;
-        if (entrySheetVisible !== this.data.entrySheetVisible) patch.entrySheetVisible = entrySheetVisible;
+        for (const [key, value] of Object.entries(tabBarVisibility(page, selected))) {
+          if (value !== this.data[key]) patch[key] = value;
+        }
         if (Object.keys(patch).length) this.setData(patch);
       }
     },
     switchTab(event) {
       const index = Number(event.currentTarget.dataset.index);
       const item = this.data.list[index];
-      if (!item || index === this.data.selected || this.switching || this.data.entrySheetVisible || this.data.keyboardVisible) return;
+      if (!item || index === this.data.selected || this.switching || this.data.entrySheetVisible || this.data.roomMenuVisible || this.data.keyboardVisible) return;
       const pages = getCurrentPages();
       const page = pages[pages.length - 1];
       if (typeof page?.switchMainTab === "function") {

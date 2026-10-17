@@ -1,6 +1,6 @@
 "use strict";
 const DAY = 86400000;
-const defaults = Object.freeze({ lobbyDays: 7, graceDays: 3, endedDays: 30, entryDays: 90, receiptDays: 90, batchSize: 100 });
+const defaults = Object.freeze({ lobbyDays: 7, graceDays: 3, endedDays: 3, entryDays: 90, receiptDays: 90, batchSize: 100 });
 
 function initialize(store) {
   const db = store.db;
@@ -49,7 +49,7 @@ function cleanup(store, options = {}) {
     }
     const rooms = db.prepare(`SELECT * FROM room_lifecycle WHERE
       (phase='lobby' AND activity<? AND (pending_since=0 OR pending_since<=?)) OR
-      (phase IN ('ended','terminated') AND activity<?) ORDER BY activity LIMIT ?`)
+      (phase IN ('ended','terminated') AND activity<=?) ORDER BY activity LIMIT ?`)
       .all(now - policy.lobbyDays * DAY, now - policy.graceDays * DAY, now - policy.endedDays * DAY, limit);
     for (const entry of rooms) {
       const room = store.get(entry.code);

@@ -7,7 +7,8 @@
   function canDissolve(room) {
     return !!room && room.isHost === true && room.available !== false && ["lobby", "ended"].includes(room.status);
   }
-  function width(room) { return canDissolve(room) ? 160 : 80; }
+  // Stacked actions share one rail, whether the room offers one or two buttons.
+  function width() { return 124; }
   function start(room, point, opened) {
     return { code: room.code, x: point.x, y: point.y, width: width(room),
       initial: opened ? -width(room) : 0, offset: opened ? -width(room) : 0, axis: "" };

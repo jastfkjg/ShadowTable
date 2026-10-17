@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const { wxmlToJs } = require("miniprogram-compiler");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("./helpers/replay-fixtures");
-const { presentReplay } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/replay");
 const root = path.resolve(__dirname, "../miniprogram");
 function fixture() {
   const store = new Store(":memory:");
@@ -118,7 +118,36 @@ test("复盘插画区分初始与最终身份，未知初始身份不根据最�
   assert.equal(shown.initialPlayers[0].factionLabel, "未知");
   assert.equal(shown.finalPlayers[0].rolePortrait, "/assets/roles/assassin.png");
   assert.equal(shown.finalPlayers[0].factionLabel, "好人");
+  const history = trajectory(raw, raw.initialPlayers[0].seat);
+  assert.equal(history.steps[0].rolePortrait, "");
+  assert.equal(history.steps[0].contextLabel, "初始身份未记录");
+  assert.equal(history.finalPlayer.rolePortrait, "/assets/roles/assassin.png");
+  assert.equal(history.finalPlayer.factionLabel, "好人");
   assert.equal(JSON.stringify(raw), before);
+});
+
+test("盘刀区分真实目标、0号空刀和未记录决定，轨迹按行动时的目标身份配图", () => {
+  const raw = fixture(), seat = raw.self.seat;
+  const action = { kind: "knife", actor: { seat, role: "刺客", faction: "evil" },
+    targets: [{ seat: 1, role: "梅林", faction: "good" }], effect: "already_out" };
+  raw.events = [{ id: "skill", kind: "skills", round: 2, actions: [action] }];
+  const step = trajectory(raw, seat).steps.find(s => s.isAction);
+  assert.equal(step.stageLabel, "第2轮"); assert.equal(step.actionLabel, "出刀");
+  assert.equal(step.rolePortrait, "/assets/roles/merlin.png"); assert.equal(step.textTone, "good");
+  assert.equal(step.contextLabel, "目标已出局");
+  raw.final = { targetSeat: 0, target: null, actor: null, emptyWin: false, label: "最终盘刀" };
+  let shown = presentReplay(raw);
+  assert.equal(shown.replay.final.hasKnife, true); assert.equal(shown.replay.final.target, null);
+  assert.equal(shown.replay.final.targetLabel, "0号空刀");
+  assert.equal(shown.replay.final.resultLabel, "空刀，场上仍有梅林");
+  raw.final.targetSeat = null; raw.final.emptyWin = null;
+  shown = presentReplay(raw);
+  assert.equal(shown.replay.final.hasKnife, false); assert.equal(shown.replay.final.resultLabel, "");
+  raw.finalPlayers = raw.finalPlayers.filter(p => p.seat !== seat);
+  const incomplete = trajectory(raw, seat);
+  assert.equal(incomplete.finalPlayer, null);
+  assert.equal(incomplete.steps.at(-1).rolePortrait, "");
+  assert.equal(incomplete.steps.at(-1).statusLabel, "");
 });
 
 test("生产复盘展示线上投票和出牌明细、转换前后阵营、湖仙结果、抽牌及作废与盘刀结果", () => {

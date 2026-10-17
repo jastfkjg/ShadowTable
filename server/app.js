@@ -65,6 +65,7 @@ function createApp({
   trustedProxies = "",
   logger = console,
   clock = () => Date.now(),
+  endedRoomRetentionDays,
 } = {}) {
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
@@ -92,7 +93,7 @@ function createApp({
   }
   const clientAddress = require("./network").clientAddressResolver(trustedProxies);
   const metrics = require("./network").createMetrics({ clock, logger });
-  const store = new Store(database, { clock }),
+  const store = new Store(database, { clock, endedRoomRetentionDays }),
     limits = new Map();
   const leaderboard = new Leaderboard(store);
   const monthlyReport = new MonthlyReport(store);
@@ -405,12 +406,13 @@ function createApp({
       }
       if (req.method === "GET" && path === "/api/me/rooms") {
         const rooms = store.personalRooms(uid);
-        return send(200, { rooms });
+        return send(200, { rooms, serverTime: store.clock() });
       }
       const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/stats$/);
       if (req.method === "GET" && playerStats) {
         const room = store.get(playerStats[1]);
         check(room, "房间不存在", 404);
+        check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
         res.setHeader("Cache-Control", "no-store");
         return send(200, readRoomPlayerStats(store, room, uid, playerStats[2]));
       }
@@ -421,6 +423,7 @@ function createApp({
       if (req.method === "GET" && match) {
         const room = store.get(match[1]);
         check(room, "房间不存在", 404);
+        check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
         if (requestUrl.searchParams.has("instance"))
           check(requestUrl.searchParams.get("instance") === String(room.createdAt || 0), "该邀请已失效", 410);
         if (match[2] === "invitation") {
@@ -439,7 +442,6 @@ function createApp({
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
         view.players = view.players.map(p => ({ ...p, avatarUrl: avatarBySeat.get(p.seat), statsId: playerStatsId(room, room.players.find(player => player.seat === p.seat)) }));
-        store.touchRoom(room.code);
         const encoded = JSON.stringify(view), etag = '"' + hash(uid + "\n" + encoded) + '"';
         res.setHeader("ETag", etag);
         // Authorization and the viewer-specific projection always precede conditional responses.
@@ -448,12 +450,12 @@ function createApp({
       }
       check(
         req.method === "POST" &&
-          (path === "/api/rooms" || personal ||
+          (path === "/api/rooms" || path === "/api/me/rooms/cleanup" || personal ||
             (match && ["join", "commands", "delete"].includes(match[2]))),
         "接口不存在",
         404,
       );
-      const b = await body(req),
+      const b = await body(req, path === "/api/me/rooms/cleanup" ? 65536 : 8192),
         id = req.headers["idempotency-key"];
       check(
         typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id),
@@ -469,6 +471,20 @@ function createApp({
             409,
           );
           return JSON.parse(cached.result);
+        }
+        if (path === "/api/me/rooms/cleanup") {
+          check(Array.isArray(b.rooms) && b.rooms.length > 0 && b.rooms.length <= 1000, "请选择有效的失效房间记录");
+          check(b.rooms.every(r => r && typeof r.code === "string" && /^\d{6}$/.test(r.code) && Number.isSafeInteger(r.createdAt) && r.createdAt >= 0), "无效的房间记录");
+          const candidates = new Map(b.rooms.map(r => [r.code, r.createdAt]));
+          let removed = 0;
+          for (const room of store.personalRooms(uid)) {
+            // Recheck in the write transaction: rejoined rooms and reused codes survive.
+            if (room.available === false && candidates.get(room.code) === room.createdAt)
+              removed += store.db.prepare("UPDATE room_entries SET hidden=1 WHERE uid=? AND code=? AND hidden=0").run(uid, room.code).changes;
+          }
+          const response = { accepted: true, removed };
+          store.addReceipt(uid, id, fingerprint, response);
+          return response;
         }
         if (personal) {
           const code = personal[1], room = store.get(code);
@@ -500,6 +516,7 @@ function createApp({
         } else {
           room = store.get(match[1]);
           check(room, "房间不存在", 404);
+          check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
           auditBefore = structuredClone(room);
           if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid))
             details = actionDetails(

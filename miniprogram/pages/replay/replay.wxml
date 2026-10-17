@@ -57,18 +57,51 @@
       </view>
     </view>
     <view id="replay-final" class="replay-section replay-final">
-      <view class="replay-section-heading"><text>最终结算</text><text class="replay-legend">{{replay.final.label}}</text></view>
-      <view wx:if="{{replay.final.targetSeat!==null}}" class="replay-final-knife"><view class="{{replay.final.actor.faction}}">{{replay.final.actorLabel}}</view><view class="replay-final-arrow" aria-hidden="true">→</view><view class="{{replay.final.target.faction}}">{{replay.final.targetLabel}}</view></view>
-      <view wx:if="{{replay.final.resultLabel}}" class="replay-final-verdict {{replay.winnerTone}}">{{replay.final.resultLabel}} · {{replay.winnerLabel}}</view>
-      <view wx:if="{{replay.final.corrected}}" class="replay-note">最终结算已按管理员更正后的结果更新。</view>
+      <view class="replay-section-heading"><view class="replay-section-title"><image src="/assets/record-swords.svg" aria-hidden="true" /><text>最终结算</text></view><text class="replay-legend">{{replay.final.summaryLabel}}</text></view>
+      <view class="replay-final-summary">
+        <block wx:if="{{replay.final.hasKnife}}">
+          <view class="replay-final-context"><image src="/assets/record-sword.svg" aria-hidden="true" /><text>最终盘刀</text></view>
+          <view class="replay-final-knife">
+            <view class="replay-final-player">
+              <image wx:if="{{replay.final.actor.rolePortrait}}" class="replay-final-portrait" src="{{replay.final.actor.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view wx:else class="replay-final-portrait replay-final-unknown" aria-hidden="true">?</view>
+              <view wx:if="{{replay.final.actor}}" class="replay-final-seat">{{replay.final.actor.seat}}号</view>
+              <view class="replay-final-role {{replay.final.actor.faction || 'unknown'}}">{{replay.final.actor.roleLabel || '带刀人未记录'}}</view>
+            </view>
+            <view class="replay-final-direction"><view class="replay-final-arrow" aria-hidden="true"></view><text>刺杀目标</text></view>
+            <view class="replay-final-player">
+              <image wx:if="{{replay.final.targetSeat!==0 && replay.final.target.rolePortrait}}" class="replay-final-portrait" src="{{replay.final.target.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view wx:else class="replay-final-portrait replay-final-unknown" aria-hidden="true">{{replay.final.targetSeat===0?'0':'?'}}</view>
+              <view class="replay-final-seat">{{replay.final.targetSeat}}号</view>
+              <view class="replay-final-role {{replay.final.targetSeat===0?'neutral':replay.final.target.faction || 'unknown'}}">{{replay.final.targetSeat===0?'空刀':replay.final.target.roleLabel || '目标身份未记录'}}</view>
+            </view>
+          </view>
+        </block>
+        <view class="replay-final-verdict is-{{replay.winnerTone}}">
+          <view class="replay-verdict-symbol {{replay.winnerTone}}" aria-hidden="true"><view wx:if="{{replay.winner}}" class="replay-verdict-check"></view><text wx:else>—</text></view>
+          <view class="replay-verdict-copy"><view class="replay-verdict-title {{replay.winnerTone}}">{{replay.winnerLabel}}</view><view wx:if="{{replay.final.resultLabel}}" class="replay-note">{{replay.final.resultLabel}}</view></view>
+          <text class="replay-verdict-tag {{replay.winnerTone}}">最终结果</text>
+        </view>
+      </view>
+      <view wx:if="{{replay.final.corrected}}" class="replay-note replay-final-note">最终结算已按管理员更正后的结果更新。</view>
       <view wx:if="{{replay.excludedReason}}" class="replay-notice">不计入原因：{{replay.excludedReason}}</view>
-      <view class="replay-my-result"><text>我的结果</text><view class="replay-score-line"><text class="{{replay.self.outcome==='loss'?'evil':replay.self.outcome==='win'?'good':'neutral'}}">{{replay.selfFactionLabel}}阵营 · {{replay.outcomeLabel}}</text><text class="replay-points">{{replay.scoreLabel}}<text wx:if="{{replay.score.status==='scored'}}">分</text></text></view><view wx:for="{{replay.score.breakdown}}" wx:key="id" class="replay-score-award"><text>{{item.label}}</text><text class="accent">{{item.pointsLabel}}</text></view><view wx:if="{{replay.score.manualOverride}}" class="replay-note">管理员调整：{{replay.score.manualOverride.reason}}</view><view wx:if="{{replay.score.status!=='scored'}}" class="replay-note">{{replay.score.reason || '本局未计分'}}</view></view>
-      <view class="replay-section-heading replay-personal-title">我的身份与行动</view>
-      <view class="replay-path"><view wx:for="{{selfTrajectory.steps}}" wx:key="id" class="replay-path-step"><view class="replay-note">{{item.label}}</view><view class="{{item.tone}}">{{item.text}}</view><view wx:if="{{item.detail}}" class="replay-note">{{item.detail}}</view></view></view>
-      <button class="disclosure-button replay-all-players" bindtap="togglePlayers" aria-expanded="{{playersExpanded}}" hover-class="none"><text>{{playersExpanded?'收起':'查看'}}所有玩家身份轨迹</text><view class="replay-arrow {{playersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
-      <view wx:if="{{playersExpanded}}" class="replay-player-grid"><button wx:for="{{finalPlayers}}" wx:key="seat" class="replay-player {{item.isSelf?'is-self':''}}" data-seat="{{item.seat}}" bindtap="openPlayer" hover-class="ledger-pressed" aria-label="{{item.seat}}号{{item.name}}，最终{{item.roleLabel}}，查看身份轨迹"><view class="replay-seat-name"><text>{{item.seat}}号</text><text>{{item.name}}</text></view><image wx:if="{{item.rolePortrait}}" class="replay-player-portrait" src="{{item.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view wx:else class="replay-player-unknown" aria-hidden="true">?</view><view class="replay-player-role {{item.faction}}"><view class="replay-faction-dot is-{{item.faction}}" aria-hidden="true"></view><text>{{item.roleLabel}}</text></view><view class="replay-note">{{item.alive?'在场':'已出局'}}</view></button></view>
+      <view class="replay-my-result"><view class="replay-score-line"><view class="replay-my-outcome"><view class="replay-note">我的结果</view><view class="{{replay.self.outcome==='loss'?'evil':replay.self.outcome==='win'?'good':'neutral'}}">{{replay.selfFactionLabel}}阵营 · {{replay.outcomeLabel}}</view></view><view class="replay-my-points"><view class="replay-points {{replay.score.status!=='scored'?'is-unscored':''}}">{{replay.scoreLabel}}<text wx:if="{{replay.score.status==='scored'}}">分</text></view><view class="replay-note">本局积分</view></view></view><view wx:for="{{replay.score.breakdown}}" wx:key="id" class="replay-score-award"><text>{{item.label}}</text><text class="accent">{{item.pointsLabel}}</text></view><view wx:if="{{replay.score.manualOverride}}" class="replay-note replay-score-note">管理员调整：{{replay.score.manualOverride.reason}}</view><view wx:if="{{replay.score.status!=='scored'}}" class="replay-note replay-score-note">{{replay.score.reason || '本局未计分'}}</view></view>
+      <view class="replay-section-heading replay-personal-title"><view class="replay-section-title"><image src="/assets/record-list.svg" aria-hidden="true" /><text>我的身份与行动</text></view><text class="replay-legend">{{replay.self.seat}}号 · 我</text></view>
+      <template is="replayTrajectory" data="{{steps:selfTrajectory.steps}}" />
+      <button class="replay-all-players" bindtap="togglePlayers" aria-expanded="{{playersExpanded}}" hover-class="ledger-pressed"><view class="replay-all-players-label"><image src="/assets/record-users.svg" aria-hidden="true" /><text>{{playersExpanded?'收起':'查看'}}所有玩家身份轨迹</text></view><view class="replay-arrow {{playersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
+      <block wx:if="{{playersExpanded}}"><view class="replay-note replay-players-hint">按最终身份展示，点击查看完整轨迹</view><view class="replay-player-grid"><button wx:for="{{finalPlayers}}" wx:key="seat" class="replay-player {{item.isSelf?'is-self':''}}" data-seat="{{item.seat}}" bindtap="openPlayer" hover-class="ledger-pressed" aria-label="{{item.seat}}号{{item.name}}，最终{{item.roleLabel}}，{{item.alive?'在场':'已出局'}}，查看身份轨迹"><view class="replay-seat-name"><text>{{item.seat}}号</text><text>{{item.name}}</text><text wx:if="{{item.isSelf}}" class="replay-self-tag">我</text></view><image wx:if="{{item.rolePortrait}}" class="replay-player-portrait" src="{{item.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view wx:else class="replay-player-unknown" aria-hidden="true">?</view><view class="replay-player-role {{item.faction}}"><view class="replay-faction-dot is-{{item.faction}}" aria-hidden="true"></view><text>{{item.roleLabel}}</text></view><view class="replay-note">{{item.alive?'在场':'已出局'}}</view></button></view></block>
       <view class="replay-end">本局记录结束</view>
     </view>
   </block>
 </view>
-<view wx:if="{{playerDetail}}" class="replay-backdrop" catchtap="closePlayer" catchtouchmove="blockScroll"><view class="replay-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerDetail.seat}}号{{playerDetail.name}}身份轨迹"><view class="replay-sheet-heading"><text>{{playerDetail.seat}}号 · {{playerDetail.name}}</text><button bindtap="closePlayer" aria-label="关闭身份轨迹" hover-class="none">×</button></view><scroll-view class="replay-sheet-body" scroll-y enhanced show-scrollbar="{{false}}"><view class="replay-path"><view wx:for="{{playerDetail.steps}}" wx:key="id" class="replay-path-step"><view class="replay-note">{{item.label}}</view><view class="{{item.tone}}">{{item.text}}</view><view wx:if="{{item.detail}}" class="replay-note">{{item.detail}}</view></view></view></scroll-view></view></view>
+<template name="replayTrajectory">
+  <view class="replay-path"><view wx:for="{{steps}}" wx:key="id" class="replay-path-step">
+    <view class="replay-path-heading"><text class="replay-path-stage">{{item.stageLabel}}</text><text>{{item.actionLabel}}</text></view>
+    <view class="replay-path-content {{item.isAction?'is-action':''}}"><image wx:if="{{item.rolePortrait}}" class="replay-path-portrait" src="{{item.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view class="replay-path-copy"><view class="replay-path-text {{item.textTone || item.tone}}">{{item.text}}</view><view wx:if="{{item.contextLabel || item.statusLabel}}" class="replay-path-context"><image wx:if="{{item.isAction && item.contextLabel}}" src="/assets/record-info.svg" aria-hidden="true" /><text wx:if="{{item.contextLabel}}">{{item.contextLabel}}</text><text wx:if="{{item.statusLabel}}" class="replay-presence {{item.alive?'':'is-out'}}">{{item.statusLabel}}</text></view></view></view>
+  </view></view>
+</template>
+<view wx:if="{{playerDetail}}" class="replay-backdrop" catchtap="closePlayer" catchtouchmove="blockScroll"><view class="replay-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerDetail.seat}}号{{playerDetail.name}}身份轨迹">
+  <view class="replay-sheet-handle" aria-hidden="true"></view>
+  <view class="replay-sheet-heading"><view class="replay-sheet-identity"><view class="replay-sheet-name"><text>{{playerDetail.seat}}号 · {{playerDetail.name}}</text><text wx:if="{{playerDetail.isSelf}}" class="replay-sheet-self">我</text></view><view class="replay-note">身份轨迹</view></view><button bindtap="closePlayer" aria-label="关闭身份轨迹" hover-class="ledger-pressed">×</button></view>
+  <view class="replay-sheet-profile"><image wx:if="{{playerDetail.finalPlayer.rolePortrait}}" class="replay-sheet-portrait" src="{{playerDetail.finalPlayer.rolePortrait}}" mode="aspectFit" aria-hidden="true" /><view wx:else class="replay-sheet-portrait replay-final-unknown" aria-hidden="true">?</view><view class="replay-sheet-role-copy"><view class="replay-sheet-role {{playerDetail.finalPlayer.faction || 'unknown'}}">{{playerDetail.finalPlayer.roleLabel || '最终身份未记录'}}</view><view class="replay-note">{{playerDetail.finalPlayer?playerDetail.finalPlayer.factionLabel+'阵营 · 最终身份':'最终身份未记录'}}</view></view><text wx:if="{{playerDetail.finalPlayer}}" class="replay-presence {{playerDetail.finalPlayer.alive?'':'is-out'}}">{{playerDetail.finalPlayer.alive?'在场':'已出局'}}</text></view>
+  <scroll-view class="replay-sheet-body" scroll-y enhanced show-scrollbar="{{false}}"><template is="replayTrajectory" data="{{steps:playerDetail.steps}}" /></scroll-view>
+  <button class="primary replay-sheet-done" bindtap="closePlayer" hover-class="ledger-pressed">完成</button>
+</view></view>

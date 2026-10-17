@@ -20,6 +20,9 @@ const assets = {
   "/builtin-avatars.js": [null, "text/javascript; charset=utf-8"],
   "/public-history.js": ["../../miniprogram/public-history.js", "text/javascript; charset=utf-8"],
   "/room-swipe.js": ["../../miniprogram/room-swipe.js", "text/javascript; charset=utf-8"],
+  "/room-list.js": ["../../miniprogram/room-list.js", "text/javascript; charset=utf-8"],
+  "/room-list.css": ["../../miniprogram/room-list.wxss", "text/css; charset=utf-8"],
+  "/room-menu.css": ["../../miniprogram/room-menu.wxss", "text/css; charset=utf-8"],
   "/honors.js": ["../../miniprogram/honors.js", "text/javascript; charset=utf-8"],
   "/honors.css": ["../../miniprogram/honors.wxss", "text/css; charset=utf-8"],
   "/fun-copy.js": ["../../miniprogram/fun-copy.js", "text/javascript; charset=utf-8"],
@@ -34,6 +37,8 @@ const assets = {
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
+for (const name of ["home-table-blue", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+  assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const role of ["merlin", "percival", "assassin"])

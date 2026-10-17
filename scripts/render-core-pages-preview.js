@@ -9,6 +9,9 @@ const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures
 const { presentReplay, trajectory } = require("../miniprogram/replay");
 const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
+const roomSwipe = require("../miniprogram/room-swipe");
+const roomList = require("../miniprogram/room-list");
+const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
 const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
@@ -104,11 +107,32 @@ const room = (code, status, people, relation, activity, extra = {}) => ({ code, 
 const rooms = [room("201375", "lobby", "12/12 人已入座", "我是房主 · 1号", "今天 15:50"), room("534718", "lobby", "1/12 人已入座", "我是房主 · 1号", "10/13 14:53"), room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:33", { boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false })];
 const homeScenes = {
   home: {}, "home-empty": { memberRooms: [], visibleMemberRooms: [] }, "home-loading": { loading: true, memberRooms: [], visibleMemberRooms: [] },
-  "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -156 },
+  "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -roomSwipe.width(rooms[0]) },
+  "home-swipe-single": { roomSwipeCode: rooms[2].code, roomSwipeOffset: -roomSwipe.width(rooms[2]) },
   "home-menu": { roomMenu: rooms[0] }, "home-join": { entrySheet: true, entryMode: "join", name: "子龙", nicknameSetup: false },
+  "home-menu-ended": { roomMenu: { ...rooms[2], code: "672158", boardName: "阿瓦隆 · 十二骑士", canLeave: false } },
+  "home-menu-expired": { roomMenu: { ...rooms[2], available: false, statusLabel: "已失效", canLeave: false } },
+  "home-menu-busy": { roomMenu: rooms[0], busy: true },
+  "home-menu-long": { roomMenu: { ...rooms[0], boardName: "阿瓦隆 · 十二骑士与扩展角色配置测试，较长的牌桌名称完整显示" } },
   "home-keyboard": { entrySheet: true, entryMode: "join", entryKeyboardHeight: 320, entryFocusedField: "code", code: "2013", name: "子龙", nicknameSetup: false },
   "home-long": { memberRooms: [...rooms, ...rooms], visibleMemberRooms: [room("201375", "playing", "12/12 人已入座 · 3人准备", "房主：昵称较长的玩家名字测试 · 我在12号", "2026/10/16 15:50", { note: "这是一个用于检查窄屏长备注换行的牌桌记录", boardName: "阿瓦隆 · 十二骑士与扩展角色配置测试（12人）" })] },
 };
+const roomsNow = Date.now();
+const organizedRooms = [room("201375", "lobby", "6/12 人已入座", "我是房主 · 1号", "今天 12:30", { updatedAt: roomsNow }),
+  ...Array.from({ length: 5 }, (_, i) => room(String(273840 + i), "ended", "11 人", "房主：大V · 我在4号", i ? "昨天 21:24" : "今天 11:20", {
+    updatedAt: roomsNow - (i + 1) * 3600000, boardName: i ? "阿瓦隆 · 十二骑士" : "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false,
+  })),
+  room("534718", "ended", "12 人", "我是房主 · 1号", "10/11 23:29", { updatedAt: roomsNow - 6 * 86400000 }),
+  room("623811", "unavailable", "12 人", "房间已解散", "10/10 22:16", { updatedAt: roomsNow - 7 * 86400000, statusLabel: "已失效", entryLabel: "已失效", available: false, canSwipeDissolve: false }),
+];
+const organized = { memberRooms: organizedRooms, ...roomList.present(organizedRooms, "all", roomsNow) };
+homeScenes["home-room-organized"] = organized;
+homeScenes["home-room-history"] = { ...organized, historyExpanded: true };
+homeScenes["home-room-history-entering"] = { ...organized, historyExpanded: true, busy: true, hasPendingRequest: true, enteringCode: organizedRooms[1].code };
+homeScenes["home-room-history-refreshing"] = { ...organized, historyExpanded: true, roomsRefreshing: true };
+homeScenes["home-room-unavailable"] = { ...organized, unavailableExpanded: true };
+homeScenes["home-history-only"] = { memberRooms: [organizedRooms[6]], ...roomList.present([organizedRooms[6]], "all", roomsNow) };
+homeScenes["home-unavailable-only"] = { memberRooms: [organizedRooms[7]], ...roomList.present([organizedRooms[7]], "all", roomsNow) };
 function entryScene(capacity, boardId, extra = {}) {
   const page = createTable({ lobby: true });
   page.data = { ...page.data, boards: BOARDS };
@@ -132,7 +156,7 @@ Object.assign(homeScenes, {
 });
 for (const [name, data] of Object.entries(homeScenes)) {
   const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...data };
-  const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, entrySheetVisible: lobby.entrySheet, list: [
+  const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, ...tabBarVisibility({ data: { lobby } }, 0), list: [
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
     { pagePath: "pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },
   ] }));
