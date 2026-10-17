@@ -21,6 +21,7 @@
     return {
       visibleMemberRooms: [...current, ...visibleRecent],
       currentRoomCount: current.length + visibleRecent.length,
+      recentRoomCount: visibleRecent.length,
       historyRooms: ended.filter(r => !recentCodes.has(r.code)),
       unavailableRooms: unavailable,
       showHistorySection: showEnded,

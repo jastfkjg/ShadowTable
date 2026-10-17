@@ -133,6 +133,17 @@ homeScenes["home-room-history-refreshing"] = { ...organized, historyExpanded: tr
 homeScenes["home-room-unavailable"] = { ...organized, unavailableExpanded: true };
 homeScenes["home-history-only"] = { memberRooms: [organizedRooms[6]], ...roomList.present([organizedRooms[6]], "all", roomsNow) };
 homeScenes["home-unavailable-only"] = { memberRooms: [organizedRooms[7]], ...roomList.present([organizedRooms[7]], "all", roomsNow) };
+const redesignRooms = [room("201375", "ended", "12 人", "我是房主 · 1号", "昨天 21:24", { updatedAt: roomsNow - 86400000, entryLabel: "查看结果" }),
+  room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:29", { updatedAt: roomsNow - 6 * 86400000, entryLabel: "查看结果", boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false }),
+  room("534718", "unavailable", "12 人", "房间已解散", "11:55", { updatedAt: roomsNow - 7 * 86400000, statusLabel: "已失效", entryLabel: "已失效", available: false, canSwipeDissolve: false })];
+const redesign = { memberRooms: redesignRooms, ...roomList.present(redesignRooms, "all", roomsNow), historyExpanded: true };
+homeScenes["home-room-redesign"] = redesign;
+homeScenes["home-room-redesign-collapsed"] = { ...redesign, historyExpanded: false };
+homeScenes["home-room-redesign-expanded"] = { ...redesign, unavailableExpanded: true };
+homeScenes["home-room-redesign-refreshing"] = { ...redesign, unavailableExpanded: true, roomsRefreshing: true };
+homeScenes["home-room-redesign-swipe"] = { ...redesign, roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
+homeScenes["home-room-redesign-swipe-expired"] = { ...redesign, unavailableExpanded: true, roomSwipeCode: redesignRooms[2].code, roomSwipeOffset: -roomSwipe.width() };
+homeScenes["home-room-redesign-swipe-host"] = { ...redesign, historyRooms: [{ ...redesignRooms[1], isHost: true, canSwipeDissolve: true }], roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
 function entryScene(capacity, boardId, extra = {}) {
   const page = createTable({ lobby: true });
   page.data = { ...page.data, boards: BOARDS };

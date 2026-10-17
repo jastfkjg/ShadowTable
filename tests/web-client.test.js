@@ -98,11 +98,31 @@ test('网页最近结束上限、历史折叠与失效清理入口在筛选和�
     {code:'444444',status:'unavailable',available:false}];
   const c=client(async()=>response({rooms,serverTime:now}));c.state.loading=false;await c.loadRooms();
   let html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,4);
-  assert.match(html,/历史牌桌/);assert.match(html,/清理失效/);assert.doesNotMatch(html,/&lt;span/);
+  assert.match(html,/历史牌桌/);assert.doesNotMatch(html,/data-action="cleanupUnavailableRooms"|&lt;span/);
+  assert.match(html, /3 桌 · 近 3 天/);
   assert.doesNotMatch(html,/data-room-swipe="333333"|data-room-swipe="444444"/);
   c.ACTIONS.toggleRoomHistory(); html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,7);
   c.ACTIONS.toggleUnavailableRooms();html=c.viewEntry();assert.match(html,/data-room-swipe="444444"/);
+  assert.match(html, /id="room-unavailable-list"[\s\S]*data-action="cleanupUnavailableRooms"/);
+  assert.match(html, /清理 1 条/);assert.match(html, /战绩与复盘保留/);
+  assert.doesNotMatch(html.split('<div id="room-unavailable-list">')[1], /data-action="openRoom"/);
+  c.ACTIONS.toggleUnavailableRooms();assert.doesNotMatch(c.viewEntry(), /data-action="cleanupUnavailableRooms"/);
+  c.ACTIONS.filterRooms({dataset:{filter:'unavailable'}});html=c.viewEntry();
+  assert.match(html, /data-action="cleanupUnavailableRooms"/);assert.doesNotMatch(html,/历史牌桌/);
   c.ACTIONS.filterRooms({dataset:{filter:'lobby'}});html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,1);assert.doesNotMatch(html,/历史牌桌/);
+});
+test('网页牌桌复制只复制所选房间号，失效记录仍可复制且不触发进入请求', async () => {
+  const copied = [], writes = [];
+  const c = client(async (...args) => { writes.push(args); return response({}); }, new Map(), undefined,
+    { navigator: { clipboard: { writeText: async text => copied.push(text) } } });
+  try {
+    c.state.memberRooms = [{ code: '201375', available: true }, { code: '534718', available: false }];
+    await c.ACTIONS.copyListedRoom({ dataset: { code: '201375' } });
+    await c.ACTIONS.copyListedRoom({ dataset: { code: '534718' } });
+    await c.ACTIONS.copyListedRoom({ dataset: { code: '000000' } });
+    assert.deepEqual(copied, ['201375', '534718']);
+    assert.equal(writes.length, 0);
+  } finally { c.stop(); }
 });
 test('网页批量清理支持取消、后台保护和原请求重试，完成后同步清理数量', async () => {
   for(const mode of ['cancel','background','confirm','retry']) {

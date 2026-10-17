@@ -37,7 +37,7 @@ const assets = {
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-table-blue", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+for (const name of ["home-table-blue", "home-refresh", "home-clock", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];

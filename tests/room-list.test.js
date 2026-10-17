@@ -14,6 +14,7 @@ test("已结束牌桌以全房活动排序，最近最多三桌，其余完整�
   assert.deepEqual(result.historyRooms.map(r => r.code), ["444444", "777777"]);
   assert.deepEqual(result.unavailableRooms.map(r => r.code), ["888888"]);
   assert.equal(result.currentRoomCount, 5);
+  assert.equal(result.recentRoomCount, 3);
   assert.equal(new Set([...result.visibleMemberRooms, ...result.historyRooms, ...result.unavailableRooms].map(r => r.code)).size, rooms.length);
   assert.equal(rooms.some(r => r.sectionLabel), false);
 });
@@ -33,6 +34,7 @@ test("筛选不打破最近三桌上限，历史和失效独立于当前牌桌",
   const playing = present(rooms, "playing", now);
   assert.deepEqual(playing.visibleMemberRooms.map(r => r.code), ["111111"]);
   assert.equal(playing.showHistorySection, false); assert.equal(playing.showUnavailableSection, false);
+  assert.equal(playing.recentRoomCount, 0);
   const unavailable = present(rooms, "unavailable", now);
   assert.equal(unavailable.visibleMemberRooms.length, 0); assert.equal(unavailable.showHistorySection, false);
   assert.equal(unavailable.showUnavailableSection, true);
