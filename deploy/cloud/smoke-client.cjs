@@ -40,10 +40,10 @@ async function main() {
     const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
     if (!assets.size) throw new Error("Web entry has no assets");
     // These images are referenced by rendered views rather than the HTML shell.
-    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg",
+    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg",
       ...["home-table-blue", "home-refresh", "home-clock", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
       ...["info", "heart", "sword", "swords", "shield", "spark", "medal", "users"].map(name => "/assets/record-" + name + ".svg"),
-      ...["merlin", "percival", "assassin"].map(name => "/assets/roles/" + name + ".png"),
+      ...["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"].map(name => "/assets/roles/" + name + ".png"),
       ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {
       const url = new URL(asset, origin);
@@ -58,6 +58,12 @@ async function main() {
       body: "{}",
     }));
     if (!/^[a-f0-9]{64}$/.test(data.token)) throw new Error("Guest login returned an invalid token");
+    const auth = { Authorization: "Bearer " + data.token };
+    const wallet = JSON.parse(await request("/api/me/avoidance", { headers: auth }));
+    if (wallet.balance !== 0 || wallet.history.length !== 0) throw new Error("New accounts must start without avoidance cards or automatic grants");
+    const room = JSON.parse(await request("/api/rooms", { method: "POST", headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": require("node:crypto").randomUUID() }, body: JSON.stringify({ name: "容器验收", board: "classic", capacity: 6 }) }));
+    const choices = JSON.parse(await request("/api/rooms/" + room.code + "/avoidance", { headers: auth }));
+    if (choices.balance !== 0 || choices.selected !== null || !choices.editable || !choices.options.length || choices.options.some(o => !o.portrait)) throw new Error("Avoidance choices are unavailable in the image");
     const artwork = await request("/assets/monthly-report-background.jpg");
     if (Buffer.from(artwork, "utf8").length < 1000) throw new Error("Monthly artwork was not packaged");
     const report = JSON.parse(await request("/api/monthly-report", { headers: { Authorization: "Bearer " + data.token } }));
@@ -73,6 +79,8 @@ async function main() {
     const token = fs.readFileSync(sessionFile, "utf8");
     const data = JSON.parse(await request("/api/me/rooms", { headers: { Authorization: "Bearer " + token } }));
     if (!Array.isArray(data.rooms)) throw new Error("Session did not survive restart");
+    const wallet = JSON.parse(await request("/api/me/avoidance", { headers: { Authorization: "Bearer " + token } }));
+    if (wallet.balance !== 0 || wallet.history.length !== 0) throw new Error("Restart must not grant avoidance cards");
   } else {
     throw new Error("Usage: smoke-client.cjs login|resume");
   }
