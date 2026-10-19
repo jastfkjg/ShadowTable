@@ -2489,15 +2489,15 @@ function roomListItems(rooms) {
     const isWallet = !!state.avoidanceWalletOpen, value = isWallet ? state.avoidanceWallet : state.avoidance;
     let body = '', footer = '';
     if (isWallet) {
-      body = '<div class="avoidance-wallet-total"><span>可用回避卡</span><div>' + (value?.balance || 0) + '<span> 张</span></div></div><div class="avoidance-note">每个账号赠送 1 张，也可获得管理员额外发放。入座后，在准备前选择本局想避开的一个角色，生效才扣卡。中途换牌不受影响。</div>';
+      body = '<div class="avoidance-wallet-total"><span>可用回避卡</span><div>' + (value?.balance || 0) + '<span> 张</span></div></div><div class="avoidance-note">回避卡由管理员发放。入座后，在准备前选择本局想避开的一个角色，生效才扣卡。中途换牌不受影响。</div>';
       if (state.avoidanceWalletError) body += '<div role="alert" class="avoidance-note">' + esc(state.avoidanceWalletError) + btn('text-button','openAvoidanceWallet','重新读取') + '</div>';
       if (state.avoidanceWalletLoading) body += '<div class="avoidance-note" role="status">正在同步记录…</div>';
-      body += '<div class="avoidance-history-title">最近记录</div>' + (value?.history || []).map(row => '<div class="avoidance-ledger"><div><div>' + esc(row.label) + '</div><span>' + esc(row.dateLabel) + '</span>' + (row.source === 'admin' ? '<span class="avoidance-ledger-note">' + esc(row.note) + '</span>' : '') + '</div><div class="avoidance-ledger-amount' + (row.delta > 0 ? ' is-gain' : '') + '">' + row.amountLabel + '<span>余 ' + row.balance + ' 张</span></div></div>').join('');
+      body += '<div class="avoidance-history-title">最近记录</div>' + (!state.avoidanceWalletLoading && !state.avoidanceWalletError && !value?.history?.length ? '<div class="avoidance-footnote">暂无记录，收到管理员发放后会显示在这里。</div>' : '') + (value?.history || []).map(row => '<div class="avoidance-ledger"><div><div>' + esc(row.label) + '</div><span>' + esc(row.dateLabel) + '</span>' + (row.source === 'admin' ? '<span class="avoidance-ledger-note">' + esc(row.note) + '</span>' : '') + '</div><div class="avoidance-ledger-amount' + (row.delta > 0 ? ' is-gain' : '') + '">' + row.amountLabel + '<span>余 ' + row.balance + ' 张</span></div></div>').join('');
       footer = btn('primary','closeAvoidance','知道了');
     } else if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
     else {
       const locked = !value?.editable || value.balance < 1 || state.busy || !!pending;
-      body = '<div class="avoidance-note">' + (!value.editable ? '已准备，取消准备后可修改。' : value.balance < 1 ? '暂无回避卡，可在「我的」查看获得记录。' : '每局选一个角色，发牌生效后才扣 1 张。') + '</div>';
+      body = '<div class="avoidance-note">' + (!value.editable ? '已准备，取消准备后可修改。' : value.balance < 1 ? '暂无回避卡，可由管理员发放。' : '每局选一个角色，发牌生效后才扣 1 张。') + '</div>';
       body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
       body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。仅影响初始发牌，中途换牌不受影响。</div>';
       footer = value.editable && value.balance > 0 ? btn('primary','saveAvoidance','确认回避「' + (state.avoidanceDraftName || '选择角色') + '」',null,!state.avoidanceDraft || locked || !state.network) : btn('primary','closeAvoidance','知道了');

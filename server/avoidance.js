@@ -19,9 +19,7 @@ function initialize(store) {
 }
 function ensureAccount(store, uid) {
   const insert = () => {
-    const added = store.db.prepare("INSERT OR IGNORE INTO avoidance_accounts VALUES(?,1)").run(uid);
-    if (added.changes) store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
-      .run(randomUUID(), uid, 1, 1, "welcome", "账号赠送", null, store.clock());
+    store.db.prepare("INSERT OR IGNORE INTO avoidance_accounts VALUES(?,0)").run(uid);
   };
   if (store.db.prepare("SELECT 1 FROM avoidance_accounts WHERE uid=?").get(uid)) return;
   if (store.inTransaction) insert(); else store.transaction(insert);

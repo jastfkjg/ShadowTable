@@ -47,19 +47,28 @@ async function setup(t) {
   const ready = async (path, tokens) => { for (const token of tokens) assert.equal((await cmd(path, token, "ready", { ready: true })).status, 200); };
   return { ...app, request, login, admin, room, cmd, ready, adminLogin: () => request("/api/admin/login", null, { key }, undefined, true) };
 }
-const tokensFor = (a, prefix = "player") => Promise.all(Array.from({ length: 6 }, (_, i) => a.login(prefix + i)));
+const tokensFor = async (a, prefix = "player", funded = true) => {
+  const tokens = await Promise.all(Array.from({ length: 6 }, (_, i) => a.login(prefix + i)));
+  if (funded) a.store.transaction(() => avoidance.grant(a.store, { scope: "all", expectedCount: 6, amount: 1, reason: "测试预置回避卡" }));
+  return tokens;
+};
 
-test("每账号仅赠1张，重登、服务重启和重复初始化不重新赠送", () => {
+test("账号初始0张且无赠送流水，重登及重启不赠卡也不改管理员发放余额", () => {
   const directory = mkdtempSync(join(tmpdir(), "shadowtable-avoidance-")), file = join(directory, "test.sqlite");
   let store;
   try {
     store = new Store(file); store.addSession("token1", "wx:one");
-    assert.equal(avoidance.balance(store, "wx:one"), 1);
-    store.db.prepare("UPDATE avoidance_accounts SET balance=0 WHERE uid=?").run("wx:one");
-    store.addSession("token2", "wx:one"); store.close(); store = new Store(file);
     assert.equal(avoidance.balance(store, "wx:one"), 0);
-    assert.equal(avoidance.wallet(store, "wx:one").history.filter(h => h.source === "welcome").length, 1);
-    assert.equal(avoidance.balance(store, "guest:new"), 1);
+    assert.deepEqual(avoidance.wallet(store, "wx:one").history, []);
+    store.transaction(() => avoidance.grant(store, { scope: "player", uid: "wx:one", amount: 2, reason: "管理员赠送" }));
+    store.addSession("token2", "wx:one"); store.close(); store = new Store(file);
+    assert.equal(avoidance.balance(store, "wx:one"), 2);
+    assert.equal(avoidance.wallet(store, "wx:one").history.filter(h => h.source === "admin").length, 1);
+    assert.equal(avoidance.wallet(store, "wx:one").history.filter(h => h.source === "welcome").length, 0);
+    for (const uid of ["guest:new", "dev:new", "test:new"]) {
+      assert.equal(avoidance.balance(store, uid), 0);
+      assert.deepEqual(avoidance.wallet(store, uid).history, []);
+    }
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 test("最优随机发牌保留重复牌，能满足时全部满足，无法满足时最少失败", () => {
@@ -146,7 +155,7 @@ test("发牌保存失败时余额、发牌及回执一起回滚，原编号可�
   assert.equal((await a.request("/api/me/avoidance", tokens[0])).data.balance, 0);
 });
 test("管理员定向及全员发放有权限校验、人数确认、审计与幂等，玩家不能伪造发放", async t => {
-  const a = await setup(t), tokens = await tokensFor(a);
+  const a = await setup(t), tokens = await tokensFor(a, "player", false);
   assert.equal((await a.admin()).status, 401);
   assert.equal((await a.request("/api/admin/avoidance", tokens[0], null, undefined, true)).status, 401);
   await a.adminLogin();
@@ -154,7 +163,7 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
   const uid = page.players[0].uid, id = randomUUID(), input = { scope: "player", uid, amount: 3, reason: "活动赠送", requestId: id };
   const first = await a.admin(input); assert.equal(first.status, 200);
   assert.deepEqual((await a.admin(input)).data, first.data);
-  assert.equal(avoidance.balance(a.store, uid), 4);
+  assert.equal(avoidance.balance(a.store, uid), 3);
   assert.equal((await a.admin({ ...input, amount: 4 })).status, 409);
   assert.equal((await a.admin({ ...input, amount: 0, requestId: randomUUID() })).status, 400);
   assert.equal((await a.admin({ scope: "all", amount: 2, reason: "全员福利", expectedCount: 5, requestId: randomUUID() })).status, 409);
@@ -162,11 +171,22 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
   const all = { scope: "all", amount: 2, reason: "全员福利", expectedCount: 6, requestId: randomUUID() };
   assert.equal((await a.admin(all)).data.recipients, 6);
   assert.equal((await a.admin(all)).data.recipients, 6);
-  for (const p of page.players) assert.equal(avoidance.balance(a.store, p.uid), p.uid === uid ? 6 : 3);
-  assert.equal(avoidance.balance(a.store, "test:room:actor"), 1);
+  for (const p of page.players) assert.equal(avoidance.balance(a.store, p.uid), p.uid === uid ? 5 : 2);
+  assert.equal(avoidance.balance(a.store, "test:room:actor"), 0);
   assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='grant-avoidance'").get().n, 2);
   const raw = (await a.request("/api/me/avoidance", tokens[0])).data;
   assert.ok(raw.history.some(h => h.note === "全员福利"));
+});
+test("0张账号不能回避但可正常准备发牌，登录和建房不会自动获得卡", async t => {
+  const a = await setup(t), tokens = await tokensFor(a, "empty", false), path = await a.room(tokens);
+  assert.equal((await a.cmd(path, tokens[0], "avoidance", { role: "merlin" })).status, 400);
+  await a.ready(path, tokens);
+  assert.equal((await a.cmd(path, tokens[0], "start", { flexible: true })).status, 200);
+  for (const token of tokens) {
+    const value = (await a.request("/api/me/avoidance", token)).data;
+    assert.equal(value.balance, 0); assert.deepEqual(value.history, []);
+    assert.equal((await a.request(path + "/private", token)).data.avoidance, null);
+  }
 });
 test("站起、移出和修改板子清除回避；所有板子仅提供初始牌", () => {
   for (const b of engine.BOARDS.filter(b => b.available)) for (const capacity of b.counts) {
