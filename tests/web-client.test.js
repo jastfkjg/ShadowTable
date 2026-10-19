@@ -33,11 +33,12 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
+  context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
     window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches,
+      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
@@ -2139,4 +2140,23 @@ test('网页徽章管理按需显示摘下，详情精简说明且保留获取�
   assert.match(detail,/获取条件/);assert.match(detail,/持有规则/);
   assert.doesNotMatch(detail,/按北京时间本月|摘下后仍保留/);
   assert.match(detail,/secondary badge-detail-action/);
+});
+
+test('网页版回避卡单选、确认、只读和私密结果遮盖，与小程序规则一致', async () => {
+  const value = { code: '123456', stage: 1, phase: 'lobby', balance: 1, selected: null, editable: true,
+    options: [{ id: 'merlin', name: '梅林', faction: 'good', count: 1, portrait: '/assets/roles/merlin.png' }] };
+  const c = client(async () => response(value)); c.state.page = 'table';
+  c.state.room = { code: '123456', stage: 1, phase: 'lobby', me: { seat: 1, avoidance: { balance: 1 } } };
+  try {
+    await c.ACTIONS.openAvoidance(); assert.equal(c.state.avoidanceOpen, true);
+    c.ACTIONS.chooseAvoidance({ dataset: { id: 'merlin' } });
+    assert.equal(c.state.avoidanceDraft, 'merlin');
+    assert.match(c.viewAvoidance(), /aria-pressed="true"/); assert.match(c.viewAvoidance(), /确认回避「梅林」/);
+    c.ACTIONS.closeAvoidance(); assert.equal(c.state.avoidance, null); assert.equal(c.state.avoidanceDraft, '');
+    c.state.dealtIdentityDialog = true; c.state.dealtIdentitySecret = null;
+    assert.doesNotMatch(c.viewDealtIdentity(), /已回避/);
+    c.state.dealtIdentitySecret = { role: '忠臣', faction: '好人', factionTone: 'good', information: '没有视野', avoidance: { roleName: '梅林', status: 'effective' } };
+    assert.match(c.viewDealtIdentity(), /已回避「梅林」/);
+    c.ACTIONS.closeDealtIdentity(); assert.equal(c.state.dealtIdentitySecret, null);
+  } finally { c.stop(); }
 });

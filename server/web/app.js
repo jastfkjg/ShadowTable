@@ -13,6 +13,7 @@
   const roomSwipe = window.shadowtableRoomSwipe;
   const roomList = window.shadowtableRoomList;
   const boardDetailPresentation = window.shadowtableBoardDetail;
+  const avoidancePresentation = window.shadowtableAvoidance;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -794,6 +795,11 @@
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
         profileDraft: draft, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
       } : {}) });
+      if (!edit && foreground && state.page === 'me' && profile.avoidance) {
+        const notice = avoidancePresentation.grantNotice(profile.avoidance, safeParse(storage.get('avoidanceGrantNotices')));
+        if (notice.message) toast(notice.message);
+        storage.set('avoidanceGrantNotices', JSON.stringify(notice.seen));
+      }
     } catch (e) {
       if (sequence !== profileSequence || route !== routeSequence) return;
       setState({ profileError: e.message });
@@ -872,7 +878,7 @@
     return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
   }
   function viewNavigation() {
-    if (!['lobby','me'].includes(state.page)) return '';
+    if (!['lobby','me'].includes(state.page) || state.avoidanceWalletOpen) return '';
     return '<nav class="bottom-navigation" aria-label="主导航">' + [['lobby','对局','table'],['me','我的','me']].map(function (item) {
       return '<button type="button" data-action="navigate" data-page="' + item[0] + '" class="nav-destination ' + (state.page === item[0] ? 'active' : '') + '"' + (state.page === item[0] ? ' aria-current="page"' : '') + '>' + navIcon(item[2]) + '<span>' + item[1] + '</span></button>';
     }).join('') + '</nav>';
@@ -921,7 +927,7 @@
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     html += '</section>' + viewScoreOverview(stats?.score) + '</div>';
     const link = (page, title, note, icon) => '<button class="personal-link" type="button" data-action="navigate" data-page="'+page+'"><span class="me-icon me-icon-'+icon+'" aria-hidden="true"></span><span class="me-link-copy"><span>'+title+'</span>'+(note?'<span class="small muted link-note">'+esc(note)+'</span>':'')+'</span><span aria-hidden="true">›</span></button>';
-    html += '<div class="personal-links me-links-primary">' + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('badges','荣誉徽章','','medal') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
+    html += '<div class="personal-links me-links-primary">' + (profile.avoidance ? btn('personal-link','openAvoidanceWallet','回避卡 · ' + profile.avoidance.balance + ' 张 ›') : '') + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('badges','荣誉徽章','','medal') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
     return html;
   }
   let badgeManagerSequence = 0;
@@ -1299,6 +1305,7 @@
     generation++;
     actionGeneration++;
     setState({
+      avoidanceOpen: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "", avoidanceWalletOpen: false, avoidanceWallet: null,
       dealtIdentityDialog: false,
       dealtIdentitySecret: null,
       identityHintVisible: false,
@@ -1579,6 +1586,11 @@ function roomListItems(rooms) {
       patch.identityChange = null;
       patch.identityChangeRevealed = false;
       patch.dealtIdentityDialog = false;
+      patch.avoidanceOpen = false;
+      patch.avoidance = null;
+      patch.avoidanceGroups = [];
+      patch.avoidanceDraft = "";
+      patch.avoidanceDraftName = "";
       patch.dealtIdentitySecret = null;
       patch.identityHintVisible = false;
       patch.revealed = false;
@@ -1839,6 +1851,7 @@ function roomListItems(rooms) {
       } else {
         setState({ notice: "" });
         await refresh();
+        if (p.data.type === 'avoidance') toast(p.data.role === null ? '本局不使用回避卡' : '本局回避已保存，生效后才扣卡');
       }
     } catch (e) {
       if (e.status && e.status < 500 && e.status !== 401 && e.status !== 429) {
@@ -2438,6 +2451,60 @@ function roomListItems(rooms) {
     const selected = state.selected.includes(seatNum) ? state.selected.filter(n => n !== seatNum) : [...state.selected, seatNum];
     setState({ selected, seats: state.seats.map(s => ({ ...s, selected: selected.includes(s.seat) })) });
   }
+  function viewAvoidanceResult(raw) {
+    if (!raw) return "";
+    const value = avoidancePresentation.result(raw);
+    return '<div class="avoidance-result' + (value.effective ? ' is-effective' : '') + '"><div>' + esc(value.title) + '</div><span>' + esc(value.detail) + '</span></div>';
+  }
+  async function openAvoidance() {
+    const room = state.room;
+    if (!room || room.phase !== 'lobby' || room.me.seat === null || state.busy || pending || !state.network) return;
+    mask(); const gen = generation;
+    setState({ avoidanceOpen: true, avoidanceLoading: true, avoidance: { balance: room.me.avoidance?.balance || 0 } });
+    try {
+      const value = await request('/api/rooms/' + room.code + '/avoidance');
+      if (!alive || !foreground || gen !== generation || !state.avoidanceOpen || state.room?.code !== value.code || state.room.stage !== value.stage || value.phase !== 'lobby') return;
+      setState({ avoidance: value, avoidanceLoading: false, avoidanceDraft: value.selected || '', avoidanceDraftName: value.options.find(o => o.id === value.selected)?.name || '', avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) });
+      app.querySelector('.avoidance-close')?.focus({ preventScroll: true });
+    } catch (error) { if (gen === generation && foreground) { closeAvoidance(); handleError(error); } }
+  }
+  function closeAvoidance() {
+    generation++;
+    setState({ avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: '', avoidanceDraftName: '', avoidanceWalletOpen: false, avoidanceWallet: null });
+    app.querySelector('[data-action="' + (state.page === 'me' ? 'openAvoidanceWallet' : 'openAvoidance') + '"]')?.focus({ preventScroll: true });
+  }
+  async function openAvoidanceWallet() {
+    if (state.page !== 'me' || !foreground) return;
+    const gen = ++generation;
+    setState({ avoidanceWalletOpen: true, avoidanceWalletLoading: true, avoidanceWalletError: '', avoidanceWallet: avoidancePresentation.wallet(state.profile?.avoidance || { balance: 0 }) });
+    try {
+      const value = await request('/api/me/avoidance');
+      if (!alive || !foreground || gen !== generation || !state.avoidanceWalletOpen || state.page !== 'me') return;
+      setState({ avoidanceWallet: avoidancePresentation.wallet(value), profile: { ...state.profile, avoidance: value } });
+    } catch (error) { if (gen === generation && foreground) setState({ avoidanceWalletError: error.message }); }
+    finally { if (gen === generation && foreground) { setState({ avoidanceWalletLoading: false }); app.querySelector('.avoidance-close')?.focus({ preventScroll: true }); } }
+  }
+  function viewAvoidance() {
+    if ((!state.avoidanceOpen && !state.avoidanceWalletOpen) || state.error || !modal.hidden) return '';
+    const isWallet = !!state.avoidanceWalletOpen, value = isWallet ? state.avoidanceWallet : state.avoidance;
+    let body = '', footer = '';
+    if (isWallet) {
+      body = '<div class="avoidance-wallet-total"><span>可用回避卡</span><div>' + (value?.balance || 0) + '<span> 张</span></div></div><div class="avoidance-note">每个账号赠送 1 张，也可获得管理员额外发放。入座后，在准备前选择本局想避开的一个角色，生效才扣卡。中途换牌不受影响。</div>';
+      if (state.avoidanceWalletError) body += '<div role="alert" class="avoidance-note">' + esc(state.avoidanceWalletError) + btn('text-button','openAvoidanceWallet','重新读取') + '</div>';
+      if (state.avoidanceWalletLoading) body += '<div class="avoidance-note" role="status">正在同步记录…</div>';
+      body += '<div class="avoidance-history-title">最近记录</div>' + (value?.history || []).map(row => '<div class="avoidance-ledger"><div><div>' + esc(row.label) + '</div><span>' + esc(row.dateLabel) + '</span>' + (row.source === 'admin' ? '<span class="avoidance-ledger-note">' + esc(row.note) + '</span>' : '') + '</div><div class="avoidance-ledger-amount' + (row.delta > 0 ? ' is-gain' : '') + '">' + row.amountLabel + '<span>余 ' + row.balance + ' 张</span></div></div>').join('');
+      footer = btn('primary','closeAvoidance','知道了');
+    } else if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
+    else {
+      const locked = !value?.editable || value.balance < 1 || state.busy || !!pending;
+      body = '<div class="avoidance-note">' + (!value.editable ? '已准备，取消准备后可修改。' : value.balance < 1 ? '暂无回避卡，可在「我的」查看获得记录。' : '每局选一个角色，发牌生效后才扣 1 张。') + '</div>';
+      body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
+      body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。仅影响初始发牌，中途换牌不受影响。</div>';
+      footer = value.editable && value.balance > 0 ? btn('primary','saveAvoidance','确认回避「' + (state.avoidanceDraftName || '选择角色') + '」',null,!state.avoidanceDraft || locked || !state.network) : btn('primary','closeAvoidance','知道了');
+      if (value.editable && value.selected) footer += btn('text-button','cancelAvoidance','本局不使用',null,state.busy || !!pending || !state.network);
+    }
+    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-icon"><img src="/assets/table-cards.svg" alt="" /></div><div class="avoidance-heading-copy"><div id="avoidance-title">' + (isWallet ? '我的回避卡' : '这局想避开哪个角色？') + '</div><span>' + (isWallet ? '仅你可见 · 跟随账号保存' : '回避卡 ×' + (value?.balance || 0) + ' · 仅你可见') + '</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭回避卡">×</button></div></div><div class="avoidance-body"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
+  }
   function ready() {
     cmd("ready", { ready: !state.room.me.ready });
   }
@@ -2517,6 +2584,7 @@ function roomListItems(rooms) {
       setState({ dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         information: secret.information, skillStatus: secret.skillStatus,
+        avoidance: secret.avoidance,
       } });
       var close = app.querySelector && app.querySelector('.dealt-identity-dialog [data-action="closeDealtIdentity"]');
       if (close) close.focus({ preventScroll: true });
@@ -2741,6 +2809,7 @@ function roomListItems(rooms) {
             factionTone: factionTone(secret.faction),
             information: secret.information,
             skillStatus: secret.skillStatus,
+            avoidance: secret.avoidance,
           },
         });
       }
@@ -3446,7 +3515,7 @@ function roomListItems(rooms) {
     var secret = state.dealtIdentitySecret;
     return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
       '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="small muted identity-privacy-note">仅供本人查看</div>' +
-      (secret ? '<div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
+      (secret ? viewAvoidanceResult(secret.avoidance) + '<div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
         '</div><div class="private-info"><div class="label">你的视野</div>' + esc(secret.information) + '</div>' +
         (secret.skillStatus ? '<div class="private-info"><div class="label">技能状态 · ' + esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>' : '') +
         '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' +
@@ -3627,7 +3696,7 @@ function roomListItems(rooms) {
           esc(s.faction) +
           '</div><div class="private-info"><div class="label">你的视角</div>' +
           esc(s.information) +
-          "</div>" + viewSkillStatus(s) + "</div>";
+          "</div>" + viewAvoidanceResult(s.avoidance) + viewSkillStatus(s) + "</div>";
       }
       html +=
         btn(
@@ -3957,7 +4026,7 @@ function roomListItems(rooms) {
     if (r.phase !== "lobby" && r.me.seat !== null) {
       if (state.revealed && state.secret)
         html +=
-          '<div class="identity open">' +
+          '<div class="identity open">' + viewAvoidanceResult(state.secret.avoidance) +
           (state.secret.identityHistory?.length > 1 ? '<div class="identity-card-topline"><span class="small muted">当前身份</span><button type="button" class="identity-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button></div>' : '') +
           '<div class="identity-title faction-' +
           (state.secret.factionTone || "") +
@@ -4028,6 +4097,7 @@ function roomListItems(rooms) {
         '<div class="panel"><span class="muted small">' +
         esc(state.startHint) +
         "</span>" +
+        (r.me.seat !== null && r.me.avoidance ? btn("secondary web-avoidance-entry", "openAvoidance", "回避卡 ×" + r.me.avoidance.balance + (r.me.avoidance.selected ? " · 已选择" : ""), null, state.busy || !!pending || !state.network) : "") +
         (r.me.seat !== null ? btn("primary", "ready", r.me.ready ? "取消准备" : "我准备好了", null, state.busy) : "") +
         (r.me.isHost
           ? btn("secondary", "start", "发放身份", null, state.busy || !state.network || !state.canStart)
@@ -4617,10 +4687,11 @@ function roomListItems(rooms) {
       viewFairyResult() +
       viewIdentityChange() +
       viewDealtIdentity() +
+      viewAvoidance() +
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.avoidanceOpen || state.avoidanceWalletOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
       (['profile', 'badges'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4874,6 +4945,15 @@ function roomListItems(rooms) {
       seat(Number(el.dataset.seat));
     },
     ready: ready,
+    openAvoidance, closeAvoidance, openAvoidanceWallet,
+    chooseAvoidance: function (el) {
+      const value = state.avoidance, id = el.dataset.id;
+      if (!value?.editable || value.balance < 1 || state.busy || pending) return;
+      const option = value.options.find(o => o.id === id); if (!option) return;
+      setState({ avoidanceDraft: id, avoidanceDraftName: option.name, avoidanceGroups: avoidancePresentation.groups(value.options, id) });
+    },
+    saveAvoidance: function () { if (state.avoidance?.editable && state.avoidanceDraft && !state.avoidanceLoading) cmd('avoidance', { role: state.avoidanceDraft }); },
+    cancelAvoidance: function () { if (state.avoidance?.editable) cmd('avoidance', { role: null }); },
     start: function () {
       confirmCommand(
         "开始这一局？",
@@ -5159,6 +5239,16 @@ function roomListItems(rooms) {
   });
 
   // ===== lifecycle =====
+  app.addEventListener('click', function (event) { if (event.target.hasAttribute?.('data-avoidance-backdrop')) closeAvoidance(); });
+  document.addEventListener('keydown', function (event) {
+    if (!(state.avoidanceOpen || state.avoidanceWalletOpen) || state.error || !modal.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeAvoidance(); return; }
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(app.querySelectorAll('.avoidance-sheet button:not(:disabled)'));
+    if (!controls.length) return;
+    event.preventDefault(); const index = controls.indexOf(document.activeElement);
+    controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus({ preventScroll: true });
+  });
   app.addEventListener('pointerdown', startRoomSwipe);
   document.addEventListener('pointerdown', function (event) {
     if (state.roomSwipeCode && !event.target.closest('[data-room-swipe]')) closeRoomSwipe();

@@ -54,7 +54,7 @@ function readProfile(store, uid) {
   // Retain roomStatsVisible for older clients; player cards are always available.
   const row = store.db.prepare("SELECT nickname, avatar_hash, version, updated, leaderboard_visible, room_stats_visible, nickname_confirmed FROM profiles WHERE uid=?").get(uid);
   return { nickname: row?.nickname || "", avatarUrl: row?.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,
-    identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null,
+    identityType: uid.split(":")[0], version: row?.version || 0, updatedAt: row?.updated || null, avoidance: require("./avoidance").wallet(store, uid),
     leaderboardVisible: /^(wx|dev|test):/.test(uid) && (row ? !!row.leaderboard_visible : true), roomStatsVisible: !!row?.room_stats_visible, nicknameConfirmed: !!row?.nickname_confirmed };
 }
 // Room presentation uses current avatars without copying profile data into game state.

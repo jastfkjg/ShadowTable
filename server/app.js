@@ -11,6 +11,7 @@ const { readMonthlyReset, acknowledgeMonthlyReset } = require("./monthly-reset")
 const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const honors = require("./honors");
+const avoidance = require("./avoidance");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -277,7 +278,7 @@ function createApp({
         check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
         const ownDataRead = req.method === "GET" && ([
           "/api/me/profile", "/api/me/stats", "/api/me/matches",
-          "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard", "/api/monthly-report",
+          "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard", "/api/monthly-report", "/api/me/avoidance",
         ].includes(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
         const ownProfileWrite = req.method === "POST" && [
           "/api/me/profile", "/api/me/leaderboard-visibility",
@@ -291,6 +292,8 @@ function createApp({
         check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
+      avoidance.ensureAccount(store, uid);
+      if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
       if (path === "/api/me/avatar-uploads") {
         if (req.method === "GET") return send(200, { enabled: uploads.enabled && (uid.startsWith("wx:") || devAuth && uid.startsWith("dev:")) });
         check(req.method === "POST", "接口不存在", 404);
@@ -418,7 +421,7 @@ function createApp({
       }
       const personal = path.match(/^\/api\/me\/rooms\/(\d{6})$/);
       const match = path.match(
-        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management|invitation))?$/,
+        /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management|invitation|avoidance))?$/,
       );
       if (req.method === "GET" && match) {
         const room = store.get(match[1]);
@@ -434,10 +437,12 @@ function createApp({
           check(room.host === uid, "只有房主可以管理牌桌", 403);
           return send(200, { ...roomSummary(room, uid), stage: room.stage });
         }
+        if (match[2] === "avoidance") return send(200, avoidance.roomView(store, room, uid));
         check(!match[2] || match[2] === "private", "接口不存在", 404);
-        if (match[2] === "private") return send(200, privateView(room, uid));
+        if (match[2] === "private") return send(200, { ...privateView(room, uid), avoidance: avoidance.resultView(store, room, uid) });
         // Authorize and build the existing allowlisted view before enriching presentation.
         const view = publicView(room, uid);
+        view.me.avoidance = { balance: avoidance.balance(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
         view.honors = honors.view(store, room, uid);
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
@@ -552,7 +557,10 @@ function createApp({
             room = store.get(room.code);
           } else {
             if (b.type === "rematch") { honors.closeForRoom(store, room); room = store.get(room.code); }
+            if (b.type === "avoidance" && b.role !== null) check(avoidance.balance(store, uid) > 0, "回避卡不足，本次没有扣卡");
+            if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
+            if (b.type === "start") avoidance.settle(store, room);
           }
           if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };
@@ -572,7 +580,7 @@ function createApp({
           }
         }
         store.addReceipt(uid, id, fingerprint, response);
-        store.db
+        if (!(match?.[2] === "commands" && b.type === "avoidance")) store.db
           .prepare(
             "INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)",
           )

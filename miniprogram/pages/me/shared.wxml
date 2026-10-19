@@ -1,4 +1,6 @@
+<import src="../../avoidance.wxml" />
 <template name="personalPanel">
+<template is="avoidanceWallet" data="{{avoidanceWalletOpen,avoidanceWallet,avoidanceWalletLoading,avoidanceWalletError,avoidanceBodyHeight}}" />
 <view class="page personal-page me-page tab-page">
   <view wx:if="{{loading && !profile}}" class="status" role="status">正在读取个人资料…</view>
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
@@ -39,6 +41,7 @@
     <view class="personal-links me-links me-links-primary">
       <view class="me-section-label">我的记录</view>
       <view class="me-link-group">
+        <button wx:if="{{profile.avoidance}}" class="personal-link" bindtap="openAvoidanceWallet" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="{{'我的回避卡，剩余'+profile.avoidance.balance+'张'}}"><view class="me-icon-well me-well-gold"><image class="avoidance-me-icon" src="/assets/table-cards.svg" aria-hidden="true" /></view><view class="me-link-copy"><view class="me-link-title">回避卡 <text class="avoidance-me-balance">{{profile.avoidance.balance}} 张</text></view><view class="me-link-caption">开局前选角色，生效才扣卡</view></view><view class="me-chevron" aria-hidden="true"></view></button>
         <navigator class="personal-link" url="/pages/matches/matches" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-blue"><view class="me-icon me-icon-history" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">对局记录</view><view class="me-link-caption">回看身份、胜负与对局过程</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
         <navigator class="personal-link me-fun-link" url="/pages/stats/stats?tab=fun" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-purple"><view class="me-icon me-icon-spark" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">趣味记录</view><view class="me-link-caption">刀法、挡刀，还有那些名场面</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
         <navigator class="personal-link" url="/pages/badges/badges" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-gold"><view class="me-icon me-icon-medal" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">荣誉徽章</view><view class="me-link-caption">查看本月荣誉，佩戴你的徽章</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>

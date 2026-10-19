@@ -12,6 +12,8 @@
   --focus: #235846;
   --shadow: 0 12px 40px #1724341a, 0 2px 8px #1724340a;
 }
+#cards-search { margin: 18px 0 22px; }
+#cards-count { margin: 14px 0 22px; }
 * {
   box-sizing: border-box;
 }

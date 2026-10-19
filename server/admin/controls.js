@@ -3,8 +3,8 @@
 // Keep native selects as the source of truth for forms and existing API handlers.
 // The visible control and its popup only change presentation and navigation.
 (() => {
-  const tabs = ["rooms", "scores", "audit"];
-  const panels = ["room-overview", "score-management", "audit-section"];
+  const tabs = ["rooms", "scores", "cards", "audit"];
+  const panels = ["room-overview", "score-management", "card-management", "audit-section"];
   const tabButtons = tabs.map((tab) => document.getElementById("dashboard-tab-" + tab));
   function activateTab(index, focus = false) {
     tabButtons.forEach((button, i) => {
@@ -21,7 +21,7 @@
     button.addEventListener("keydown", (event) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
-      const next = event.key === "Home" ? 0 : event.key === "End" ? 2 :
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 :
         (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
       activateTab(next, true);
     });

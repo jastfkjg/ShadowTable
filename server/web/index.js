@@ -11,6 +11,9 @@ const assets = {
   "/match-story.css": ["../../miniprogram/match-story.wxss", "text/css; charset=utf-8"],
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/avoidance.js": ["../../miniprogram/avoidance.js", "text/javascript; charset=utf-8"],
+  "/avoidance.css": ["../../miniprogram/avoidance.wxss", "text/css; charset=utf-8"],
+  "/assets/table-cards.svg": ["../../miniprogram/assets/table-cards.svg", "image/svg+xml"],
   "/board-detail.js": ["../../miniprogram/board-detail.js", "text/javascript; charset=utf-8"],
   "/board-detail.css": ["board-detail.css", "text/css; charset=utf-8"],
   "/assets/board-search.svg": ["../../miniprogram/assets/board-search.svg", "image/svg+xml"],
@@ -41,7 +44,7 @@ for (const name of ["home-table-blue", "home-refresh", "home-clock", "record-mor
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
-for (const role of ["merlin", "percival", "assassin"])
+for (const role of ["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"])
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
 for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
@@ -52,9 +55,10 @@ function serve(req, res, path) {
   const asset = Object.hasOwn(assets, path) ? assets[path] : null;
   if (!asset || req.method !== "GET") return false;
   // Read before committing headers so a missing asset can return a normal 500.
-  const content = asset[0] === null
+  let content = asset[0] === null
     ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0]));
+  if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + ({ view: "div", text: "span", image: "img" })[tag]);
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
   res.setHeader("X-Frame-Options", "DENY");

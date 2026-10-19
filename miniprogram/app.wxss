@@ -1,6 +1,7 @@
 @import "./honors.wxss";
 @import "./room-menu.wxss";
 @import "./overlay-tokens.wxss";
+@import "./avoidance.wxss";
 page {
   --bg: #101c24;
   --surface: #1b2b35;

@@ -214,6 +214,7 @@ const tableReadySource = newRoom('201375','host','子龙','knights',12);
 for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
 tableReadySource.players[0].ready=true;
 const tableReady = tableScene(tableReadySource,'host',{startHint:'等待其他玩家准备',canStart:false});
+tableReady.room.me.avoidance = { balance: 1, selected: false };
 const badgeSamples = require('../miniprogram/badges').catalogue.slice(0,3);
 const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,wins:3,byFaction:[
   {faction:'evil',label:'坏人阵营',total:2,wins:1,winRate:50,rateLabel:'50.0%',rateValue:'50.0'},
@@ -284,9 +285,19 @@ tableScenes['classic-targets']={...classic,room:{...classic.room,phase:'assassin
 thirteen.players.forEach(p=>p.ready=true);tableFixtures.run(thirteen,'start',{flexible:true});
 const thirteenPage=createTable();thirteenPage.data=tableScene(thirteen,'host');thirteenPage.setData=(v,callback)=>{Object.assign(thirteenPage.data,v);callback?.();};thirteenPage.openTool({currentTarget:{dataset:{kind:'quest'}}});tableScenes['host-thirteen']=thirteenPage.data;
 tableScenes['player-card-empty']={...tablePlaying,playerCard:playerSample,playerCardStats:{scoreTotal:0,rateLabel:'—',rateValue:'—',total:0,wins:0,byFaction:[]}};
+const avoidancePresentation = require('../miniprogram/avoidance');
+const avoidanceOptions = require('../server/engine').avoidanceOptions(tableReadySource).map(o => ({ ...o, portrait: portrait(o.name,o.faction).portrait }));
+const avoidanceDraft = { ...tableReady, avoidanceOpen: true, avoidanceLoading: false, avoidanceBodyHeight: 360,
+  avoidance: { balance: 1, selected: null, editable: true, options: avoidanceOptions }, avoidanceDraft:'merlin',avoidanceDraftName:'梅林',
+  avoidanceGroups:avoidancePresentation.groups(avoidanceOptions,'merlin') };
+tableScenes['avoidance-select'] = avoidanceDraft;
+tableScenes['avoidance-empty'] = { ...avoidanceDraft, avoidance: { ...avoidanceDraft.avoidance, balance: 0 }, avoidanceDraft:'',avoidanceDraftName:'',avoidanceGroups:avoidancePresentation.groups(avoidanceOptions,null) };
+tableScenes['avoidance-effective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'effective',roleName:'梅林'})} };
+tableScenes['avoidance-ineffective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'ineffective',roleName:privateData.role})} };
 // Project the same native four-rectangle fit used by the controller.
 const processProjection=`<script>window.fitProcessSheet=()=>{const sheet=document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
-for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
+const avoidanceProjection = `<script>function fitAvoidance(){const body=document.querySelector('.avoidance-body');if(!body)return;const rects=['.avoidance-backdrop','.avoidance-top','.avoidance-fields','.avoidance-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());if(rects.some(r=>!r))return;body.style.height=Math.max(1,Math.floor(Math.min(rects[2].height,rects[0].height-rects[1].height-rects[3].height-(rects[0].width>rects[0].height&&rects[0].height<=500?20:72))))+'px';}addEventListener('load',fitAvoidance);addEventListener('resize',fitAvoidance);</script>`;
+for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection+avoidanceProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
   fs.writeFileSync(path.join(output,gallery+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:28px 40px;width:1638px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;margin:0 0 12px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px}iframe{display:block;width:390px;height:844px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${items.map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>保留游戏规则与私密流程 · 示例数据 · 需真机验收</p></main></html>`);
 }

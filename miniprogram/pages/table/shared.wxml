@@ -2,6 +2,8 @@
 <include src="./public-history.wxml" />
 <view wx:if="{{roomFeedback && !error}}" class="room-feedback {{homeShell?'above-tab':''}}" role="status" aria-live="polite">{{roomFeedback}}</view>
 <import src="../home/role-groups.wxml" />
+<import src="../../avoidance.wxml" />
+<template is="avoidanceSelection" data="{{avoidanceOpen,avoidanceLoading,avoidance,avoidanceGroups,avoidanceDraft,avoidanceDraftName,avoidanceBodyHeight,error,busy,hasPendingRequest,network}}" />
 <import src="../home/room-card.wxml" />
 
 <template name="tablePhase">
@@ -110,6 +112,7 @@
       <view class="table-sheet-fields">
         <view class="small muted identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
         <block wx:if="{{dealtIdentitySecret}}">
+          <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
           <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view>
           <view class="private-info-group"><view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view><view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view></view>
           <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
@@ -223,6 +226,7 @@
           <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
           <view class="muted">{{actionSecret.faction}}</view>
           <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
+          <template is="avoidanceResult" data="{{result:actionSecret.avoidance}}" />
 <view wx:if="{{actionSecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{actionSecret.skillStatus.title}}</view>{{actionSecret.skillStatus.detail}}</view>
         </view>
         <button hover-class="none" class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
@@ -423,6 +427,7 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open">
+        <template is="avoidanceResult" data="{{result:secret.avoidance}}" />
         <view class="inline-privacy-row"><view class="identity-privacy-note muted"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button inline-hide" bindtap="reveal">立即遮盖</button></view>
         <view class="identity-card-topline"><text class="small muted">当前身份</text><button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
         <view class="inline-role-heading"><image wx:if="{{secret.portrait}}" class="private-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="inline-role-copy"><view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="private-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view><text wx:if="{{secret.outcome}}" class="inline-role-outcome {{secret.outcome==='本局你获胜'?'is-win':secret.outcome==='本局你失败'?'is-loss':''}}">{{secret.outcome}}</text></view>
@@ -510,6 +515,7 @@
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="lobby-action-bar">
         <view class="lobby-action-inner">
+          <button wx:if="{{room.me.seat!==null && room.me.avoidance}}" class="avoidance-entry" bindtap="openAvoidance" disabled="{{busy || hasPendingRequest || !network}}" hover-class="none" aria-label="{{'回避卡'+room.me.avoidance.balance+'张，'+(room.me.avoidance.selected?'本局已选择角色':'选择本局回避角色')}}"><view class="avoidance-entry-line"><image src="/assets/table-cards.svg" aria-hidden="true" /><text>×{{room.me.avoidance.balance}}</text></view><text class="avoidance-entry-state">{{room.me.avoidance.selected?'已选择':'回避卡'}}</text></button>
           <view wx:if="{{room.me.seat!==null}}" class="lobby-ready-controls">
             <text wx:if="{{room.me.ready}}" class="lobby-ready-status">✓ 已准备</text>
             <button hover-class="none" class="{{room.me.ready?'text-button lobby-cancel':'primary lobby-ready-button'}}" bindtap="ready" disabled="{{hasPendingRequest || busy || !network}}" loading="{{busy && busyAction==='ready'}}">{{room.me.ready?'取消准备':'准备'}}</button>

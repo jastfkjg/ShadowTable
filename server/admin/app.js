@@ -10,6 +10,7 @@ const labels = {
   login: "管理员登录",
   "correct-result": "更正对局结果",
   "adjust-player-score": "调整玩家积分",
+  "grant-avoidance": "发放回避卡",
   "adjust-match-scores": "调整本局积分",
   "match-delete": "删除对局记录",
   "match-restore": "恢复对局记录",
@@ -46,6 +47,7 @@ function showSession(on) {
     $("rooms").replaceChildren();
     $("audit").replaceChildren();
     window.MatchRecords?.clear();
+    window.AvoidanceAdmin?.clear();
   }
 }
 function el(tag, text, cls) {

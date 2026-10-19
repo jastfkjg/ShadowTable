@@ -6,6 +6,7 @@ const fairy = require("./fairy");
 const scoring = require("./scoring");
 const fun = require("./fun");
 const replay = require("./replay");
+const avoidance = require("./avoidance");
 const funCopy = require("../miniprogram/fun-copy");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
@@ -407,10 +408,15 @@ function start(room, flexible = false) {
   board(room.board, room.capacity);
   room.fairyEnabled = fairy.enabled(room);
   room.players.sort((a, b) => a.seat - b.seat);
-  const roles = shuffle(roleDeck(room.board, room.capacity));
+  const roles = avoidance.deal(room.players, roleDeck(room.board, room.capacity), room.avoidanceChoices, shuffle);
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
+  room.avoidanceResults = { ...room.avoidanceUnavailable };
+  for (const [uid, role] of Object.entries(room.avoidanceChoices || {}))
+    if (room.players.some(p => p.uid === uid)) room.avoidanceResults[uid] = { role, status: room.roles[uid] === role ? "ineffective" : "effective" };
+  delete room.avoidanceChoices;
+  delete room.avoidanceUnavailable;
   fun.init(room);
   room.game++;
   room.matchId = randomUUID();
@@ -749,6 +755,7 @@ function rememberKnightIdentity(room, uid, reason = "redraw") {
 }
 function privateView(room, uid) {
   const view = privateIdentity(room, uid);
+  if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
   const history = previousKnightIdentities(room, uid);
@@ -1638,6 +1645,7 @@ function applyCommand(room, uid, input) {
       ...new Set([...(room.removedPlayers || []), target.uid]),
     ];
     room.players = room.players.filter((player) => player.uid !== target.uid);
+    if (room.avoidanceChoices) delete room.avoidanceChoices[target.uid];
     // Revoke stale submissions and management confirmations without changing the result.
     stage(room, room.phase);
     return;
@@ -1648,6 +1656,7 @@ function applyCommand(room, uid, input) {
     room.players = room.players.filter((player) => player.uid !== uid);
     p.seat = null;
     p.ready = false;
+    if (room.avoidanceChoices) delete room.avoidanceChoices[uid];
     (room.spectators ||= []).push(p);
     return;
   }
@@ -1655,6 +1664,7 @@ function applyCommand(room, uid, input) {
     requireRule(room.phase === "lobby" || (p.seat === null && uid !== room.host), "对局中不可离开座位，请联系房主终止");
     room.players = room.players.filter((p) => p.uid !== uid);
     room.spectators = (room.spectators || []).filter((p) => p.uid !== uid);
+    if (room.avoidanceChoices) delete room.avoidanceChoices[uid];
     return;
   }
   if (type === "transfer") {
@@ -1687,6 +1697,16 @@ function applyCommand(room, uid, input) {
     p.ready = false;
     return;
   }
+  if (type === "avoidance") {
+    requireRule(room.phase === "lobby", "只能在发牌前选择回避角色", 409);
+    requireRule(p.seat !== null, "请先入座再使用回避卡");
+    requireRule(!p.ready, "请先取消准备，再修改回避角色", 409);
+    requireRule(input.role === null || typeof input.role === "string" && roleDeck(room.board, room.capacity).includes(input.role), "请选择本局初始牌中的角色");
+    room.avoidanceChoices ||= {};
+    if (input.role === null) delete room.avoidanceChoices[uid];
+    else room.avoidanceChoices[uid] = input.role;
+    return;
+  }
   if (type === "ready") {
     requireRule(p.seat !== null, "请先入座再准备");
     requireRule(room.phase === "lobby", "当前不能准备");
@@ -1708,6 +1728,7 @@ function applyCommand(room, uid, input) {
       room.scoreEnabled = scoring.defaultEnabled(input.board, input.capacity);
     room.board = input.board;
     room.capacity = input.capacity;
+    delete room.avoidanceChoices;
     room.players.forEach((p) => (p.ready = false));
     stage(room, "lobby");
     return;
@@ -1752,6 +1773,9 @@ function applyCommand(room, uid, input) {
       "scoringFacts",
       "fun",
       "replay",
+      "avoidanceChoices",
+      "avoidanceResults",
+      "avoidanceUnavailable",
     ])
       delete room[key];
     room.history = [];
@@ -1987,4 +2011,5 @@ module.exports = {
   privateView,
   actionSpec,
   roleName: (role) => ROLES[role]?.[0] || null,
+  avoidanceOptions: room => [...new Set(roleDeck(room.board, room.capacity))].map(id => ({ id, name: ROLES[id][0], faction: ROLES[id][1], count: roleDeck(room.board, room.capacity).filter(role => role === id).length })),
 };

@@ -45,6 +45,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../room-list') return require('../miniprogram/room-list');
         if (name === '../../room-sheet-presentation') return require('../miniprogram/room-sheet-presentation');
         if (name === '../../role-portraits') return require('../miniprogram/role-portraits');
+        if (name === '../../avoidance') return require('../miniprogram/avoidance');
         if (name === '../../result-registration') return require('../miniprogram/result-registration');
         if (name !== '../../tab-navigation') return api;
         const module = { exports: {} };
@@ -2156,4 +2157,21 @@ test('最佳玩家弹窗只自动提示一次，可修改本人选票，刷新�
   let sent;p.cmd=(type,data)=>sent={type,data};p.submitHonors();assert.equal(sent.type,'honorVote');assert.equal(sent.data.matchId,'match-1');assert.equal(sent.data.mvp,2);
   room.honors={matchId:'match-1',status:'settled',mvp:[{seat:2,name:'林间',votes:3}],svp:[{seat:5,name:'晚风',votes:3}]};
   await p.refresh();assert.equal(p.data.honorDialog,false);assert.equal(p.data.honors.awards[0].players[0].votes,3);
+});
+
+test('回避角色先本地选择再确认，关闭和切后台清空私密草稿并丢弃迟到响应', async () => {
+  const value = { code: '123456', stage: 1, game: 0, phase: 'lobby', balance: 1, selected: null, editable: true,
+    options: [{ id: 'merlin', name: '梅林', faction: 'good', count: 1, portrait: '/assets/roles/merlin.png' }] };
+  let resolve;
+  const p = page({ request: async () => value }); p.roomCode = '123456';
+  p.data.room = { code: '123456', phase: 'lobby', stage: 1, me: { seat: 1, avoidance: { balance: 1 } } };
+  const commands = []; p.cmd = (...args) => commands.push(args);
+  await p.openAvoidance(); assert.equal(p.data.avoidanceOpen, true);
+  p.chooseAvoidance({ currentTarget: { dataset: { id: 'merlin' } } });
+  assert.equal(p.data.avoidanceDraft, 'merlin'); assert.equal(commands.length, 0);
+  p.saveAvoidance(); assert.deepEqual(JSON.parse(JSON.stringify(commands)), [['avoidance', { role: 'merlin' }, 'avoidance']]);
+  p.mask(); assert.equal(p.data.avoidance, null); assert.equal(p.data.avoidanceDraft, '');
+  const delayed = page({ request: () => new Promise(r => resolve = r) }); delayed.roomCode = '123456'; delayed.data.room = p.data.room;
+  const loading = delayed.openAvoidance(); delayed.onHide(); resolve(value); await loading;
+  assert.equal(delayed.data.avoidanceOpen, false); assert.equal(delayed.data.avoidance, null);
 });
