@@ -26,13 +26,6 @@
 .room-directory button.room-archive-toggle:active,
 .room-directory button.room-refresh:hover { background:transparent; box-shadow:none; }
 .room-directory button.room-archive-toggle:active .room-archive-title { opacity:.75; }
-.room-cleanup-bar { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:0 12px; min-height:48px; box-sizing:border-box; margin-top:8px; padding:0 4px; }
-.room-directory button.room-cleanup,
-.room-directory button.room-cleanup[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; min-width:44px; height:44px; min-height:44px; box-sizing:border-box; margin:0; padding:0; border:0; border-radius:12px; background:transparent; box-shadow:none; color:var(--evil); line-height:1; }
-.room-cleanup-icon { display:block; flex-shrink:0; width:20px; height:20px; }
-.room-directory button.room-cleanup:hover:not(:disabled),
-.room-directory button.room-cleanup:active:not(:disabled) { background:rgba(242,182,174,.08); }
-.room-directory button.room-cleanup[disabled] { opacity:.4; }
 .room-directory .member-room.room-list-item { position:relative; display:block; box-sizing:border-box; margin:0; padding:12px 16px 0; border:0; border-radius:18px; background:var(--surface); }
 .room-directory .room-swipe { border-radius:18px; }
 .room-directory .room-list-top { display:flex; align-items:center; gap:9px; min-height:32px; padding-right:30px; }
@@ -77,6 +70,5 @@
 .room-list-expired-time { flex-shrink:0; color:var(--muted); font-size:12px; line-height:1.5; }
 .room-directory button.room-refresh:focus-visible,
 .room-directory button.room-archive-toggle:focus-visible,
-.room-directory button.room-cleanup:focus-visible,
 .room-directory button.room-list-copy:focus-visible { outline:2px solid var(--room-blue); outline-offset:-2px; }
 @media (prefers-reduced-motion:reduce) { .room-archive-chevron { transition:none; }.room-refresh-icon.is-refreshing { animation:none; } }

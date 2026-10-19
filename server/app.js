@@ -405,14 +405,14 @@ function createApp({
         return send(200, result);
       }
       if (req.method === "GET" && path === "/api/me/rooms") {
-        const rooms = store.personalRooms(uid);
+        const rooms = store.personalRooms(uid).filter(r => r.available !== false && r.status !== "unavailable");
         return send(200, { rooms, serverTime: store.clock() });
       }
       const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/stats$/);
       if (req.method === "GET" && playerStats) {
         const room = store.get(playerStats[1]);
         check(room, "房间不存在", 404);
-        check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
+        check(!store.roomExpired(room), "房间已失效", 410);
         res.setHeader("Cache-Control", "no-store");
         return send(200, readRoomPlayerStats(store, room, uid, playerStats[2]));
       }
@@ -423,7 +423,7 @@ function createApp({
       if (req.method === "GET" && match) {
         const room = store.get(match[1]);
         check(room, "房间不存在", 404);
-        check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
+        check(!store.roomExpired(room), "房间已失效", 410);
         if (requestUrl.searchParams.has("instance"))
           check(requestUrl.searchParams.get("instance") === String(room.createdAt || 0), "该邀请已失效", 410);
         if (match[2] === "invitation") {
@@ -516,7 +516,7 @@ function createApp({
         } else {
           room = store.get(match[1]);
           check(room, "房间不存在", 404);
-          check(!store.roomExpired(room), "房间已失效，请清理列表记录", 410);
+          check(!store.roomExpired(room), "房间已失效", 410);
           auditBefore = structuredClone(room);
           if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid))
             details = actionDetails(

@@ -27,7 +27,7 @@ async function user(app) {
 }
 function candidate(room) { return { code: room.code, createdAt: room.createdAt }; }
 
-test("已结束房间满72小时立即失效，旧入口不能续期；清理房间与列表后战绩复盘仍可读取", async () => {
+test("已结束房间满72小时自动从列表隐藏，旧入口不能续期，战绩复盘与个人条目保留", async () => {
   let now = Date.now(); const app = await launch({ clock: () => now });
   try {
     const token = "a".repeat(64), uid = "wx:replay-5", store = app.store;
@@ -38,7 +38,9 @@ test("已结束房间满72小时立即失效，旧入口不能续期；清理房
     assert.equal((await app.request("/api/me/rooms", token)).data.rooms[0].available, true);
     now++;
     const list = (await app.request("/api/me/rooms", token)).data.rooms;
-    assert.equal(list[0].available, false); assert.equal(list[0].status, "unavailable"); assert.match(list[0].phaseName, /3 天无活动/);
+    assert.deepEqual(list, []);
+    assert.equal(store.entry(uid, room.code).hidden, 0, "自动隐藏不删除或改写个人条目");
+    assert.equal(store.personalRooms(uid)[0].available, false);
     for (const suffix of ["", "/private", "/management", "/invitation"])
       assert.equal((await app.request("/api/rooms/" + room.code + suffix, token)).status, 410);
     assert.equal((await app.request("/api/rooms/" + room.code + "/join", token, { name: "子龙" })).status, 410);
@@ -47,7 +49,6 @@ test("已结束房间满72小时立即失效，旧入口不能续期；清理房
     assert.ok(store.get(room.code), "到期判定不依赖后台物理删除或备份任务");
     assert.deepEqual(store.replayFor(uid, room.matchRecord.id), replay);
     assert.equal(cleanup(store).rooms, 1); assert.equal(store.get(room.code), null);
-    assert.equal((await app.request("/api/me/rooms/cleanup", token, { rooms: [candidate(room)] })).data.removed, 1);
     assert.deepEqual((await app.request("/api/me/rooms", token)).data.rooms, []);
     assert.deepEqual(store.matchesFor(uid), records); assert.deepEqual(store.statsFor(uid), stats);
     assert.deepEqual((await app.request("/api/me/matches/" + room.matchRecord.id + "/replay", token)).data.replay, replay);

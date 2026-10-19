@@ -221,7 +221,7 @@ class Store {
     return this.db.prepare("SELECT * FROM room_entries WHERE uid=? AND code=?").get(uid, code);
   }
   visitRoom(uid, code) {
-    if (this.roomExpired(this.get(code))) throw new RuleError("房间已失效，请清理列表记录", 410);
+    if (this.roomExpired(this.get(code))) throw new RuleError("房间已失效", 410);
     this.db.prepare("UPDATE room_entries SET hidden=0, entered=? WHERE uid=? AND code=?").run(this.clock(), uid, code);
     this.touchRoom(code);
   }

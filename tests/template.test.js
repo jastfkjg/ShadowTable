@@ -541,53 +541,31 @@ test("WXSS官方编译器封装可编译全局样式", () => {
   assert.ok(output.length > 100);
 });
 
-test("统一历史折叠隐藏全部历史卡片，展开标明各状态且只提供失效清理", () => {
-  const now = Date.now(), rooms = [{ code: "111111", status: "lobby", available: true },
-    { code: "222222", status: "ended", statusLabel: "已结束", available: true, lastActivityAt: now - 4 * 86400000 },
-    { code: "333333", status: "unavailable", available: false }];
-  const present = filter => require("../miniprogram/room-list").present(rooms, filter, now);
-  const data = { ...base, memberRooms: rooms, ...present("all"), historyExpanded: false };
-  let tree = render(data);
-  assert.equal(nodes(tree).filter(n => n.attr?.catchtap === "openRoomMenu").length, 1);
-  assert.equal(byHandler(tree, "toggleRoomHistory").attr.ariaExpanded, false);
-  assert.equal(byHandler(tree, "toggleUnavailableRooms"), undefined);
-  assert.equal(byHandler(tree, "cleanupUnavailableRooms"), undefined);
-  const heading = nodes(tree).find(n => n.attr?.class?.includes("room-directory-heading"));
-  assert.equal(nodes(heading).some(n => n.attr?.class === "room-count"), false);
-  const text = n => typeof n === "string" || typeof n === "number" ? String(n) : (n.children || []).map(text).join("");
-  assert.doesNotMatch(text(byHandler(tree, "toggleRoomHistory")), /展开|收起/);
-  const group = nodes(tree).find(n => n.attr?.class === "room-archive-group");
-  assert.ok(byHandler(group, "toggleRoomHistory"));
-  assert.equal(nodes(group).filter(n => n.attr?.class?.includes("room-archive-toggle")).length, 1);
-  assert.equal(text(byHandler(group, "toggleRoomHistory")), "历史牌桌");
-  assert.equal(nodes(byHandler(group, "toggleRoomHistory")).some(n => n.tag === "wx-image"), false);
-  tree = render({ ...data, historyExpanded: true });
-  assert.equal(nodes(tree).filter(n => n.attr?.catchtap === "openRoomMenu").length, 3);
-  assert.equal(byHandler(tree, "toggleRoomHistory").attr.ariaExpanded, true);
-  const history = nodes(tree).find(n => n.attr?.id === "room-history-list");
-  const unavailable = nodes(history).find(n => n.attr?.class?.includes("member-room") && n.attr?.["data-code"] === "333333");
-  const cleanup = byHandler(history, "cleanupUnavailableRooms");
-  assert.equal(cleanup.attr.ariaLabel, "清理所有失效房间，共1个，需再次确认");
-  assert.equal(cleanup.attr.ariaHaspopup, "dialog");
-  assert.equal(text(cleanup), "");
-  assert.equal(nodes(cleanup).find(n => n.tag === "wx-image").attr.src, "/assets/room-menu-delete.svg");
-  assert.doesNotMatch(text(history), /战绩与复盘保留/);
-  assert.equal(byHandler(unavailable, "copyListedRoom").attr["data-code"], "333333");
-  assert.equal(nodes(unavailable).some(n => n.attr?.class === "room-list-open"), false);
-  assert.equal(nodes(unavailable).some(n => n.attr?.class === "room-list-footer"), false);
-  assert.equal(byHandler(history, "openRoom").attr["data-code"], "222222");
-  assert.equal(byHandler(history, "openRoomMenu").attr["data-code"], "222222");
-  assert.deepEqual(nodes(history).filter(n => n.attr?.class?.startsWith("room-status")).map(text), ["已结束", "已失效"]);
-  const locked = render({ ...data, historyExpanded: true, roomsRefreshing: true });
-  assert.equal(byHandler(locked, "cleanupUnavailableRooms").attr.disabled, true);
-  assert.equal(byHandler(locked, "toggleRoomHistory").attr.disabled, true);
-  const ended = render({ ...data, ...present("ended"), historyExpanded: true });
-  assert.equal(byHandler(ended, "cleanupUnavailableRooms"), undefined);
-  assert.doesNotMatch(text(ended), /已失效/);
-  const expiredOnly = render({ ...data, ...present("unavailable"), historyExpanded: true });
-  assert.equal(text(byHandler(expiredOnly, "toggleRoomHistory")), "历史牌桌");
-  assert.ok(byHandler(expiredOnly, "cleanupUnavailableRooms"));
-  assert.doesNotMatch(text(expiredOnly), /没有符合条件/);
+test("历史仅展示有效牌桌，失效房间和批量清理入口自动隐藏", () => {
+  const now=Date.now(),rooms=[{code:"111111",status:"lobby",available:true},
+    {code:"222222",status:"ended",statusLabel:"已结束",available:true,lastActivityAt:now-4*86400000},
+    {code:"333333",status:"unavailable",available:false}];
+  const roomList=require("../miniprogram/room-list");
+  const data={...base,memberRooms:rooms,...roomList.present(rooms,"all",now),historyExpanded:false};
+  const text=n=>typeof n==="string"||typeof n==="number"?String(n):(n.children||[]).map(text).join("");
+  let tree=render(data);
+  assert.equal(nodes(tree).filter(n=>n.attr?.catchtap==="openRoomMenu").length,1);
+  assert.equal(byHandler(tree,"toggleRoomHistory").attr.ariaExpanded,false);
+  assert.equal(text(byHandler(tree,"toggleRoomHistory")),"历史牌桌");
+  tree=render({...data,historyExpanded:true});
+  assert.equal(nodes(tree).filter(n=>n.attr?.catchtap==="openRoomMenu").length,2);
+  assert.equal(byHandler(tree,"toggleRoomHistory").attr.ariaExpanded,true);
+  const history=nodes(tree).find(n=>n.attr?.id==="room-history-list");
+  assert.equal(byHandler(history,"openRoom").attr["data-code"],"222222");
+  assert.equal(byHandler(history,"cleanupUnavailableRooms"),undefined);
+  assert.equal(nodes(history).some(n=>n.attr?.["data-code"]==="333333"),false);
+  assert.doesNotMatch(text(history),/已失效|战绩与复盘保留/);
+  const locked=render({...data,historyExpanded:true,roomsRefreshing:true});
+  assert.equal(byHandler(locked,"toggleRoomHistory").attr.disabled,true);
+  const expiredOnly=render({...base,memberRooms:[rooms[2]],...roomList.present([rooms[2]],"all",now),historyExpanded:true});
+  assert.equal(byHandler(expiredOnly,"toggleRoomHistory"),undefined);
+  assert.equal(byHandler(expiredOnly,"cleanupUnavailableRooms"),undefined);
+  assert.match(text(expiredOnly),/还没有牌桌/);assert.doesNotMatch(text(expiredOnly),/没有符合条件|已失效/);
 });
 test("我的牌桌统一更多入口，只有房主菜单显示解散，非房主仍可移除记录", () => {
   const rooms = [{ code: "123456", isHost: true, available: true }, { code: "234567", isHost: false, available: true }];

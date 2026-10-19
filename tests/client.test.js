@@ -788,12 +788,12 @@ test("房主删除后双方回到入口，成员不再轮询已删牌桌", async
     await lobby.bootstrap();
     await lobby.deleteRoom({ currentTarget: { dataset: { code } } });
     assert.equal(lobby.data.notice, "房间已解散");
-    assert.equal(lobby.data.memberRooms[0].available, false);
+    assert.equal(lobby.data.memberRooms.length, 0);
     await guest.refresh();
     assert.equal(guest.roomCode, null);
     assert.equal(guest.data.room, null);
     assert.equal(guest.data.error, "");
-    assert.equal(guest.data.memberRooms[0].available, false);
+    assert.equal(guest.data.memberRooms.length, 0);
   } finally {
     await a.close();
   }

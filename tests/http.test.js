@@ -353,7 +353,7 @@ test("删除牌桌仅当前房主可执行，检查阶段且重试幂等", async
     assert.equal((await a.req(path, guest)).status, 404);
     assert.equal((await a.req(path + "/private", host)).status, 404);
     for (const token of [host, guest])
-      assert.equal((await a.req("/api/me/rooms", token)).data.rooms[0].status, "unavailable");
+      assert.deepEqual((await a.req("/api/me/rooms", token)).data.rooms, []);
   } finally {
     await a.close();
   }
@@ -535,7 +535,7 @@ test("个人牌桌隐藏、备注和撤销不改变房间及座位，重试幂�
   } finally { await a.close(); }
 });
 
-test("个人记录跨重启保存，解散后可清理且无法进入，不返回其他房间或私密信息", async () => {
+test("个人记录跨重启保存，解散后自动隐藏且无法进入，不返回其他房间或私密信息", async () => {
   const dir = mkdtempSync(join(tmpdir(), 'shadow-entries-'));
   let a = await launch({ database: join(dir, 'rooms.sqlite') });
   try {
@@ -543,6 +543,7 @@ test("个人记录跨重启保存，解散后可清理且无法进入，不返�
     const code = (await a.req('/api/rooms', host, { name: '甲' })).data.code;
     const path = '/api/rooms/' + code, personal = '/api/me/rooms/' + code;
     await a.req(path + '/join', guest, { name: '乙' });
+    const guestUid = a.store.get(code).players.find(p => p.name === '乙').uid;
     await a.req(personal, guest, { action: 'note', note: '我的备注' });
     await a.req(personal, guest, { action: 'hide' });
     await a.close();
@@ -553,9 +554,9 @@ test("个人记录跨重启保存，解散后可清理且无法进入，不返�
     const room = (await a.req(path, host)).data;
     await a.req(path + '/delete', host, { stage: room.stage });
     const entries = (await a.req('/api/me/rooms', guest)).data.rooms;
-    assert.equal(entries[0].available, false);
-    assert.equal(entries[0].status, 'unavailable');
-    assert.equal(entries[0].canLeave, false);
+    assert.deepEqual(entries, []);
+    assert.equal(a.store.entry(guestUid, code).hidden, 0);
+    assert.equal(a.store.entry(guestUid, code).note, '我的备注');
     assert.equal((await a.req(personal, guest, { action: 'visit' })).status, 404);
     assert.ok(!JSON.stringify(entries).includes('membershipId'));
     await a.req(personal, guest, { action: 'hide' });

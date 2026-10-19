@@ -89,36 +89,29 @@ test('网页房间到期410返回列表并显示失效提示，不继续轮询�
   const c=client(async url=>url==='/api/me/rooms'?response({rooms:[{code:'123456',status:'unavailable',available:false}]}):{status:410,json:async()=>({error:'房间已失效'})});
   Object.assign(c.state,{loading:false,room:{code:'123456'}});await c.refresh();
   assert.equal(c.state.room,null);assert.match(c.state.notice,/房间已失效/);
-  assert.equal(c.state.memberRooms[0].available,false);
+  assert.equal(c.state.memberRooms.length,0);assert.doesNotMatch(c.state.notice,/请清理/);
 });
-test('网页历史合并失效记录，统一展开并保留状态筛选和失效清理', async () => {
-  const now=Date.now(), rooms=[{code:'111111',status:'lobby',available:true},
+test('网页自动隐藏失效记录，展开历史仅展示有效房间，移除失效筛选和清理入口', async () => {
+  const now=Date.now(),rooms=[{code:'111111',status:'lobby',available:true},
     ...Array.from({length:5},(_,i)=>({code:String(222220+i),status:'ended',available:true,lastActivityAt:now-i*1000})),
     {code:'333333',status:'ended',available:true,lastActivityAt:now-3*86400000},
     {code:'444444',status:'unavailable',available:false}];
-  const c=client(async()=>response({rooms,serverTime:now}));c.state.loading=false;await c.loadRooms();
-  let html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,4);
-  assert.match(html,/历史牌桌/);assert.doesNotMatch(html,/data-action="cleanupUnavailableRooms"|&lt;span/);
-  assert.match(html, /class="room-subheading"><span>最近结束<\/span><\/div>/);
-  assert.doesNotMatch(html, /room-section-hint|room-count|近 3 天/);
-  assert.doesNotMatch(html,/data-room-swipe="333333"|data-room-swipe="444444"/);
-  c.ACTIONS.toggleRoomHistory(); html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,8);
-  assert.equal((html.match(/data-action="toggleRoomHistory"/g)||[]).length,1);
-  assert.doesNotMatch(html,/toggleUnavailableRooms|room-unavailable-list/);
-  assert.match(html, /id="room-history-list"[\s\S]*data-action="cleanupUnavailableRooms"/);
-  assert.match(html, /aria-label="清理所有失效房间，共1个，需再次确认" aria-haspopup="dialog"[^>]*><img class="room-cleanup-icon"[^>]+\/><\/button>/);
-  assert.doesNotMatch(html, /清理失效记录 ·|战绩与复盘保留|room-cleanup-hint/);
-  assert.match(html, /class="room-status ended">已结束/);
-  assert.match(html, /class="room-status unavailable">已失效/);
-  assert.doesNotMatch(html.split('data-room-swipe="444444"')[1], /data-action="openRoom"/);
-  c.ACTIONS.toggleRoomHistory();assert.doesNotMatch(c.viewEntry(), /data-action="cleanupUnavailableRooms"/);
-  c.ACTIONS.filterRooms({dataset:{filter:'ended'}});c.ACTIONS.toggleRoomHistory();html=c.viewEntry();
-  assert.doesNotMatch(html,/data-action="cleanupUnavailableRooms"|data-room-swipe="444444"/);
-  c.ACTIONS.filterRooms({dataset:{filter:'unavailable'}});html=c.viewEntry();
-  assert.match(html, /data-action="cleanupUnavailableRooms"/);assert.match(html,/历史牌桌/);
-  assert.equal((html.match(/data-room-swipe=/g)||[]).length,1);
-  c.ACTIONS.filterRooms({dataset:{filter:'lobby'}});html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,1);assert.doesNotMatch(html,/历史牌桌/);
-  c.stop();
+  const c=client(async()=>response({rooms,serverTime:now}));
+  try {
+    c.state.loading=false;await c.loadRooms();
+    let html=c.viewEntry();assert.equal((html.match(/data-room-swipe=/g)||[]).length,4);
+    assert.match(html,/历史牌桌/);assert.match(html,/class="room-subheading"><span>最近结束/);
+    c.ACTIONS.toggleRoomHistory();html=c.viewEntry();
+    assert.equal((html.match(/data-room-swipe=/g)||[]).length,7);
+    assert.match(html,/data-room-swipe="333333"/);
+    assert.doesNotMatch(html,/data-room-swipe="444444"|room-cleanup|data-filter="unavailable"|已失效/);
+    assert.equal(c.ACTIONS.cleanupUnavailableRooms,undefined);
+    c.ACTIONS.filterRooms({dataset:{filter:'ended'}});c.ACTIONS.toggleRoomHistory();
+    assert.equal((c.viewEntry().match(/data-room-swipe=/g)||[]).length,6);
+    c.ACTIONS.filterRooms({dataset:{filter:'unavailable'}});assert.equal(c.state.roomListFilter,'ended');
+    c.ACTIONS.filterRooms({dataset:{filter:'lobby'}});html=c.viewEntry();
+    assert.equal((html.match(/data-room-swipe=/g)||[]).length,1);assert.doesNotMatch(html,/历史牌桌/);
+  } finally {c.stop();}
 });
 test('网页牌桌复制只复制所选房间号，失效记录仍可复制且不触发进入请求', async () => {
   const copied = [], writes = [];
@@ -133,29 +126,17 @@ test('网页牌桌复制只复制所选房间号，失效记录仍可复制且�
     assert.equal(writes.length, 0);
   } finally { c.stop(); }
 });
-test('网页批量清理支持取消、后台保护和原请求重试，完成后同步清理数量', async () => {
-  for(const mode of ['cancel','background','confirm','retry']) {
-    let hidden=false, fail=mode==='retry',resolveConfirm;const writes=[],dialogs=[];
-    const expired={code:'123456',createdAt:123,status:'unavailable',available:false};
-    const expiredSecond={code:'345678',createdAt:345,status:'unavailable',available:false};
-    const valid={code:'234567',createdAt:234,status:'ended',available:true,lastActivityAt:1};
-    const c=client(async(url,options)=>{
-      if(options.method==='POST'){writes.push({url,body:JSON.parse(options.body),id:options.headers['Idempotency-Key']});if(fail){fail=false;throw Error('网络中断');}hidden=true;return response({removed:2});}
-      return response({rooms:hidden?[valid]:[expired,expiredSecond,valid]});
-    });
-    Object.assign(c.state,{loading:false,memberRooms:[expired,expiredSecond,valid],historyExpanded:true});
-    c.setConfirm((title,message,showCancel,label)=>{dialogs.push({title,message,showCancel,label});return new Promise(resolve=>{resolveConfirm=resolve;});});
-    const cleaning=c.ACTIONS.cleanupUnavailableRooms();await c.ACTIONS.cleanupUnavailableRooms();
-    assert.equal(dialogs.length,1);assert.equal(dialogs[0].showCancel,true);assert.equal(dialogs[0].label,'全部清理');assert.equal(writes.length,0);
-    assert.equal(dialogs[0].title,'清理所有失效房间？');assert.match(dialogs[0].message,/全部 2 个失效记录/);
-    if(mode==='background')c.stop();resolveConfirm(mode!=='cancel');await cleaning;
-    if(mode==='retry'){c.state.reconnecting=false;await c.retry();assert.equal(writes[0].id,writes[1].id);}
-    assert.equal(writes.length,mode==='retry'?2:mode==='confirm'?1:0);
-    if(hidden){assert.match(c.state.notice,/已移除 2 个失效房间/);assert.doesNotMatch(c.viewEntry(),/data-action="cleanupUnavailableRooms"/);
-      assert.match(c.viewEntry(),/data-room-swipe="234567"/);assert.doesNotMatch(c.viewEntry(),/data-room-swipe="123456"|data-room-swipe="345678"/);}
-    if(writes.length)assert.equal(JSON.stringify(writes[0].body),JSON.stringify({rooms:[{code:'123456',createdAt:123},{code:'345678',createdAt:345}]}));
-    assert.equal(c.state.busy,false);
-  }
+test('网页仅有失效房间时显示创建加入空态，旧数据重新加入后恢复，无需写入请求', async () => {
+  let rooms=[{code:'123456',status:'unavailable',available:false}],writes=0,dialogs=0;
+  const c=client(async(url,options)=>{if(options.method==='POST')writes++;return response({rooms});});
+  try {
+    c.state.loading=false;c.setConfirm(()=>{dialogs++;return true;});await c.loadRooms();
+    let html=c.viewEntry();assert.match(html,/还没有牌桌/);
+    assert.doesNotMatch(html,/历史牌桌|room-cleanup|data-filter="unavailable"|没有符合条件/);
+    rooms=[{code:'123456',status:'lobby',available:true}];await c.loadRooms();
+    html=c.viewEntry();assert.match(html,/data-room-swipe="123456"/);
+    assert.doesNotMatch(html,/还没有牌桌/);assert.equal(writes,0);assert.equal(dialogs,0);
+  } finally {c.stop();}
 });
 test('网页各板子详情自适应技能和规则模式，搜索不受牌组限制，目录跳转先展开目标', () => {
   const c = client(async () => response({}));
@@ -231,6 +212,7 @@ test('网页左滑按身份和房间状态显示操作，关闭时不向键盘�
     c.state.memberRooms = [{ code:'123456', status, isHost, available }];
     c.closeRoomSwipe();
     const closed = c.viewEntry();
+    if (!available) { assert.doesNotMatch(closed, /data-room-swipe|room-swipe-actions/); continue; }
     assert.match(closed, /class="room-swipe-actions" aria-hidden="true" inert/);
     webSwipe(c, '123456');
     const open = c.viewEntry();

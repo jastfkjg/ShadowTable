@@ -134,16 +134,14 @@ homeScenes["home-room-organized"] = organized;
 homeScenes["home-room-history"] = { ...organized, historyExpanded: true };
 homeScenes["home-room-history-entering"] = { ...organized, historyExpanded: true, busy: true, hasPendingRequest: true, enteringCode: organizedRooms[1].code };
 homeScenes["home-room-history-refreshing"] = { ...organized, historyExpanded: true, roomsRefreshing: true };
-homeScenes["home-room-unavailable"] = { memberRooms: organizedRooms, ...roomList.present(organizedRooms, "unavailable", roomsNow), roomListFilter: "unavailable", historyExpanded: true };
+homeScenes["home-room-unavailable"] = { memberRooms: organizedRooms, ...roomList.present(organizedRooms, "all", roomsNow), historyExpanded: true };
 homeScenes["home-history-only"] = { memberRooms: [organizedRooms[6]], ...roomList.present([organizedRooms[6]], "all", roomsNow) };
 homeScenes["home-unavailable-only"] = { memberRooms: [organizedRooms[7]], ...roomList.present([organizedRooms[7]], "all", roomsNow) };
-const cleanupRooms = [
+const expiredRooms = [
   room("534718", "unavailable", "12 人", "房间已解散", "10/17 11:55", { updatedAt: roomsNow - 4 * 86400000, statusLabel: "已失效", available: false, canSwipeDissolve: false }),
   room("201375", "unavailable", "12 人", "房间已解散", "10/16 21:24", { updatedAt: roomsNow - 5 * 86400000, statusLabel: "已失效", available: false, canSwipeDissolve: false }),
 ];
-const cleanupHistory = { memberRooms: cleanupRooms, ...roomList.present(cleanupRooms, "all", roomsNow), historyExpanded: true };
-homeScenes["home-room-cleanup"] = cleanupHistory;
-homeScenes["home-room-cleanup-confirm"] = { ...cleanupHistory, appDialog: { title: "清理所有失效房间？", content: "将移除列表中全部 2 个失效记录。\n战绩和复盘保留。", confirmText: "全部清理" } };
+homeScenes["home-expired-hidden"] = { memberRooms: expiredRooms, ...roomList.present(expiredRooms, "all", roomsNow), historyExpanded: true };
 const redesignRooms = [room("201375", "ended", "12 人", "我是房主 · 1号", "昨天 21:24", { updatedAt: roomsNow - 86400000, entryLabel: "查看结果" }),
   room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:29", { updatedAt: roomsNow - 6 * 86400000, entryLabel: "查看结果", boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false }),
   room("534718", "unavailable", "12 人", "房间已解散", "11:55", { updatedAt: roomsNow - 7 * 86400000, statusLabel: "已失效", entryLabel: "已失效", available: false, canSwipeDissolve: false })];
@@ -187,6 +185,7 @@ Object.assign(homeScenes, {
 });
 for (const [name, data] of Object.entries(homeScenes)) {
   const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...data };
+  lobby.availableRoomCount = roomList.availableRooms(lobby.memberRooms).length;
   const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, ...tabBarVisibility({ data: { lobby } }, 0), list: [
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
     { pagePath: "pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },

@@ -127,56 +127,45 @@ test('小程序房间到期410清除当前牌桌，刷新列表并明确提示�
   }});
   p.roomCode='123456';p.setData({room:{code:'123456'},loading:false});await p.refresh();
   assert.equal(p.data.room,null);assert.match(p.data.notice,/房间已失效/);
-  assert.equal(p.data.unavailableRooms.length,1);p.onUnload();
+  assert.equal(p.data.memberRooms.length,0);assert.doesNotMatch(p.data.notice,/请清理/);p.onUnload();
 });
-test('小程序最近结束只显示三桌，历史包含失效记录并统一折叠、展开和筛选', async () => {
-  const now = Date.now(), rooms = [
-    {code:'111111',status:'playing',available:true,lastActivityAt:1},
+test('小程序自动隐藏失效记录，保留有效历史的展开和状态筛选', async () => {
+  const now=Date.now(), rooms=[{code:'111111',status:'playing',available:true,lastActivityAt:1},
     ...Array.from({length:5},(_,i)=>({code:String(222220+i),status:'ended',available:true,lastActivityAt:now-i*1000})),
     {code:'333333',status:'ended',available:true,lastActivityAt:now-3*86400000},
-    {code:'444444',status:'unavailable',available:false,lastActivityAt:now},
-  ];
+    {code:'444444',status:'unavailable',available:false,lastActivityAt:now}];
   const {p}=page('lobby',{...apiBase,request:async()=>({rooms,serverTime:now})});
-  p.setData({loading:false}); await p.loadRooms();
-  assert.equal(p.data.visibleMemberRooms.length,4); assert.equal(p.data.historyRooms.length,4);
-  assert.equal(p.data.unavailableRooms.length,1); assert.equal(p.data.historyExpanded,false);
-  assert.equal(p.data.historyUnavailableCount,1); assert.equal(p.data.historyRooms[0].code,'444444');
-  p.toggleRoomHistory(); assert.equal(p.data.historyExpanded,true);
-  p.filterRooms({currentTarget:{dataset:{filter:'playing'}}});
-  assert.equal(p.data.visibleMemberRooms.length,1); assert.equal(p.data.showHistorySection,false);
-  assert.equal(p.data.historyRooms.length,0); assert.equal(p.data.historyExpanded,false);
-  p.filterRooms({currentTarget:{dataset:{filter:'unavailable'}}});
-  assert.equal(p.data.historyExpanded,true); assert.equal(p.data.showHistorySection,true);
-  assert.equal(p.data.historyRooms.length,1); assert.equal(p.data.historyRooms[0].code,'444444');
-  p.filterRooms({currentTarget:{dataset:{filter:'ended'}}});
-  assert.equal(p.data.historyUnavailableCount,0); assert.equal(p.data.historyRooms.length,3);
-  p.onUnload();
-});
-test('小程序批量清理只确认一次，取消或后台不写入；网络不确定时保留原编号及选择', async () => {
-  for (const mode of ['cancel','background','confirm','retry']) {
-    let hidden=false, fail=mode==='retry'; const writes=[],dialogs=[];
-    const expired={code:'123456',createdAt:123,status:'unavailable',available:false};
-    const expiredSecond={code:'345678',createdAt:345,status:'unavailable',available:false};
-    const valid={code:'234567',createdAt:234,status:'ended',available:true,lastActivityAt:1};
-    const {p}=page('lobby',{...apiBase,request:async(path,method,data,id)=>{
-      if(method==='POST') {writes.push({path,data,id});if(fail){fail=false;throw new Error('网络中断');}hidden=true;return {removed:2};}
-      return {rooms:hidden?[valid]:[expired,expiredSecond,valid]};
-    }},{wx:{showModal:o=>dialogs.push(o)}});
-    p.setData({loading:false}); await p.loadRooms();
+  try {
+    p.setData({loading:false});await p.loadRooms();
+    assert.equal(p.data.memberRooms.length,7);
+    assert.equal(p.data.visibleMemberRooms.length,4);assert.equal(p.data.historyRooms.length,3);
+    assert.equal(p.data.historyExpanded,false);assert.ok(p.data.memberRooms.every(r=>r.available!==false));
+    assert.equal(p.data.roomFilters.some(f=>f.id==='unavailable'),false);
+    p.toggleRoomHistory();assert.equal(p.data.historyExpanded,true);
+    p.filterRooms({currentTarget:{dataset:{filter:'playing'}}});
+    assert.equal(p.data.visibleMemberRooms.length,1);assert.equal(p.data.showHistorySection,false);
+    assert.equal(p.data.historyRooms.length,0);assert.equal(p.data.historyExpanded,false);
+    p.filterRooms({currentTarget:{dataset:{filter:'unavailable'}}});
+    assert.equal(p.data.roomListFilter,'playing');
+    p.filterRooms({currentTarget:{dataset:{filter:'ended'}}});
     assert.equal(p.data.historyRooms.length,3);
-    const cleaning=p.cleanupUnavailableRooms(); await p.cleanupUnavailableRooms();
-    assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'清理所有失效房间？');
-    assert.match(dialogs[0].content,/全部 2 个失效记录/);
-    assert.equal(dialogs[0].confirmText,'全部清理'); assert.equal(writes.length,0);
-    if(mode==='background')p.onHide();
-    dialogs[0].success({confirm:mode!=='cancel'}); await cleaning;
-    if(mode==='retry') {assert.ok(p.pending);p.data.reconnecting=false;await p.executePending();assert.equal(writes.length,2);assert.equal(writes[0].id,writes[1].id);}
-    assert.equal(writes.length,mode==='retry'?2:mode==='confirm'?1:0);
-    if(hidden) {assert.equal(p.data.unavailableRooms.length,0);assert.match(p.data.notice,/已移除 2 个失效房间/);
-      assert.equal(p.data.historyRooms.length,1);assert.equal(p.data.historyRooms[0].code,valid.code);assert.equal(p.data.historyUnavailableCount,0);}
-    if(writes.length){assert.equal(writes[0].path,'/api/me/rooms/cleanup');assert.equal(JSON.stringify(writes[0].data),JSON.stringify({rooms:[{code:'123456',createdAt:123},{code:'345678',createdAt:345}]}));}
-    assert.equal(p.data.busy,false); p.onUnload();
-  }
+  } finally {p.onUnload();}
+});
+test('小程序从旧服务读取到失效房间时自动隐藏，重新加入后恢复有效入口，无需清理请求', async () => {
+  const expired={code:'123456',status:'unavailable',available:false};
+  let rooms=[expired],writes=0,dialogs=0;
+  const {p}=page('lobby',{...apiBase,request:async(path,method)=>{
+    if(method==='POST')writes++;
+    return {rooms};
+  }},{wx:{showModal:()=>dialogs++}});
+  try {
+    p.setData({loading:false});await p.loadRooms();
+    assert.equal(p.data.availableRoomCount,0);assert.equal(p.data.memberRooms.length,0);
+    assert.equal(p.data.historyRooms.length,0);assert.equal(p.cleanupUnavailableRooms,undefined);
+    rooms=[{...expired,status:'lobby',available:true}];await p.loadRooms();
+    assert.equal(p.data.availableRoomCount,1);assert.equal(p.data.visibleMemberRooms[0].code,'123456');
+    assert.equal(writes,0);assert.equal(dialogs,0);
+  } finally {p.onUnload();}
 });
 test('小程序左滑不触发进入或删除，一次展开一条，点击卡片仅收起并保留菜单入口', async () => {
   const { p } = page('lobby', apiBase);

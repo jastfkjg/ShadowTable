@@ -309,7 +309,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
-    historyRooms: [], unavailableRooms: [], historyExpanded: false, historyUnavailableCount: 0,
+    historyRooms: [], historyExpanded: false, availableRoomCount: 0,
     showHistorySection: true, currentRoomCount: 0,
     roomListFilter: "all",
     roomSwipeCode: "",
@@ -318,7 +318,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     roomMenu: null,
     noteRoom: null,
     roomNoteDraft: "",
-    roomFilters: [{id:"all",label:"全部"},{id:"playing",label:"进行中"},{id:"lobby",label:"待开局"},{id:"ended",label:"已结束"},{id:"unavailable",label:"已失效"}],
+    roomFilters: [{id:"all",label:"全部"},{id:"playing",label:"进行中"},{id:"lobby",label:"待开局"},{id:"ended",label:"已结束"}],
     boardId: "classic",
     boardName: "阿瓦隆 · 经典基础",
     boardRoleConfiguration: [],
@@ -649,7 +649,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const { rooms, serverTime } = await api.request("/api/me/rooms");
     if (this.alive && sequence === this.roomsReadSequence) {
       this.connectionRecovered();
-      const items = roomListItems(rooms);
+      const items = roomListItems(roomList.availableRooms(rooms));
       this.roomsServerTime = serverTime || Date.now();
       this.dismissRoomSwipe();
       this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false),
@@ -745,7 +745,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           return;
         }
         this.setData({
-          notice: e.status === 404 ? "牌桌已删除或不存在" : e.status === 410 ? "房间已失效，请清理列表记录" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
+          notice: e.status === 404 ? "牌桌已删除或不存在" : e.status === 410 ? "房间已失效，已从列表隐藏" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
         await this.loadRooms();
         return;
@@ -1021,27 +1021,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const filter = e.currentTarget.dataset.filter;
     if (!this.data.roomFilters.some(f => f.id === filter)) return;
     this.dismissRoomSwipe();
-    this.setData({ roomListFilter: filter, historyExpanded: filter === "unavailable",
+    this.setData({ roomListFilter: filter, historyExpanded: false,
       ...roomList.present(this.data.memberRooms, filter, this.roomsServerTime || Date.now()) });
   },
   toggleRoomHistory() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
     this.dismissRoomSwipe();
     this.setData({ historyExpanded: !this.data.historyExpanded });
-  },
-  async cleanupUnavailableRooms() {
-    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
-    const rooms = this.data.unavailableRooms.map(r => ({ code: r.code, createdAt: r.createdAt || 0 }));
-    if (!rooms.length) return;
-    this.dismissRoomSwipe();
-    this.setData({ busy: true, error: "" });
-    try {
-      if (!(await this.confirm("清理所有失效房间？",
-        "将移除列表中全部 " + rooms.length + " 个失效记录。\n战绩和复盘保留。", "全部清理"))) return;
-      if (!this.alive || !this.foreground) return;
-      this.setData({ busy: false });
-      await this.mutate("/api/me/rooms/cleanup", { rooms }, "entryCleanup");
-    } finally { this.setData({ busy: false }); }
   },
   async refreshRooms() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
