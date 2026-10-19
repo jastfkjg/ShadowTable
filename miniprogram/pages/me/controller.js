@@ -1,3 +1,4 @@
+const dialog = require("../../dialog");
 const api = require("../../api");
 const { presentProfile, presentStats } = require("../../profile");
 const { selectTab } = require("../../tab-navigation");
@@ -79,5 +80,5 @@ module.exports = function createMePage() { return {
       if (this.alive) this.updateChangedData({ resetError: error.message });
     } finally { if (this.alive) this.updateChangedData({ resetSaving: false }); }
   },
-  about() { wx.showModal({ title: "关于桌边助手", content: "ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。", showCancel: false }); },
+  about() { dialog.show({ title: "关于桌边助手", content: "ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。", showCancel: false }); },
 }; };

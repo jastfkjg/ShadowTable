@@ -33,3 +33,4 @@
     <button wx:if="{{terminal}}" class="secondary" bindtap="back" hover-class="none">返回小程序</button>
   </block>
 </view>
+<app-dialog id="app-dialog" />

@@ -99,3 +99,4 @@
     <view class="transfer-footer"><button hover-class="none" class="transfer-cancel" bindtap="closeKick" disabled="{{busy}}">取消</button></view>
   </view>
 </view>
+<app-dialog id="app-dialog" />

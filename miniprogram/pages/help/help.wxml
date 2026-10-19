@@ -37,3 +37,4 @@
   </block>
   <template wx:else is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,scoringOnly}}" />
 </view>
+<app-dialog id="app-dialog" />

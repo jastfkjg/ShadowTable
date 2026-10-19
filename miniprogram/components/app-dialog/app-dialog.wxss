@@ -1,0 +1,21 @@
+.app-dialog-backdrop { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:24px; background:var(--overlay-scrim,rgba(2,10,15,.7)); }
+.app-dialog { display:flex; flex-direction:column; width:100%; max-width:350px; max-height:calc(100vh - 48px - env(safe-area-inset-bottom)); box-sizing:border-box; padding:26px 24px 24px; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-radius:var(--dialog-radius,22px); background:var(--surface,#1b2b35); color:var(--text,#f2eee5); box-shadow:0 20px 70px rgba(0,0,0,.28); text-align:left; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; animation:app-dialog-enter 160ms ease-out; }
+.app-dialog-title { flex-shrink:0; font-size:20px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.app-dialog-context { display:flex; flex-shrink:0; align-items:center; flex-wrap:wrap; gap:9px; margin-top:16px; color:var(--muted,#b1bfc6); font-size:13px; line-height:1.6; }
+.app-dialog-context image { flex-shrink:0; width:18px; height:18px; }
+.app-dialog-context-value { color:var(--accent,#e5c68b); font-size:16px; letter-spacing:1.3px; font-weight:500; font-variant-numeric:tabular-nums; }
+.app-dialog-context-meta { border-left:1px solid var(--border,#536570); padding-left:10px; }
+.app-dialog-body { flex-shrink:1; min-height:0; max-height:48vh; margin-top:20px; }
+.app-dialog-message { color:var(--muted,#b1bfc6); font-size:14px; line-height:1.85; white-space:pre-wrap; overflow-wrap:anywhere; }
+.app-dialog-actions { display:flex; flex-shrink:0; gap:12px; margin-top:26px; }
+.app-dialog-actions button { display:flex; flex:1; align-items:center; justify-content:center; width:0; min-width:0; min-height:48px; box-sizing:border-box; margin:0; padding:12px 8px; border-radius:var(--dialog-control-radius,12px); font-size:15px; font-weight:500; line-height:1.5; }
+.app-dialog-actions button::after { border:0; }
+.app-dialog-actions .app-dialog-cancel { border:1px solid var(--control-border,#8295a0); background:var(--control-bg,#14232c); color:var(--text,#f2eee5); }
+.app-dialog-actions .app-dialog-confirm { border:1px solid var(--accent,#e5c68b); background:var(--accent,#e5c68b); color:var(--bg,#101c24); font-weight:600; }
+.app-dialog-actions .is-danger { border-color:var(--evil,#f2b6ae); background:var(--evil,#f2b6ae); }
+.app-dialog-pressed { opacity:.78; }
+.app-dialog-actions button:focus-visible { outline:2px solid var(--accent,#e5c68b); outline-offset:3px; }
+@keyframes app-dialog-enter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media(max-width:350px) { .app-dialog-backdrop { padding:20px; }.app-dialog { padding:24px 20px; }.app-dialog-title { font-size:19px; } }
+@media(max-height:500px) { .app-dialog { max-height:calc(100vh - 32px); padding:20px 24px; }.app-dialog-backdrop { padding:16px; }.app-dialog-context { margin-top:10px; }.app-dialog-body { margin-top:12px; max-height:35vh; }.app-dialog-actions { margin-top:18px; } }
+@media(prefers-reduced-motion:reduce) { .app-dialog { animation:none; } }

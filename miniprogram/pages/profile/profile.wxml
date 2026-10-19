@@ -51,3 +51,4 @@
     </view>
   </form>
 </view>
+<app-dialog id="app-dialog" />

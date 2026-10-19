@@ -58,5 +58,8 @@
         "selectedIconPath": "assets/tab-me-active.png"
       }
     ]
+  },
+  "usingComponents": {
+    "app-dialog": "/components/app-dialog/app-dialog"
   }
 }

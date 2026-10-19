@@ -79,8 +79,8 @@ switch {
   min-width: 0;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1rpx solid var(--border);
-  border-radius: 28rpx;
+  border: 1rpx solid var(--overlay-border);
+  border-radius:var(--dialog-radius);
   background: var(--surface);
   box-shadow: 0 24rpx 80rpx rgba(0, 0, 0, 0.3);
 }
@@ -171,7 +171,7 @@ switch {
   min-height: 88rpx;
   margin: 0;
   border: 0;
-  border-radius: 16rpx;
+  border-radius:var(--dialog-control-radius);
   background: var(--bg);
   color: var(--text);
   font-size: 28rpx;

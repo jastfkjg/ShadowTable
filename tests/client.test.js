@@ -35,6 +35,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
     {
       module: { exports: {} },
       require: name => {
+        if (name === '../../dialog') return { show: options => wx.showModal(options) };
         if (name === '../../player-card') return require('../miniprogram/player-card');
         if (name === '../../honors') return require('../miniprogram/honors');
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
@@ -1759,7 +1760,8 @@ test("首页个人牌桌备注、确认移除和重新进入保持座位，重�
     lobby.startRoomSwipeAction();
     await lobby.swipeRoomAction({currentTarget:{dataset:{code,kind:'hide'}}});
     assert.equal(lobby.data.memberRooms.length, 0);
-    assert.equal(lobby.data.notice, '已从列表移除');
+    assert.equal(lobby.data.notice, '');
+    assert.equal(lobby.data.roomFeedback, '已移除');
     await lobby.openRoom({currentTarget:{dataset:{code}}});
     assert.equal(lobby.data.memberRooms[0].note, '周五朋友局');
     const resumed = guest.freshPage(); await resumed.bootstrap();
@@ -1790,7 +1792,8 @@ test("个人记录写入响应丢失时保留原幂等键，重试确认后再�
   assert.equal(p.pending, null);
   assert.equal(calls.length, 2);
   assert.deepEqual(calls[0], calls[1]);
-  assert.equal(p.data.notice, '已从列表移除');
+  assert.equal(p.data.notice, '');
+  assert.equal(p.data.roomFeedback, '已移除');
 });
 
 test("列表进入期间仅标记目标房间，阻止重复进入且失败后清除状态", async () => {

@@ -3,3 +3,4 @@
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="openRecords" hover-class="none">重新打开</button></view>
   <view wx:else class="status">正在打开对局记录…</view>
 </view>
+<app-dialog id="app-dialog" />

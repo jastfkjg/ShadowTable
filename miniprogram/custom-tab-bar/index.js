@@ -5,6 +5,7 @@ Component({
     keyboardVisible: false,
     entrySheetVisible: false,
     roomMenuVisible: false,
+    dialogVisible: false,
     list: [
       { pagePath: "/pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
       { pagePath: "/pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },
@@ -43,7 +44,7 @@ Component({
     switchTab(event) {
       const index = Number(event.currentTarget.dataset.index);
       const item = this.data.list[index];
-      if (!item || index === this.data.selected || this.switching || this.data.entrySheetVisible || this.data.roomMenuVisible || this.data.keyboardVisible) return;
+      if (!item || index === this.data.selected || this.switching || this.data.dialogVisible || this.data.entrySheetVisible || this.data.roomMenuVisible || this.data.keyboardVisible) return;
       const pages = getCurrentPages();
       const page = pages[pages.length - 1];
       if (typeof page?.switchMainTab === "function") {

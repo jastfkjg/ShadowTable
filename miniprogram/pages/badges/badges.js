@@ -1,3 +1,4 @@
+const dialog = require("../../dialog");
 const api = require('../../api');
 const { presentCollection, rules } = require('../../badges');
 const { initialBadgeManager, badgeManagerMethods } = require('../../badge-manager');
@@ -41,7 +42,7 @@ Page({
   },
   closeBadgeDetail() { this.setData({ selectedBadge: null, badgeDetailHeight: 0 }); },
   manageBadges() { if (!this.data.badgeManagerSaving && !this.data.badgeManagerLoading) this.setData({ badgeManaging: !this.data.badgeManaging }); },
-  showBadgeRules() { wx.showModal({ title: '荣誉徽章规则', content: rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时，请先摘下一枚。', showCancel: false }); },
+  showBadgeRules() { dialog.show({ title: '荣誉徽章规则', content: rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时，请先摘下一枚。', showCancel: false }); },
   blockScroll() {},
   back: backToMe,
 });

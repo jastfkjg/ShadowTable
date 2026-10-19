@@ -35,7 +35,7 @@
 .honor-votes { color: var(--honor-color); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .honor-result.is-settled + button { margin-top: 18px; }
 .dialog-backdrop.honor-backdrop { padding: 0; align-items: flex-end; }
-.honor-sheet { --honor-color: #e5c68b; width: 100%; max-width: 540px; max-height: 92vh; display: flex; flex-direction: column; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 22px 22px 0 0; overflow: hidden; padding-bottom: env(safe-area-inset-bottom); }
+.honor-sheet { --honor-color: #e5c68b; width: 100%; max-width: 540px; max-height: 92vh; display: flex; flex-direction: column; box-sizing: border-box; background: var(--surface); border: 1px solid var(--overlay-border); border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; overflow: hidden; padding-bottom: env(safe-area-inset-bottom); }
 .honor-handle { flex-shrink: 0; margin: 10px auto 0; width: 32px; height: 4px; border-radius: 4px; background: var(--border); }
 .honor-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 20px; flex-shrink: 0; }
 button.honor-later { width: auto; min-width: 48px; min-height: 48px; padding: 8px; margin: 0 -8px 0 0; color: var(--muted); font-size: 13px; }

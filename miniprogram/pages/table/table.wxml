@@ -1,2 +1,3 @@
 <import src="../home/role-groups.wxml" />
 <include src="./shared.wxml" />
+<app-dialog id="app-dialog" />

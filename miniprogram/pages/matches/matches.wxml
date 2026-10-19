@@ -1,1 +1,2 @@
 <include src="../records/shell.wxml" />
+<app-dialog id="app-dialog" />

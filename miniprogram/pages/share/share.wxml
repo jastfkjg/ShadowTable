@@ -20,3 +20,4 @@
 </view>
 </view>
 <canvas type="2d" id="share-canvas" class="share-canvas" aria-hidden="true" />
+<app-dialog id="app-dialog" />

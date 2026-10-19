@@ -1,0 +1,8 @@
+/* Shared visual language for alerts, confirmations and content sheets. */
+page {
+  --overlay-scrim: rgba(2, 10, 15, 0.7);
+  --overlay-border: rgba(177, 191, 198, 0.24);
+  --dialog-radius: 22px;
+  --sheet-radius: 24px;
+  --dialog-control-radius: 12px;
+}

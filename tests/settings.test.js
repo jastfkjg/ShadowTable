@@ -11,7 +11,9 @@ function page(api, wxOverrides = {}) {
       "utf8",
     ),
     {
-      require: () => api,
+      require: name => name === '../../dialog'
+        ? { show: options => (wxOverrides.showModal || (o => o.success({ confirm: true })))(options) }
+        : api,
       Page: (p) => (definition = p),
       wx: {
         showToast: () => {},

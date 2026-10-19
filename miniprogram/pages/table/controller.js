@@ -1,3 +1,4 @@
+const dialog = require("../../dialog");
 const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const funCopy = require("../../fun-copy");
@@ -11,6 +12,8 @@ const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
+// The sheet enters over 180ms; allow one render frame before raising the keyboard.
+const ENTRY_FOCUS_DELAY = 200;
 function roomListItems(rooms) {
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
@@ -242,6 +245,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     recoverableError: false,
     hasPendingRequest: false,
     notice: "",
+    roomFeedback: "",
     room: null,
     ...initialPlayerCardData,
     latestResult: null,
@@ -256,6 +260,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     availableBoards: [],
     entryMode: "join",
     entrySheet: false,
+    entryMeasuring: false,
     entryFocusedField: "",
     entryScrollTarget: "",
     entryKeyboardHeight: 0,
@@ -304,8 +309,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
-    historyRooms: [], unavailableRooms: [], historyExpanded: false, unavailableExpanded: false,
-    showHistorySection: true, showUnavailableSection: true, currentRoomCount: 0,
+    historyRooms: [], unavailableRooms: [], historyExpanded: false, historyUnavailableCount: 0,
+    showHistorySection: true, currentRoomCount: 0,
     roomListFilter: "all",
     roomSwipeCode: "",
     roomSwipeOffset: 0,
@@ -382,6 +387,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   onHide() {
     this.foreground = false;
+    this.clearRoomFeedback();
     this.dismissRoomSwipe();
     this.resetEntryFocus();
     clearTimeout(this.timer);
@@ -402,6 +408,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   onUnload() {
     this.alive = false;
     this.foreground = false;
+    this.clearRoomFeedback();
+    this.cancelEntryAutoFocus();
     clearTimeout(this.timer);
     wx.offNetworkStatusChange(this.networkListener);
     this.mask();
@@ -413,6 +421,23 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         changed[key] = values[key];
     }
     if (Object.keys(changed).length) this.setData(changed);
+  },
+  clearRoomFeedback() {
+    clearTimeout(this.roomFeedbackTimer);
+    this.roomFeedbackTimer = null;
+    this.roomFeedbackRevision = (this.roomFeedbackRevision || 0) + 1;
+    this.updateChangedData({ roomFeedback: "" });
+  },
+  showRoomFeedback(message) {
+    this.clearRoomFeedback();
+    if (!this.alive || !this.foreground) return;
+    const revision = this.roomFeedbackRevision;
+    this.setData({ roomFeedback: message });
+    this.roomFeedbackTimer = setTimeout(() => {
+      if (revision !== this.roomFeedbackRevision) return;
+      this.roomFeedbackTimer = null;
+      if (this.alive) this.setData({ roomFeedback: "" });
+    }, 1500);
   },
   mask() {
     this.dismissRoomSwipe();
@@ -996,18 +1021,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const filter = e.currentTarget.dataset.filter;
     if (!this.data.roomFilters.some(f => f.id === filter)) return;
     this.dismissRoomSwipe();
-    this.setData({ roomListFilter: filter, historyExpanded: false, unavailableExpanded: filter === "unavailable",
+    this.setData({ roomListFilter: filter, historyExpanded: filter === "unavailable",
       ...roomList.present(this.data.memberRooms, filter, this.roomsServerTime || Date.now()) });
   },
   toggleRoomHistory() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
     this.dismissRoomSwipe();
     this.setData({ historyExpanded: !this.data.historyExpanded });
-  },
-  toggleUnavailableRooms() {
-    if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
-    this.dismissRoomSwipe();
-    this.setData({ unavailableExpanded: !this.data.unavailableExpanded });
   },
   async cleanupUnavailableRooms() {
     if (this.data.busy || this.pending || this.data.loading || this.data.roomsRefreshing) return;
@@ -1016,8 +1036,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.dismissRoomSwipe();
     this.setData({ busy: true, error: "" });
     try {
-      if (!(await this.confirm("清理 " + rooms.length + " 个失效房间？",
-        "仅从你的牌桌列表移除这些失效记录，保留战绩和复盘，不影响其他用户。", "清理"))) return;
+      if (!(await this.confirm("清理所有失效房间？",
+        "将移除列表中全部 " + rooms.length + " 个失效记录。\n战绩和复盘保留。", "全部清理"))) return;
       if (!this.alive || !this.foreground) return;
       this.setData({ busy: false });
       await this.mutate("/api/me/rooms/cleanup", { rooms }, "entryCleanup");
@@ -1112,9 +1132,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.setData({ busy: true, error: "" });
     try {
       if (!(await this.confirm(
-        "从列表移除房间 " + code + "？",
-        "只移除你列表中的记录，不会离开或解散房间，也不会删除战绩。重新进入房间后会恢复显示。",
-        "移除",
+        "移除这条房间记录？",
+        "仅从你的列表中移除，房间、座位和战绩都会保留。",
+        "移除记录",
+        { contextLabel: "房间", contextValue: code, contextMeta: this.data.memberRooms.find(room => room.code === code)?.statusLabel || "" },
       ))) return;
       if (!this.alive || !this.foreground) return;
       this.setData({ busy: false });
@@ -1132,7 +1153,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (kind === "delete" && room.isHost && room.available !== false)
       return this.deleteRoom({ currentTarget: { dataset: { code: room.code } } });
     if (kind === "leave" && room.canLeave) {
-      if (!(await this.confirm("离开房间 " + room.code + "？", "你将退出成员关系并释放座位。房间不会解散；房主离开后仍保留管理权。"))) return;
+      if (!(await this.confirm("离开房间 " + room.code + "？", "将释放你的座位，房间和房主权限保留。"))) return;
       if (this.data.busy || this.pending) return;
       this.setData({ busy: true });
       try {
@@ -1160,6 +1181,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           "解散房间 " + code + "？",
           "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
           "解散",
+          { danger: true },
         ))
       )
         return;
@@ -1263,26 +1285,51 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.dismissRoomSwipe();
     const mode = e.currentTarget.dataset.mode;
     if (!["join", "create"].includes(mode)) return;
-    this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
+    this.cancelEntryAutoFocus();
+    const revision = this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
+    const hadKeyboard = !!(this.data.entryFocusedField || this.data.entryKeyboardHeight);
+    this.entryAutoFocusPending = mode === "join";
     this.setData({
       entryMode: mode,
       entrySheet: true,
+      entryMeasuring: true,
       entryFocusedField: "",
+      entryScrollTarget: "",
       entryKeyboardHeight: 0,
       entryBodyHeight: 0,
       entryNameError: "", entryCodeError: "", entryError: "",
       error: "",
       notice: "",
     }, () => {
-      if (mode === "join" && this.data.entrySheet && this.foreground)
-        this.setData({ entryFocusedField: this.data.nicknameSetup || !this.data.name.trim() ? "nickname" : "code" });
-      this.syncRoomSheetLayout("entry");
+      if (revision === this.entrySheetRevision) this.syncRoomSheetLayout("entry");
     });
+    if (hadKeyboard) wx.hideKeyboard?.();
+  },
+  cancelEntryAutoFocus() {
+    clearTimeout(this.entryFocusTimer);
+    this.entryFocusTimer = null;
+    this.entryAutoFocusPending = false;
+  },
+  focusEntryAfterOpen(revision) {
+    if (!this.entryAutoFocusPending || revision !== this.entrySheetRevision || !this.alive || !this.foreground || !this.data.entrySheet) return;
+    clearTimeout(this.entryFocusTimer);
+    this.entryFocusTimer = setTimeout(() => {
+      this.entryFocusTimer = null;
+      if (!this.entryAutoFocusPending || revision !== this.entrySheetRevision) return;
+      this.entryAutoFocusPending = false;
+      if (!this.alive || !this.foreground || !this.data.entrySheet || this.data.entryMode !== "join" ||
+          this.data.entryFocusedField || this.data.busy || this.pending || this.data.hasPendingRequest) return;
+      this.setData({ entryFocusedField: this.data.nicknameSetup || !this.data.name.trim() ? "nickname" : "code" });
+    }, ENTRY_FOCUS_DELAY);
   },
   resetEntryFocus() {
-    this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
+    this.cancelEntryAutoFocus();
+    const revision = this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
     if (this.data.entryFocusedField || this.data.entryKeyboardHeight) {
-      this.setData({ entryFocusedField: "", entryKeyboardHeight: 0 });
+      this.setData({ entryFocusedField: "", entryKeyboardHeight: 0, entryScrollTarget: "" }, () => {
+        if (revision === this.entrySheetRevision) this.syncRoomSheetLayout("entry");
+      });
+      // The submit button also calls this: native form values can wait for input blur.
       wx.hideKeyboard?.();
     }
   },
@@ -1293,15 +1340,20 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   editEntryName() {
     if (!this.data.entrySheet || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
+    this.cancelEntryAutoFocus();
     this.setData({ entryFocusedField: "nickname", entryScrollTarget: "entry-name-block" });
   },
   editEntryCode() {
     if (!this.data.entrySheet || this.data.entryMode !== "join" || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
+    this.cancelEntryAutoFocus();
     this.setData({ entryFocusedField: "code", entryScrollTarget: "entry-code-block" });
   },
   entryInputFocus(e) {
     if (!this.data.entrySheet || !this.foreground) return;
-    this.setData({ entryFocusedField: e.currentTarget.dataset.field });
+    this.cancelEntryAutoFocus();
+    const field = e.currentTarget.dataset.field;
+    if (this.data.entryFocusedField !== field)
+      this.setData({ entryFocusedField: field, entryScrollTarget: field === "code" ? "entry-code-block" : "entry-name-block" });
     this.entryKeyboardChange(e);
   },
   entryInputBlur(e) {
@@ -1310,7 +1362,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   entryKeyboardChange(e) {
     if (!this.data.entrySheet || !this.foreground || !Number.isFinite(e.detail.height)) return;
-    this.setData({ entryKeyboardHeight: Math.max(0, e.detail.height), entryScrollTarget: "" }, () => {
+    const height = Math.max(0, e.detail.height);
+    if (height === this.data.entryKeyboardHeight) return;
+    const revision = this.entrySheetRevision;
+    this.setData({ entryKeyboardHeight: height, entryScrollTarget: "" }, () => {
+      if (!this.alive || !this.foreground || !this.data.entrySheet || revision !== this.entrySheetRevision || height !== this.data.entryKeyboardHeight) return;
       if (this.data.entrySheet && this.foreground && this.data.entryFocusedField)
         this.setData({ entryScrollTarget: this.data.entryFocusedField === "code" ? "entry-code-block" : "entry-name-block" });
       this.syncRoomSheetLayout("entry");
@@ -1319,20 +1375,28 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   entryAvatarError() { this.setData({ entryAvatarFailed: true }); },
   syncRoomSheetLayout(kind) {
     const entry = kind === "entry", openKey = entry ? "entrySheet" : "showRoomRules";
-    if (!this.data[openKey] || !this.foreground || !wx.createSelectorQuery) return;
+    if (!this.data[openKey] || !this.foreground) return;
     this.sheetLayoutRevisions = this.sheetLayoutRevisions || {};
     const revision = this.sheetLayoutRevisions[kind] = (this.sheetLayoutRevisions[kind] || 0) + 1;
     const entryRevision = this.entrySheetRevision;
+    const applyHeight = height => {
+      if (!this.alive || !this.foreground || !this.data[openKey] || revision !== this.sheetLayoutRevisions[kind] || entry && entryRevision !== this.entrySheetRevision) return;
+      const patch = {}, key = entry ? "entryBodyHeight" : "roomRulesBodyHeight";
+      if (height !== null && this.data[key] !== height) patch[key] = height;
+      const opening = entry && this.data.entryMeasuring;
+      if (opening) patch.entryMeasuring = false;
+      const rendered = () => { if (opening) this.focusEntryAfterOpen(entryRevision); };
+      if (Object.keys(patch).length) this.setData(patch, rendered);
+      else rendered();
+    };
+    if (!wx.createSelectorQuery) { applyHeight(null); return; }
     const run = () => {
-      if (!this.alive || !this.foreground || !this.data[openKey]) return;
+      if (!this.alive || !this.foreground || !this.data[openKey] || revision !== this.sheetLayoutRevisions[kind] || entry && entryRevision !== this.entrySheetRevision) return;
       const query = wx.createSelectorQuery();
       const prefix = entry ? ".entry" : ".room-rules";
       for (const suffix of ["-backdrop", "-sheet-top", "-sheet-fields", "-sheet-footer"]) query.select(prefix + suffix).boundingClientRect();
       query.exec(rects => {
-        if (!this.alive || !this.foreground || !this.data[openKey] || revision !== this.sheetLayoutRevisions[kind] || entry && entryRevision !== this.entrySheetRevision) return;
-        const height = roomSheet.fitBody(rects, entry ? this.data.entryKeyboardHeight : 0);
-        const key = entry ? "entryBodyHeight" : "roomRulesBodyHeight";
-        if (height !== null && this.data[key] !== height) this.setData({ [key]: height });
+        applyHeight(roomSheet.fitBody(rects, entry ? this.data.entryKeyboardHeight : 0));
       });
     };
     if (wx.nextTick) wx.nextTick(run); else run();
@@ -1370,6 +1434,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   pasteRoomCode() {
     if (this.data.busy || this.pending || !this.data.entrySheet) return;
+    this.cancelEntryAutoFocus();
     const revision = this.entrySheetRevision;
     wx.getClipboardData?.({
       success: ({ data }) => {
@@ -1432,7 +1497,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   showQuestRecord(e) {
     const entry = this.data.questTimeline.find(h => h.key === Number(e.currentTarget.dataset.key));
     if (!entry) return;
-    wx.showModal({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
+    dialog.show({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
   },
   openHelp() {
     wx.navigateTo({ url: "/pages/help/help" });
@@ -1570,8 +1635,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       if (["entryHide", "entryRestore", "entryNote", "entryCleanup"].includes(pending.after)) {
         this.setData({ roomMenu: null, noteRoom: null,
-          notice: pending.after === "entryCleanup" ? roomList.cleanupNotice(result.removed) : pending.after === "entryHide" ? "已从列表移除" : pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
+          notice: pending.after === "entryCleanup" ? roomList.cleanupNotice(result.removed) : pending.after === "entryHide" ? "" : pending.after === "entryNote" ? "个人备注已保存" : "已恢复牌桌记录" });
         await this.loadRooms();
+        if (pending.after === "entryHide") this.showRoomFeedback("已移除");
       } else if (pending.after === "leave" || pending.after === "delete") {
         this.clearRoom();
         this.setData({
@@ -1739,12 +1805,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   ready() {
     this.cmd("ready", { ready: !this.data.room.me.ready });
   },
-  async confirm(title, content, confirmText = "确定") {
+  async confirm(title, content, confirmText = "确定", options = {}) {
+    if (!this.alive || !this.foreground) return false;
     return new Promise((resolve) =>
-      wx.showModal({
+      dialog.show({
         title,
         content,
         confirmText,
+        ...options,
         success: (r) => resolve(r.confirm),
         fail: () => resolve(false),
       }),
@@ -1752,7 +1820,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async confirmCommand(title, content, type, extra = {}) {
     const stage = this.data.room?.stage;
-    if (!(await this.confirm(title, content))) return;
+    if (!(await this.confirm(title, content, "确定", { danger: ["terminate", "cancelActivity"].includes(type) }))) return;
     if (!this.foreground || this.data.room?.stage !== stage) {
       this.setData({ error: "阶段已变化，请查看当前阶段后重新操作" });
       return;
@@ -2054,8 +2122,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       !(await this.confirm(
         "离开房间？",
         room.me.isHost
-          ? "离开仅释放座位，牌桌与房主身份保留，可从我的牌桌重新入座。"
-          : "离开后将释放你的座位，牌桌保留。重新加入需要输入房间码。",
+          ? "将释放你的座位，牌桌和房主权限保留。"
+          : "将释放你的座位，牌桌保留。",
       ))
     )
       return;
@@ -2084,7 +2152,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         : this.data.busy || this.data.loading || this.data.roomsRefreshing || this.pending
           ? "正在确认操作，请稍候。"
           : "最近一次服务器请求成功。";
-    wx.showModal({ title: "连接状态", content, showCancel: false });
+    dialog.show({ title: "连接状态", content, showCancel: false });
   },
   closeAction() {
     this.actionGeneration = (this.actionGeneration || 0) + 1;

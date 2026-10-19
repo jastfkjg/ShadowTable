@@ -11,6 +11,7 @@ const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
 const roomSwipe = require("../miniprogram/room-swipe");
 const roomList = require("../miniprogram/room-list");
+const { present: presentDialog } = require("../miniprogram/dialog");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
 const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require("../miniprogram/room-sheet-presentation");
@@ -41,17 +42,20 @@ function html(node) {
       value = "data:" + mime + ";base64," + fs.readFileSync(path.join(root, value)).toString("base64");
     }
     if (key === "style") value = String(value).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
-    return ["id", "class", "src", "style", "role", "aria-label", "aria-selected", "aria-pressed", "aria-expanded", "aria-hidden", "aria-modal", "value", "placeholder", "maxlength"].includes(key) ? [`${key}="${safe(value)}"`] : [];
+    return ["id", "class", "src", "style", "role", "aria-label", "aria-live", "aria-busy", "aria-selected", "aria-pressed", "aria-expanded", "aria-hidden", "aria-haspopup", "aria-modal", "value", "placeholder", "maxlength"].includes(key) ? [`${key}="${safe(value)}"`] : [];
   }).join(" ");
   return `<${tag} ${attrs}>${(node.children || []).map(html).join("")}${["img", "input"].includes(tag) ? "" : `</${tag}>`}`;
 }
-const projection = 'body{margin:0}button,input{font:inherit}button{border:0;width:100%}span{display:inline}img{object-fit:contain}a{text-decoration:none;color:inherit}input{box-sizing:border-box}[hidden]{display:none!important}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;z-index:500;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
-const common = css("app.wxss") + css("components/app-nav/app-nav.wxss");
+// Include native button clipping so nested rounded outlines cannot hide QA defects.
+const projection = 'body{margin:0}button,input{font:inherit}button{position:relative;overflow:hidden;border:0;width:100%}span{display:inline}img{object-fit:contain}a{text-decoration:none;color:inherit}input{box-sizing:border-box}[hidden]{display:none!important}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;z-index:500;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
+const common = css("app.wxss") + css("components/app-nav/app-nav.wxss") + css("components/app-dialog/app-dialog.wxss");
 fs.mkdirSync(output, { recursive: true });
 const scenes = [];
 function write(name, file, data, styles, extra = "") {
   const rendered = html(factory(file)(data));
-  fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>桌边助手 · ${name} · 实际模板</title><style>${projection}${common}${styles}</style>${rendered}${extra}<div class="preview-homebar"></div></html>`);
+  const dialog = data.appDialog || data.lobby?.appDialog;
+  const alert = dialog ? html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...presentDialog(dialog), id: 1 } })) : "";
+  fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>桌边助手 · ${name} · 实际模板</title><style>${projection}${common}${styles}${dialog?'.tab-bar{display:none}.preview-homebar{z-index:5100}':''}</style>${rendered}${extra}${alert}<div class="preview-homebar"></div></html>`);
   scenes.push(name);
 }
 // Browser projection of the native selector-query measurement, not app behavior.
@@ -130,20 +134,36 @@ homeScenes["home-room-organized"] = organized;
 homeScenes["home-room-history"] = { ...organized, historyExpanded: true };
 homeScenes["home-room-history-entering"] = { ...organized, historyExpanded: true, busy: true, hasPendingRequest: true, enteringCode: organizedRooms[1].code };
 homeScenes["home-room-history-refreshing"] = { ...organized, historyExpanded: true, roomsRefreshing: true };
-homeScenes["home-room-unavailable"] = { ...organized, unavailableExpanded: true };
+homeScenes["home-room-unavailable"] = { memberRooms: organizedRooms, ...roomList.present(organizedRooms, "unavailable", roomsNow), roomListFilter: "unavailable", historyExpanded: true };
 homeScenes["home-history-only"] = { memberRooms: [organizedRooms[6]], ...roomList.present([organizedRooms[6]], "all", roomsNow) };
 homeScenes["home-unavailable-only"] = { memberRooms: [organizedRooms[7]], ...roomList.present([organizedRooms[7]], "all", roomsNow) };
+const cleanupRooms = [
+  room("534718", "unavailable", "12 人", "房间已解散", "10/17 11:55", { updatedAt: roomsNow - 4 * 86400000, statusLabel: "已失效", available: false, canSwipeDissolve: false }),
+  room("201375", "unavailable", "12 人", "房间已解散", "10/16 21:24", { updatedAt: roomsNow - 5 * 86400000, statusLabel: "已失效", available: false, canSwipeDissolve: false }),
+];
+const cleanupHistory = { memberRooms: cleanupRooms, ...roomList.present(cleanupRooms, "all", roomsNow), historyExpanded: true };
+homeScenes["home-room-cleanup"] = cleanupHistory;
+homeScenes["home-room-cleanup-confirm"] = { ...cleanupHistory, appDialog: { title: "清理所有失效房间？", content: "将移除列表中全部 2 个失效记录。\n战绩和复盘保留。", confirmText: "全部清理" } };
 const redesignRooms = [room("201375", "ended", "12 人", "我是房主 · 1号", "昨天 21:24", { updatedAt: roomsNow - 86400000, entryLabel: "查看结果" }),
   room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:29", { updatedAt: roomsNow - 6 * 86400000, entryLabel: "查看结果", boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false }),
   room("534718", "unavailable", "12 人", "房间已解散", "11:55", { updatedAt: roomsNow - 7 * 86400000, statusLabel: "已失效", entryLabel: "已失效", available: false, canSwipeDissolve: false })];
 const redesign = { memberRooms: redesignRooms, ...roomList.present(redesignRooms, "all", roomsNow), historyExpanded: true };
 homeScenes["home-room-redesign"] = redesign;
 homeScenes["home-room-redesign-collapsed"] = { ...redesign, historyExpanded: false };
-homeScenes["home-room-redesign-expanded"] = { ...redesign, unavailableExpanded: true };
-homeScenes["home-room-redesign-refreshing"] = { ...redesign, unavailableExpanded: true, roomsRefreshing: true };
+homeScenes["home-room-redesign-expanded"] = redesign;
+const remainingRedesignRooms = redesignRooms.filter(room => room.code !== "273843");
+homeScenes["home-room-removed"] = { memberRooms: remainingRedesignRooms, ...roomList.present(remainingRedesignRooms, "all", roomsNow), historyExpanded: true };
+homeScenes["home-room-removed-feedback"] = { ...homeScenes["home-room-removed"], roomFeedback: "已移除" };
+homeScenes["home-room-redesign-refreshing"] = { ...redesign, roomsRefreshing: true };
 homeScenes["home-room-redesign-swipe"] = { ...redesign, roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
-homeScenes["home-room-redesign-swipe-expired"] = { ...redesign, unavailableExpanded: true, roomSwipeCode: redesignRooms[2].code, roomSwipeOffset: -roomSwipe.width() };
-homeScenes["home-room-redesign-swipe-host"] = { ...redesign, historyRooms: [{ ...redesignRooms[1], isHost: true, canSwipeDissolve: true }], roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
+homeScenes["home-room-redesign-swipe-expired"] = { ...redesign, roomSwipeCode: redesignRooms[2].code, roomSwipeOffset: -roomSwipe.width() };
+homeScenes["home-room-redesign-swipe-host"] = { ...redesign, historyRooms: redesign.historyRooms.map(r => r.code === redesignRooms[1].code ? { ...r, isHost: true, canSwipeDissolve: true } : r), roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
+for (const [name, appDialog] of Object.entries({
+  'dialog-remove': { title:'移除这条房间记录？', content:'仅从你的列表中移除，房间、座位和战绩都会保留。', contextLabel:'房间', contextValue:'273843', contextMeta:'已结束', confirmText:'移除记录' },
+  'dialog-dissolve': { title:'解散房间 273843？', content:'所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。', confirmText:'解散', danger:true },
+  'dialog-information': { title:'关于桌边助手', content:'ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', showCancel:false },
+  'dialog-long': { title:'荣誉徽章规则', content:require('../miniprogram/badges').rules + '\n趣味徽章按次数榜授予。最多佩戴3枚。', showCancel:false },
+})) homeScenes[name] = { ...redesign, appDialog };
 function entryScene(capacity, boardId, extra = {}) {
   const page = createTable({ lobby: true });
   page.data = { ...page.data, boards: BOARDS };
@@ -171,7 +191,7 @@ for (const [name, data] of Object.entries(homeScenes)) {
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },
     { pagePath: "pages/me/me", text: "我的", icon: "/assets/tab-me.png", activeIcon: "/assets/tab-me-active.png" },
   ] }));
-  write(name, "pages/lobby/lobby.wxml", { activeTab: 0, lobby, personal: {} }, css("pages/lobby/lobby.wxss") + css("custom-tab-bar/index.wxss") + ".tab-bar{height:78px;padding-bottom:28px}.entry-sheet-footer{padding-bottom:40px}.entry-sheet.has-keyboard .entry-sheet-footer{padding-bottom:12px}.preview-homebar{z-index:1200}", tabs + sheetProjection);
+  write(name, "pages/lobby/lobby.wxml", { activeTab: 0, lobby, personal: {} }, css("pages/lobby/lobby.wxss") + css("custom-tab-bar/index.wxss") + ".tab-bar{height:78px;padding-bottom:28px}.room-feedback.above-tab{bottom:94px}.entry-sheet-footer{padding-bottom:40px}.entry-sheet.has-keyboard .entry-sheet-footer{padding-bottom:12px}.preview-homebar{z-index:1200}", tabs + sheetProjection);
 }
 // These fixtures render the production table templates, including private DOM
 // guards. Sample stats are illustrative; game choices come from privateView.
@@ -211,6 +231,10 @@ const tableScenes = {
   'player-card-error':{...tablePlaying,playerCard:playerSample,playerCardError:'网络暂时不可用，请稍后重试'},
   'player-card-untracked':{...tablePlaying,playerCard:playerSample,playerCardStatus:'untracked'},
 };
+const completedSource = tableFixtures.completed();
+tableScenes['table-ended'] = tableScene(completedSource, 'wx:replay-5');
+tableScenes['table-ended-busy'] = { ...tableScenes['table-ended'], busy: true };
+tableScenes['table-ended-host'] = tableScene(completedSource, 'wx:replay-1');
 tableFixtures.run(tableSource,'beginActivity',{kind:'quest',team:[1,5,9],threshold:1});
 const taskSource = privateView(tableSource,'wx:replay-5').action;
 const taskChoices = taskSource.choices.map(value=>({value,label:taskSource.options?.find(o=>o.value===value)?.label||({success:'任务成功',fail:'任务失败',magic:'魔法（反转结果）',thiefFail:'盗贼失败'})[value]||value}));

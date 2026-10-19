@@ -47,3 +47,4 @@
     <view wx:elif="{{records.length && !error}}" class="ledger-end"><view class="ledger-end-rule" aria-hidden="true"></view><text>已显示全部记录</text><view class="ledger-end-rule" aria-hidden="true"></view></view>
   </block>
 </view>
+<app-dialog id="app-dialog" />

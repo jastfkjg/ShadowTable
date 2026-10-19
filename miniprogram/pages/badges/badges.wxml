@@ -36,3 +36,4 @@
     </scroll-view>
   </view>
 </view>
+<app-dialog id="app-dialog" />

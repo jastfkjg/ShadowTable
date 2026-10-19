@@ -105,3 +105,4 @@
   <scroll-view class="replay-sheet-body" scroll-y enhanced show-scrollbar="{{false}}"><template is="replayTrajectory" data="{{steps:playerDetail.steps}}" /></scroll-view>
   <button class="primary replay-sheet-done" bindtap="closePlayer" hover-class="ledger-pressed">完成</button>
 </view></view>
+<app-dialog id="app-dialog" />

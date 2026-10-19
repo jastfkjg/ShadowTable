@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const { BOARDS, newRoom, publicView, invitationView, enter, command } = require('../server/engine');
 const { wxmlToJs } = require('miniprogram-compiler');
 const root = path.resolve(__dirname,'../miniprogram');
-function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false } = {}) {
+function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false, timers } = {}) {
   let definition;
   const navigations = [];
   const wx = {
@@ -19,10 +19,12 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
   };
   function load(file) {
     if (file === path.join(root,'api.js')) return api;
+    if (file === path.join(root,'dialog.js')) return { show: options => wx.showModal(options) };
     const mod = { exports: {} };
     vm.runInNewContext(fs.readFileSync(file,'utf8'), {
       module: mod, require: name => load(path.resolve(path.dirname(file), name + '.js')),
-      Page: value => definition = value, wx, getApp: () => appState, getCurrentPages: () => pages, setTimeout, clearTimeout,
+      Page: value => definition = value, wx, getApp: () => appState, getCurrentPages: () => pages,
+      setTimeout: timers?.setTimeout || setTimeout, clearTimeout: timers?.clearTimeout || clearTimeout,
     }, { filename: file });
     return mod.exports;
   }
@@ -49,6 +51,75 @@ const emptyStats = { total:0,wins:0,losses:0,excluded:0,winRate:null,byFaction:[
 const profile = { nickname:'林间',avatarUrl:null,version:1,identityType:'wx' };
 const apiBase = { login: async () => {}, requestId: () => 'same-request-id-123', assetUrl: p => 'https://test.invalid'+p };
 const swipeEvent = (code, x = 250, y = 400) => ({ currentTarget: { dataset: { code } }, touches: [{ clientX: x, clientY: y }] });
+function feedbackClock() {
+  let id=0;
+  const jobs=new Map();
+  return {jobs,setTimeout(callback,delay){const key=++id;jobs.set(key,{callback,delay});return key;},clearTimeout(key){jobs.delete(key);}};
+}
+test('移除成功后显示 1.5 秒轻提示，顶部无成功文案且可立即继续操作', async () => {
+  const timers=feedbackClock(),room={code:'123456',status:'ended',available:true};
+  let finish,started,hidden=false;
+  const posted=new Promise(resolve=>started=resolve);
+  const {p}=page('lobby',{...apiBase,request:async(url,method)=>{
+    if(method==='POST'){started();await new Promise(resolve=>finish=resolve);hidden=true;return {accepted:true};}
+    return {rooms:hidden?[]:[room]};
+  }},{timers});
+  p.setData({loading:false,memberRooms:[room]});
+  const removing=p.removeRoomRecord(room.code);
+  await posted;
+  assert.equal(p.data.roomFeedback,'');
+  assert.equal(p.data.memberRooms.length,1);
+  finish();await removing;
+  assert.equal(p.data.memberRooms.length,0);
+  assert.equal(p.data.notice,'');
+  assert.equal(p.data.roomFeedback,'已移除');
+  assert.equal(p.data.busy,false);
+  p.toggleRoomHistory();assert.equal(p.data.historyExpanded,true);
+  const job=[...timers.jobs.values()].find(job=>job.delay===1500);
+  assert.ok(job);job.callback();
+  assert.equal(p.data.roomFeedback,'');
+  p.onUnload();
+});
+test('移除失败或确认响应晚于后台切换时不显示成功轻提示', async () => {
+  for(const mode of ['failure','background']){
+    const timers=feedbackClock(),room={code:'123456',status:'ended',available:true};
+    let finish,started;
+    const posted=new Promise(resolve=>started=resolve);
+    const {p}=page('lobby',{...apiBase,request:async(url,method)=>{
+      if(method==='POST'){started();await new Promise(resolve=>finish=resolve);if(mode==='failure')throw Object.assign(Error('移除失败'),{status:400});return {accepted:true};}
+      return {rooms:[]};
+    }},{timers});
+    p.setData({loading:false,memberRooms:[room]});
+    const removing=p.removeRoomRecord(room.code);await posted;
+    if(mode==='background')p.onHide();
+    finish();await removing;
+    assert.equal(p.data.roomFeedback,'');assert.equal(p.data.notice,'');
+    assert.equal(timers.jobs.size,0);
+    if(mode==='failure'){assert.equal(p.data.memberRooms.length,1);assert.equal(p.data.error,'移除失败');}
+    p.onUnload();
+  }
+});
+test('轻提示更新后旧回调不会提前关闭新提示，切后台和卸载会清理计时器', () => {
+  for(const lifecycle of ['onHide','onUnload']){
+    const timers=feedbackClock(),{p}=page('lobby',apiBase,{timers});
+    p.showRoomFeedback('已移除');
+    const old=[...timers.jobs.values()][0].callback;
+    p.showRoomFeedback('已移除');
+    old();assert.equal(p.data.roomFeedback,'已移除');
+    assert.equal(timers.jobs.size,1);
+    p[lifecycle]();
+    assert.equal(p.data.roomFeedback,'');assert.equal(timers.jobs.size,0);
+    if(lifecycle==='onHide')p.onUnload();
+  }
+});
+test('后台的延迟操作不会在当前页面弹出确认框', async () => {
+  let dialogs=0;
+  const {p}=page('lobby',apiBase,{wx:{showModal(){dialogs++;}}});
+  p.foreground=false;
+  assert.equal(await p.confirm('解散房间？','无法恢复'),false);
+  assert.equal(dialogs,0);
+  p.onUnload();
+});
 test('小程序房间到期410清除当前牌桌，刷新列表并明确提示失效', async () => {
   const {p}=page('table',{...apiBase,request:async url=>{
     if(url==='/api/me/rooms')return {rooms:[{code:'123456',status:'unavailable',available:false}]};
@@ -58,7 +129,7 @@ test('小程序房间到期410清除当前牌桌，刷新列表并明确提示�
   assert.equal(p.data.room,null);assert.match(p.data.notice,/房间已失效/);
   assert.equal(p.data.unavailableRooms.length,1);p.onUnload();
 });
-test('小程序最近结束只显示三桌，历史与失效默认折叠并且可独立展开', async () => {
+test('小程序最近结束只显示三桌，历史包含失效记录并统一折叠、展开和筛选', async () => {
   const now = Date.now(), rooms = [
     {code:'111111',status:'playing',available:true,lastActivityAt:1},
     ...Array.from({length:5},(_,i)=>({code:String(222220+i),status:'ended',available:true,lastActivityAt:now-i*1000})),
@@ -67,33 +138,43 @@ test('小程序最近结束只显示三桌，历史与失效默认折叠并且�
   ];
   const {p}=page('lobby',{...apiBase,request:async()=>({rooms,serverTime:now})});
   p.setData({loading:false}); await p.loadRooms();
-  assert.equal(p.data.visibleMemberRooms.length,4); assert.equal(p.data.historyRooms.length,3);
-  assert.equal(p.data.unavailableRooms.length,1); assert.equal(p.data.historyExpanded,false); assert.equal(p.data.unavailableExpanded,false);
+  assert.equal(p.data.visibleMemberRooms.length,4); assert.equal(p.data.historyRooms.length,4);
+  assert.equal(p.data.unavailableRooms.length,1); assert.equal(p.data.historyExpanded,false);
+  assert.equal(p.data.historyUnavailableCount,1); assert.equal(p.data.historyRooms[0].code,'444444');
   p.toggleRoomHistory(); assert.equal(p.data.historyExpanded,true);
-  p.toggleUnavailableRooms(); assert.equal(p.data.unavailableExpanded,true);
   p.filterRooms({currentTarget:{dataset:{filter:'playing'}}});
   assert.equal(p.data.visibleMemberRooms.length,1); assert.equal(p.data.showHistorySection,false);
-  assert.equal(p.data.showUnavailableSection,false); assert.equal(p.data.historyExpanded,false);
+  assert.equal(p.data.historyRooms.length,0); assert.equal(p.data.historyExpanded,false);
+  p.filterRooms({currentTarget:{dataset:{filter:'unavailable'}}});
+  assert.equal(p.data.historyExpanded,true); assert.equal(p.data.showHistorySection,true);
+  assert.equal(p.data.historyRooms.length,1); assert.equal(p.data.historyRooms[0].code,'444444');
+  p.filterRooms({currentTarget:{dataset:{filter:'ended'}}});
+  assert.equal(p.data.historyUnavailableCount,0); assert.equal(p.data.historyRooms.length,3);
+  p.onUnload();
 });
 test('小程序批量清理只确认一次，取消或后台不写入；网络不确定时保留原编号及选择', async () => {
   for (const mode of ['cancel','background','confirm','retry']) {
     let hidden=false, fail=mode==='retry'; const writes=[],dialogs=[];
     const expired={code:'123456',createdAt:123,status:'unavailable',available:false};
-    const valid={code:'234567',createdAt:234,status:'lobby',available:true};
+    const expiredSecond={code:'345678',createdAt:345,status:'unavailable',available:false};
+    const valid={code:'234567',createdAt:234,status:'ended',available:true,lastActivityAt:1};
     const {p}=page('lobby',{...apiBase,request:async(path,method,data,id)=>{
-      if(method==='POST') {writes.push({path,data,id});if(fail){fail=false;throw new Error('网络中断');}hidden=true;return {removed:1};}
-      return {rooms:hidden?[valid]:[expired,valid]};
+      if(method==='POST') {writes.push({path,data,id});if(fail){fail=false;throw new Error('网络中断');}hidden=true;return {removed:2};}
+      return {rooms:hidden?[valid]:[expired,expiredSecond,valid]};
     }},{wx:{showModal:o=>dialogs.push(o)}});
     p.setData({loading:false}); await p.loadRooms();
+    assert.equal(p.data.historyRooms.length,3);
     const cleaning=p.cleanupUnavailableRooms(); await p.cleanupUnavailableRooms();
-    assert.equal(dialogs.length,1); assert.match(dialogs[0].title,/1 个失效房间/);
-    assert.equal(dialogs[0].confirmText,'清理'); assert.equal(writes.length,0);
+    assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'清理所有失效房间？');
+    assert.match(dialogs[0].content,/全部 2 个失效记录/);
+    assert.equal(dialogs[0].confirmText,'全部清理'); assert.equal(writes.length,0);
     if(mode==='background')p.onHide();
     dialogs[0].success({confirm:mode!=='cancel'}); await cleaning;
     if(mode==='retry') {assert.ok(p.pending);p.data.reconnecting=false;await p.executePending();assert.equal(writes.length,2);assert.equal(writes[0].id,writes[1].id);}
     assert.equal(writes.length,mode==='retry'?2:mode==='confirm'?1:0);
-    if(hidden) {assert.equal(p.data.unavailableRooms.length,0);assert.match(p.data.notice,/已移除 1 个失效房间/);}
-    if(writes.length){assert.equal(writes[0].path,'/api/me/rooms/cleanup');assert.equal(JSON.stringify(writes[0].data),JSON.stringify({rooms:[{code:'123456',createdAt:123}]}));}
+    if(hidden) {assert.equal(p.data.unavailableRooms.length,0);assert.match(p.data.notice,/已移除 2 个失效房间/);
+      assert.equal(p.data.historyRooms.length,1);assert.equal(p.data.historyRooms[0].code,valid.code);assert.equal(p.data.historyUnavailableCount,0);}
+    if(writes.length){assert.equal(writes[0].path,'/api/me/rooms/cleanup');assert.equal(JSON.stringify(writes[0].data),JSON.stringify({rooms:[{code:'123456',createdAt:123},{code:'345678',createdAt:345}]}));}
     assert.equal(p.data.busy,false); p.onUnload();
   }
 });
@@ -237,9 +318,11 @@ test('小程序左滑和菜单移除均须确认，取消或切入后台不提�
     const removing = action();
     assert.equal(p.data.busy,true); assert.equal(writes.length,0);
     await action(); assert.equal(dialogs.length,1);
-    assert.match(dialogs[0].title,/从列表移除房间 123456/);
-    assert.match(dialogs[0].content,/不会离开或解散房间/);
-    assert.equal(dialogs[0].confirmText,'移除');
+    assert.equal(dialogs[0].title,'移除这条房间记录？');
+    assert.equal(dialogs[0].contextValue,'123456');
+    assert.match(dialogs[0].content,/房间、座位和战绩都会保留/);
+    assert.doesNotMatch(dialogs[0].content,/重新进入|恢复显示/);
+    assert.equal(dialogs[0].confirmText,'移除记录');
     if (result === 'background') p.onHide();
     dialogs[0].success({confirm:result !== 'cancel'}); await removing;
     assert.equal(writes.length,result === 'confirm' ? 1 : 0);
@@ -1171,7 +1254,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|stats-pressed|stats-role-pressed|rank-pressed|rank-row-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|stats-pressed|stats-role-pressed|rank-pressed|rank-row-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed|app-dialog-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -1977,13 +2060,137 @@ test('旧详情链接替换当前页到同一对局记录，跳转失败可重�
   missing.onLoad(); assert.match(missing.data.error, /不存在/);
 });
 
-test('首页入口按需展开，关闭保留草稿且清理键盘；原生键盘晚到的事件不会复活面板', () => {
+test('加入面板先完成高度测量和入场，再聚焦昵称或房间码，首页代理保持同样顺序', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const home of [false, true]) for (const nicknameSetup of [false, true]) {
+    const measurements = [], renders = [];
+    const { p } = page('lobby', apiBase, { home, wx: { createSelectorQuery() {
+      const query = { select() { return query; }, boundingClientRect() { return query; }, exec(callback) { measurements.push(callback); } };
+      return query;
+    } } });
+    if (home) p.onLoad();
+    const controller = home ? p.lobbyController : p;
+    controller.alive = controller.foreground = true;
+    controller.setData({ loading: false, name: nicknameSetup ? '' : '子龙', nicknameSetup });
+    const setData = p.setData;
+    p.setData = function(patch, callback) { setData.call(this, patch); if (callback) renders.push(callback); };
+    p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+    assert.equal(controller.data.entryMeasuring, true);
+    assert.equal(controller.data.entryFocusedField, '');
+    t.mock.timers.tick(1000);
+    assert.equal(controller.data.entryFocusedField, '');
+    renders.shift()();
+    measurements.shift()([{ width: 375, height: 740 }, { height: 86 }, { height: 240 }, { height: 134 }]);
+    assert.equal(controller.data.entryMeasuring, false);
+    assert.equal(controller.data.entryBodyHeight, 240);
+    t.mock.timers.tick(1000);
+    assert.equal(controller.data.entryFocusedField, '');
+    renders.shift()();
+    t.mock.timers.tick(179);
+    assert.equal(controller.data.entryFocusedField, '');
+    t.mock.timers.tick(21);
+    assert.equal(controller.data.entryFocusedField, nicknameSetup ? 'nickname' : 'code');
+    controller.onUnload();
+  }
+});
+
+test('延迟聚焦不会在关闭、后台、卸载、换模式或用户手动结束输入后拉起键盘', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const action of ['close', 'hide', 'unload', 'create', 'name', 'code', 'native-focus', 'paste', 'reset', 'reopen']) {
+    const { p } = page('lobby', apiBase, { wx: { getClipboardData(options) { options.success({ data: '062819' }); } } });
+    p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+    const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
+    open('join');
+    t.mock.timers.tick(100);
+    if (action === 'close') p.closeEntry();
+    if (action === 'hide') { p.onHide(); p.foreground = true; }
+    if (action === 'unload') p.onUnload();
+    if (action === 'create') open('create');
+    if (action === 'name') p.editEntryName();
+    if (action === 'code') p.editEntryCode();
+    if (action === 'native-focus') p.entryInputFocus({ currentTarget: { dataset: { field: 'nickname' } }, detail: {} });
+    if (action === 'paste') p.pasteRoomCode();
+    if (action === 'reset') p.resetEntryFocus();
+    if (action === 'reopen') { p.closeEntry(); open('join'); }
+    if (['name', 'code', 'native-focus', 'paste'].includes(action))
+      p.entryInputBlur({ currentTarget: { dataset: { field: p.data.entryFocusedField } }, detail: { value: '子龙' } });
+    t.mock.timers.tick(100);
+    assert.equal(p.data.entryFocusedField, '', action);
+    t.mock.timers.tick(100);
+    assert.equal(p.data.entryFocusedField, action === 'reopen' ? 'code' : '', action);
+    p.onUnload();
+  }
+});
+
+test('相同原生焦点和键盘高度不重复测量或滚动，主动收起键盘后恢复面板高度', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let measurements = 0;
+  const patches = [];
+  const { p } = page('lobby', apiBase, { wx: { createSelectorQuery() {
+    const query = { select() { return query; }, boundingClientRect() { return query; }, exec(callback) {
+      measurements++;
+      callback([{ width: 375, height: 740 }, { height: 86 }, { height: 240 }, { height: p.data.entryKeyboardHeight ? 100 : 134 }]);
+    } };
+    return query;
+  } } });
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  t.mock.timers.tick(200);
+  const focus = { currentTarget: { dataset: { field: 'code' } }, detail: { height: 280 } };
+  p.entryInputFocus(focus);
+  assert.equal(p.data.entryBodyHeight, 186);
+  const setData = p.setData;
+  p.setData = function(patch, callback) { patches.push(patch); setData.call(this, patch, callback); };
+  const previousMeasurements = measurements;
+  p.entryInputFocus(focus);
+  p.entryKeyboardChange({ detail: { height: 280, duration: 250 } });
+  assert.equal(measurements, previousMeasurements);
+  assert.equal(patches.length, 0);
+  p.resetEntryFocus();
+  assert.equal(p.data.entryBodyHeight, 240);
+  patches.length = 0;
+  const afterReset = measurements;
+  p.entryKeyboardChange({ detail: { height: 0 } });
+  assert.equal(measurements, afterReset);
+  assert.equal(patches.length, 0);
+  p.onUnload();
+});
+
+test('关闭重开后的旧渲染和键盘回调不会提前显示或聚焦新面板', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const renders = [];
+  const { p } = page('lobby', apiBase);
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  t.mock.timers.tick(200);
+  const setData = p.setData;
+  p.setData = function(patch, callback) { setData.call(this, patch); if (callback) renders.push(callback); };
+  p.entryKeyboardChange({ detail: { height: 280 } });
+  p.closeEntry();
+  const previous = renders.splice(0);
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  previous.forEach(callback => callback());
+  assert.equal(p.data.entryMeasuring, true);
+  assert.equal(p.data.entryScrollTarget, '');
+  t.mock.timers.tick(500);
+  assert.equal(p.data.entryFocusedField, '');
+  while (renders.length) renders.shift()();
+  t.mock.timers.tick(200);
+  assert.equal(p.data.entryMeasuring, false);
+  assert.equal(p.data.entryFocusedField, 'code');
+  p.onUnload();
+});
+
+test('首页入口按需展开，关闭保留草稿且清理键盘；原生键盘晚到的事件不会复活面板', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   let hidden = 0;
   const { p } = page('lobby', apiBase, { wx: { hideKeyboard() { hidden++; } } });
   p.setData({ loading: false, name: '子龙', nicknameSetup: false });
   assert.equal(p.data.entrySheet, false);
   p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
   assert.equal(p.data.entrySheet, true);
+  assert.equal(p.data.entryFocusedField, '');
+  t.mock.timers.tick(200);
   assert.equal(p.data.entryFocusedField, 'code');
   p.entryKeyboardChange({ detail: { height: 280 } });
   assert.equal(p.data.entryKeyboardHeight, 280);
@@ -2100,6 +2307,73 @@ test('加入面板提交收起的昵称；显式清空和不完整房间码就�
   assert.equal(writes.length, 1);
 });
 
+test('原生表单在键盘展开或收起时单次点击即可提交最新值、显示加载并进入房间', async () => {
+  const context = { window: {}, global: {}, console }; vm.createContext(context);
+  const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
+  const nodes = node => !node || typeof node !== 'object' ? [] : [node, ...(node.children || []).flatMap(nodes)];
+  for (const home of [false, true]) for (const focused of ['code', 'nickname', '']) {
+    for (const collectFirst of [false, true]) {
+      const response = deferred(), writes = [], waiting = [];
+      const values = { nickname: '微信昵称', code: '062819' };
+      let keyboardOpen = !!focused;
+      const { p, navigations } = page('lobby', { ...apiBase, request: async (url, method, body) => {
+        if (method !== 'POST') return { rooms: [] };
+        writes.push({ url, body });
+        return response.promise;
+      } }, { home, wx: { hideKeyboard() {
+        keyboardOpen = false;
+        // Native form collection can already be waiting for the input's blur callback.
+        setImmediate(() => waiting.splice(0).forEach(resolve => resolve()));
+      } } });
+      if (home) p.onLoad();
+      const controller = home ? p.lobbyController : p;
+      controller.alive = controller.foreground = true;
+      controller.schedule = () => {};
+      controller.setData({ loading: false, name: '旧昵称', nicknameSetup: false });
+      p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+      controller.setData({ entryFocusedField: focused, entryKeyboardHeight: keyboardOpen ? 280 : 0 });
+      const tree = factory('pages/lobby/lobby.wxml')({ activeTab: 0, lobby: controller.data, personal: {} });
+      const form = nodes(tree).find(node => node.tag === 'wx-form');
+      const button = nodes(form).find(node => node.attr?.formType === 'submit');
+      const collect = () => Promise.all(Object.entries(values).map(async ([key, value]) => {
+        // WeChat defers an active input's form value until the keyboard is dismissed.
+        if (keyboardOpen && key === focused) await new Promise(resolve => waiting.push(resolve));
+        return [key, value];
+      })).then(entries => p[form.attr.bindsubmit]({ detail: { value: Object.fromEntries(entries) } }));
+      let submitting;
+      try {
+        if (collectFirst) submitting = collect();
+        if (button.attr.bindtap) p[button.attr.bindtap]();
+        if (!collectFirst) submitting = collect();
+        await new Promise(setImmediate);
+        assert.equal(writes.length, 1, JSON.stringify({ home, focused, collectFirst }));
+        assert.equal(writes[0].url, '/api/rooms/062819/join');
+        assert.equal(writes[0].body.name, values.nickname);
+        assert.equal(controller.data.busy, true);
+        assert.equal(controller.data.busyAction, 'enter');
+        const busyTree = factory('pages/lobby/lobby.wxml')({ activeTab: 0, lobby: controller.data, personal: {} });
+        const busyButton = nodes(busyTree).find(node => node.attr?.formType === 'submit');
+        assert.equal(busyButton.attr.loading, true);
+        assert.equal(busyButton.attr.disabled, true);
+        assert.equal(controller.data.entryFocusedField, '');
+        assert.equal(controller.data.entryKeyboardHeight, 0);
+        p[form.attr.bindsubmit]({ detail: { value: values } });
+        assert.equal(writes.length, 1, '重复提交不应重复加入');
+        response.resolve({ code: values.code });
+        await submitting;
+        assert.equal(navigations[0], '/pages/table/table?code=062819&resume=1');
+        assert.equal(controller.data.entrySheet, false);
+        assert.equal(controller.data.busy, false);
+      } finally {
+        response.resolve({ code: values.code });
+        waiting.splice(0).forEach(resolve => resolve());
+        if (submitting) await submitting;
+        controller.onUnload();
+      }
+    }
+  }
+});
+
 test('加入面板中的业务错误保留表单，未确认的网络请求锁住面板且复用幂等键', async () => {
   const writes = []; let failure = 'business';
   const { p } = page('lobby', { ...apiBase, request: async (url, method, body, id) => {
@@ -2131,7 +2405,8 @@ test('加入面板中的业务错误保留表单，未确认的网络请求锁�
   assert.equal(p.data.entrySheet, false);
 });
 
-test('分享邀请自动打开加入面板，首页列表合并房主信息且复制不触发访问', async () => {
+test('分享邀请自动打开加入面板，首页列表合并房主信息且复制不触发访问', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const copies = [], writes = [];
   const { p } = page('lobby', { ...apiBase, request: async (url, method) => {
     if (method === 'POST') writes.push(url);
@@ -2142,11 +2417,14 @@ test('分享邀请自动打开加入面板，首页列表合并房主信息且�
   await p.onLoad({ code: '062819' });
   assert.equal(p.data.entrySheet, true);
   assert.equal(p.data.code, '062819');
+  assert.equal(p.data.entryFocusedField, '');
+  t.mock.timers.tick(200);
   assert.equal(p.data.entryFocusedField, 'code');
   assert.equal(p.data.memberRooms[0].compactRelation, '我是房主 · 1号');
   p.copyListedRoom({ currentTarget: { dataset: { code: '123456' } } });
   assert.deepEqual(copies, ['123456']);
   assert.equal(writes.length, 0);
+  p.onUnload();
 });
 
 test('首页表单打开立即收起底栏，关闭、成功进入房间和切换区域时正确恢复', async () => {

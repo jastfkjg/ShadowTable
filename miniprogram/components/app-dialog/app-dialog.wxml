@@ -1,0 +1,17 @@
+<view wx:if="{{dialog}}" class="app-dialog-backdrop" catchtouchmove="blockScroll" catchtap="blockScroll">
+  <view class="app-dialog" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+    <view class="app-dialog-title">{{dialog.title}}</view>
+    <view wx:if="{{dialog.contextValue}}" class="app-dialog-context">
+      <image src="/assets/dialog-room.svg" aria-hidden="true" />
+      <text>{{dialog.contextLabel}}</text><text class="app-dialog-context-value">{{dialog.contextValue}}</text>
+      <text wx:if="{{dialog.contextMeta}}" class="app-dialog-context-meta">{{dialog.contextMeta}}</text>
+    </view>
+    <scroll-view wx:if="{{dialog.content}}" class="app-dialog-body" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="app-dialog-message">{{dialog.content}}</view>
+    </scroll-view>
+    <view class="app-dialog-actions">
+      <button wx:if="{{dialog.showCancel}}" class="app-dialog-cancel" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.cancelText}}</button>
+      <button class="app-dialog-confirm {{dialog.danger?'is-danger':''}}" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.confirmText}}</button>
+    </view>
+  </view>
+</view>

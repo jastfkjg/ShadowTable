@@ -1,6 +1,6 @@
 <import src="./role-groups.wxml" />
 <view wx:if="{{entrySheet}}" class="entry-backdrop" catchtap="closeEntry" catchtouchmove="blockScroll">
-  <form class="entry-panel entry-sheet {{entryMode==='create'?'is-create':''}} {{entryKeyboardHeight?'has-keyboard':''}} {{entryBodyHeight?'has-measured-body':''}}" style="--entry-keyboard-height: {{entryKeyboardHeight}}px; --entry-available-height: calc(100vh - {{entryKeyboardHeight}}px - 88px); bottom: {{entryKeyboardHeight}}px;" catchtap="blockScroll" bindsubmit="submitEntry" role="dialog" aria-modal="true" aria-label="{{entryMode==='join'?'加入房间':'创建房间'}}">
+  <form class="entry-panel entry-sheet {{entryMeasuring?'is-measuring':''}} {{entryMode==='create'?'is-create':''}} {{entryKeyboardHeight?'has-keyboard':''}} {{entryBodyHeight?'has-measured-body':''}}" style="--entry-keyboard-height: {{entryKeyboardHeight}}px; --entry-available-height: calc(100vh - {{entryKeyboardHeight}}px - 88px); bottom: {{entryKeyboardHeight}}px;" catchtap="blockScroll" bindsubmit="submitEntry" role="dialog" aria-modal="true" aria-label="{{entryMode==='join'?'加入房间':'创建房间'}}">
     <view class="entry-sheet-layout">
       <view class="entry-sheet-top">
         <view class="entry-sheet-handle" aria-hidden="true" />
@@ -26,7 +26,7 @@
               <view class="entry-field-heading"><label class="field-title" for="room-code">房间码</label><button class="entry-paste" hover-class="entry-option-pressed" bindtap="pasteRoomCode" disabled="{{busy || hasPendingRequest}}"><image src="/assets/sheet-copy.svg" aria-hidden="true" /><text>粘贴</text></button></view>
               <view class="entry-code-field {{entryFocusedField==='code'?'is-focused':''}} {{entryCodeError?'has-error':''}}" bindtap="editEntryCode">
                 <view class="entry-code-slots" aria-hidden="true"><view wx:for="{{codeSlots}}" wx:key="*this" class="entry-code-slot"><text wx:if="{{code[item]}}">{{code[item]}}</text><view wx:elif="{{entryFocusedField!=='code' || item!==code.length}}" class="entry-code-dash" /><view wx:if="{{entryFocusedField==='code' && item===(code.length<6?code.length:5)}}" class="entry-code-caret {{code.length===6?'is-complete':''}}" /></view></view>
-                <input class="room-input" id="room-code" name="code" type="number" maxlength="6" value="{{code}}" cursor="{{code.length}}" selection-start="{{code.length}}" selection-end="{{code.length}}" bindinput="inputCode" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="code" focus="{{entryFocusedField==='code'}}" always-embed="{{true}}" hold-keyboard="{{true}}" adjust-position="{{false}}" aria-label="6 位房间码" disabled="{{busy || hasPendingRequest}}" />
+                <input class="room-input" id="room-code" name="code" type="number" maxlength="6" value="{{code}}" cursor="{{code.length}}" selection-start="{{code.length}}" selection-end="{{code.length}}" bindinput="inputCode" bindblur="entryInputBlur" bindfocus="entryInputFocus" bindkeyboardheightchange="entryKeyboardChange" data-field="code" focus="{{entryFocusedField==='code'}}" always-embed="{{true}}" adjust-position="{{false}}" aria-label="6 位房间码" disabled="{{busy || hasPendingRequest}}" />
               </view>
               <view wx:if="{{entryCodeError}}" class="entry-field-error" role="alert">{{entryCodeError}}</view>
               <view wx:else class="entry-field-help">向房主获取 6 位房间码</view>
@@ -50,7 +50,7 @@
       <view class="entry-sheet-footer">
         <view wx:if="{{entryError}}" class="entry-field-error" role="alert">{{entryError}}</view>
         <view wx:if="{{hasPendingRequest || reconnecting}}" class="entry-field-help" role="status">{{hasPendingRequest?'请求尚未确认，连接恢复后会自动重试，请勿重复提交。':'正在恢复连接…'}}</view>
-        <button class="primary entry-submit" hover-class="entry-option-pressed" form-type="submit" data-action="{{entryMode==='join'?'join':'create'}}" loading="{{busy && busyAction==='enter'}}" disabled="{{hasPendingRequest || loading || busy || !network || reconnecting}}"><text>{{busy && busyAction==='enter'?(entryMode==='join'?'加入中…':'创建中…'):entryMode==='join'?(nicknameSetup?'确认昵称并加入房间':'加入房间'):(nicknameSetup?'确认昵称并创建':'创建')+' '+capacity+' 人房间'}}</text><view wx:if="{{!busy}}" class="room-sheet-chevron" aria-hidden="true" /></button>
+        <button class="primary entry-submit" hover-class="entry-option-pressed" form-type="submit" bindtap="resetEntryFocus" data-action="{{entryMode==='join'?'join':'create'}}" loading="{{busy && busyAction==='enter'}}" disabled="{{hasPendingRequest || loading || busy || !network || reconnecting}}"><text>{{busy && busyAction==='enter'?(entryMode==='join'?'加入中…':'创建中…'):entryMode==='join'?(nicknameSetup?'确认昵称并加入房间':'加入房间'):(nicknameSetup?'确认昵称并创建':'创建')+' '+capacity+' 人房间'}}</text><view wx:if="{{!busy}}" class="room-sheet-chevron" aria-hidden="true" /></button>
       </view>
     </view>
   </form>

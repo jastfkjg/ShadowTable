@@ -87,7 +87,7 @@ button.fun-metric-toggle { width: 100%; min-height: 80px; margin: 0; padding: 16
 .fun-rank-count { color: var(--muted); font-size: 24rpx; text-align: right; }
 .fun-leaderboard .rank-list-end { padding-top: 36rpx; }
 .rank-sheet-backdrop { padding: 0; align-items: flex-end; }
-.rank-sheet { --rank-line: rgba(177,191,198,.18); width: 100%; max-width: 540px; max-height: 90vh; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-top: 1rpx solid var(--border); border-radius: 36rpx 36rpx 0 0; padding-bottom: env(safe-area-inset-bottom); animation: rank-sheet-enter .2s ease-out; }
+.rank-sheet { --rank-line: rgba(177,191,198,.18); width: 100%; max-width: 540px; max-height: 90vh; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-top: 1rpx solid var(--overlay-border); border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; padding-bottom: env(safe-area-inset-bottom); animation: rank-sheet-enter .2s ease-out; }
 .rank-sheet-handle { flex-shrink: 0; width: 64rpx; height: 7rpx; background: var(--border); border-radius: 8rpx; margin: 16rpx auto 6rpx; }
 .rank-sheet-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 0 32rpx; }
 .rank-sheet-title { flex: 1; min-width: 0; font-size: 36rpx; font-weight: 600; }
@@ -130,7 +130,7 @@ button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 16rpx; 
 @media (max-height: 500px) {
   .rank-mine { position: static; margin-top: 24px; padding: 12px 0; }
   .leaderboard-page, .leaderboard-page.has-wide-rank { padding-bottom: 24px; }
-  .rank-sheet { max-height: 96vh; border-radius: 16px 16px 0 0; }
+  .rank-sheet { max-height: 96vh; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; }
   .rank-sheet-header, .fun-categories, .fun-metric-options, .rank-sheet-footer, .rank-rules-body, .rank-details-body { padding-left: 16px; padding-right: 16px; }
   .rank-sheet-title { font-size: 20px; }
   .fun-option-title, .fun-metric-name { font-size: 15px; }

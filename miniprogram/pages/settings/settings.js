@@ -1,3 +1,4 @@
+const dialog = require("../../dialog");
 const api = require("../../api");
 Page({
   data: {
@@ -248,7 +249,7 @@ Page({
     if (!target) return;
     this.setData({ busy: true });
     const answer = await new Promise((resolve) =>
-      wx.showModal({
+      dialog.show({
         title: "移交房主？",
         content: `将房主移交给 ${seat}号 · ${target.name}，新房主立即接管流程，你将不再拥有管理权限。${this.data.dirty ? "未保存的设置将放弃。" : ""}`,
         success: resolve,
@@ -336,11 +337,11 @@ Page({
     };
     this.setData({ busy: true });
     const answer = await new Promise((resolve) =>
-      wx.showModal({
+      dialog.show({
         title: "移出玩家？",
-        content: `将 ${target.seat}号 · ${target.name} 移出房间，其他玩家和已有对局记录保留。准备阶段可凭房间码重新加入。`,
+        content: `将 ${target.seat}号 · ${target.name} 移出房间，已有对局记录保留。`,
         confirmText: "移出",
-        confirmColor: "#b5473a",
+        danger: true,
         cancelText: "取消",
         success: resolve,
         fail: () => resolve({ confirm: false }),
@@ -416,7 +417,7 @@ Page({
       this.kickPending
     ) {
       const answer = await new Promise((resolve) =>
-        wx.showModal({
+        dialog.show({
           title: "返回牌桌？",
           content: this.kickPending
             ? "移出结果尚未确认，返回后请核对房间成员。"

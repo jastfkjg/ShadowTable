@@ -86,3 +86,4 @@
   </view>
 </view>
 <include src="../../player-card.wxml" />
+<app-dialog id="app-dialog" />

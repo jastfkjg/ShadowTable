@@ -55,8 +55,8 @@ button.monthly-rules-entry { min-height: 44px; margin: 4px auto 0; padding: 8px;
 .monthly-rules-entry > text { font-size: 20px; }
 .monthly-page .status,.monthly-page .inline-error { padding: 24px 0; font-size: 14px; }
 .monthly-page .inline-error .secondary { min-height: 44px; font-size: 14px; }
-.monthly-rules-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center; background: rgba(3,9,13,.75); }
-.monthly-rules-sheet { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 520px; min-height: 0; border-radius: 24px 24px 0 0; background: var(--surface); border-top: 1px solid rgba(177,191,198,.2); padding: 10px 20px calc(12px + env(safe-area-inset-bottom)); }
+.monthly-rules-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center; background:var(--overlay-scrim); }
+.monthly-rules-sheet { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 520px; min-height: 0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background: var(--surface); border-top: 1px solid var(--overlay-border); padding: 10px 20px calc(12px + env(safe-area-inset-bottom)); }
 .monthly-sheet-handle { width: 34px; height: 4px; margin: 0 auto 8px; flex-shrink: 0; border-radius: 4px; background: var(--border); }
 .monthly-rules-heading { display: flex; align-items: center; gap: 10px; min-height: 66px; flex-shrink: 0; border-bottom: 1px solid rgba(177,191,198,.14); font-size: 19px; font-weight: 600; }
 .monthly-rules-heading > image { width: 24px; height: 24px; flex-shrink: 0; }

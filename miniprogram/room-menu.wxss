@@ -1,6 +1,6 @@
 /* Shared room-management sheet: keep native disabled buttons geometrically stable. */
-.dialog-backdrop.room-menu-backdrop { align-items:flex-end; padding:0; background:rgba(2,10,15,.64); backdrop-filter:blur(2px); }
-.error-dialog.room-menu-dialog { --menu-divider:rgba(177,191,198,.13); --menu-hover:rgba(177,191,198,.08); display:flex; flex-direction:column; width:100%; max-width:600px; max-height:calc(100vh - 20px); margin:0; padding:0 20px; box-sizing:border-box; overflow:hidden; border:1px solid rgba(177,191,198,.2); border-bottom:0; border-radius:27px 27px 0 0; background:var(--surface); box-shadow:0 -12px 45px rgba(0,0,0,.14); animation:room-menu-in 180ms ease-out; }
+.dialog-backdrop.room-menu-backdrop { align-items:flex-end; padding:0; background:var(--overlay-scrim); backdrop-filter:none; }
+.error-dialog.room-menu-dialog { --menu-divider:rgba(177,191,198,.13); --menu-hover:rgba(177,191,198,.08); display:flex; flex-direction:column; width:100%; max-width:600px; max-height:calc(100vh - 20px); margin:0; padding:0 20px; box-sizing:border-box; overflow:hidden; border:1px solid var(--overlay-border); border-bottom:0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background:var(--surface); box-shadow:0 -12px 45px rgba(0,0,0,.14); animation:room-menu-in 180ms ease-out; }
 .room-menu-handle { flex-shrink:0; width:34px; height:4px; margin:11px auto 8px; border-radius:8px; background:#5c6b73; opacity:.65; }
 .room-menu-header { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:12px; min-height:49px; }
 .room-menu-heading { color:var(--text); font-size:19px; line-height:1.5; font-weight:600; letter-spacing:.2px; }
@@ -36,7 +36,7 @@
 .room-menu-action.danger .room-menu-chevron { border-color:var(--evil); }
 .room-menu-footer { flex-shrink:0; padding:20px 0 calc(12px + env(safe-area-inset-bottom)); }
 .room-menu-footer button.room-menu-cancel,
-.room-menu-footer button.room-menu-cancel[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; width:100%; min-height:46px; margin:0; padding:10px 16px; border:1px solid rgba(177,191,198,.09); border-radius:14px; background:#263842; color:#d0d9dd; font-size:15px; line-height:1.5; font-weight:500; }
+.room-menu-footer button.room-menu-cancel[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; width:100%; min-height:46px; margin:0; padding:10px 16px; border:1px solid rgba(177,191,198,.09); border-radius:var(--dialog-control-radius); background:#263842; color:#d0d9dd; font-size:15px; line-height:1.5; font-weight:500; }
 .room-menu-dialog button::after { border:0; }
 .room-menu-dialog button[disabled] { opacity:.5; }
 .room-menu-dialog button:not([disabled]):active { background:var(--menu-hover); }

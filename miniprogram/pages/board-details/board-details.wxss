@@ -83,8 +83,8 @@ button.detail-chapter-toggle { display: flex; align-items: center; justify-conte
 .detail-deck-note { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.85; }
 .settings-error { color: var(--evil); margin-bottom: 16px; }
 .board-detail-status button { min-height: 44px; font-size: 14px; }
-.directory-backdrop { position: fixed; inset: 0; z-index: 110; background: rgba(3,9,13,.75); display: flex; align-items: flex-end; justify-content: center; }
-.directory-panel { width: 100%; max-width: 520px; display: flex; flex-direction: column; box-sizing: border-box; min-height: 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom)); background: var(--surface); border-radius: 24px 24px 0 0; border-top: 1px solid rgba(177,191,198,.2); }
+.directory-backdrop { position: fixed; inset: 0; z-index: 110; background:var(--overlay-scrim); display: flex; align-items: flex-end; justify-content: center; }
+.directory-panel { width: 100%; max-width: 520px; display: flex; flex-direction: column; box-sizing: border-box; min-height: 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom)); background: var(--surface); border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; border-top: 1px solid var(--overlay-border); }
 .directory-handle { width: 34px; height: 4px; border-radius: 4px; background: var(--border); margin: 0 auto 8px; flex-shrink: 0; }
 .directory-header { display: flex; align-items: center; gap: 11px; min-height: 74px; flex-shrink: 0; border-bottom: 1px solid rgba(177,191,198,.14); font-size: 19px; font-weight: 600; }
 .directory-symbol { width: 37px; height: 37px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: rgba(229,198,139,.08); flex-shrink: 0; }

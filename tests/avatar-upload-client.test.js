@@ -23,6 +23,7 @@ function page(overrides = {}) {
     navigateBack: () => navigations.push("back"), showToast: options => toasts.push(options), showModal: options => options.success({ confirm: true }) };
   function load(file) {
     if (file === path.join(root, "api.js")) return api;
+    if (file === path.join(root, "dialog.js")) return { show: options => wx.showModal(options) };
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(file, "utf8"), { module, require: name => load(path.resolve(path.dirname(file), name + ".js")),
       Page: value => { spec = value; }, wx, getCurrentPages: () => [{ route: "pages/me/me" }, {}],

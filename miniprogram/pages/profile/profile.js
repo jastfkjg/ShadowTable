@@ -1,3 +1,4 @@
+const dialog = require("../../dialog");
 const api = require("../../api");
 const { presentProfile, backToMe, personalPreview } = require("../../profile");
 const builtinAvatars = require("../../builtin-avatars");
@@ -211,7 +212,7 @@ Page({
   },
   async reload() {
     if (this.data.dirty) {
-      const yes = await new Promise(resolve => wx.showModal({ title: "重新载入资料？", content: "当前未保存的修改将丢弃。", success: r => resolve(r.confirm), fail: () => resolve(false) }));
+      const yes = await new Promise(resolve => dialog.show({ title: "重新载入资料？", content: "未保存的修改将丢弃。", confirmText: "重新载入", danger: true, success: r => resolve(r.confirm), fail: () => resolve(false) }));
       if (!yes) return;
     }
     await this.load();
@@ -219,7 +220,7 @@ Page({
   async back() {
     if (this.data.busy) return;
     if (this.data.dirty || this.pending) {
-      const yes = await new Promise(resolve => wx.showModal({ title: "离开编辑资料？", content: this.pending ? "保存结果尚未确认，建议先重试保存。仍要离开吗？" : "未保存的修改将丢弃。", success: r => resolve(r.confirm), fail: () => resolve(false) }));
+      const yes = await new Promise(resolve => dialog.show({ title: "离开编辑资料？", content: this.pending ? "保存结果尚未确认，建议先重试保存。仍要离开吗？" : "未保存的修改将丢弃。", confirmText: "离开", danger: true, success: r => resolve(r.confirm), fail: () => resolve(false) }));
       if (!yes) return;
     }
     wx.disableAlertBeforeUnload?.(); backToMe();
