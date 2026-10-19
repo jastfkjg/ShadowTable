@@ -230,6 +230,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   const source = readFileSync(resolve(__dirname, '../server/web/app.js'), 'utf8');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
+  context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
     window.test = { state, applyRoute, ACTIONS, viewEntry };

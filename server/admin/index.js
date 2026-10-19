@@ -324,7 +324,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         if (cached) { fail(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409); return JSON.parse(cached.result); }
         const result = require("../avoidance").grant(store, input);
         store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
-          .run("grant-avoidance", "", input.reason.trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: "发放回避卡" }));
+          .run("grant-avoidance", "", (input.reason || "").trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: "发放回避卡" }));
         store.addReceipt(actor, input.requestId, fingerprint, result); return result;
       });
       send(200, result); return true;

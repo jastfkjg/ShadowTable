@@ -1,7 +1,7 @@
 "use strict";
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { mkdtempSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
@@ -206,6 +206,59 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
   assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='grant-avoidance'").get().n, 2);
   const raw = (await a.request("/api/me/avoidance", tokens[0])).data;
   assert.ok(raw.history.some(h => h.note === "全员福利"));
+});
+test("发放原因可省略、留空或仅空格，仍保留流水、审计和幂等保护", async t => {
+  const a = await setup(t), token = await a.login("optional-reason"); await a.adminLogin();
+  const uid = (await a.admin()).data.players[0].uid;
+  for (const fields of [{}, { reason: "" }, { reason: "   " }]) {
+    const input = { scope: "player", uid, amount: 2, requestId: randomUUID(), ...fields };
+    const first = await a.admin(input);
+    assert.equal(first.status, 200);
+    assert.deepEqual((await a.admin(input)).data, first.data);
+  }
+  const wallet = (await a.request("/api/me/avoidance", token)).data;
+  assert.equal(wallet.balance, 6); assert.equal(wallet.history.length, 3);
+  assert.ok(wallet.history.every(row => row.note === ""));
+  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='grant-avoidance' AND reason=''").get().n, 3);
+  for (const reason of [null, 1, {}, "x".repeat(201)]) assert.equal((await a.admin({ scope: "player", uid, amount: 1, reason, requestId: randomUUID() })).status, 400);
+  assert.equal(avoidance.balance(a.store, uid), 6);
+});
+test("收卡通知仅本人可读和确认，离线多笔合并、超过流水页仍可提醒，确认不吞掉并发发放", async t => {
+  const a = await setup(t), one = await a.login("notice-one"), two = await a.login("notice-two");
+  const oneUid = "wx:" + createHash("sha256").update("notice-one").digest("hex");
+  const path = "/api/me/avoidance/notice";
+  assert.equal((await a.request(path)).status, 401);
+  assert.equal((await a.request(path, one)).data.notice, null);
+  const grant = (uid, amount) => a.store.transaction(() => avoidance.grant(a.store, { scope: "player", uid, amount }));
+  for (let i = 0; i < 32; i++) grant(oneUid, 2);
+  const first = (await a.request(path, one)).data;
+  assert.equal(first.balance, 64); assert.equal(first.notice.amount, 64); assert.equal(first.notice.grants, 32);
+  assert.equal((await a.request("/api/me/avoidance", one)).data.history.length, 30);
+  assert.equal((await a.request(path, two)).data.notice, null);
+  assert.equal((await a.request(path, two, { through: first.notice.through })).status, 404);
+  assert.equal((await a.request(path, one)).data.notice.through, first.notice.through);
+  grant(oneUid, 3);
+  assert.equal((await a.request(path, one, { through: first.notice.through })).status, 200);
+  assert.equal((await a.request(path, one, { through: first.notice.through })).status, 200);
+  const latest = (await a.request(path, one)).data;
+  assert.equal(latest.balance, 67); assert.equal(latest.notice.amount, 3); assert.equal(latest.notice.grants, 1);
+  assert.equal((await a.request(path, one, { through: "bad" })).status, 400);
+  await a.request(path, one, { through: latest.notice.through });
+  assert.equal((await a.request(path, one)).data.notice, null);
+  assert.equal((await a.request("/api/me/avoidance", one)).data.balance, 67);
+});
+test("通知确认持久化，重启后不重复提醒，新发放仍保持未读", () => {
+  const directory = mkdtempSync(join(tmpdir(), "shadowtable-notice-")), file = join(directory, "test.sqlite");
+  let store;
+  try {
+    store = new Store(file); store.addSession("token", "wx:notice");
+    store.transaction(() => avoidance.grant(store, { scope: "player", uid: "wx:notice", amount: 1 }));
+    avoidance.acknowledgeGrant(store, "wx:notice", avoidance.grantNotice(store, "wx:notice").notice);
+    store.close(); store = new Store(file);
+    assert.equal(avoidance.grantNotice(store, "wx:notice").notice, null);
+    store.transaction(() => avoidance.grant(store, { scope: "player", uid: "wx:notice", amount: 2 }));
+    assert.equal(avoidance.grantNotice(store, "wx:notice").notice.amount, 2);
+  } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 test("0张账号不能回避但可正常准备发牌，登录和建房不会自动获得卡", async t => {
   const a = await setup(t), tokens = await tokensFor(a, "empty", false), path = await a.room(tokens);

@@ -14,6 +14,7 @@ function definition(entry, wx, pages = []) {
     vm.runInNewContext(fs.readFileSync(file, "utf8"), {
       module, require: name => load(path.resolve(path.dirname(file), name + ".js")),
       App: capture, Component: capture, wx, getCurrentPages: () => pages,
+      setTimeout: () => 1, clearTimeout() {},
     }, { filename: file });
     return module.exports;
   }
@@ -38,7 +39,7 @@ test("深色窗口由静态配置提供，导航挂载和页面显示不再写�
 test("后台仍遮盖身份，不再通过原生底栏外观 API 重绘；缺少外观 API 可正常执行", () => {
   let masked = 0;
   const pages = [{ mask() { masked++; } }, {}];
-  const app = definition("app.js", { setTabBarStyle() { throw new Error('不应重绘原生底栏'); } }, pages);
+  const app = definition("app.js", { getStorageSync: () => "", setTabBarStyle() { throw new Error('不应重绘原生底栏'); } }, pages);
   app.onShow?.(); app.onHide(); app.onShow?.();
   assert.equal(masked, 1);
   const legacyNav = definition("components/app-nav/app-nav.js", { getSystemInfoSync: () => ({}) });

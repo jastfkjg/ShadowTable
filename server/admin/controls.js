@@ -210,13 +210,13 @@
 
   const confirmation = document.getElementById("score-confirm-dialog");
   window.AdminUI = {
-    confirm({ title, description, danger = false }) {
+    confirm({ title, description, danger = false, confirmText }) {
       if (confirmation.open) return Promise.resolve(false);
       document.getElementById("score-confirm-title").textContent = title;
       document.getElementById("score-confirm-description").textContent = description;
       const accept = document.getElementById("score-confirm-accept");
       accept.className = danger ? "danger" : "primary";
-      accept.textContent = danger ? "确认更正结果" : "确认保存";
+      accept.textContent = confirmText || (danger ? "确认更正结果" : "确认保存");
       confirmation.returnValue = "cancel";
       closePicker();
       return new Promise((resolve) => {

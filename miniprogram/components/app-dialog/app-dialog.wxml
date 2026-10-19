@@ -2,7 +2,7 @@
   <view class="app-dialog" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
     <view class="app-dialog-title">{{dialog.title}}</view>
     <view wx:if="{{dialog.contextValue}}" class="app-dialog-context">
-      <image src="/assets/dialog-room.svg" aria-hidden="true" />
+      <image src="{{dialog.contextIcon}}" aria-hidden="true" />
       <text>{{dialog.contextLabel}}</text><text class="app-dialog-context-value">{{dialog.contextValue}}</text>
       <text wx:if="{{dialog.contextMeta}}" class="app-dialog-context-meta">{{dialog.contextMeta}}</text>
     </view>

@@ -53,17 +53,30 @@
           <div class="dashboard-tools"><button id="refresh">刷新列表</button><a href="/admin/companion">打开陪测台 →</a></div>
         </div>
         <section id="card-management" role="tabpanel" aria-labelledby="dashboard-tab-cards" tabindex="0" hidden>
-          <div class="section-heading"><h2>发放回避卡</h2><button id="cards-refresh" type="button">刷新玩家</button></div>
-          <p>账号初始为 0 张，由管理员按需发放；陪测账号不参与全员发放。</p>
-          <form id="cards-search" class="score-search"><div class="score-field"><label for="cards-query">查找玩家</label><input id="cards-query" type="search" maxlength="200" placeholder="玩家昵称或完整账号标识" /></div><button type="submit">查找</button></form>
+          <div class="section-heading"><div><h2>发放回避卡</h2><p class="cards-intro">选择发放对象与数量，玩家收到后会弹窗提醒。</p></div><button id="cards-refresh" type="button">刷新玩家</button></div>
+          <form id="cards-search"></form>
           <form id="cards-grant">
-            <div class="score-fields"><div class="score-field"><label for="cards-scope">发放范围</label><select id="cards-scope"><option value="player">指定玩家</option><option value="all">所有现有玩家</option></select></div>
-            <div class="score-field" id="cards-player-field"><label for="cards-player">选择玩家</label><select id="cards-player"><option value="">请先载入玩家</option></select></div></div>
-            <div id="cards-pager" class="score-pager" hidden><button id="cards-prev" type="button">上一页</button><span id="cards-page"></span><button id="cards-next" type="button">下一页</button></div>
-            <p id="cards-count" class="score-hint" aria-live="polite">正在准备玩家列表</p>
-            <div class="score-fields"><div class="score-field"><label for="cards-amount">每人发放张数</label><input id="cards-amount" type="number" min="1" max="100" step="1" value="1" required /></div><div class="score-field"><label for="cards-reason">发放原因</label><input id="cards-reason" maxlength="200" required placeholder="例如：聚会活动赠送" /></div></div>
-            <div class="score-form-footer"><p class="score-hint">全员发放仅包含确认时已存在的账号，记录可在操作记录中查看。</p><button id="cards-submit" class="primary" disabled>确认发放</button></div>
-          </form><p id="cards-status" class="score-status" role="status" aria-live="polite"></p>
+            <div class="cards-layout"><div class="cards-fields">
+              <div class="score-field"><label for="cards-scope">发放对象</label><select id="cards-scope"><option value="player">指定玩家</option><option value="all">所有现有玩家</option></select></div>
+              <div id="cards-player-field" class="cards-recipient">
+                <div class="cards-search-row"><div class="score-field"><label for="cards-query">查找玩家</label><input id="cards-query" form="cards-search" type="search" maxlength="200" placeholder="输入昵称或完整账号标识" /></div><button type="submit" form="cards-search">查找</button></div>
+                <div class="score-field"><label for="cards-player">选择玩家</label><select id="cards-player"><option value="">请先载入玩家</option></select></div>
+                <p id="cards-player-detail" class="score-hint cards-player-detail"></p>
+                <div id="cards-pager" class="score-pager" hidden><button id="cards-prev" type="button">上一页</button><span id="cards-page"></span><button id="cards-next" type="button">下一页</button></div>
+              </div>
+              <p id="cards-count" class="score-hint" aria-live="polite">正在准备玩家列表</p>
+              <div class="score-field cards-quantity"><label for="cards-amount">每人发放张数 <span class="cards-optional">1–100 张</span></label><div class="cards-amount-row"><input id="cards-amount" type="number" min="1" max="100" step="1" value="1" required aria-describedby="cards-amount-error" /><span>张</span><div class="cards-presets" aria-label="快捷选择张数"><button type="button" data-card-amount="1" aria-pressed="true">1 张</button><button type="button" data-card-amount="3" aria-pressed="false">3 张</button><button type="button" data-card-amount="5" aria-pressed="false">5 张</button></div></div><p id="cards-amount-error" class="cards-field-error" hidden>请输入 1 至 100 的整数</p></div>
+              <div class="score-field"><label for="cards-reason">发放原因 <span class="cards-optional">选填</span></label><input id="cards-reason" maxlength="200" placeholder="可留空，例如：聚会活动赠送" /></div>
+            </div><aside class="cards-summary" aria-label="本次发放摘要">
+              <h3>本次发放</h3><p id="cards-summary-target">请先选择玩家</p>
+              <dl><div><dt>接收玩家</dt><dd id="cards-summary-recipients">—</dd></div><div><dt>每人获得</dt><dd id="cards-summary-amount">1 张</dd></div><div class="cards-summary-total"><dt>合计发放</dt><dd id="cards-summary-total">—</dd></div></dl>
+              <p id="cards-summary-balance" class="score-hint" hidden></p>
+              <button id="cards-submit" class="primary" disabled>确认发放</button>
+              <p class="score-hint cards-summary-note">账号初始为 0 张。全员发放仅包含当前已有玩家，不含陪测账号。</p>
+              <p id="cards-status" class="cards-status" role="status" aria-live="polite"></p>
+            </aside></div>
+          </form>
+          <p class="score-hint cards-audit-note">发放记录可在「操作记录」中查看。</p>
         </section>
         <section id="room-overview" role="tabpanel" aria-labelledby="dashboard-tab-rooms" tabindex="0">
           <div class="section-heading">

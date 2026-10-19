@@ -294,6 +294,8 @@ function createApp({
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
       avoidance.ensureAccount(store, uid);
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
+      if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
+      if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));
       if (path === "/api/me/avatar-uploads") {
         if (req.method === "GET") return send(200, { enabled: uploads.enabled && (uid.startsWith("wx:") || devAuth && uid.startsWith("dev:")) });
         check(req.method === "POST", "接口不存在", 404);

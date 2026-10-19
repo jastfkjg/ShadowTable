@@ -16,6 +16,7 @@ function present(options = {}) {
     contextLabel: options.contextLabel || "",
     contextValue: options.contextValue || "",
     contextMeta: options.contextMeta || "",
+    contextIcon: options.contextIcon || "/assets/dialog-room.svg",
     showCancel: options.showCancel !== false,
     cancelText: options.cancelText || "取消",
     confirmText: options.confirmText || (options.showCancel === false ? "知道了" : "确定"),

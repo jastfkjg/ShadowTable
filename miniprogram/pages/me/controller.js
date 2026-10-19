@@ -42,11 +42,6 @@ module.exports = function createMePage() { return {
           const result = await api.request("/api/me/" + key);
           if (this.alive && sequence === this.sequence) {
             this.updateChangedData({ [key]: present(result) });
-            if (key === "profile" && this.foreground && result.avoidance) {
-              const notice = avoidancePresentation.grantNotice(result.avoidance, wx.getStorageSync("avoidanceGrantNotices"));
-              if (notice.message) wx.showToast?.({ title: notice.message, icon: "none" });
-              try { wx.setStorageSync("avoidanceGrantNotices", notice.seen); } catch (_) {}
-            }
             if (key === "stats" && this.foreground && !this.data.resetSaving && resetEpoch === this.resetEpoch) this.updateChangedData({ monthlyReset: presentMonthlyReset(result.monthlyReset), resetError: "" });
           }
         } catch (e) {

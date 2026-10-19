@@ -37,7 +37,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
-    window.test = { request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
+    window.test = { grantNotifier, request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
       viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
@@ -51,6 +51,28 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页收卡通过主题弹窗展示，未确认不读，身份或操作面板打开时延后提醒', async () => {
+  const calls = [], dialogs = [];
+  let notice = { through: 'grant-1', amount: 2, grants: 1 }, accepted = false;
+  const c = client(async (url, options = {}) => {
+    calls.push([url, options]);
+    if (options.method === 'POST') { notice = null; return response({ acknowledged: true }); }
+    return response({ balance: 4, notice });
+  });
+  c.state.loading = false; c.state.page = 'table'; c.state.room = { phase: 'lobby', me: { avoidance: { balance: 2 } } };
+  c.setConfirm(async (...args) => { dialogs.push(args); return accepted; });
+  try {
+    c.state.avoidanceOpen = true; await c.grantNotifier.start(); assert.equal(calls.length, 0);
+    c.state.avoidanceOpen = false; c.state.room.phase = 'vote'; await c.grantNotifier.check(); assert.equal(calls.length, 0);
+    c.state.room.phase = 'lobby'; await c.grantNotifier.check();
+    assert.equal(dialogs.length, 1); assert.equal(dialogs[0][0], '收到回避卡'); assert.equal(dialogs[0][2], false); assert.equal(dialogs[0][3], '知道了');
+    assert.match(dialogs[0][1], /2 张回避卡/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
+    assert.equal(c.state.room.me.avoidance.balance, 4);
+    accepted = true; await c.grantNotifier.check();
+    assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 1);
+    await c.grantNotifier.check(); assert.equal(dialogs.length, 2);
+  } finally { c.grantNotifier.stop(); c.stop(); }
+});
 test('网页房间管理按有效性与权限展示可用操作，省略额外说明并保留关闭入口', () => {
   const c = client(async () => response({})); c.state.loading = false;
   try {

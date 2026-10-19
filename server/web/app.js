@@ -795,11 +795,6 @@
       setState({ profile, serverConnected: true, ...(edit && state.page === 'profile' ? {
         profileDraft: draft, profileDirty: false, profileEditingNickname: false, profileNicknameError: '',
       } : {}) });
-      if (!edit && foreground && state.page === 'me' && profile.avoidance) {
-        const notice = avoidancePresentation.grantNotice(profile.avoidance, safeParse(storage.get('avoidanceGrantNotices')));
-        if (notice.message) toast(notice.message);
-        storage.set('avoidanceGrantNotices', JSON.stringify(notice.seen));
-      }
     } catch (e) {
       if (sequence !== profileSequence || route !== routeSequence) return;
       setState({ profileError: e.message });
@@ -1291,6 +1286,30 @@
       };
     });
   }
+
+  let grantNoticeOpen = false;
+  const grantNotifier = avoidancePresentation.createGrantNotifier({
+    setTimeout, clearTimeout,
+    account: () => storage.get('session'),
+    read: () => request('/api/me/avoidance/notice'),
+    ack: through => request('/api/me/avoidance/notice', 'POST', { through }),
+    canShow() {
+      if (!alive || !foreground || !state.network || !modal.hidden || pending || grantNoticeOpen || !['lobby', 'me', 'table'].includes(state.page)) return false;
+      if (state.page === 'table' && !['lobby', 'ended', 'terminated'].includes(state.room?.phase)) return false;
+      return !['loading', 'busy', 'error', 'reconnecting', 'profileLoading', 'entrySheet', 'invitation', 'roomMenu', 'noteRoom', 'monthlyReset', 'resetSaving', 'avoidanceOpen', 'avoidanceWalletOpen', 'actionDialog', 'actionLoading', 'identityChange', 'fairyResult', 'identityHistoryOpen', 'historyOpen', 'toolType', 'showRoomRules', 'showRoomSettings', 'showBoardDetails', 'dealtIdentityDialog', 'honorDialog', 'resultDialog', 'revealed', 'playerCard', 'statsOpen', 'showTransfer'].some(key => state[key]);
+    },
+    update(value) {
+      const patch = {};
+      if (state.profile?.avoidance && state.profile.avoidance.balance !== value.balance) patch.profile = { ...state.profile, avoidance: { ...state.profile.avoidance, balance: value.balance } };
+      if (state.room?.me?.avoidance && state.room.me.avoidance.balance !== value.balance) patch.room = { ...state.room, me: { ...state.room.me, avoidance: { ...state.room.me.avoidance, balance: value.balance } } };
+      if (Object.keys(patch).length) setState(patch);
+    },
+    async show(value) {
+      grantNoticeOpen = true;
+      try { return await confirm(value.title, value.content, false, '知道了'); }
+      finally { grantNoticeOpen = false; }
+    },
+  });
 
   // ===== lifecycle helpers =====
   function buzz(pattern) {
@@ -5304,11 +5323,14 @@ function roomListItems(rooms) {
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       foreground = false;
+      grantNotifier.stop();
+      if (grantNoticeOpen) modalCancel.onclick?.();
       clearTimeout(webLoginTimer);
       clearTimeout(timer);
       mask();
     } else {
       foreground = true;
+      grantNotifier.start();
       if (state.page === 'login') pollWebLogin();
       if (state.page === 'monthly') loadMonthlyReport();
       if (state.page === 'badges') loadBadgeManager();
@@ -5319,6 +5341,8 @@ function roomListItems(rooms) {
       }
     }
   });
+  window.addEventListener('pagehide', () => { grantNotifier.stop(); if (grantNoticeOpen) modalCancel.onclick?.(); });
+  window.addEventListener('pageshow', () => { if (!document.hidden) grantNotifier.start(); });
   window.addEventListener("offline", function () {
     state.network = false;
     mask();
@@ -5436,4 +5460,5 @@ function roomListItems(rooms) {
   if (initialRoute.code) state.code = initialRoute.code;
   render();
   bootstrap();
+  grantNotifier.start();
 })();

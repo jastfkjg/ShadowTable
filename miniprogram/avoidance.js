@@ -38,11 +38,41 @@
     };
     if (wx.nextTick) wx.nextTick(run); else run();
   }
-  function grantNotice(value, seen) {
-    const history = value?.history || [], ids = Array.isArray(seen) ? seen : [];
-    const latest = history[0];
-    return { message: latest?.delta > 0 && !ids.includes(latest.id) ? "获得回避卡 ×" + latest.delta : "",
-      seen: [...new Set([...history.filter(row => row.delta > 0).map(row => row.id), ...ids])].slice(0, 100) };
+  function grantMessage(value) {
+    const notice = value.notice;
+    return (notice.grants > 1 ? "管理员累计向你发放了 " : "管理员向你发放了 ") + notice.amount + " 张回避卡。\n当前可用 " + value.balance + " 张。\n\n入座后可在发牌前选择想避开的角色，生效才扣卡。";
   }
-  return { groups, result, wallet, measureSheet, grantNotice };
+  function createGrantNotifier(options) {
+    let active = false, running = false, timer, epoch = 0, pending = null;
+    const later = options.setTimeout || setTimeout, cancel = options.clearTimeout || clearTimeout;
+    function schedule() { cancel(timer); if (active) timer = later(check, 10000); }
+    async function check() {
+      if (!active || running) { schedule(); return; }
+      const account = options.account(), turn = epoch;
+      const valid = () => active && turn === epoch && account === options.account();
+      if (!account || !options.canShow()) { schedule(); return; }
+      running = true;
+      try {
+        if (pending && pending.account !== account) pending = null;
+        if (pending) { await options.ack(pending.through); if (valid()) pending = null; }
+        if (!valid()) return;
+        const value = await options.read();
+        if (!valid()) return;
+        options.update?.(value);
+        if (!value.notice || !options.canShow()) return;
+        const confirmed = await options.show({ title: "收到回避卡", content: grantMessage(value), amount: value.notice.amount });
+        if (!confirmed || !valid()) return;
+        pending = { account, through: value.notice.through };
+        await options.ack(pending.through);
+        if (valid()) pending = null;
+      } catch (_) { /* Keep unread grants and retry quietly when connectivity returns. */ }
+      finally { running = false; schedule(); }
+    }
+    return {
+      start() { if (active) return; active = true; epoch++; return check(); },
+      stop() { active = false; epoch++; cancel(timer); },
+      check,
+    };
+  }
+  return { groups, result, wallet, measureSheet, grantMessage, createGrantNotifier };
 });

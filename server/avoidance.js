@@ -9,7 +9,8 @@ function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS avoidance_accounts(uid TEXT PRIMARY KEY, balance INTEGER NOT NULL CHECK(balance>=0));
     CREATE TABLE IF NOT EXISTS avoidance_ledger(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, balance INTEGER NOT NULL, source TEXT NOT NULL, note TEXT NOT NULL, match_id TEXT, created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS avoidance_ledger_user ON avoidance_ledger(uid,created DESC);
-    CREATE UNIQUE INDEX IF NOT EXISTS avoidance_spend_match ON avoidance_ledger(uid,match_id) WHERE source='spend';`);
+    CREATE UNIQUE INDEX IF NOT EXISTS avoidance_spend_match ON avoidance_ledger(uid,match_id) WHERE source='spend';
+    CREATE TABLE IF NOT EXISTS avoidance_grant_reads(uid TEXT NOT NULL, ledger_id TEXT NOT NULL, PRIMARY KEY(uid,ledger_id));`);
   store.transaction(() => {
     const known = store.db.prepare(`SELECT uid FROM profiles UNION SELECT uid FROM sessions UNION SELECT uid FROM match_players
       UNION SELECT json_extract(p.value,'$.uid') FROM rooms r,json_each(r.state,'$.players') p
@@ -29,7 +30,26 @@ function balance(store, uid) {
   return store.db.prepare("SELECT balance FROM avoidance_accounts WHERE uid=?").get(uid).balance;
 }
 function wallet(store, uid) {
-  return { balance: balance(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
+  return { ...grantNotice(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
+}
+function grantNotice(store, uid) {
+  const rows = store.db.prepare(`SELECT l.id,l.delta FROM avoidance_ledger l
+    LEFT JOIN avoidance_grant_reads r ON r.uid=l.uid AND r.ledger_id=l.id
+    WHERE l.uid=? AND l.source='admin' AND l.delta>0 AND r.ledger_id IS NULL ORDER BY l.rowid`).all(uid);
+  return { balance: balance(store, uid), notice: rows.length ? {
+    through: rows[rows.length - 1].id, amount: rows.reduce((n, row) => n + row.delta, 0), grants: rows.length,
+  } : null };
+}
+function acknowledgeGrant(store, uid, input) {
+  fail(typeof input.through === "string" && /^[a-f0-9-]{36}$/.test(input.through), "通知编号无效");
+  return store.transaction(() => {
+    const row = store.db.prepare("SELECT rowid FROM avoidance_ledger WHERE uid=? AND id=? AND source='admin' AND delta>0").get(uid, input.through);
+    fail(row, "通知不存在", 404);
+    // Acknowledge only the grants actually displayed; concurrent grants stay unread.
+    store.db.prepare(`INSERT OR IGNORE INTO avoidance_grant_reads(uid,ledger_id)
+      SELECT uid,id FROM avoidance_ledger WHERE uid=? AND rowid<=? AND source='admin' AND delta>0`).run(uid, row.rowid);
+    return { acknowledged: true };
+  });
 }
 
 // Count optimal completions over labelled card slots, then sample by their
@@ -110,7 +130,8 @@ function grant(store, input) {
   fail(store.inTransaction, "发放需要在事务中执行");
   fail(["player", "all"].includes(input.scope), "请选择发放范围");
   fail(Number.isSafeInteger(input.amount) && input.amount >= 1 && input.amount <= 100, "每人发放数量须为1至100张整数");
-  fail(typeof input.reason === "string" && input.reason.trim().length >= 1 && input.reason.length <= 200, "请填写发放原因，最多200字");
+  fail(input.reason === undefined || typeof input.reason === "string" && input.reason.length <= 200, "发放原因最多200字");
+  const reason = (input.reason || "").trim();
   let targets;
   if (input.scope === "all") {
     targets = store.db.prepare("SELECT uid FROM avoidance_accounts WHERE uid LIKE 'wx:%' OR uid LIKE 'dev:%' OR uid LIKE 'guest:%' ORDER BY uid").all();
@@ -127,8 +148,8 @@ function grant(store, input) {
     fail(Number.isSafeInteger(after), "回避卡数量超出有效范围");
     store.db.prepare("UPDATE avoidance_accounts SET balance=? WHERE uid=?").run(after, uid);
     store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
-      .run(randomUUID(), uid, input.amount, after, "admin", input.reason.trim(), null, created);
+      .run(randomUUID(), uid, input.amount, after, "admin", reason, null, created);
   }
   return { batchId, recipients: targets.length, amount: input.amount };
 }
-module.exports = { initialize, ensureAccount, balance, wallet, deal, prepare, settle, resultView, roomView, players, grant };
+module.exports = { initialize, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, deal, prepare, settle, resultView, roomView, players, grant };

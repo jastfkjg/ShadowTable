@@ -2336,6 +2336,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   identityOverlayBlocked() {
     return !this.alive || !this.foreground || !this.data.room || this.data.error ||
+      this.grantNoticeOpen ||
       this.data.actionDialog || this.data.actionLoading || this.data.identityChange ||
       this.data.fairyResult || this.data.identityHistoryOpen || this.data.historyOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
   },
