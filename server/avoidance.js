@@ -91,7 +91,7 @@ function roomView(store, room, uid) {
   const view = publicView(room, uid); // Check membership before reading private data.
   return { code: room.code, stage: room.stage, game: room.game, phase: room.phase,
     balance: balance(store, uid), selected: room.phase === "lobby" ? room.avoidanceChoices?.[uid] || null : null,
-    editable: room.phase === "lobby" && view.me.seat !== null && !view.me.ready,
+    editable: room.phase === "lobby" && view.me.seat !== null,
     options: room.phase === "lobby" ? avoidanceOptions(room).map(o => ({ ...o, portrait: require("../miniprogram/role-portraits").portrait(o.name, o.faction).portrait })) : [] };
 }
 

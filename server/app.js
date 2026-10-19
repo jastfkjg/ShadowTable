@@ -557,7 +557,7 @@ function createApp({
             room = store.get(room.code);
           } else {
             if (b.type === "rematch") { honors.closeForRoom(store, room); room = store.get(room.code); }
-            if (b.type === "avoidance" && b.role !== null) check(avoidance.balance(store, uid) > 0, "回避卡不足，本次没有扣卡");
+            if (b.type === "avoidance" && b.role !== null && room.phase === "lobby") check(avoidance.balance(store, uid) > 0, "暂无回避卡");
             if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
             if (b.type === "start") avoidance.settle(store, room);

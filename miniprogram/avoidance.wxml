@@ -10,7 +10,7 @@
       <scroll-view class="avoidance-body" scroll-y enhanced show-scrollbar="{{false}}" style="height:{{avoidanceBodyHeight}}px;"><view class="avoidance-fields">
         <view wx:if="{{avoidanceLoading}}" class="avoidance-note" role="status">正在读取回避卡…</view>
         <block wx:else>
-          <view class="avoidance-note">{{!avoidance.editable?'已准备，取消准备后可修改。':avoidance.balance<1?'暂无回避卡，可由管理员发放。':'每局选一个角色，发牌生效后才扣 1 张。'}}</view>
+          <view class="avoidance-note">{{avoidance.balance<1?'暂无回避卡':!avoidance.editable?'当前无法使用回避卡':'发牌前可随时修改，生效后才扣 1 张。'}}</view>
           <view wx:for="{{avoidanceGroups}}" wx:key="faction" class="avoidance-group">
             <view class="avoidance-faction faction-{{item.faction}}">{{item.label}}</view>
             <view class="avoidance-grid"><button wx:for="{{item.entries}}" wx:for-item="role" wx:key="id" class="avoidance-role {{role.selected?'is-selected':''}}" bindtap="chooseAvoidance" data-id="{{role.id}}" disabled="{{!avoidance.editable || avoidance.balance<1 || busy || hasPendingRequest}}" aria-pressed="{{role.selected}}" aria-label="{{'回避'+role.name}}" hover-class="entry-option-pressed"><view class="avoidance-choice-mark" aria-hidden="true">{{role.selected?'✓':''}}</view><image src="{{role.portrait}}" mode="aspectFit" aria-hidden="true" /><view>{{role.name}}<text wx:if="{{role.countLabel}}"> {{role.countLabel}}</text></view></button></view>
@@ -28,7 +28,7 @@
       <view class="avoidance-top"><view class="avoidance-handle" aria-hidden="true" /><view class="avoidance-heading"><view class="avoidance-heading-icon"><image src="/assets/table-cards.svg" aria-hidden="true" /></view><view class="avoidance-heading-copy"><view>我的回避卡</view><text>仅你可见 · 跟随账号保存</text></view><button class="avoidance-close" bindtap="closeAvoidanceWallet" aria-label="关闭我的回避卡" hover-class="none">×</button></view></view>
       <scroll-view class="avoidance-body" scroll-y enhanced show-scrollbar="{{false}}" style="height:{{avoidanceBodyHeight}}px;"><view class="avoidance-fields">
         <view class="avoidance-wallet-total"><text>可用回避卡</text><view>{{avoidanceWallet.balance || 0}}<text> 张</text></view></view>
-        <view class="avoidance-note">回避卡由管理员发放。入座后，在准备前选择本局想避开的一个角色，生效才扣卡。中途换牌不受影响。</view>
+        <view class="avoidance-note">回避卡由管理员发放。入座后，在发牌前选择本局想避开的一个角色，已准备也可修改，生效才扣卡。中途换牌不受影响。</view>
         <view wx:if="{{avoidanceWalletLoading}}" class="avoidance-note" role="status">正在同步记录…</view>
         <view wx:if="{{avoidanceWalletError}}" role="alert" class="avoidance-note">{{avoidanceWalletError}}<button class="text-button" bindtap="openAvoidanceWallet" hover-class="none">重新读取</button></view>
         <view class="avoidance-history-title">最近记录</view>

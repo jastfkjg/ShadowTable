@@ -1403,6 +1403,7 @@ function command(room, uid, input) {
 function applyCommand(room, uid, input) {
   const p = member(room, uid);
   requireRule(input && typeof input === "object", "请求格式错误");
+  if (input.type === "avoidance") requireRule(room.phase === "lobby", "身份已发放，无法修改回避角色", 409);
   requireRule(input.stage === room.stage, "阶段已变化，请刷新后重新操作", 409);
   const { type } = input;
   if (
@@ -1698,9 +1699,7 @@ function applyCommand(room, uid, input) {
     return;
   }
   if (type === "avoidance") {
-    requireRule(room.phase === "lobby", "只能在发牌前选择回避角色", 409);
     requireRule(p.seat !== null, "请先入座再使用回避卡");
-    requireRule(!p.ready, "请先取消准备，再修改回避角色", 409);
     requireRule(input.role === null || typeof input.role === "string" && roleDeck(room.board, room.capacity).includes(input.role), "请选择本局初始牌中的角色");
     room.avoidanceChoices ||= {};
     if (input.role === null) delete room.avoidanceChoices[uid];

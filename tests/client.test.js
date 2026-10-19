@@ -2164,11 +2164,12 @@ test('回避角色先本地选择再确认，关闭和切后台清空私密草�
     options: [{ id: 'merlin', name: '梅林', faction: 'good', count: 1, portrait: '/assets/roles/merlin.png' }] };
   let resolve;
   const p = page({ request: async () => value }); p.roomCode = '123456';
-  p.data.room = { code: '123456', phase: 'lobby', stage: 1, me: { seat: 1, avoidance: { balance: 1 } } };
+  p.data.room = { code: '123456', phase: 'lobby', stage: 1, me: { seat: 1, ready: true, avoidance: { balance: 1 } } };
   const commands = []; p.cmd = (...args) => commands.push(args);
   await p.openAvoidance(); assert.equal(p.data.avoidanceOpen, true);
   p.chooseAvoidance({ currentTarget: { dataset: { id: 'merlin' } } });
   assert.equal(p.data.avoidanceDraft, 'merlin'); assert.equal(commands.length, 0);
+  assert.equal(p.data.room.me.ready, true);
   p.saveAvoidance(); assert.deepEqual(JSON.parse(JSON.stringify(commands)), [['avoidance', { role: 'merlin' }, 'avoidance']]);
   p.mask(); assert.equal(p.data.avoidance, null); assert.equal(p.data.avoidanceDraft, '');
   const delayed = page({ request: () => new Promise(r => resolve = r) }); delayed.roomCode = '123456'; delayed.data.room = p.data.room;

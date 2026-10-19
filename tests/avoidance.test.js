@@ -84,7 +84,7 @@ test("最优随机发牌保留重复牌，能满足时全部满足，无法满�
   avoidance.deal(players, cards, {}, value => { originalShuffle = true; return value; });
   assert.equal(originalShuffle, true);
 });
-test("选择和结果仅本人可读；准备锁定、旁观及非法角色被拒绝，取消不扣卡", async t => {
+test("选择和结果仅本人可读；已准备可修改和取消，旁观及非法角色被拒绝", async t => {
   const a = await setup(t), tokens = await tokensFor(a), outsider = await a.login("outsider"), path = await a.room(tokens);
   const before = (await a.request(path, tokens[0])).data;
   assert.equal((await a.cmd(path, tokens[1], "avoidance", { role: "merlin" })).status, 200);
@@ -96,12 +96,42 @@ test("选择和结果仅本人可读；准备锁定、旁观及非法角色被�
   assert.equal((await a.cmd(path, outsider, "avoidance", { role: "merlin" })).status, 400);
   assert.equal((await a.cmd(path, tokens[1], "avoidance", { role: "witch" })).status, 400);
   await a.cmd(path, tokens[1], "ready", { ready: true });
-  assert.equal((await a.cmd(path, tokens[1], "avoidance", { role: null })).status, 409);
-  await a.cmd(path, tokens[1], "ready", { ready: false });
+  assert.equal((await a.request(path + "/avoidance", tokens[1])).data.editable, true);
+  assert.equal((await a.cmd(path, tokens[1], "avoidance", { role: "assassin" })).status, 200);
+  assert.equal((await a.request(path + "/avoidance", tokens[1])).data.selected, "assassin");
   assert.equal((await a.cmd(path, tokens[1], "avoidance", { role: null })).status, 200);
+  assert.equal((await a.request(path, tokens[1])).data.me.ready, true);
+  assert.equal((await a.request(path + "/avoidance", tokens[1])).data.selected, null);
   assert.equal((await a.request("/api/me/avoidance", tokens[1])).data.balance, 1);
   const audits = a.store.db.prepare("SELECT details FROM admin_audit").all().map(r => JSON.parse(r.details));
   assert.ok(audits.every(row => row.command !== "avoidance"));
+});
+test("全员准备后回避不影响准备、发牌或他人视图；发牌采用最后保存选择并拒绝迟到提交", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens);
+  await a.ready(path, tokens);
+  const before = (await a.request(path, tokens[1])).data;
+  const stage = before.stage;
+  for (const role of ["assassin", null, "merlin"]) {
+    assert.equal((await a.cmd(path, tokens[0], "avoidance", { role })).status, 200);
+    assert.deepEqual((await a.request(path, tokens[1])).data, before);
+    const host = (await a.request(path, tokens[0])).data;
+    assert.equal(host.stage, stage); assert.equal(host.phase, "lobby");
+    assert.equal(host.players.length, host.capacity); assert.equal(host.me.ready, true);
+    assert.ok(host.players.every(p => p.ready));
+    assert.equal((await a.request("/api/me/avoidance", tokens[0])).data.balance, 1);
+  }
+  assert.equal((await a.cmd(path, tokens[0], "start", { flexible: true })).status, 200);
+  const identity = (await a.request(path + "/private", tokens[0])).data;
+  assert.notEqual(identity.role, "梅林");
+  assert.equal(identity.avoidance.role, "merlin");
+  const late = await a.request(path + "/commands", tokens[0], { type: "avoidance", stage, role: "assassin" });
+  assert.equal(late.status, 409); assert.match(late.data.error, /身份已发放/);
+  const lateCancel = await a.request(path + "/commands", tokens[0], { type: "avoidance", stage, role: null });
+  assert.equal(lateCancel.status, 409);
+  assert.deepEqual((await a.request(path + "/private", tokens[0])).data, identity);
+  const choices = (await a.request(path + "/avoidance", tokens[0])).data;
+  assert.equal(choices.editable, false); assert.equal(choices.selected, null); assert.deepEqual(choices.options, []);
+  assert.equal((await a.request("/api/me/avoidance", tokens[0])).data.history.filter(h => h.source === "spend").length, 1);
 });
 test("全员回避梅林只失败1人，成功才扣，重复发牌不多扣，终止不退，重开清空", async t => {
   const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens);
@@ -179,7 +209,10 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
 });
 test("0张账号不能回避但可正常准备发牌，登录和建房不会自动获得卡", async t => {
   const a = await setup(t), tokens = await tokensFor(a, "empty", false), path = await a.room(tokens);
-  assert.equal((await a.cmd(path, tokens[0], "avoidance", { role: "merlin" })).status, 400);
+  await a.cmd(path, tokens[0], "ready", { ready: true });
+  const empty = await a.cmd(path, tokens[0], "avoidance", { role: "merlin" });
+  assert.equal(empty.status, 400); assert.equal(empty.data.error, "暂无回避卡");
+  assert.equal((await a.request(path, tokens[0])).data.me.ready, true);
   await a.ready(path, tokens);
   assert.equal((await a.cmd(path, tokens[0], "start", { flexible: true })).status, 200);
   for (const token of tokens) {

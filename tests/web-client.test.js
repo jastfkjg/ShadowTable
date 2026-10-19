@@ -2146,11 +2146,12 @@ test('网页版回避卡单选、确认、只读和私密结果遮盖，与小�
   const value = { code: '123456', stage: 1, phase: 'lobby', balance: 1, selected: null, editable: true,
     options: [{ id: 'merlin', name: '梅林', faction: 'good', count: 1, portrait: '/assets/roles/merlin.png' }] };
   const c = client(async () => response(value)); c.state.page = 'table';
-  c.state.room = { code: '123456', stage: 1, phase: 'lobby', me: { seat: 1, avoidance: { balance: 1 } } };
+  c.state.room = { code: '123456', stage: 1, phase: 'lobby', me: { seat: 1, ready: true, avoidance: { balance: 1 } } };
   try {
     await c.ACTIONS.openAvoidance(); assert.equal(c.state.avoidanceOpen, true);
     c.ACTIONS.chooseAvoidance({ dataset: { id: 'merlin' } });
     assert.equal(c.state.avoidanceDraft, 'merlin');
+    assert.equal(c.state.room.me.ready, true);
     assert.match(c.viewAvoidance(), /aria-pressed="true"/); assert.match(c.viewAvoidance(), /确认回避「梅林」/);
     c.ACTIONS.closeAvoidance(); assert.equal(c.state.avoidance, null); assert.equal(c.state.avoidanceDraft, '');
     c.state.dealtIdentityDialog = true; c.state.dealtIdentitySecret = null;
@@ -2158,5 +2159,21 @@ test('网页版回避卡单选、确认、只读和私密结果遮盖，与小�
     c.state.dealtIdentitySecret = { role: '忠臣', faction: '好人', factionTone: 'good', information: '没有视野', avoidance: { roleName: '梅林', status: 'effective' } };
     assert.match(c.viewDealtIdentity(), /已回避「梅林」/);
     c.ACTIONS.closeDealtIdentity(); assert.equal(c.state.dealtIdentitySecret, null);
+  } finally { c.stop(); }
+});
+test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入口', () => {
+  const c = client(async () => response({})); c.state.page = 'table';
+  c.state.room = { code: '123456', stage: 1, phase: 'lobby', players: [], team: [], history: [], me: { seat: 1, ready: true, avoidance: { balance: 0 } } };
+  try {
+    c.state.avoidanceOpen = true; c.state.avoidance = { balance: 0, editable: false };
+    const html = c.viewAvoidance();
+    assert.match(html, /class="avoidance-note">暂无回避卡<\/div>/);
+    assert.doesNotMatch(html, /取消准备后|当前无法使用回避卡/);
+    c.ACTIONS.closeAvoidance();
+    assert.match(c.viewRoom(), /data-action="openAvoidance"/);
+    for (const phase of ['identity', 'tools', 'quest', 'ended', 'terminated']) {
+      c.state.room.phase = phase;
+      assert.doesNotMatch(c.viewRoom(), /data-action="openAvoidance"/);
+    }
   } finally { c.stop(); }
 });

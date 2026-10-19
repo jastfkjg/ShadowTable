@@ -15,6 +15,23 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test('已准备仍能选择回避，无卡提示优先；发牌后隐藏入口', () => {
+  const room = { code: '123456', phase: 'lobby', capacity: 6, players: [], team: [], history: [], me: { seat: 1, ready: true, avoidance: { balance: 1 } } };
+  const data = { ...base, room, avoidanceOpen: true, avoidanceLoading: false,
+    avoidance: { balance: 1, editable: true }, avoidanceDraft: 'merlin', avoidanceDraftName: '梅林',
+    avoidanceGroups: [{ faction: 'good', label: '好人阵营', entries: [{ id: 'merlin', name: '梅林', portrait: '/assets/roles/merlin.png', selected: true }] }] };
+  const tree = renderTable(data);
+  assert.equal(byHandler(tree, 'chooseAvoidance').attr.disabled, false);
+  assert.equal(byHandler(tree, 'saveAvoidance').attr.disabled, false);
+  const empty = renderTable({ ...data, avoidance: { balance: 0, editable: false } });
+  const note = nodes(empty).find(n => n.attr?.class === 'avoidance-note');
+  assert.deepEqual(Array.from(note.children), ['暂无回避卡']);
+  assert.equal(byHandler(empty, 'chooseAvoidance').attr.disabled, true);
+  for (const phase of ['lobby', 'identity', 'tools', 'quest', 'ended', 'terminated']) {
+    const page = renderTable({ ...base, room: { ...room, phase } });
+    assert.equal(!!byHandler(page, 'openAvoidance'), phase === 'lobby');
+  }
+});
 test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发放身份操作', () => {
   const room = { code:'123456', phase:'lobby', capacity:6, boardName:'经典基础', players:[], team:[], history:[], me:{seat:1,isHost:true,ready:false} };
   const text = JSON.stringify(renderTable({ ...base, isLobby:false, room }));
