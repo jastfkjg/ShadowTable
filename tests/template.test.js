@@ -546,7 +546,7 @@ test("历史仅展示有效牌桌，失效房间和批量清理入口自动隐�
     {code:"222222",status:"ended",statusLabel:"已结束",available:true,lastActivityAt:now-4*86400000},
     {code:"333333",status:"unavailable",available:false}];
   const roomList=require("../miniprogram/room-list");
-  const data={...base,memberRooms:rooms,...roomList.present(rooms,"all",now),historyExpanded:false};
+  const data={...base,memberRooms:roomList.availableRooms(rooms),...roomList.present(rooms,"all",now),historyExpanded:false};
   const text=n=>typeof n==="string"||typeof n==="number"?String(n):(n.children||[]).map(text).join("");
   let tree=render(data);
   assert.equal(nodes(tree).filter(n=>n.attr?.catchtap==="openRoomMenu").length,1);
@@ -562,10 +562,30 @@ test("历史仅展示有效牌桌，失效房间和批量清理入口自动隐�
   assert.doesNotMatch(text(history),/已失效|战绩与复盘保留/);
   const locked=render({...data,historyExpanded:true,roomsRefreshing:true});
   assert.equal(byHandler(locked,"toggleRoomHistory").attr.disabled,true);
-  const expiredOnly=render({...base,memberRooms:[rooms[2]],...roomList.present([rooms[2]],"all",now),historyExpanded:true});
+  const expiredOnly=render({...base,memberRooms:roomList.availableRooms([rooms[2]]),...roomList.present([rooms[2]],"all",now),historyExpanded:true});
   assert.equal(byHandler(expiredOnly,"toggleRoomHistory"),undefined);
   assert.equal(byHandler(expiredOnly,"cleanupUnavailableRooms"),undefined);
   assert.match(text(expiredOnly),/还没有牌桌/);assert.doesNotMatch(text(expiredOnly),/没有符合条件|已失效/);
+});
+test("牌桌空态与有效列表一致，计数缺失或过期不会和卡片、历史及筛选提示同时出现", () => {
+  const roomList = require("../miniprogram/room-list"), now = Date.now();
+  const rooms = [{ code: "696130", status: "lobby", available: true },
+    { code: "464905", status: "ended", available: true, lastActivityAt: now }];
+  const data = { ...base, memberRooms: rooms, ...roomList.present(rooms, "all", now) };
+  for (const availableRoomCount of [0, undefined]) {
+    const shown = JSON.stringify(render({ ...data, availableRoomCount }));
+    assert.match(shown, /696130/); assert.match(shown, /464905/); assert.match(shown, /最近结束/);
+    assert.doesNotMatch(shown, /还没有牌桌|没有符合条件的牌桌/);
+    const historyRooms = [{ ...rooms[1], lastActivityAt: now - roomList.HISTORY_AFTER }];
+    const history = JSON.stringify(render({ ...base, memberRooms: historyRooms,
+      ...roomList.present(historyRooms, "all", now), availableRoomCount, historyExpanded: false }));
+    assert.match(history, /历史牌桌/); assert.doesNotMatch(history, /还没有牌桌|没有符合条件的牌桌/);
+    const filtered = JSON.stringify(render({ ...data, ...roomList.present(rooms, "playing", now), availableRoomCount }));
+    assert.match(filtered, /没有符合条件的牌桌/); assert.doesNotMatch(filtered, /还没有牌桌/);
+  }
+  const empty = { ...base, memberRooms: [], ...roomList.present([], "all", now), availableRoomCount: 2 };
+  assert.match(JSON.stringify(render(empty)), /还没有牌桌/);
+  assert.doesNotMatch(JSON.stringify(render({ ...empty, loading: true })), /还没有牌桌|没有符合条件的牌桌/);
 });
 test("我的牌桌统一更多入口，只有房主菜单显示解散，非房主仍可移除记录", () => {
   const rooms = [{ code: "123456", isHost: true, available: true }, { code: "234567", isHost: false, available: true }];

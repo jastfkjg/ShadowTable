@@ -16,6 +16,7 @@ function avatarLibrary(styleId) {
   const style = avatarStyles.find(item => item.id === styleId) || avatarStyles[0];
   return {
     avatarStyles,
+    avatarCount: builtinAvatars.length,
     avatarStyle: style.id,
     visibleAvatars: builtinAvatars.filter(item => item.style === style.id),
   };

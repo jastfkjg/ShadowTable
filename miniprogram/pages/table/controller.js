@@ -1627,9 +1627,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       } else if (pending.after === "leave" || pending.after === "delete") {
         this.clearRoom();
         this.setData({
-          notice: pending.after === "delete" ? "房间已解散" : "已离开房间",
+          notice: pending.after === "delete" ? "" : "已离开房间",
         });
         await this.loadRooms();
+        if (pending.after === "delete") this.showRoomFeedback("房间已解散");
       } else {
         this.setData({ notice: "" });
         await this.refresh();

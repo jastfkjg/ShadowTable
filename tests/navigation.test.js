@@ -80,6 +80,45 @@ test('移除成功后显示 1.5 秒轻提示，顶部无成功文案且可立即
   assert.equal(p.data.roomFeedback,'');
   p.onUnload();
 });
+test('解散成功后在底部显示 1.5 秒轻提示，不在顶部保留成功文案', async () => {
+  const timers=feedbackClock(),room={code:'123456',status:'lobby',isHost:true,available:true,stage:1};
+  let finish,started;
+  const posted=new Promise(resolve=>started=resolve);
+  const {p}=page('lobby',{...apiBase,request:async(url,method)=>{
+    if(url.endsWith('/management'))return room;
+    if(method==='POST'){started();await new Promise(resolve=>finish=resolve);return {accepted:true};}
+    return {rooms:[]};
+  }},{timers});
+  try {
+    p.setData({loading:false,memberRooms:[room]});
+    const dissolving=p.deleteRoom({currentTarget:{dataset:{code:room.code}}});
+    await posted;assert.equal(p.data.roomFeedback,'');
+    finish();await dissolving;
+    assert.equal(p.data.notice,'');assert.equal(p.data.roomFeedback,'房间已解散');
+    assert.equal(p.data.memberRooms.length,0);assert.equal(p.data.busy,false);
+    const job=[...timers.jobs.values()].find(job=>job.delay===1500);
+    assert.ok(job);job.callback();assert.equal(p.data.roomFeedback,'');
+  } finally {p.onUnload();}
+});
+test('解散失败或确认响应晚于后台切换时不显示成功轻提示', async () => {
+  for(const mode of ['failure','background']){
+    const timers=feedbackClock(),room={code:'123456',status:'lobby',isHost:true,available:true,stage:1};
+    let finish,started;
+    const posted=new Promise(resolve=>started=resolve);
+    const {p}=page('lobby',{...apiBase,request:async(url,method)=>{
+      if(url.endsWith('/management'))return room;
+      if(method==='POST'){started();await new Promise(resolve=>finish=resolve);if(mode==='failure')throw Object.assign(Error('解散失败'),{status:400});return {accepted:true};}
+      return {rooms:[]};
+    }},{timers});
+    try {
+      p.setData({loading:false,memberRooms:[room]});
+      const dissolving=p.deleteRoom({currentTarget:{dataset:{code:room.code}}});
+      await posted;if(mode==='background')p.onHide();finish();await dissolving;
+      assert.equal(p.data.roomFeedback,'');assert.equal(p.data.notice,'');assert.equal(timers.jobs.size,0);
+      if(mode==='failure'){assert.equal(p.data.error,'解散失败');assert.equal(p.data.memberRooms.length,1);}
+    } finally {p.onUnload();}
+  }
+});
 test('移除失败或确认响应晚于后台切换时不显示成功轻提示', async () => {
   for(const mode of ['failure','background']){
     const timers=feedbackClock(),room={code:'123456',status:'ended',available:true};

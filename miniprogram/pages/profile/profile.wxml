@@ -4,35 +4,38 @@
   <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
   <form wx:if="{{profile}}" bindsubmit="save">
     <view class="avatar-editor">
-      <view class="avatar-preview">
-        <view class="avatar-image-wrap">
-          <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" aria-label="当前头像" />
-          <view wx:else class="profile-avatar large avatar-fallback" aria-label="默认头像">{{initial}}</view>
-          <view wx:if="{{uploadStatus === 'uploading'}}" class="avatar-upload-progress" role="progressbar" aria-label="头像上传进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{uploadProgress}}"><view class="avatar-upload-progress-fill" style="width: {{uploadProgress}}%;" /></view>
+      <view class="profile-identity-row">
+        <view class="avatar-preview">
+          <view class="avatar-image-wrap">
+            <image wx:if="{{avatarPreview}}" class="profile-avatar large" src="{{avatarPreview}}" mode="aspectFill" aria-label="{{'当前头像，' + avatarLabel}}" />
+            <view wx:else class="profile-avatar large avatar-fallback" aria-label="默认头像">{{initial}}</view>
+            <view wx:if="{{uploadStatus === 'uploading'}}" class="avatar-upload-progress" role="progressbar" aria-label="头像上传进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{uploadProgress}}"><view class="avatar-upload-progress-fill" style="width: {{uploadProgress}}%;" /></view>
+          </view>
+          <button wx:if="{{canUpload}}" hover-class="none" class="avatar-change" open-type="chooseAvatar" bindchooseavatar="chooseWechatAvatar" disabled="{{busy || pendingSave}}" aria-label="{{uploadStatus === 'uploading' ? '头像上传中，可以重新选择图片' : (uploadStatus === 'pending' || uploadStatus === 'processing' ? '正在准备头像，可以重新选择图片' : '更换头像，可使用微信头像、从相册选择或拍照')}}">
+            <view class="avatar-change-badge" aria-hidden="true"><image class="avatar-camera-icon" src="/assets/camera.svg" /></view><text>更换头像</text>
+          </button>
+          <text wx:else class="avatar-preview-caption">当前头像</text>
         </view>
-        <view class="avatar-preview-copy"><view class="avatar-preview-caption">头像预览</view><view class="avatar-preview-name">{{avatarLabel}}</view><view class="avatar-preview-selected"><text aria-hidden="true">✓</text>当前选择</view></view>
-        <button wx:if="{{canUpload}}" hover-class="none" class="avatar-change" open-type="chooseAvatar" bindchooseavatar="chooseWechatAvatar" disabled="{{busy || pendingSave}}" aria-label="{{uploadStatus === 'uploading' ? '头像上传中，可以重新选择图片' : (uploadStatus === 'pending' || uploadStatus === 'processing' ? '正在准备头像，可以重新选择图片' : '更换头像，可使用微信头像、从相册选择或拍照')}}">
-          <view class="avatar-change-badge" aria-hidden="true"><image class="avatar-camera-icon" src="/assets/camera.svg" /></view><text>更换头像</text>
-        </button>
+        <view class="nickname-editor">
+          <view class="nickname-heading"><label for="profile-nickname">个人昵称</label><text>{{nickname.length}}/16</text></view>
+          <view wx:if="{{editingNickname}}" class="nickname-input-row {{nicknameError ? 'is-invalid' : ''}}">
+            <input id="profile-nickname" class="input nickname-input {{nicknameError ? 'is-invalid' : ''}}" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" focus="{{editingNickname}}" bindinput="inputName" bindblur="finishNicknameEdit" bindconfirm="finishNicknameEdit" bindkeyboardheightchange="keyboardHeightChange" confirm-type="done" cursor-spacing="24" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符" />
+          </view>
+          <button wx:else hover-class="none" class="nickname-display" bindtap="editNickname" disabled="{{busy || pendingSave}}" aria-label="{{'修改个人昵称，当前昵称：' + nickname}}">
+            <text class="nickname-text">{{nickname}}</text>
+            <image class="nickname-edit-icon" src="/assets/edit.svg" aria-hidden="{{true}}" />
+          </button>
+          <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
+          <view wx:else class="nickname-hint">{{editingNickname ? '输入1–16个字符' : '点击修改昵称'}}</view>
+        </view>
       </view>
       <view wx:if="{{canUpload && uploadError}}" class="custom-avatar-editor">
         <view class="avatar-upload-error" role="alert">{{uploadError}}</view>
         <button wx:if="{{uploadStatus !== 'rejected'}}" hover-class="none" class="custom-avatar-retry" bindtap="retryAvatarUpload" loading="{{uploadBusy}}" disabled="{{uploadBusy || busy || pendingSave}}">重试</button>
       </view>
-      <view class="nickname-editor">
-        <view class="nickname-heading"><label for="profile-nickname">个人昵称</label><text>{{nickname.length}}/16</text></view>
-        <view wx:if="{{editingNickname}}" class="nickname-input-row {{nicknameError ? 'is-invalid' : ''}}">
-          <input id="profile-nickname" class="input nickname-input {{nicknameError ? 'is-invalid' : ''}}" name="nickname" type="nickname" maxlength="16" value="{{nickname}}" focus="{{editingNickname}}" bindinput="inputName" bindblur="finishNicknameEdit" bindconfirm="finishNicknameEdit" bindkeyboardheightchange="keyboardHeightChange" confirm-type="done" cursor-spacing="24" disabled="{{busy || pendingSave}}" placeholder="输入1–16个字符" aria-label="个人昵称，1至16个字符" />
-        </view>
-        <button wx:else hover-class="none" class="nickname-display" bindtap="editNickname" disabled="{{busy || pendingSave}}" aria-label="{{'修改个人昵称，当前昵称：' + nickname}}">
-          <text class="nickname-text">{{nickname}}</text>
-          <image class="nickname-edit-icon" src="/assets/edit.svg" aria-hidden="{{true}}" />
-        </button>
-        <view wx:if="{{nicknameError}}" class="nickname-error" role="alert">{{nicknameError}}</view>
-      </view>
     </view>
     <view class="avatar-library">
-      <view class="avatar-library-heading"><view class="field-title">选择头像</view><text>{{avatarStyles.length}} 种风格</text></view>
+      <view class="avatar-library-heading"><view class="field-title">选择头像</view><text>共 {{avatarCount}} 款</text></view>
       <view class="avatar-styles" role="group" aria-label="头像风格">
         <button wx:for="{{avatarStyles}}" wx:key="id" hover-class="none" class="avatar-style {{avatarStyle === item.id ? 'is-active' : ''}}" data-style="{{item.id}}" bindtap="chooseAvatarStyle" disabled="{{busy || pendingSave}}" aria-label="{{item.label + '，' + item.count + '款头像'}}" aria-pressed="{{avatarStyle === item.id}}">{{item.shortLabel}}</button>
       </view>
