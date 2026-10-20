@@ -260,6 +260,22 @@ test("通知确认持久化，重启后不重复提醒，新发放仍保持未�
     assert.equal(avoidance.grantNotice(store, "wx:notice").notice.amount, 2);
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+test("收卡通知仅携带本人的非空发放原因，合并时去重并保留并发新原因", async t => {
+  const a = await setup(t), one = await a.login("reason-one"), two = await a.login("reason-two");
+  const uid = name => "wx:" + createHash("sha256").update(name).digest("hex");
+  const grant = (account, reason) => a.store.transaction(() => avoidance.grant(a.store, { scope: "player", uid: account, amount: 1, reason }));
+  grant(uid("reason-one")); grant(uid("reason-one"), "   ");
+  assert.equal((await a.request("/api/me/avoidance/notice", one)).data.notice.reasons, undefined);
+  grant(uid("reason-one"), "  感谢参加聚会！  "); grant(uid("reason-one"), "感谢参加聚会！");
+  grant(uid("reason-one"), "<b>保持原文</b>\n第二行"); grant(uid("reason-two"), "另一位玩家的原因");
+  const first = (await a.request("/api/me/avoidance/notice", one)).data.notice;
+  assert.deepEqual(first.reasons, ["感谢参加聚会！", "<b>保持原文</b>\n第二行"]);
+  assert.equal(first.amount, 5);
+  assert.deepEqual((await a.request("/api/me/avoidance/notice", two)).data.notice.reasons, ["另一位玩家的原因"]);
+  grant(uid("reason-one"), "新赠卡原因");
+  assert.equal((await a.request("/api/me/avoidance/notice", one, { through: first.through })).status, 200);
+  assert.deepEqual((await a.request("/api/me/avoidance/notice", one)).data.notice.reasons, ["新赠卡原因"]);
+});
 test("0张账号不能回避但可正常准备发牌，登录和建房不会自动获得卡", async t => {
   const a = await setup(t), tokens = await tokensFor(a, "empty", false), path = await a.room(tokens);
   await a.cmd(path, tokens[0], "ready", { ready: true });

@@ -271,6 +271,7 @@ function change(store, input) {
     d.players.filter(p => !p.companion).forEach((p) => uids.add(p.uid));
   }
   for (const uid of uids) store.touchScore(uid);
+  require("./avoidance-rewards").reconcile(store, selected.map(d => d.id));
   store.syncScoreRooms();
   store.invalidateLeaderboard();
   return {

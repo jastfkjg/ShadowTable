@@ -1,13 +1,21 @@
 <view wx:if="{{dialog}}" class="app-dialog-backdrop" catchtouchmove="blockScroll" catchtap="blockScroll">
-  <view class="app-dialog" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
-    <view class="app-dialog-title">{{dialog.title}}</view>
+  <view class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+    <view wx:if="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
+      <view class="app-dialog-grant-icon" aria-hidden="true"><image src="{{dialog.contextIcon}}" /></view>
+      <view class="app-dialog-title">{{dialog.title}}</view>
+    </view>
+    <view wx:else class="app-dialog-title">{{dialog.title}}</view>
     <view wx:if="{{dialog.contextValue}}" class="app-dialog-context">
-      <image src="{{dialog.contextIcon}}" aria-hidden="true" />
+      <image wx:if="{{dialog.variant!=='avoidance-grant'}}" src="{{dialog.contextIcon}}" aria-hidden="true" />
       <text>{{dialog.contextLabel}}</text><text class="app-dialog-context-value">{{dialog.contextValue}}</text>
       <text wx:if="{{dialog.contextMeta}}" class="app-dialog-context-meta">{{dialog.contextMeta}}</text>
     </view>
-    <scroll-view wx:if="{{dialog.content}}" class="app-dialog-body" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
-      <view class="app-dialog-message">{{dialog.content}}</view>
+    <scroll-view wx:if="{{dialog.content||dialog.lead}}" class="app-dialog-body" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
+      <view wx:if="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-message">
+        <view wx:if="{{dialog.lead}}" class="app-dialog-lead">{{dialog.lead}}</view>
+        <view wx:if="{{dialog.content}}" class="app-dialog-hint {{dialog.lead?'has-lead':''}}">{{dialog.content}}</view>
+      </view>
+      <view wx:else class="app-dialog-message">{{dialog.content}}</view>
     </scroll-view>
     <view class="app-dialog-actions">
       <button wx:if="{{dialog.showCancel}}" class="app-dialog-cancel" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.cancelText}}</button>

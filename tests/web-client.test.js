@@ -53,7 +53,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
 const response = (body) => ({ status: 200, json: async () => body });
 test('网页收卡通过主题弹窗展示，未确认不读，身份或操作面板打开时延后提醒', async () => {
   const calls = [], dialogs = [];
-  let notice = { through: 'grant-1', amount: 2, grants: 1 }, accepted = false;
+  let notice = { through: 'grant-1', amount: 2, grants: 1, kind: 'generic', reasons: ['感谢参加聚会！'] }, accepted = false;
   const c = client(async (url, options = {}) => {
     calls.push([url, options]);
     if (options.method === 'POST') { notice = null; return response({ acknowledged: true }); }
@@ -69,7 +69,8 @@ test('网页收卡通过主题弹窗展示，未确认不读，身份或操作�
     for (const phase of ['vote', 'identity', 'ended', 'terminated']) { c.state.room.phase = phase; await c.grantNotifier.check(); assert.equal(calls.length, 0); }
     c.state.room.phase = 'lobby'; await c.grantNotifier.check();
     assert.equal(dialogs.length, 1); assert.equal(dialogs[0][0], '收到回避卡'); assert.equal(dialogs[0][2], false); assert.equal(dialogs[0][3], '知道了');
-    assert.match(dialogs[0][1], /本次获得 \+2 张/); assert.doesNotMatch(dialogs[0][1], /管理员|发放/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
+    assert.match(dialogs[0][1], /生效才扣卡/); assert.equal(dialogs[0][4].amount, 2); assert.equal(dialogs[0][4].lead, '感谢参加聚会！');
+    assert.doesNotMatch(dialogs[0][1], /管理员|发放/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
     assert.equal(c.state.room.me.avoidance.balance, 4);
     accepted = true; await c.grantNotifier.check();
     assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 1);

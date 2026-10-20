@@ -19,3 +19,18 @@
 @media(max-width:350px) { .app-dialog-backdrop { padding:20px; }.app-dialog { padding:24px 20px; }.app-dialog-title { font-size:19px; } }
 @media(max-height:500px) { .app-dialog { max-height:calc(100vh - 32px); padding:20px 24px; }.app-dialog-backdrop { padding:16px; }.app-dialog-context { margin-top:10px; }.app-dialog-body { margin-top:12px; max-height:35vh; }.app-dialog-actions { margin-top:18px; } }
 @media(prefers-reduced-motion:reduce) { .app-dialog { animation:none; } }
+
+/* Receipt-specific hierarchy; other shared dialogs retain their existing layout. */
+.app-dialog.is-avoidance-grant { padding:24px; }
+.app-dialog-grant-header { display:flex; flex-shrink:0; align-items:center; gap:12px; }
+.app-dialog-grant-icon { display:flex; flex-shrink:0; align-items:center; justify-content:center; width:42px; height:42px; border-radius:13px; background:rgba(153,199,245,.10); }
+.app-dialog-grant-icon image { width:27px; height:27px; }
+.is-avoidance-grant .app-dialog-context { justify-content:space-between; gap:12px; margin-top:22px; padding-bottom:18px; border-bottom:1px solid rgba(177,191,198,.14); font-size:14px; line-height:1.5; }
+.is-avoidance-grant .app-dialog-context-value { margin-left:auto; font-size:23px; line-height:1.3; font-weight:600; letter-spacing:.2px; }
+.is-avoidance-grant .app-dialog-lead { color:var(--text,#f2eee5); font-size:16px; line-height:1.8; font-weight:500; white-space:pre-wrap; overflow-wrap:anywhere; }
+.is-avoidance-grant .app-dialog-hint { color:var(--muted,#b1bfc6); font-size:14px; line-height:1.8; font-weight:400; white-space:pre-wrap; overflow-wrap:anywhere; }
+.is-avoidance-grant .app-dialog-hint.has-lead { margin-top:14px; }
+.is-avoidance-grant .app-dialog-actions { margin-top:24px; }
+.is-avoidance-grant .app-dialog-actions button { min-height:50px; font-size:16px; }
+@media(max-width:350px) { .app-dialog.is-avoidance-grant { padding:22px 20px; }.app-dialog-grant-header { gap:10px; }.is-avoidance-grant .app-dialog-context { margin-top:20px; } }
+@media(max-height:500px) { .app-dialog.is-avoidance-grant { padding:20px 24px; }.app-dialog-grant-icon { width:36px; height:36px; border-radius:11px; }.app-dialog-grant-icon image { width:24px; height:24px; }.is-avoidance-grant .app-dialog-context { margin-top:14px; padding-bottom:12px; }.is-avoidance-grant .app-dialog-body { margin-top:14px; }.is-avoidance-grant .app-dialog-actions { margin-top:18px; } }

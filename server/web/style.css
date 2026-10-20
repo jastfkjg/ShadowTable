@@ -1137,6 +1137,21 @@ button.leave-button {
   color: var(--text);
 }
 
+/* Avoidance receipts use the same hierarchy as the mini-program. */
+.error-dialog.is-avoidance-grant { display:flex; flex-direction:column; max-width:350px; max-height:calc(100dvh - 48px); overflow:hidden; padding:24px; border-radius:22px; border-color:rgba(177,191,198,.24); }
+.is-avoidance-grant .dialog-title { display:flex; flex-shrink:0; align-items:center; gap:12px; padding:0; margin:0; border:0; font-size:20px; line-height:1.5; font-weight:600; letter-spacing:0; }
+.is-avoidance-grant .dialog-title::before { content:""; flex-shrink:0; width:42px; height:42px; border-radius:13px; background:rgba(153,199,245,.10) url('/assets/table-cards.svg') center/27px 27px no-repeat; }
+.dialog-grant-context { display:flex; flex-shrink:0; justify-content:space-between; align-items:center; gap:12px; margin-top:22px; padding-bottom:18px; border-bottom:1px solid rgba(177,191,198,.14); color:var(--muted); font-size:14px; line-height:1.5; }
+.dialog-grant-amount { margin-left:auto; color:var(--accent); font-size:23px; font-weight:600; line-height:1.3; letter-spacing:.2px; }
+.is-avoidance-grant .dialog-message { flex-shrink:1; min-height:0; margin:20px 0 0; overflow-y:auto; max-height:48vh; white-space:normal; }
+.dialog-grant-lead { color:var(--text); font-size:16px; line-height:1.8; font-weight:500; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dialog-grant-hint { color:var(--muted); font-size:14px; line-height:1.8; font-weight:400; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dialog-grant-hint.has-lead { margin-top:14px; }
+.is-avoidance-grant .dialog-actions { flex-shrink:0; margin-top:24px; }
+.is-avoidance-grant .dialog-actions button { min-height:50px; border-radius:12px; font-size:16px; }
+@media(max-width:350px) { .error-dialog.is-avoidance-grant { padding:22px 20px; }.is-avoidance-grant .dialog-title { gap:10px; font-size:19px; }.dialog-grant-context { margin-top:20px; } }
+@media(max-height:500px) { .error-dialog.is-avoidance-grant { max-height:calc(100dvh - 32px); padding:20px 24px; }.is-avoidance-grant .dialog-title::before { width:36px; height:36px; border-radius:11px; background-size:24px 24px; }.dialog-grant-context { margin-top:14px; padding-bottom:12px; }.is-avoidance-grant .dialog-message { margin-top:14px; max-height:35vh; }.is-avoidance-grant .dialog-actions { margin-top:18px; } }
+
 /* Settings dialog */
 .settings-header {
   margin-bottom: 24px;

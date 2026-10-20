@@ -9,6 +9,7 @@ const fun = require("./fun");
 const funCopy = require("../miniprogram/fun-copy");
 const replay = require("./replay");
 const management = require("./match-management");
+const avoidanceRewards = require("./avoidance-rewards");
 const { migrate: migrateKnights } = require("./knights");
 const { monthAt, monthRange } = require("../miniprogram/monthly-report");
 const companion = player => player.uid.startsWith("test:");
@@ -108,6 +109,7 @@ class Store {
     });
     require("./retention").initialize(this);
     require("./avoidance").initialize(this);
+    avoidanceRewards.initialize(this);
   }
   restoreFunRecords() {
     const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='excluded' AND json_extract(m.snapshot,'$.excludedReason') IS NULL AND p.outcome IN ('win','loss')) OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
@@ -268,6 +270,7 @@ class Store {
     this.db.prepare("DELETE FROM rooms WHERE code=?").run(code);
   }
   archiveMatch(record) {
+    if (!this.inTransaction) return this.transaction(() => this.archiveMatch(record));
     const { players, ...match } = record;
     const participants = players.filter(player => !companion(player));
     if (!participants.length) return;
@@ -277,17 +280,20 @@ class Store {
     const projections = fun.project(record, participants, roleName);
     for (const event of record.funFacts?.events || []) this.db.prepare("INSERT OR IGNORE INTO match_events VALUES(?,?,?)").run(match.id, event.id, JSON.stringify(event));
     const insert = this.db.prepare("INSERT OR IGNORE INTO match_players VALUES(?,?,?,?,?,?,?)");
+    let changed = false;
     for (const { uid, ...player } of participants) {
       player.fun = projections.find(p => p.uid === uid).fun;
       this.initializeLeaderboardProfile(uid);
       const result = insert.run(match.id, uid, match.board, player.faction, player.outcome, match.endedAt, JSON.stringify(player));
       if (result.changes) {
+        changed = true;
         this.writeFun(match, uid, player.fun);
         if (player.score) this.db.prepare("INSERT INTO match_scores VALUES(?,?,?,?,?,?)").run(match.id, uid, player.score.status, player.score.total, match.endedAt, JSON.stringify(player.score));
         this.invalidateLeaderboard();
         this.touchScore(uid);
       }
     }
+    if (changed) avoidanceRewards.reconcile(this, [match.id]);
   }
   requireActiveMatch(id) {
     if (management.control(this,id).state !== "active") throw new RuleError("请先恢复记录并计入战绩，再更正结果或积分",409);
@@ -388,6 +394,7 @@ class Store {
     this.rebuildFun(match, this.matchParticipants(match));
     this.syncScoreRooms(id);
     this.invalidateLeaderboard();
+    avoidanceRewards.reconcile(this, [id]);
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision}};
   }
   correctFunMatch(id, input) {
@@ -419,6 +426,7 @@ class Store {
       match.honorResult = { status: "invalidated", mvp: [], svp: [] };
     }
     this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
+    avoidanceRewards.reconcile(this, [id]);
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision}};
   }
   syncScoreRooms(resultId = null) {

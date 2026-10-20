@@ -66,7 +66,7 @@
               </div>
               <p id="cards-count" class="score-hint" aria-live="polite">正在准备玩家列表</p>
               <div class="score-field cards-quantity"><label for="cards-amount">每人发放张数 <span class="cards-optional">1–100 张</span></label><div class="cards-amount-row"><input id="cards-amount" type="number" min="1" max="100" step="1" value="1" required aria-describedby="cards-amount-error" /><span>张</span><div class="cards-presets" aria-label="快捷选择张数"><button type="button" data-card-amount="1" aria-pressed="true">1 张</button><button type="button" data-card-amount="3" aria-pressed="false">3 张</button><button type="button" data-card-amount="5" aria-pressed="false">5 张</button></div></div><p id="cards-amount-error" class="cards-field-error" hidden>请输入 1 至 100 的整数</p></div>
-              <div class="score-field"><label for="cards-reason">发放原因 <span class="cards-optional">选填</span></label><input id="cards-reason" maxlength="200" placeholder="可留空，例如：聚会活动赠送" /></div>
+              <div class="score-field"><label for="cards-reason">发放原因 <span class="cards-optional">选填</span></label><input id="cards-reason" maxlength="200" placeholder="可留空，例如：聚会活动赠送" aria-describedby="cards-reason-hint" /><p id="cards-reason-hint" class="score-hint">填写后会作为收卡弹窗正文展示给玩家。</p></div>
             </div><aside class="cards-summary" aria-label="本次发放摘要">
               <h3>本次发放</h3><p id="cards-summary-target">请先选择玩家</p>
               <dl><div><dt>接收玩家</dt><dd id="cards-summary-recipients">—</dd></div><div><dt>每人获得</dt><dd id="cards-summary-amount">1 张</dd></div><div class="cards-summary-total"><dt>合计发放</dt><dd id="cards-summary-total">—</dd></div></dl>

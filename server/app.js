@@ -12,6 +12,7 @@ const { publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const honors = require("./honors");
 const avoidance = require("./avoidance");
+const avoidanceRewards = require("./avoidance-rewards");
 const BOARD_INFO = require("./board-info");
 const {
   BOARDS,
@@ -562,7 +563,10 @@ function createApp({
             if (b.type === "avoidance" && b.role !== null && room.phase === "lobby") check(avoidance.balance(store, uid) > 0, "暂无回避卡");
             if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
-            if (b.type === "start") avoidance.settle(store, room);
+            if (b.type === "start") {
+              avoidance.settle(store, room);
+              avoidanceRewards.registerStart(store, room);
+            }
           }
           if (!details) details = actionDetails(room, uid, match[2], b);
           response = { code: room.code, accepted: true };

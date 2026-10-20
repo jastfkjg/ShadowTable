@@ -81,6 +81,22 @@ test('共享入口只寻找当前页，缺少宿主时安全取消，不调用�
   assert.equal(nativeCalls,0);
 });
 
+test('收卡弹窗正文与提示分离，无正文不提升提示；长原因按完整图标标题行测量', async () => {
+  assert.equal(present({ content: '普通说明' }).variant, undefined);
+  const plain = present({ variant: 'avoidance-grant', content: '使用提示' });
+  assert.equal(plain.lead, ''); assert.equal(plain.content, '使用提示');
+  const { host, tap } = component(), selectors = [];
+  host.createSelectorQuery = () => {
+    const q = { select(s) { selectors.push(s); return q; }, boundingClientRect() { return q; }, exec(cb) { cb([{height:600},{height:42},{height:49},{height:50},{height:1200}]); } };
+    return q;
+  };
+  const job = host.show({ variant: 'avoidance-grant', title: '收到回避卡', lead: '很长的发放原因'.repeat(20), content: '使用提示' });
+  assert.equal(selectors[1], '.app-dialog-grant-header');
+  assert.equal(host.data.bodyHeight, 277);
+  assert.equal(host.data.dialog.lead, '很长的发放原因'.repeat(20));
+  host.confirm(tap()); await job;
+});
+
 test('所有小程序路由都包含共享宿主，业务代码不再使用原生弹窗', () => {
   const app=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8'));
   assert.equal(app.usingComponents['app-dialog'],'/components/app-dialog/app-dialog');

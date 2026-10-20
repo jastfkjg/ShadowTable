@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { createGrantNotifier } = require("../miniprogram/avoidance");
+const { createGrantNotifier, grantMessage, grantCopy } = require("../miniprogram/avoidance");
 
 function notifier(overrides = {}) {
   const state = { account: "one", safe: true, value: { balance: 5, notice: { through: "grant-one", amount: 3, grants: 2 } }, shown: [], acked: [], timers: new Map() };
@@ -18,18 +18,52 @@ function notifier(overrides = {}) {
   return { instance, state };
 }
 
-test("通知合并为弹窗、包含可用余额与用法，只在确认后标记已读", async () => {
+test("通知合并为弹窗、包含获得数量与用法，只在确认后标记已读", async () => {
   let finish;
   const { instance, state } = notifier({ show: value => { state.shown.push(value); return new Promise(resolve => finish = resolve); } });
   const job = instance.start();
   await Promise.resolve(); await Promise.resolve();
   assert.equal(state.shown.length, 1); assert.equal(state.shown[0].title, "收到回避卡");
-  assert.equal(state.shown[0].amount, 3); assert.doesNotMatch(state.shown[0].content, /管理员|发放/); assert.match(state.shown[0].content, /当前可用 5 张/);
+  assert.equal(state.shown[0].amount, 3); assert.doesNotMatch(state.shown[0].content, /管理员|发放|当前可用/);
   assert.match(state.shown[0].content, /生效才扣卡/); assert.deepEqual(state.acked, []);
   finish(true); await job;
   assert.deepEqual(state.acked, ["grant-one"]);
   await instance.check(); assert.equal(state.shown.length, 1);
   instance.stop(); assert.equal(state.timers.size, 0);
+});
+test("三种收卡统一标题，失利和胜利使用指定文案，均不展示余额", async () => {
+  const original = "入座后可在发牌前选择想避开的角色，生效才扣卡。";
+  const cases = [
+    ["loss", "加油，下局试试避开不想玩的角色！"],
+    ["win", "累计四场胜利达成，送你一张回避卡！"],
+    ["generic", ""],
+    [undefined, ""],
+  ];
+  for (const [kind, lead] of cases) {
+    const { instance, state } = notifier();
+    state.value = { balance: 1, notice: { through: "grant", amount: 1, grants: 1, kind } };
+    try {
+      await instance.start();
+      assert.deepEqual(state.shown, [{ title: "收到回避卡", lead, content: original, amount: 1 }]);
+      assert.deepEqual(state.acked, ["grant"]);
+    } finally { instance.stop(); }
+  }
+  // Several victory rewards may be combined after an offline session; avoid
+  // saying one card when the amount shown is larger, or guessing old sources.
+  for (const kind of ["win", "generic", "unknown"]) {
+    assert.equal(grantMessage({ balance: 1, notice: { kind, amount: 2 } }), original);
+  }
+});
+test("发放原因作为独立正文；空原因没有正文，使用提示始终保持独立", () => {
+  const content = "入座后可在发牌前选择想避开的角色，生效才扣卡。";
+  for (const reasons of [undefined, [], ["", "  ", null, 1]]) {
+    assert.deepEqual(grantCopy({ notice: { kind: "generic", amount: 1, reasons } }), { lead: "", content });
+  }
+  const reasons = ["感谢参加聚会！", "感谢参加聚会！", "  下次见！  ", "<b>活动赠卡</b>\n保持原样"];
+  const value = { notice: { kind: "generic", amount: 4, reasons } };
+  const lead = "感谢参加聚会！\n\n下次见！\n\n<b>活动赠卡</b>\n保持原样";
+  assert.deepEqual(grantCopy(value), { lead, content });
+  assert.equal(grantMessage(value), lead + "\n\n" + content);
 });
 test("关键交互期间暂缓，恢复后弹窗；后台取消或未确认不丢通知", async () => {
   let confirmed = false;
@@ -73,7 +107,8 @@ test("小程序仅在房间准备阶段提醒收卡，首页、我的、结束�
   for (const key of ["entrySheet", "monthlyReset", "avoidanceOpen", "playerCard", "actionDialog"]) { data[key] = {}; assert.equal(options.canShow(), false, key); delete data[key]; }
   for (const phase of ["vote", "identity", "quest", "ended", "terminated"]) { data.room.phase = phase; assert.equal(options.canShow(), false, phase); }
   data.room.phase = "lobby"; assert.equal(options.canShow(), true);
-  await options.show({ title: "收到回避卡", content: "获得3张", amount: 3 });
+  await options.show({ title: "收到回避卡", lead: "活动赠卡", content: "使用提示", amount: 3 });
   assert.equal(shown.showCancel, false); assert.equal(shown.confirmText, "知道了"); assert.equal(shown.contextIcon, "/assets/table-cards.svg");
+  assert.equal(shown.variant, "avoidance-grant"); assert.equal(shown.lead, "活动赠卡"); assert.equal(shown.content, "使用提示");
   assert.equal(controller.grantNoticeOpen, false);
 });

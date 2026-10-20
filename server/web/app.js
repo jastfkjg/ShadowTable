@@ -1250,12 +1250,22 @@
       toastEl.classList.remove("show");
     }, 1600);
   }
-  function confirm(title, content, showCancel, confirmLabel) {
+  function confirm(title, content, showCancel, confirmLabel, receipt) {
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
       modalTitle.textContent = title;
-      modalMessage.textContent = content;
+      const box = modal.querySelector('.error-dialog'), grantContext = document.getElementById('modal-grant-context');
+      grantContext.hidden = !receipt;
+      if (receipt) {
+        box?.classList.add('is-avoidance-grant');
+        document.getElementById('modal-grant-amount').textContent = '+' + receipt.amount + ' 张';
+        modalMessage.innerHTML = (receipt.lead ? '<div class="dialog-grant-lead">' + esc(receipt.lead) + '</div>' : '')
+          + '<div class="dialog-grant-hint' + (receipt.lead ? ' has-lead' : '') + '">' + esc(content) + '</div>';
+      } else {
+        box?.classList.remove('is-avoidance-grant');
+        modalMessage.textContent = content;
+      }
       modalOk.textContent = confirmLabel || "确定";
       modalCancel.hidden = showCancel === false;
       modal.hidden = false;
@@ -1276,6 +1286,8 @@
         if (opener && opener.isConnected) opener.focus();
         modalOk.onclick = null;
         modalCancel.onclick = null;
+        box?.classList.remove('is-avoidance-grant');
+        grantContext.hidden = true;
         resolve(val);
       }
       modalOk.onclick = function () {
@@ -1306,7 +1318,7 @@
     },
     async show(value) {
       grantNoticeOpen = true;
-      try { return await confirm(value.title, '本次获得 +' + value.amount + ' 张\n' + value.content, false, '知道了'); }
+      try { return await confirm(value.title, value.content, false, '知道了', { amount: value.amount, lead: value.lead }); }
       finally { grantNoticeOpen = false; }
     },
   });

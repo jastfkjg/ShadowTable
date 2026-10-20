@@ -4,6 +4,7 @@ const fail = (ok, message, status = 400) => {
   if (!ok) throw new (require("./engine").RuleError)(message, status);
 };
 const eligible = uid => /^(wx|dev|guest):/.test(uid);
+const grantSources = "'admin','match_reward','loss_reward','win_reward'";
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS avoidance_accounts(uid TEXT PRIMARY KEY, balance INTEGER NOT NULL CHECK(balance>=0));
@@ -33,21 +34,25 @@ function wallet(store, uid) {
   return { ...grantNotice(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
 }
 function grantNotice(store, uid) {
-  const rows = store.db.prepare(`SELECT l.id,l.delta FROM avoidance_ledger l
+  const rows = store.db.prepare(`SELECT l.id,l.delta,l.source,l.note FROM avoidance_ledger l
     LEFT JOIN avoidance_grant_reads r ON r.uid=l.uid AND r.ledger_id=l.id
-    WHERE l.uid=? AND l.source='admin' AND l.delta>0 AND r.ledger_id IS NULL ORDER BY l.rowid`).all(uid);
+    WHERE l.uid=? AND l.source IN (${grantSources}) AND l.delta>0 AND r.ledger_id IS NULL ORDER BY l.rowid`).all(uid);
+  const sources = new Set(rows.map(row => row.source));
+  const reasons = [...new Set(rows.filter(row => row.source === "admin").map(row => row.note.trim()).filter(Boolean))];
   return { balance: balance(store, uid), notice: rows.length ? {
     through: rows[rows.length - 1].id, amount: rows.reduce((n, row) => n + row.delta, 0), grants: rows.length,
+    kind: sources.size === 1 ? ({ loss_reward: "loss", win_reward: "win" }[rows[0].source] || "generic") : "generic",
+    ...(reasons.length ? { reasons } : {}),
   } : null };
 }
 function acknowledgeGrant(store, uid, input) {
   fail(typeof input.through === "string" && /^[a-f0-9-]{36}$/.test(input.through), "通知编号无效");
   return store.transaction(() => {
-    const row = store.db.prepare("SELECT rowid FROM avoidance_ledger WHERE uid=? AND id=? AND source='admin' AND delta>0").get(uid, input.through);
+    const row = store.db.prepare(`SELECT rowid FROM avoidance_ledger WHERE uid=? AND id=? AND source IN (${grantSources}) AND delta>0`).get(uid, input.through);
     fail(row, "通知不存在", 404);
     // Acknowledge only the grants actually displayed; concurrent grants stay unread.
     store.db.prepare(`INSERT OR IGNORE INTO avoidance_grant_reads(uid,ledger_id)
-      SELECT uid,id FROM avoidance_ledger WHERE uid=? AND rowid<=? AND source='admin' AND delta>0`).run(uid, row.rowid);
+      SELECT uid,id FROM avoidance_ledger WHERE uid=? AND rowid<=? AND source IN (${grantSources}) AND delta>0`).run(uid, row.rowid);
     return { acknowledged: true };
   });
 }
@@ -152,4 +157,4 @@ function grant(store, input) {
   }
   return { batchId, recipients: targets.length, amount: input.amount };
 }
-module.exports = { initialize, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, deal, prepare, settle, resultView, roomView, players, grant };
+module.exports = { initialize, eligible, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, deal, prepare, settle, resultView, roomView, players, grant };

@@ -16,8 +16,17 @@
       detail: effective ? "已消耗 1 张回避卡" : value.status === "unavailable" ? "发牌时回避卡不足，本次未扣卡" : "需保留完整角色配置，本次未扣卡",
     };
   }
+  function grantCopy(value) {
+    const kind = value.notice?.kind;
+    const reasons = Array.isArray(value.notice?.reasons) ? value.notice.reasons.filter(reason => typeof reason === "string").map(reason => reason.trim()).filter(Boolean) : [];
+    // Keep combined/migrated grants neutral; the win message describes one card.
+    const lead = kind === "loss" ? "加油，下局试试避开不想玩的角色！"
+      : kind === "win" && value.notice.amount === 1 ? "累计四场胜利达成，送你一张回避卡！" : [...new Set(reasons)].join("\n\n");
+    return { lead, content: "入座后可在发牌前选择想避开的角色，生效才扣卡。" };
+  }
   function grantMessage(value) {
-    return "当前可用 " + value.balance + " 张。\n\n入座后可在发牌前选择想避开的角色，生效才扣卡。";
+    const copy = grantCopy(value);
+    return [copy.lead, copy.content].filter(Boolean).join("\n\n");
   }
   function createGrantNotifier(options) {
     let active = false, running = false, timer, epoch = 0, pending = null;
@@ -37,7 +46,7 @@
         if (!valid()) return;
         options.update?.(value);
         if (!value.notice || !options.canShow()) return;
-        const confirmed = await options.show({ title: "收到回避卡", content: grantMessage(value), amount: value.notice.amount });
+        const confirmed = await options.show({ title: "收到回避卡", ...grantCopy(value), amount: value.notice.amount });
         if (!confirmed || !valid()) return;
         pending = { account, through: value.notice.through };
         await options.ack(pending.through);
@@ -51,5 +60,5 @@
       check,
     };
   }
-  return { groups, result, grantMessage, createGrantNotifier };
+  return { groups, result, grantCopy, grantMessage, createGrantNotifier };
 });

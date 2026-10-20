@@ -27,7 +27,7 @@ function create() {
     },
     async show(value) {
       const { host, controller } = surface(), shared = host.selectComponent("#app-dialog");
-      const options = { title: value.title, content: value.content, contextLabel: "本次获得", contextValue: "+" + value.amount + " 张", contextIcon: "/assets/table-cards.svg", showCancel: false, confirmText: "知道了" };
+      const options = { variant: "avoidance-grant", title: value.title, lead: value.lead, content: value.content, contextLabel: "本次获得", contextValue: "+" + value.amount + " 张", contextIcon: "/assets/table-cards.svg", showCancel: false, confirmText: "知道了" };
       controller.grantNoticeOpen = true;
       controller.dismissGrantNotice = () => { if (shared.currentDialog?.options === options) shared.finish(false, shared.data.dialog.id); };
       try { return (await dialog.show(options)).confirm; }
