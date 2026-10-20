@@ -2,7 +2,7 @@
 const configured = require("./scoring-rules.json");
 const { createHash } = require("node:crypto");
 const clone = value => JSON.parse(JSON.stringify(value));
-const conditionKeys = new Set(["faction", "outcome", "roleId", "roleIdNot", "reason", "isTarget"]);
+const conditionKeys = new Set(["faction", "outcome", "roleId", "roleIdNot", "reason", "isTarget", "honor"]);
 function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
     || !Array.isArray(rules.endReasons)) throw Error("积分规则配置不完整");
@@ -17,6 +17,7 @@ function validateRules(rules) {
       || !award.when || Object.keys(award.when).some(key => !conditionKeys.has(key))) throw Error("积分奖励配置无效");
     if (Object.hasOwn(award.when, "roleIdNot") && (![].concat(award.when.roleIdNot).length
       || [].concat(award.when.roleIdNot).some(role => typeof role !== "string" || !role))) throw Error("积分排除角色配置无效");
+    if (Object.hasOwn(award.when, "honor") && !["mvp", "svp"].includes(award.when.honor)) throw Error("积分票选奖励配置无效");
     ids.add(award.id);
   }
   ids.clear();
@@ -71,9 +72,11 @@ function resolveWinner(option, target, players, board, rules) {
     : players.some(player => player.seat === target && player.roleId === "merlin" && (!livingMode || player.alive !== false));
   return hit ? "evil" : "good";
 }
-function scorePlayer(player, facts, rules, excludedReason) {
+function scorePlayer(player, facts, rules, excludedReason, honorResult = null) {
   if (excludedReason) return { status: "excluded", total: 0, breakdown: [], reason: excludedReason, ruleVersion: rules?.version || null };
-  const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target && player.alive !== false };
+  const honorKey = player.outcome === "win" ? "mvp" : "svp";
+  const honor = honorResult?.status === "settled" && honorResult[honorKey]?.some(winner => winner.seat === player.seat) ? honorKey : null;
+  const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target && player.alive !== false, honor };
   const breakdown = rules.awards.filter(award => Object.entries(award.when).every(([key, value]) =>
     key === "roleIdNot" ? ![].concat(value).includes(context.roleId)
       : Array.isArray(value) ? value.includes(context[key]) : context[key] === value))
@@ -85,7 +88,7 @@ function publicRules(rules = policy()) {
   const roleNames = { merlin: "梅林", percival: "派西维尔" };
   const reasonNames = Object.fromEntries(rules.endReasons.map(reason => [reason.id, reason.label]));
   const names = { faction: { good: "好人", evil: "坏人", third: "第三方" },
-    outcome: { win: "获胜", loss: "失利" }, roleId: roleNames, reason: reasonNames,
+    outcome: { win: "获胜", loss: "失利" }, roleId: roleNames, reason: reasonNames, honor: { mvp: "公投 MVP", svp: "公投 SVP" },
     isTarget: { true: "最终刺杀目标为本人", false: "最终刺杀目标不是本人" } };
   return { title: rules.title, scopeLabel: rules.scopeLabel, version: rules.version,
     items: rules.awards.map(award => {

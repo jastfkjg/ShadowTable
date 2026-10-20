@@ -20,14 +20,16 @@ const skillRoles = [...swords, ...bRoles.filter((r) => r !== "prophet")];
 function init(room, shuffle) {
   const blue = shuffle(bRoles.filter((r) => roles[r][1] === "good"));
   const red = shuffle(bRoles.filter((r) => roles[r][1] === "evil"));
+  // Each segment is shuffled independently, ordered from the top of the deck.
+  const segments = room.capacity === 10
+    ? [[2, 1], [2, 2], [3, 2]]
+    : [[3, 2], [2, 2], [2, 1]];
   room.knights = {
     rulesVersion: 2,
     initialRoles: { ...room.roles },
-    deck: [
-      ...shuffle([...red.splice(0, 2), ...blue.splice(0, 2)]),
-      ...shuffle([...red.splice(0, 2), ...blue.splice(0, 3)]),
-      ...shuffle([...red, ...blue]),
-    ],
+    deck: segments.flatMap(([good, evil]) =>
+      shuffle([...blue.splice(0, good), ...red.splice(0, evil)]),
+    ),
     conversions: shuffle([true, true, false, false, false, false, false]),
     round: 1,
     convertedRound: 0,

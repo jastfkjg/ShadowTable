@@ -439,7 +439,7 @@ class Store {
       WHERE s.uid=? AND s.match_id=? AND s.status='scored'`).all(uid,id);
     for (const row of rows) {
       const player=JSON.parse(row.player), game=JSON.parse(row.game);
-      const score = scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null);
+      const score = scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null,game.honorResult);
       const override = JSON.parse(row.score).manualOverride;
       if (override) {
         score.manualOverride = override;

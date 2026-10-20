@@ -12,7 +12,7 @@ const { setup, completed, onlineCompleted, run, task, skills, submit } = require
 
 test("完整复盘保留初始身份、当时阵营、同时互刀、抽牌顺序和最终计分，主流程结果不变", () => {
   const room = completed(), record = room.matchRecord;
-  assert.equal(record.winner, "evil"); assert.equal(record.players[4].score.total, 1);
+  assert.equal(record.winner, "evil"); assert.equal(record.players[4].score.total, 2);
   assert.equal(record.replay.complete, true); assert.equal(record.replay.initialPlayers[5].roleId, "gaheris");
   const events = record.replay.events;
   assert.deepEqual(events.filter(e => e.kind === "quest").map(e => e.success), [true, false, true, true]);
@@ -242,7 +242,7 @@ test("复盘界面按实际技能周期分组，个人视角筛选行动与影�
   try {
     const room = completed(); store.save(room); const raw = store.replayFor("wx:replay-5", room.matchRecord.id);
     const global = presentReplay(raw); assert.equal(global.rounds.length, 4); assert.equal(global.initialPlayers.length, 12);
-    assert.equal(global.questLabel, "3 成功 / 1 失败"); assert.equal(global.replay.scoreLabel, "+1");
+    assert.equal(global.questLabel, "3 成功 / 1 失败"); assert.equal(global.replay.scoreLabel, "+2");
     assert.equal(global.rounds[3].events.find(e => e.kind === "skills").summary, "本轮无人使用技能");
     assert.equal(global.replay.final.actor.seat, 10); assert.equal(global.replay.final.target.seat, 1);
     assert.equal(presentReplay(raw, "mine", ["round-1"]).rounds[0].expanded, true);

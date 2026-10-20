@@ -97,7 +97,7 @@ const BOARDS = [
     available: true,
     counts: [10],
     description:
-      "十二骑士10人局：A牌去掉红蓝兰斯洛特（6蓝4红），B牌堆与技能规则不变",
+      "十二骑士10人局：A牌去掉红蓝兰斯洛特（6蓝4红），B牌采用10人局分段配比，技能规则不变",
   },
   {
     id: "knights-11",

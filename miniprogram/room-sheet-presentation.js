@@ -1,5 +1,21 @@
 const { portrait } = require("./role-portraits");
 
+function presentBoardOption(board, capacity) {
+  const hints = {
+    classic: capacity === 9 ? "逆仆指认" : capacity === 8 ? "线下刺梅林" : capacity === 7 ? "单奥伯伦" : "梅派入门",
+    "classic-court": capacity === 9 ? "经典阵容" : capacity === 12 ? "双奥伯伦" : "单奥伯伦",
+    "classic-11": "逆仆指认",
+    lancelot: "红蓝转换",
+    "shadow-assist": "红蓝内奸",
+    chaos: "术士与盗贼",
+  };
+  const entryHint = board.id?.startsWith("knights") ? "技能与B牌" : hints[board.id];
+  return { ...board,
+    shortName: (board.namesByCapacity?.[capacity] || board.name || "游戏板子").replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
+    entryHint: entryHint || board.description?.trim() || "查看完整角色与玩法",
+  };
+}
+
 // Only decorate the public composition supplied by the server. Counts and
 // factions remain authoritative, including future roles and third factions.
 function presentRoleGroups(groups) {
@@ -37,4 +53,4 @@ function presentFairyResult(result) {
   return { ...result, displaySeat: match ? Number(match[1]) : null,
     displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
 }
-module.exports = { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult };
+module.exports = { presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult };

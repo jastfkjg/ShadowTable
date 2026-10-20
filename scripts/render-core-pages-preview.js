@@ -177,6 +177,8 @@ Object.assign(homeScenes, {
   'entry-join-error': entryScene(6,'classic',{entryMode:'join',code:'062',entryCodeError:'请输入完整的 6 位数字房间码'}),
   'entry-new-player': entryScene(6,'classic',{entryMode:'join',name:'',nicknameSetup:true,entryNameError:'请填写昵称'}),
   'entry-create6': entryScene(6,'classic'), 'entry-create12': entryScene(12,'knights'),
+  'entry-create9': entryScene(9,'classic-court'), 'entry-create11': entryScene(11,'classic-11'),
+  'entry-lancelot11': entryScene(11,'lancelot'), 'entry-lancelot12': entryScene(12,'lancelot'),
   'entry-classic12': entryScene(12,'classic-court'), 'entry-chaos12': entryScene(12,'chaos'),
   'entry-create13': entryScene(13,'knights-13'),
   'entry-keyboard': entryScene(12,'knights',{entryKeyboardHeight:320,entryFocusedField:'nickname'}),

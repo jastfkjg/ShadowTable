@@ -10,9 +10,9 @@ const {
 const { chaosQuest, roles } = require("../server/variants");
 const run = (r, uid, type, extra = {}) =>
   command(r, uid, { type, stage: r.stage, ...extra });
-function setup(board = "knights") {
-  const r = newRoom("123456", "p1", "房主", board, 12);
-  for (let i = 2; i <= 12; i++) enter(r, `p${i}`, `玩家${i}`);
+function setup(board = "knights", capacity = 12) {
+  const r = newRoom("123456", "p1", "房主", board, capacity);
+  for (let i = 2; i <= capacity; i++) enter(r, `p${i}`, `玩家${i}`);
   r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
   run(r, "p1", "start", { flexible: true });
   r.leader = 1;
@@ -83,22 +83,29 @@ test("混沌契约票型权限、第三方身份与四类匿名汇总", () => {
   assert.equal(chaosQuest(["magic", "magic", "success"], 1).success, true);
 });
 test("十二骑士A/B牌配比、分层随机牌堆与公开视图不泄露B角色", () => {
-  const r = setup();
-  assert.equal(r.knights.deck.length, 12);
-  for (const [start, end, evil] of [
-    [0, 4, 2],
-    [4, 9, 2],
-    [9, 12, 1],
-  ])
-    assert.equal(
-      r.knights.deck.slice(start, end).filter((k) => roles[k][1] === "evil")
-        .length,
-      evil,
-    );
-  const view = JSON.stringify(publicView(r, "p1"));
-  assert.ok(!view.includes("initialRoles"));
-  assert.ok(!view.includes("blueAwakened"));
-  assert.equal(r.knights.conversions.filter(Boolean).length, 2);
+  const expectedRoles = [
+    "blueAwakened", "redAwakened", "blueKnight", "redKnight",
+    "blueHunter", "redHunter", "blueGuard", "gargoyle",
+    "witch", "magician", "prophet", "paladin",
+  ].sort();
+  for (const capacity of [10, 11, 12, 13]) {
+    const segments = capacity === 10
+      ? [[0, 3, 2, 1], [3, 7, 2, 2], [7, 12, 3, 2]]
+      : [[0, 5, 3, 2], [5, 9, 2, 2], [9, 12, 2, 1]];
+    for (let sample = 0; sample < 20; sample++) {
+      const r = setup(capacity === 12 ? "knights" : `knights-${capacity}`, capacity);
+      assert.deepEqual([...r.knights.deck].sort(), expectedRoles);
+      for (const [start, end, good, evil] of segments) {
+        const factions = r.knights.deck.slice(start, end).map(k => roles[k][1]);
+        assert.equal(factions.filter(f => f === "good").length, good, `${capacity}人第${start + 1}–${end}张好人`);
+        assert.equal(factions.filter(f => f === "evil").length, evil, `${capacity}人第${start + 1}–${end}张坏人`);
+      }
+      const view = JSON.stringify(publicView(r, "p1"));
+      assert.ok(!view.includes("initialRoles"));
+      assert.ok(!view.includes("blueAwakened"));
+      assert.equal(r.knights.conversions.filter(Boolean).length, 2);
+    }
+  }
 });
 test("互刀与456789循环刀全部生效，不受车长和玩家排列影响", () => {
   for (const seats of [[4, 5], [4, 5, 6, 7, 8, 9]]) {

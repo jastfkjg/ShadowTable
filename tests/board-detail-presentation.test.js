@@ -50,7 +50,7 @@ test("所有可用板子与人数保留规则和当前角色配置；非技能�
   assert.equal(fallback.chapters[0].configuration[0].count, 6);
 });
 
-test("骑士各人数独立展示 A 牌、特殊注记与相同的 B 牌层序，完整角色文字不丢失", () => {
+test("骑士各人数独立展示 A 牌、特殊注记与对应的 B 牌层序，完整角色文字不丢失", () => {
   for (const [id, capacity, good, evil] of [
     ["knights", 12, 7, 5],
     ["knights-10", 10, 6, 4],
@@ -63,8 +63,13 @@ test("骑士各人数独立展示 A 牌、特殊注记与相同的 B 牌层序�
     assert.deepEqual([b.count, b.good, b.evil], [12, 7, 5]);
     assert.deepEqual(
       b.layers.map((layer) => layer.text),
-      ["2 红 + 2 蓝", "2 红 + 3 蓝", "1 红 + 2 蓝"],
+      capacity === 10
+        ? ["1 红 + 2 蓝", "2 红 + 2 蓝", "2 红 + 3 蓝"]
+        : ["2 红 + 3 蓝", "2 红 + 2 蓝", "1 红 + 2 蓝"],
     );
+    assert.ok(b.note.includes(capacity === 10
+      ? "第 1–3 张 2 好 1 坏，第 4–7 张 2 好 2 坏，第 8–12 张 3 好 2 坏"
+      : "第 1–5 张 3 好 2 坏，第 6–9 张 2 好 2 坏，第 10–12 张 2 好 1 坏"));
     assert.deepEqual(
       view.groups.map((g) => g.id),
       ["b-good", "b-evil", "a"],

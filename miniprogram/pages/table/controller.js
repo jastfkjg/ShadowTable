@@ -1529,17 +1529,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   selectCapacity(capacity) {
     const availableBoards = this.data.boards.filter(
       (b) => b.available && b.counts.includes(capacity),
-    ).map(b => ({
-      ...b,
-      shortName: (b.namesByCapacity?.[capacity] || b.name).replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
-      entryHint: b.id.startsWith("knights") ? "技能与 B 牌" : ({
-        "classic-court": capacity === 12 ? "双奥伯伦" : "经典阵容",
-        "classic-11": "逆仆指认",
-        lancelot: "红蓝兰斯洛特",
-        "shadow-assist": "红蓝内奸",
-        chaos: "术士与盗贼",
-      })[b.id] || "",
-    }));
+    ).map(b => roomSheet.presentBoardOption(b, capacity));
     const b =
       availableBoards.find((b) => b.id === this.data.boardId) ||
       availableBoards[0];

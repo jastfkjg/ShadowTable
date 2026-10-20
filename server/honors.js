@@ -40,6 +40,11 @@ function publish(store, match, result) {
   match.honorResult = result;
   const saved = store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match), match.id);
   if (saved.changes) {
+    if (match.scorePolicy?.awards.some(award => award.when.honor)) {
+      for (const player of store.matchParticipants(match)) {
+        if (!player.uid.startsWith("test:")) store.rebuildScores(player.uid, match.id);
+      }
+    }
     store.rebuildFun(match, store.matchParticipants(match));
     store.syncScoreRooms();
     store.invalidateLeaderboard();

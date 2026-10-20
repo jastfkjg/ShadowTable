@@ -1,11 +1,11 @@
 {
-  "version": "avalon-2026-10-v9",
+  "version": "avalon-2026-10-v10",
   "defaultEnabledBoards": { "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
   "title": "阿瓦隆积分规则",
   "scopeLabel": "经典基础 5–10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
   "boards": { "classic": [5, 6, 7, 8], "classic-court": [9, 10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
   "targetModes": { "knights-10": "living_merlin", "knights-11": "living_merlin", "knights": "living_merlin", "knights-13": "living_merlin" },
-  "notes": ["仅十二骑士 10、11、12、13 人默认开启计分；其他板子默认关闭，房主可手动开启。", "十二骑士按结束时的角色与阵营计分；出局玩家保留最后阵营。", "十二骑士空刀：场上无存活梅林则坏人胜，仍有存活梅林则好人胜。提前盘刀与三绿盘刀使用相同计分规则。"],
+  "notes": ["仅十二骑士 10、11、12、13 人默认开启计分；其他板子默认关闭，房主可手动开启。", "十二骑士按结束时的角色与阵营计分；出局玩家保留最后阵营。", "十二骑士空刀：场上无存活梅林则坏人胜，仍有存活梅林则好人胜。提前盘刀与三绿盘刀使用相同计分规则。", "三绿或提前起刀：梅林躲刀时普通好人 3 分、梅林和派西 4 分，挡刀的好人额外 3 分（梅林、派西除外）；梅林被刺时普通好人 2 分、梅林和派西 1 分。坏人以上情况均为 0 分，三炸车或连续五次否决获胜为 3 分。", "有效计分局的公投 MVP、SVP 各额外获得 1 分；沿用现有票选门槛，并列最高票每人均获奖，未达投票人数不加分。奖励计入本局所属月份，关闭计分的对局不发积分。"],
   "endReasons": [
     { "id": "assassination", "label": "三绿，已完成最终刺杀", "requiresTarget": true },
     { "id": "early_assassination", "label": "提前盘刀（按三绿计分）", "requiresTarget": true, "boards": ["knights-10", "knights-11", "knights", "knights-13"] },
@@ -13,10 +13,13 @@
     { "id": "five_rejections", "label": "连续五次组队被否决", "winner": "evil" }
   ],
   "awards": [
-    { "id": "good_win", "label": "好人获胜", "points": 2, "when": { "faction": "good", "outcome": "win" } },
-    { "id": "good_stage", "label": "三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"], "roleIdNot": ["merlin", "percival"] } },
-    { "id": "evil_win", "label": "坏人获胜", "points": 3, "when": { "faction": "evil", "outcome": "win" } },
+    { "id": "good_win", "label": "好人获胜", "points": 3, "when": { "faction": "good", "outcome": "win" } },
+    { "id": "good_stage", "label": "三绿阶段奖励", "points": 2, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"], "roleIdNot": ["merlin", "percival"] } },
+    { "id": "good_stage_role", "label": "梅林／派西三绿阶段奖励", "points": 1, "when": { "faction": "good", "outcome": "loss", "reason": ["assassination", "early_assassination"], "roleId": ["merlin", "percival"] } },
+    { "id": "evil_win", "label": "坏人任务获胜", "points": 3, "when": { "faction": "evil", "outcome": "win", "reason": ["quest_fail", "five_rejections"] } },
     { "id": "role", "label": "梅林／派西角色奖励", "points": 1, "when": { "faction": "good", "outcome": "win", "roleId": ["merlin", "percival"] } },
-    { "id": "shield", "label": "挡刀奖励", "points": 2, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true, "roleIdNot": ["merlin", "percival"] } }
+    { "id": "shield", "label": "挡刀奖励", "points": 3, "when": { "faction": "good", "outcome": "win", "reason": ["assassination", "early_assassination"], "isTarget": true, "roleIdNot": ["merlin", "percival"] } },
+    { "id": "honor_mvp", "label": "MVP 票选奖励", "points": 1, "when": { "outcome": "win", "honor": "mvp" } },
+    { "id": "honor_svp", "label": "SVP 票选奖励", "points": 1, "when": { "outcome": "loss", "honor": "svp" } }
   ]
 }
