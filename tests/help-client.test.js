@@ -74,6 +74,19 @@ test("帮助页区分9人经典基础和逆仆入口，跳转到各自配置", a
   page.onUnload();
 });
 
+test("帮助页为红蓝兰斯保留11人和12人两个独立人数入口", async () => {
+  const boards = require("../server/engine").BOARDS;
+  const { page, links } = help(async url => url === "/api/boards" ? { boards } : scoring);
+  page.onLoad(); await tick();
+  const group = page.data.boards.find(board => board.id === "lancelot");
+  assert.equal(group.name, "阿瓦隆 · 红蓝兰斯");
+  assert.deepEqual(Array.from(group.choices, choice => choice.capacity), [11, 12]);
+  for (const choice of group.choices) page.openBoard(tap(choice));
+  assert.match(links[0], /board=lancelot&capacity=11/);
+  assert.match(links[1], /board=lancelot&capacity=12/);
+  page.onUnload();
+});
+
 test("异步帮助内容在页面卸载后不再写入，也不会覆盖现有静态内容", async () => {
   const pending = [], { page } = help(() => new Promise(resolve => pending.push(resolve)));
   page.onLoad(); const snapshot = JSON.stringify(page.data); page.onUnload();

@@ -413,10 +413,11 @@ function completeActionDetails(details, before, room) {
         lines: ["线上未记录本次结算结果。"],
       });
     } else if (result.resultType === "conversion") {
+      const previous = (before.knights || before.lancelot).players;
+      const current = (room.knights || room.lancelot).players;
       const changed = room.players.filter(
         (player) =>
-          before.knights.players[player.uid].faction !==
-          room.knights.players[player.uid].faction,
+          previous[player.uid]?.faction !== current[player.uid]?.faction,
       );
       const side = (value) => ({ good: "好人", evil: "坏人" })[value];
       outcomes.push({
@@ -425,7 +426,7 @@ function completeActionDetails(details, before, room) {
         text: result.text,
         lines: changed.map(
           (player) =>
-            `${seatLabel(room, player.seat)}·${roleName(room.roles[player.uid])} → ${side(room.knights.players[player.uid].faction)}`,
+            `${seatLabel(room, player.seat)}·${roleName(room.roles[player.uid])} → ${side(current[player.uid].faction)}`,
         ),
       });
     }

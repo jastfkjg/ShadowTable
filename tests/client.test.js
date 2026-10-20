@@ -701,7 +701,7 @@ test("先选人数：自动匹配可用板子，切板不改变人数", async ()
     p.pickCapacity({ currentTarget: { dataset: { capacity: 12 } } });
     assert.deepEqual(
       Array.from(p.data.availableBoards, (b) => b.id),
-      ["classic-court", "shadow-assist", "chaos", "knights"],
+      ["classic-court", "shadow-assist", "chaos", "knights", "lancelot"],
     );
     p.pickBoard({ currentTarget: { dataset: { index: 1 } } });
     assert.equal(p.data.capacity, 12);
@@ -739,6 +739,77 @@ test("9人可选经典基础或原逆仆，经典入口按四忠臣配置创建�
     assert.equal(p.data.room.board, "classic-court");
     assert.equal(p.data.room.capacity, 9);
     assert.equal(p.data.room.roleConfiguration[0].roles, "梅林，派西维尔，忠臣×4");
+  } finally {
+    await a.close();
+  }
+});
+
+test("11/12人可选红蓝兰斯并按人数创建房间，切换人数保留板子", async () => {
+  const a = await server();
+  try {
+    for (const capacity of [11, 12]) {
+      const p = await a.actor();
+      await p.bootstrap();
+      p.selectCapacity(11);
+      p.pickBoard({ currentTarget: { dataset: { index: p.data.availableBoards.findIndex(board => board.id === "lancelot") } } });
+      p.selectCapacity(capacity);
+      assert.equal(p.data.boardId, "lancelot");
+      assert.equal(p.data.boardName, "阿瓦隆 · 红蓝兰斯");
+      assert.equal(p.data.boardRoleConfiguration[0].roles, "梅林，派西维尔，忠臣×4，蓝兰斯洛特");
+      assert.equal(p.data.boardRoleConfiguration[1].roles, `莫德雷德，莫甘娜，刺客，${capacity === 12 ? "奥伯伦，" : ""}红兰斯洛特`);
+      p.setData({ entryMode: "create" });
+      p.submitEntry({ detail: { value: { nickname: "兰斯房主" } } });
+      await settle(p);
+      assert.equal(p.data.room.board, "lancelot");
+      assert.equal(p.data.room.capacity, capacity);
+      assert.equal(p.data.room.players.length, 1);
+    }
+  } finally {
+    await a.close();
+  }
+});
+
+test("11人红蓝兰斯经HTTP发牌和转换，只有两名兰斯收到私密阵营变化并可确认", async () => {
+  const a = await server();
+  try {
+    const players = [];
+    for (let i = 0; i < 11; i++) players.push(await a.actor());
+    const host = players[0];
+    await host.mutate("/api/rooms", { name: "兰斯房主", board: "lancelot", capacity: 11 }, "enter");
+    for (const [index, player] of players.slice(1).entries()) {
+      player.setData({ name: "玩家" + index, code: host.roomCode, loading: false });
+      player.join();
+      await settle(player);
+    }
+    const refresh = () => Promise.all(players.map(player => player.refresh()));
+    await refresh();
+    for (const player of players) await cmd(player, "ready", { ready: true });
+    await host.start(); await settle(host); await refresh();
+    const cards = [];
+    for (const player of players) {
+      await player.reveal();
+      cards.push({ player, role: player.data.secret.role });
+      player.mask();
+    }
+    const blue = cards.find(card => card.role === "蓝兰斯洛特").player;
+    const red = cards.find(card => card.role === "红兰斯洛特").player;
+    for (let i = 0; i < 7; i++) {
+      await cmd(host, "beginActivity", { kind: "conversion" });
+      await refresh();
+      if (blue.data.room.me.identityChanged) break;
+    }
+    assert.equal(blue.data.room.me.identityChanged, true);
+    assert.equal(red.data.room.me.identityChanged, true);
+    assert.ok(players.filter(player => ![blue, red].includes(player)).every(player => !player.data.room.me.identityChanged));
+    for (const [player, faction] of [[blue, "坏人阵营"], [red, "好人阵营"]]) {
+      await player.showIdentityChange();
+      assert.equal(player.data.identityChangeRevealed, false);
+      assert.equal(player.data.identityChange.faction, faction);
+      assert.equal(player.data.identityChange.information, "没有视野。");
+      player.revealChangedIdentity();
+      player.acknowledgeIdentity(); await settle(player);
+      assert.equal(player.data.room.me.identityChanged, false);
+    }
   } finally {
     await a.close();
   }

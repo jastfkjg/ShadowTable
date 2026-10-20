@@ -186,6 +186,23 @@ test('网页仅有失效房间时显示创建加入空态，旧数据重新加�
     assert.doesNotMatch(html,/还没有牌桌/);assert.equal(writes,0);assert.equal(dialogs,0);
   } finally {c.stop();}
 });
+test('网页红蓝兰斯提供独立转换入口，基础板隐藏转换，十二骑士仍有技能和转换', () => {
+  const c = client(async () => response({}));
+  try {
+    for (const [board, capacity] of [["lancelot", 11], ["lancelot", 12], ["classic", 6], ["knights", 12]]) {
+      const room = newRoom("123456", "p1", "房主", board, capacity);
+      for (let i = 2; i <= capacity; i++) enter(room, `p${i}`, `玩家${i}`);
+      room.players.forEach(player => player.ready = true);
+      command(room, "p1", { stage: room.stage, type: "start", flexible: true });
+      c.state.room = publicView(room, "p1");
+      const html = c.viewRoom();
+      assert.equal(html.includes('data-kind="conversion"'), board !== "classic");
+      assert.equal(html.includes('data-kind="skills"'), board === "knights");
+      assert.equal(html.includes("B牌剩余"), board === "knights");
+    }
+  } finally { c.stop(); }
+});
+
 test('网页各板子详情自适应技能和规则模式，搜索不受牌组限制，目录跳转先展开目标', () => {
   const c = client(async () => response({}));
   c.state.boards = BOARDS.map(board => ({...board,detail:require('../server/board-info')[board.id]}));

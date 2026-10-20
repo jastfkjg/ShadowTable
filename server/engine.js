@@ -115,6 +115,13 @@ const BOARDS = [
     description:
       "十二骑士13人局：在12人局A牌中增加一名忠臣（8蓝5红），其余规则不变",
   },
+  {
+    id: "lancelot",
+    name: "阿瓦隆 · 红蓝兰斯",
+    available: true,
+    counts: [11, 12],
+    description: "11人7蓝4红；12人增加奥伯伦，7蓝5红；均含红蓝兰斯洛特",
+  },
 ];
 const ROLES = {
   ...variants.roles,
@@ -291,6 +298,18 @@ function archiveResult(room) {
 }
 function roleDeck(boardId, capacity) {
   if (variants.decks[boardId]) return [...variants.decks[boardId]];
+  if (boardId === "lancelot")
+    return [
+      "merlin",
+      "percival",
+      ...Array(4).fill("servant"),
+      "blueLancelot",
+      "mordred",
+      "morgana",
+      "assassin",
+      ...(capacity === 12 ? ["oberon"] : []),
+      "redLancelot",
+    ];
   if (boardId === "classic" && capacity <= 9) {
     const goodRoles = [
       "merlin",
@@ -440,12 +459,19 @@ function start(room, flexible = false) {
   room.toolSequence = 0;
   if (isKnights(room.board)) knights.init(room, shuffle);
   if (isKnights(room.board)) replay.init(room, ROLES);
+  if (room.board === "lancelot") room.lancelot = {
+    conversions: shuffle([true, true, false, false, false, false, false]),
+    players: Object.fromEntries(Object.entries(room.roles)
+      .filter(([, role]) => ["blueLancelot", "redLancelot"].includes(role))
+      .map(([uid, role]) => [uid, { faction: ROLES[role][1], identityRevision: 0, identityAcknowledged: 0 }])),
+  };
   fairy.init(room);
-  if (isKnights(room.board) || room.board === "chaos") room.flexible = true;
+  if (isKnights(room.board) || ["chaos", "lancelot"].includes(room.board)) room.flexible = true;
   stage(room, room.flexible ? "tools" : "identity");
 }
 function faction(room, uid) {
   if (room.knights) return knights.side(room, uid, ROLES);
+  if (room.lancelot?.players[uid]) return room.lancelot.players[uid].faction;
   if (uid === room.convertedReverse) return "evil";
   return ROLES[room.roles[uid]][1];
 }
@@ -459,10 +485,10 @@ function questChoices(room, uid) {
     if (role === "blueThief") return ["success"];
   }
   if (
-    room.knights &&
-    (role === "redSwordsman" ||
-      (["blueLancelot", "redLancelot"].includes(role) &&
-        faction(room, uid) === "evil"))
+    (room.knights && role === "redSwordsman") ||
+    ((room.knights || room.lancelot) &&
+      ["blueLancelot", "redLancelot"].includes(role) &&
+      faction(room, uid) === "evil")
   )
     return ["fail"];
 
@@ -473,8 +499,11 @@ function questChoices(room, uid) {
     return ["fail"];
   return faction(room, uid) === "good" ? ["success"] : ["success", "fail"];
 }
+function identityState(room, uid) {
+  return room.knights?.players[uid] || room.lancelot?.players[uid];
+}
 function identityRevision(room, uid) {
-  const state = room.knights?.players[uid];
+  const state = identityState(room, uid);
   return state?.identityRevision ?? (state?.availableRound > 1 ? 1 : 0);
 }
 function knightKnifeAllowed(room, uid) {
@@ -619,13 +648,16 @@ function privateIdentity(room, uid) {
     information = `梅林与莫甘娜位于：${seats((r) => ["merlin", "morgana"].includes(r))}号。你无法区分谁是梅林。`;
   else if (role === "oberon")
     information = "你不知道其他坏人是谁，其他坏人也看不见你。";
+  else if (room.lancelot && ["blueLancelot", "redLancelot"].includes(role))
+    information = "没有视野。";
   else if (side === "evil") {
     const allies = room.players
       .filter(
         (p) =>
           p.uid !== uid &&
           ROLES[room.roles[p.uid]][1] === "evil" &&
-          room.roles[p.uid] !== "oberon",
+          room.roles[p.uid] !== "oberon" &&
+          !(room.lancelot && room.roles[p.uid] === "redLancelot"),
       )
       .map((p) => `${p.seat}号（${ROLES[room.roles[p.uid]][0]}）`);
     information = `你的坏人同伴：${allies.join("、") || "无可见同伴"}`;
@@ -806,19 +838,20 @@ function advanceKnightRound(room) {
   room.leader = (room.leader % room.capacity) + 1;
   room.history.push({ kind: "variant", text: `进入第${room.round}轮` });
 }
-function convertKnights(room) {
-  const k = room.knights;
+function convertLancelots(room) {
+  const k = room.knights || room.lancelot;
   requireRule(k.conversions.length > 0, "转换牌已用完");
   const change = k.conversions.shift();
   if (change)
     for (const p of room.players) {
       if (["blueLancelot", "redLancelot"].includes(room.roles[p.uid])) {
-        rememberKnightIdentity(room, p.uid, "conversion");
+        if (room.knights) rememberKnightIdentity(room, p.uid, "conversion");
         k.players[p.uid].faction =
           faction(room, p.uid) === "good" ? "evil" : "good";
+        if (room.lancelot) k.players[p.uid].identityRevision++;
       }
     }
-  k.convertedRound = k.round;
+  if (room.knights) k.convertedRound = k.round;
   room.history.push({
     kind: "variant",
     text: change ? "本轮阵营转换" : "本轮不转换",
@@ -862,7 +895,7 @@ function beginActivity(room, input) {
     return;
   }
   if (["skills", "conversion"].includes(kind)) {
-    requireRule(isKnights(room.board), "当前板子不支持此操作");
+    requireRule(isKnights(room.board) || (kind === "conversion" && !!room.lancelot), "当前板子不支持此操作");
     requireRule(!hasActiveOperation(room), "请先完成或作废当前操作");
     const k = room.knights;
     if (kind === "skills") {
@@ -871,7 +904,8 @@ function beginActivity(room, input) {
       room.toolSequence++;
       room.activity = { kind, number: room.toolSequence, threshold: null, startedAt: Date.now() };
     } else {
-      convertKnights(room);
+      convertLancelots(room);
+      room.flexible = true;
       stage(room, "tools");
     }
     return;
@@ -1313,6 +1347,7 @@ function publicView(room, uid) {
           remainingCards: room.knights.deck.length,
         }
       : null,
+    supportsConversion: !!room.knights || !!room.lancelot,
     hasReverse: !!room.roles && Object.values(room.roles).includes("reverse"),
     assisted: assisted(room),
     offlineAssassination: offlineAssassination(room),
@@ -1334,7 +1369,7 @@ function publicView(room, uid) {
           (fairyResult.fairyAcknowledged || 0),
       identityChanged:
         identityRevision(room, uid) >
-        (room.knights?.players[uid]?.identityAcknowledged || 0),
+        (identityState(room, uid)?.identityAcknowledged || 0),
     },
     players: room.players.map((p) => ({
       seat: p.seat,
@@ -1490,7 +1525,7 @@ function applyCommand(room, uid, input) {
     return;
   }
   if (type === "ackIdentity") {
-    const state = room.knights?.players[uid];
+    const state = identityState(room, uid);
     requireRule(
       state && input.revision === identityRevision(room, uid),
       "身份已变化，请重新查看",
@@ -1750,6 +1785,7 @@ function applyCommand(room, uid, input) {
     for (const key of [
       "roles",
       "knights",
+      "lancelot",
       "fairy",
       "submissions",
       "leader",

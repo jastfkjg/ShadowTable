@@ -916,6 +916,18 @@ test("发身份弹窗默认隐藏，展开后在确认按钮前展示身份和�
   assert.equal(byHandler(vote, "revealActionIdentity"), undefined);
 });
 
+test("红蓝兰斯房主可发起身份转换，技能及B牌信息仅在十二骑士展示", () => {
+  const room = { phase: "tools", canUseTools: true, supportsConversion: true, knights: null,
+    team: [], players: [], history: [], me: { isHost: true } };
+  const tree = render({ ...base, room });
+  const kinds = nodes(tree).filter(node => node.attr?.bindtap === "openTool").map(node => node.attr["data-kind"]);
+  assert.ok(kinds.includes("conversion"));
+  assert.ok(!kinds.includes("skills"));
+  assert.doesNotMatch(JSON.stringify(tree), /B牌剩余/);
+  const ordinary = render({ ...base, room: { ...room, supportsConversion: false } });
+  assert.ok(!nodes(ordinary).some(node => node.attr?.["data-kind"] === "conversion"));
+});
+
 test("十二骑士不提供主动先知查验和刀梅林入口，新身份提醒默认遮盖，主动查看才显示新牌", () => {
   const room = {
     phase: "tools",

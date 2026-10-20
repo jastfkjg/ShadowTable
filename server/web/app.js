@@ -4119,8 +4119,10 @@ function roomListItems(rooms) {
         btn("secondary", "openTool", "投票", { kind: "vote" }, state.busy) +
         btn("secondary", "openTool", "做任务", { kind: "quest" }, state.busy) +
         (r.knights
-          ? btn("secondary", "openTool", "使用技能", { kind: "skills" }, state.busy) +
-            btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
+          ? btn("secondary", "openTool", "使用技能", { kind: "skills" }, state.busy)
+          : "") +
+        (r.knights || r.supportsConversion
+          ? btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
           : "") +
         (r.fairyEnabled ? btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy) : "") +
         (r.hasReverse && !r.knifeOffline

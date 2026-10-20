@@ -450,10 +450,8 @@
         <view class="tool-actions">
           <button hover-class="none" class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
           <button hover-class="none" class="secondary" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">做任务</button>
-          <block wx:if="{{room.knights}}">
-            <button hover-class="none" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
-            <button hover-class="none" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
-          </block>
+          <button hover-class="none" wx:if="{{room.knights}}" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
+          <button hover-class="none" wx:if="{{room.knights || room.supportsConversion}}" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
           <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
           <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
         </view>

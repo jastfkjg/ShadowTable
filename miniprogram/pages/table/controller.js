@@ -1535,6 +1535,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       entryHint: b.id.startsWith("knights") ? "技能与 B 牌" : ({
         "classic-court": capacity === 12 ? "双奥伯伦" : "经典阵容",
         "classic-11": "逆仆指认",
+        lancelot: "红蓝兰斯洛特",
         "shadow-assist": "红蓝内奸",
         chaos: "术士与盗贼",
       })[b.id] || "",
