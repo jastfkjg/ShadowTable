@@ -275,6 +275,7 @@ function action(room, uid) {
       );
     return {
       kind: "choice",
+      unavailableHint: options.length === 1 ? skillUnavailableHint(room, uid) : "",
       label: "同时秘密提交技能；不使用技能请选择确认",
       choices: options.map((o) => o.value),
       options,
@@ -303,6 +304,7 @@ function action(room, uid) {
     }
     return {
       kind: "choice",
+      unavailableHint: options.length === 1 ? skillUnavailableHint(room, uid) : "",
       label:
         room.phase === "hunterTurn"
           ? "出局技能确认"
@@ -312,6 +314,18 @@ function action(room, uid) {
     };
   }
   return null;
+}
+function skillUnavailableHint(room, uid) {
+  const p = room.knights.players[uid], role = room.roles[uid];
+  if (!p.alive) return "你已出局，请确认本轮选择";
+  if (!skillRoles.includes(role)) return "你没有技能";
+  if (p.used) return "技能已使用";
+  if (p.availableRound > room.knights.round) return "新技能尚未启用，下次技能环节可用";
+  if (role === "paladin") return "你的技能为被动触发，请确认本轮选择";
+  if (room.phase === "skillTurn" && room.knights.order[room.knights.cursor] !== uid
+    || room.phase === "hunterTurn" && room.knights.hunters[0] !== uid)
+    return "本阶段无需使用技能，请确认本轮选择";
+  return "本阶段没有可选目标，请确认本轮选择";
 }
 function begin(room, kind, check) {
   const k = room.knights;

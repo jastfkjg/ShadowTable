@@ -144,6 +144,13 @@ const base = {
   boardId: "classic",
   network: true,
 };
+test("回避结果只在首次身份揭示中展示，不进入身份卡和操作内身份", () => {
+  const room = { phase: "tools", players: [], team: [], history: [], me: { seat: 1 } };
+  const secret = { role: "莫甘娜", information: "私密视野", avoidance: { effective: true, title: "已回避「派西维尔」", detail: "已消耗 1 张回避卡" } };
+  assert.match(JSON.stringify(renderTable({ ...base, room, dealtIdentityDialog: true, dealtIdentitySecret: secret })), /已回避/);
+  assert.doesNotMatch(JSON.stringify(renderTable({ ...base, room, revealed: true, secret })), /已回避|已消耗 1 张回避卡/);
+  assert.doesNotMatch(JSON.stringify(renderTable({ ...base, room, actionDialog: true, actionSecret: secret })), /已回避|已消耗 1 张回避卡/);
+});
 function nodes(node) {
   return typeof node === "string"
     ? []

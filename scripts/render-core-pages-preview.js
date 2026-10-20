@@ -269,7 +269,7 @@ for(const [role,mode,value] of [...skillFixtures.cases,['servant','none','pass']
   const {source,room,secret}=skillFixtures.fixture(role,mode);
   const swapOptions=(secret.action.choices || []).filter(v=>v.startsWith('swap:'));
   const choices=mode==='final'?secret.action.targets.map(t=>({value:'target:'+t.seat,label:'目标'+t.seat})):secret.action.hunterModes?secret.action.options.filter(c=>c.value.startsWith(mode+':')).concat([{value:'mode:',label:'返回选择技能方式'}]):secret.action.options.filter(c=>!c.value.startsWith('swap:'));
-  const data={...tableScene(source,'p2'),room,actionDialog:true,stagedChoice:true,actionChoices:choices,swapOptions,swapSeats:[],swapPlayers:[],...skillPresentation.skillView(room,choices,!!secret.action.hunterModes,secret.action.hunterModes?mode:'',swapOptions)};
+  const data={...tableScene(source,'p2'),room,actionDialog:true,stagedChoice:true,actionChoices:choices,swapOptions,swapSeats:[],swapPlayers:[],...skillPresentation.skillView(room,choices,!!secret.action.hunterModes,secret.action.hunterModes?mode:'',swapOptions,secret.action.unavailableHint)};
   tableScenes['skill-'+role]=data;
   tableScenes['skill-'+role+'-selected']={...data,draftChoice:value,draftLabel:choices.find(c=>c.value===value)?.label||'',...skillPresentation.skillSelectionView(room,value,data.skillTargetMode),...(mode==='swap'?{swapSeats:[2,7],swapPlayers:data.swapPlayers.map(p=>({...p,selected:[2,7].includes(p.seat)}))}:{})};
 }

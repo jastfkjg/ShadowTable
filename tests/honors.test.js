@@ -245,6 +245,23 @@ test('one human and five companions can vote; companion winners never create per
   } finally{s.close();}
 });
 
+test('微信玩家与陪测同桌获得 SVP，新规则加一分，旧规则不补发',()=>{
+  for (const legacy of [false, true]) {
+    const s=new Store(':memory:');
+    try {
+      const uids=['test:host','test:2','test:3','test:4','wx:svp','test:6'];
+      const r=fixture(s,uids,{scoreEnabled:true,legacy});
+      act(s,r,r.host,'honorStart');
+      for(let i=0;i<uids.length;i++) act(s,r,uids[i],'honorVote',{mvp:i===0?2:1,svp:i===4?6:5});
+      assert.equal(honors.view(s,s.get(r.code),'wx:svp').svp[0].seat,5);
+      const score=s.matchFor('wx:svp',r.matchRecord.id).score;
+      assert.equal(score.total,legacy?0:1);
+      assert.equal(score.breakdown.some(row=>row.id==='honor_svp'),!legacy);
+      assert.equal(s.playerScore('wx:svp').points,legacy?0:1);
+    } finally { s.close(); }
+  }
+});
+
 test('companion ballots can award a human and only that human receives an honor count',()=>{
   const s=new Store(':memory:');
   try {

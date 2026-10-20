@@ -291,8 +291,8 @@ test("顺序流程只将上车者视为任务参与者，结算推进同样保�
   assert.equal(result.counts.success, 2);
 });
 
-test("提前截止投票保留弃权数量，作废任务不产生任务成功结果", () => {
-  const { run } = reviewRoom();
+test("提前截止投票保留弃权数量，任务跳过保留补票结果", () => {
+  const { room, run } = reviewRoom();
   run("p1", "beginActivity", { kind: "vote", team: [2, 3] });
   run("p2", "submit", { value: "approve" });
   const closed = run("p1", "closeWaiting", { confirm: true });
@@ -300,13 +300,14 @@ test("提前截止投票保留弃权数量，作废任务不产生任务成功�
   assert.equal(closed.outcomes[0].abstain, 7);
   assert.equal(closed.outcomes[0].earlyClosed, true);
   assert.deepEqual(closed.skippedSeats, [1, 3, 4, 5, 6, 7, 8]);
+  room.roles.p2 = "assassin";
+  room.roles.p3 = "servant";
   run("p1", "beginActivity", { kind: "quest", team: [2, 3], threshold: 1 });
-  const cancelled = run("p1", "closeWaiting", { confirm: true });
-  assert.deepEqual(
-    cancelled.outcomes.map((outcome) => outcome.kind),
-    ["cancel"],
-  );
-  assert.equal(cancelled.outcomes[0].text, "本次操作已作废");
+  const quest = run("p1", "closeWaiting", { confirm: true });
+  assert.deepEqual(quest.outcomes.map(outcome => outcome.kind), ["quest"]);
+  assert.equal(quest.outcomes[0].text, "任务失败");
+  assert.deepEqual(quest.outcomes[0].counts, { success: 1, fail: 1 });
+  assert.deepEqual(quest.skippedSeats, [2, 3]);
 });
 
 test("湖仙查验保存实际结果与传递对象，后续查验不覆盖，玩家公开视图没有秘密结果", () => {

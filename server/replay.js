@@ -86,10 +86,13 @@ function observe(room, before, input, uid, roles) {
         approved: entry.approved, leader: entry.leader || null, earlyClosed: !!entry.earlyClosed });
     else if (["toolQuest", "quest"].includes(entry.kind))
       append(room, roles, { ...base, kind: "quest", team: [...entry.team], success: entry.success,
-        fails: entry.fails, threshold: entry.threshold,
-        cards: room.players.filter(p => entry.team.includes(p.seat)).map(p => ({
-          actor: before.players.find(old => old.seat === p.seat), value: submissions[p.uid] || null,
-        })) });
+        fails: entry.fails, threshold: entry.threshold, earlyClosed: !!entry.earlyClosed,
+        cards: room.players.filter(p => entry.team.includes(p.seat)).map(p => {
+          const actor = before.players.find(old => old.seat === p.seat);
+          return { actor, value: submissions[p.uid] ||
+            (entry.earlyClosed && input.type === "closeWaiting" && actor?.alive
+              ? actor.faction === "good" ? "success" : "fail" : null) };
+        }) });
     else if (entry.resultType === "conversion")
       append(room, roles, { ...base, kind: "conversion", converted: entry.text === "本轮阵营转换",
         changes: changes(before.players, after) });

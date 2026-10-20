@@ -226,7 +226,6 @@
           <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
           <view class="muted">{{actionSecret.faction}}</view>
           <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
-          <template is="avoidanceResult" data="{{result:actionSecret.avoidance}}" />
 <view wx:if="{{actionSecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{actionSecret.skillStatus.title}}</view>{{actionSecret.skillStatus.detail}}</view>
         </view>
         <button hover-class="none" class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
@@ -427,7 +426,6 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open">
-        <template is="avoidanceResult" data="{{result:secret.avoidance}}" />
         <view class="inline-privacy-row"><view class="identity-privacy-note muted"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button inline-hide" bindtap="reveal">立即遮盖</button></view>
         <view class="identity-card-topline"><text class="small muted">当前身份</text><button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
         <view class="inline-role-heading"><image wx:if="{{secret.portrait}}" class="private-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="inline-role-copy"><view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="private-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view><text wx:if="{{secret.outcome}}" class="inline-role-outcome {{secret.outcome==='本局你获胜'?'is-win':secret.outcome==='本局你失败'?'is-loss':''}}">{{secret.outcome}}</text></view>

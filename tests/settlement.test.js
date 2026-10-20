@@ -111,22 +111,64 @@ test("提前截止投票明确记弃权，门槛按全部有资格玩家计算",
   assert.equal(room.history.at(-1).approved, true);
 });
 
-test("任务提前结束只作废，不补秘密票，不产生成功失败结果", () => {
+test("任务跳过未交牌者按当前阵营补票，保留已交牌且不公开个人票", () => {
   for (const board of ["classic", "chaos", "knights"]) {
     const room = setup(board, board === "classic" ? 6 : 12);
-    begin(room, "quest", { team: [1, 2], threshold: 1 });
-    run(room, "p1", "submit", {
-      value: privateView(room, "p1").action.choices[0],
-    });
+    Object.assign(room.roles, { p1: "morgana", p2: "servant", p3: "assassin" });
+    begin(room, "quest", { team: [1, 2, 3], threshold: 1 });
+    run(room, "p1", "submit", { value: "success" });
+    assert.equal(publicView(room, "p1").closeWaiting.mode, "questDefault");
+    assert.equal(publicView(room, "p2").closeWaiting, null);
+    const before = structuredClone(room);
+    assert.throws(() => run(room, "p2", "closeWaiting", { confirm: true }), /只有房主/);
+    assert.throws(() => run(room, "p1", "closeWaiting"), /请确认/);
+    assert.deepEqual(room, before);
     cutoff(room);
     assert.equal(room.phase, "tools");
     assert.equal(room.history.length, 1);
-    assert.equal(room.history[0].kind, "toolCanceled");
-    for (const key of ["votes", "fails", "success", "counts"])
-      assert.equal(room.history[0][key], undefined);
+    assert.equal(room.history[0].kind, "toolQuest");
+    assert.equal(room.history[0].fails, 1);
+    assert.equal(room.history[0].success, false);
+    assert.equal(room.history[0].earlyClosed, true);
+    assert.equal(room.history[0].votes, undefined);
+    assert.equal(publicView(room, "p2").history[0].votes, undefined);
     assert.deepEqual(room.submissions, {});
-    assert.equal(room.quests.length, 0);
   }
+});
+
+test("任务默认票使用转换后的阵营，保留已提交的特殊牌", () => {
+  const room = knightsRoom();
+  Object.assign(room.roles, { p1: "blueLancelot", p2: "redLancelot" });
+  room.knights.players.p1.faction = "evil";
+  room.knights.players.p2.faction = "good";
+  begin(room, "quest", { team: [1, 2], threshold: 2 });
+  cutoff(room);
+  assert.equal(room.history.at(-1).fails, 1);
+  assert.equal(room.history.at(-1).success, true);
+  assert.deepEqual(room.replay.events.at(-1).cards.map(card => card.value), ["fail", "success"]);
+
+  const chaos = setup("chaos", 12);
+  Object.assign(chaos.roles, { p1: "blueWarlock", p2: "redWarlock", p3: "redThief" });
+  begin(chaos, "quest", { team: [1, 2, 3], threshold: 1 });
+  run(chaos, "p1", "submit", { value: "magic" });
+  cutoff(chaos);
+  assert.equal(chaos.history.at(-1).fails, 2);
+  assert.equal(chaos.history.at(-1).success, true);
+});
+
+test("技能无法使用时仅私密返回角色对应原因", () => {
+  const room = knightsRoom();
+  Object.assign(room.roles, { p1: "morgana", p2: "servant", p3: "gareth", p4: "blueLancelot", p5: "magician", p6: "paladin", p7: "blueGuard" });
+  for (const uid of ["p3", "p4", "p5"]) room.knights.players[uid].used = true;
+  room.knights.players.p7.availableRound = 2;
+  begin(room, "skills");
+  for (const uid of ["p1", "p2"]) assert.equal(privateView(room, uid).action.unavailableHint, "你没有技能");
+  for (const uid of ["p3", "p4", "p5"]) assert.equal(privateView(room, uid).action.unavailableHint, "技能已使用");
+  assert.match(privateView(room, "p6").action.unavailableHint, /被动触发/);
+  assert.match(privateView(room, "p7").action.unavailableHint, /尚未启用/);
+  assert.doesNotMatch(JSON.stringify(publicView(room, "p1")), /unavailableHint|你没有技能|技能已使用/);
+  room.knights.players.p3.alive = false;
+  assert.match(privateView(room, "p3").action.unavailableHint, /已出局/);
 });
 
 test("截止技能只补pass，猎人未选被动不触发，已选被动自动结算", () => {

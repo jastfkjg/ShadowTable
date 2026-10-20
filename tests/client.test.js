@@ -1979,6 +1979,17 @@ test("技能记录分行且仅在有人仍出局时展示最终结果", async ()
   assert.equal(p.data.history[0].resultRows.at(-1).value, "4 号");
 });
 
+test("小程序无技能和技能已使用提示沿用本人私密状态", async () => {
+  for (const unavailableHint of ["你没有技能", "技能已使用", "新技能尚未启用，下次技能环节可用"]) {
+    const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass"], unavailableHint } }) });
+    p.data.room = { code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false } };
+    await p.openAction();
+    assert.equal(p.data.skillHint, unavailableHint);
+    assert.equal(p.data.actionSecret, null);
+    p.closeAction();
+  }
+});
+
 test("猎人先三选一，再显示对应号码；切换模式不提交，关闭后清除私密草稿", async () => {
   const options = [
     {value: "pass", label: "不使用技能"},

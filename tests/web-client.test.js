@@ -1037,9 +1037,9 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   c.ACTIONS.toggleHistoryRow({ dataset: { key: '0' } });
   assert.match(c.viewHistorySheet(), /5票弃权/);
   assert.match(html, /本次你无需操作/);
-  assert.match(c.viewHostBar(), /作废本次任务/);
+  assert.match(c.viewHostBar(), /跳过未交牌玩家并结算/);
   assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
-  assert.ok(!c.viewHostBar().includes('data-action="cancelTool"'));
+  assert.ok(c.viewHostBar().includes('data-action="cancelTool"'));
   run("p2", "submit", { value: "success" });
   await c.refresh();
   assert.equal(c.state.latestResult.text, "任务成功");
@@ -1386,6 +1386,18 @@ test("查看结果定位更早的公开记录，并展开被折叠的目标", ()
   assert.equal(c.lookups.at(-1), "history-record-0");
   assert.equal(c.scrolls.length, 0);
   assert.equal(c.state.visibleHistory.find(h => h.key === 0).expanded, true);
+});
+
+test("网页无技能和技能已使用提示沿用本人私密状态", async () => {
+  for (const unavailableHint of ["你没有技能", "技能已使用", "新技能尚未启用，下次技能环节可用"]) {
+    const c = client(async () => response({ stage: "s1", action: { choices: ["pass"], unavailableHint } }));
+    try {
+      c.state.room = { code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false } };
+      await c.ACTIONS.openAction();
+      assert.match(c.viewActionDialog(), new RegExp(unavailableHint));
+      assert.equal(c.state.actionSecret, null);
+    } finally { c.stop(); }
+  }
 });
 
 test("网页猎人技能三选一后只显示该模式号码，返回及阶段变化清除草稿", async () => {
@@ -2228,7 +2240,14 @@ test('网页版回避卡单选、确认、只读和私密结果遮盖，与小�
     assert.doesNotMatch(c.viewDealtIdentity(), /已回避/);
     c.state.dealtIdentitySecret = { role: '忠臣', faction: '好人', factionTone: 'good', information: '没有视野', avoidance: { roleName: '梅林', status: 'effective' } };
     assert.match(c.viewDealtIdentity(), /已回避「梅林」/);
+    const secret = c.state.dealtIdentitySecret;
     c.ACTIONS.closeDealtIdentity(); assert.equal(c.state.dealtIdentitySecret, null);
+    c.state.room.phase = "tools";
+    c.state.room.players = []; c.state.room.team = []; c.state.room.history = [];
+    c.state.secret = secret; c.state.revealed = true;
+    assert.doesNotMatch(c.viewRoom(), /已回避|已消耗.*回避卡/);
+    c.state.actionDialog = true; c.state.actionSecret = secret;
+    assert.doesNotMatch(c.viewActionDialog(), /已回避|已消耗.*回避卡/);
   } finally { c.stop(); }
 });
 test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入口', () => {

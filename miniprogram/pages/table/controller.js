@@ -44,7 +44,7 @@ const CHOICES = {
   pass: "不使用技能 / 确认",
 };
 // Derive private skill controls only from the server's allowed choices.
-function skillView(room, choices, hunterModes, hunterMode, swapOptions) {
+function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavailableHint = "") {
   const fairyAction = room.phase === "fairy";
   const finalAction = !!room.knights && ["assassination", "reverseStrike"].includes(room.phase) && choices.some(c => /^target:\d+$/.test(c.value));
   const skillAction = fairyAction || finalAction || ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
@@ -83,7 +83,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions) {
   const count = mode === "swap" ? swapSeats.size : targets.length;
   return {
     skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
-    skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : "本阶段没有可选目标，请确认本轮选择"),
+    skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择"),
     skillTargets,
     ...(mode === "swap" ? { swapPlayers } : {}),
     skillTargetMeta: mode ? (round ? "第 " + round + " 轮 · " : "") +
@@ -2253,7 +2253,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           .filter((p) => swapSeats.has(p.seat))
           .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
         actionChoices,
-        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions),
+        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions, response.action.unavailableHint),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {

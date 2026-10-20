@@ -1070,6 +1070,7 @@ function settleActivity(room) {
       fails,
       threshold: room.activity.threshold,
       success: fails < room.activity.threshold,
+      ...(room.activity.earlyClosed ? { earlyClosed: true } : {}),
       ...(room.board === "chaos"
         ? variants.chaosQuest(
             participants.map((p) => room.submissions[p.uid]),
@@ -1140,6 +1141,14 @@ function closeWaitingPolicy(room) {
       description:
         "未提交者记为弃权；赞成票仍需超过本次全部有投票资格玩家的一半才通过。已提交的票不会更改。",
     };
+  if (room.phase === "quest")
+    return {
+      mode: "questDefault",
+      label: "跳过未交牌玩家并结算",
+      title: "跳过未交牌玩家？",
+      description:
+        "未交牌玩家按当前阵营补票：好人默认成功，坏人默认失败。已提交的牌不会更改；只公开汇总票数，不公开出牌人。",
+    };
   if (["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase))
     return {
       mode: "pass",
@@ -1150,12 +1159,10 @@ function closeWaitingPolicy(room) {
     };
   return {
     mode: "cancel",
-    label: room.phase === "quest" ? "作废本次任务" : room.phase === "fairy" ? "作废本次查验" : "作废本次操作",
+    label: room.phase === "fairy" ? "作废本次查验" : "作废本次操作",
     title: "作废本次操作并结束等待？",
     description:
-      room.phase === "quest"
-        ? "本次任务作废，不补成功或失败票，不公布已提交票数，也不计入任务结果。可重新发起或在线下处理。"
-        : "本次操作作废，不代选目标、不产生查验或命中结果。可重新发起或在线下处理。",
+      "本次操作作废，不代选目标、不产生查验或命中结果。可重新发起或在线下处理。",
   };
 }
 function settleIfComplete(room) {
@@ -1565,7 +1572,9 @@ function applyCommand(room, uid, input) {
             actionSpec(next, player.uid).choices.includes("pass"),
             "本阶段不支持跳过",
           );
-        next.submissions[player.uid] = policy.mode;
+        next.submissions[player.uid] = policy.mode === "questDefault"
+          ? faction(next, player.uid) === "good" ? "success" : "fail"
+          : policy.mode;
       }
       next.activity.earlyClosed = true;
       settleIfComplete(next);
