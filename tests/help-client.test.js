@@ -62,6 +62,18 @@ test("板子搜索保留合法人数入口；板子加载失败不影响静态�
   scorePage.onLoad({ section: "scoring" }); await tick();
   assert.deepEqual(calls, ["/api/scoring/rules"]); assert.equal(scorePage.data.scoringExpanded, true);
 });
+test("帮助页区分9人经典基础和逆仆入口，跳转到各自配置", async () => {
+  const boards = require("../server/engine").BOARDS;
+  const { page, links } = help(async url => url === "/api/boards" ? { boards } : scoring);
+  page.onLoad(); await tick();
+  const choices = page.data.boards.find(board => board.id === "classic").choices.filter(choice => choice.capacity === 9);
+  assert.deepEqual(Array.from(choices, choice => choice.label), ["9人 · 逆仆", "9人 · 经典基础"]);
+  for (const choice of choices) page.openBoard(tap(choice));
+  assert.match(links[0], /board=classic&capacity=9/);
+  assert.match(links[1], /board=classic-court&capacity=9/);
+  page.onUnload();
+});
+
 test("异步帮助内容在页面卸载后不再写入，也不会覆盖现有静态内容", async () => {
   const pending = [], { page } = help(() => new Promise(resolve => pending.push(resolve)));
   page.onLoad(); const snapshot = JSON.stringify(page.data); page.onUnload();

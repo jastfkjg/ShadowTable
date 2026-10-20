@@ -9,7 +9,8 @@
 .avoidance-heading-copy { flex:1;min-width:0;font-size:18px;font-weight:600; }
 .avoidance-heading-copy text { display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:3px; }
 button.avoidance-close { width:44px;min-height:44px;flex-shrink:0;margin:0 -8px 0 0;padding:0;border:0;background:transparent;color:var(--muted);font-size:28px;line-height:44px; }
-.avoidance-body { flex-shrink:1;min-height:0;max-height:calc(100vh - 260px);overflow-y:auto; }
+/* Reserve the same native scroll area while loading and after roles arrive. */
+.avoidance-body { height:480px;flex-shrink:1;min-height:0;max-height:calc(100vh - 260px);overflow-y:auto; }
 .avoidance-fields { padding:0 18px 16px; }
 .avoidance-note { padding:12px 14px;border-radius:12px;background:var(--control-bg, #14232c);font-size:13px;color:var(--muted); }
 .avoidance-group { margin-top:18px; }

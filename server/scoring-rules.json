@@ -1,9 +1,9 @@
 {
-  "version": "avalon-2026-10-v8",
+  "version": "avalon-2026-10-v9",
   "defaultEnabledBoards": { "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
   "title": "阿瓦隆积分规则",
-  "scopeLabel": "经典基础 5–8、10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
-  "boards": { "classic": [5, 6, 7, 8], "classic-court": [10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
+  "scopeLabel": "经典基础 5–10、12 人及十二骑士 10–13 人；逆仆及其他扩展板暂不计积分",
+  "boards": { "classic": [5, 6, 7, 8], "classic-court": [9, 10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
   "targetModes": { "knights-10": "living_merlin", "knights-11": "living_merlin", "knights": "living_merlin", "knights-13": "living_merlin" },
   "notes": ["仅十二骑士 10、11、12、13 人默认开启计分；其他板子默认关闭，房主可手动开启。", "十二骑士按结束时的角色与阵营计分；出局玩家保留最后阵营。", "十二骑士空刀：场上无存活梅林则坏人胜，仍有存活梅林则好人胜。提前盘刀与三绿盘刀使用相同计分规则。"],
   "endReasons": [

@@ -112,6 +112,47 @@ async function server() {
     },
   };
 }
+test('房间配置测量完成后才显示，重新打开丢弃旧测量并允许测量失败时关闭', () => {
+  const layout = { callbacks: [] }, p = page({}, new Map(), layout);
+  const rects = [{ width: 390, height: 844 }, { height: 86 }, { height: 300 }, { height: 100 }];
+  p.openRoomRules();
+  assert.equal(p.data.roomRulesMeasuring, true);
+  p.closeRoomRules();
+  p.openRoomRules();
+  layout.callbacks[0](rects);
+  assert.equal(p.data.roomRulesMeasuring, true);
+  assert.equal(p.data.roomRulesBodyHeight, 0);
+  layout.callbacks[1](rects);
+  assert.equal(p.data.roomRulesBodyHeight, 300);
+  assert.equal(p.data.roomRulesMeasuring, false);
+  p.closeRoomRules();
+  p.openRoomRules();
+  layout.callbacks[2]([null, null, null, null]);
+  assert.equal(p.data.roomRulesMeasuring, false);
+  p.closeRoomRules();
+  assert.equal(p.data.showRoomRules, false);
+
+  const fallback = page({});
+  fallback.openRoomRules();
+  assert.equal(fallback.data.roomRulesMeasuring, false);
+});
+test('重新打开配置后，前一次延迟的渲染回调不能触发测量或提前显示弹层', () => {
+  const layout = { callbacks: [] }, p = page({}, new Map(), layout), renders = [];
+  p.setData = function(patch, callback) {
+    Object.assign(this.data, patch);
+    if (callback) renders.push(callback);
+  };
+  p.openRoomRules();
+  p.closeRoomRules();
+  p.openRoomRules();
+  renders.shift()();
+  assert.equal(layout.callbacks.length, 0);
+  assert.equal(p.data.roomRulesMeasuring, true);
+  renders.shift()();
+  assert.equal(layout.callbacks.length, 1);
+  layout.callbacks[0]([{ width: 390, height: 844 }, { height: 86 }, { height: 300 }, { height: 100 }]);
+  assert.equal(p.data.roomRulesMeasuring, false);
+});
 test('游戏弹层原生测量随展开状态更新，关闭、换阶段和后台后的旧回调不再写入高度', () => {
   const layout={callbacks:[]},p=page({},new Map(),layout);
   const rects=[{width:390,height:844},{height:76},{height:900},{height:100}];
@@ -674,6 +715,30 @@ test("先选人数：自动匹配可用板子，切板不改变人数", async ()
     assert.equal(p.data.boardId, "knights-13");
     assert.deepEqual(Array.from(p.data.availableBoards, b => b.id), ["knights-13"]);
     assert.ok(p.data.boardRoleConfiguration[0].roles.includes("忠臣×3"));
+  } finally {
+    await a.close();
+  }
+});
+
+test("9人可选经典基础或原逆仆，经典入口按四忠臣配置创建房间", async () => {
+  const a = await server();
+  try {
+    const p = await a.actor();
+    await p.bootstrap();
+    p.selectCapacity(9);
+    assert.deepEqual(Array.from(p.data.availableBoards, board => board.id), ["classic", "classic-court"]);
+    assert.equal(p.data.boardName, "阿瓦隆 · 9人逆仆");
+    p.pickBoard({ currentTarget: { dataset: { index: 1 } } });
+    assert.equal(p.data.capacity, 9);
+    assert.equal(p.data.boardName, "阿瓦隆 · 经典基础");
+    assert.equal(p.data.boardRoleConfiguration[0].roles, "梅林，派西维尔，忠臣×4");
+    assert.equal(p.data.boardRoleConfiguration[1].roles, "莫德雷德，莫甘娜，刺客");
+    p.setData({ entryMode: "create" });
+    p.submitEntry({ detail: { value: { nickname: "九人房主" } } });
+    await settle(p);
+    assert.equal(p.data.room.board, "classic-court");
+    assert.equal(p.data.room.capacity, 9);
+    assert.equal(p.data.room.roleConfiguration[0].roles, "梅林，派西维尔，忠臣×4");
   } finally {
     await a.close();
   }

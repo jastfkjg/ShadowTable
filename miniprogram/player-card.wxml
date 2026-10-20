@@ -2,7 +2,7 @@
   <view class="player-card-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="{{playerCard.name+'的玩家战绩'}}">
     <view class="player-card-handle" aria-hidden="{{true}}" />
     <view class="player-card-heading"><view class="table-sheet-title"><view class="table-symbol gold"><image src="/assets/record-cup.svg" aria-hidden="true" /></view><text>玩家战绩</text></view><button hover-class="none" class="player-card-close" bindtap="closePlayerCard" aria-label="关闭玩家战绩">×</button></view>
-    <scroll-view scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" class="player-card-body" style="height:{{(playerCardStats ? 300 + playerCardStats.byFaction.length * 80 : 180) + (playerCard.name.length>8 ? 54 : 0) + (playerCardBadge ? 220 : 0)}}px;">
+    <scroll-view scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" class="player-card-body">
       <view class="player-card-identity {{playerCard.name.length>8 ? 'is-long-name' : ''}}">
         <view class="player-card-avatar"><text>{{playerCard.initial}}</text><image class="player-card-avatar-image" wx:if="{{playerCard.avatarUrl && !playerCard.avatarFailed}}" src="{{playerCard.avatarUrl}}" mode="aspectFill" binderror="playerCardAvatarError" aria-hidden="{{true}}" /></view>
         <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text wx:if="{{playerCard.scope!=='leaderboard'}}" class="small muted">{{playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>

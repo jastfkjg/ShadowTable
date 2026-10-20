@@ -7,7 +7,7 @@
   <view wx:if="{{avoidanceOpen && !error}}" class="avoidance-backdrop" catchtap="closeAvoidance" catchtouchmove="blockScroll">
     <view class="avoidance-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="选择本局回避角色">
       <view class="avoidance-top"><view class="avoidance-handle" aria-hidden="true" /><view class="avoidance-heading"><view class="avoidance-heading-icon"><image src="/assets/table-cards.svg" aria-hidden="true" /></view><view class="avoidance-heading-copy"><view>这局想避开哪个角色？</view><text>回避卡 ×{{avoidance.balance}} · 仅你可见</text></view><button class="avoidance-close" bindtap="closeAvoidance" aria-label="关闭回避卡" hover-class="none">×</button></view></view>
-      <scroll-view class="avoidance-body" scroll-y enhanced show-scrollbar="{{false}}" style="height:{{avoidanceBodyHeight}}px;"><view class="avoidance-fields">
+      <scroll-view class="avoidance-body" scroll-y enhanced show-scrollbar="{{false}}"><view class="avoidance-fields">
         <view wx:if="{{avoidanceLoading}}" class="avoidance-note" role="status">正在读取回避卡…</view>
         <block wx:else>
           <view class="avoidance-note">{{avoidance.balance<1?'暂无回避卡':!avoidance.editable?'当前无法使用回避卡':'发牌前可随时修改，生效后才扣 1 张。'}}</view>

@@ -283,15 +283,15 @@ test("终止不揭露身份，可重开；开始后新成员只能旁观且不�
   assert.equal(r.roles, undefined);
 });
 
-test("用户确认10/12人完整角色配置：梅林不见大莫、派西不区分梅莫、奥伯伦互不认识", () => {
-  for (const n of [10, 12]) {
+test("经典9/10/12人完整角色配置：梅林不见大莫、派西不区分梅莫、奥伯伦互不认识", () => {
+  for (const n of [9, 10, 12]) {
     const r = newRoom("123456", "p1", "房主", "classic-court", n);
     for (let i = 2; i <= n; i++) enter(r, "p" + i, "玩家" + i);
     r.players.forEach((p) => run(r, p.uid, "ready", { ready: true }));
     run(r, "p1", "start");
     const find = (role) => r.players.filter((p) => r.roles[p.uid] === role);
-    assert.equal(find("oberon").length, n === 10 ? 1 : 2);
-    assert.equal(find("servant").length, n === 10 ? 4 : 5);
+    assert.equal(find("oberon").length, n === 9 ? 0 : n === 10 ? 1 : 2);
+    assert.equal(find("servant").length, n === 12 ? 5 : 4);
     const merlin = privateView(r, find("merlin")[0].uid).information;
     const listed = merlin.split("：")[1].split("（")[0].split("、").map(Number);
     assert.ok(!listed.includes(find("mordred")[0].seat));
@@ -565,6 +565,18 @@ test("6至9人角色逐项匹配用户配置，说明和发牌一致", () => {
     assert.deepEqual(Object.values(r.roles).sort(), expected[n].sort());
   }
   assert.equal(publicView(setup(9), "p1").boardName, "阿瓦隆 · 9人逆仆");
+});
+
+test("9人经典基础仅将逆仆换为忠臣，忠臣无视野且不提供刀逆仆", () => {
+  const classic = setupBoard("classic-court", 9), reverse = setup(9);
+  assert.deepEqual(Object.values(classic.roles).sort(),
+    Object.values(reverse.roles).map(role => role === "reverse" ? "servant" : role).sort());
+  assert.equal(publicView(classic, "p1").boardName, "阿瓦隆 · 经典基础");
+  assert.equal(publicView(classic, "p1").hasReverse, false);
+  assert.equal(publicView(reverse, "p1").hasReverse, true);
+  for (const player of classic.players.filter(p => classic.roles[p.uid] === "servant"))
+    assert.equal(privateView(classic, player.uid).information, "没有视野。");
+  assert.throws(() => run(classic, "p1", "beginActivity", { kind: "reverseStrike" }), /没有逆仆/);
 });
 
 test("9人逆仆局三次成功进入逆仆刀，再刺梅林完成结算", () => {

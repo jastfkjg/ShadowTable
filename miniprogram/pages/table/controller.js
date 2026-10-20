@@ -277,9 +277,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     invitationNeedsName: false,
     invitationRetry: false,
     showRoomRules: false,
+    roomRulesMeasuring: false,
     roomRulesBodyHeight: 0,
     roomRoleGroups: [],
-    avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "", avoidanceBodyHeight: 280,
+    avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "",
     actionDialog: false,
     actionSecret: null,
     dealtIdentityDialog: false,
@@ -401,7 +402,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.showIdentityHintWhenVisible();
   },
   onResize() {
-    avoidancePresentation.measureSheet(this);
     this.dismissRoomSwipe();
     this.showIdentityHintWhenVisible();
     this.syncRoomSheetLayout("entry");
@@ -1376,9 +1376,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (!this.alive || !this.foreground || !this.data[openKey] || revision !== this.sheetLayoutRevisions[kind] || entry && entryRevision !== this.entrySheetRevision) return;
       const patch = {}, key = entry ? "entryBodyHeight" : "roomRulesBodyHeight";
       if (height !== null && this.data[key] !== height) patch[key] = height;
-      const opening = entry && this.data.entryMeasuring;
-      if (opening) patch.entryMeasuring = false;
-      const rendered = () => { if (opening) this.focusEntryAfterOpen(entryRevision); };
+      const measuringKey = entry ? "entryMeasuring" : "roomRulesMeasuring";
+      const opening = this.data[measuringKey];
+      if (opening) patch[measuringKey] = false;
+      const rendered = () => { if (entry && opening) this.focusEntryAfterOpen(entryRevision); };
       if (Object.keys(patch).length) this.setData(patch, rendered);
       else rendered();
     };
@@ -1496,8 +1497,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     wx.navigateTo({ url: "/pages/help/help" });
   },
   openRoomRules() {
-    this.setData({ showRoomRules: true, roomRulesBodyHeight: 0,
-      roomRoleGroups: roomSheet.presentRoleGroups(this.data.room?.roleConfiguration) }, () => this.syncRoomSheetLayout("rules"));
+    this.sheetLayoutRevisions = this.sheetLayoutRevisions || {};
+    const revision = this.sheetLayoutRevisions.rules = (this.sheetLayoutRevisions.rules || 0) + 1;
+    this.setData({ showRoomRules: true, roomRulesMeasuring: true, roomRulesBodyHeight: 0,
+      roomRoleGroups: roomSheet.presentRoleGroups(this.data.room?.roleConfiguration) }, () => {
+      if (revision === this.sheetLayoutRevisions.rules) this.syncRoomSheetLayout("rules");
+    });
   },
   openBoardDetails() {
     this.setData({ showRoomRules: false });
@@ -1805,13 +1810,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!room || room.phase !== "lobby" || room.me.seat === null || this.data.busy || this.pending || !this.data.network) return;
     this.mask();
     const generation = this.generation;
-    this.setData({ avoidanceOpen: true, avoidanceLoading: true, avoidanceBodyHeight: 100, avoidance: { balance: room.me.avoidance?.balance || 0 } });
+    this.setData({ avoidanceOpen: true, avoidanceLoading: true, avoidance: { balance: room.me.avoidance?.balance || 0 } });
     try {
       const value = await api.request("/api/rooms/" + room.code + "/avoidance");
       if (!this.alive || !this.foreground || generation !== this.generation || !this.data.avoidanceOpen || this.data.room?.code !== value.code || this.data.room.stage !== value.stage || value.phase !== "lobby") return;
       this.setData({ avoidance: value, avoidanceLoading: false, avoidanceDraft: value.selected || "",
         avoidanceDraftName: value.options.find(o => o.id === value.selected)?.name || "",
-        avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) }, () => avoidancePresentation.measureSheet(this));
+        avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) });
     } catch (error) { if (generation === this.generation && this.foreground) { this.closeAvoidance(); this.handleError(error); } }
   },
   closeAvoidance() { this.generation++; this.setData({ avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "" }); },

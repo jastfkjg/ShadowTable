@@ -59,7 +59,7 @@ function write(name, file, data, styles, extra = "") {
   scenes.push(name);
 }
 // Browser projection of the native selector-query measurement, not app behavior.
-const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
+const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');sheet.classList.remove('is-measuring');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
 const store = new Store(":memory:");
 let raw, online;
 try {
@@ -238,6 +238,7 @@ const tableScenes = {
   'table-covered':{...tablePlaying,dealtIdentityDialog:true},
   'table-revealed':{...tablePlaying,dealtIdentityDialog:true,dealtIdentitySecret:privateData},
   'player-card':{...tablePlaying,playerCard:playerSample,playerCardStats:playerStats},
+  'player-card-loading':{...tablePlaying,playerCard:{...playerSample,badges:[]},playerCardLoading:true},
   'player-card-badge':{...tablePlaying,playerCard:playerSample,playerCardStats:playerStats,playerCardBadge:badgeSamples[0]},
   'player-card-long':{...tablePlaying,playerCard:{...playerSample,name:'昵称很长的玩家名字完整展示测试'},playerCardStats:{...playerStats,scoreTotal:-123456789,rateLabel:'—',rateValue:'—',byFaction:[...playerStats.byFaction,{faction:'third',label:'盗贼阵营',total:0,wins:0,winRate:null,rateLabel:'—',rateValue:'—'}]}},
   'player-card-error':{...tablePlaying,playerCard:playerSample,playerCardError:'网络暂时不可用，请稍后重试'},
@@ -299,17 +300,17 @@ const thirteenPage=createTable();thirteenPage.data=tableScene(thirteen,'host');t
 tableScenes['player-card-empty']={...tablePlaying,playerCard:playerSample,playerCardStats:{scoreTotal:0,rateLabel:'—',rateValue:'—',total:0,wins:0,byFaction:[]}};
 const avoidancePresentation = require('../miniprogram/avoidance');
 const avoidanceOptions = require('../server/engine').avoidanceOptions(tableReadySource).map(o => ({ ...o, portrait: portrait(o.name,o.faction).portrait }));
-const avoidanceDraft = { ...tableReady, avoidanceOpen: true, avoidanceLoading: false, avoidanceBodyHeight: 360,
+const avoidanceDraft = { ...tableReady, avoidanceOpen: true, avoidanceLoading: false,
   avoidance: { balance: 1, selected: null, editable: true, options: avoidanceOptions }, avoidanceDraft:'merlin',avoidanceDraftName:'梅林',
   avoidanceGroups:avoidancePresentation.groups(avoidanceOptions,'merlin') };
 tableScenes['avoidance-select'] = avoidanceDraft;
+tableScenes['avoidance-loading'] = { ...avoidanceDraft, avoidanceLoading: true, avoidance: { balance: 1 }, avoidanceGroups: [], avoidanceDraft:'', avoidanceDraftName:'' };
 tableScenes['avoidance-empty'] = { ...avoidanceDraft, avoidance: { ...avoidanceDraft.avoidance, balance: 0 }, avoidanceDraft:'',avoidanceDraftName:'',avoidanceGroups:avoidancePresentation.groups(avoidanceOptions,null) };
 tableScenes['avoidance-effective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'effective',roleName:'梅林'})} };
 tableScenes['avoidance-ineffective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'ineffective',roleName:privateData.role})} };
 // Project the same native four-rectangle fit used by the controller.
 const processProjection=`<script>window.fitProcessSheet=()=>{const sheet=document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
-const avoidanceProjection = `<script>function fitAvoidance(){const body=document.querySelector('.avoidance-body');if(!body)return;const rects=['.avoidance-backdrop','.avoidance-top','.avoidance-fields','.avoidance-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());if(rects.some(r=>!r))return;body.style.height=Math.max(1,Math.floor(Math.min(rects[2].height,rects[0].height-rects[1].height-rects[3].height-(rects[0].width>rects[0].height&&rects[0].height<=500?20:72))))+'px';}addEventListener('load',fitAvoidance);addEventListener('resize',fitAvoidance);</script>`;
-for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection+avoidanceProjection);
+for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
   fs.writeFileSync(path.join(output,gallery+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:28px 40px;width:1638px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;margin:0 0 12px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px}iframe{display:block;width:390px;height:844px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${items.map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>保留游戏规则与私密流程 · 示例数据 · 需真机验收</p></main></html>`);
 }
@@ -321,7 +322,7 @@ for (const [name, boardId, capacity, extra] of [
   const source = newRoom('201375','host','子龙',boardId,capacity);
   for (let i=2;i<=capacity;i++) enter(source,'player-'+i,'陪测'+(i-1));
   const room = {...publicView(source,'host'),testRoom:true,scoreSettings:{enabled:true},...extra};
-  const page = {...createTable().data,loading:false,room,showRoomRules:true,roomRoleGroups:presentRoleGroups(room.roleConfiguration),
+  const page = {...createTable().data,loading:false,room,showRoomRules:true,roomRulesMeasuring:true,roomRoleGroups:presentRoleGroups(room.roleConfiguration),
     seats:room.players.map(player=>({...player,occupied:true,mine:player.seat===1,host:player.seat===1,avatarInitial:player.name[0]})),seatOccupiedCount:capacity,seatReadyCount:0};
   write(name,'pages/table/table.wxml',page,'.room-rules-sheet-footer{padding-bottom:40px}.preview-homebar{z-index:1200}',sheetProjection);
 }

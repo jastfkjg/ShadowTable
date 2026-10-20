@@ -297,6 +297,22 @@ test("结算无身份预览，非法目标不泄露身份，只有房主能提�
   assert.equal(publicView(room,"wx:observer").myScore,null);
   assert.doesNotMatch(JSON.stringify(publicView(room,"wx:3")),/wx:1|wx:2|scorePolicy|scoringFacts|"uid"/);
 });
+test("9人经典基础可手动开启经典计分，原9人逆仆仍不计分", () => {
+  const lobby = newRoom("123456", "wx:1", "房主", "classic-court", 9);
+  assert.equal(lobby.scoreEnabled, false);
+  assert.equal(publicView(lobby, lobby.host).scoreSettings.unavailableReason, null);
+  const room = deal({ board: "classic-court", capacity: 9 });
+  const target = room.players.find(player => room.roles[player.uid] === "servant").seat;
+  finish(room, { scoreReason: "assassination", scoreTarget: target });
+  assert.equal(room.result.winner, "good");
+  for (const player of room.matchRecord.players) {
+    assert.equal(player.score.status, "scored");
+    assert.equal(player.score.total, player.faction === "evil" ? 0 : player.seat === target ? 4 : ["merlin", "percival"].includes(player.roleId) ? 3 : 2);
+  }
+  const reverse = newRoom("654321", "wx:1", "房主", "classic", 9);
+  assert.equal(publicView(reverse, reverse.host).scoreSettings.unavailableReason, "本板子暂未参与计分");
+});
+
 test("积分资格独立于战绩；旧开局、逆仆板和缺少依据不会计分",()=>{
   for(const variant of ["legacy","unknown","reverse","terminated"]) {
     const room=variant==="reverse"?deal({capacity:9}):deal();

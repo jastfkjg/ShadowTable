@@ -85,14 +85,14 @@ Page({
           id,
           name: classic ? "阿瓦隆 · 经典基础" : knights ? "阿瓦隆 · 十二骑士" : board.name,
           description: classic
-            ? "按人数配置经典角色；9人、11人含逆仆，12人含双奥伯伦。"
+            ? "按人数配置经典角色；9人可选经典基础或逆仆，11人含逆仆，12人含双奥伯伦。"
             : knights ? "同时秘密提交技能、同时生效，支持B牌复活；10、11、12人局的角色配置不同，技能规则相同。" : board.description,
           choices: [],
         });
         groups.get(id).choices.push(...board.counts.map(capacity => ({
           board: board.id,
           capacity,
-          label: `${capacity}人${classic && [9, 11].includes(capacity) ? ' · 逆仆' : ''}`,
+          label: `${capacity}人${(board.id === "classic" && capacity === 9) || board.id === "classic-11" ? ' · 逆仆' : classic && capacity === 9 ? ' · 经典基础' : ''}`,
         })));
       }
       this.setData({ boards: [...groups.values()].map(group => ({

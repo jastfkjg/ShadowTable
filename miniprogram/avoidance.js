@@ -16,21 +16,6 @@
       detail: effective ? "已消耗 1 张回避卡" : value.status === "unavailable" ? "发牌时回避卡不足，本次未扣卡" : "需保留完整角色配置，本次未扣卡",
     };
   }
-  function measureSheet(page) {
-    if (!page.alive || !page.foreground || !page.data.avoidanceOpen || typeof wx === "undefined" || !wx.createSelectorQuery) return;
-    const run = () => {
-      if (!page.alive || !page.foreground || !page.data.avoidanceOpen) return;
-      const query = wx.createSelectorQuery();
-      for (const selector of [".avoidance-backdrop", ".avoidance-top", ".avoidance-fields", ".avoidance-footer"]) query.select(selector).boundingClientRect();
-      query.exec(rects => {
-        if (!page.alive || !page.foreground || !page.data.avoidanceOpen || !rects || rects.length !== 4 || rects.some(r => !r)) return;
-        const [backdrop, top, fields, footer] = rects;
-        const clearance = backdrop.width > backdrop.height && backdrop.height <= 500 ? 20 : 72;
-        page.setData({ avoidanceBodyHeight: Math.max(1, Math.floor(Math.min(fields.height, backdrop.height - top.height - footer.height - clearance))) });
-      });
-    };
-    if (wx.nextTick) wx.nextTick(run); else run();
-  }
   function grantMessage(value) {
     return "当前可用 " + value.balance + " 张。\n\n入座后可在发牌前选择想避开的角色，生效才扣卡。";
   }
@@ -66,5 +51,5 @@
       check,
     };
   }
-  return { groups, result, measureSheet, grantMessage, createGrantNotifier };
+  return { groups, result, grantMessage, createGrantNotifier };
 });

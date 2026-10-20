@@ -50,8 +50,8 @@ const BOARDS = [
     id: "classic-court",
     name: "阿瓦隆 · 经典基础",
     available: true,
-    counts: [10, 12],
-    description: "梅林、派西、莫甘娜、莫德雷德、刺客、奥伯伦；12人双奥伯伦",
+    counts: [9, 10, 12],
+    description: "9人无逆仆；10人增加奥伯伦，12人双奥伯伦",
   },
   {
     id: "classic-11",
