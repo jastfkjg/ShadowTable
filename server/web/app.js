@@ -873,7 +873,7 @@
     return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
   }
   function viewNavigation() {
-    if (!['lobby','me'].includes(state.page) || state.avoidanceWalletOpen) return '';
+    if (!['lobby','me'].includes(state.page)) return '';
     return '<nav class="bottom-navigation" aria-label="主导航">' + [['lobby','对局','table'],['me','我的','me']].map(function (item) {
       return '<button type="button" data-action="navigate" data-page="' + item[0] + '" class="nav-destination ' + (state.page === item[0] ? 'active' : '') + '"' + (state.page === item[0] ? ' aria-current="page"' : '') + '>' + navIcon(item[2]) + '<span>' + item[1] + '</span></button>';
     }).join('') + '</nav>';
@@ -922,7 +922,7 @@
     if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
     html += '</section>' + viewScoreOverview(stats?.score) + '</div>';
     const link = (page, title, note, icon) => '<button class="personal-link" type="button" data-action="navigate" data-page="'+page+'"><span class="me-icon me-icon-'+icon+'" aria-hidden="true"></span><span class="me-link-copy"><span>'+title+'</span>'+(note?'<span class="small muted link-note">'+esc(note)+'</span>':'')+'</span><span aria-hidden="true">›</span></button>';
-    html += '<div class="personal-links me-links-primary">' + (profile.avoidance ? btn('personal-link','openAvoidanceWallet','回避卡 · ' + profile.avoidance.balance + ' 张 ›') : '') + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('badges','荣誉徽章','','medal') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
+    html += '<div class="personal-links me-links-primary">' + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('badges','荣誉徽章','','medal') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
     return html;
   }
   let badgeManagerSequence = 0;
@@ -1294,9 +1294,9 @@
     read: () => request('/api/me/avoidance/notice'),
     ack: through => request('/api/me/avoidance/notice', 'POST', { through }),
     canShow() {
-      if (!alive || !foreground || !state.network || !modal.hidden || pending || grantNoticeOpen || !['lobby', 'me', 'table'].includes(state.page)) return false;
-      if (state.page === 'table' && !['lobby', 'ended', 'terminated'].includes(state.room?.phase)) return false;
-      return !['loading', 'busy', 'error', 'reconnecting', 'profileLoading', 'entrySheet', 'invitation', 'roomMenu', 'noteRoom', 'monthlyReset', 'resetSaving', 'avoidanceOpen', 'avoidanceWalletOpen', 'actionDialog', 'actionLoading', 'identityChange', 'fairyResult', 'identityHistoryOpen', 'historyOpen', 'toolType', 'showRoomRules', 'showRoomSettings', 'showBoardDetails', 'dealtIdentityDialog', 'honorDialog', 'resultDialog', 'revealed', 'playerCard', 'statsOpen', 'showTransfer'].some(key => state[key]);
+      if (!alive || !foreground || !state.network || !modal.hidden || pending || grantNoticeOpen || state.page !== 'table') return false;
+      if (state.room?.phase !== 'lobby') return false;
+      return !['loading', 'busy', 'error', 'reconnecting', 'profileLoading', 'entrySheet', 'invitation', 'roomMenu', 'noteRoom', 'monthlyReset', 'resetSaving', 'avoidanceOpen', 'actionDialog', 'actionLoading', 'identityChange', 'fairyResult', 'identityHistoryOpen', 'historyOpen', 'toolType', 'showRoomRules', 'showRoomSettings', 'showBoardDetails', 'dealtIdentityDialog', 'honorDialog', 'resultDialog', 'revealed', 'playerCard', 'statsOpen', 'showTransfer'].some(key => state[key]);
     },
     update(value) {
       const patch = {};
@@ -1306,7 +1306,7 @@
     },
     async show(value) {
       grantNoticeOpen = true;
-      try { return await confirm(value.title, value.content, false, '知道了'); }
+      try { return await confirm(value.title, '本次获得 +' + value.amount + ' 张\n' + value.content, false, '知道了'); }
       finally { grantNoticeOpen = false; }
     },
   });
@@ -1318,13 +1318,14 @@
     } catch (e) {}
   }
   function mask() {
+    if (grantNoticeOpen) modalCancel.onclick?.();
     closeRoomSwipe();
     state.historyOpen = false;
     closePlayerCard(false);
     generation++;
     actionGeneration++;
     setState({
-      avoidanceOpen: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "", avoidanceWalletOpen: false, avoidanceWallet: null,
+      avoidanceOpen: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "",
       dealtIdentityDialog: false,
       dealtIdentitySecret: null,
       identityHintVisible: false,
@@ -1571,6 +1572,7 @@ function roomListItems(rooms) {
       throw e;
     }
     if (!alive || code !== roomCode || sequence !== refreshSequence) return;
+    if (room.phase !== 'lobby' && grantNoticeOpen) modalCancel.onclick?.();
     connectionRecovered();
     const snapshot = JSON.stringify(room);
     unchangedPolls = snapshot === lastRoomSnapshot ? unchangedPolls + 1 : 0;
@@ -2477,7 +2479,7 @@ function roomListItems(rooms) {
   }
   async function openAvoidance() {
     const room = state.room;
-    if (!room || room.phase !== 'lobby' || room.me.seat === null || state.busy || pending || !state.network) return;
+    if (state.page !== 'table' || !room || room.phase !== 'lobby' || room.me.seat === null || state.busy || pending || !state.network) return;
     mask(); const gen = generation;
     setState({ avoidanceOpen: true, avoidanceLoading: true, avoidance: { balance: room.me.avoidance?.balance || 0 } });
     try {
@@ -2489,40 +2491,24 @@ function roomListItems(rooms) {
   }
   function closeAvoidance() {
     generation++;
-    setState({ avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: '', avoidanceDraftName: '', avoidanceWalletOpen: false, avoidanceWallet: null });
-    app.querySelector('[data-action="' + (state.page === 'me' ? 'openAvoidanceWallet' : 'openAvoidance') + '"]')?.focus({ preventScroll: true });
-  }
-  async function openAvoidanceWallet() {
-    if (state.page !== 'me' || !foreground) return;
-    const gen = ++generation;
-    setState({ avoidanceWalletOpen: true, avoidanceWalletLoading: true, avoidanceWalletError: '', avoidanceWallet: avoidancePresentation.wallet(state.profile?.avoidance || { balance: 0 }) });
-    try {
-      const value = await request('/api/me/avoidance');
-      if (!alive || !foreground || gen !== generation || !state.avoidanceWalletOpen || state.page !== 'me') return;
-      setState({ avoidanceWallet: avoidancePresentation.wallet(value), profile: { ...state.profile, avoidance: value } });
-    } catch (error) { if (gen === generation && foreground) setState({ avoidanceWalletError: error.message }); }
-    finally { if (gen === generation && foreground) { setState({ avoidanceWalletLoading: false }); app.querySelector('.avoidance-close')?.focus({ preventScroll: true }); } }
+    setState({ avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: '', avoidanceDraftName: '' });
+    app.querySelector('[data-action="openAvoidance"]')?.focus({ preventScroll: true });
   }
   function viewAvoidance() {
-    if ((!state.avoidanceOpen && !state.avoidanceWalletOpen) || state.error || !modal.hidden) return '';
-    const isWallet = !!state.avoidanceWalletOpen, value = isWallet ? state.avoidanceWallet : state.avoidance;
+    if (!state.avoidanceOpen || state.page !== 'table' || state.room?.phase !== 'lobby' || state.error || !modal.hidden) return '';
+    const value = state.avoidance;
     let body = '', footer = '';
-    if (isWallet) {
-      body = '<div class="avoidance-wallet-total"><span>可用回避卡</span><div>' + (value?.balance || 0) + '<span> 张</span></div></div><div class="avoidance-note">回避卡由管理员发放。入座后，在发牌前选择本局想避开的一个角色，已准备也可修改，生效才扣卡。中途换牌不受影响。</div>';
-      if (state.avoidanceWalletError) body += '<div role="alert" class="avoidance-note">' + esc(state.avoidanceWalletError) + btn('text-button','openAvoidanceWallet','重新读取') + '</div>';
-      if (state.avoidanceWalletLoading) body += '<div class="avoidance-note" role="status">正在同步记录…</div>';
-      body += '<div class="avoidance-history-title">最近记录</div>' + (!state.avoidanceWalletLoading && !state.avoidanceWalletError && !value?.history?.length ? '<div class="avoidance-footnote">暂无记录，收到管理员发放后会显示在这里。</div>' : '') + (value?.history || []).map(row => '<div class="avoidance-ledger"><div><div>' + esc(row.label) + '</div><span>' + esc(row.dateLabel) + '</span>' + (row.source === 'admin' ? '<span class="avoidance-ledger-note">' + esc(row.note) + '</span>' : '') + '</div><div class="avoidance-ledger-amount' + (row.delta > 0 ? ' is-gain' : '') + '">' + row.amountLabel + '<span>余 ' + row.balance + ' 张</span></div></div>').join('');
-      footer = btn('primary','closeAvoidance','知道了');
-    } else if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
+    if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
     else {
       const locked = !value?.editable || value.balance < 1 || state.busy || !!pending;
       body = '<div class="avoidance-note">' + (value.balance < 1 ? '暂无回避卡' : !value.editable ? '当前无法使用回避卡' : '发牌前可随时修改，生效后才扣 1 张。') + '</div>';
       body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
-      body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。仅影响初始发牌，中途换牌不受影响。</div>';
-      footer = value.editable && value.balance > 0 ? btn('primary','saveAvoidance','确认回避「' + (state.avoidanceDraftName || '选择角色') + '」',null,!state.avoidanceDraft || locked || !state.network) : btn('primary','closeAvoidance','知道了');
-      if (value.editable && value.selected) footer += btn('text-button','cancelAvoidance','本局不使用',null,state.busy || !!pending || !state.network);
+      body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。</div>';
+      if (!value.editable || value.balance < 1) footer = btn('primary','closeAvoidance','知道了');
+      else if (value.selected && state.avoidanceDraft === value.selected) footer = btn('secondary','cancelAvoidance','不避开了（不扣卡）',null,locked || !state.network);
+      else footer = btn('primary','saveAvoidance',state.avoidanceDraft ? (value.selected ? '改成避开' : '避开') + state.avoidanceDraftName : '点一个角色',null,!state.avoidanceDraft || locked || !state.network);
     }
-    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-icon"><img src="/assets/table-cards.svg" alt="" /></div><div class="avoidance-heading-copy"><div id="avoidance-title">' + (isWallet ? '我的回避卡' : '这局想避开哪个角色？') + '</div><span>' + (isWallet ? '仅你可见 · 跟随账号保存' : '回避卡 ×' + (value?.balance || 0) + ' · 仅你可见') + '</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭回避卡">×</button></div></div><div class="avoidance-body"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
+    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-icon"><img src="/assets/table-cards.svg" alt="" /></div><div class="avoidance-heading-copy"><div id="avoidance-title">这局想避开哪个角色？</div><span>' + ('回避卡 ×' + (value?.balance || 0) + ' · 仅你可见') + '</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭回避卡">×</button></div></div><div class="avoidance-body"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
   }
   function ready() {
     cmd("ready", { ready: !state.room.me.ready });
@@ -4111,17 +4097,13 @@ function roomListItems(rooms) {
     html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
     if (r.recordNotice) html += '<div class="small muted">' + esc(r.recordNotice) + '</div>';
     if (r.scoreSettings) html += '<div class="small muted">' + esc(r.scoreNotice || (r.scoreSettings.enabled ? '本局计分已开启' : '本局计分已关闭')) + '</div>';
+    let lobbyActionHtml = "";
     if (r.phase === "lobby") {
-      html +=
-        '<div class="panel"><span class="muted small">' +
-        esc(state.startHint) +
-        "</span>" +
-        (r.me.seat !== null && r.me.avoidance ? btn("secondary web-avoidance-entry", "openAvoidance", "回避卡 ×" + r.me.avoidance.balance + (r.me.avoidance.selected ? " · 已选择" : ""), null, state.busy || !!pending || !state.network) : "") +
-        (r.me.seat !== null ? btn("primary", "ready", r.me.ready ? "取消准备" : "我准备好了", null, state.busy) : "") +
-        (r.me.isHost
-          ? btn("secondary", "start", "发放身份", null, state.busy || !state.network || !state.canStart)
-          : "") +
-        "</div>";
+      const blocked = state.busy || !!pending || !state.network, card = r.me.avoidance;
+      lobbyActionHtml = '<div class="web-lobby-action-bar"><div class="web-lobby-action-inner">' +
+        (r.me.seat !== null && card ? '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + esc('回避卡' + card.balance + '张，' + (card.selected ? '本局已选择角色' : '选择本局回避角色')) + '"' + (blocked ? ' disabled' : '') + '><span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /><span>×' + esc(card.balance) + '</span></span><span class="avoidance-entry-state">' + (card.selected ? '已选择' : '回避卡') + '</span></button>' : '') +
+        (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
+        (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
     if (r.canUseTools) {
       html +=
@@ -4299,7 +4281,7 @@ function roomListItems(rooms) {
         btn("finish-game-button", "finishTools", "结束本局", null, state.busy) +
         "</div>";
     if (r.phase !== 'lobby') html += '<div class="public-history-dock' + (r.canUseTools && r.hasActiveOperation && r.phase !== 'offlineFinal' ? ' with-host-actions' : '') + '">' + viewHistoryEntry() + viewHostBar() + '</div>';
-    return html;
+    return html + lobbyActionHtml;
   }
   function resultIcon(tone) {
     return tone ? '<span class="quest-result-icon ' + tone + '" aria-hidden="true">' + (tone === "success" ? "✓" : "×") + '</span>' : '';
@@ -4709,8 +4691,8 @@ function roomListItems(rooms) {
       viewAvoidance() +
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
-      (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.avoidanceOpen || state.avoidanceWalletOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (state.page === 'table' && state.room?.phase === 'lobby' ? ' has-lobby-actions' : '') + (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
+      (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
       (['profile', 'badges'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
@@ -4964,7 +4946,7 @@ function roomListItems(rooms) {
       seat(Number(el.dataset.seat));
     },
     ready: ready,
-    openAvoidance, closeAvoidance, openAvoidanceWallet,
+    openAvoidance, closeAvoidance,
     chooseAvoidance: function (el) {
       const value = state.avoidance, id = el.dataset.id;
       if (!value?.editable || value.balance < 1 || state.busy || pending) return;
@@ -5260,7 +5242,7 @@ function roomListItems(rooms) {
   // ===== lifecycle =====
   app.addEventListener('click', function (event) { if (event.target.hasAttribute?.('data-avoidance-backdrop')) closeAvoidance(); });
   document.addEventListener('keydown', function (event) {
-    if (!(state.avoidanceOpen || state.avoidanceWalletOpen) || state.error || !modal.hidden) return;
+    if (!state.avoidanceOpen || state.error || !modal.hidden) return;
     if (event.key === 'Escape') { event.preventDefault(); closeAvoidance(); return; }
     if (event.key !== 'Tab') return;
     const controls = Array.from(app.querySelectorAll('.avoidance-sheet button:not(:disabled)'));

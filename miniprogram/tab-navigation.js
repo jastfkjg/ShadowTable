@@ -3,7 +3,7 @@ function tabBarVisibility(page, selected) {
   const data = page.data || {};
   const panel = (selected === 0 ? data.lobby : data.personal) || data;
   return {
-    entrySheetVisible: selected === 0 ? !!panel.entrySheet : !!panel.monthlyReset || !!panel.avoidanceWalletOpen,
+    entrySheetVisible: selected === 0 ? !!panel.entrySheet : !!panel.monthlyReset,
     roomMenuVisible: selected === 0 && !!(panel.roomMenu || panel.noteRoom),
   };
 }

@@ -8,7 +8,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   let scheduled, scheduledDelay;
   const events = {};
   const scrolls = [], lookups = [], navigations = [];
-  const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener(name, fn) { events['app:' + name] = fn; }, hidden: true, classList: { add() {}, remove() {} } };
+  const element = { querySelector() { return null; }, focus() {}, scrollIntoView(options) { scrolls.push(options); }, addEventListener(name, fn) { events['app:' + name] = fn; }, removeEventListener(name, fn) { if (events['app:' + name] === fn) delete events['app:' + name]; }, hidden: true, classList: { add() {}, remove() {} } };
   if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
@@ -63,14 +63,39 @@ test('网页收卡通过主题弹窗展示，未确认不读，身份或操作�
   c.setConfirm(async (...args) => { dialogs.push(args); return accepted; });
   try {
     c.state.avoidanceOpen = true; await c.grantNotifier.start(); assert.equal(calls.length, 0);
-    c.state.avoidanceOpen = false; c.state.room.phase = 'vote'; await c.grantNotifier.check(); assert.equal(calls.length, 0);
+    c.state.avoidanceOpen = false;
+    for (const page of ['lobby', 'me']) { c.state.page = page; await c.grantNotifier.check(); assert.equal(calls.length, 0); }
+    c.state.page = 'table';
+    for (const phase of ['vote', 'identity', 'ended', 'terminated']) { c.state.room.phase = phase; await c.grantNotifier.check(); assert.equal(calls.length, 0); }
     c.state.room.phase = 'lobby'; await c.grantNotifier.check();
     assert.equal(dialogs.length, 1); assert.equal(dialogs[0][0], '收到回避卡'); assert.equal(dialogs[0][2], false); assert.equal(dialogs[0][3], '知道了');
-    assert.match(dialogs[0][1], /2 张回避卡/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
+    assert.match(dialogs[0][1], /本次获得 \+2 张/); assert.doesNotMatch(dialogs[0][1], /管理员|发放/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
     assert.equal(c.state.room.me.avoidance.balance, 4);
     accepted = true; await c.grantNotifier.check();
     assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 1);
     await c.grantNotifier.check(); assert.equal(dialogs.length, 2);
+  } finally { c.grantNotifier.stop(); c.stop(); }
+});
+test('收卡弹窗未确认时房主发牌，收到新房间状态后立即收起且不标记已读', async () => {
+  const room = newRoom('123456', 'host', '房主', 'classic', 6);
+  for (let i = 2; i <= 6; i++) enter(room, 'p' + i, '玩家' + i);
+  for (const player of room.players) command(room, player.uid, { type: 'ready', ready: true, stage: room.stage });
+  const writes = [];
+  const c = client(async (url, options = {}) => {
+    if (options.method === 'POST') writes.push(url);
+    return response(url.includes('/avoidance/notice') ? { balance: 1, notice: { through: 'grant-1', amount: 1, grants: 1 } }
+      : url.endsWith('/private') ? require('../server/engine').privateView(room, 'host') : publicView(room, 'host'));
+  });
+  c.state.loading = false; c.state.page = 'table'; c.state.room = publicView(room, 'host');
+  try {
+    const notification = c.grantNotifier.start();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.equal(c.document.getElementById('modal').hidden, false);
+    command(room, 'host', { type: 'start', flexible: true, stage: room.stage });
+    await c.refresh(); await notification;
+    assert.equal(c.document.getElementById('modal').hidden, true);
+    assert.deepEqual(writes, []);
+    assert.doesNotMatch(c.viewRoom(), /data-action="openAvoidance"/);
   } finally { c.grantNotifier.stop(); c.stop(); }
 });
 test('网页房间管理按有效性与权限展示可用操作，省略额外说明并保留关闭入口', () => {
@@ -1802,11 +1827,12 @@ test('网页不计积分的骑士终局必须选实际带刀人，切换带刀�
   c.ACTIONS.pickFunActor({dataset:{seat:2}});assert.equal(c.state.resultTarget,null);c.ACTIONS.nextResult();assert.match(c.viewResultDialog(),/pickScoreTarget" disabled data-seat="2"/);assert.match(c.viewResultDialog(),/1号<\/span><span class="score-player-name">&lt;甲&gt;/);assert.doesNotMatch(c.viewResultDialog(),/&amp;lt;/);
 });
 
-test('个人趣味入口不显示预览，昵称仍转义动态文字，排名详情按需打开', async () => {
+test('个人页隐藏回避卡和趣味预览，昵称仍转义动态文字，排名详情按需打开', async () => {
   const c = client(async () => response(webRanks()));
-  c.state.profile = {nickname:'<img src=x onerror=attack()>昵称',identityType:'wx'};
+  c.state.profile = {nickname:'<img src=x onerror=attack()>昵称',identityType:'wx',avoidance:{balance:5}};
   c.state.stats = {total:1,wins:1,winRate:100,fun:{teaser:'<img src=x onerror=attack()>战报'}};
   const html = c.viewMe();
+  assert.doesNotMatch(html, /回避卡|openAvoidanceWallet/);
   assert.match(html, /data-page="stats\?tab=fun"/);
   assert.doesNotMatch(html, /&lt;span|<img src=x/);
   assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;昵称/);
@@ -2174,7 +2200,12 @@ test('网页版回避卡单选、确认、只读和私密结果遮盖，与小�
     c.ACTIONS.chooseAvoidance({ dataset: { id: 'merlin' } });
     assert.equal(c.state.avoidanceDraft, 'merlin');
     assert.equal(c.state.room.me.ready, true);
-    assert.match(c.viewAvoidance(), /aria-pressed="true"/); assert.match(c.viewAvoidance(), /确认回避「梅林」/);
+    assert.match(c.viewAvoidance(), /aria-pressed="true"/); assert.match(c.viewAvoidance(), />避开梅林<\/button>/);
+    c.state.avoidance.selected = 'merlin';
+    assert.match(c.viewAvoidance(), />不避开了（不扣卡）<\/button>/); assert.doesNotMatch(c.viewAvoidance(), /data-action="saveAvoidance"/);
+    c.state.avoidance.options.push({ id: 'percival', name: '派西维尔', faction: 'good', count: 1, portrait: '/assets/roles/percival.png' });
+    c.ACTIONS.chooseAvoidance({ dataset: { id: 'percival' } });
+    assert.match(c.viewAvoidance(), />改成避开派西维尔<\/button>/); assert.doesNotMatch(c.viewAvoidance(), /data-action="cancelAvoidance"/);
     c.ACTIONS.closeAvoidance(); assert.equal(c.state.avoidance, null); assert.equal(c.state.avoidanceDraft, '');
     c.state.dealtIdentityDialog = true; c.state.dealtIdentitySecret = null;
     assert.doesNotMatch(c.viewDealtIdentity(), /已回避/);
@@ -2193,6 +2224,15 @@ test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入�
     assert.doesNotMatch(html, /取消准备后|当前无法使用回避卡/);
     c.ACTIONS.closeAvoidance();
     assert.match(c.viewRoom(), /data-action="openAvoidance"/);
+    let actions = c.viewRoom().split('<div class="web-lobby-action-inner">')[1];
+    assert.ok(actions.indexOf('data-action="openAvoidance"') < actions.indexOf('data-action="ready"'));
+    assert.match(actions, /取消准备/);
+    c.state.room.me.isHost = true; c.state.canStart = true;
+    actions = c.viewRoom().split('<div class="web-lobby-action-inner">')[1];
+    assert.ok(actions.indexOf('data-action="ready"') < actions.indexOf('data-action="start"'));
+    c.state.network = false;
+    assert.match(c.viewRoom(), /data-action="ready" disabled/);
+    c.state.network = true;
     for (const phase of ['identity', 'tools', 'quest', 'ended', 'terminated']) {
       c.state.room.phase = phase;
       assert.doesNotMatch(c.viewRoom(), /data-action="openAvoidance"/);

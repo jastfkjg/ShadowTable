@@ -8,7 +8,7 @@
 .table-symbol.gold { background: #3b372d; }
 .table-sheet-title { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .page.table-room { max-width: 632px; padding: 10px 16px calc(118px + env(safe-area-inset-bottom)); font-size: 14px; line-height: 1.6; }
-.page.table-room.table-lobby { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+.page.table-room.table-lobby { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
 .table-room .small { font-size: 12px; }
 .table-room .lobby-room-header { margin: 0 0 16px; padding: 0; border: 0; }
 .table-room .room-summary { gap: 8px; }
@@ -135,12 +135,11 @@
 
 /* Fixed controls reserve safe-area space and retain all host actions. */
 .table-room .lobby-action-bar { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(177,191,198,.13); }
-.table-room .lobby-action-inner { max-width: 600px; gap: 12px; }
-.table-room .lobby-ready-controls { gap: 4px 8px; }
-.table-room .lobby-ready-status { font-size: 13px; line-height: 1.5; }
-.table-room .lobby-action-inner button, .table-room .lobby-action-inner button[disabled]:not([type]) { min-height: 48px; font-size: 14px; padding: 10px 12px; border-radius: 13px; }
-.table-room .lobby-action-inner button.lobby-cancel { min-height: 44px; padding: 6px 0; font-size: 12px; }
-.table-room .lobby-action-inner button.lobby-start { min-width: 122px; }
+.table-room .lobby-action-inner { max-width: 600px; gap: 10px; }
+.table-room .lobby-action-inner button, .table-room .lobby-action-inner button[disabled]:not([type]) { flex: 1 1 0; width: 0; min-width: 0; min-height: 48px; font-size: 14px; padding: 10px 12px; border-radius: 13px; }
+.table-room .lobby-action-inner button.avoidance-entry, .table-room .lobby-action-inner button.avoidance-entry[disabled]:not([type]) { flex: 0 0 64px; width: 64px; min-width: 64px; height: 48px; padding: 3px 4px; gap: 1px; font-size: 11px; }
+.table-room .lobby-action-inner .avoidance-entry-line { font-size: 12px; gap: 4px; }
+.table-room .lobby-action-inner .avoidance-entry-line image { width: 18px; height: 18px; }
 .table-room .lobby-spectator-hint { padding: 8px 0; font-size: 12px; }
 .table-room .public-history-dock { padding: 8px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(177,191,198,.13); box-shadow: 0 -6px 24px rgba(0,0,0,.12); }
 .table-room button.public-history-entry { max-width: 600px; min-height: 48px; padding: 0; gap: 10px; }
@@ -254,9 +253,6 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
   .table-room .seat-head { flex-wrap: wrap; }
   .table-room .seat-head-tags { margin-left: auto; }
   .table-room .lobby-action-inner { gap: 8px; }
-  .table-room .lobby-action-inner button.lobby-start { min-width: 116px; }
-  .table-room .lobby-ready-controls { gap: 0 4px; }
-  .table-room .lobby-ready-status { font-size: 12px; }
   .player-card-sheet { padding-left: 14px; padding-right: 14px; }
   .player-card-stat { padding-left: 10px; padding-right: 10px; }
   .player-card-faction-info .small { font-size: 11px; }
@@ -264,6 +260,7 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
   .table-sheet-fields, .table-sheet-footer { padding-left: 14px; padding-right: 14px; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
+  .page.table-room.table-lobby { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .table-sheet-backdrop, .player-card-backdrop { padding-top: 20px; }
   .table-sheet-backdrop .table-sheet, .player-card-sheet { max-height: calc(100vh - 20px); }
   .player-card-body { max-height: calc(100vh - 116px - env(safe-area-inset-bottom)); }

@@ -443,6 +443,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }, 1500);
   },
   mask() {
+    this.dismissGrantNotice?.();
     this.dismissRoomSwipe();
     this.closePlayerCard();
     this.generation = (this.generation || 0) + 1;
@@ -762,6 +763,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       sequence !== this.refreshSequence
     )
       return;
+    if (room.phase !== "lobby") this.dismissGrantNotice?.();
     this.connectionRecovered();
     if (this.data.invitation) this.setData({ invitation: null, invitationNeedsName: false, invitationError: "", entryNameError: "", entryError: "" });
     const snapshot = JSON.stringify(room);

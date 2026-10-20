@@ -23,6 +23,19 @@ test('已准备仍能选择回避，无卡提示优先；发牌后隐藏入口',
   const tree = renderTable(data);
   assert.equal(byHandler(tree, 'chooseAvoidance').attr.disabled, false);
   assert.equal(byHandler(tree, 'saveAvoidance').attr.disabled, false);
+  const actionRow = nodes(tree).find(n => n.attr?.class === 'lobby-action-inner');
+  assert.equal(actionRow.children[0].attr.bindtap, 'openAvoidance');
+  assert.ok(byHandler(actionRow, 'ready'));
+  assert.equal(nodes(tree).some(n => n.attr?.class === 'lobby-action-meta'), false);
+  assert.deepEqual(Array.from(byHandler(tree, 'saveAvoidance').children), ['避开梅林']);
+  const saved = { ...data, avoidance: { ...data.avoidance, selected: 'merlin' } };
+  const unchanged = renderTable(saved);
+  assert.deepEqual(Array.from(byHandler(unchanged, 'cancelAvoidance').children), ['不避开了（不扣卡）']);
+  assert.equal(byHandler(unchanged, 'saveAvoidance'), undefined);
+  const modified = renderTable({ ...saved, avoidanceDraft: 'percival', avoidanceDraftName: '派西维尔' });
+  assert.deepEqual(Array.from(byHandler(modified, 'saveAvoidance').children), ['改成避开派西维尔']);
+  assert.equal(byHandler(modified, 'cancelAvoidance'), undefined);
+  assert.equal(byHandler(renderTable({ ...data, avoidanceDraft: '', avoidanceDraftName: '' }), 'saveAvoidance').attr.disabled, true);
   const empty = renderTable({ ...data, avoidance: { balance: 0, editable: false } });
   const note = nodes(empty).find(n => n.attr?.class === 'avoidance-note');
   assert.deepEqual(Array.from(note.children), ['暂无回避卡']);
@@ -31,6 +44,9 @@ test('已准备仍能选择回避，无卡提示优先；发牌后隐藏入口',
     const page = renderTable({ ...base, room: { ...room, phase } });
     assert.equal(!!byHandler(page, 'openAvoidance'), phase === 'lobby');
   }
+  const personal = factory('pages/me/me.wxml')({ activeTab: 1, personal: { loading: false, profile: { nickname: '子龙', avoidance: { balance: 5 } } }, lobby: { isLobby: true } });
+  assert.doesNotMatch(JSON.stringify(personal), /回避卡|openAvoidanceWallet/);
+  assert.match(JSON.stringify(personal), /对局记录/);
 });
 test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发放身份操作', () => {
   const room = { code:'123456', phase:'lobby', capacity:6, boardName:'经典基础', players:[], team:[], history:[], me:{seat:1,isHost:true,ready:false} };
@@ -663,7 +679,7 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
     code: "123456",
     phase: "lobby",
     players: [],
-    me: { isHost: false, seat: 2 },
+    me: { isHost: false, seat: 2, avoidance: { balance: 0, selected: false } },
   };
   const guest = render({ ...base, room, showRoomSettings: true });
   assert.equal(byHandler(guest, "toggleRoomSettings"), undefined);
@@ -676,6 +692,10 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
   assert.ok(byHandler(guest, "copyRoomCode"));
   const footer = nodes(guest).find(n => n.attr?.class === "lobby-action-bar");
   assert.ok(byHandler(footer, "ready"));
+  assert.ok(byHandler(footer, "openAvoidance"));
+  const row = nodes(footer).find(n => n.attr?.class === 'lobby-action-inner');
+  assert.equal(row.children[0].attr.bindtap, 'openAvoidance');
+  assert.equal(byHandler(row, 'openAvoidance').attr.disabled, false);
   assert.deepEqual(Array.from(byHandler(guest, "ready").children), ["准备"]);
   for (const blocked of [{ network: false }, { busy: true }, { hasPendingRequest: true }]) {
     assert.equal(byHandler(render({ ...base, room, ...blocked }), "ready").attr.disabled, true);
@@ -687,10 +707,12 @@ test("房间设置仅房主可见，普通玩家仍可准备和复制房间号",
   assert.ok(byHandler(spectator, "leave"));
   const host = render({
     ...base,
-    room: { ...room, me: { isHost: true, seat: 1 } },
+    room: { ...room, me: { isHost: true, seat: 1, avoidance: { balance: 1, selected: true } } },
     showRoomSettings: true,
   });
   assert.ok(byHandler(host, "toggleRoomSettings"));
+  const hostRow = nodes(host).find(n => n.attr?.class === 'lobby-action-inner');
+  assert.ok(byHandler(hostRow, 'openAvoidance')); assert.ok(byHandler(hostRow, 'ready')); assert.ok(byHandler(hostRow, 'start'));
   assert.ok(
     !nodes(host).some((n) => n.attr?.bindchange === "configureCapacity"),
   );

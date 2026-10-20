@@ -516,10 +516,7 @@
       <view class="lobby-action-bar">
         <view class="lobby-action-inner">
           <button wx:if="{{room.me.seat!==null && room.me.avoidance}}" class="avoidance-entry" bindtap="openAvoidance" disabled="{{busy || hasPendingRequest || !network}}" hover-class="none" aria-label="{{'回避卡'+room.me.avoidance.balance+'张，'+(room.me.avoidance.selected?'本局已选择角色':'选择本局回避角色')}}"><view class="avoidance-entry-line"><image src="/assets/table-cards.svg" aria-hidden="true" /><text>×{{room.me.avoidance.balance}}</text></view><text class="avoidance-entry-state">{{room.me.avoidance.selected?'已选择':'回避卡'}}</text></button>
-          <view wx:if="{{room.me.seat!==null}}" class="lobby-ready-controls">
-            <text wx:if="{{room.me.ready}}" class="lobby-ready-status">✓ 已准备</text>
-            <button hover-class="none" class="{{room.me.ready?'text-button lobby-cancel':'primary lobby-ready-button'}}" bindtap="ready" disabled="{{hasPendingRequest || busy || !network}}" loading="{{busy && busyAction==='ready'}}">{{room.me.ready?'取消准备':'准备'}}</button>
-          </view>
+          <button wx:if="{{room.me.seat!==null}}" hover-class="none" class="{{room.me.ready?'secondary lobby-cancel':'primary lobby-ready-button'}}" bindtap="ready" disabled="{{hasPendingRequest || busy || !network}}" loading="{{busy && busyAction==='ready'}}">{{room.me.ready?'取消准备':'准备'}}</button>
           <text wx:else class="lobby-spectator-hint">{{seatOccupiedCount < room.capacity?'选择空位入座':'座位已满，正在围观'}}</text>
           <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{canStart?'primary':'secondary'}} lobby-start" bindtap="start" disabled="{{hasPendingRequest || busy || !network || !canStart}}" aria-label="{{canStart?'发放身份':'发放身份，'+startHint}}">发放身份</button>
         </view>

@@ -222,6 +222,20 @@ button.connection-button {
   border: 1px solid var(--border);
   margin-top: 10px;
 }
+.page.has-lobby-actions { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+.web-lobby-action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(177,191,198,.13); background: var(--bg); }
+.web-lobby-action-inner { display: flex; align-items: center; gap: 10px; max-width: 428px; margin: 0 auto; }
+.web-lobby-action-inner button { flex: 1 1 0; width: 0; min-width: 0; min-height: 48px; margin: 0; padding: 10px 12px; border-radius: 13px; font-size: 14px; }
+.web-lobby-action-inner button.web-avoidance-entry { flex: 0 0 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 64px; min-width: 64px; height: 48px; padding: 3px 4px; gap: 1px; border: 0; background: rgba(229,198,139,.08); color: var(--accent); font-size: 11px; }
+.web-avoidance-entry .avoidance-entry-line { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.web-avoidance-entry .avoidance-entry-line img { width: 18px; height: 18px; }
+.web-avoidance-entry .avoidance-entry-state { color: var(--muted); font-size: 10px; }
+.web-lobby-spectator-hint { flex: 1; min-width: 0; padding: 8px 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 359px) { .web-lobby-action-inner { gap: 8px; } }
+@media (max-height: 500px) and (orientation: landscape) {
+  .page.has-lobby-actions { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .web-lobby-action-bar { position: static; margin-top: 16px; padding: 12px 0; }
+}
 .text-button {
   background: transparent;
   color: var(--muted);

@@ -1,6 +1,5 @@
 const dialog = require("../../dialog");
 const api = require("../../api");
-const avoidancePresentation = require("../../avoidance");
 const { presentProfile, presentStats } = require("../../profile");
 const { selectTab } = require("../../tab-navigation");
 const { presentMonthlyReset } = require("../../monthly-reset");
@@ -13,10 +12,10 @@ function currentRoom(rooms) {
     relationLabel: room.seat != null ? "我在 " + room.seat + " 号" : room.isHost ? "我是房主" : "旁观中" } : null;
 }
 module.exports = function createMePage() { return {
-  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "", avoidanceWalletOpen: false, avoidanceWallet: null, avoidanceWalletLoading: false, avoidanceWalletError: "", avoidanceBodyHeight: 280 },
+  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "" },
   onLoad() { this.alive = true; },
   onShow() { this.foreground = true; selectTab(this, 1); return this.load(); },
-  onHide() { this.foreground = false; this.walletSequence = (this.walletSequence || 0) + 1; this.updateChangedData({ monthlyReset: null, avoidanceWalletOpen: false, avoidanceWallet: null }); },
+  onHide() { this.foreground = false; this.updateChangedData({ monthlyReset: null }); },
   onUnload() { this.alive = false; },
   updateChangedData(values) {
     const changed = {};
@@ -69,19 +68,6 @@ module.exports = function createMePage() { return {
     }
   },
   blockMonthlyResetScroll() {},
-  blockAvoidanceScroll() {},
-  async openAvoidanceWallet() {
-    if (!this.foreground) return;
-    const sequence = this.walletSequence = (this.walletSequence || 0) + 1;
-    this.updateChangedData({ avoidanceWalletOpen: true, avoidanceWalletLoading: true, avoidanceWalletError: "", avoidanceWallet: avoidancePresentation.wallet(this.data.profile?.avoidance || { balance: 0 }), avoidanceBodyHeight: 280 });
-    try {
-      const value = await api.request("/api/me/avoidance");
-      if (!this.alive || !this.foreground || sequence !== this.walletSequence) return;
-      this.updateChangedData({ avoidanceWallet: avoidancePresentation.wallet(value), profile: { ...this.data.profile, avoidance: value } });
-    } catch (error) { if (this.alive && sequence === this.walletSequence) this.updateChangedData({ avoidanceWalletError: error.message }); }
-    finally { if (this.alive && sequence === this.walletSequence) { this.updateChangedData({ avoidanceWalletLoading: false }); avoidancePresentation.measureSheet(this); } }
-  },
-  closeAvoidanceWallet() { this.walletSequence = (this.walletSequence || 0) + 1; this.updateChangedData({ avoidanceWalletOpen: false, avoidanceWallet: null }); },
   async dismissMonthlyReset() {
     const month = this.data.monthlyReset?.month;
     if (!month || this.data.resetSaving) return;

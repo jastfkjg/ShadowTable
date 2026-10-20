@@ -26,7 +26,7 @@ module.exports = function createHomePage(initialTab = 0) {
           host.setData(patch, callback);
           // The custom tab bar lives outside the page's stacking context.
           // Remove it while the sheet is open, even when the keyboard is closed.
-          if (key === "lobby" && ["entrySheet", "roomMenu", "noteRoom"].some(name => name in values) || key === "personal" && ["monthlyReset", "avoidanceWalletOpen"].some(name => name in values)) selectTab(host, host.data.activeTab);
+          if (key === "lobby" && ["entrySheet", "roomMenu", "noteRoom"].some(name => name in values) || key === "personal" && "monthlyReset" in values) selectTab(host, host.data.activeTab);
         },
       });
       this.lobbyController = attach(lobby, "lobby");
@@ -72,7 +72,6 @@ module.exports = function createHomePage(initialTab = 0) {
     },
     onResize(event) {
       if (this.startedPanels[0]) this.lobbyController.onResize(event);
-      if (this.startedPanels[1]) require("./avoidance").measureSheet(this.personalController);
     },
     switchMainTab(index) {
       if (!this.alive || ![0, 1].includes(index) || index === this.data.activeTab) return;

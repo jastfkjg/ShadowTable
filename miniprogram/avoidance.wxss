@@ -47,4 +47,4 @@ button.avoidance-role.is-selected,button.avoidance-role.is-selected[disabled]:no
 @media (max-height:500px) { .avoidance-backdrop { padding-top:20px; }.avoidance-sheet { max-height:calc(100vh - 20px); }.avoidance-body { max-height:calc(100vh - 170px); } }
 .avoidance-me-icon { width:22px;height:22px; }
 .avoidance-me-balance { margin-left:8px;font-size:13px;color:var(--accent); }
-@media (max-width:359px) { .table-room .lobby-action-inner { gap:7px; }.table-room button.lobby-start { min-width:100px; }.avoidance-heading-copy { font-size:16px; } }
+@media (max-width:359px) { .avoidance-heading-copy { font-size:16px; } }

@@ -196,6 +196,7 @@ for (const [name, data] of Object.entries(homeScenes)) {
 // guards. Sample stats are illustrative; game choices come from privateView.
 function tableScene(source, uid, extra = {}) {
   const room = publicView(source, uid);
+  if (room.phase === 'lobby' && room.me.seat !== null) room.me.avoidance = { balance: 0, selected: false };
   const history = room.history.filter(h => h.kind === 'toolQuest').map((h, i) => ({...h,key:i,number:i+1,
     questResult:h.success?'success':'failure',resultTone:h.success?'success':'failure',
     text:h.success?'任务成功':'任务失败',latestDetail:h.team.join('、')+'号 · '+h.fails+'张失败票',timeLabel:'17:29'}));
@@ -212,9 +213,15 @@ const privateSource = privateView(tableSource,'wx:replay-5');
 const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait};
 const tableReadySource = newRoom('201375','host','子龙','knights',12);
 for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
+enter(tableReadySource,'spectator','围观玩家');
 tableReadySource.players[0].ready=true;
 const tableReady = tableScene(tableReadySource,'host',{startHint:'等待其他玩家准备',canStart:false});
-tableReady.room.me.avoidance = { balance: 1, selected: false };
+const tableUnreadySource = structuredClone(tableReadySource);
+tableUnreadySource.players[0].ready = false;
+const tableAllReadySource = structuredClone(tableReadySource);
+tableAllReadySource.players.forEach(player => { player.ready = true; });
+const tablePlayerReadySource = structuredClone(tableReadySource);
+tablePlayerReadySource.players[1].ready = true;
 const badgeSamples = require('../miniprogram/badges').catalogue.slice(0,3);
 const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,wins:3,byFaction:[
   {faction:'evil',label:'坏人阵营',total:2,wins:1,winRate:50,rateLabel:'50.0%',rateValue:'50.0'},
@@ -222,6 +229,11 @@ const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,win
 const playerSample = {name:'阿伟',initial:'阿',seat:6,badges:badgeSamples};
 const tableScenes = {
   'table-ready':tableReady, 'table-playing':tablePlaying,
+  'table-unready':tableScene(tableUnreadySource,'host',{startHint:'等待其他玩家准备',canStart:false}),
+  'table-can-start':tableScene(tableAllReadySource,'host',{canStart:true,startHint:'全员已准备，可以发放身份'}),
+  'table-player-ready':tableScene(tablePlayerReadySource,'player-2'),
+  'table-player-unready':tableScene(tableReadySource,'player-2'),
+  'table-lobby-spectator':tableScene(tableReadySource,'spectator'),
   'table-identity':{...tablePlaying,revealed:true,secret:privateData},
   'table-covered':{...tablePlaying,dealtIdentityDialog:true},
   'table-revealed':{...tablePlaying,dealtIdentityDialog:true,dealtIdentitySecret:privateData},

@@ -24,7 +24,7 @@ test("通知合并为弹窗、包含可用余额与用法，只在确认后标�
   const job = instance.start();
   await Promise.resolve(); await Promise.resolve();
   assert.equal(state.shown.length, 1); assert.equal(state.shown[0].title, "收到回避卡");
-  assert.match(state.shown[0].content, /累计.*3 张/); assert.match(state.shown[0].content, /当前可用 5 张/);
+  assert.equal(state.shown[0].amount, 3); assert.doesNotMatch(state.shown[0].content, /管理员|发放/); assert.match(state.shown[0].content, /当前可用 5 张/);
   assert.match(state.shown[0].content, /生效才扣卡/); assert.deepEqual(state.acked, []);
   finish(true); await job;
   assert.deepEqual(state.acked, ["grant-one"]);
@@ -58,9 +58,9 @@ test("切后台后晚到的读取不显示，账号重新进入时仍能提醒",
   const next = instance.start(); read(state.value); await next;
   assert.equal(state.shown.length, 1); instance.stop();
 });
-test("小程序使用共享弹窗与卡片图标，对局和正在编辑的面板不被通知打断", async () => {
-  const data = { isLobby: true }, controller = { alive: true, foreground: true, data, setData: patch => Object.assign(data, patch) };
-  const host = { route: "pages/lobby/lobby", data: { activeTab: 0 }, lobbyController: controller, selectComponent: () => ({}) };
+test("小程序仅在房间准备阶段提醒收卡，首页、我的、结束后及其他面板中不展示", async () => {
+  const data = { room: { phase: "lobby" } }, controller = { alive: true, foreground: true, data, setData: patch => Object.assign(data, patch) };
+  const host = Object.assign(controller, { route: "pages/table/table", selectComponent: () => ({}) });
   let options, shown;
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/avoidance-notices"), "utf8"), {
@@ -68,8 +68,10 @@ test("小程序使用共享弹窗与卡片图标，对局和正在编辑的面�
     require: name => name === "./avoidance" ? { createGrantNotifier: value => { options = value; return value; } } : name === "./dialog" ? { show: async value => { shown = value; return { confirm: true }; } } : { request() {} },
   });
   module.exports.create(); assert.equal(options.canShow(), true);
+  for (const route of ["pages/lobby/lobby", "pages/me/me"]) { host.route = route; assert.equal(options.canShow(), false, route); }
+  host.route = "pages/table/table";
   for (const key of ["entrySheet", "monthlyReset", "avoidanceOpen", "playerCard", "actionDialog"]) { data[key] = {}; assert.equal(options.canShow(), false, key); delete data[key]; }
-  data.room = { phase: "vote" }; assert.equal(options.canShow(), false);
+  for (const phase of ["vote", "identity", "quest", "ended", "terminated"]) { data.room.phase = phase; assert.equal(options.canShow(), false, phase); }
   data.room.phase = "lobby"; assert.equal(options.canShow(), true);
   await options.show({ title: "收到回避卡", content: "获得3张", amount: 3 });
   assert.equal(shown.showCancel, false); assert.equal(shown.confirmText, "知道了"); assert.equal(shown.contextIcon, "/assets/table-cards.svg");

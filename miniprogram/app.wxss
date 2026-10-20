@@ -1335,7 +1335,6 @@ button.lobby-connection { justify-content: flex-start; gap: 12rpx; width: 100%; 
 .table-room .seat-empty-label { font-size: 26rpx; line-height: 36rpx; }
 .lobby-action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--border); background: var(--bg); }
 .lobby-action-inner { display: flex; align-items: center; gap: 24rpx; max-width: 836rpx; margin: 0 auto; }
-.lobby-ready-controls { display: flex; flex: 1; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0 12rpx; min-width: 0; }
 .lobby-ready-status { color: var(--good); font-size: 28rpx; line-height: 40rpx; }
 .lobby-action-inner button,
 .lobby-action-inner button[disabled]:not([type]) { min-height: 48px; margin: 0; }
