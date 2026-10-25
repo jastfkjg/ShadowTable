@@ -29,7 +29,7 @@
         <view class="badge-detail-title">{{selectedBadge.title}}</view>
         <view class="badge-detail-status"><view wx:if="{{selectedBadge.equipped}}" class="badge-check" aria-hidden="true"></view><text>{{selectedBadge.status}}</text></view>
         <view wx:if="{{selectedBadge.flavor}}" class="badge-detail-description">{{selectedBadge.flavor}}</view>
-        <view class="badge-detail-criteria"><view class="badge-detail-row"><text>获取条件</text><text>{{selectedBadge.condition}}</text></view><view class="badge-detail-row"><text>持有规则</text><text>{{selectedBadge.holdingRule}}</text></view></view>
+        <view class="badge-detail-criteria"><view class="badge-detail-row"><text>获取条件</text><text>{{selectedBadge.detailCondition}}</text></view><view class="badge-detail-row"><text>持有规则</text><text>{{selectedBadge.holdingRule}}</text></view></view>
         <view wx:if="{{selectedBadge.owned && !selectedBadge.equipped && badgeCollection.equippedCount >= 3}}" class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</view>
         <button wx:if="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading || (!selectedBadge.equipped && badgeCollection.equippedCount >= 3)}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button><button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
       </view>
