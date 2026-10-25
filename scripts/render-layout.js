@@ -128,6 +128,7 @@ function roomData(source = r) {
   return {
     ...base,
     room,
+    operationProgressSegments: Array.from({ length: room.operationProgress?.total || 0 }, (_, index) => ({ index, completed: index < room.operationProgress.completed })),
     seatOccupiedCount: room.players.length,
     seatReadyCount: room.players.filter(p => p.ready).length,
     teamText: "尚未选择",

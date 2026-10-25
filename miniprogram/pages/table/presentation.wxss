@@ -214,7 +214,7 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
 .table-sheet-fields { padding: 0 18px 8px; overflow-wrap: anywhere; }
 .table-sheet .small { font-size: 12px; }
 .table-sheet .identity-privacy-note { justify-content: center; }
-.dealt-identity-body { height: 410px; max-height: calc(100vh - 260px - env(safe-area-inset-bottom)); }
+.dealt-identity-body { height: 466px; max-height: calc(100vh - 260px - env(safe-area-inset-bottom)); }
 .is-covered .dealt-identity-body { height: 242px; max-height: calc(100vh - 312px - env(safe-area-inset-bottom)); }
 .dealt-role-heading { margin: 18px 0; text-align: center; }
 .dealt-role-heading .private-role-art { width: 76px; height: 76px; margin: 0 auto 9px; }

@@ -857,6 +857,7 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
     ...base,
     room,
     operationProgressExpanded: true,
+    operationProgressSegments: [{ index: 0, completed: true }, { index: 1, completed: false }],
     history: [{ key: 0, text: "已有记录", detail: "已结算" }],
     secret: { role: "测试私密角色", information: "隐私" },
   });
@@ -864,7 +865,10 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   assert.ok(!serialized.includes("身份已遮盖"));
   assert.ok(!serialized.includes("测试私密角色"));
   assert.ok(byHandler(tree, "reveal"));
-  assert.ok(serialized.includes("未完成"));
+  assert.ok(serialized.includes("待完成"));
+  assert.match(serialized, /等待 1 位玩家完成操作/);
+  assert.equal(nodes(tree).filter(n => n.attr?.role === "listitem").length, 2);
+  assert.equal(nodes(tree).find(n => n.attr?.role === "progressbar").attr.ariaValuenow, 1);
   assert.ok(!serialized.includes("无需操作"));
   assert.ok(!serialized.includes("丙"));
   const collapsed = render({ ...base, room, operationProgressExpanded: false });
@@ -1040,10 +1044,10 @@ test("仙女目标弹窗禁用不合法座位，未选目标不能确认，传�
   assert.equal(byHandler(tree, "confirmChoice").attr.disabled, true);
   assert.ok(nodes(tree).find(n => n.attr?.class?.includes("skill-option-unavailable")).attr.disabled);
   assert.equal(nodes(tree).filter(n => n.attr?.class === "skill-other-choices").length, 0);
-  tree = render({ ...data, draftChoice: "target:3", skillSummary: "查验目标：3 号 · 玩家三", skillConfirmLabel: "确认查验 3 号", skillConsequence: "仙女将传给 3 号 · 确认后不可更改" });
+  tree = render({ ...data, draftChoice: "target:3", skillSummary: "查验目标：3号（玩家三） · 湖仙将传给3号", skillConfirmLabel: "确认查验 3 号", skillConsequence: "" });
   assert.equal(byHandler(tree, "confirmChoice").attr.disabled, false);
-  assert.match(JSON.stringify(tree), /仙女将传给 3 号/);
-  assert.match(JSON.stringify(tree), /查验目标：3 号 · 玩家三/);
+  assert.match(JSON.stringify(tree), /查验目标：3号（玩家三） · 湖仙将传给3号/);
+  assert.doesNotMatch(JSON.stringify(tree), /skill-consequence|2 号持有仙女/);
 });
 
 test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显示", () => {

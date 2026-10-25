@@ -14,6 +14,8 @@
 !miniprogram/board-detail.js
 !miniprogram/avoidance.js
 !miniprogram/avoidance.wxss
+!miniprogram/identity-vision.js
+!miniprogram/identity-vision.wxss
 !miniprogram/role-portraits.js
 !miniprogram/honors.js
 !miniprogram/honors.wxss

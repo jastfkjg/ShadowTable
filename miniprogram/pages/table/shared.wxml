@@ -114,7 +114,16 @@
         <block wx:if="{{dealtIdentitySecret}}">
           <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
           <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view>
-          <view class="private-info-group"><view class="private-info"><view class="label">你的视野</view>{{dealtIdentitySecret.information}}</view><view wx:if="{{dealtIdentitySecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view></view>
+          <view class="identity-vision">
+            <view class="identity-vision-heading">你的视野</view>
+            <block wx:if="{{dealtIdentitySecret.vision.players.length}}">
+              <view class="identity-vision-label">{{dealtIdentitySecret.vision.label}}</view>
+              <view class="identity-vision-players"><view wx:for="{{dealtIdentitySecret.vision.players}}" wx:key="seat" class="identity-vision-player"><view class="identity-vision-seat">{{item.seat}}<text class="identity-vision-unit">号</text></view><view wx:if="{{item.role}}" class="identity-vision-role">{{item.role}}</view></view></view>
+              <view wx:if="{{dealtIdentitySecret.vision.note}}" class="identity-vision-note">{{dealtIdentitySecret.vision.note}}</view>
+            </block>
+            <view wx:else class="identity-vision-text">{{dealtIdentitySecret.information}}</view>
+          </view>
+          <view wx:if="{{dealtIdentitySecret.skillStatus}}" class="dealt-skill-status"><view class="dealt-skill-status-title">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view>
           <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
         </block>
         <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
@@ -132,12 +141,15 @@
     <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
       <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
       <block wx:if="{{fairyResultRevealed}}">
-        <view wx:if="{{fairyResult.displaySeat}}" class="process-inspection-result" aria-label="{{fairyResult.summary || fairyResult.information}}"><view><text class="small muted">查验对象</text><view class="process-inspection-seat">{{fairyResult.displaySeat}}<text>号</text></view></view><view class="process-inspection-faction"><view class="player-card-faction-symbol faction-{{fairyResult.factionTone}}"><image src="/assets/{{fairyResult.factionTone==='good'?'record-shield-good':fairyResult.factionTone==='evil'?'process-shield-evil':'process-shield-third'}}.svg" aria-hidden="true" /></view><view><text class="small muted">查验结果</text><view class="faction-{{fairyResult.factionTone}}">{{fairyResult.displayFaction}}</view></view></view></view>
+        <view wx:if="{{fairyResult.displaySeat}}" class="process-inspection-result" aria-label="{{fairyResult.summary || fairyResult.information}}">
+          <view><text class="small muted">查验对象</text><view class="process-inspection-seat">{{fairyResult.displaySeat}}<text>号</text></view></view>
+          <view class="process-inspection-faction"><text class="small muted">查验结果</text><view class="process-inspection-faction-value faction-{{fairyResult.factionTone}}">{{fairyResult.displayFaction}}</view></view>
+        </view>
         <view wx:else class="fairy-result-summary">{{fairyResult.summary || fairyResult.information}}</view>
       </block>
       <view wx:else class="process-sealed"><view class="table-symbol blue"><image src="/assets/table-lock.svg" aria-hidden="true" /></view><view>查验结果已遮盖</view><text class="small muted">请确认周围无人查看。</text></view>
     </view></scroll-view>
-    <view class="process-sheet-footer table-sheet-footer"><button wx:if="{{fairyResultRevealed}}" hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了，遮盖结果</button><button wx:else hover-class="none" class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button></view>
+    <view class="process-sheet-footer table-sheet-footer"><button wx:if="{{fairyResultRevealed}}" hover-class="none" class="primary" bindtap="acknowledgeFairyResult" disabled="{{hasPendingRequest || busy}}">记住了</button><button wx:else hover-class="none" class="primary" bindtap="revealFairyResult" disabled="{{busy}}">查看查验结果</button></view>
   </view>
 </view>
 <view wx:if="{{identityChange && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
@@ -187,7 +199,7 @@
     <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
       <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{skillTargetMode==='fairy' || skillTargetMode==='inspect'?'process-eye':skillTargetMode==='sword' || skillTargetMode==='attack'?'record-swords':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{skillTitle}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择技能">×</button></view></view>
       <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="skill-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
-        <view class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
+        <view wx:if="{{skillTargetMode!=='fairy'}}" class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
         <view class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
         <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
@@ -204,7 +216,7 @@
       </view></scroll-view>
       <view class="skill-footer process-sheet-footer table-sheet-footer">
         <view class="skill-summary" aria-live="polite">{{skillTargetMode?skillSummary:draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
-        <view wx:if="{{skillTargetMode}}" class="skill-consequence">{{skillConsequence}}</view>
+        <view wx:if="{{skillTargetMode && skillConsequence}}" class="skill-consequence">{{skillConsequence}}</view>
         <view wx:if="{{hunterModes && draftChoice==='pass'}}" class="small">本轮若出局，将不会触发被动开枪。是否确认？</view>
         <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':skillTargetMode?skillConfirmLabel:draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button><button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
       </view>
@@ -453,12 +465,26 @@
           <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
           <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
         </view>
-        <view wx:if="{{room.operationProgress}}" class="operation-progress">
-          <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}"><text class="progress-title">当前操作进度</text><text class="progress-count">{{room.operationProgress.completed}} / {{room.operationProgress.total}} 已完成</text><text class="progress-disclosure">{{operationProgressExpanded?'收起 ⌃':'展开 ⌄'}}</text></button>
-          <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{operationProgressExpanded && item.required}}" class="progress-player">
-            <text class="progress-player-name">{{item.seat}}号 · {{item.name}}</text>
-            <text class="progress-state {{item.completed?'completed':'pending'}}">{{item.completed?'已完成':'未完成'}}</text>
+        <view wx:if="{{room.operationProgress}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
+          <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}" aria-label="{{'当前操作进度，'+room.operationProgress.completed+'人已完成，共'+room.operationProgress.total+'人，'+(operationProgressExpanded?'收起':'展开')}}">
+            <text class="progress-title">当前操作进度</text>
+            <view class="progress-count"><text class="progress-completed-count">{{room.operationProgress.completed}}</text><text class="progress-total">/ {{room.operationProgress.total}}</text><text class="progress-count-label">已完成</text></view>
+            <view class="progress-disclosure" aria-hidden="true"><text>{{operationProgressExpanded?'收起':'展开'}}</text><view class="progress-chevron {{operationProgressExpanded?'expanded':''}}" /></view>
+          </button>
+          <view class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="{{room.operationProgress.total}}" aria-valuenow="{{room.operationProgress.completed}}">
+            <view wx:for="{{operationProgressSegments}}" wx:key="index" class="progress-segment {{item.completed?'completed':''}}" />
           </view>
+          <view class="progress-note" role="status"><view class="progress-note-dot" aria-hidden="true" /><text>{{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'全部玩家已完成操作':room.operationProgress.total > 0?'等待 '+(room.operationProgress.total-room.operationProgress.completed)+' 位玩家完成操作':'暂无待完成操作'}}</text></view>
+          <block wx:if="{{operationProgressExpanded}}">
+            <view class="progress-players" role="list">
+              <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{item.required}}" class="progress-player {{item.completed?'completed':''}}" role="listitem" aria-label="{{item.seat+'号，'+item.name+'，'+(item.completed?'已完成':'待完成')}}">
+                <text class="progress-seat" aria-hidden="true">{{item.seat}}</text>
+                <text class="progress-player-name" aria-hidden="true">{{item.name}}</text>
+                <view class="progress-state {{item.completed?'completed':'pending'}}" aria-hidden="true" />
+              </view>
+            </view>
+            <view class="progress-legend" aria-hidden="true"><view class="progress-legend-item"><view class="progress-state completed" /><text>已完成</text></view><view class="progress-legend-item"><view class="progress-state pending" /><text>待完成</text></view></view>
+          </block>
         </view>
       </view>
     <view class="task-progress">
@@ -549,9 +575,9 @@
     <view wx:if="{{room.phase!=='lobby'}}" class="public-history-dock {{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'?'with-host-actions':''}}">
       <template is="publicHistoryEntry" data="{{history, historyLatest, historyUnreadCount}}" />
       <block wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}">
-      <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}}">
+      <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}} {{room.closeWaiting.mode==='cancel'?'has-single-action':''}}">
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
-        <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cancel bar-cutoff" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
+        <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cutoff {{room.closeWaiting.mode==='cancel'?'is-destructive':''}}" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
         <button hover-class="none" wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
         <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
       </view>

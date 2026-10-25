@@ -87,8 +87,8 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择"),
     skillTargets,
     ...(mode === "swap" ? { swapPlayers } : {}),
-    skillTargetMeta: mode ? (round ? "第 " + round + " 轮 · " : "") +
-      (fairyAction ? (room.fairyHolder || room.me?.seat) + " 号持有仙女" : finalAction ? "最终盘刀" : "技能准备") : "",
+    skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
+      (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
     skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
@@ -131,6 +131,7 @@ function skillSelectionView(room, value, mode, swapSeats = []) {
     confirm = "确认本次空刀";
   } else if (seat !== null) {
     summary = copy.verb + "目标：" + seat + " 号" + (player?.name ? " · " + player.name : "");
+    if (mode === "fairy") summary = "查验目标：" + seat + "号" + (player?.name ? "（" + player.name + "）" : "") + " · 湖仙将传给" + seat + "号";
     confirm = mode === "fairy" || mode === "inspect" ? "确认查验 " + seat + " 号" : "确认对 " + seat + " 号" + copy.verb;
   } else if (mode === "swap") {
     const seats = value.startsWith("swap:") ? value.split(":").slice(1).map(Number) : swapSeats;
@@ -139,8 +140,7 @@ function skillSelectionView(room, value, mode, swapSeats = []) {
   }
   return {
     skillSummary: summary,
-    skillConsequence: mode === "fairy" && seat !== null ? "仙女将传给 " + seat + " 号 · 确认后不可更改"
-      : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
+    skillConsequence: mode === "fairy" ? "" : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
     skillConfirmLabel: confirm,
   };
 }
@@ -257,6 +257,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     seatOccupiedCount: 0,
     seatReadyCount: 0,
     operationProgressExpanded: false,
+    operationProgressSegments: [],
     questTimeline: [],
     boards: [],
     availableBoards: [],
@@ -898,6 +899,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatOccupiedCount: seats.filter(s => s.occupied).length,
       seatReadyCount: seats.filter(s => s.occupied && s.ready).length,
       operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
+      operationProgressSegments: Array.from({ length: room.operationProgress?.total || 0 }, (_, index) => ({
+        index, completed: index < room.operationProgress.completed,
+      })),
       ...historyUpdate,
       questTimeline: history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 })),
       notice:
@@ -2352,6 +2356,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information, skillStatus: secret.skillStatus,
+        vision: roomSheet.presentVision(secret.information),
         avoidance: avoidancePresentation.result(secret.avoidance),
       } });
     } catch (e) {
@@ -2493,17 +2498,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async acknowledgeFairyResult() {
     if (
-      this.data.busy || this.fairyAckConfirm ||
+      this.data.busy || this.data.hasPendingRequest || this.fairyAckConfirm || !this.alive || !this.foreground ||
       !this.data.fairyResultRevealed ||
       !this.data.fairyResult
     )
       return;
     const result = this.data.fairyResult;
-    const generation = this.generation;
     this.fairyAckConfirm = true;
     try {
-      if (!(await this.confirm("关闭查验结果？", "关闭后不会再显示本次查验结果，请确认已记住。"))) return;
-      if (!this.alive || !this.foreground || generation !== this.generation || this.data.fairyResult !== result || !this.data.fairyResultRevealed) return;
       this.setData({ fairyResult: null, fairyResultRevealed: false });
       return this.cmd("ackFairyResult", { revision: result.revision });
     } finally {

@@ -13,6 +13,8 @@ const assets = {
   "/match-story.css": ["../../miniprogram/match-story.wxss", "text/css; charset=utf-8"],
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/identity-vision.js": ["../../miniprogram/identity-vision.js", "text/javascript; charset=utf-8"],
+  "/identity-vision.css": ["../../miniprogram/identity-vision.wxss", "text/css; charset=utf-8"],
   "/avoidance.js": ["../../miniprogram/avoidance.js", "text/javascript; charset=utf-8"],
   "/avoidance.css": ["../../miniprogram/avoidance.wxss", "text/css; charset=utf-8"],
   "/assets/table-cards.svg": ["../../miniprogram/assets/table-cards.svg", "image/svg+xml"],

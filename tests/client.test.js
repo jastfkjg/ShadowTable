@@ -43,6 +43,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../public-history') return require('../miniprogram/public-history');
         if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
         if (name === '../../room-list') return require('../miniprogram/room-list');
+        if (name === '../../room-confirmation') return require('../miniprogram/room-confirmation');
         if (name === '../../room-sheet-presentation') return require('../miniprogram/room-sheet-presentation');
         if (name === '../../role-portraits') return require('../miniprogram/role-portraits');
         if (name === '../../avoidance') return require('../miniprogram/avoidance');
@@ -1787,16 +1788,22 @@ test("房主进度默认收起，同一操作刷新保留展开，新操作重�
   p.roomCode = room.code;
   await p.refresh();
   assert.equal(p.data.operationProgressExpanded, false);
+  assert.equal(p.data.operationProgressSegments.length, 12);
+  assert.equal(p.data.operationProgressSegments.filter(segment => segment.completed).length, 1);
   p.toggleOperationProgress();
   room.operationProgress.completed = 2;
   await p.refresh();
   assert.equal(p.data.operationProgressExpanded, true);
+  assert.equal(p.data.operationProgressSegments.filter(segment => segment.completed).length, 2);
   p.toggleOperationProgress();
   assert.equal(p.data.operationProgressExpanded, false);
   p.toggleOperationProgress();
   room.stage = "s2";
   await p.refresh();
   assert.equal(p.data.operationProgressExpanded, false);
+  room.operationProgress = null;
+  await p.refresh();
+  assert.equal(p.data.operationProgressSegments.length, 0);
 });
 
 test("小程序最近结果包含转换，时间到分钟，收起座位和点击展开记录保持到下一次刷新", async () => {
@@ -1828,28 +1835,32 @@ test("小程序最近结果包含转换，时间到分钟，收起座位和点�
   assert.equal(p.data.visibleHistory.length, 0);
 });
 
-test("仙女结果关闭确认可取消，确认期间换结果或切后台不误确认", async () => {
+test("仙女结果记住后直接确认对应版本，遮盖、后台和提交期间不误确认", async () => {
   const p = page({});
   const result = { revision: 3, summary: "6号 · 坏人" };
   const sent = [];
   p.cmd = (...args) => sent.push(args);
   p.data.fairyResult = result;
   p.data.fairyResultRevealed = true;
-  p.confirm = async (title, content) => {
-    assert.match(content, /关闭后不会再显示本次查验结果/);
-    return false;
-  };
+  p.confirm = async () => { throw new Error("不应再弹确认框"); };
+  p.data.fairyResultRevealed = false;
   await p.acknowledgeFairyResult();
   assert.equal(p.data.fairyResult, result);
   assert.equal(sent.length, 0);
-  p.confirm = async () => { p.foreground = false; return true; };
+  p.data.fairyResultRevealed = true;
+  p.foreground = false;
   await p.acknowledgeFairyResult();
   assert.equal(sent.length, 0);
   p.foreground = true;
-  p.confirm = async () => true;
+  p.data.hasPendingRequest = true;
+  await p.acknowledgeFairyResult();
+  assert.equal(sent.length, 0);
+  p.data.hasPendingRequest = false;
   await p.acknowledgeFairyResult();
   assert.equal(sent[0][1].revision, 3);
   assert.equal(p.data.fairyResult, null);
+  await p.acknowledgeFairyResult();
+  assert.equal(sent.length, 1);
 });
 
 test("查看最近结果清除记录筛选并在渲染后定位目标记录", () => {
@@ -2132,8 +2143,9 @@ test("仙女目标先选择再确认，不可选座位不生成草稿，过期�
   await choose("target:1");
   await choose("target:3");
   assert.equal(writes.length, 0);
-  assert.match(p.data.skillSummary, /3 号 · 玩家3/);
-  assert.equal(p.data.skillConsequence, "仙女将传给 3 号 · 确认后不可更改");
+  assert.equal(p.data.skillSummary, "查验目标：3号（玩家3） · 湖仙将传给3号");
+  assert.equal(p.data.skillConsequence, "");
+  assert.equal(p.data.skillTargetMeta, "");
   for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }, { room: { ...p.data.room, stage: "f2" } }]) {
     const original = { ...p.data };
     Object.assign(p.data, patch);

@@ -15,7 +15,7 @@ const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require("../miniprogram/room-sheet-presentation");
+const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -209,6 +209,7 @@ function tableScene(source, uid, extra = {}) {
   return {...createTable().data,loading:false,room,network:true,seatsExpanded:true,
     seats:room.players.map(p=>({...p,occupied:true,mine:p.seat===room.me.seat,host:p.isHost,avatarInitial:p.name[0],inTeam:room.team.includes(p.seat)})),
     seatOccupiedCount:room.players.length,seatReadyCount:room.players.filter(p=>p.ready).length,
+    operationProgressSegments:Array.from({length:room.operationProgress?.total || 0},(_,index)=>({index,completed:index<room.operationProgress.completed})),
     history,historyLatest:history.at(-1),latestResult:history.at(-1),questTimeline:history,
     teamText:room.team.join('、'),actionEntryLabel:({quest:'提交任务牌',teamVote:'参与表决',identity:'查看身份'})[room.phase] || '完成本轮操作',...extra};
 }
@@ -216,7 +217,7 @@ const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
 const privateSource = privateView(tableSource,'wx:replay-5');
-const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait};
+const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait,vision:presentVision(privateSource.information)};
 const tableReadySource = newRoom('201375','host','子龙','knights',12);
 for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
 enter(tableReadySource,'spectator','围观玩家');
@@ -315,6 +316,33 @@ tableScenes['avoidance-empty'] = { ...avoidanceDraft, avoidance: { ...avoidanceD
 tableScenes['avoidance-effective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'effective',roleName:'梅林'})} };
 tableScenes['avoidance-ineffective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'ineffective',roleName:privateData.role})} };
 // Project the same native four-rectangle fit used by the controller.
+// Focused review scenes use the shipped templates and actual private endpoint
+// projection; the forced role allocation makes the requested example stable.
+const reviewSource = newRoom('201375','review-1','子龙','knights',12);
+for(let i=2;i<=12;i++) enter(reviewSource,'review-'+i,'陪测'+(i-1));
+reviewSource.players.forEach(player=>player.ready=true);
+tableFixtures.run(reviewSource,'start',{flexible:true});
+for(const player of reviewSource.players) reviewSource.roles[player.uid]='servant';
+Object.assign(reviewSource.roles,{'review-1':'morgana','review-3':'mordred','review-7':'assassin'});
+reviewSource.knights.initialRoles={...reviewSource.roles};
+const reviewSecret=privateView(reviewSource,'review-1');
+const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information)};
+tableScenes['ui-identity-morgana']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
+for(const [name,information] of [['anonymous','梅林与莫甘娜位于：3、7号。你无法区分谁是梅林。'],['long','完整的私密视野说明。'.repeat(35)]]) {
+  tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information)}});
+}
+reviewSource.knights.fairy=1;reviewSource.knights.fairyVisited=[8];
+tableFixtures.run(reviewSource,'beginActivity',{kind:'fairy'});
+const reviewRoom=publicView(reviewSource,'review-1'),reviewAction=privateView(reviewSource,'review-1').action;
+const reviewSkill=skillPresentation.skillView(reviewRoom,reviewAction.options,false,'',[]);
+tableScenes['ui-fairy-selection']={...tableScene(reviewSource,'review-1'),actionDialog:true,stagedChoice:true,actionChoices:reviewAction.options,...reviewSkill,
+  draftChoice:'target:3',...skillPresentation.skillSelectionView(reviewRoom,'target:3','fairy')};
+tableScenes['ui-fairy-result']={...tableScene(reviewSource,'review-1'),fairyResult:presentFairyResult({summary:'3号 · 坏人'}),fairyResultRevealed:true};
+for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
+  tableScenes['ui-fairy-result-'+tone]={...tableScenes['ui-fairy-result'],fairyResult:presentFairyResult({summary:'12号 · '+label})};
+}
+tableScenes['ui-host-fairy']=tableScene(reviewSource,'review-1',{settleHint:'还差 1 人提交'});
+tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom,phase:'teamVote',closeWaiting:{mode:'settle',label:'提前结算投票'}}};
 const processProjection=`<script>window.fitProcessSheet=()=>{const sheet=document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
 for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
