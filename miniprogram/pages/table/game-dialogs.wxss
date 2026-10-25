@@ -127,12 +127,12 @@
 .process-sealed > view:nth-child(2) { margin-bottom: 10px; font-size: 20px; font-weight: 600; }
 .process-sealed .small { display: block; max-width: 260px; margin: 0 auto; font-size: 13px; }
 .process-inspection .process-sheet-body { height: 200px; max-height: calc(100vh - 248px - env(safe-area-inset-bottom)); }
-.process-inspection-result { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin: 27px 0 15px; padding: 24px 21px; border-radius: 18px; background: var(--control-bg, #14232c); }
+.process-inspection-result { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 20px; min-height: 136px; box-sizing: border-box; margin: 27px 0 15px; padding: 24px 21px; border-radius: 18px; background: var(--control-bg, #14232c); }
+.process-inspection-result > view { min-width: 0; }
+.process-inspection-result .small { display: block; line-height: 1.7; }
 .process-inspection-seat { margin-top: 8px; font-size: 44px; font-weight: 600; line-height: 1.2; }
 .process-inspection-seat text { margin-left: 6px; font-size: 13px; font-weight: 400; color: var(--muted); }
-.process-inspection-faction { display: flex; align-items: center; gap: 10px; }
-.process-inspection-faction > view { min-width: 0; }
-.process-inspection-faction > view > view { margin-top: 8px; font-size: 25px; font-weight: 600; line-height: 1.4; }
+.process-inspection-faction-value { display: flex; align-items: center; min-height: 53px; margin-top: 8px; font-size: 29px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
 .process-inspection .fairy-result-summary { margin: 22px 0; font-size: 25px; line-height: 1.6; overflow-wrap: anywhere; }
 .process-history .identity-history-title { font-size: 22px; margin: 0; }
 .table-sheet-backdrop .process-history { height: auto; padding: 0; }
@@ -193,7 +193,6 @@
   .process-history .identity-history-record-heading, .process-history button.identity-history-toggle { gap: 8px; }
   .process-history-art { width: 42px; }
   .process-inspection-result { padding: 20px 16px; gap: 14px; }
-  .process-inspection-faction { gap: 8px; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .process-sheet-top { padding-bottom: 6px; }

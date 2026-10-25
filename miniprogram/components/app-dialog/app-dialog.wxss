@@ -1,4 +1,5 @@
 @import "../../badge-awards.wxss";
+@import "../../room-confirmation.wxss";
 .app-dialog-backdrop { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:24px; background:var(--overlay-scrim,rgba(2,10,15,.7)); }
 .app-dialog { display:flex; flex-direction:column; width:100%; max-width:350px; max-height:calc(100vh - 48px - env(safe-area-inset-bottom)); box-sizing:border-box; padding:26px 24px 24px; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-radius:var(--dialog-radius,22px); background:var(--surface,#1b2b35); color:var(--text,#f2eee5); box-shadow:0 20px 70px rgba(0,0,0,.28); text-align:left; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; animation:app-dialog-enter 160ms ease-out; }
 .app-dialog-title { flex-shrink:0; font-size:20px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }

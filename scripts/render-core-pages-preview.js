@@ -12,9 +12,10 @@ const createTable = require("../miniprogram/pages/table/controller");
 const roomSwipe = require("../miniprogram/room-swipe");
 const roomList = require("../miniprogram/room-list");
 const { present: presentDialog } = require("../miniprogram/dialog");
+const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require("../miniprogram/room-sheet-presentation");
+const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -114,6 +115,7 @@ const homeScenes = {
   "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -roomSwipe.width(rooms[0]) },
   "home-swipe-single": { roomSwipeCode: rooms[2].code, roomSwipeOffset: -roomSwipe.width(rooms[2]) },
   "home-menu": { roomMenu: rooms[0] }, "home-join": { entrySheet: true, entryMode: "join", name: "子龙", nicknameSetup: false },
+  "home-menu-member": { roomMenu: { ...rooms[0], code: "993636", boardName: "阿瓦隆 · 十二骑士（10人）", isHost: false } },
   "home-menu-ended": { roomMenu: { ...rooms[2], code: "672158", boardName: "阿瓦隆 · 十二骑士", canLeave: false } },
   "home-menu-expired": { roomMenu: { ...rooms[2], available: false, statusLabel: "已失效", canLeave: false } },
   "home-menu-busy": { roomMenu: rooms[0], busy: true },
@@ -157,8 +159,10 @@ homeScenes["home-room-redesign-swipe"] = { ...redesign, roomSwipeCode: redesignR
 homeScenes["home-room-redesign-swipe-expired"] = { ...redesign, roomSwipeCode: redesignRooms[2].code, roomSwipeOffset: -roomSwipe.width() };
 homeScenes["home-room-redesign-swipe-host"] = { ...redesign, historyRooms: redesign.historyRooms.map(r => r.code === redesignRooms[1].code ? { ...r, isHost: true, canSwipeDissolve: true } : r), roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
 for (const [name, appDialog] of Object.entries({
-  'dialog-remove': { title:'移除这条房间记录？', content:'仅从你的列表中移除，房间、座位和战绩都会保留。', contextLabel:'房间', contextValue:'273843', contextMeta:'已结束', confirmText:'移除记录' },
-  'dialog-dissolve': { title:'解散房间 273843？', content:'所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。', confirmText:'解散', danger:true },
+  'dialog-remove': roomConfirmation.present('hide', { code:'993636', status:'lobby' }),
+  'dialog-leave': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:false }),
+  'dialog-leave-host': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:true }),
+  'dialog-dissolve': roomConfirmation.present('delete', { code:'858201', status:'lobby' }),
   'dialog-information': { title:'关于桌边助手', content:'ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', showCancel:false },
   'dialog-long': { title:'荣誉徽章规则', content:require('../miniprogram/badges').rules + '\n趣味徽章按次数榜授予。最多佩戴3枚。', showCancel:false },
 })) homeScenes[name] = { ...redesign, appDialog };
@@ -205,6 +209,7 @@ function tableScene(source, uid, extra = {}) {
   return {...createTable().data,loading:false,room,network:true,seatsExpanded:true,
     seats:room.players.map(p=>({...p,occupied:true,mine:p.seat===room.me.seat,host:p.isHost,avatarInitial:p.name[0],inTeam:room.team.includes(p.seat)})),
     seatOccupiedCount:room.players.length,seatReadyCount:room.players.filter(p=>p.ready).length,
+    operationProgressSegments:Array.from({length:room.operationProgress?.total || 0},(_,index)=>({index,completed:index<room.operationProgress.completed})),
     history,historyLatest:history.at(-1),latestResult:history.at(-1),questTimeline:history,
     teamText:room.team.join('、'),actionEntryLabel:({quest:'提交任务牌',teamVote:'参与表决',identity:'查看身份'})[room.phase] || '完成本轮操作',...extra};
 }
@@ -212,7 +217,7 @@ const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
 const privateSource = privateView(tableSource,'wx:replay-5');
-const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait};
+const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait,vision:presentVision(privateSource.information)};
 const tableReadySource = newRoom('201375','host','子龙','knights',12);
 for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
 enter(tableReadySource,'spectator','围观玩家');
@@ -311,7 +316,39 @@ tableScenes['avoidance-empty'] = { ...avoidanceDraft, avoidance: { ...avoidanceD
 tableScenes['avoidance-effective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'effective',roleName:'梅林'})} };
 tableScenes['avoidance-ineffective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'ineffective',roleName:privateData.role})} };
 // Project the same native four-rectangle fit used by the controller.
-const processProjection=`<script>window.fitProcessSheet=()=>{const sheet=document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
+const merlinSource=tableFixtures.setup();
+const merlinPlayer=merlinSource.players.find(player=>merlinSource.roles[player.uid]==='merlin');
+const merlinSecret=privateView(merlinSource,merlinPlayer.uid);
+tableScenes['ui-identity-merlin']=tableScene(merlinSource,merlinPlayer.uid,{dealtIdentityDialog:true,dealtIdentitySecret:{...merlinSecret,
+  factionTone:'good',portrait:portrait(merlinSecret.role,'good').portrait,vision:presentVision(merlinSecret.information)}});
+// Focused review scenes use the shipped templates and actual private endpoint
+// projection; the forced role allocation makes the requested example stable.
+const reviewSource = newRoom('201375','review-1','子龙','knights',12);
+for(let i=2;i<=12;i++) enter(reviewSource,'review-'+i,'陪测'+(i-1));
+reviewSource.players.forEach(player=>player.ready=true);
+tableFixtures.run(reviewSource,'start',{flexible:true});
+for(const player of reviewSource.players) reviewSource.roles[player.uid]='servant';
+Object.assign(reviewSource.roles,{'review-1':'morgana','review-3':'mordred','review-7':'assassin'});
+reviewSource.knights.initialRoles={...reviewSource.roles};
+const reviewSecret=privateView(reviewSource,'review-1');
+const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information)};
+tableScenes['ui-identity-morgana']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
+for(const [name,information] of [['anonymous','梅林与莫甘娜位于：3、7号。你无法区分谁是梅林。'],['long','完整的私密视野说明。'.repeat(35)]]) {
+  tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information)}});
+}
+reviewSource.knights.fairy=1;reviewSource.knights.fairyVisited=[8];
+tableFixtures.run(reviewSource,'beginActivity',{kind:'fairy'});
+const reviewRoom=publicView(reviewSource,'review-1'),reviewAction=privateView(reviewSource,'review-1').action;
+const reviewSkill=skillPresentation.skillView(reviewRoom,reviewAction.options,false,'',[]);
+tableScenes['ui-fairy-selection']={...tableScene(reviewSource,'review-1'),actionDialog:true,stagedChoice:true,actionChoices:reviewAction.options,...reviewSkill,
+  draftChoice:'target:3',...skillPresentation.skillSelectionView(reviewRoom,'target:3','fairy')};
+tableScenes['ui-fairy-result']={...tableScene(reviewSource,'review-1'),fairyResult:presentFairyResult({summary:'3号 · 坏人'}),fairyResultRevealed:true};
+for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
+  tableScenes['ui-fairy-result-'+tone]={...tableScenes['ui-fairy-result'],fairyResult:presentFairyResult({summary:'12号 · '+label})};
+}
+tableScenes['ui-host-fairy']=tableScene(reviewSource,'review-1',{settleHint:'还差 1 人提交'});
+tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom,phase:'teamVote',closeWaiting:{mode:'settle',label:'提前结算投票'}}};
+const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
 for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
   fs.writeFileSync(path.join(output,gallery+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:28px 40px;width:1638px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;margin:0 0 12px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px}iframe{display:block;width:390px;height:844px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${items.map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>保留游戏规则与私密流程 · 示例数据 · 需真机验收</p></main></html>`);

@@ -9,6 +9,7 @@ const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
 const roomList = require("../../room-list");
+const roomConfirmation = require("../../room-confirmation");
 const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
@@ -86,8 +87,8 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择"),
     skillTargets,
     ...(mode === "swap" ? { swapPlayers } : {}),
-    skillTargetMeta: mode ? (round ? "第 " + round + " 轮 · " : "") +
-      (fairyAction ? (room.fairyHolder || room.me?.seat) + " 号持有仙女" : finalAction ? "最终盘刀" : "技能准备") : "",
+    skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
+      (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
     skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
@@ -130,6 +131,7 @@ function skillSelectionView(room, value, mode, swapSeats = []) {
     confirm = "确认本次空刀";
   } else if (seat !== null) {
     summary = copy.verb + "目标：" + seat + " 号" + (player?.name ? " · " + player.name : "");
+    if (mode === "fairy") summary = "查验目标：" + seat + "号" + (player?.name ? "（" + player.name + "）" : "") + " · 湖仙将传给" + seat + "号";
     confirm = mode === "fairy" || mode === "inspect" ? "确认查验 " + seat + " 号" : "确认对 " + seat + " 号" + copy.verb;
   } else if (mode === "swap") {
     const seats = value.startsWith("swap:") ? value.split(":").slice(1).map(Number) : swapSeats;
@@ -138,8 +140,7 @@ function skillSelectionView(room, value, mode, swapSeats = []) {
   }
   return {
     skillSummary: summary,
-    skillConsequence: mode === "fairy" && seat !== null ? "仙女将传给 " + seat + " 号 · 确认后不可更改"
-      : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
+    skillConsequence: mode === "fairy" ? "" : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
     skillConfirmLabel: confirm,
   };
 }
@@ -256,6 +257,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     seatOccupiedCount: 0,
     seatReadyCount: 0,
     operationProgressExpanded: false,
+    operationProgressSegments: [],
     questTimeline: [],
     boards: [],
     availableBoards: [],
@@ -897,6 +899,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatOccupiedCount: seats.filter(s => s.occupied).length,
       seatReadyCount: seats.filter(s => s.occupied && s.ready).length,
       operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
+      operationProgressSegments: Array.from({ length: room.operationProgress?.total || 0 }, (_, index) => ({
+        index, completed: index < room.operationProgress.completed,
+      })),
       ...historyUpdate,
       questTimeline: history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 })),
       notice:
@@ -1124,12 +1129,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending) return;
     this.setData({ busy: true, error: "" });
     try {
-      if (!(await this.confirm(
-        "移除这条房间记录？",
-        "仅从你的列表中移除，房间、座位和战绩都会保留。",
-        "移除记录",
-        { contextLabel: "房间", contextValue: code, contextMeta: this.data.memberRooms.find(room => room.code === code)?.statusLabel || "" },
-      ))) return;
+      if (!(await this.confirmRoomAction("hide", this.data.memberRooms.find(room => room.code === code) || { code }))) return;
       if (!this.alive || !this.foreground) return;
       this.setData({ busy: false });
       await this.mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
@@ -1146,7 +1146,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (kind === "delete" && room.isHost && room.available !== false)
       return this.deleteRoom({ currentTarget: { dataset: { code: room.code } } });
     if (kind === "leave" && room.canLeave) {
-      if (!(await this.confirm("离开房间 " + room.code + "？", "将释放你的座位，房间和房主权限保留。"))) return;
+      if (!(await this.confirmRoomAction("leave", room))) return;
       if (this.data.busy || this.pending) return;
       this.setData({ busy: true });
       try {
@@ -1170,12 +1170,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         return;
       }
       if (
-        !(await this.confirm(
-          "解散房间 " + code + "？",
-          "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
-          "解散",
-          { danger: true },
-        ))
+        !(await this.confirmRoomAction("delete", room))
       )
         return;
       if (!this.alive || !this.foreground) return;
@@ -1399,6 +1394,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     if (d.error) return "";
     const stage = d.room?.code + ":" + d.room?.stage;
+    if (d.dealtIdentityDialog) return stage + ":dealt:" + !!d.dealtIdentitySecret;
     if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
     if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
     if (d.fairyResult) return stage + ":fairy:" + d.fairyResult.revision + ":" + d.fairyResultRevealed;
@@ -1417,7 +1413,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const run = () => {
       if (!this.alive || !this.foreground || key !== this.processSheetKey()) return;
       const query = wx.createSelectorQuery().in(this);
-      for (const selector of [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"]) query.select(selector).boundingClientRect();
+      const selectors = this.data.dealtIdentityDialog
+        ? [".dealt-identity-backdrop", ".dealt-identity-top", ".dealt-identity-fields", ".dealt-identity-footer"]
+        : [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
+      for (const selector of selectors) query.select(selector).boundingClientRect();
       query.exec(rects => {
         if (!this.alive || !this.foreground || revision !== this.processLayoutRevision || key !== this.processSheetKey()) return;
         const height = roomSheet.fitBody(rects);
@@ -1832,6 +1831,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }),
     );
   },
+  confirmRoomAction(kind, room) {
+    const value = roomConfirmation.present(kind, room);
+    return this.confirm(value.title, value.content, value.confirmText, value);
+  },
   async confirmCommand(title, content, type, extra = {}) {
     const stage = this.data.room?.stage;
     if (!(await this.confirm(title, content, "确定", { danger: ["terminate", "cancelActivity"].includes(type) }))) return;
@@ -2133,12 +2136,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending || !this.data.room) return;
     const room = this.data.room;
     if (
-      !(await this.confirm(
-        "离开房间？",
-        room.me.isHost
-          ? "将释放你的座位，牌桌和房主权限保留。"
-          : "将释放你的座位，牌桌保留。",
-      ))
+      !(await this.confirmRoomAction("leave", room))
     )
       return;
     if (
@@ -2344,7 +2342,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.dealtIdentityDialog) return true;
     if (this.identityReceipts().includes(key)) return false;
     this.mask();
-    this.setData({ dealtIdentityDialog: true });
+    this.setProcessData({ dealtIdentityDialog: true, processBodyHeight: 0 });
     return true;
   },
   async revealDealtIdentity() {
@@ -2358,10 +2356,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
         this.data.room.stage !== stage || secret.stage !== stage) return;
       this.rememberDealtIdentity();
-      this.setData({ dealtIdentitySecret: {
+      this.setProcessData({ processBodyHeight: 0, dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information, skillStatus: secret.skillStatus,
+        vision: roomSheet.presentVision(secret.information),
         avoidance: avoidancePresentation.result(secret.avoidance),
       } });
     } catch (e) {
@@ -2503,17 +2502,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async acknowledgeFairyResult() {
     if (
-      this.data.busy || this.fairyAckConfirm ||
+      this.data.busy || this.data.hasPendingRequest || this.fairyAckConfirm || !this.alive || !this.foreground ||
       !this.data.fairyResultRevealed ||
       !this.data.fairyResult
     )
       return;
     const result = this.data.fairyResult;
-    const generation = this.generation;
     this.fairyAckConfirm = true;
     try {
-      if (!(await this.confirm("关闭查验结果？", "关闭后不会再显示本次查验结果，请确认已记住。"))) return;
-      if (!this.alive || !this.foreground || generation !== this.generation || this.data.fairyResult !== result || !this.data.fairyResultRevealed) return;
       this.setData({ fairyResult: null, fairyResultRevealed: false });
       return this.cmd("ackFairyResult", { revision: result.revision });
     } finally {

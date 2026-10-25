@@ -29,9 +29,9 @@
   function presentCollection(value, filter = 'all', assetUrl = path => path) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
     const items = catalogue.map(b => {
-      const condition = b.condition || (copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0]);
+      const condition = (b.condition || (copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
       return { ...b, imageUrl: b.permanent ? assetUrl(b.imageUrl) : b.imageUrl, owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped,
-      condition, detailCondition: condition.replace(/。+$/, ''),
+      condition, detailCondition: condition,
       periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首持有，含并列第一',
       status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }; });
     items.sort((a, b) => Number(b.owned) - Number(a.owned));

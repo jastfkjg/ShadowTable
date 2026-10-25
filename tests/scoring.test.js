@@ -42,7 +42,7 @@ test('十二骑士10到13人默认计分，三绿和提前盘刀按新分值计�
       const bad=deal({board,capacity}),merlin=bad.players.find(player=>bad.roles[player.uid]==='merlin').seat;
       finish(bad,{scoreReason:reason,scoreTarget:merlin});
       assert.equal(bad.result.winner,'evil');
-      for(const player of bad.matchRecord.players) assert.equal(player.score.total,['assassination','early_assassination'].includes(reason) ? player.faction==='evil'?0:['merlin','percival'].includes(player.roleId)?1:2 : player.faction==='evil'?3:0);
+      for(const player of bad.matchRecord.players) assert.equal(player.score.total,['assassination','early_assassination'].includes(reason) ? player.faction==='evil'?3:['merlin','percival'].includes(player.roleId)?1:2 : player.faction==='evil'?3:0);
     }
   }
   const classic=deal();assert.ok(!publicView(classic,classic.host).scoreSettlement.some(option=>option.id==='early_assassination'));
@@ -186,8 +186,9 @@ test('房主关闭只排除积分，胜负仍归档，不改变已有积分；�
 });
 test("三蓝车刺中、未中、派西被刺、普通好人挡刀、刺到坏人和空刀正确分解积分",()=>{
   const hit=deal();
-  assert.deepEqual(finish(hit,{scoreReason:"assassination",scoreTarget:1}),[1,1,2,2,0,0]);
+  assert.deepEqual(finish(hit,{scoreReason:"assassination",scoreTarget:1}),[1,1,2,2,3,3]);
   for(const player of hit.matchRecord.players.slice(0,2)) assert.deepEqual(player.score.breakdown,[{id:'good_stage_role',label:'梅林／派西三绿阶段奖励',points:1}]);
+  for(const player of hit.matchRecord.players.slice(4)) assert.deepEqual(player.score.breakdown,[{id:'evil_win',label:'坏人获胜',points:3}]);
   assert.deepEqual(finish(deal()),[4,4,6,3,0,0]);
   assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[4,4,3,3,0,0]);
   for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[4,4,3,3,0,0]);
@@ -272,6 +273,28 @@ test('角色排除条件由服务端下发说明，拒绝无效配置',()=>{
     const rules=policy();rules.awards[0].when.roleIdNot=invalid;
     assert.throws(()=>validateRules(rules),/排除角色/);
   }
+});
+test('v10 已开局三绿刺中坏人仍为零分，新局坏人每人三分，归档更正沿用各局快照',()=>{
+  const store=new Store(':memory:');
+  try {
+    const old=deal();old.scorePolicy.version='avalon-2026-10-v10';
+    const award=old.scorePolicy.awards.find(item=>item.id==='evil_win');
+    award.label='坏人任务获胜';award.when.reason=['quest_fail','five_rejections'];
+    assert.deepEqual(finish(old,{scoreReason:'assassination',scoreTarget:1}),[1,1,2,2,0,0]);
+    store.transaction(()=>store.save(old));
+    store.transaction(()=>store.correctMatch(old.matchId,{revision:0,scoreReason:'quest_fail'}));
+    assert.equal(store.matchFor('wx:5',old.matchId).score.total,3);
+    store.transaction(()=>store.correctMatch(old.matchId,{revision:1,scoreReason:'assassination',scoreTarget:1}));
+    assert.equal(store.matchFor('wx:5',old.matchId).score.total,0);
+    assert.equal(store.matchFor('wx:5',old.matchId).score.ruleVersion,'avalon-2026-10-v10');
+    const fresh=deal();assert.deepEqual(finish(fresh,{scoreReason:'assassination',scoreTarget:1}),[1,1,2,2,3,3]);
+    store.transaction(()=>store.save(fresh));
+    for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,3);
+    store.transaction(()=>store.correctMatch(fresh.matchId,{revision:0,scoreReason:'assassination',scoreTarget:2}));
+    for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,0);
+    store.transaction(()=>store.correctMatch(fresh.matchId,{revision:1,scoreReason:'assassination',scoreTarget:1}));
+    for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,3);
+  } finally {store.close();}
 });
 test('调整前开局的规则仍发梅派阶段分和派西挡刀分，归档及管理员更正保留旧分值',()=>{
   const store=new Store(':memory:');

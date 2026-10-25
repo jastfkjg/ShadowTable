@@ -1,0 +1,22 @@
+/* Private vision is the memory anchor; ability status is supporting detail. */
+.identity-vision { margin: 0; padding: 14px; border: 1px solid rgba(229,198,139,.24); border-radius: 14px; background: rgba(229,198,139,.045); }
+.identity-vision-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: var(--accent); font-size: 14px; font-weight: 600; }
+.identity-vision-heading::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--accent); }
+.identity-vision-label { margin-bottom: 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.identity-vision-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.identity-vision-player { min-width: 0; padding: 7px 10px; border-radius: 10px; background: var(--control-bg, #14232c); text-align: center; }
+.identity-vision-seat { color: var(--accent); font-size: 24px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.identity-vision-unit { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.identity-vision-role { margin-top: 3px; color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.identity-vision-note { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.identity-vision-text { color: var(--text); font-size: 17px; font-weight: 500; line-height: 1.8; overflow-wrap: anywhere; }
+.dealt-skill-status { margin: 14px 0 0; padding: 0 3px; color: var(--muted); font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.dealt-skill-status-title { margin-bottom: 3px; font-weight: 500; }
+.dealt-identity-dialog.is-morgana .identity-vision { padding: 11px; }
+.dealt-identity-dialog.is-morgana .identity-vision-heading { margin-bottom: 7px; }
+.dealt-identity-dialog.is-morgana .identity-vision-label { margin-bottom: 5px; }
+.dealt-identity-dialog.is-morgana .identity-vision-player { padding: 5px 8px; }
+.dealt-identity-dialog.is-morgana .identity-vision-seat { font-size: 23px; }
+.dealt-identity-dialog.is-morgana .identity-vision-role { font-size: 12px; }
+.dealt-identity-dialog .dealt-web-role-heading { margin: 10px 0; text-align: center; }
+.dealt-identity-dialog .dealt-web-role-heading .identity-title { margin: 0 0 2px; font-size: 22px; line-height: 1.4; }

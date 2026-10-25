@@ -33,7 +33,9 @@ const css = (file) =>
       css(path.relative(root, path.resolve(root, path.dirname(file), name))),
     )
     .replace(/^page\s*\{/m, "body {")
-    .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+    .replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)")
+    .replace(/(^|[\s>+~,])(view|text|image)(?=[\s.{:#>+~,]|$)/gm,
+      (_, before, tag) => before + ({ view: "div", text: "span", image: "img" })[tag]);
 function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
   if (node.tag === "wx-app-nav")
@@ -102,8 +104,27 @@ for (const source of BOARDS.filter((b) => b.available))
       chapters: board.chapters,
       visibleRoles: presentation.visibleRoles(board, selectedGroup),
     };
+    const scene = scenes[source.id + "-" + capacity];
+    scenes[source.id + "-" + capacity + "-rules-expanded"] = {
+      ...scene,
+      tab: "rules",
+      allExpanded: true,
+      chapters: board.chapters.map((chapter) => ({ ...chapter, expanded: true })),
+    };
+    const expanded = Object.fromEntries(board.roles.map((role) => [role.id, true]));
+    for (const group of board.groups)
+      scenes[source.id + "-" + capacity + "-roles-" + group.id] = {
+        ...scene,
+        selectedGroup: group.id,
+        visibleRoles: presentation.visibleRoles(board, group.id, "", expanded),
+      };
   }
 const base = scenes["knights-12"];
+scenes["classic-7-expanded"] = {
+  ...scenes["classic-7"],
+  allExpanded: true,
+  chapters: scenes["classic-7"].chapters.map((chapter) => ({ ...chapter, expanded: true })),
+};
 scenes["knights-expanded"] = {
   ...base,
   visibleRoles: presentation.visibleRoles(base.board, base.selectedGroup, "", {
@@ -122,6 +143,9 @@ scenes["knights-search"] = {
   ),
 };
 fs.mkdirSync(output, { recursive: true });
+fs.writeFileSync(path.join(output, "audit-scenes.json"), JSON.stringify(
+  Object.keys(scenes).filter(name => /-rules-expanded$|-roles-/.test(name)),
+));
 for (const [name, data] of Object.entries(scenes))
   fs.writeFileSync(
     path.join(output, name + ".html"),

@@ -1,4 +1,5 @@
 const { portrait } = require("./role-portraits");
+const identityVision = require("./identity-vision");
 
 function presentBoardOption(board, capacity) {
   const hints = {
@@ -53,4 +54,4 @@ function presentFairyResult(result) {
   return { ...result, displaySeat: match ? Number(match[1]) : null,
     displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
 }
-module.exports = { presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult };
+module.exports = { presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present };

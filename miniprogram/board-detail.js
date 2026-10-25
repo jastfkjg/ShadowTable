@@ -107,7 +107,8 @@
       .replace(/^阿瓦隆\s*[·/]\s*/, "")
       .replace(/[（(]\d+人[）)]$/, "")
       .trim();
-    const source = board.detail?.sections || [];
+    const detail = board.detail?.byCapacity?.[capacity] || board.detail;
+    const source = detail?.sections || [];
     const groups = [],
       roles = [],
       chapters = [];
@@ -178,14 +179,14 @@
       capacity,
       name,
       hasRoles,
-      hasDetail: !!board.detail,
+      hasDetail: !!detail,
       groups,
       roles,
       chapters,
       eyebrow: "阿瓦隆 / " + (/经典/.test(title) ? "经典玩法" : "扩展玩法"),
-      summary: /^B\s*牌技能速查/.test(board.detail?.summary || "")
+      summary: /^B\s*牌技能速查/.test(detail?.summary || "")
         ? ""
-        : board.detail?.summary || "",
+        : detail?.summary || "",
       subtitle: groups.some((group) => group.id === "a")
         ? "A 牌初始身份 · B 牌复活身份"
         : "",

@@ -2,8 +2,9 @@
 .room-directory { --room-divider:rgba(177,191,198,.13); --room-blue:#99c7f5; }
 .room-directory .room-directory-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:12px; margin:22px 4px 16px; font-size:20px; font-weight:600; }
 .room-directory button.room-refresh,
-.room-directory button.room-refresh[disabled]:not([type]) { display:flex; align-items:center; justify-content:flex-end; flex-shrink:0; gap:7px; width:88px; min-height:44px; margin:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; color:var(--muted); font-size:13px; font-weight:400; line-height:1.5; white-space:nowrap; }
-.room-refresh-icon { flex-shrink:0; width:17px; height:17px; }
+.room-directory button.room-refresh[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; flex-shrink:0; box-sizing:border-box; width:44px; height:44px; min-height:44px; margin:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; color:var(--muted); }
+.room-refresh-icon { display:block; flex-shrink:0; width:20px; height:20px; }
+.room-directory button.room-refresh:not([disabled]):active .room-refresh-icon { opacity:.75; }
 .room-refresh-icon.is-refreshing { animation:room-refresh-spin 900ms linear infinite; }
 @keyframes room-refresh-spin { to { transform:rotate(360deg); } }
 .room-directory .room-subheading,

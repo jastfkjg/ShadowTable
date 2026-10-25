@@ -1,0 +1,19 @@
+/* One compact confirmation layout for both clients. */
+.is-room-confirm-backdrop { padding:24px; background:var(--overlay-scrim,rgba(2,10,15,.7)); -webkit-backdrop-filter:none; backdrop-filter:none; }
+.app-dialog.is-room-confirm, .error-dialog.is-room-confirm { display:flex; flex-direction:column; width:100%; max-width:350px; max-height:calc(100vh - 48px - env(safe-area-inset-bottom)); box-sizing:border-box; overflow:hidden; padding:22px; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-radius:20px; background:var(--surface,#1b2b35); box-shadow:0 20px 70px rgba(0,0,0,.28); text-align:left; }
+.is-room-confirm .app-dialog-title, .is-room-confirm .dialog-title { flex-shrink:0; margin:0; padding:0; border:0; color:var(--text,#f2eee5); font-size:20px; line-height:1.5; font-weight:600; letter-spacing:0; }
+.is-room-confirm .app-dialog-context, .is-room-confirm .dialog-room-context { display:flex; flex-shrink:0; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; color:var(--muted,#b1bfc6); font-size:13px; line-height:1.6; }
+.is-room-confirm .app-dialog-context image, .is-room-confirm .dialog-room-context img { flex-shrink:0; width:16px; height:16px; }
+.is-room-confirm .app-dialog-context-value, .is-room-confirm .dialog-room-code { color:var(--text,#f2eee5); font-size:14px; letter-spacing:.7px; font-weight:500; font-variant-numeric:tabular-nums; }
+.is-room-confirm .app-dialog-context-meta, .is-room-confirm .dialog-room-status { padding-left:10px; border-left:1px solid var(--border,#536570); }
+.is-room-confirm .app-dialog-body { margin-top:16px; }
+.is-room-confirm .dialog-message { flex-shrink:1; min-height:0; max-height:48vh; overflow-y:auto; margin:16px 0 0; }
+.is-room-confirm .app-dialog-message, .is-room-confirm .dialog-message { color:var(--muted,#b1bfc6); font-size:14px; line-height:1.6; font-weight:400; white-space:pre-wrap; overflow-wrap:anywhere; }
+.is-room-confirm .app-dialog-emphasis, .is-room-confirm .dialog-emphasis { color:var(--evil,#f2b6ae); font-weight:500; }
+.is-room-confirm .app-dialog-actions, .is-room-confirm .dialog-actions { display:flex; flex-shrink:0; gap:12px; margin-top:20px; }
+.is-room-confirm .app-dialog-actions button, .is-room-confirm .dialog-actions button { display:flex; flex:1; align-items:center; justify-content:center; width:0; min-width:0; min-height:48px; box-sizing:border-box; margin:0; padding:12px 8px; border-radius:12px; font-size:15px; line-height:1.5; font-weight:500; }
+.is-room-confirm .app-dialog-actions .app-dialog-cancel, .is-room-confirm .dialog-actions .secondary { border:1px solid #6a7d89; background:var(--control-bg,#14232c); color:var(--text,#f2eee5); }
+.is-room-confirm .app-dialog-confirm, .is-room-confirm .dialog-actions .primary { border:1px solid var(--accent,#e5c68b); background:var(--accent,#e5c68b); color:var(--bg,#101c24); font-weight:600; }
+.is-room-confirm .app-dialog-confirm.is-danger, .is-room-confirm .dialog-actions .primary.is-danger { border-color:var(--evil,#f2b6ae); background:var(--evil,#f2b6ae); }
+@media(max-width:350px) { .is-room-confirm-backdrop { padding:20px; }.app-dialog.is-room-confirm, .error-dialog.is-room-confirm { padding:20px; } }
+@media(max-height:500px) { .is-room-confirm-backdrop { padding:16px; }.app-dialog.is-room-confirm, .error-dialog.is-room-confirm { max-height:calc(100vh - 32px); padding:20px 22px; }.is-room-confirm .app-dialog-body, .is-room-confirm .dialog-message { max-height:35vh; margin-top:12px; }.is-room-confirm .app-dialog-actions, .is-room-confirm .dialog-actions { margin-top:16px; } }

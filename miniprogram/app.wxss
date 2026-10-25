@@ -2,6 +2,7 @@
 @import "./room-menu.wxss";
 @import "./overlay-tokens.wxss";
 @import "./avoidance.wxss";
+@import "./identity-vision.wxss";
 page {
   --bg: #101c24;
   --surface: #1b2b35;
@@ -893,46 +894,74 @@ button.identity-compact[disabled]:not([type]) {
   color: var(--accent);
 }
 .operation-progress {
-  margin: 28rpx 0;
-  border-top: 1rpx solid var(--border);
-  padding-top: 24rpx;
+  --progress-line: rgba(83, 101, 112, .45);
+  --progress-track: #354750;
+  --progress-seat: #20323d;
+  --progress-pending: #8299a5;
+  --progress-completed-bg: rgba(229, 198, 139, .10);
+  margin: 14px 0 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--progress-line);
+  border-radius: 16px;
+  background: var(--bg);
 }
-.progress-heading,
+.operation-progress.all-done { border-color: rgba(229, 198, 139, .25); }
+button.progress-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; flex-wrap: wrap; line-height: 1.5; }
+.progress-title { flex: 1; font-size: 16px; font-weight: 600; white-space: nowrap; }
+.progress-count { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.progress-completed-count { font-size: 20px; font-weight: 600; color: var(--accent); }
+.progress-total { font-size: 14px; color: var(--muted); }
+.progress-count-label { font-size: 12px; font-weight: 400; color: var(--muted); }
+.progress-disclosure { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 5px; color: var(--muted); font-size: 12px; font-weight: 400; white-space: nowrap; }
+.progress-chevron { flex-shrink: 0; width: 6px; height: 6px; margin: -3px 2px 0 0; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .16s ease; }
+.progress-chevron.expanded { transform: translateY(3px) rotate(225deg); }
+.progress-meter { display: flex; gap: 4px; margin: 9px 0 12px; }
+.progress-segment { flex: 1; min-width: 0; height: 4px; border-radius: 2px; background: var(--progress-track); }
+.progress-segment.completed { background: var(--accent); }
+.progress-note { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.progress-note-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--progress-pending); }
+.all-done .progress-note { color: var(--accent); }
+.all-done .progress-note-dot { background: var(--accent); }
+.progress-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; margin-top: 17px; }
 .progress-player {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16rpx;
+  gap: 9px;
+  min-width: 0;
+  min-height: 47px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--progress-line);
+  font-size: 14px;
 }
-.progress-heading {
-  font-size: 28rpx;
-  font-weight: 600;
-  margin-bottom: 8rpx;
-}
-button.progress-toggle { width:100%; min-height:88rpx; margin:0; padding:8rpx 0; border:0; border-radius:0; background:transparent; color:var(--text); text-align:left; flex-wrap:wrap; }
-.progress-title { flex:1; }
-.progress-count { white-space:nowrap; }
-.progress-disclosure { color:var(--muted); font-size:24rpx; font-weight:400; white-space:nowrap; }
-.progress-player {
-  padding: 16rpx 0;
-  border-bottom: 1rpx solid var(--border);
-  font-size: 28rpx;
-}
+.progress-player:last-child, .progress-player:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+.progress-seat { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 27px; min-height: 27px; border-radius: 7px; background: var(--progress-seat); color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .progress-player-name {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-state {
-  flex-shrink: 0;
-  font-size: 26rpx;
+.progress-player.completed .progress-seat { background: var(--progress-completed-bg); color: var(--accent); }
+.progress-player.completed .progress-player-name { color: var(--accent); font-weight: 500; }
+.progress-state { position: relative; flex-shrink: 0; width: 13px; height: 13px; margin: 0 2px; border: 1.3px solid var(--progress-pending); border-radius: 50%; }
+.progress-state.completed { width: 17px; height: 17px; margin: 0; border: 0; background: var(--progress-completed-bg); color: var(--accent); }
+.progress-state.completed::after { content: ""; position: absolute; width: 7px; height: 4px; left: 4px; top: 5px; border-left: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: rotate(-45deg); }
+.progress-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; padding-top: 13px; border-top: 1px solid var(--progress-line); color: var(--muted); font-size: 12px; }
+.progress-legend-item { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 360px) {
+  .operation-progress { padding-right: 10px; padding-left: 10px; }
+  button.progress-toggle { gap: 5px; }
+  .progress-title { font-size: 15px; }
+  .progress-count { gap: 4px; }
+  .progress-completed-count { font-size: 18px; }
+  .progress-count-label, .progress-disclosure { font-size: 11px; }
+  .progress-disclosure { margin-left: 2px; }
+  .progress-players { column-gap: 14px; }
+  .progress-player { gap: 7px; }
 }
-.progress-state.completed {
-  color: var(--accent);
-}
-.progress-state.not-required {
-  color: var(--muted);
+@media (prefers-reduced-motion: reduce) {
+  .progress-chevron { transition: none; }
 }
 .finish-game-footer {
   margin-top: 48rpx;
@@ -1363,6 +1392,12 @@ button.history-more::after { border: 0; }
 .host-action-bar-inner.has-waiting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; gap: 12rpx 16rpx; }
 .has-waiting .host-waiting-copy { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 16rpx; }
 .host-action-bar-inner.has-waiting button { width: 100%; min-width: 0; min-height: 88rpx; padding: 16rpx 12rpx; line-height: 1.4; display: flex; align-items: center; justify-content: center; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box; }
+.host-action-bar-inner.has-single-action { grid-template-columns: minmax(0, 1fr); }
+.host-action-bar-inner.has-waiting .host-waiting-copy { align-items: center; flex-wrap: wrap; gap: 4rpx 16rpx; padding: 4rpx 0 8rpx; }
+.host-action-bar-inner.has-waiting .host-waiting-copy > view { font-size: 22rpx; }
+.host-action-bar-inner button.bar-cancel, .host-action-bar-inner button.is-destructive { border-color: rgba(242,182,174,.28); border-radius: 22rpx; color: var(--evil); background: rgba(242,182,174,.045); }
+.host-action-bar-inner button.bar-cutoff { border-radius: 22rpx; font-weight: 500; }
+.host-action-bar-inner button:active { opacity: .78; }
 
 .history-card-count .history-count.success { color: var(--good); }
 .history-card-count .history-count.failure { color: var(--evil); }
@@ -1509,7 +1544,9 @@ button.room-filter.active[disabled]:not([type]) { color: var(--accent); backgrou
 .room-empty-actions { display: flex; gap: 24rpx; margin-top: 32rpx; }
 .room-list-dialog .input { margin: 24rpx 0; }
 
-.help-entry-icon { display: inline-flex; align-items: center; justify-content: center; width: 32rpx; height: 32rpx; border: 2rpx solid currentColor; border-radius: 50%; font-size: 24rpx; line-height: 1; }
+.brand button.home-help { gap: 0; width: 44px; min-width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); }
+.home-help-icon { display: block; flex-shrink: 0; width: 20px; height: 20px; }
+.brand button.home-help:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Keep the entry screen stable while its actions are locked for navigation. */
 .is-entering-room button[disabled] { opacity: 1; color: var(--text); background: transparent; }

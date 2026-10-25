@@ -31,9 +31,11 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
+  context.window.shadowtableRoomConfirmation = require('../miniprogram/room-confirmation');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
+  context.window.shadowtableIdentityVision = require('../miniprogram/identity-vision');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
@@ -325,8 +327,8 @@ test('网页左滑和菜单移除均须确认，取消或离开页面不提交�
       }
       return response({rooms:hidden?[]:[room]});
     });
-    c.setConfirm((title, message, showCancel, label) => {
-      dialogs.push({title,message,label});
+    c.setConfirm((title, message, showCancel, label, receipt, context) => {
+      dialogs.push({title,message,label,context});
       return new Promise(resolve => { resolveConfirm = resolve; });
     });
     Object.assign(c.state,{loading:false,memberRooms:[room]});
@@ -338,9 +340,10 @@ test('网页左滑和菜单移除均须确认，取消或离开页面不提交�
     const removing = action();
     assert.equal(c.state.busy,true); assert.equal(writes.length,0);
     await action(); assert.equal(dialogs.length,1);
-    assert.match(dialogs[0].title,/从列表移除房间 123456/);
-    assert.match(dialogs[0].message,/不会离开或解散房间/);
-    assert.equal(dialogs[0].label,'移除');
+    assert.equal(dialogs[0].title,'移除房间记录？');
+    assert.match(dialogs[0].message,/房间、座位和战绩都会保留/);
+    assert.equal(dialogs[0].label,'移除记录');
+    assert.equal(dialogs[0].context.contextValue,'123456');
     if (result === 'background') c.stop();
     resolveConfirm(result !== 'cancel'); await removing;
     assert.equal(writes.length,result === 'confirm' || result === 'failure' ? 1 : 0);
@@ -360,10 +363,14 @@ test('网页左滑解散须确认，取消不删除，快捷操作不解散已�
     if(url.endsWith('/management'))return response({...room,status});
     return response({rooms:[{...room,status}]});
   });
-  c.setConfirm(async (title, message) => {dialogs.push({title,message}); return allow;});
+  c.setConfirm(async (title, message, showCancel, label, receipt, context) => {dialogs.push({title,message,label,context}); return allow;});
   Object.assign(c.state,{loading:false,memberRooms:[room]});
   webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});
-  assert.equal(dialogs.length,1); assert.match(dialogs[0].title,/解散房间 123456/);
+  assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'解散房间？');
+  assert.equal(dialogs[0].message,'所有玩家将退出，进行中的对局不判胜负，房间将被删除且无法恢复。');
+  assert.equal(dialogs[0].context.contextValue,'123456');
+  assert.equal(dialogs[0].context.danger,true);
+  assert.equal(dialogs[0].label,'解散房间');
   assert.equal(calls.some(x=>x.url.endsWith('/delete')),false);
   status='playing'; allow=true; webSwipe(c,room.code);
   await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});
@@ -763,20 +770,28 @@ test("网页座位昵称转义且轮询更新人数和准备统计", async () =>
   assert.equal(writes, 0);
 });
 test("网页房主进度可展开收起，刷新保留状态，新操作默认收起", async () => {
-  const room = dealtWebRoom({ phase: "skillPrepare", canUseTools: true, knights: { round: 3, remainingCards: 6 }, operationProgress: { total: 2, completed: 1, players: [{ seat: 1, name: "甲", required: true, completed: true }, { seat: 2, name: "乙", required: true, completed: false }] } });
+  const room = dealtWebRoom({ phase: "skillPrepare", canUseTools: true, knights: { round: 3, remainingCards: 6 }, operationProgress: { total: 2, completed: 1, players: [{ seat: 1, name: "甲", required: true, completed: true }, { seat: 2, name: '乙<"长昵称">', required: true, completed: false }, { seat: 3, name: "本次无需操作", required: false, completed: false }] } });
   const c = client(async () => response(structuredClone(room)));
   await c.refresh();
   assert.equal(c.state.operationProgressExpanded, false);
-  assert.match(c.viewRoom(), /1 \/ 2 已完成/);
-  assert.doesNotMatch(c.viewRoom(), /class="progress-player"|再次发起技能/);
+  assert.match(c.viewRoom(), /aria-label="当前操作进度，1人已完成，共2人，展开"/);
+  assert.match(c.viewRoom(), /等待 1 位玩家完成操作/);
+  assert.equal((c.viewRoom().match(/class="progress-segment(?: completed)?"/g) || []).length, 2);
+  assert.doesNotMatch(c.viewRoom(), /class="progress-player(?: completed)?"|再次发起技能/);
   c.ACTIONS.toggleOperationProgress();
-  assert.match(c.viewRoom(), /class="progress-player"/);
+  assert.equal((c.viewRoom().match(/role="listitem"/g) || []).length, 2);
+  assert.match(c.viewRoom(), /aria-label="2号，乙&lt;&quot;长昵称&quot;&gt;，待完成"/);
+  assert.doesNotMatch(c.viewRoom(), /本次无需操作/);
   assert.match(c.viewRoom(), /aria-expanded="true"/);
   room.operationProgress.completed = 2;
+  room.operationProgress.players[1].completed = true;
   await c.refresh();
   assert.equal(c.state.operationProgressExpanded, true);
+  assert.match(c.viewRoom(), /operation-progress all-done/);
+  assert.match(c.viewRoom(), /全部玩家已完成操作/);
+  assert.match(c.viewRoom(), /aria-valuemax="2" aria-valuenow="2"/);
   c.ACTIONS.toggleOperationProgress();
-  assert.doesNotMatch(c.viewRoom(), /class="progress-player"/);
+  assert.doesNotMatch(c.viewRoom(), /class="progress-player(?: completed)?"/);
   c.ACTIONS.toggleOperationProgress();
   room.stage = "next";
   await c.refresh();
@@ -1321,17 +1336,29 @@ test('网页任务与投票详情在收起时隐藏，点击展开后呈现队�
   }
 });
 
-test("网页仙女关闭需确认，取消保留结果，等待确认时新结果不被旧确认清除", async () => {
-  const c = client(async () => { throw new Error("不应提交"); });
+test("网页仙女记住后直接关闭，只确认当前结果版本且不再弹窗", async () => {
+  const writes = [];
+  const room = newRoom("123456", "p1", "房主");
+  const c = client(async (url, options = {}) => {
+    if (options.method === 'POST') writes.push(JSON.parse(options.body));
+    return response(publicView(room, 'p1'));
+  });
+  c.state.room = publicView(room, 'p1');
   const result = { revision: 1, summary: "6号 · 坏人" };
   c.state.fairyResult = result;
-  c.state.fairyResultRevealed = true;
-  c.setConfirm(async (title, text) => { assert.match(text, /关闭后不会再显示/); return false; });
+  c.state.fairyResultRevealed = false;
+  c.setConfirm(async () => { throw new Error('不应再弹确认框'); });
   await c.ACTIONS.acknowledgeFairyResult();
   assert.equal(c.state.fairyResult, result);
-  c.setConfirm(async () => { c.state.fairyResult = { revision: 2 }; return true; });
+  assert.equal(writes.length, 0);
+  c.state.fairyResultRevealed = true;
   await c.ACTIONS.acknowledgeFairyResult();
-  assert.equal(c.state.fairyResult.revision, 2);
+  assert.equal(c.state.fairyResult, null);
+  assert.equal(c.state.fairyResultRevealed, false);
+  assert.equal(writes[0].type, 'ackFairyResult');
+  assert.equal(writes[0].revision, 1);
+  await c.ACTIONS.acknowledgeFairyResult();
+  assert.equal(writes.length, 1);
 });
 
 test("网页阶段集中待办，房主工具与任务进度优先，最近结果仅展示公开数据", async () => {
@@ -1548,8 +1575,8 @@ test("网页仙女只确认合法当前目标，提示传递关系并阻止过�
   assert.equal(c.state.draftChoice, "");
   c.ACTIONS.submitChoice({ dataset: { value: "target:3" } });
   assert.equal(writes.length, 0);
-  assert.match(c.viewActionDialog(), /查验目标：3 号 · &lt;玩家三&gt;/);
-  assert.match(c.viewActionDialog(), /仙女将传给 3 号 · 确认后不可更改/);
+  assert.match(c.viewActionDialog(), /查验目标：3号（&lt;玩家三&gt;） · 湖仙将传给3号/);
+  assert.doesNotMatch(c.viewActionDialog(), /skill-meta|skill-consequence|持有仙女<\/div>/);
   c.state.room.stage = "f2";
   c.ACTIONS.confirmChoice();
   c.state.room.stage = "f1";

@@ -14,7 +14,12 @@
 .table-room .room-summary { gap: 8px; }
 .table-room button.lobby-room-code { gap: 8px; min-height: 44px; padding: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
 .table-room .lobby-copy-icon { width: 15px; height: 17px; margin-right: 5px; }
-.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { min-height: 44px; padding: 0 0 0 8px; font-size: 12px; line-height: 1.5; }
+.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { width: calc(45px + 4em); min-height: 44px; padding: 0 0 0 8px; justify-content: flex-start; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+.table-room button.lobby-header-link.room-invite-button, .table-room button.lobby-header-link.room-invite-button[disabled]:not([type]) { color: var(--accent); }
+.table-room .lobby-header-icon { display: block; flex-shrink: 0; width: 16px; height: 16px; }
+.table-room .lobby-header-label { flex: 0 0 4em; text-align: left; }
+.table-room .lobby-header-chevron { flex-shrink: 0; width: 5px; height: 5px; margin: 0 2px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }
+.table-room .lobby-header-chevron.is-placeholder { visibility: hidden; }
 .table-room button.room-identity, .table-room button.room-identity[disabled]:not([type]) { min-height: 44px; border-width: 3px 0; border-radius: 14px; padding: 0 12px; gap: 6px; font-size: 12px; }
 .table-room .room-identity-icon { width: 16px; height: 16px; }
 .table-room .lobby-board-row { margin: 0; gap: 10px; }
@@ -154,6 +159,8 @@
 .table-room .public-history-dock .host-action-bar-inner button { min-height: 44px; font-size: 13px; padding: 8px; }
 .table-room .public-history-dock .host-waiting-copy { font-size: 12px; }
 .table-room .finish-game-footer button, .table-room button.leave-button { min-height: 44px; font-size: 13px; }
+.table-room button.leave-button, .table-room button.leave-button[disabled]:not([type]) { gap: 8px; background: transparent; color: var(--evil); }
+.table-room .leave-button-icon { display: block; flex-shrink: 0; width: 18px; height: 18px; }
 
 /* Shared player sheet also appears on leaderboards. Keep badge disclosures. */
 .player-card-backdrop { padding: 88px 0 0; }
@@ -207,11 +214,15 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
 .table-sheet-fields { padding: 0 18px 8px; overflow-wrap: anywhere; }
 .table-sheet .small { font-size: 12px; }
 .table-sheet .identity-privacy-note { justify-content: center; }
-.dealt-identity-body { height: 410px; max-height: calc(100vh - 260px - env(safe-area-inset-bottom)); }
+.dealt-identity-body { height: 380px; max-height: calc(100vh - 260px - env(safe-area-inset-bottom)); }
+.is-morgana .dealt-identity-body { height: 330px; }
+.dealt-identity-dialog.has-measured-body .dealt-identity-body { max-height: none; }
 .is-covered .dealt-identity-body { height: 242px; max-height: calc(100vh - 312px - env(safe-area-inset-bottom)); }
-.dealt-role-heading { margin: 18px 0; text-align: center; }
-.dealt-role-heading .private-role-art { width: 76px; height: 76px; margin: 0 auto 9px; }
-.dealt-role-heading .identity-title { font-size: 24px; line-height: 1.5; margin: 0 0 4px; }
+.dealt-role-heading { margin: 10px 0; text-align: center; }
+.dealt-role-heading .private-role-art { width: 56px; height: 56px; margin: 0 auto 6px; }
+.dealt-role-heading .identity-title { font-size: 22px; line-height: 1.4; margin: 0 0 2px; }
+.dealt-identity-dialog.is-morgana .dealt-role-heading { margin: 7px 0; }
+.dealt-identity-dialog.is-morgana .private-role-art { width: 50px; height: 50px; }
 .private-info-group { padding: 15px; border-radius: 17px; background: var(--control-bg, #14232c); }
 .table-sheet .private-info { margin: 0; font-size: 13px; line-height: 1.75; }
 .table-sheet .private-info + .private-info { margin-top: 14px; }

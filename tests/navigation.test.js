@@ -346,7 +346,7 @@ test('小程序左滑和菜单移除均须确认，取消或切入后台不提�
     const removing = action();
     assert.equal(p.data.busy,true); assert.equal(writes.length,0);
     await action(); assert.equal(dialogs.length,1);
-    assert.equal(dialogs[0].title,'移除这条房间记录？');
+    assert.equal(dialogs[0].title,'移除房间记录？');
     assert.equal(dialogs[0].contextValue,'123456');
     assert.match(dialogs[0].content,/房间、座位和战绩都会保留/);
     assert.doesNotMatch(dialogs[0].content,/重新进入|恢复显示/);
@@ -377,7 +377,11 @@ test('小程序左滑解散保留二次确认，状态已变为进行中时不�
     await p.swipeRoomAction({ currentTarget: { dataset: { code: room.code, kind: 'delete' } } });
   };
   await act();
-  assert.equal(dialogs.length, 1); assert.match(dialogs[0].title, /解散房间 123456/);
+  assert.equal(dialogs.length, 1); assert.equal(dialogs[0].title, '解散房间？');
+  assert.equal(dialogs[0].contextValue, '123456');
+  assert.equal(dialogs[0].content, '所有玩家将退出，进行中的对局不判胜负，房间将被删除且无法恢复。');
+  assert.equal(dialogs[0].confirmText, '解散房间');
+  assert.equal(dialogs[0].danger, true);
   assert.equal(calls.some(c => c.url.endsWith('/delete')), false);
   status = 'playing'; confirmed = true; await act();
   assert.equal(dialogs.length, 1); assert.equal(calls.some(c => c.url.endsWith('/delete')), false);
@@ -1701,7 +1705,7 @@ test('大厅刷新保留空状态与表单，不插入页面加载文字，重�
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
   const rendered = JSON.stringify(renderMainPanel(factory,0,p.data));
   assert.match(rendered, /还没有牌桌/);
-  assert.match(rendered, /刷新中/);
+  assert.match(rendered, /正在刷新牌桌/);
   assert.doesNotMatch(rendered, /正在连接牌桌/);
   roomsRead.resolve({ rooms: [] }); await refreshing;
   assert.equal(p.data.roomsRefreshing, false);
