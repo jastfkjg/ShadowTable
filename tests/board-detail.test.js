@@ -63,6 +63,16 @@ test("每个可用板子都带符合契约的板子详情，未收录板子为 n
       );
       for (const section of board.detail.sections)
         assert.ok(isValidSection(section), `板子 ${board.id} 章节不合法`);
+      if (board.detail.byCapacity) {
+        assert.deepEqual(Object.keys(board.detail.byCapacity).map(Number), board.counts);
+        for (const capacity of board.counts) {
+          const detail = board.detail.byCapacity[capacity];
+          assert.ok(detail.summary.length > 0);
+          assert.ok(detail.sections.length > 0);
+          for (const section of detail.sections)
+            assert.ok(isValidSection(section), `板子 ${board.id}/${capacity} 章节不合法`);
+        }
+      }
     }
   } finally {
     await a.close();
@@ -333,7 +343,7 @@ test("十二骑士13人局仅多一名忠臣，B牌、转换、任务与初始�
   }
 });
 
-test("/api/boards 提供13人入口和三忠臣说明，其余详情与12人一致", async () => {
+test("/api/boards 提供13人入口、三忠臣及本人数示例，其余规则与12人一致", async () => {
   const a = await launch();
   try {
     const { data } = await a.boards();
@@ -350,6 +360,16 @@ test("/api/boards 提供13人入口和三忠臣说明，其余详情与12人一�
         assert.ok(section.items[0].startsWith("A 牌 13 张"));
         assert.ok(section.items[0].includes("忠臣×3"));
         assert.ok(base.detail.sections[i].items[0].startsWith("A 牌 12 张"));
+        assert.deepEqual(section.items.slice(1), base.detail.sections[i].items.slice(1));
+      } else if (section.kind === "roles") {
+        const expected = structuredClone(base.detail.sections[i]);
+        for (const role of expected.items)
+          if (/^(蓝|红)猎人$/.test(role.name))
+            role.text = role.text.replace("12 号邻座为 1 号与 11 号", "13 号邻座为 1 号与 12 号");
+        assert.deepEqual(section, expected);
+      } else if (section.title === "湖中仙女") {
+        assert.match(section.items[0], /^13 人局默认开启/);
+        assert.match(base.detail.sections[i].items[0], /^12 人局默认开启/);
         assert.deepEqual(section.items.slice(1), base.detail.sections[i].items.slice(1));
       } else assert.deepEqual(section, base.detail.sections[i]);
     }

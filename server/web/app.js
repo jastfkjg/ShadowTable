@@ -12,6 +12,7 @@
   const publicHistory = window.shadowtablePublicHistory;
   const roomSwipe = window.shadowtableRoomSwipe;
   const roomList = window.shadowtableRoomList;
+  const roomConfirmation = window.shadowtableRoomConfirmation;
   const boardDetailPresentation = window.shadowtableBoardDetail;
   const avoidancePresentation = window.shadowtableAvoidance;
 
@@ -1250,12 +1251,23 @@
       toastEl.classList.remove("show");
     }, 1600);
   }
-  function confirm(title, content, showCancel, confirmLabel, receipt) {
+  function confirm(title, content, showCancel, confirmLabel, receipt, roomContext) {
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
       modalTitle.textContent = title;
       const box = modal.querySelector('.error-dialog'), grantContext = document.getElementById('modal-grant-context');
+      const context = document.getElementById('modal-room-context');
+      context.hidden = !roomContext;
+      if (roomContext) {
+        box?.classList.add('is-room-confirm');
+        modal.classList.add('is-room-confirm-backdrop');
+        document.getElementById('modal-room-code').textContent = roomContext.contextValue;
+        const status = document.getElementById('modal-room-status');
+        status.textContent = roomContext.contextMeta;
+        status.hidden = !roomContext.contextMeta;
+        if (roomContext.danger) modalOk.classList.add('is-danger');
+      }
       grantContext.hidden = !receipt;
       if (receipt) {
         box?.classList.add('is-avoidance-grant');
@@ -1264,7 +1276,9 @@
           + '<div class="dialog-grant-hint' + (receipt.lead ? ' has-lead' : '') + '">' + esc(content) + '</div>';
       } else {
         box?.classList.remove('is-avoidance-grant');
-        modalMessage.textContent = content;
+        const emphasisAt = roomContext?.emphasis ? content.indexOf(roomContext.emphasis) : -1;
+        if (emphasisAt >= 0) modalMessage.innerHTML = esc(content.slice(0, emphasisAt)) + '<span class="dialog-emphasis">' + esc(roomContext.emphasis) + '</span>' + esc(content.slice(emphasisAt + roomContext.emphasis.length));
+        else modalMessage.textContent = content;
       }
       modalOk.textContent = confirmLabel || "确定";
       modalCancel.hidden = showCancel === false;
@@ -1287,6 +1301,10 @@
         modalOk.onclick = null;
         modalCancel.onclick = null;
         box?.classList.remove('is-avoidance-grant');
+        box?.classList.remove('is-room-confirm');
+        modal.classList.remove('is-room-confirm-backdrop');
+        modalOk.classList.remove('is-danger');
+        context.hidden = true;
         grantContext.hidden = true;
         resolve(val);
       }
@@ -1297,6 +1315,10 @@
         done(false);
       };
     });
+  }
+  function confirmRoomAction(kind, room) {
+    const value = roomConfirmation.present(kind, room);
+    return confirm(value.title, value.content, true, value.confirmText, null, value);
   }
 
   let grantNoticeOpen = false;
@@ -2394,7 +2416,7 @@ function roomListItems(rooms) {
     if (kind === "hide") return removeRoomRecord(room.code);
     if (kind === "delete" && room.isHost && room.available !== false) return deleteRoom(room.code);
     if (kind === "leave" && room.canLeave) {
-      if (!(await confirm("离开房间 " + room.code + "？", "你将退出成员关系并释放座位。房间不会解散；房主离开后仍保留管理权。"))) return;
+      if (!(await confirmRoomAction("leave", room))) return;
       if (state.busy || pending) return;
       setState({ busy: true });
       try {
@@ -2409,11 +2431,7 @@ function roomListItems(rooms) {
     if (state.busy || pending) return;
     setState({ busy: true, error: "" });
     try {
-      if (!(await confirm(
-        "从列表移除房间 " + code + "？",
-        "只移除你列表中的记录，不会离开或解散房间，也不会删除战绩。重新进入房间后会恢复显示。",
-        true, "移除",
-      ))) return;
+      if (!(await confirmRoomAction("hide", state.memberRooms.find(room => room.code === code) || { code }))) return;
       if (!alive || !foreground) return;
       setState({ busy: false });
       await mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
@@ -2433,11 +2451,7 @@ function roomListItems(rooms) {
         return;
       }
       if (
-        !(await confirm(
-          "解散房间 " + code + "？",
-          "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
-          true, "解散",
-        ))
+        !(await confirmRoomAction("delete", room))
       )
         return;
       if (!alive || !foreground) return;
@@ -2589,12 +2603,7 @@ function roomListItems(rooms) {
     if (state.busy || pending || !state.room) return;
     var room = state.room;
     if (
-      !(await confirm(
-        "离开房间？",
-        room.me.isHost
-          ? "离开仅释放座位，牌桌与房主身份保留，可从我的牌桌重新入座。"
-          : "离开后将释放你的座位，牌桌保留。重新加入需要输入房间码。",
-      ))
+      !(await confirmRoomAction("leave", room))
     )
       return;
     if (
@@ -3546,7 +3555,7 @@ function roomListItems(rooms) {
   }
 
   function roomMenuButton(kind, title, description, disabled) {
-    return '<button type="button" class="room-menu-action' + (kind === "delete" ? ' danger' : '') +
+    return '<button type="button" class="room-menu-action' + (kind === "delete" ? ' danger' : kind === "leave" ? ' is-leave' : '') +
       '" data-action="roomMenuAction" data-kind="' + kind + '"' + (disabled ? ' disabled' : '') +
       '><span class="room-menu-action-icon"><img src="/assets/room-menu-' + (kind === 'hide' ? 'remove' : kind) + '.svg" alt="" /></span><span class="room-menu-copy"><span class="room-menu-label">' + esc(title) +
       '</span>' + (description ? '<span class="room-menu-description">' + esc(description) + '</span>' : '') +
@@ -4040,9 +4049,9 @@ function roomListItems(rooms) {
     if (state.roomMenu && !state.error) {
       var m = state.roomMenu, locked = state.busy || !!pending;
       html += '<div class="dialog-backdrop room-menu-backdrop"><section class="error-dialog room-list-dialog room-menu-dialog' + (m.available === false ? ' is-expired' : '') + '" role="dialog" aria-modal="true" aria-labelledby="room-menu-title" aria-describedby="room-menu-code"><div class="room-menu-handle" aria-hidden="true"></div><div class="room-menu-header"><div id="room-menu-title" class="room-menu-heading">房间管理</div><button type="button" class="room-menu-close" data-action="closeRoomMenu" aria-label="关闭房间管理"' + (locked ? ' disabled' : '') + '><span class="room-menu-cross" aria-hidden="true"></span></button></div><div class="room-menu-body"><div class="room-menu-context"><span class="room-menu-table-icon"><img src="/assets/home-table-blue.svg" alt="" /></span><div class="room-menu-copy"><div id="room-menu-code" class="room-menu-code">房间 <span>' + esc(m.code) + '</span></div><div class="room-menu-board">' + esc(m.boardName || '牌桌') + '</div></div>' + (m.available === false || m.statusLabel ? '<span class="room-menu-status">' + esc(m.available === false ? '已失效' : m.statusLabel) + '</span>' : '') + '</div><div class="room-menu-options">' +
-        roomMenuButton("hide", m.available === false ? "移除失效记录" : "从列表移除", m.available === false ? "从你的牌桌列表清理这条记录" : "仅整理个人列表，房间与座位保留", locked) +
-        (m.available !== false && m.isMember && m.canLeave === true ? roomMenuButton("leave", "离开房间", "退出成员关系并释放座位", locked) : '') + '</div>' +
-        (m.available !== false && m.isHost ? '<div class="room-menu-danger-zone">' + roomMenuButton("delete", "解散房间", "关闭房间，所有成员将无法继续进入", locked) + '</div>' : '') + '</div>' +
+        roomMenuButton("hide", m.available === false ? "移除失效记录" : "从列表移除", m.available === false ? "从你的牌桌列表清理这条记录" : "仅整理个人列表，保留成员关系与座位", locked) +
+        (m.available !== false && m.isMember && m.canLeave === true ? roomMenuButton("leave", "离开房间", "退出成员关系，并释放座位", locked) : '') +
+        (m.available !== false && m.isHost ? roomMenuButton("delete", "解散房间", "关闭房间，所有成员将无法继续进入", locked) : '') + '</div></div>' +
         '<div class="room-menu-footer">' + btn("secondary room-menu-cancel","closeRoomMenu","取消",null,locked) + '</div></section></div>';
     }
     if (state.noteRoom && !state.error) html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注"><div class="dialog-title">个人备注 · ' + esc(state.noteRoom.code) + '</div><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label><input id="room-note" class="input" data-input="roomNote" maxlength="30" placeholder="例如：周五朋友局" value="' + esc(state.roomNoteDraft) + '"' + (state.busy || pending ? ' disabled' : '') + ' /><div class="dialog-actions">' + btn("secondary","closeRoomMenu","取消",null,state.busy || !!pending) + btn("primary","saveRoomNote","保存",null,state.busy || !!pending) + '</div></div></div>';

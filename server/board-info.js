@@ -1,6 +1,7 @@
 "use strict";
 // 板子详情说明内容（只读，供「配置说明」弹窗中的详情入口展示）。
-// 内容逐条摘自 docs/rules.md；仅承载规则说明，不参与任何裁决或结算逻辑。
+// 规则依据 docs/rules.md，多人数板的正文按公开角色配置与任务人数生成。
+// 仅承载规则说明，不参与任何裁决或结算逻辑。
 // schema：{ summary, sections: [{ title, kind: "lines"|"blocks"|"roles", items }] }
 //   lines/blocks 的 items 为字符串；roles 的 items 为 { name, meta, text }。
 module.exports = {
@@ -28,8 +29,8 @@ module.exports = {
         kind: "lines",
         items: [
           "转换牌 2 张转换 / 5 张不转换，混洗后由房主按需发起身份转换，每次消耗一张，牌堆耗尽后不能继续抽取。",
-          "抽到转换时，红蓝兰斯洛特立即互换阵营；角色和初始视野保持不变，各自私密查看当前阵营。当前好人阵营的兰斯只能投成功，当前坏人阵营的兰斯必须投失败。其他坏人可成功或失败，奥伯伦不强制失败。",
-          "三次任务失败或连续五次否决：坏人胜。三次任务成功后由刺客刀梅林，命中坏人胜，否则好人胜；房主登记最终胜负，个人胜负按当前阵营结算。",
+          "抽到转换时，红蓝兰斯洛特立即互换阵营；角色和初始视野保持不变，各自私密查看当前阵营。当前好人阵营的兰斯只能投成功，当前坏人阵营的兰斯必须投失败。其他坏人可成功或失败。",
+          "三次任务失败或连续五次否决：坏人胜。三次任务成功后由刺客刀梅林，命中坏人胜，否则好人胜；个人胜负按当前阵营结算。",
         ],
       },
       {
@@ -49,18 +50,16 @@ module.exports = {
         title: "目标与胜负",
         kind: "lines",
         items: [
-          "三张任务失败：坏人胜。",
-          "三张任务成功：进入最终行刺；刺客在线下指认梅林，命中坏人胜，未命中好人胜，由房主结束本局。",
+          "三次任务失败：坏人胜。",
+          "三次任务成功：进入最终行刺；刺客在线下指认梅林，命中坏人胜，未命中好人胜。",
         ],
       },
       {
         title: "组队与任务",
         kind: "lines",
         items: [
-          "5 人：3 好（梅林、派西维尔、忠臣）、2 坏（莫甘娜、刺客）；五轮任务人数为 2 / 3 / 2 / 3 / 3，每轮一张失败即任务失败。",
-          "任务人数与两失败门槛由服务端按人数配置，可查看发牌前的角色配置。",
           "组队表决严格过半才通过，平票视为否决；连续 5 次否决坏人胜。",
-          "任务只能由队员出牌；好人必须投成功，坏人可投成功或失败（奥伯伦不强制失败）。",
+          "任务只能由队员出牌；好人必须投成功，坏人可投成功或失败。",
         ],
       },
       {
@@ -71,11 +70,6 @@ module.exports = {
           "普通坏人只看到非奥伯伦的同阵营伙伴的座位；奥伯伦与其他坏人互不认识。",
           "9 人逆仆：逆仆只能投成功，能看到刺客的确切座位，其他坏人看不到逆仆。",
         ],
-      },
-      {
-        title: "其他",
-        kind: "lines",
-        items: ["最终刀梅林、逆仆指认等线下的决策由房主发起并结束本局。"],
       },
     ],
   },
@@ -95,8 +89,8 @@ module.exports = {
         title: "目标与胜负",
         kind: "lines",
         items: [
-          "三张失败任务：坏人胜。",
-          "三张成功任务：刺客在线下指认梅林，命中坏人胜，未命中好人胜；由房主结束本局。",
+          "三次任务失败：坏人胜。",
+          "三次任务成功：刺客在线下指认梅林，命中坏人胜，未命中好人胜。",
         ],
       },
       {
@@ -133,8 +127,8 @@ module.exports = {
         title: "目标与胜负",
         kind: "lines",
         items: [
-          "三张失败任务：逆仆输。",
-          "三张成功任务：先指认逆仆（命中则逆仆转阵营随坏人胜，未中保留原阵营），无论命中与否都再刺梅林；两次决策在线下讨论后由刺客录入目标，房主请求结算。",
+          "三次任务失败：坏人胜，逆仆随好人阵营失败。",
+          "三次任务成功：先指认逆仆（命中则逆仆转阵营随坏人胜，未中保留原阵营），无论命中与否都再刺梅林；两次决策在线下讨论后由刺客录入目标，房主请求结算。",
           "先刀逆仆的目标与命中结果不额外公开。",
         ],
       },
@@ -163,8 +157,8 @@ module.exports = {
         kind: "lines",
         items: [
           "线上部分：随机首队长、座位顺时针轮换、组队表决与任务。",
-          "初始互认、内奸挡刀、猜角色与起刀等特殊规则在线下完成。",
-          "三成功、三失败、5 次连续否决都转入线下特殊结算，软件不宣布最终胜方；房主确认「线下已完成」后结束本局。",
+          "初始视野在私密身份卡查看；内奸挡刀、猜角色与起刀等特殊规则在线下完成。",
+          "三次任务成功、三次任务失败或连续 5 次组队否决后，在线下按内奸与阵营规则判定最终胜负。",
         ],
       },
       {
@@ -172,7 +166,7 @@ module.exports = {
         kind: "lines",
         items: [
           "蓝方只能投成功；奥伯伦与红内奸必须失败；其余红方可选成功或失败。",
-          "第 4 轮两张失败，其他轮单张失败；组队票按座位公开，任务只公开汇总，不返回个人暗票。",
+          "组队表决严格过半通过，平票视为否决；组队票按座位公开，任务只公开汇总。",
         ],
       },
       {
@@ -200,7 +194,7 @@ module.exports = {
         kind: "lines",
         items: [
           "线上完成组队、任务、投票与术士/盗贼出牌；捣蛋鬼首夜绑定、盗贼共同盘刀与排名在线下处理。",
-          "三张失败、混合排名与合并刺杀等特殊胜负在线下结算，软件不公开隐藏状态；房主确认后结束本局。",
+          "三次任务成功、三次任务失败后，按盗贼、捣蛋鬼与好坏阵营的特殊胜负规则在线下结算；起刀、混合排名与合并刺杀也在线下处理。",
         ],
       },
       {
@@ -222,7 +216,7 @@ module.exports = {
         kind: "lines",
         items: [
           "梅林见莫甘娜、红术士、奥伯伦、红盗贼；派西维尔见梅林与莫甘娜且不区分。",
-          "莫德雷德、莫甘娜、红术士互认但不区分身份；高文见两名术士的座位；两名盗贼互认；其余无视野。",
+          "莫德雷德、莫甘娜、红术士互见同伴座位与具体身份；高文见两名术士的座位，不区分红蓝；两名盗贼互认；其余无视野。",
         ],
       },
     ],
@@ -235,9 +229,9 @@ module.exports = {
         title: "目标与胜负",
         kind: "lines",
         items: [
-          "三张任务失败：红方（坏人）胜利。",
-          "三张任务成功：进入最终行刺；带刀人线下指向梅林，命中红胜、未命中好人胜，由房主结束本局。",
-          "三张成功前允许存活见面匪提前起刀；带刀人由红方多数决议，平票先在线下猜拳。",
+          "三次任务失败：红方（坏人）胜利。",
+          "三次任务成功：进入最终行刺；带刀人线下指向梅林，命中红胜、未命中好人胜。",
+          "三次任务成功前允许存活见面匪提前起刀；带刀人由红方多数决议，平票先在线下猜拳。",
         ],
       },
       {
@@ -253,9 +247,9 @@ module.exports = {
         kind: "blocks",
         items: [
           "抽牌复活：技能结算后按出局顺序依次抽取 B 牌复活；新身份在下一轮技能环节才获得行动资格。",
-          "复活甲：梅林、派西维尔、莫甘娜的首张 B 牌视作复活甲，消耗一张 B 牌恢复原视野身份且不再拥有技能。",
+          "复活甲：梅林、派西维尔、莫甘娜首次出局后，消耗一张 B 牌恢复原身份与初始视野；B 牌耗尽时无法触发。",
           "B 牌耗尽后出局者不再复活，不能参加投票与组队但可发言，并保留最后阵营。",
-          "身份转换：转换牌 2 张转换 / 5 张不转换，混洗后依次抽取；第 2–5 轮任务后由房主发起。",
+          "身份转换：转换牌 2 张转换 / 5 张不转换，混洗后由房主按线下进度独立发起。每次消耗一张，牌堆耗尽后不能继续抽取。",
         ],
       },
       {
@@ -270,8 +264,9 @@ module.exports = {
         title: "流程顺序",
         kind: "lines",
         items: [
-          "组队与任务（线下讨论）→ 第 2–5 轮身份转换 → 技能环节（全员同时秘密提交，收齐后自动结算，允许互刀）→ 按出局顺序抽 B 复活 → 仙女查验 → 月下先知视野自动更新。",
-          "第一轮可直接使用技能；本轮技能结算完成后，下一次合法发起任务自动推进一轮并轮换车长。",
+          "技能环节全员同时秘密提交，收齐后自动结算，允许互刀；完成全部技能后，按出局顺序抽 B 牌复活，并自动更新月下先知视野。",
+          "第一轮可直接使用技能；本轮技能结算后，下一次发起任务或技能时自动推进技能轮次，新抽 B 牌的主动技能随之启用。",
+          "身份转换与仙女查验可按线下进度独立发起，不限制轮次或每轮次数；已开始的操作须先结算或明确作废。",
         ],
       },
       {
@@ -343,7 +338,7 @@ module.exports = {
           {
             name: "觉醒蓝刀客",
             meta: "蓝方",
-            text: "B 牌刀客。技能环节可攻击 1 人，结算与 A 刀一致；本身份通过复活摸牌获得，下一轮技能环节启用。",
+            text: "B 牌刀客。技能环节可攻击场上其他 1 人，不受 A 刀的目标身份限制；每张身份牌限用一次，通过复活摸牌获得后，下一轮技能环节启用。",
           },
           {
             name: "蓝骑士",
@@ -358,7 +353,7 @@ module.exports = {
           {
             name: "蓝猎人",
             meta: "蓝方",
-            text: "技能环节从主动技能、被动技能、不使用技能中三选一。主动自爆出局并带走固定相邻座位的 1 人（12 人局 12 号可选 1 或 11 号）；被动预选场上其他 1 人，自己出局时自动向其开枪。两种方式共用一次技能；替女巫出局不触发被动枪。",
+            text: "技能环节从主动技能、被动技能、不使用技能中三选一。主动自爆出局并带走固定相邻座位的 1 人；首尾相邻，不会跳过已出局的邻座。被动预选场上其他 1 人，自己出局时自动向其开枪。两种方式共用一次技能；替女巫出局不触发被动枪。",
           },
         ],
       },
@@ -369,7 +364,7 @@ module.exports = {
           {
             name: "觉醒红刀客",
             meta: "红方",
-            text: "B 牌刀客。技能环节可攻击 1 人，结算与 A 刀一致；本身份通过复活摸牌获得，下一轮技能环节启用。",
+            text: "B 牌刀客。技能环节可攻击场上其他 1 人，不受 A 刀的目标身份限制；每张身份牌限用一次，通过复活摸牌获得后，下一轮技能环节启用。",
           },
           {
             name: "红骑士",
@@ -379,12 +374,12 @@ module.exports = {
           {
             name: "石像鬼",
             meta: "红方",
-            text: "替代红守卫。抽到时随机查验场上 1 人，每轮技能环节还可主动查验场上 1 人。仅获知是否拥有主动击杀能力（刀客、觉醒刀客、骑士、猎人），不获知具体身份；结果仅本人可见。",
+            text: "整批 B 牌发完后，随机查验场上 1 人（可含自己）；以后每轮技能环节还可主动查验场上 1 人。仅获知是否拥有主动击杀能力（含刺客、刀客、觉醒刀客、骑士、猎人），不获知具体身份；结果仅本人可见。",
           },
           {
             name: "红猎人",
             meta: "红方",
-            text: "技能环节从主动技能、被动技能、不使用技能中三选一。主动自爆出局并带走固定相邻座位的 1 人（12 人局 12 号可选 1 或 11 号）；被动预选场上其他 1 人，自己出局时自动向其开枪。两种方式共用一次技能；替女巫出局不触发被动枪。",
+            text: "技能环节从主动技能、被动技能、不使用技能中三选一。主动自爆出局并带走固定相邻座位的 1 人；首尾相邻，不会跳过已出局的邻座。被动预选场上其他 1 人，自己出局时自动向其开枪。两种方式共用一次技能；替女巫出局不触发被动枪。",
           },
           {
             name: "女巫",
@@ -402,7 +397,7 @@ module.exports = {
           "初始互认固定在发牌时，不随同伴死亡、阵营转换或更换 B 牌更新；新 B 牌没有额外初始互认视野。",
           "仙女初始由首车长持有，不能自验或查验此前持有过仙女的人；即使出局仍可传递。",
           "技能或查验进行中需先结算，或明确「作废当前操作」才能切换；作废恢复本环节开始时的状态。",
-          "最终刀梅林、带刀人决议与最终胜负以线下为准，由房主结束本局。",
+          "最终刀梅林、带刀人决议与最终胜负在线下判定，个人胜负按最终阵营结算。",
         ],
       },
     ],
@@ -411,7 +406,7 @@ module.exports = {
 // 十二骑士 10 人局由 12 人局内容派生：A 牌去掉红蓝兰斯洛特；
 // 组队任务人数按服务端 TEAMS[10]（3/4/4/5/5）改写，其余章节保持一致。
 module.exports["knights-10"] = (() => {
-  const base = module.exports.knights;
+  const base = structuredClone(module.exports.knights);
   const sections = base.sections.map((sec) => {
     if (sec.title === "AB 牌堆与身份构成")
       return {
@@ -446,7 +441,7 @@ module.exports["knights-10"] = (() => {
 // 十二骑士 11 人局由 12 人局内容派生：A 牌去掉红兰斯洛特（7 蓝 4 红共 11 张），
 // 蓝兰斯洛特被梅林视为坏人；组队任务人数按服务端 TEAMS[11]（3/4/5/6/6）改写。
 module.exports["knights-11"] = (() => {
-  const base = module.exports.knights;
+  const base = structuredClone(module.exports.knights);
   const sections = base.sections.map((sec) => {
     if (sec.title === "AB 牌堆与身份构成")
       return {
@@ -474,7 +469,7 @@ module.exports["knights-11"] = (() => {
           )
           .map((item) =>
             item.name === "蓝刀客 · 兰斯洛特"
-              ? { ...item, text: item.text + " 11 人局转换前被梅林视为坏人。" }
+              ? { ...item, text: item.text + " 11 人局发牌时被梅林视为坏人；后续转换不改变初始视野。" }
               : item,
           ),
       };
@@ -488,16 +483,15 @@ module.exports["knights-11"] = (() => {
 })();
 // 扩展板优先查技能；完整技能保留在展开说明中。
 module.exports["classic-11"].sections = module.exports["classic-11"].sections
-  .filter(sec => sec.title !== "组队与任务")
   .map(sec => sec.title === "目标与胜负"
-    ? { ...sec, title: "逆仆结算", items: sec.items.slice(1) }
+    ? { ...sec, title: "逆仆结算" }
     : sec);
 const skillBriefs = {
   "圣骑士": "本轮反伤所有击杀者；触发后下轮失效，无法反伤红女巫。",
   "魔术师": "秘密交换两人号码；参与攻击结算才消耗。",
   "月下先知": "每轮技能全部结算后，查看在场 B 牌坏人。",
-  "觉醒蓝刀客": "攻击 1 人，按 A 刀规则结算；下轮启用。",
-  "觉醒红刀客": "攻击 1 人，按 A 刀规则结算；下轮启用。",
+  "觉醒蓝刀客": "可攻击其他任意身份；一次技能，下轮启用。",
+  "觉醒红刀客": "可攻击其他任意身份；一次技能，下轮启用。",
   "蓝骑士": "决斗坏人则对方出局，决斗好人则自己出局；莫德雷德按好人判定。",
   "红骑士": "决斗好人则对方出局，决斗坏人则自己出局；莫德雷德按好人判定。",
   "蓝守卫": "守护 1 人，可守自己；挡一刀才消耗。",
@@ -558,3 +552,250 @@ module.exports["knights-13"] = JSON.parse(JSON.stringify(module.exports.knights)
 module.exports["knights-13"].sections
   .find((sec) => sec.title === "AB 牌堆与身份构成").items[0] =
   "A 牌 13 张（初始身份）：蓝方 8 张——蓝刀客×3（加雷斯、加赫雷斯、兰斯洛特）、忠臣×3、派西维尔、梅林；红方 5 张——红刀客×2（奥伯伦、兰斯洛特）、刺客、莫德雷德、莫甘娜。仅比 12 人局增加一名忠臣，其余规则完全一致。";
+
+// 多人数板按当前公开配置生成独立正文；小程序与 Web 共用同一份规则数据。
+const { BOARDS, TEAMS } = require("./engine");
+const classicTemplate = module.exports.classic;
+function formationDescription(board, capacity) {
+  return `${capacity} 人：${board.roleConfigurations[capacity]
+    .map(
+      (side) =>
+        `${side.count} ${{ good: "好", evil: "坏", third: "盗贼" }[side.faction]}（${side.roles.replaceAll("，", "、")}）`,
+    )
+    .join("、")}`;
+}
+function taskDescription(capacity) {
+  return `五轮任务人数为 ${TEAMS[capacity].join(" / ")}；${
+    capacity >= 7
+      ? "第 4 轮需两张失败才算任务失败，其余轮次一张失败即任务失败。"
+      : "每轮一张失败即任务失败。"
+  }`;
+}
+function capacityDetail(board, capacity) {
+  const configuration = board.roleConfigurations[capacity];
+  const hasRole = (name) =>
+    configuration.some((side) => side.roles.includes(name));
+  const formation = formationDescription(board, capacity);
+  const tasks = taskDescription(capacity);
+  const reverse = hasRole("逆仆");
+  const vision = [
+    `梅林看见所有坏人${reverse ? "及逆仆" : ""}${hasRole("莫德雷德") ? "，但看不到莫德雷德" : ""}；派西维尔看到梅林与莫甘娜的座位，不区分身份。`,
+    hasRole("奥伯伦")
+      ? `除奥伯伦外，坏人互见同伴的座位与具体身份；${hasRole("奥伯伦×") ? "奥伯伦彼此之间、与其他坏人之间均不互认" : "奥伯伦与其他坏人互不认识"}。`
+      : "坏人互见同伴的座位与具体身份。",
+    ...(reverse
+      ? ["逆仆只能投成功，能看到刺客的确切座位；其他坏人看不到逆仆。"]
+      : []),
+  ];
+  const template = module.exports[board.id];
+  if (board.id === "lancelot")
+    return {
+      ...template,
+      summary: `${capacity} 人红蓝兰斯：${configuration[0].count} 好 ${configuration[1].count} 坏，支持兰斯阵营转换。`,
+      sections: template.sections.map((section) => {
+        if (section.title === "阵容")
+          return { ...section, items: [formation + "。"] };
+        if (section.title === "组队与任务")
+          return { ...section, items: [tasks, ...section.items.slice(1)] };
+        if (section.title === "初始视野")
+          return {
+            ...section,
+            items: [
+              `梅林看见莫甘娜、刺客、红兰斯洛特${hasRole("奥伯伦") ? "和奥伯伦" : ""}，看不到莫德雷德和蓝兰斯洛特；派西维尔看到梅林与莫甘娜，但无法区分身份。`,
+              `红蓝兰斯洛特均没有初始视野；红兰斯洛特${hasRole("奥伯伦") ? "和奥伯伦均" : ""}不与其他坏人互认。莫德雷德、莫甘娜、刺客互见同伴座位与具体角色。`,
+            ],
+          };
+        return section;
+      }),
+    };
+  if (board.id === "classic-11") {
+    const sections = template.sections.map((section) => {
+      if (section.title === "阵容与逆仆")
+        return {
+          ...section,
+          items: [formation + "。", ...section.items.slice(1)],
+        };
+      if (section.title === "组队与任务")
+        return {
+          ...section,
+          items: [
+            tasks,
+            ...section.items.slice(1),
+            classicTemplate.sections.find((s) => s.title === "组队与任务")
+              .items[1],
+          ],
+        };
+      return section;
+    });
+    sections.splice(
+      sections.findIndex((s) => s.title === "湖中仙女"),
+      0,
+      {
+        title: "初始视野",
+        kind: "lines",
+        items: vision,
+      },
+    );
+    return { ...template, sections };
+  }
+  return {
+    summary: reverse
+      ? `${capacity} 人逆仆：组队、表决、任务，最终先指认逆仆再刺梅林。`
+      : `经典阿瓦隆：${capacity} 人配置，组队、表决、任务，最终在线下刺梅林。`,
+    sections: classicTemplate.sections.map((section) => {
+      if (section.title === "目标与胜负")
+        return {
+          ...section,
+          items: [
+            "三次任务失败：坏人胜。",
+            reverse
+              ? "三次任务成功：先指认逆仆，命中则逆仆转入坏人阵营，未命中保留原阵营；无论是否命中，都再由刺客在线下指认梅林，命中坏人胜，未命中好人胜。指认逆仆的目标与命中结果不额外公开。"
+              : `三次任务成功：进入最终行刺；${hasRole("刺客") ? "刺客" : "莫德雷德"}在线下指认梅林，命中坏人胜，未命中好人胜。`,
+          ],
+        };
+      if (section.title === "组队与任务")
+        return {
+          ...section,
+          items: [formation + "；" + tasks, ...section.items],
+        };
+      if (section.title === "初始视野") return { ...section, items: vision };
+      return section;
+    }),
+  };
+}
+function fairySection(capacity, knights) {
+  return {
+    title: "湖中仙女",
+    kind: "lines",
+    items:
+      capacity < 7
+        ? [`${capacity} 人局不使用湖中仙女。`]
+        : [
+            `${capacity} 人局默认${capacity === 7 ? "关闭，可由房主在房间设置中开启" : "开启，可由房主在房间设置中禁用"}；同房重开保留选择。`,
+            "初始由随机首车长持有，公共座位显示「湖仙」。持有者查验后将仙女传给目标，不能自验或查验历任持有者。",
+            ...(knights
+              ? ["只能查验在场玩家；已出局的仙女持有者仍可传递。"]
+              : []),
+            "查验结果仅本人可见，显示目标当前真实阵营。关闭后保留本局传递记录；正在查验时须先完成或作废才能修改开关。",
+          ],
+  };
+}
+
+function knightVision(capacity) {
+  const hasBlue = capacity !== 10,
+    hasRed = capacity >= 12;
+  const visible = [
+    "刺客",
+    "莫甘娜",
+    "红刀客·奥伯伦",
+    ...(hasRed ? ["红兰斯洛特"] : []),
+    ...(capacity === 11 ? ["蓝兰斯洛特（视为坏人）"] : []),
+  ];
+  const closed = [
+    "蓝刀客·加雷斯",
+    "蓝刀客·加赫雷斯",
+    "红刀客·奥伯伦",
+    ...(hasBlue ? ["蓝兰斯洛特"] : []),
+    ...(hasRed ? ["红兰斯洛特"] : []),
+    "忠臣",
+  ];
+  return {
+    title: "初始视野",
+    kind: "lines",
+    items: [
+      `梅林看见${visible.join("、")}，看不到莫德雷德${hasRed ? "和蓝兰斯洛特" : ""}；派西维尔看到梅林与莫甘娜的座位，不区分身份。`,
+      "刺客、莫德雷德、莫甘娜互见同伴座位与具体身份。",
+      `${closed.join("、")}没有初始视野，也不参与坏人互认。`,
+    ],
+  };
+}
+
+// 每种已开放配置都使用独立正文，避免派生板之间共享数组或角色卡对象。
+const capacityBoards = new Set([
+  "classic",
+  "classic-court",
+  "classic-11",
+  "lancelot",
+]);
+for (const board of BOARDS.filter((b) => b.available)) {
+  const source = module.exports[board.id];
+  const byCapacity = Object.fromEntries(
+    board.counts.map((capacity) => {
+      const detail = structuredClone(
+        capacityBoards.has(board.id) ? capacityDetail(board, capacity) : source,
+      );
+      const knights = board.id.startsWith("knights");
+      detail.sections = detail.sections.map((section) => {
+        if (section.title === "湖中仙女")
+          return fairySection(capacity, knights);
+        if (section.title === "身份构成")
+          return {
+            ...section,
+            items: [formationDescription(board, capacity) + "。"],
+          };
+        if (section.title === "出牌限制")
+          return {
+            ...section,
+            items: [taskDescription(capacity), ...section.items],
+          };
+        if (knights && section.kind === "roles")
+          return {
+            ...section,
+            items: section.items.map((role) =>
+              /^(蓝|红)猎人$/.test(role.name)
+                ? {
+                    ...role,
+                    text: role.text.replace(
+                      "首尾相邻",
+                      `首尾相邻（${capacity} 号邻座为 1 号与 ${capacity - 1} 号）`,
+                    ),
+                  }
+                : role,
+            ),
+          };
+        if (knights && section.title === "B 牌、复活与转换")
+          return {
+            ...section,
+            items: [
+              ...section.items.filter(
+                (line) => capacity !== 10 || !line.startsWith("身份转换："),
+              ),
+              capacity === 10
+                ? "本配置没有兰斯洛特，无需进行兰斯阵营转换。"
+                : capacity === 11
+                  ? "抽到转换时，蓝兰斯洛特切换阵营；角色和初始视野保持不变。"
+                  : "抽到转换时，红蓝兰斯洛特互换阵营；角色和初始视野保持不变。",
+            ],
+          };
+        if (knights && capacity === 10 && section.title === "流程顺序")
+          return {
+            ...section,
+            items: section.items.map((line) =>
+              line.replace("身份转换与仙女查验", "仙女查验"),
+            ),
+          };
+        return section;
+      });
+      if (knights) {
+        const deckIndex = detail.sections.findIndex(
+          (s) => s.title === "AB 牌堆与身份构成",
+        );
+        detail.sections.splice(
+          deckIndex + 1,
+          0,
+          {
+            title: "任务配置",
+            kind: "lines",
+            items: [
+              taskDescription(capacity),
+              `好人只能投成功；红刀客·奥伯伦${capacity === 10 ? "" : "及当前坏人阵营的兰斯洛特"}必须投失败；其余坏人可投成功或失败。`,
+            ],
+          },
+          knightVision(capacity),
+        );
+      }
+      return [capacity, detail];
+    }),
+  );
+  module.exports[board.id] = { ...byCapacity[board.counts[0]], byCapacity };
+}

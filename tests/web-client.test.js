@@ -31,6 +31,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
+  context.window.shadowtableRoomConfirmation = require('../miniprogram/room-confirmation');
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
@@ -325,8 +326,8 @@ test('网页左滑和菜单移除均须确认，取消或离开页面不提交�
       }
       return response({rooms:hidden?[]:[room]});
     });
-    c.setConfirm((title, message, showCancel, label) => {
-      dialogs.push({title,message,label});
+    c.setConfirm((title, message, showCancel, label, receipt, context) => {
+      dialogs.push({title,message,label,context});
       return new Promise(resolve => { resolveConfirm = resolve; });
     });
     Object.assign(c.state,{loading:false,memberRooms:[room]});
@@ -338,9 +339,10 @@ test('网页左滑和菜单移除均须确认，取消或离开页面不提交�
     const removing = action();
     assert.equal(c.state.busy,true); assert.equal(writes.length,0);
     await action(); assert.equal(dialogs.length,1);
-    assert.match(dialogs[0].title,/从列表移除房间 123456/);
-    assert.match(dialogs[0].message,/不会离开或解散房间/);
-    assert.equal(dialogs[0].label,'移除');
+    assert.equal(dialogs[0].title,'移除房间记录？');
+    assert.match(dialogs[0].message,/房间、座位和战绩都会保留/);
+    assert.equal(dialogs[0].label,'移除记录');
+    assert.equal(dialogs[0].context.contextValue,'123456');
     if (result === 'background') c.stop();
     resolveConfirm(result !== 'cancel'); await removing;
     assert.equal(writes.length,result === 'confirm' || result === 'failure' ? 1 : 0);
@@ -360,10 +362,14 @@ test('网页左滑解散须确认，取消不删除，快捷操作不解散已�
     if(url.endsWith('/management'))return response({...room,status});
     return response({rooms:[{...room,status}]});
   });
-  c.setConfirm(async (title, message) => {dialogs.push({title,message}); return allow;});
+  c.setConfirm(async (title, message, showCancel, label, receipt, context) => {dialogs.push({title,message,label,context}); return allow;});
   Object.assign(c.state,{loading:false,memberRooms:[room]});
   webSwipe(c,room.code); await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});
-  assert.equal(dialogs.length,1); assert.match(dialogs[0].title,/解散房间 123456/);
+  assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'解散房间？');
+  assert.equal(dialogs[0].message,'所有玩家将退出，进行中的对局不判胜负，房间将被删除且无法恢复。');
+  assert.equal(dialogs[0].context.contextValue,'123456');
+  assert.equal(dialogs[0].context.danger,true);
+  assert.equal(dialogs[0].label,'解散房间');
   assert.equal(calls.some(x=>x.url.endsWith('/delete')),false);
   status='playing'; allow=true; webSwipe(c,room.code);
   await c.ACTIONS.swipeRoomAction({dataset:{code:room.code,kind:'delete'}});

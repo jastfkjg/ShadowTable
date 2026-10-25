@@ -9,6 +9,7 @@ const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
 const roomList = require("../../room-list");
+const roomConfirmation = require("../../room-confirmation");
 const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
@@ -1124,12 +1125,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending) return;
     this.setData({ busy: true, error: "" });
     try {
-      if (!(await this.confirm(
-        "移除这条房间记录？",
-        "仅从你的列表中移除，房间、座位和战绩都会保留。",
-        "移除记录",
-        { contextLabel: "房间", contextValue: code, contextMeta: this.data.memberRooms.find(room => room.code === code)?.statusLabel || "" },
-      ))) return;
+      if (!(await this.confirmRoomAction("hide", this.data.memberRooms.find(room => room.code === code) || { code }))) return;
       if (!this.alive || !this.foreground) return;
       this.setData({ busy: false });
       await this.mutate("/api/me/rooms/" + code, { action: "hide" }, "entryHide");
@@ -1146,7 +1142,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (kind === "delete" && room.isHost && room.available !== false)
       return this.deleteRoom({ currentTarget: { dataset: { code: room.code } } });
     if (kind === "leave" && room.canLeave) {
-      if (!(await this.confirm("离开房间 " + room.code + "？", "将释放你的座位，房间和房主权限保留。"))) return;
+      if (!(await this.confirmRoomAction("leave", room))) return;
       if (this.data.busy || this.pending) return;
       this.setData({ busy: true });
       try {
@@ -1170,12 +1166,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         return;
       }
       if (
-        !(await this.confirm(
-          "解散房间 " + code + "？",
-          "所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。",
-          "解散",
-          { danger: true },
-        ))
+        !(await this.confirmRoomAction("delete", room))
       )
         return;
       if (!this.alive || !this.foreground) return;
@@ -1832,6 +1823,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }),
     );
   },
+  confirmRoomAction(kind, room) {
+    const value = roomConfirmation.present(kind, room);
+    return this.confirm(value.title, value.content, value.confirmText, value);
+  },
   async confirmCommand(title, content, type, extra = {}) {
     const stage = this.data.room?.stage;
     if (!(await this.confirm(title, content, "确定", { danger: ["terminate", "cancelActivity"].includes(type) }))) return;
@@ -2133,12 +2128,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.busy || this.pending || !this.data.room) return;
     const room = this.data.room;
     if (
-      !(await this.confirm(
-        "离开房间？",
-        room.me.isHost
-          ? "将释放你的座位，牌桌和房主权限保留。"
-          : "将释放你的座位，牌桌保留。",
-      ))
+      !(await this.confirmRoomAction("leave", room))
     )
       return;
     if (

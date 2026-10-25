@@ -1,6 +1,6 @@
-<view wx:if="{{dialog}}" class="app-dialog-backdrop" catchtouchmove="blockScroll" catchtap="blockScroll">
+<view wx:if="{{dialog}}" class="app-dialog-backdrop {{dialog.variant==='room-confirm'?'is-room-confirm-backdrop':''}}" catchtouchmove="blockScroll" catchtap="blockScroll">
   <block wx:if="{{dialog.variant==='badge-awards'}}"><include src="./awards.wxml" /></block>
-  <view wx:else class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+  <view wx:else class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
     <view wx:if="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
       <view class="app-dialog-grant-icon" aria-hidden="true"><image src="{{dialog.contextIcon}}" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>
@@ -16,7 +16,7 @@
         <view wx:if="{{dialog.lead}}" class="app-dialog-lead">{{dialog.lead}}</view>
         <view wx:if="{{dialog.content}}" class="app-dialog-hint {{dialog.lead?'has-lead':''}}">{{dialog.content}}</view>
       </view>
-      <view wx:else class="app-dialog-message">{{dialog.content}}</view>
+      <view wx:else class="app-dialog-message"><block wx:if="{{dialog.emphasis}}"><text>{{dialog.contentBefore}}</text><text class="app-dialog-emphasis">{{dialog.emphasis}}</text><text>{{dialog.contentAfter}}</text></block><block wx:else>{{dialog.content}}</block></view>
     </scroll-view>
     <view class="app-dialog-actions">
       <button wx:if="{{dialog.showCancel}}" class="app-dialog-cancel" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.cancelText}}</button>

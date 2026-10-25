@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/room-list.css" />
     <link rel="stylesheet" href="/room-menu.css" />
+    <link rel="stylesheet" href="/room-confirmation.css" />
     <link rel="stylesheet" href="/leaderboard.css" />
     <link rel="stylesheet" href="/monthly.css" />
     <link rel="stylesheet" href="/board-detail.css" />
@@ -27,6 +28,7 @@
     <script src="/public-history.js" defer></script>
     <script src="/room-swipe.js" defer></script>
     <script src="/room-list.js" defer></script>
+    <script src="/room-confirmation.js" defer></script>
     <script src="/badges.js" defer></script>
     <script src="/board-detail.js" defer></script>
     <script src="/avoidance.js" defer></script>
@@ -41,8 +43,9 @@
     <main id="app"></main>
     <div id="toast" role="status" aria-live="polite"></div>
     <div id="modal" class="dialog-backdrop" hidden>
-      <div class="error-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="error-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-room-context modal-message">
         <div class="dialog-title" id="modal-title"></div>
+        <div id="modal-room-context" class="dialog-room-context" hidden><img src="/assets/home-table-blue.svg" alt="" /><span>房间</span><span id="modal-room-code" class="dialog-room-code"></span><span id="modal-room-status" class="dialog-room-status"></span></div>
         <div class="dialog-grant-context" id="modal-grant-context" hidden><span>本次获得</span><span class="dialog-grant-amount" id="modal-grant-amount"></span></div>
         <div class="dialog-message" id="modal-message"></div>
         <div class="dialog-actions">

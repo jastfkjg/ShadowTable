@@ -1,46 +1,51 @@
 /* Shared room-management sheet: keep native disabled buttons geometrically stable. */
-.dialog-backdrop.room-menu-backdrop { align-items:flex-end; padding:0; background:var(--overlay-scrim); backdrop-filter:none; }
-.error-dialog.room-menu-dialog { --menu-divider:rgba(177,191,198,.13); --menu-hover:rgba(177,191,198,.08); display:flex; flex-direction:column; width:100%; max-width:600px; max-height:calc(100vh - 20px); margin:0; padding:0 20px; box-sizing:border-box; overflow:hidden; border:1px solid var(--overlay-border); border-bottom:0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background:var(--surface); box-shadow:0 -12px 45px rgba(0,0,0,.14); animation:room-menu-in 180ms ease-out; }
-.room-menu-handle { flex-shrink:0; width:34px; height:4px; margin:11px auto 8px; border-radius:8px; background:#5c6b73; opacity:.65; }
-.room-menu-header { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:12px; min-height:49px; }
-.room-menu-heading { color:var(--text); font-size:19px; line-height:1.5; font-weight:600; letter-spacing:.2px; }
+.dialog-backdrop.room-menu-backdrop { align-items:flex-end; padding:0; background:var(--overlay-scrim,rgba(2,10,15,.7)); backdrop-filter:none; }
+.error-dialog.room-menu-dialog { --menu-divider:rgba(177,191,198,.13); --menu-hover:rgba(177,191,198,.08); --menu-summary:#24333e; --menu-blue:#99c7f5; --menu-leave:#f29b96; display:flex; flex-direction:column; width:100%; max-width:600px; max-height:calc(100vh - 20px); margin:0; padding:0 20px; box-sizing:border-box; overflow:hidden; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-bottom:0; border-radius:var(--sheet-radius,24px) var(--sheet-radius,24px) 0 0; background:var(--surface); box-shadow:0 -12px 45px rgba(0,0,0,.14); animation:room-menu-in 180ms ease-out; }
+.room-menu-handle { flex-shrink:0; width:34px; height:4px; margin:10px auto 6px; border-radius:8px; background:#5c6b73; opacity:.65; }
+.room-menu-header { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:12px; min-height:44px; }
+.room-menu-heading { color:var(--text); font-size:21px; line-height:1.5; font-weight:600; letter-spacing:.2px; }
 .room-menu-dialog button.room-menu-close,
 .room-menu-dialog button.room-menu-close[disabled]:not([type]) { display:flex; flex:0 0 44px; align-items:center; justify-content:center; width:44px; height:44px; min-height:44px; margin:0 -8px 0 0; padding:0; border:0; border-radius:12px; background:transparent; color:var(--muted); }
-.room-menu-cross { position:relative; display:block; width:14px; height:14px; }
-.room-menu-cross::before, .room-menu-cross::after { content:""; position:absolute; top:6px; left:0; width:14px; height:1.5px; border-radius:1px; background:currentColor; transform:rotate(45deg); }
+.room-menu-cross { position:relative; display:block; width:18px; height:18px; }
+.room-menu-cross::before, .room-menu-cross::after { content:""; position:absolute; top:8px; left:0; width:18px; height:1.5px; border-radius:1px; background:currentColor; transform:rotate(45deg); }
 .room-menu-cross::after { transform:rotate(-45deg); }
-.room-menu-body { display:block; flex-shrink:1; min-height:0; max-height:calc(100vh - 164px - env(safe-area-inset-bottom)); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
-.room-menu-context { display:flex; align-items:center; gap:11px; min-height:44px; margin:10px 0 20px; }
-.room-menu-table-icon { display:flex; flex:0 0 37px; align-items:center; justify-content:center; width:37px; height:39px; border-radius:12px; background:#263e52; }
-.room-menu-table-icon image, .room-menu-table-icon img { display:block; width:20px; height:20px; }
+.room-menu-body { display:block; flex-shrink:1; min-height:0; max-height:calc(100vh - 168px - env(safe-area-inset-bottom)); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.room-menu-context { display:flex; align-items:center; gap:12px; min-height:74px; margin:12px 0 8px; padding:12px; box-sizing:border-box; border:1px solid rgba(153,199,245,.18); border-radius:12px; background:var(--menu-summary); }
+.room-menu-table-icon { display:flex; flex:0 0 40px; align-items:center; justify-content:center; width:40px; height:42px; border-radius:12px; background:#263e52; }
+.room-menu-table-icon image, .room-menu-table-icon img { display:block; width:22px; height:22px; }
 .is-expired .room-menu-table-icon { background:rgba(177,191,198,.07); }
 .is-expired .room-menu-table-icon image, .is-expired .room-menu-table-icon img { opacity:.65; filter:grayscale(1); }
 .room-menu-copy { display:block; flex:1; min-width:0; }
-.room-menu-code { color:var(--text); font-size:15px; line-height:1.5; font-weight:500; letter-spacing:.4px; font-variant-numeric:tabular-nums; }
+.room-menu-code { color:var(--text); font-size:17px; line-height:1.5; font-weight:600; letter-spacing:.2px; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .room-menu-code text, .room-menu-code span { letter-spacing:1.1px; }
-.room-menu-board { margin-top:4px; color:var(--muted); font-size:12px; line-height:1.6; font-weight:400; overflow-wrap:anywhere; }
-.room-menu-status { flex-shrink:0; padding:3px 7px; border-radius:7px; background:rgba(177,191,198,.07); color:var(--muted); font-size:11px; line-height:1.5; font-weight:400; white-space:nowrap; }
-.room-menu-options { border-top:1px solid var(--menu-divider); border-bottom:1px solid var(--menu-divider); }
+.room-menu-board { margin-top:4px; color:var(--muted); font-size:13px; line-height:1.6; font-weight:400; overflow-wrap:anywhere; }
+.room-menu-status { display:flex; flex-shrink:0; align-items:center; gap:6px; padding:5px 8px; border:1px solid rgba(153,199,245,.12); border-radius:10px; background:rgba(153,199,245,.08); color:var(--menu-blue); font-size:12px; line-height:1.5; font-weight:500; white-space:nowrap; }
+.room-menu-status::before { content:""; flex-shrink:0; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.is-expired .room-menu-context { border-color:var(--menu-divider); }
+.is-expired .room-menu-status { border-color:var(--menu-divider); background:rgba(177,191,198,.07); color:var(--muted); }
+.room-menu-options { border-bottom:1px solid var(--menu-divider); }
 .room-menu-dialog button.room-menu-action,
-.room-menu-dialog button.room-menu-action[disabled]:not([type]) { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:82px; margin:0; padding:17px 0; box-sizing:border-box; border:0; border-radius:0; background:transparent; color:var(--text); font-size:15px; line-height:1.5; text-align:left; }
+.room-menu-dialog button.room-menu-action[disabled]:not([type]) { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:78px; margin:0; padding:14px 0; box-sizing:border-box; border:0; border-radius:0; background:transparent; color:var(--text); font-size:16px; line-height:1.5; text-align:left; }
 .room-menu-options > button.room-menu-action + button.room-menu-action { box-shadow:inset 0 1px 0 var(--menu-divider); }
-.room-menu-action-icon { display:flex; flex:0 0 36px; align-items:center; justify-content:center; width:36px; height:36px; border-radius:11px; background:rgba(155,197,233,.07); }
-.room-menu-action-icon image, .room-menu-action-icon img { display:block; width:19px; height:19px; }
-.room-menu-label { display:block; font-size:15px; line-height:1.5; font-weight:500; }
-.room-menu-description { display:block; margin-top:5px; color:var(--muted); font-size:12px; line-height:1.65; font-weight:400; overflow-wrap:anywhere; }
-.room-menu-chevron { display:block; flex-shrink:0; width:6px; height:6px; margin-right:3px; border-top:1.5px solid #8eabbc; border-right:1.5px solid #8eabbc; transform:rotate(45deg); }
-.room-menu-danger-zone { margin-top:12px; border-top:1px solid rgba(242,182,174,.18); border-bottom:1px solid rgba(242,182,174,.18); }
+.room-menu-action-icon { display:flex; flex:0 0 40px; align-items:center; justify-content:center; width:40px; height:40px; border-radius:12px; background:rgba(155,197,233,.07); }
+.room-menu-action-icon image, .room-menu-action-icon img { display:block; width:22px; height:22px; }
+.room-menu-label { display:block; font-size:16px; line-height:1.5; font-weight:600; }
+.room-menu-description { display:block; margin-top:4px; color:var(--muted); font-size:13px; line-height:1.6; font-weight:400; overflow-wrap:anywhere; }
+.room-menu-chevron { display:block; flex-shrink:0; width:8px; height:8px; margin-right:4px; border-top:1.5px solid var(--muted); border-right:1.5px solid var(--muted); transform:rotate(45deg); }
+.room-menu-action.is-leave .room-menu-label { color:var(--menu-leave); }
+.room-menu-action.is-leave .room-menu-action-icon { background:rgba(242,155,150,.14); }
 .room-menu-dialog button.room-menu-action.danger,
 .room-menu-dialog button.room-menu-action.danger[disabled]:not([type]) { color:var(--evil); }
 .room-menu-action.danger .room-menu-action-icon { background:rgba(242,182,174,.07); }
 .room-menu-action.danger .room-menu-chevron { border-color:var(--evil); }
-.room-menu-footer { flex-shrink:0; padding:20px 0 calc(12px + env(safe-area-inset-bottom)); }
+.room-menu-footer { flex-shrink:0; padding:16px 0 calc(20px + env(safe-area-inset-bottom)); }
 .room-menu-footer button.room-menu-cancel,
-.room-menu-footer button.room-menu-cancel[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; width:100%; min-height:46px; margin:0; padding:10px 16px; border:1px solid rgba(177,191,198,.09); border-radius:var(--dialog-control-radius); background:#263842; color:#d0d9dd; font-size:15px; line-height:1.5; font-weight:500; }
+.room-menu-footer button.room-menu-cancel[disabled]:not([type]) { display:flex; align-items:center; justify-content:center; width:100%; min-height:48px; margin:0; padding:10px 16px; border:1px solid rgba(177,191,198,.12); border-radius:12px; background:var(--menu-summary); color:var(--text); font-size:16px; line-height:1.5; font-weight:500; }
 .room-menu-dialog button::after { border:0; }
 .room-menu-dialog button[disabled] { opacity:.5; }
 .room-menu-dialog button:not([disabled]):active { background:var(--menu-hover); }
 .room-menu-dialog button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-@media (hover:hover) { .room-menu-dialog button:not([disabled]):hover { background:var(--menu-hover); } }
+@media (hover:hover) { .room-menu-close:not([disabled]):hover, .room-menu-cancel:not([disabled]):hover, .room-menu-action:not([disabled]):hover .room-menu-action-icon { background:var(--menu-hover); } }
+@media (max-width:359px) { .room-menu-context { gap:10px; padding:12px 10px; } .room-menu-status { gap:5px; padding:4px 6px; } }
 @keyframes room-menu-in { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion:reduce) { .error-dialog.room-menu-dialog { animation:none; } }

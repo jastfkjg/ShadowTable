@@ -12,6 +12,7 @@ const createTable = require("../miniprogram/pages/table/controller");
 const roomSwipe = require("../miniprogram/room-swipe");
 const roomList = require("../miniprogram/room-list");
 const { present: presentDialog } = require("../miniprogram/dialog");
+const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
 const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require("../miniprogram/room-sheet-presentation");
@@ -114,6 +115,7 @@ const homeScenes = {
   "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -roomSwipe.width(rooms[0]) },
   "home-swipe-single": { roomSwipeCode: rooms[2].code, roomSwipeOffset: -roomSwipe.width(rooms[2]) },
   "home-menu": { roomMenu: rooms[0] }, "home-join": { entrySheet: true, entryMode: "join", name: "子龙", nicknameSetup: false },
+  "home-menu-member": { roomMenu: { ...rooms[0], code: "993636", boardName: "阿瓦隆 · 十二骑士（10人）", isHost: false } },
   "home-menu-ended": { roomMenu: { ...rooms[2], code: "672158", boardName: "阿瓦隆 · 十二骑士", canLeave: false } },
   "home-menu-expired": { roomMenu: { ...rooms[2], available: false, statusLabel: "已失效", canLeave: false } },
   "home-menu-busy": { roomMenu: rooms[0], busy: true },
@@ -157,8 +159,10 @@ homeScenes["home-room-redesign-swipe"] = { ...redesign, roomSwipeCode: redesignR
 homeScenes["home-room-redesign-swipe-expired"] = { ...redesign, roomSwipeCode: redesignRooms[2].code, roomSwipeOffset: -roomSwipe.width() };
 homeScenes["home-room-redesign-swipe-host"] = { ...redesign, historyRooms: redesign.historyRooms.map(r => r.code === redesignRooms[1].code ? { ...r, isHost: true, canSwipeDissolve: true } : r), roomSwipeCode: redesignRooms[1].code, roomSwipeOffset: -roomSwipe.width() };
 for (const [name, appDialog] of Object.entries({
-  'dialog-remove': { title:'移除这条房间记录？', content:'仅从你的列表中移除，房间、座位和战绩都会保留。', contextLabel:'房间', contextValue:'273843', contextMeta:'已结束', confirmText:'移除记录' },
-  'dialog-dissolve': { title:'解散房间 273843？', content:'所有玩家将退出，牌桌与对局记录将被删除且无法恢复。进行中的对局不判胜负。', confirmText:'解散', danger:true },
+  'dialog-remove': roomConfirmation.present('hide', { code:'993636', status:'lobby' }),
+  'dialog-leave': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:false }),
+  'dialog-leave-host': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:true }),
+  'dialog-dissolve': roomConfirmation.present('delete', { code:'858201', status:'lobby' }),
   'dialog-information': { title:'关于桌边助手', content:'ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', showCancel:false },
   'dialog-long': { title:'荣誉徽章规则', content:require('../miniprogram/badges').rules + '\n趣味徽章按次数榜授予。最多佩戴3枚。', showCancel:false },
 })) homeScenes[name] = { ...redesign, appDialog };

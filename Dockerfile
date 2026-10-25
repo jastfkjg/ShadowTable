@@ -17,6 +17,7 @@ COPY --chown=node:node miniprogram/match-story.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/result-registration.js miniprogram/leaderboard-presentation.js miniprogram/public-history.js ./miniprogram/
 COPY --chown=node:node miniprogram/room-swipe.js miniprogram/monthly-report.js miniprogram/monthly-report-card.js miniprogram/poster-canvas.js ./miniprogram/
 COPY --chown=node:node miniprogram/room-list.js miniprogram/room-list.wxss miniprogram/room-menu.wxss ./miniprogram/
+COPY --chown=node:node miniprogram/room-confirmation.js miniprogram/room-confirmation.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/assets/roles/*.png ./miniprogram/assets/roles/
 COPY --chown=node:node miniprogram/assets/table-cards.svg ./miniprogram/assets/
 COPY --chown=node:node miniprogram/assets/monthly-report-background.jpg ./miniprogram/assets/monthly-report-background.jpg

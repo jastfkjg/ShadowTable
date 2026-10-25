@@ -21,7 +21,7 @@ test("所有可用板子与人数保留规则和当前角色配置；非技能�
         view.chapters
           .filter((c) => c.kind !== "configuration")
           .map((c) => c.items),
-        details[source.id].sections
+        (details[source.id].byCapacity?.[capacity] || details[source.id]).sections
           .filter((c) => c.kind !== "roles")
           .map((c) => c.items),
       );
@@ -48,6 +48,58 @@ test("所有可用板子与人数保留规则和当前角色配置；非技能�
   );
   assert.equal(fallback.hasDetail, false);
   assert.equal(fallback.chapters[0].configuration[0].count, 6);
+});
+
+test("经典板正文按板子和人数展示阵容、任务、门槛与初始视野", () => {
+  for (const [id, capacity, good, evil, teams, mordred, oberon, reverse] of [
+    ["classic", 5, 3, 2, "2 / 3 / 2 / 3 / 3", false, false, false],
+    ["classic", 6, 4, 2, "2 / 3 / 4 / 3 / 4", false, false, false],
+    ["classic", 7, 4, 3, "2 / 3 / 3 / 4 / 4", false, true, false],
+    ["classic", 8, 5, 3, "3 / 4 / 4 / 5 / 5", true, true, false],
+    ["classic", 9, 6, 3, "3 / 4 / 4 / 5 / 5", true, false, true],
+    ["classic-court", 9, 6, 3, "3 / 4 / 4 / 5 / 5", true, false, false],
+    ["classic-court", 10, 6, 4, "3 / 4 / 4 / 5 / 5", true, true, false],
+    ["classic-court", 12, 7, 5, "3 / 4 / 5 / 6 / 6", true, true, false],
+  ]) {
+    const view = board(id, capacity);
+    const text = (title) => view.chapters.find((c) => c.title === title).items.join("");
+    const tasks = text("组队与任务"), vision = text("初始视野"), goal = text("目标与胜负");
+    assert.ok(tasks.startsWith(`${capacity} 人：${good} 好（`));
+    assert.ok(tasks.includes(`、${evil} 坏（`));
+    assert.ok(tasks.includes(teams));
+    assert.match(tasks, capacity >= 7 ? /第 4 轮需两张失败/ : /每轮一张失败即任务失败/);
+    assert.equal(vision.includes("莫德雷德"), mordred, `${id}/${capacity} 梅林视野`);
+    assert.equal(vision.includes("奥伯伦"), oberon, `${id}/${capacity} 坏人互认`);
+    assert.equal(vision.includes("逆仆"), reverse, `${id}/${capacity} 逆仆视野`);
+    assert.match(goal, /三次任务失败/);
+    assert.match(goal, /三次任务成功/);
+    assert.equal(goal.includes("先指认逆仆"), reverse);
+    if (capacity === 8) assert.match(goal, /莫德雷德在线下指认梅林/);
+    assert.doesNotMatch(JSON.stringify(view.chapters), /三张任务|由房主结束本局|奥伯伦不强制失败|任务人数与两失败门槛由服务端/);
+  }
+  assert.match(board("classic", 7).chapters.find(c => c.title === "组队与任务").items[0], /忠臣×2.*莫甘娜、刺客、奥伯伦/);
+  assert.match(board("classic", 9).chapters.find(c => c.title === "初始视野").items[0], /梅林看见所有坏人及逆仆/);
+  assert.match(board("classic-court", 12).chapters.find(c => c.title === "组队与任务").items[0], /奥伯伦×2/);
+});
+
+test("兰斯板只展示当前人数的阵容、任务和视野，11人逆仆保留专属说明", () => {
+  for (const capacity of [11, 12]) {
+    const view = board("lancelot", capacity);
+    const formation = view.chapters.find(c => c.title === "阵容").items;
+    const vision = view.chapters.find(c => c.title === "初始视野").items.join("");
+    assert.equal(formation.length, 1);
+    assert.ok(formation[0].startsWith(`${capacity} 人：7 好`));
+    assert.equal(vision.includes("奥伯伦"), capacity === 12);
+    assert.doesNotMatch(vision, /逆仆|12 人局/);
+    assert.match(view.chapters.find(c => c.title === "组队与任务").items[0], /3 \/ 4 \/ 5 \/ 6 \/ 6.*第 4 轮需两张失败/);
+    assert.doesNotMatch(JSON.stringify(view.chapters), /奥伯伦不强制失败/);
+  }
+  const view = board("classic-11", 11);
+  assert.match(view.chapters.find(c => c.title === "初始视野").items.join(""), /逆仆只能投成功，能看到刺客的确切座位/);
+  const settlement = view.chapters.find(c => c.title === "逆仆结算").items.join("");
+  assert.match(settlement, /三次任务失败：坏人胜/);
+  assert.match(settlement, /三次任务成功：先指认逆仆/);
+  assert.match(view.chapters.find(c => c.title === "组队与任务").items[0], /3 \/ 4 \/ 5 \/ 6 \/ 6/);
 });
 
 test("骑士各人数独立展示 A 牌、特殊注记与对应的 B 牌层序，完整角色文字不丢失", () => {
