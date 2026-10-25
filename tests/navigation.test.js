@@ -1701,7 +1701,7 @@ test('大厅刷新保留空状态与表单，不插入页面加载文字，重�
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
   const rendered = JSON.stringify(renderMainPanel(factory,0,p.data));
   assert.match(rendered, /还没有牌桌/);
-  assert.match(rendered, /刷新中/);
+  assert.match(rendered, /正在刷新牌桌/);
   assert.doesNotMatch(rendered, /正在连接牌桌/);
   roomsRead.resolve({ rooms: [] }); await refreshing;
   assert.equal(p.data.roomsRefreshing, false);

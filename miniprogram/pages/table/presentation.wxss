@@ -14,7 +14,12 @@
 .table-room .room-summary { gap: 8px; }
 .table-room button.lobby-room-code { gap: 8px; min-height: 44px; padding: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
 .table-room .lobby-copy-icon { width: 15px; height: 17px; margin-right: 5px; }
-.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { min-height: 44px; padding: 0 0 0 8px; font-size: 12px; line-height: 1.5; }
+.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { width: calc(45px + 4em); min-height: 44px; padding: 0 0 0 8px; justify-content: flex-start; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+.table-room button.lobby-header-link.room-invite-button, .table-room button.lobby-header-link.room-invite-button[disabled]:not([type]) { color: var(--accent); }
+.table-room .lobby-header-icon { display: block; flex-shrink: 0; width: 16px; height: 16px; }
+.table-room .lobby-header-label { flex: 0 0 4em; text-align: left; }
+.table-room .lobby-header-chevron { flex-shrink: 0; width: 5px; height: 5px; margin: 0 2px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }
+.table-room .lobby-header-chevron.is-placeholder { visibility: hidden; }
 .table-room button.room-identity, .table-room button.room-identity[disabled]:not([type]) { min-height: 44px; border-width: 3px 0; border-radius: 14px; padding: 0 12px; gap: 6px; font-size: 12px; }
 .table-room .room-identity-icon { width: 16px; height: 16px; }
 .table-room .lobby-board-row { margin: 0; gap: 10px; }
@@ -154,6 +159,8 @@
 .table-room .public-history-dock .host-action-bar-inner button { min-height: 44px; font-size: 13px; padding: 8px; }
 .table-room .public-history-dock .host-waiting-copy { font-size: 12px; }
 .table-room .finish-game-footer button, .table-room button.leave-button { min-height: 44px; font-size: 13px; }
+.table-room button.leave-button, .table-room button.leave-button[disabled]:not([type]) { gap: 8px; background: transparent; color: var(--evil); }
+.table-room .leave-button-icon { display: block; flex-shrink: 0; width: 18px; height: 18px; }
 
 /* Shared player sheet also appears on leaderboards. Keep badge disclosures. */
 .player-card-backdrop { padding: 88px 0 0; }

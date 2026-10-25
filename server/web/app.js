@@ -4020,7 +4020,7 @@ function roomListItems(rooms) {
     html += "</form>";
 
     var partition = roomList.present(state.memberRooms, state.roomListFilter, state.roomsServerTime || Date.now());
-    html += '<section class="room-directory"><div class="section-title history-heading room-directory-heading"><span>我的牌桌</span><button type="button" class="history-toggle room-refresh" data-action="refreshRooms" aria-label="' + (state.roomsRefreshing ? '正在刷新牌桌' : '刷新我的牌桌') + '"' + (state.busy || state.loading || state.roomsRefreshing || pending ? ' disabled' : '') + '><img class="room-refresh-icon' + (state.roomsRefreshing ? ' is-refreshing' : '') + '" src="/assets/home-refresh.svg" alt="" />' + (state.roomsRefreshing ? '刷新中…' : '刷新') + '</button></div>';
+    html += '<section class="room-directory"><div class="section-title history-heading room-directory-heading"><span>我的牌桌</span><button type="button" class="history-toggle room-refresh" data-action="refreshRooms" aria-label="' + (state.roomsRefreshing ? '正在刷新牌桌' : '刷新我的牌桌') + '"' + (state.busy || state.loading || state.roomsRefreshing || pending ? ' disabled' : '') + '><img class="room-refresh-icon' + (state.roomsRefreshing ? ' is-refreshing' : '') + '" src="/assets/home-refresh.svg" alt="" /></button></div>';
     if (partition.currentRoomCount >= 6 || state.roomListFilter !== "all") {
       html += '<div class="room-filters">' + [["all","全部"],["playing","进行中"],["lobby","待开局"],["ended","已结束"]].map(function (f) {
         return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';

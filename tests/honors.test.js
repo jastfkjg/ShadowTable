@@ -88,8 +88,23 @@ test('更正刀口保留票选奖励，改变胜方撤回奖励；手动总分�
     s.transaction(()=>s.correctMatch(r.matchId,{revision:3,scoreReason:'assassination',scoreTarget:1}));
     assert.equal(honors.view(s,s.get(r.code),r.host).status,'invalidated');
     assert.equal(s.playerScore('wx:2').points,1);
-    assert.equal(s.playerScore('wx:5').points,0);
+    assert.equal(s.playerScore('wx:5').points,3);
     assert.ok(!s.matchFor('wx:2',r.matchId).score.breakdown.some(row=>row.id.startsWith('honor_')));
+  } finally {s.close();}
+});
+test('三绿刺中梅林坏人每人三分，MVP 额外加一分',()=>{
+  const s=new Store(':memory:');
+  try {
+    const r=fixture(s,undefined,{scoreEnabled:true});
+    s.transaction(()=>s.correctMatch(r.matchId,{revision:0,scoreReason:'assassination',scoreTarget:1}));
+    act(s,r,r.host,'honorStart');
+    vote(s,r,1,5,2);vote(s,r,3,5,2);vote(s,r,4,5,2);act(s,r,r.host,'honorClose');
+    assert.equal(s.playerScore('wx:5').points,4);
+    assert.equal(s.playerScore('wx:6').points,3);
+    assert.equal(s.playerScore('wx:2').points,2);
+    assert.deepEqual(s.matchFor('wx:5',r.matchId).score.breakdown,[
+      {id:'evil_win',label:'坏人获胜',points:3},{id:'honor_mvp',label:'MVP 票选奖励',points:1}
+    ]);
   } finally {s.close();}
 });
 test('票选奖励归对局原月份，重启后保留得分且不会重复结算',()=>{
