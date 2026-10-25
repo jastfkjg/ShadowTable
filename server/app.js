@@ -360,6 +360,13 @@ function createApp({
         });
         return send(200, result);
       }
+      if (path === '/api/me/badges/notice') {
+        res.setHeader('Cache-Control', 'no-store');
+        const awards = require('./badge-awards');
+        if (req.method === 'GET') return send(200, awards.notice(store, uid));
+        check(req.method === 'POST', '接口不存在', 404);
+        return send(200, awards.acknowledge(store, uid, await body(req)));
+      }
       if (req.method === "GET" && path === "/api/me/stats") {
         res.setHeader("Cache-Control", "no-store");
         return send(200, { ...store.statsFor(uid), ...(!uid.startsWith("test:") ? { monthlyReset: readMonthlyReset(store, uid) } : {}) });

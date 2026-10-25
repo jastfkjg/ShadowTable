@@ -51,6 +51,17 @@ test('切到后台或卸载时取消当前和排队弹窗，恢复底部导航',
   }
 });
 
+test('查看活动徽章后的迟到按钮不会修改下一项弹窗动作', async () => {
+  const {host,tap}=component();
+  const first=host.show({title:'活动徽章',variant:'badge-awards',awards:{badges:[]}}),old=tap();
+  host.confirm(old);await first;
+  const second=host.show({title:'普通提示'});
+  host.viewAwardCollection(old);host.confirm(tap());
+  assert.equal((await second).action,undefined);
+  const next=host.show({title:'活动徽章',variant:'badge-awards',awards:{badges:[]}});
+  host.viewAwardCollection(tap());assert.equal((await next).action,'badges');
+});
+
 test('长内容按可用空间滚动，过期的测量不覆盖新弹窗', async () => {
   const {host,tap}=component(),callbacks=[];
   host.createSelectorQuery=()=>{const q={select(){return q},boundingClientRect(){return q},exec(cb){callbacks.push(cb)}};return q;};

@@ -964,7 +964,7 @@
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;
     const busy = state.badgeManagerLoading || state.badgeManagerSaving;
     let html = '<div class="badge-page"' + (state.selectedBadgeId ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1><span></span></header>';
-    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span><button type="button" class="badge-rules" data-action="badgeRules">规则<img class="badge-info-icon" src="/assets/record-info.svg" alt="" /></button></div><div class="badge-hero"><div><div class="badge-title">本月荣誉</div><div class="badge-caption">榜首荣誉，每月更新</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
+    html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span><button type="button" class="badge-rules" data-action="badgeRules">规则<img class="badge-info-icon" src="/assets/record-info.svg" alt="" /></button></div><div class="badge-hero"><div><div class="badge-title">荣誉收藏</div><div class="badge-caption">月榜荣誉与永久纪念</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
     if (state.badgeManagerLoading) html += '<div class="status" role="status">正在读取徽章…</div>';
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';
@@ -982,7 +982,7 @@
     const b = c.items.find(b => b.id === state.selectedBadgeId);
     if (b) {
       const full = !b.equipped && c.equippedCount >= c.maxEquipped;
-      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content"><div class="badge-detail-handle" aria-hidden="true"></div><div class="badge-detail-header"><span>徽章详情</span><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button></div><div class="badge-detail-art"><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /></div><div class="badge-detail-category">' + esc(c.monthLabel + ' · ' + b.category) + '</div><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-detail-status">' + (b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</div>' + (b.flavor ? '<p class="badge-detail-description">' + esc(b.flavor) + '</p>' : '') + '<div class="badge-detail-criteria"><div class="badge-detail-row"><span>获取条件</span><span>' + esc(b.condition) + '</span></div><div class="badge-detail-row"><span>持有规则</span><span>榜首持有，含并列第一</span></div></div>' + (b.owned && full ? '<div class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</div>' : '') + (b.owned ? btn((b.equipped ? 'secondary' : 'primary') + ' badge-detail-action','toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : '佩戴徽章',{id:b.id},busy || full) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</div></section></div>';
+      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content"><div class="badge-detail-handle" aria-hidden="true"></div><div class="badge-detail-header"><span>徽章详情</span><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button></div><div class="badge-detail-art"><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /></div><div class="badge-detail-category">' + esc((b.periodLabel || c.monthLabel) + ' · ' + b.category) + '</div><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-detail-status">' + (b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</div>' + (b.flavor ? '<p class="badge-detail-description">' + esc(b.flavor) + '</p>' : '') + '<div class="badge-detail-criteria"><div class="badge-detail-row"><span>获取条件</span><span>' + esc(b.condition) + '</span></div><div class="badge-detail-row"><span>持有规则</span><span>' + esc(b.holdingRule) + '</span></div></div>' + (b.owned && full ? '<div class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</div>' : '') + (b.owned ? btn((b.equipped ? 'secondary' : 'primary') + ' badge-detail-action','toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : '佩戴徽章',{id:b.id},busy || full) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</div></section></div>';
     }
     return html;
   }
@@ -1300,13 +1300,69 @@
   }
 
   let grantNoticeOpen = false;
+  let badgeNoticeCancel = null;
+  const badgeNoticeHost = document.createElement('div');
+  badgeNoticeHost.className = 'dialog-backdrop';
+  badgeNoticeHost.hidden = true;
+  document.body.appendChild(badgeNoticeHost);
+  const badgeNotifier = window.shadowtableBadgeAwards.createNotifier({
+    setTimeout, clearTimeout,
+    account: () => webSessionTag || storage.get('session'),
+    read: () => request('/api/me/badges/notice'),
+    ack: through => request('/api/me/badges/notice', 'POST', { through }),
+    canShow() {
+      if (!alive || !foreground || !state.network || !modal.hidden || !badgeNoticeHost.hidden || pending || grantNoticeOpen || !['lobby','me','badges'].includes(state.page)) return false;
+      return !['loading','busy','error','reconnecting','profileLoading','statsLoading','badgeManagerLoading','entrySheet','invitation','roomMenu','noteRoom','monthlyReset','resetSaving','playerCard','selectedBadgeId','showBoardDetails'].some(k => state[k]);
+    },
+    show(value) {
+      return new Promise(resolve => {
+        let detail = null, closed = false;
+        const previousFocus = document.activeElement;
+        const renderNotice = () => {
+          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwards.markup(value, esc, detail);
+          badgeNoticeHost.querySelector(detail ? '[data-award-back]' : '[data-award-confirm]')?.focus({preventScroll:true});
+        };
+        const done = confirmed => {
+          if (closed) return;
+          closed = true;
+          badgeNoticeHost.hidden = true;
+          badgeNoticeHost.innerHTML = '';
+          badgeNoticeHost.onclick = null;
+          badgeNoticeHost.onkeydown = null;
+          badgeNoticeCancel = null;
+          app.inert = false;
+          previousFocus?.focus?.({preventScroll:true});
+          resolve(confirmed);
+        };
+        badgeNoticeCancel = () => done(false);
+        badgeNoticeHost.onclick = event => {
+          const button = event.target.closest('button');
+          if (!button) return;
+          if (button.hasAttribute('data-award-detail')) { detail = value.badges.find(b => b.id === button.dataset.awardDetail); renderNotice(); }
+          else if (button.hasAttribute('data-award-back')) { detail = null; renderNotice(); }
+          else if (button.hasAttribute('data-award-collection')) { done(true); navigate('badges'); }
+          else if (button.hasAttribute('data-award-confirm')) done(true);
+        };
+        badgeNoticeHost.onkeydown = event => {
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (detail) { detail = null; renderNotice(); } else done(true); }
+          if (event.key === 'Tab') {
+            const buttons = [...badgeNoticeHost.querySelectorAll('button')], i = buttons.indexOf(document.activeElement);
+            event.preventDefault(); buttons[(i + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
+          }
+        };
+        app.inert = true;
+        badgeNoticeHost.hidden = false;
+        renderNotice();
+      });
+    },
+  });
   const grantNotifier = avoidancePresentation.createGrantNotifier({
     setTimeout, clearTimeout,
     account: () => storage.get('session'),
     read: () => request('/api/me/avoidance/notice'),
     ack: through => request('/api/me/avoidance/notice', 'POST', { through }),
     canShow() {
-      if (!alive || !foreground || !state.network || !modal.hidden || pending || grantNoticeOpen || state.page !== 'table') return false;
+      if (!alive || !foreground || !state.network || !modal.hidden || !badgeNoticeHost.hidden || pending || grantNoticeOpen || state.page !== 'table') return false;
       if (state.room?.phase !== 'lobby') return false;
       return !['loading', 'busy', 'error', 'reconnecting', 'profileLoading', 'entrySheet', 'invitation', 'roomMenu', 'noteRoom', 'monthlyReset', 'resetSaving', 'avoidanceOpen', 'actionDialog', 'actionLoading', 'identityChange', 'fairyResult', 'identityHistoryOpen', 'historyOpen', 'toolType', 'showRoomRules', 'showRoomSettings', 'showBoardDetails', 'dealtIdentityDialog', 'honorDialog', 'resultDialog', 'revealed', 'playerCard', 'statsOpen', 'showTransfer'].some(key => state[key]);
     },
@@ -1330,6 +1386,7 @@
     } catch (e) {}
   }
   function mask() {
+    badgeNoticeCancel?.();
     if (grantNoticeOpen) modalCancel.onclick?.();
     closeRoomSwipe();
     state.historyOpen = false;
@@ -5319,14 +5376,14 @@ function roomListItems(rooms) {
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       foreground = false;
-      grantNotifier.stop();
+      grantNotifier.stop(); badgeNotifier.stop(); badgeNoticeCancel?.();
       if (grantNoticeOpen) modalCancel.onclick?.();
       clearTimeout(webLoginTimer);
       clearTimeout(timer);
       mask();
     } else {
       foreground = true;
-      grantNotifier.start();
+      grantNotifier.start(); badgeNotifier.start();
       if (state.page === 'login') pollWebLogin();
       if (state.page === 'monthly') loadMonthlyReport();
       if (state.page === 'badges') loadBadgeManager();
@@ -5337,8 +5394,8 @@ function roomListItems(rooms) {
       }
     }
   });
-  window.addEventListener('pagehide', () => { grantNotifier.stop(); if (grantNoticeOpen) modalCancel.onclick?.(); });
-  window.addEventListener('pageshow', () => { if (!document.hidden) grantNotifier.start(); });
+  window.addEventListener('pagehide', () => { grantNotifier.stop(); badgeNotifier.stop(); badgeNoticeCancel?.(); if (grantNoticeOpen) modalCancel.onclick?.(); });
+  window.addEventListener('pageshow', () => { if (!document.hidden) grantNotifier.start(); badgeNotifier.start(); });
   window.addEventListener("offline", function () {
     state.network = false;
     mask();
@@ -5456,5 +5513,5 @@ function roomListItems(rooms) {
   if (initialRoute.code) state.code = initialRoute.code;
   render();
   bootstrap();
-  grantNotifier.start();
+  grantNotifier.start(); badgeNotifier.start();
 })();

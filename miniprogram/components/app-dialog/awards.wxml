@@ -1,0 +1,32 @@
+<view class="award-popup {{awardDetail?'award-detail':dialog.awards.ranked?'award-ranked':dialog.awards.hero?'award-single':'award-dual'}}" role="dialog" aria-modal="true" aria-label="{{awardDetail?awardDetail.title:dialog.title}}" catchtap="blockScroll">
+  <button wx:if="{{awardDetail}}" class="award-close" bindtap="closeAward" aria-label="返回发放弹窗" hover-class="app-dialog-pressed">×</button>
+  <button wx:else class="award-close" bindtap="confirm" data-id="{{dialog.id}}" aria-label="关闭发放弹窗" hover-class="app-dialog-pressed">×</button>
+  <scroll-view class="award-scroll" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="award-scroll-content">
+      <block wx:if="{{awardDetail}}">
+        <view class="award-eyebrow">2026年10月 · {{awardDetail.category}}</view>
+        <view class="award-large-art"><image src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
+        <view class="award-title">{{awardDetail.title}}</view><view class="award-reason">{{awardDetail.condition}}</view>
+        <view class="award-message">{{awardDetail.flavor}}</view><view class="award-hint">获得后永久保留</view>
+      </block>
+      <block wx:else>
+        <view class="award-eyebrow">2026年10月 · 内测纪念</view><view class="award-title">{{dialog.title}}</view>
+        <view class="award-count">你获得了 <text>{{dialog.awards.count}}</text> 枚限定徽章</view>
+        <view wx:if="{{dialog.awards.hero}}" class="award-hero">
+          <button class="award-hero-art" bindtap="showAward" data-badge="{{dialog.awards.hero.id}}" aria-label="{{'查看'+dialog.awards.hero.title+'详情'}}" hover-class="app-dialog-pressed"><image src="{{dialog.awards.hero.imageUrl}}" mode="aspectFit" aria-hidden="true" /></button>
+          <view class="award-hero-name">{{dialog.awards.hero.title}}</view><view class="award-reason {{dialog.awards.ranked?'award-rank':''}}">{{dialog.awards.hero.displayReason}}</view>
+        </view>
+        <view wx:if="{{dialog.awards.secondary.length}}" class="award-secondary">
+          <view wx:for="{{dialog.awards.secondary}}" wx:key="id" class="award-small">
+            <button bindtap="showAward" data-badge="{{item.id}}" aria-label="{{'查看'+item.title+'详情'}}" hover-class="app-dialog-pressed"><view class="award-small-art"><image src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view><view class="award-name">{{item.title}}</view></button>
+            <view class="award-reason">{{item.displayReason}}</view>
+          </view>
+        </view>
+        <view wx:if="{{dialog.awards.message}}" class="award-message">{{dialog.awards.message}}</view><view class="award-hint">可在「荣誉徽章」中查看与佩戴</view>
+      </block>
+    </view>
+  </scroll-view>
+  <view class="award-actions"><button wx:if="{{awardDetail}}" class="award-confirm" bindtap="closeAward" hover-class="app-dialog-pressed">返回</button>
+    <block wx:else><button class="award-confirm" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">收下徽章</button><button class="award-view" bindtap="viewAwardCollection" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">查看荣誉徽章 ›</button></block>
+  </view>
+</view>

@@ -25,7 +25,7 @@ Page({
   chooseBadgeFilter(e) {
     const badgeFilter = e.currentTarget.dataset.id;
     if (!['all', 'owned', 'unowned'].includes(badgeFilter)) return;
-    this.setData({ badgeFilter, ...(this.data.badgeCollection ? { badgeCollection: presentCollection(this.data.badgeCollection, badgeFilter) } : {}) });
+    this.setData({ badgeFilter, ...(this.data.badgeCollection ? { badgeCollection: presentCollection(this.data.badgeCollection, badgeFilter, api.assetUrl) } : {}) });
   },
   showBadgeDetail(e) {
     const selectedBadge = this.data.badgeCollection?.items.find(b => b.id === e.currentTarget.dataset.id);

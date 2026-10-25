@@ -12,7 +12,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   if (layout) element.querySelector = () => ({ focus() {}, getBoundingClientRect: () => layout.anchor });
   const source = fs.readFileSync(require.resolve("../server/web/app.js"), "utf8");
   const context = {
-    document: { hidden: false, getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
+    document: { hidden: false, body: { appendChild() {} }, createElement: () => ({...element}), getElementById: id => { lookups.push(id); return element; }, addEventListener(name, fn) { events[name] = fn; } },
     location: { hash: "#/lobby" },
     window: { location: { replace: url => navigations.push(url), reload: () => navigations.push('reload') }, history: { replaceState() {}, pushState() {} }, scrollTo() {}, innerHeight: layout?.height, addEventListener(name, fn) { events["window:" + name] = fn; }, shadowtableBuiltinAvatars: require('../miniprogram/builtin-avatars'), shadowtableAvatarStyles: require('../miniprogram/avatar-library').avatarStyles, shadowtableFunCopy: require('../miniprogram/fun-copy') },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
@@ -34,6 +34,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableResultRegistration = require('../miniprogram/result-registration');
   context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
+  context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";
@@ -2166,12 +2167,12 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.match(c.viewMe(),/data-page="badges"/); assert.doesNotMatch(c.viewMe(),/toggleBadgeManager/);
   await c.applyRoute('#/badges');
   assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,18);
-  assert.match(c.viewBadgeManager(),/<span> \/ 18<\/span>/);assert.match(c.viewBadgeManager(),/金牌替身/);
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,23);
+  assert.match(c.viewBadgeManager(),/<span> \/ 23<\/span>/);assert.match(c.viewBadgeManager(),/金牌替身/);
   c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
   c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,17);
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,22);
   c.ACTIONS.showBadgeDetail({dataset:{id:'points'}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
   assert.match(detail,/积分王者/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);

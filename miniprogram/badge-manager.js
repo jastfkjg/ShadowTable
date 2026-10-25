@@ -9,7 +9,7 @@ function badgeManagerMethods() {
       this.setData({ badgeManagerLoading: true, badgeManagerError: '' });
       try {
         const value = await api.request('/api/me/badges');
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter) });
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl) });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerError: e.message });
       } finally {
@@ -28,7 +28,7 @@ function badgeManagerMethods() {
       this.setData({ badgeManagerSaving: true, badgeManagerError: '' });
       try {
         const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart }, api.requestId());
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter), selectedBadge: null });
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl), selectedBadge: null });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) {
           // Reconcile an ambiguous network result before permitting another toggle.

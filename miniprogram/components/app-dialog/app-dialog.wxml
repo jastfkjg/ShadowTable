@@ -1,5 +1,6 @@
 <view wx:if="{{dialog}}" class="app-dialog-backdrop" catchtouchmove="blockScroll" catchtap="blockScroll">
-  <view class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+  <block wx:if="{{dialog.variant==='badge-awards'}}"><include src="./awards.wxml" /></block>
+  <view wx:else class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
     <view wx:if="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
       <view class="app-dialog-grant-icon" aria-hidden="true"><image src="{{dialog.contextIcon}}" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>

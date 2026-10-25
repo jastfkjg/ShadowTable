@@ -62,6 +62,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
     require("./avatar-uploads").initialize(this.db);
     management.initialize(this);
+    require('./badge-awards').initialize(this);
     const profileColumns = this.db.prepare("PRAGMA table_info(profiles)").all();
     if (!profileColumns.some(column => column.name === "room_stats_visible"))
       this.db.exec("ALTER TABLE profiles ADD COLUMN room_stats_visible INTEGER NOT NULL DEFAULT 0");
@@ -293,7 +294,10 @@ class Store {
         this.touchScore(uid);
       }
     }
-    if (changed) avoidanceRewards.reconcile(this, [match.id]);
+    if (changed) {
+      avoidanceRewards.reconcile(this, [match.id]);
+      require('./badge-awards').reconcileParticipants(this);
+    }
   }
   requireActiveMatch(id) {
     if (management.control(this,id).state !== "active") throw new RuleError("请先恢复记录并计入战绩，再更正结果或积分",409);

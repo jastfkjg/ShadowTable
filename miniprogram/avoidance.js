@@ -46,7 +46,7 @@
         if (!valid()) return;
         options.update?.(value);
         if (!value.notice || !options.canShow()) return;
-        const confirmed = await options.show({ title: "收到回避卡", ...grantCopy(value), amount: value.notice.amount });
+        const confirmed = await options.show(options.present ? options.present(value.notice) : { title: "收到回避卡", ...grantCopy(value), amount: value.notice.amount });
         if (!confirmed || !valid()) return;
         pending = { account, through: value.notice.through };
         await options.ack(pending.through);
