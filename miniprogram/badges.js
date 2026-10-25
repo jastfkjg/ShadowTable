@@ -17,13 +17,13 @@
     category: ({ points: '积分荣誉', games: '场次荣誉', overall: '胜率荣誉' })[badge.id] || '趣味荣誉',
     flavor: badge.description.split('。').slice(1).join('。') }));
   const october = [
-    { id: 'october_2026_crown', title: '加冕圣剑', rank: 1, condition: '2026年10月积分榜，发布时锁定第1名', flavor: '每一场认真，汇成这一刻的荣光。' },
-    { id: 'october_2026_silver', title: '银盔骑士', rank: 2, condition: '2026年10月积分榜，发布时锁定第2名', flavor: '银盔之下，锋芒长存。' },
-    { id: 'october_2026_stag', title: '林间守望', rank: 3, condition: '2026年10月积分榜，发布时锁定第3名', flavor: '步履坚定，荣光自来。' },
-    { id: 'october_2026_table', title: '共建圆桌', condition: '2026年10月至少参加1场游戏，不限计分对局', briefCondition: '十月参与过游戏', flavor: '这个十月，因为相聚而值得纪念。' },
-    { id: 'october_2026_book', title: '内测纪念册', condition: '2026年10月至少参加1场计分对局', briefCondition: '十月参与过计分对局', flavor: '你的名字，留在了十月的故事里。', largeImageUrl: '/assets/badges/october_2026_book-large.png' },
+    { id: 'october_2026_crown', title: '加冕圣剑', rank: 1, condition: '2026年10月积分榜第1名。' },
+    { id: 'october_2026_silver', title: '银盔骑士', rank: 2, condition: '2026年10月积分榜第2名。' },
+    { id: 'october_2026_stag', title: '林间守望', rank: 3, condition: '2026年10月积分榜第3名。' },
+    { id: 'october_2026_table', title: '共建圆桌', condition: '2026年10月至少参加一场对局。' },
+    { id: 'october_2026_book', title: '内测纪念册', condition: '2026年10月至少参加一场计分对局。', largeImageUrl: '/assets/badges/october_2026_book-large.png' },
   ].map(b => ({ ...b, permanent: true, metric: 'campaign', periodLabel: '2026年10月', category: b.rank ? '积分榜限定荣誉' : '内测参与纪念',
-    imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition + '。' + b.flavor }));
+    imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
   const MAX_EQUIPPED = 3;
   function presentCollection(value, filter = 'all', assetUrl = path => path) {

@@ -7,7 +7,7 @@
         <view class="award-eyebrow">2026年10月 · {{awardDetail.category}}</view>
         <view class="award-large-art"><image src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
         <view class="award-title">{{awardDetail.title}}</view><view class="award-reason">{{awardDetail.condition}}</view>
-        <view class="award-message">{{awardDetail.flavor}}</view><view class="award-hint">获得后永久保留</view>
+        <view wx:if="{{awardDetail.flavor}}" class="award-message">{{awardDetail.flavor}}</view><view class="award-hint">获得后永久保留</view>
       </block>
       <block wx:else>
         <view class="award-eyebrow">2026年10月 · 内测纪念</view><view class="award-title">{{dialog.title}}</view>
