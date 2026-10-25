@@ -11,6 +11,7 @@ function show(options = {}) {
 
 function present(options = {}) {
   return {
+    ...(options.variant === 'badge-awards' ? { variant: 'badge-awards', awards: options.awards } : {}),
     ...(options.variant === "avoidance-grant" ? { variant: "avoidance-grant", lead: typeof options.lead === "string" ? options.lead : "" } : {}),
     title: options.title || "操作提示",
     content: options.content || "",

@@ -7,6 +7,8 @@ const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const assets = {
   "/badges.js": ["../../miniprogram/badges.js", "text/javascript; charset=utf-8"],
+  "/badge-awards.js": ["../../miniprogram/badge-awards.js", "text/javascript; charset=utf-8"],
+  "/badge-awards.css": ["../../miniprogram/badge-awards.wxss", "text/css; charset=utf-8"],
   "/badges.css": ["../../miniprogram/pages/badges/badges.wxss", "text/css; charset=utf-8"],
   "/match-story.css": ["../../miniprogram/match-story.wxss", "text/css; charset=utf-8"],
   "/": ["index.html", "text/html; charset=utf-8"],
@@ -47,7 +49,9 @@ for (const avatar of builtinAvatars)
 for (const role of ["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"])
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
 for (const badge of require('../../miniprogram/badges').catalogue)
-  assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
+  assets[badge.imageUrl] = [badge.permanent ? 'assets/' + badge.imageUrl.split('/').pop() : '../../miniprogram' + badge.imageUrl, 'image/png'];
+for (const badge of require('../../miniprogram/badges').catalogue.filter(b => b.largeImageUrl))
+  assets[badge.largeImageUrl] = ['assets/october_2026_book-large.png', 'image/png'];
 for (const name of ['info','heart','sword','swords','shield','spark','medal','users'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.

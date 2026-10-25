@@ -26,10 +26,10 @@ function playerCardMethods(api) {
           byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate), rateValue: rateValue(row.winRate) })) } : null;
         let playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
-        // Badge artwork ships in the mini-program; it also works when web hosting is disabled.
+        // Monthly artwork is bundled; campaign artwork is shared with the web client.
         const { catalogue, MAX_EQUIPPED } = require('./badges');
         playerCard = { ...playerCard, badges: (result.player.badges || []).filter(badge => catalogue.some(b => b.id === badge.id)).slice(0, MAX_EQUIPPED)
-          .map(badge => ({ ...badge, imageUrl: catalogue.find(b => b.id === badge.id).imageUrl })) };
+          .map(badge => ({ ...badge, imageUrl: badge.permanent ? api.assetUrl(catalogue.find(b => b.id === badge.id).imageUrl) : catalogue.find(b => b.id === badge.id).imageUrl })) };
         this.setData({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
       } catch (e) {
         if (active()) this.setData({ playerCardError: e.message || "战绩读取失败，请重试" });

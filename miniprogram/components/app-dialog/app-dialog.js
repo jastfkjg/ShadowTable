@@ -1,7 +1,7 @@
 const { present } = require("../../dialog");
 
 Component({
-  data: { dialog: null, bodyHeight: 0 },
+  data: { dialog: null, bodyHeight: 0, awardDetail: null },
   lifetimes: {
     attached() { this.dialogQueue = []; this.dialogHidden = false; },
     detached() { this.dialogHidden = true; this.dismissAll(); },
@@ -26,9 +26,19 @@ Component({
       this.dialogTabBar = pages[pages.length - 1]?.getTabBar?.();
       this.dialogTabBar?.setData({ dialogVisible: true });
       const id = this.dialogSequence = (this.dialogSequence || 0) + 1;
-      this.setData({ dialog: { ...present(this.currentDialog.options), id }, bodyHeight: 0 }, () => this.measureBody());
+      this.setData({ dialog: { ...present(this.currentDialog.options), id }, bodyHeight: 0, awardDetail: null }, () => this.measureBody());
     },
     measureBody() {
+      if (this.data.dialog?.variant === 'badge-awards' && this.createSelectorQuery) {
+        const id = this.data.dialog.id, detail = this.data.awardDetail?.id;
+        const q = this.createSelectorQuery();
+        for (const selector of ['.app-dialog-backdrop','.award-scroll-content','.award-actions']) q.select(selector).boundingClientRect();
+        q.exec(rects => {
+          if (this.data.dialog?.id !== id || this.data.awardDetail?.id !== detail || !rects?.[0] || !rects[1]) return;
+          this.setData({ bodyHeight: Math.min(Math.ceil(rects[1].height), Math.max(44, rects[0].height - 50 - (rects[2]?.height || 110))) });
+        });
+        return;
+      }
       if (!(this.data.dialog?.content || this.data.dialog?.lead) || !this.createSelectorQuery) return;
       const id = this.data.dialog.id;
       const grant = this.data.dialog.variant === "avoidance-grant";
@@ -51,7 +61,7 @@ Component({
       this.deliver(job, confirm);
     },
     deliver(job, confirm) {
-      const result = { confirm, cancel: !confirm, errMsg: "showDialog:ok" };
+      const result = { confirm, cancel: !confirm, errMsg: "showDialog:ok", ...(job.action ? { action: job.action } : {}) };
       try { job.options.success?.(result); }
       finally {
         try { job.options.complete?.(result); }
@@ -71,6 +81,16 @@ Component({
       for (const job of jobs) this.deliver(job, false);
     },
     confirm(e) { this.finish(true, e.currentTarget.dataset.id); },
+    showAward(e) {
+      const awardDetail = this.data.dialog?.awards?.badges.find(b => b.id === e.currentTarget.dataset.badge);
+      if (awardDetail) this.setData({ awardDetail, bodyHeight: 0 }, () => this.measureBody());
+    },
+    closeAward() { this.setData({ awardDetail: null, bodyHeight: 0 }, () => this.measureBody()); },
+    viewAwardCollection(e) {
+      if (!this.currentDialog || e.currentTarget.dataset.id !== this.data.dialog?.id) return;
+      this.currentDialog.action = 'badges';
+      this.finish(true, e.currentTarget.dataset.id);
+    },
     cancel(e) { this.finish(false, e.currentTarget.dataset.id); },
     blockScroll() {},
   },

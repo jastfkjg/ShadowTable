@@ -222,7 +222,7 @@ test('首次昵称确认遇到资料版本冲突，刷新版本保留微信最�
 function webClient(fetch, storage = new Map([['session','token']])) {
   const fields = { nickname: { value: '' }, code: { value: '123456' } };
   const element = { querySelector() { return null; }, addEventListener() {}, hidden: true };
-  const context = { document: { getElementById: id => fields[id] || element, addEventListener() {} },
+  const context = { document: { body: {appendChild() {}}, createElement: () => ({...element}), getElementById: id => fields[id] || element, addEventListener() {} },
     window: { history: { pushState() {}, replaceState() {} }, scrollTo() {}, addEventListener() {}, shadowtableFunCopy: require('../miniprogram/fun-copy'), shadowtableResultRegistration: require('../miniprogram/result-registration'), shadowtablePublicHistory: require('../miniprogram/public-history') },
     location: { hash: '#/lobby' }, navigator: {}, URL, URLSearchParams, fetch,
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
@@ -231,6 +231,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
+  context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
     window.test = { state, applyRoute, ACTIONS, viewEntry };

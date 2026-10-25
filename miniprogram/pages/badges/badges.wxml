@@ -1,7 +1,7 @@
 <app-nav title="荣誉徽章" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page badge-page">
   <view class="badge-period-row"><text class="badge-caption">{{badgeCollection ? badgeCollection.monthLabel : '本月荣誉'}}</text><button class="badge-rules" bindtap="showBadgeRules" hover-class="badge-pressed">规则<image class="badge-info-icon" src="/assets/record-info.svg" aria-hidden="true" /></button></view>
-  <view class="badge-hero"><view><view class="badge-title">本月荣誉</view><view class="badge-caption">榜首荣誉，每月更新</view></view><view class="badge-total"><view class="badge-total-value">{{badgeCollection ? badgeCollection.ownedCount : '—'}}<text> / {{badgeCollection ? badgeCollection.totalCount : badgeTotalCount}}</text></view><text class="badge-caption">已拥有</text></view></view>
+  <view class="badge-hero"><view><view class="badge-title">荣誉收藏</view><view class="badge-caption">月榜荣誉与永久纪念</view></view><view class="badge-total"><view class="badge-total-value">{{badgeCollection ? badgeCollection.ownedCount : '—'}}<text> / {{badgeCollection ? badgeCollection.totalCount : badgeTotalCount}}</text></view><text class="badge-caption">已拥有</text></view></view>
   <view wx:if="{{badgeManagerLoading}}" class="status" role="status">正在读取徽章…</view>
   <view wx:if="{{badgeManagerError}}" class="inline-error" role="alert"><text>{{badgeManagerError}}</text><button class="secondary" bindtap="loadBadgeManager" disabled="{{badgeManagerLoading || badgeManagerSaving}}" hover-class="badge-pressed">刷新徽章</button></view>
   <block wx:if="{{badgeCollection}}">
@@ -25,11 +25,11 @@
         <view class="badge-detail-handle" aria-hidden="true"></view>
         <view class="badge-detail-header"><text>徽章详情</text><button class="badge-detail-close" bindtap="closeBadgeDetail" aria-label="关闭徽章详情" hover-class="badge-pressed">×</button></view>
         <view class="badge-detail-art"><image class="badge-detail-image {{!selectedBadge.owned?'is-locked':''}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
-        <view class="badge-detail-category">{{badgeCollection.monthLabel}} · {{selectedBadge.category}}</view>
+        <view class="badge-detail-category">{{selectedBadge.periodLabel || badgeCollection.monthLabel}} · {{selectedBadge.category}}</view>
         <view class="badge-detail-title">{{selectedBadge.title}}</view>
         <view class="badge-detail-status"><view wx:if="{{selectedBadge.equipped}}" class="badge-check" aria-hidden="true"></view><text>{{selectedBadge.status}}</text></view>
         <view wx:if="{{selectedBadge.flavor}}" class="badge-detail-description">{{selectedBadge.flavor}}</view>
-        <view class="badge-detail-criteria"><view class="badge-detail-row"><text>获取条件</text><text>{{selectedBadge.condition}}</text></view><view class="badge-detail-row"><text>持有规则</text><text>榜首持有，含并列第一</text></view></view>
+        <view class="badge-detail-criteria"><view class="badge-detail-row"><text>获取条件</text><text>{{selectedBadge.condition}}</text></view><view class="badge-detail-row"><text>持有规则</text><text>{{selectedBadge.holdingRule}}</text></view></view>
         <view wx:if="{{selectedBadge.owned && !selectedBadge.equipped && badgeCollection.equippedCount >= 3}}" class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</view>
         <button wx:if="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading || (!selectedBadge.equipped && badgeCollection.equippedCount >= 3)}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button><button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
       </view>
