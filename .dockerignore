@@ -9,6 +9,8 @@
 !miniprogram/avatar-library.js
 !miniprogram/fun-copy.js
 !miniprogram/badges.js
+!miniprogram/badge-awards.js
+!miniprogram/badge-awards.wxss
 !miniprogram/board-detail.js
 !miniprogram/avoidance.js
 !miniprogram/avoidance.wxss

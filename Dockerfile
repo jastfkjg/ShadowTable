@@ -8,6 +8,7 @@ COPY --chown=node:node miniprogram/builtin-avatars.js ./miniprogram/builtin-avat
 COPY --chown=node:node miniprogram/avatar-library.js ./miniprogram/avatar-library.js
 COPY --chown=node:node miniprogram/fun-copy.js ./miniprogram/fun-copy.js
 COPY --chown=node:node miniprogram/badges.js ./miniprogram/badges.js
+COPY --chown=node:node miniprogram/badge-awards.js miniprogram/badge-awards.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/board-detail.js ./miniprogram/board-detail.js
 COPY --chown=node:node miniprogram/avoidance.js miniprogram/avoidance.wxss miniprogram/role-portraits.js ./miniprogram/
 COPY --chown=node:node miniprogram/pages/badges/badges.wxss ./miniprogram/pages/badges/badges.wxss
