@@ -6,6 +6,8 @@ const { avatarStyles } = require("../../miniprogram/avatar-library");
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const assets = {
+  "/fun-info.css": ["../../miniprogram/components/app-dialog/fun.wxss", "text/css; charset=utf-8"],
+  "/fun-records.css": ["../../miniprogram/fun-records.wxss", "text/css; charset=utf-8"],
   "/record-clearing.js": ["../../miniprogram/pages/data-management/presentation.js", "text/javascript; charset=utf-8"],
   "/record-clearing-layout.css": ["../../miniprogram/pages/data-management/layout.wxss", "text/css; charset=utf-8"],
   "/record-clearing.css": ["record-clearing.css", "text/css; charset=utf-8"],
@@ -60,7 +62,7 @@ for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = [badge.permanent ? 'assets/' + badge.imageUrl.split('/').pop() : '../../miniprogram' + badge.imageUrl, 'image/png'];
 for (const badge of require('../../miniprogram/badges').catalogue.filter(b => b.largeImageUrl))
   assets[badge.largeImageUrl] = ['assets/october_2026_book-large.png', 'image/png'];
-for (const name of ['info','heart','sword','swords','shield','spark','medal','users','calendar','list','coin'])
+for (const name of ['info','heart','sword','swords','shield','shield-good','spark','medal','users','calendar','list','coin'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
 function serve(req, res, path) {

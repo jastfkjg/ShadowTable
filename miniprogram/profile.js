@@ -42,60 +42,9 @@ function presentStats(stats) {
     })) };
 }
 function presentFun(value) {
-  if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "" };
+  if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "", ...funCopy.records(null) };
   value = funCopy.summary(value);
-  const cards = value.cards.map(card => {
-    const metrics = card.metrics.filter(row => !row.id.endsWith("aim_enemy")).map(row => ({ ...row,
-      valueLabel: row.value === null ? "—" : String(row.count), rateLabel: row.rate == null ? "暂无机会" : Number(row.rate.toFixed(1)) + "%",
-      url: "/pages/matches/matches?fun=" + row.id + "&mode=" + row.mode,
-      percent: row.opportunities ? Math.round(row.count / row.opportunities * 100) : 0,
-      color: row.id.startsWith("honor_") ? row.id === "honor_mvp" ? "mvp" : "svp" : (row.honorTitle || /_(ally|hit|bust|miss)$/.test(row.id)) && !(row.positive ?? row.ranked) ? "evil" : row.id.endsWith("failed") ? "muted" : "good" }));
-    const primary = metrics.find(row => row.positive ?? row.ranked) || metrics[0];
-    const aim = card.metrics.find(row => row.id.endsWith("aim_enemy"));
-    const roles = (primary?.byRole || []).map(role => ({ ...role,
-      countLabel: role.value === null ? "—" : String(role.count),
-      ally: metrics.find(row => row.id.endsWith("ally"))?.byRole.find(row => row.role === role.role)?.count || 0,
-      failed: metrics.find(row => row.id.endsWith("failed"))?.byRole.find(row => row.role === role.role)?.count || 0,
-      url: primary ? primary.url + "&role=" + role.role : "" }));
-    const isCombat = ["knife","gun","duel","kill"].some(group => card.id.endsWith(":"+group));
-    const isDefense = card.id.endsWith(":defense");
-    const isSurvival = card.id.endsWith(":survival");
-    const isHonor = card.id.endsWith(":honor");
-    // Presentation only: illustrations identify the skill family, never its recorded faction.
-    const visual = ({
-      survival: { icon: "/assets/record-heart.svg", iconTone: "purple" },
-      honor: { icon: "/assets/record-medal.svg", iconTone: "gold" },
-      shield: { icon: "/assets/record-shield-good.svg", iconTone: "green" },
-      kill: { icon: "/assets/record-swords.svg", iconTone: "blue" },
-      defense: { icon: "/assets/record-shield.svg", iconTone: "gold" },
-      merlin: { icon: portrait("梅林").portrait, iconTone: "portrait" },
-      percival: { icon: portrait("派西维尔").portrait, iconTone: "portrait" },
-      assassin: { icon: portrait("刺客").portrait, iconTone: "portrait" },
-      knife: { icon: portrait("蓝刀客·加雷斯").portrait, iconTone: "portrait" },
-      gun: { icon: portrait("猎人").portrait, iconTone: "portrait" },
-      duel: { icon: portrait("蓝骑士").portrait, iconTone: "portrait" },
-    })[card.id.split(":").pop()] || { icon: "/assets/record-spark.svg", iconTone: "purple" };
-    return { ...card, ...visual, isHonor, metrics, roles, roleLabel: isDefense || card.id.endsWith(":kill") ? primary?.roleLabel || "" : "",
-      section: card.id.split(":")[0] + ":" + (isSurvival ? "survival" : isCombat || isDefense ? "combat" : "terminal"),
-      sectionLabel: isSurvival ? "生存趣事" : isHonor ? "玩家票选" : isCombat || isDefense ? "轮内技能" : "终局表现",
-      sampleNote: card.id.endsWith(":shield") ? "按最终刀统计" : "",
-      combatRateLabel: card.id.endsWith(":kill") ? "击杀对方率" : card.id.endsWith(":duel") ? "决斗敌方率" : "敌方命中率",
-      rateAvailable: !primary?.countOnly && primary?.value != null && primary?.rate != null && primary.opportunities > 0,
-      successFraction: primary?.value != null && primary?.opportunities > 0 ? `成功 ${primary.count} / ${primary.opportunities}` : "",
-      shareMetric: primary?.ranked && primary.value !== null && primary.knownGames ? primary.id : "", shareLabel: primary?.label || "成绩", isCombat,
-      enemyLabel: metrics.find(row => row.id.endsWith("enemy"))?.label || "敌方", allyLabel: metrics.find(row => row.id.endsWith("ally"))?.label || "友方",
-      coverage: primary ? `${primary.knownGames} 局有记录${primary.unknownGames ? ` · ${primary.unknownGames} 局未记录` : ""}` : "",
-      headerNote: primary?.countOnly ? "" : !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `${primary.opportunities} ${isCombat ? "次出手" : isDefense ? "次保护" : "次机会"}`,
-      sampleLabel: isSurvival ? "按实际发生次数累计 · 点击查看对局" : isHonor ? "按获奖局数统计 · 点击查看对局" : !primary || primary.value === null ? "暂无完整样本" : !primary.opportunities ? "暂无有效机会" : `共 ${primary.opportunities} ${isCombat ? "次出手" : isDefense ? "次实际保护" : "次机会"}`,
-      opportunities: primary?.opportunities || 0, rateLabel: primary?.rateLabel || "暂无机会", aimLabel: aim?.rate == null ? "" : "选敌率 " + aim.rate.toFixed(1) + "%" };
-  });
-  const multipleModes = new Set(cards.map(card => card.id.split(":")[0])).size > 1;
-  const modes = { classic: "经典", knights: "十二骑士", other: "扩展玩法" };
-  cards.forEach((card, index) => {
-    card.sectionTitle = cards[index - 1]?.section === card.section ? "" : (multipleModes && !card.isHonor ? modes[card.id.split(":")[0]] + " · " : "") + card.sectionLabel;
-    if (card.id.endsWith(":survival")) card.sectionTitle = multipleModes ? modes[card.id.split(":")[0]] : "";
-  });
-  return { ...value, available: true, cards, shareable: canShareFun(value) };
+  return { ...value, available: true, ...funCopy.records(value), shareable: canShareFun(value) };
 }
 function presentMatches(records) {
   return records.map(record => {

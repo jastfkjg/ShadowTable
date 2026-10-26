@@ -1,0 +1,39 @@
+<template name="sharedRecordContent">
+  <scroll-view class="shared-scroll" scroll-y="{{true}}" show-scrollbar="{{false}}" aria-label="玩家分享的成绩">
+    <view class="shared-page">
+      <view wx:if="{{loading}}" class="shared-status" role="status">正在读取分享的成绩…</view>
+      <view wx:elif="{{error}}" class="shared-status" role="alert"><view>{{error}}</view><button class="secondary shared-retry" bindtap="retrySharedRecord" hover-class="stats-pressed">重新加载</button></view>
+      <view wx:elif="{{intro}}" class="shared-intro">
+        <image class="shared-intro-cover" src="/assets/share-cover.jpg" mode="widthFix" aria-label="桌边助手，一起入座" />
+        <view class="shared-brand">桌边助手 · {{intro.label}}</view><view class="shared-result">{{intro.heading}}</view>
+        <view class="shared-description">{{intro.description}}</view><view class="shared-description">完整小程序中，可查看自己的战绩与记录。</view>
+        <button wx:if="{{!singlePage}}" class="secondary shared-retry" bindtap="openPersonalRecords" hover-class="stats-pressed">查看我的记录</button>
+      </view>
+      <block wx:elif="{{sharedRecord}}">
+        <view class="shared-brand">桌边助手</view>
+        <view class="shared-owner"><image wx:if="{{sharedRecord.avatar}}" class="shared-avatar" src="{{sharedRecord.avatar}}" mode="aspectFill" binderror="sharedAvatarError" aria-label="{{sharedRecord.name+'的头像'}}" /><view wx:else class="shared-avatar shared-initial" aria-hidden="true">{{sharedRecord.initial}}</view><view class="shared-owner-copy"><view>{{sharedRecord.name}}</view><text>{{sharedRecord.ownerLabel}}</text></view></view>
+        <block wx:if="{{sharedRecord.kind==='stats' || sharedRecord.kind==='matches' || sharedRecord.kind==='funSummary'}}">
+          <view class="shared-muted">{{sharedRecord.heroLabel}}</view><view class="shared-hero">{{sharedRecord.hero}}<text>{{sharedRecord.unit}}</text></view><view class="shared-scope">{{sharedRecord.scope}}</view>
+        </block>
+        <block wx:elif="{{sharedRecord.kind==='match'}}">
+          <view class="shared-context">{{sharedRecord.context}}</view><view class="shared-result">{{sharedRecord.result}}</view><view class="shared-scope">{{sharedRecord.endedAt}} · 已结束</view>
+          <view class="shared-role-scene"><view class="shared-role-copy"><text>{{sharedRecord.name}}的角色</text><view>{{sharedRecord.role}}</view><text>{{sharedRecord.roleContext}}</text></view><image src="{{sharedRecord.portrait}}" mode="aspectFit" aria-hidden="true" /></view>
+        </block>
+        <block wx:else>
+          <view class="shared-fun-hero"><view class="shared-context">趣味记录 · {{sharedRecord.roleLabel}}</view><view class="shared-fun-label">{{sharedRecord.heroLabel}}</view><view class="shared-hero {{sharedRecord.longHero?'is-long':''}}">{{sharedRecord.hero}}<text>{{sharedRecord.unit}}</text></view><image wx:if="{{!sharedRecord.longHero}}" class="{{sharedRecord.portraitIcon?'is-portrait':''}}" src="{{sharedRecord.icon}}" mode="aspectFit" aria-hidden="true" /></view><view class="shared-scope">{{sharedRecord.scope}}</view>
+        </block>
+        <view class="shared-metrics"><view wx:for="{{sharedRecord.metrics}}" wx:key="label" class="shared-metric"><view>{{item.value}}</view><text>{{item.label}}</text></view></view>
+        <block wx:if="{{sharedRecord.kind==='stats'}}">
+          <view class="shared-section"><view class="shared-section-heading"><text>阵营表现</text><text>胜场 / 局数</text></view><view wx:for="{{sharedRecord.factions}}" wx:key="faction" class="shared-faction"><view class="shared-faction-copy"><view>{{item.label}}<text>{{item.wins}} / {{item.total}}</text></view><text>{{item.rate}}</text></view><view class="shared-bar"><view class="is-{{item.faction}}" style="{{item.bar}}"></view></view></view></view>
+          <view wx:if="{{sharedRecord.roles.length}}" class="shared-section"><view class="shared-section-heading"><text>常玩角色</text><text>按对局数 · 前 {{sharedRecord.roles.length}} 位</text></view><view wx:for="{{sharedRecord.roles}}" wx:key="roleKey" class="shared-role-row"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="shared-role-main"><view>{{item.role}}</view><text>{{item.total}} 局 · {{item.wins}} 胜 {{item.losses}} 负</text></view><text>{{item.rate}}</text></view></view>
+        </block>
+        <view wx:elif="{{sharedRecord.kind==='matches'}}" class="shared-section"><view class="shared-section-heading"><text>近期对局</text><text>当前范围 · 最近 {{sharedRecord.related.length}} 局</text></view><view wx:for="{{sharedRecord.related}}" wx:key="id" class="shared-related"><view><view>{{item.title}}</view><text>{{item.time}}</text></view><text>{{item.value}}</text></view></view>
+        <view wx:elif="{{sharedRecord.kind==='funSummary'}}" class="shared-summary-grid"><view wx:for="{{sharedRecord.items}}" wx:key="id" class="shared-summary-item"><view class="shared-summary-identity"><image src="{{item.icon}}" mode="aspectFit" aria-hidden="true" /><text>{{item.roleLabel}}</text></view><view class="shared-summary-label">{{item.label}}</view><view class="shared-summary-count">{{item.countLabel}}<text wx:if="{{item.known}}">{{item.unit}}</text></view><view class="shared-description">{{item.rateLabel || item.stateLabel}}<text wx:if="{{item.sampleLabel}}"> · {{item.sampleLabel}}</text></view></view></view>
+        <view wx:elif="{{sharedRecord.kind==='match'}}" class="shared-section"><view class="shared-section-heading"><text>关键过程</text><text>本局公开记录</text></view><view wx:if="{{!sharedRecord.events.length}}" class="shared-description">本局没有保存可分享的过程记录。</view><view wx:for="{{sharedRecord.events}}" wx:key="id" class="shared-event"><text>{{item.round}}</text><view>{{item.label}}</view></view></view>
+        <block wx:else><view class="shared-description">{{sharedRecord.description}}</view><view class="shared-section"><view class="shared-section-heading"><text>相关记录</text><text>最近 {{sharedRecord.related.length}} 场</text></view><view wx:if="{{!sharedRecord.related.length}}" class="shared-description">暂无包含这项成绩的对局。</view><view wx:for="{{sharedRecord.related}}" wx:key="id" class="shared-related"><view><view>{{item.title}}</view><text>{{item.time}}</text></view><text>{{item.value}}</text></view></view></block>
+        <view class="shared-stamp">数据截至 {{sharedRecord.asOf}}</view>
+        <view wx:if="{{authoring}}" class="shared-author-note">可使用右上角菜单分享给好友或朋友圈。<button wx:if="{{posterAvailable}}" class="shared-poster" bindtap="sharedPoster" hover-class="stats-pressed">生成成绩图片</button></view>
+      </block>
+    </view>
+  </scroll-view>
+</template>

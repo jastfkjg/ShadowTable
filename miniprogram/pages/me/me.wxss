@@ -1,3 +1,4 @@
+@import "../shared/content.wxss";
 .me-page { --me-divider: rgba(177,191,198,.13); max-width:600px; padding:20px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
 .me-page, .me-page view, .me-page text, .me-page navigator { box-sizing:border-box; }
 .me-page .me-pressed { opacity:.72; }

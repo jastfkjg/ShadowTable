@@ -39,6 +39,12 @@ Component({
         });
         return;
       }
+      if (this.data.dialog?.variant === 'fun-record' && this.createSelectorQuery) {
+        const id=this.data.dialog.id,q=this.createSelectorQuery();
+        for(const selector of ['.app-dialog-backdrop','.fun-info-hero','.fun-info-content']) q.select(selector).boundingClientRect();
+        q.exec(r=>{if(this.data.dialog?.id===id&&r?.[0]&&r[1]&&r[2]) this.setData({bodyHeight:Math.min(r[2].height,Math.max(44,r[0].height-48-r[1].height))});});
+        return;
+      }
       if (!(this.data.dialog?.content || this.data.dialog?.lead) || !this.createSelectorQuery) return;
       const id = this.data.dialog.id;
       const grant = this.data.dialog.variant === "avoidance-grant";

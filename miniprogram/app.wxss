@@ -1803,8 +1803,8 @@ button[disabled] .score-forward { display: none; }
 .player-card-handle { flex-shrink: 0; width: 64rpx; height: 6rpx; border-radius: 6rpx; background: var(--border); margin: 0 auto 8rpx; }
 .player-card-heading { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
 button.player-card-close { margin: 0 -16rpx 0 0; padding: 0; width: 48px; min-height: 48px; font-size: 48rpx; font-weight: 400; }
-/* Loading, errors, stats and badge details share one stable scroll viewport. */
-.player-card-body { height: 540px; flex-shrink: 1; min-height: 0; max-height: 70vh; scrollbar-width: none; }
+/* Native scroll height is measured from the current content and available space. */
+.player-card-body { height: auto; flex-shrink: 1; min-height: 0; max-height: 70vh; scrollbar-width: none; }
 .player-card-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .player-card-identity { display: flex; align-items: center; gap: 24rpx; padding: 12rpx 0 28rpx; }
 .player-card-avatar { position: relative; flex-shrink: 0; width: 112rpx; height: 112rpx; border-radius: 50%; overflow: hidden; background: var(--bg); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 44rpx; }

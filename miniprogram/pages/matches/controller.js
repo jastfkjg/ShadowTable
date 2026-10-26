@@ -97,7 +97,7 @@ module.exports = function createController() { return {
   chooseFilter(e) {
     if (this.fetching || !this.data.filtersAvailable || !this.data.filtersExpanded) return;
     const group = this.data.draftFilterGroups.find(item => item.key === e.currentTarget.dataset.key);
-    const option = group?.options[Number(e.detail.value)];
+    const option = group?.options[Number(e.detail?.value ?? e.currentTarget.dataset.index)];
     if (!option || option.id === this.data.draftFilters[group.key]) return;
     this.setData(draftState({ ...this.data.draftFilters, [group.key]: option.id }, this.filterOptions, this.data.draftFilterGroups));
   },
@@ -130,6 +130,15 @@ module.exports = function createController() { return {
   toggleRecord(e) {
     const id = e.currentTarget.dataset.id;
     this.setData({ records: this.data.records.map(record => record.id === id ? { ...record, expanded: !record.expanded } : record) });
+  },
+  shareRecord(event) {
+    const record = this.data.records.find(row => row.id === event.currentTarget.dataset.id);
+    if (!record || this.data.loading || this.data.error || this.openingShareRecord) return;
+    this.openingShareRecord = true;
+    wx.navigateTo({ url: "/pages/shared/shared?kind=match&match=" + encodeURIComponent(record.id),
+      fail: () => { if (this.alive) wx.showToast({ title: "分享页暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingShareRecord = false; },
+    });
   },
   openReplay(e) {
     if (this.openingReplay) return;

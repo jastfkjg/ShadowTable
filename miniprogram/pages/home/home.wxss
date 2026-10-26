@@ -1,10 +1,11 @@
 /* Home-only presentation. Every new rule is scoped away from the table. */
 @import "../../room-list.wxss";
+@import "./connection-state.wxss";
 .home-lobby { --home-divider:rgba(177,191,198,.13); --home-state-bg:rgba(163,223,190,.08); max-width:600px; padding:12px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
 .home-lobby .brand { border:0; padding:0; margin:0 2px 14px; flex-wrap:nowrap; gap:8px; }
 .home-lobby .brand-identity { flex-wrap:wrap; gap:0 7px; }.home-lobby .brand-mark { color:var(--text); font-size:20px; letter-spacing:.4px; line-height:1.4; }
 .home-lobby .home-brand-symbol { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:30px; height:32px; border-radius:10px; background:#3b372d; }.home-lobby .home-brand-symbol image { width:20px; height:20px; }
-.home-lobby .brand-identity .connection-button { width:auto; min-width:44px; min-height:44px; margin:0; padding:0; gap:4px; }.home-lobby .connection-label { font-size:11px; font-weight:400; }.home-lobby .connection-dot { width:6px; height:6px; }
+.home-lobby .brand-identity .connection-button { justify-content:flex-start; width:auto; min-width:44px; min-height:44px; margin:0; padding:0; gap:4px; }.home-lobby .connection-label { font-size:11px; font-weight:400; }.home-lobby .connection-dot { width:6px; height:6px; }
 .home-lobby .home-entry-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .home-lobby button.room-filter { min-width:44px; min-height:44px; font-size:12px; }
 .home-lobby button.home-action, .home-lobby button.home-action[disabled]:not([type]) { position:relative; display:flex; flex-direction:column; justify-content:flex-start; align-items:flex-start; gap:8px; width:100%; min-width:0; min-height:133px; padding:16px; margin:0; border:0; border-radius:22px; background:var(--surface); color:var(--text); line-height:1.5; text-align:left; transition:opacity 120ms ease; }

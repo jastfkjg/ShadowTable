@@ -1,7 +1,9 @@
 <import src="../stats/panel.wxml" />
 <import src="../stats/fun.wxml" />
 <import src="../matches/panel.wxml" />
-<view class="records-shell">
+<import src="../shared/content.wxml" />
+<view wx:if="{{sharedSurface}}"><template is="sharedRecordContent" data="{{...publicShare}}" /></view>
+<view wx:else class="records-shell">
   <app-nav title="我的战绩" back="{{true}}" backLabel="{{tab==='matches' && historyFromFun ? '返回趣味记录' : '返回'}}" bindback="back" />
   <view class="records-tabs" aria-label="战绩分类" aria-hidden="{{history.filtersExpanded || !!statistics.statsDetail}}">
     <button hover-class="none" bindtap="chooseTab" data-id="records" class="{{tab==='records'?'selected':''}}" aria-pressed="{{tab==='records'}}"><text>统计</text></button>

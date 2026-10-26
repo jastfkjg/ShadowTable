@@ -111,6 +111,12 @@ const homeBase = { ...createTable({ lobby: true }).data, loading: false, serverC
 const room = (code, status, people, relation, activity, extra = {}) => ({ code, status, statusLabel: status === "lobby" ? "待开局" : status === "playing" ? "进行中" : "已结束", boardName: "阿瓦隆 · 十二骑士", peopleLabel: people, compactRelation: relation, activityLabel: activity, entryLabel: status === "ended" ? "查看牌桌" : "返回牌桌", available: true, updatedAt: 1, canSwipeDissolve: true, isHost: true, isMember: true, canLeave: true, ...extra });
 const rooms = [room("201375", "lobby", "12/12 人已入座", "我是房主 · 1号", "今天 15:50"), room("534718", "lobby", "1/12 人已入座", "我是房主 · 1号", "10/13 14:53"), room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:33", { boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false })];
 const homeScenes = {
+  "home-connection-connecting": { loading: true, serverConnected: false, memberRooms: [], visibleMemberRooms: [] },
+  "home-connection-reconnecting": { reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-retrying": { loading: true, reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-offline": { network: false, reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-no-cache": { reconnecting: true, serverConnected: false, memberRooms: [], visibleMemberRooms: [] },
+  "home-connection-ready": { roomsSyncLabel: "21:17", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
   home: {}, "home-empty": { memberRooms: [], visibleMemberRooms: [] }, "home-loading": { loading: true, memberRooms: [], visibleMemberRooms: [] },
   "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -roomSwipe.width(rooms[0]) },
   "home-swipe-single": { roomSwipeCode: rooms[2].code, roomSwipeOffset: -roomSwipe.width(rooms[2]) },
@@ -235,6 +241,10 @@ const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,win
   {faction:'good',label:'好人阵营',total:6,wins:2,winRate:100/3,rateLabel:'33.3%',rateValue:'33.3'}]};
 const playerSample = {name:'阿伟',initial:'阿',seat:6,badges:badgeSamples};
 const tableScenes = {
+  'player-card-a': {...tablePlaying, playerCard: {...playerSample, name:'大V', initial:'大', seat:1, isHost:true, avatarUrl:'/pages/profile/assets/avatars/crayon-07.jpg'},
+    playerCardStats: {scoreTotal:27,rateLabel:'55.6%',rateValue:'55.6',total:18,wins:10,byFaction:[
+      {faction:'evil',label:'坏人阵营',total:5,wins:4,rateValue:'80.0'},
+      {faction:'good',label:'好人阵营',total:13,wins:6,rateValue:'46.2'}]}},
   'table-ready':tableReady, 'table-playing':tablePlaying,
   'table-unready':tableScene(tableUnreadySource,'host',{startHint:'等待其他玩家准备',canStart:false}),
   'table-can-start':tableScene(tableAllReadySource,'host',{canStart:true,startHint:'全员已准备，可以发放身份'}),
@@ -364,7 +374,8 @@ for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
 tableScenes['ui-host-fairy']=tableScene(reviewSource,'review-1',{settleHint:'还差 1 人提交'});
 tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom,phase:'teamVote',closeWaiting:{mode:'settle',label:'提前结算投票'}}};
 const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
-for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
+const playerCardProjection=`<script>window.fitPlayerCard=()=>{const sheet=document.querySelector('.player-card-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.player-card-backdrop','.player-card-top','.player-card-content','.player-card-bottom'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.player-card-body').style.height=height+'px';sheet.classList.add('has-measured-body');}sheet.classList.remove('is-measuring');};addEventListener('load',window.fitPlayerCard);addEventListener('resize',window.fitPlayerCard);</script>`;
+for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}.player-card-bottom{padding-bottom:34px}',processProjection+playerCardProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
   fs.writeFileSync(path.join(output,gallery+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:28px 40px;width:1638px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;margin:0 0 12px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px}iframe{display:block;width:390px;height:844px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${items.map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>保留游戏规则与私密流程 · 示例数据 · 需真机验收</p></main></html>`);
 }

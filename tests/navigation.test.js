@@ -394,9 +394,9 @@ test('旧接口的趣味统计、历史摘要和详情统一文案，保留计�
     : { records: [legacy.match], total: 1, hasMore: false } };
   const { p: stats } = page('stats', api);
   await stats.onLoad({ tab: 'fun' });
-  assert.equal(stats.data.stats.fun.cards[0].enemyLabel, '刀中敌方');
-  assert.equal(stats.data.stats.fun.cards[0].allyLabel, '刀中友方');
-  assert.equal(stats.data.stats.fun.cards[0].metrics[1].count, 1);
+  assert.equal(stats.data.stats.fun.tiles[0].label, '刀中敌方');
+  assert.equal(stats.data.stats.fun.tiles[1].label, '刀中友方');
+  assert.equal(stats.data.stats.fun.tiles[1].count, 1);
   const { p: matches } = page('matches', api);
   await matches.onLoad({});
   assert.equal(matches.data.records[0].funLabel, '成功挡刀 · 刀中友方');
@@ -448,7 +448,7 @@ test('筛选弹层的关闭放弃草稿，重置只改草稿，重复确认不�
     return { records: [{ id: 'one', endedAt: 1, members: [] }], total: 1, hasMore: false, filterOptions: { boards: [], roles: [] } };
   } });
   await p.onLoad();
-  const choose = index => p.chooseFilter({ currentTarget: { dataset: { key: 'outcome' } }, detail: { value: index } });
+  const choose = index => p.chooseFilter({ currentTarget: { dataset: { key: 'outcome', index } }, detail: {} });
   choose(1); assert.equal(p.data.draftFilters.outcome, '');
   p.toggleFilters(); choose(1); p.closeFilters();
   assert.equal(p.data.filters.outcome, ''); assert.equal(urls.length, 1);
@@ -464,6 +464,26 @@ test('筛选弹层的关闭放弃草稿，重置只改草稿，重复确认不�
   assert.equal(p.data.filterCount, 0); assert.equal(urls.length, 3);
   p.fetching = true; p.toggleFilters(); assert.equal(p.data.filtersExpanded, false);
 });
+test('时间快捷选项与原生选择器共用草稿，确认前不请求，重置后恢复全部时间', async () => {
+  const urls = [];
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    urls.push(url);
+    return { records: [], total: 0, hasMore: false, filterOptions: { boards: [{id:'knights',label:'十二骑士'}], roles: [] } };
+  } });
+  await p.onLoad(); p.toggleFilters();
+  p.chooseFilter({ currentTarget: { dataset: { key: 'period', index: 2 } }, detail: {} });
+  p.chooseFilter({ currentTarget: { dataset: { key: 'board' } }, detail: { value: '1' } });
+  assert.equal(p.data.draftFilters.period, '7d'); assert.equal(p.data.draftFilters.board, 'knights');
+  assert.equal(p.data.filters.period, 'all'); assert.equal(urls.length, 1);
+  p.chooseFilter({ currentTarget: { dataset: { key: 'period', index: 99 } } });
+  assert.equal(p.data.draftFilters.period, '7d');
+  await p.confirmFilters();
+  assert.match(urls.at(-1), /period=7d&board=knights/);
+  p.toggleFilters(); p.resetDraftFilters();
+  assert.equal(p.data.draftFilters.period, 'all');
+  assert.equal(p.data.draftFilterGroups.find(group => group.key === 'period').index, 0);
+  assert.equal(p.data.filters.period, '7d');
+});
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
   const find = node => typeof node === 'object' &&
@@ -471,6 +491,52 @@ function renderMainPanel(factory, index, data) {
   return find(tree);
 }
 
+test('首页与我的朋友圈分享使用品牌封面，返回前台恢复两个系统菜单，切标签更新分享参数', async () => {
+  for(const route of ['lobby','me']) {
+    const menus=[];
+    const api={...apiBase,request:async url=>url==='/api/boards'?{boards:BOARDS}:url.endsWith('/profile')?profile:url.endsWith('/stats')?emptyStats:{rooms:[],records:[],total:0}};
+    const {p}=page(route,api,{home:true,wx:{showShareMenu:options=>menus.push(options)}});
+    try {
+      p.onLoad();assert.equal(menus.length,1);
+      const initial=route==='lobby'?0:1;
+      assert.equal(p.onShareTimeline().query,'main='+initial);
+      assert.equal(p.onShareTimeline().title,'来一局阿瓦隆，一起入座');
+      assert.equal(p.onShareTimeline().imageUrl,'/assets/share-cover.jpg');
+      assert.equal(p.onShareAppMessage().path,'/pages/lobby/lobby');
+      await p.onShow();assert.equal(menus.length,2);
+      await p.switchMainTab(1-initial);
+      assert.equal(p.onShareTimeline().query,'main='+(1-initial));
+      assert.deepEqual(Array.from(menus[0].menus),['shareAppMessage','shareTimeline']);
+      assert.doesNotMatch(JSON.stringify(p.onShareTimeline()),/nickname|roomCode|profile|stats/);
+    } finally {p.onUnload();}
+  }
+});
+test('首页朋友圈单页模式仅显示品牌介绍，不登录、不读取个人数据或本地登录存储', async () => {
+  const context={window:{},global:{},console};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  for(const route of ['lobby','me']) for(const main of ['0','1']){
+    const {p}=page(route,{login(){throw Error('不得登录');},request(){throw Error('不得读取个人数据');}},{home:true,wx:{
+      getEnterOptionsSync:()=>({scene:1154}),getStorageSync(){throw Error('不得读取登录存储');},showShareMenu(){throw Error('不得调用受限菜单');},
+    }});
+    p.onLoad({main});p.onReady();await p.onShow();
+    assert.equal(p.data.singlePage,true);assert.equal(p.data.activeTab,Number(main));
+    assert.equal(p.lobbyController,undefined);assert.equal(p.personalController,undefined);
+    const content=JSON.stringify(factory('pages/'+route+'/'+route+'.wxml')(p.data));
+    assert.match(content,/和朋友，一起入座/);assert.doesNotMatch(content,/main-panel|wx-app-nav|编辑资料|创建房间/);
+    await p.switchMainTab(1-Number(main));assert.equal(p.data.activeTab,Number(main));
+    assert.equal(p.getPersonalPreview('stats'),null);
+    p.onHide();p.onUnload();
+  }
+});
+test('朋友圈进入完整首页恢复分享时的标签，无效标签参数使用入口默认值',()=>{
+  for(const route of ['lobby','me']) for(const main of ['0','1','bad']){
+    const {p}=page(route,apiBase,{home:true});
+    p.onLoad({main});
+    assert.equal(p.data.singlePage,false);
+    assert.equal(p.data.activeTab,main==='bad'?(route==='lobby'?0:1):Number(main));
+    p.onUnload();
+  }
+});
 test('首页在同一窗口保留两个区域、表单和滚动位置，切回时刷新且不调用页面导航', async () => {
   const scrolls = [], pages = [];
   const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
@@ -1093,6 +1159,91 @@ test('其他房间的待确认加入保持原请求，邀请不会恢复或覆�
   assert.equal(c.p.data.invitation.code, '654321');
   assert.deepEqual(c.navigations, []);
 });
+test('战绩两入口进入即开放系统菜单，三页自动分享概览且无需选择卡片', async () => {
+  for (const route of ['stats','matches']) {
+    const menus=[],selections=[],fixtures=require('./helpers/record-share-fixtures');
+    const rawStats={...emptyStats,...require('./helpers/share-fixtures').stats,byBoard:[],recent:[]};
+    const {p}=page(route,{...apiBase,request:async(url,method,selection)=>{
+      if(url==='/api/me/shares'){selections.push(selection);return fixtures[selection.kind];}
+      return url.includes('/matches')?{records:[{id:'private-match',boardName:'阿瓦隆 · 经典基础',role:'梅林',faction:'good',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats;
+    }},{home:true,wx:{showShareMenu:o=>menus.push(o),hideShareMenu(){throw Error('正常页面不得关闭分享');}}});
+    try {
+      const loading=p.onLoad({tab:'fun'});
+      assert.equal(menus.length,1);
+      assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro=fun');
+      await loading;
+      for(const [tab,kind] of [['fun','funSummary'],['records','stats'],['matches','matches']]) {
+        await p.switchPanel(tab);await new Promise(resolve=>setImmediate(resolve));await p.sharePromise;
+        assert.equal(p.preparedShare.kind,kind);
+        assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?share='+p.preparedShare.id);
+        assert.equal(p.onShareTimeline().query,'tab='+tab+'&share='+p.preparedShare.id);
+        assert.doesNotMatch(JSON.stringify(p.onShareAppMessage()),/private-match|scored|merlin_evade/);
+      }
+      assert.deepEqual(selections.map(row=>row.kind),['funSummary','stats','matches']);
+    } finally {p.onUnload();}
+  }
+});
+test('快照准备期间切换页面，旧结果不能覆盖当前概览，菜单始终保留有效兜底', async () => {
+  const pending=[],menus=[],fixtures=require('./helpers/record-share-fixtures');
+  const rawStats={...emptyStats,total:1,wins:1,losses:0,winRate:100};
+  const {p}=page('stats',{...apiBase,request:async(url,method,selection)=>{
+    if(url==='/api/me/shares')return new Promise(resolve=>pending.push({selection,resolve}));
+    return url.includes('/matches')?{records:[{id:'selected',role:'梅林',boardName:'经典',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats;
+  }},{home:true,wx:{showShareMenu:options=>menus.push(options),hideShareMenu(){throw Error('不得关闭菜单');}}});
+  try {
+    await p.onLoad();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(pending.length,1);assert.equal(menus.length,1);
+    await p.switchPanel('matches');
+    assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro=matches');
+    await new Promise(resolve=>setImmediate(resolve));assert.equal(pending.length,2);
+    pending[0].resolve(fixtures.stats);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(p.preparedShare,null);assert.equal(menus.length,1);
+    pending[1].resolve(fixtures.matches);await p.sharePromise;
+    assert.equal(p.preparedShare.id,fixtures.matches.id);
+  } finally {p.onUnload();}
+});
+test('空记录、个人数据失败及快照接口失败时三页菜单仍能转发品牌介绍', async()=>{
+  for(const mode of ['empty','data-error','share-error']) for(const tab of ['records','matches','fun']){
+    let shown=0;
+    const rawStats=mode==='empty'?emptyStats:{...emptyStats,...require('./helpers/share-fixtures').stats,byBoard:[],recent:[]};
+    const {p}=page('stats',{...apiBase,request:async(url)=>{
+      if(mode==='data-error'||url==='/api/me/shares')throw Error('offline');
+      return url.includes('/matches')?{records:[],total:0,hasMore:false}:rawStats;
+    }},{home:true,wx:{showShareMenu(){shown++;},hideShareMenu(){throw Error('不得关闭菜单');}}});
+    try{
+      await p.onLoad({tab});await new Promise(resolve=>setImmediate(resolve));await p.sharePromise;
+      assert.equal(shown,1);assert.equal(p.preparedShare||null,null);
+      assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro='+tab);
+      assert.equal(p.onShareTimeline().query,'tab='+tab+'&intro='+tab);
+    }finally{p.onUnload();}
+  }
+});
+test('朋友圈单页模式两个入口只读取公开快照，不登录、不读取本人数据或展示个人操作', async () => {
+  const context={window:{},global:{},console};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  for(const route of ['stats','matches']) for(const tab of ['records','matches','fun']) {
+    const snapshot=require('./helpers/record-share-fixtures').stats;
+    const {p}=page(route,{...apiBase,login(){throw Error('不得登录');},request(){throw Error('不得读取本人数据');}},{home:true,wx:{request:o=>o.success({statusCode:200,data:snapshot}),getEnterOptionsSync:()=>({scene:1154}),showShareMenu(){throw Error('不得调用受限菜单');}}});
+    await p.onLoad({tab,share:snapshot.id});
+    assert.equal(p.data.singlePage,true);assert.equal(p.data.publicShare.sharedRecord.name,'子龙');
+    assert.equal(p.statisticsController,undefined);assert.equal(p.historyController,undefined);
+    const tree=factory('pages/stats/stats.wxml')(p.data);
+    const content=JSON.stringify(tree);
+    assert.match(content,/52.6/);assert.doesNotMatch(content,/overview-card|records-tabs|正在读取|打开桌边助手|sharedPoster/);
+    assert.equal(p.onShareTimeline().query,'share='+snapshot.id);
+    await p.switchPanel(tab==='fun'?'records':'fun');assert.equal(p.data.tab,tab);
+    p.onUnload();
+  }
+});
+test('战绩分享入口防重复打开，跳转失败可重试，离页后不更新提示', () => {
+  const opens=[],{p}=page('stats',apiBase,{wx:{navigateTo:o=>opens.push(o)}});
+  p.setData({loading:false,stats:{total:2}});
+  p.shareStats();p.shareStats();assert.equal(opens.length,1);
+  assert.equal(opens[0].url,'/pages/shared/shared?kind=stats');
+  opens[0].fail();opens[0].complete();assert.match(p.data.shareNotice,/暂时无法打开/);
+  p.shareStats();assert.equal(opens.length,2);assert.equal(p.data.shareNotice,'');
+  p.onUnload();opens[1].fail();opens[1].complete();assert.equal(p.data.shareNotice,'');
+});
 test('按钮与菜单分享同一房间实例，只用专用封面，不包含身份或实时人数', async () => {
   const room = publicView(newRoom('654321', 'host', '子龙', 'knights', 12), 'host');
   const c = page('table', apiBase);
@@ -1332,6 +1483,7 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
   for (const route of routes) {
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
+    if (route === 'pages/shared/shared') { assert.equal(pageConfig.navigationStyle,'default');assert.equal(pageConfig.singlePage.navigationBarFit,'squeezed');continue; }
     assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);
     if (route.endsWith('/lobby/lobby') || route.endsWith('/me/me')) {
       assert.match(template, /<app-nav/);
@@ -1780,7 +1932,7 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
   const aggregate=require('../server/fun').aggregate;
   const fun=aggregate([{match_id:'old',mode:'knights',metric:'knife_enemy',role:'gareth',role_label:'加雷斯',status:'unknown',count:0,opportunities:0}]);
   const stats=page('stats',{...apiBase,request:async()=>({...emptyStats,fun})}).p;await stats.onLoad({tab:'fun'});
-  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.cards[0].metrics[0].valueLabel,'—');assert.equal(stats.data.stats.fun.cards[0].roles[0].countLabel,'—');
+  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.tiles[0].valueLabel,'—');assert.equal(stats.data.stats.fun.tiles[0].roles[0].countLabel,'—');
   const urls=[];const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[]}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unfiltered',members:[]}],total:1}},{}]});
   await p.onLoad({fun:'knife_enemy',mode:'knights',role:'gareth'});await p.loadMore();
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
@@ -2777,4 +2929,38 @@ test('小程序确认面板防止重复提交，测量适配小屏且关闭后�
   await p.confirmClearRecords(); assert.equal(p.pending, original);
   p.closeConfirmation(); assert.equal(p.data.confirming, true);
   resolvePost({}); await saving; assert.equal(p.data.confirming, false);
+});
+
+test('趣味次数筛选覆盖反向称号，切换标签和刷新后保留筛选，清空可回到全部', async () => {
+  const { p } = page('stats', { ...apiBase, request: async () => require('./helpers/fun-copy-fixtures').stats }, { home: true });
+  await p.onLoad({ tab: 'fun' });
+  const select = filter => p.filterFun({ currentTarget: { dataset: { filter } } });
+  select('counted');
+  assert.equal(p.data.statistics.funFilter, 'counted');
+  assert.equal(p.data.statistics.stats.fun.recordedCount, 1);
+  assert.equal(p.data.statistics.stats.fun.recordedTiles[0].id, 'knife_ally');
+  await p.switchPanel('records'); await p.switchPanel('fun'); await p.load();
+  assert.equal(p.data.statistics.funFilter, 'counted');
+  select('invalid'); assert.equal(p.data.statistics.funFilter, 'counted');
+  select('all'); assert.equal(p.data.statistics.stats.fun.tiles.length, 3);
+  assert.equal(p.data.statistics.funFilter, 'all');
+  p.onUnload();
+});
+
+test('趣味卡片打开说明不切换标签或请求对局，防止重复弹窗；只有箭头进入对局', async () => {
+  const rows=[{metric:'survival_knifed',mode:'knights',role:'all',role_label:'玩家',match_id:'m',status:'known',count:4,opportunities:0}];
+  const requests=[],dialogs=[]; let dismiss;
+  const {p}=page('stats',{...apiBase,request:async url=>{requests.push(url);return url.includes('/stats')?{...emptyStats,fun:require('../server/fun').aggregate(rows)}:{records:[],total:0};}}, {home:true,wx:{showModal:options=>{dialogs.push(options);return new Promise(resolve=>dismiss=resolve)}}});
+  await p.onLoad({tab:'fun'});
+  const tile=p.data.statistics.stats.fun.tiles[0];
+  const pending=p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
+  await p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
+  assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'全民公敌'); assert.match(dialogs[0].content,/不含枪和决斗/);
+  assert.equal(p.data.tab,'fun'); assert.equal(p.data.historyStarted,false); assert.equal(requests.length,1);
+  dismiss({confirm:true}); await pending;
+  assert.equal(p.statisticsController.funInfoOpen,false);
+  await p.openFunMatches({currentTarget:{dataset:{url:tile.url}}});
+  assert.equal(p.data.tab,'matches'); assert.equal(dialogs.length,1);
+  assert.match(requests.at(-1),/fun=survival_knifed&mode=knights/);
+  p.onUnload();
 });

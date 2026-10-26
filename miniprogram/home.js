@@ -1,18 +1,25 @@
 const createLobby = require("./pages/table/controller");
 const createPersonal = require("./pages/me/controller");
 const { selectTab } = require("./tab-navigation");
+const { isSinglePage } = require("./records-share");
+const intro = { label: "桌边助手", heading: "和朋友，一起入座", description: "创建或加入阿瓦隆牌桌，记录对局、战绩与趣味故事，让精彩留在同桌之间。" };
 
 // Both entry routes use one retained page surface. Bottom tabs never navigate.
 module.exports = function createHomePage(initialTab = 0) {
   const lobby = createLobby({ lobby: true }), personal = createPersonal();
   const page = {
-    data: { activeTab: initialTab, lobby: lobby.data, personal: personal.data },
+    data: { activeTab: initialTab, lobby: lobby.data, personal: personal.data, singlePage: false, publicIntro: null },
     onLoad(query = {}) {
       this.alive = true;
       this.foreground = false;
       this.homeQuery = query;
       this.startedPanels = [false, false];
       this.tabScrollTops = [0, 0];
+      const activeTab = query.main === "0" ? 0 : query.main === "1" ? 1 : initialTab;
+      const singlePage = isSinglePage();
+      this.setData({ activeTab, singlePage });
+      if (singlePage) { this.setData({ publicIntro: intro }); return; }
+      wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
       const host = this;
       const attach = (definition, key) => ({
         ...definition,
@@ -43,6 +50,8 @@ module.exports = function createHomePage(initialTab = 0) {
       return controller.onShow();
     },
     onShow() {
+      if (this.data.singlePage) return;
+      wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
       const app = typeof getApp === "function" ? getApp() : null;
       if (app?.homeTabRequest) {
         const requested = app.homeTabRequest.selected;
@@ -53,6 +62,7 @@ module.exports = function createHomePage(initialTab = 0) {
       selectTab(this, this.data.activeTab);
       return this.showMainPanel(this.data.activeTab);
     },
+    onReady() { if (this.data.singlePage) wx.setNavigationBarTitle?.({ title: intro.label }); },
     onHide() {
       this.foreground = false;
       if (this.startedPanels[this.data.activeTab]) {
@@ -74,7 +84,7 @@ module.exports = function createHomePage(initialTab = 0) {
       if (this.startedPanels[0]) this.lobbyController.onResize(event);
     },
     switchMainTab(index) {
-      if (!this.alive || ![0, 1].includes(index) || index === this.data.activeTab) return;
+      if (!this.alive || this.data.singlePage || ![0, 1].includes(index) || index === this.data.activeTab) return;
       const previous = this.data.activeTab;
       if (this.startedPanels[previous]) {
         const controller = previous === 0 ? this.lobbyController : this.personalController;
@@ -93,7 +103,7 @@ module.exports = function createHomePage(initialTab = 0) {
       if (this.foreground) return this.showMainPanel(index);
     },
     getPersonalPreview(kind) {
-      if (this.data.activeTab !== 1) return null;
+      if (this.data.singlePage || this.data.activeTab !== 1) return null;
       return kind === "matches" ? this.personalController.matchesPreview : this.personalController.data[kind];
     },
     mask() { this.lobbyController?.mask(); },
@@ -101,9 +111,13 @@ module.exports = function createHomePage(initialTab = 0) {
     about() { return this.personalController.about(); },
     dismissMonthlyReset() { return this.personalController.dismissMonthlyReset(); },
     blockMonthlyResetScroll() {},
-    onShareAppMessage() { return { title: "桌边助手 · ShadowTable", path: "/pages/lobby/lobby" }; },
+    onShareAppMessage() { return { title: "来一局阿瓦隆，一起入座", path: "/pages/lobby/lobby", imageUrl: "/assets/share-cover.jpg" }; },
+    onShareTimeline() {
+      const { title, imageUrl } = this.onShareAppMessage();
+      return { title, imageUrl, query: "main=" + this.data.activeTab };
+    },
   };
-  const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);
+  const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "onShareTimeline", "mask"]);
   for (const name of Object.keys(lobby)) {
     if (typeof lobby[name] === "function" && !lifecycles.has(name)) {
       page[name] = function(...args) { return this.lobbyController[name](...args); };
