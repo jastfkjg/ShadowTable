@@ -1093,6 +1093,75 @@ test('其他房间的待确认加入保持原请求，邀请不会恢复或覆�
   assert.equal(c.p.data.invitation.code, '654321');
   assert.deepEqual(c.navigations, []);
 });
+test('战绩两入口只在具体数据快照准备完成后开放分享，链接不携带个人筛选', async () => {
+  for (const route of ['stats','matches']) {
+    const menus=[],fixtures=require('./helpers/record-share-fixtures');
+    const rawStats={...emptyStats,...require('./helpers/share-fixtures').stats,byBoard:[],recent:[]};
+    const {p}=page(route,{...apiBase,request:async(url,method,selection)=>url==='/api/me/shares'?fixtures[selection.kind]:url.includes('/matches')?{records:[{id:'selected-match',boardName:'阿瓦隆 · 经典基础',role:'梅林',faction:'good',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats},{home:true,wx:{showShareMenu:o=>menus.push(o)}});
+    try {
+      await p.onLoad({tab:'fun'});
+      for(const tab of ['fun','records','matches']) {
+        await p.switchPanel(tab);
+        if(tab==='fun') {p.selectedFunShareKey=p.statisticsController.data.stats.fun.tiles.find(row=>row.known).key;p.scheduleRecordsShare();}
+        if(tab==='matches')p.historyToggleRecord({currentTarget:{dataset:{id:'selected-match'}}});
+        await Promise.resolve();await p.sharePromise;
+        assert.ok(p.preparedShare,route+':'+tab+' '+p.shareKey);
+        assert.deepEqual(Array.from(menus.at(-1).menus),['shareAppMessage','shareTimeline']);
+        const friend=p.onShareAppMessage(),timeline=p.onShareTimeline();
+        assert.equal(friend.path,'/pages/shared/shared?share='+p.preparedShare.id);
+        assert.equal(timeline.query,'tab='+tab+'&share='+p.preparedShare.id);
+        assert.equal(friend.title,timeline.title);
+        assert.equal(friend.imageUrl,'/assets/share-cover.jpg');
+        assert.equal(timeline.imageUrl,friend.imageUrl);
+        assert.doesNotMatch(JSON.stringify([friend,timeline]),/private-match|scored|merlin_evade|我的战绩/);
+      }
+    } finally {p.onUnload();}
+  }
+});
+test('快照准备期间切换分享对象时，迟到的旧结果不能开放菜单或覆盖当前对象', async () => {
+  const pending=[],menus=[],fixtures=require('./helpers/record-share-fixtures');
+  const rawStats={...emptyStats,total:1,wins:1,losses:0,winRate:100};
+  const {p}=page('stats',{...apiBase,request:async(url,method,selection)=>{
+    if(url==='/api/me/shares')return new Promise(resolve=>pending.push({selection,resolve}));
+    return url.includes('/matches')?{records:[{id:'selected',role:'梅林',boardName:'经典',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats;
+  }},{home:true,wx:{showShareMenu:options=>menus.push(options)}});
+  try {
+    await p.onLoad();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(pending.length,1);assert.equal(menus.length,0);
+    await p.switchPanel('matches');p.historyToggleRecord({currentTarget:{dataset:{id:'selected'}}});
+    await new Promise(resolve=>setImmediate(resolve));assert.equal(pending.length,2);
+    pending[0].resolve(fixtures.stats);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(p.preparedShare,null);assert.equal(menus.length,0);
+    pending[1].resolve(fixtures.match);await p.sharePromise;
+    assert.equal(p.preparedShare.id,fixtures.match.id);assert.equal(menus.length,1);
+  } finally {p.onUnload();}
+});
+test('朋友圈单页模式两个入口只读取公开快照，不登录、不读取本人数据或展示个人操作', async () => {
+  const context={window:{},global:{},console};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  for(const route of ['stats','matches']) for(const tab of ['records','matches','fun']) {
+    const snapshot=require('./helpers/record-share-fixtures').stats;
+    const {p}=page(route,{...apiBase,login(){throw Error('不得登录');},request(){throw Error('不得读取本人数据');}},{home:true,wx:{request:o=>o.success({statusCode:200,data:snapshot}),getEnterOptionsSync:()=>({scene:1154}),showShareMenu(){throw Error('不得调用受限菜单');}}});
+    await p.onLoad({tab,share:snapshot.id});
+    assert.equal(p.data.singlePage,true);assert.equal(p.data.publicShare.sharedRecord.name,'子龙');
+    assert.equal(p.statisticsController,undefined);assert.equal(p.historyController,undefined);
+    const tree=factory('pages/stats/stats.wxml')(p.data);
+    const content=JSON.stringify(tree);
+    assert.match(content,/52.6/);assert.doesNotMatch(content,/overview-card|records-tabs|正在读取|打开桌边助手|sharedPoster/);
+    assert.equal(p.onShareTimeline().query,'share='+snapshot.id);
+    await p.switchPanel(tab==='fun'?'records':'fun');assert.equal(p.data.tab,tab);
+    p.onUnload();
+  }
+});
+test('战绩分享入口防重复打开，跳转失败可重试，离页后不更新提示', () => {
+  const opens=[],{p}=page('stats',apiBase,{wx:{navigateTo:o=>opens.push(o)}});
+  p.setData({loading:false,stats:{total:2}});
+  p.shareStats();p.shareStats();assert.equal(opens.length,1);
+  assert.equal(opens[0].url,'/pages/shared/shared?kind=stats');
+  opens[0].fail();opens[0].complete();assert.match(p.data.shareNotice,/暂时无法打开/);
+  p.shareStats();assert.equal(opens.length,2);assert.equal(p.data.shareNotice,'');
+  p.onUnload();opens[1].fail();opens[1].complete();assert.equal(p.data.shareNotice,'');
+});
 test('按钮与菜单分享同一房间实例，只用专用封面，不包含身份或实时人数', async () => {
   const room = publicView(newRoom('654321', 'host', '子龙', 'knights', 12), 'host');
   const c = page('table', apiBase);
@@ -1332,6 +1401,7 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
   for (const route of routes) {
     const pageConfig = JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'));
     const template = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8');
+    if (route === 'pages/shared/shared') { assert.equal(pageConfig.navigationStyle,'default');assert.equal(pageConfig.singlePage.navigationBarFit,'squeezed');continue; }
     assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);
     if (route.endsWith('/lobby/lobby') || route.endsWith('/me/me')) {
       assert.match(template, /<app-nav/);

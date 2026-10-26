@@ -13,6 +13,8 @@
         <button wx:for="{{stats.byFaction}}" wx:key="faction" class="overview-faction" hover-class="stats-pressed" bindtap="openFactionDetails" data-faction="{{item.faction}}" aria-label="{{item.label+'，'+item.wins+'胜'+item.losses+'负，胜率'+item.rateLabel+'，查看详情'}}"><view class="stats-faction-dot is-{{item.faction}}" aria-hidden="true"></view><text class="overview-faction-name">{{item.shortLabel || item.label}}</text><text>{{item.wins}} 胜 {{item.losses}} 负</text><view class="stats-chevron stats-faction-chevron" aria-hidden="true"></view></button>
       </view>
     </view>
+    <view wx:if="{{stats.total}}" class="stats-share-row"><text>全部有效对局</text><button class="stats-share-button" bindtap="shareStats" disabled="{{loading || !!error || shareOpening}}" loading="{{shareOpening}}" hover-class="stats-pressed"><image src="/assets/share.svg" aria-hidden="true" /><text>分享战绩</text></button></view>
+    <view wx:if="{{shareNotice}}" class="stats-share-notice" role="alert">{{shareNotice}}</view>
     <view class="stats-score">
       <button class="stats-score-entry" hover-class="stats-pressed" bindtap="openScoreHistory" disabled="{{loading || !!error}}" aria-label="查看本月积分明细"><view class="stats-score-label"><view class="stats-coin-icon" aria-hidden="true"></view><text>本月积分</text><text class="stats-score-value">{{stats.score.month || 0}}</text></view><view class="stats-score-link"><text>积分明细</text><view class="stats-chevron" aria-hidden="true"></view></view></button>
     </view>

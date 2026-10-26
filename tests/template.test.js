@@ -1530,18 +1530,25 @@ test('登记首页显示不计战绩，其他方式仅登记胜方，删去重�
   assert.ok(byHandler(otherFooter, 'toggleResultOther'));
 });
 
-test('统计与趣味记录页移除顶部说明、分享和卡片更多菜单，保留次数回查',()=>{
+test('统计提供战绩分享，趣味页保留次数回查且无需卡片更多菜单',()=>{
   const { presentStats } = require('../miniprogram/profile');
   const fixture = require('./helpers/fun-copy-fixtures');
   const stats = presentStats(fixture.stats);
   for (const tab of ['records', 'fun']) {
     const tree = renderStatsShell({tab,loading:false,error:'',stats});
-    assert.ok(!byHandler(tree,'shareStats'));
+    assert.ok(byHandler(tree,'shareStats'));
     assert.ok(!byHandler(tree,'openFunMenu'));
     assert.ok(!byHandler(tree,'toggleFunRules'));
     assert.ok(!nodes(tree).some(node=>node.attr?.class?.includes('records-scope')));
     assert.ok(byHandler(tree,'openFunMatches'));
   }
+});
+
+test('战绩分享入口在空战绩时隐藏，加载、读取失败和跳转期间禁用',()=>{
+  const stats=require('../miniprogram/profile').presentStats(require('./helpers/fun-copy-fixtures').stats);
+  for(const patch of [{loading:true},{error:'读取失败'},{shareOpening:true}])
+    assert.equal(byHandler(renderStatsShell({stats,...patch}),'shareStats').attr.disabled,true);
+  assert.equal(byHandler(renderStatsShell({stats:{...stats,total:0}}),'shareStats'),undefined);
 });
 
 test('筛选弹层在滚动区域外，关闭时不渲染，展示时锁定列表滚动并显示草稿选项', () => {

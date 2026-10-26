@@ -1,5 +1,6 @@
 @import "../stats/panel.wxss";
 @import "../matches/panel.wxss";
+@import "../shared/content.wxss";
 .records-shell { --records-line: rgba(177,191,198,.16); --records-selected: #30404a; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; }
 .records-shell > app-nav { flex-shrink: 0; }
 .records-tabs { display: flex; flex-shrink: 0; gap: 8px; padding: 0 12px; background: var(--bg); }

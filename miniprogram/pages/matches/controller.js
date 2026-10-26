@@ -131,6 +131,15 @@ module.exports = function createController() { return {
     const id = e.currentTarget.dataset.id;
     this.setData({ records: this.data.records.map(record => record.id === id ? { ...record, expanded: !record.expanded } : record) });
   },
+  shareRecord(event) {
+    const record = this.data.records.find(row => row.id === event.currentTarget.dataset.id);
+    if (!record || this.data.loading || this.data.error || this.openingShareRecord) return;
+    this.openingShareRecord = true;
+    wx.navigateTo({ url: "/pages/shared/shared?kind=match&match=" + encodeURIComponent(record.id),
+      fail: () => { if (this.alive) wx.showToast({ title: "分享页暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingShareRecord = false; },
+    });
+  },
   openReplay(e) {
     if (this.openingReplay) return;
     const record = this.data.records.find(row => row.id === e.currentTarget.dataset.id && row.replayAvailable);

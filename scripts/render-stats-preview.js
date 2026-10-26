@@ -120,6 +120,8 @@ for (const [name, id] of [['fun-grid-info','survival_knifed'],['fun-grid-info-lo
   const tile = gridStats.fun.tiles.find(row => row.id === id);
   scenes[name] = { ...scenes['fun-grid'], info:require('../miniprogram/dialog').present(require('../miniprogram/fun-copy').recordInfo(tile)) };
 }
+for (const [tab,kind] of [['records','stats'],['matches','match'],['fun','fun']]) scenes['single-page-'+tab] = { singlePage:true, sharedSurface:true, tab,
+  publicShare:{loading:false,error:'',authoring:false,sharedRecord:require('../miniprogram/shared-record-view').present(require('../tests/helpers/record-share-fixtures')[kind])} };
 const styles = css('app.wxss') + css('components/app-nav/app-nav.wxss') + css('pages/stats/stats.wxss') + css('components/app-dialog/app-dialog.wxss');
 const projection = 'body{margin:0}button{font:inherit;border:0;width:100%}span{display:inline}img{object-fit:contain}body .records-shell{padding-bottom:28px}.records-pane{overflow-y:auto}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
 fs.mkdirSync(output, { recursive: true });

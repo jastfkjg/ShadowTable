@@ -1,5 +1,5 @@
 Generated using the built-in image_gen tool, based on the approved Concept A round-table invitation.
-Delivery asset: miniprogram/assets/room-share-background.jpg (1000 x 800 JPEG, 119 KB).
+Delivery asset: miniprogram/assets/room-share-background.jpg (1000 x 800 JPEG, approximately 87 KiB; JPEG quality 78 for main-package size).
 Brand asset: miniprogram/assets/room-share-brand.png, resized from docs/images/avalon-icon.png.
 All lettering (including the game, board variant, and room code) is drawn dynamically by miniprogram/room-share.js.
 

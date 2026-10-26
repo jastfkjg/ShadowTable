@@ -44,6 +44,10 @@ button.stats-role-tile { display:flex; align-items:center; justify-content:flex-
 .stats-role-hint,.stats-scope-note { margin-top:18px; text-align:center; color:var(--muted); font-size:11px; line-height:1.6; }
 .stats-roles-empty { padding:24px 0; color:var(--muted); text-align:center; font-size:13px; }
 .stats-empty { padding:28px 4px 8px; font-size:14px; }.stats-empty .small { margin-top:8px; font-size:12px; }
+.stats-share-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:4px 4px 0; color:var(--muted); font-size:12px; line-height:1.6; }
+button.stats-share-button { display:flex; align-items:center; justify-content:center; gap:6px; width:auto; min-height:44px; margin:0; padding:8px 4px 8px 12px; color:var(--accent); font-size:13px; font-weight:500; line-height:1.5; }
+.stats-share-button image { width:17px; height:17px; flex-shrink:0; }
+.stats-share-notice { margin:8px 4px; color:var(--muted); font-size:13px; line-height:1.6; }
 .stats-detail-backdrop { position:fixed; inset:0; z-index:950; display:flex; align-items:flex-end; justify-content:center; background:var(--overlay-scrim); }
 .stats-detail-sheet { width:100%; max-width:600px; max-height:90vh; padding:16px 24px calc(24px + env(safe-area-inset-bottom)); border:1rpx solid var(--overlay-border); border-bottom:0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background:var(--surface); box-sizing:border-box; animation:stats-detail-enter 180ms ease-out; }
 .stats-detail-handle { width:40px; height:4px; margin:0 auto 20px; border-radius:4px; background:var(--border); }

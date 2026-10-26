@@ -14,6 +14,7 @@ const honors = require("./honors");
 const avoidance = require("./avoidance");
 const avoidanceRewards = require("./avoidance-rewards");
 const BOARD_INFO = require("./board-info");
+const recordShares = require("./record-shares");
 const {
   BOARDS,
   RuleError,
@@ -99,6 +100,7 @@ function createApp({
     limits = new Map();
   const leaderboard = new Leaderboard(store);
   const monthlyReport = new MonthlyReport(store);
+  recordShares.initialize(store);
   function limit(key, max) {
     const now = clock(),
       old = limits.get(key);
@@ -215,6 +217,12 @@ function createApp({
       if (webAuth && await webAuth.handle(req, res, path, send)) return;
       if (req.method === "GET" && path === "/api/scoring/rules")
         return send(200, scoreRules());
+      if (path.startsWith("/api/shares/")) {
+        check(req.method === "GET" && !requestUrl.search, "分享不存在或已失效", 404);
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("X-Robots-Tag", "noindex");
+        return send(200, recordShares.read(store, path.slice("/api/shares/".length)));
+      }
       const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
       if (req.method === "GET" && avatar) {
         const stored = store.db.prepare("SELECT mime,data FROM avatars WHERE hash=?").get(avatar[1]);
@@ -294,6 +302,11 @@ function createApp({
       }
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
       avoidance.ensureAccount(store, uid);
+      if (req.method === "POST" && path === "/api/me/shares") {
+        check(!requestUrl.search, "分享参数无效");
+        limit(`share:${uid}`, 20);
+        return send(200, recordShares.create(store, uid, await body(req)));
+      }
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
       if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
       if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));

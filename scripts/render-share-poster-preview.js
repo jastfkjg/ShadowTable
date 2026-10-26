@@ -14,6 +14,7 @@ const longBoard = structuredClone(board);
 longBoard.me.points = -123456789;
 longBoard.nearby = longBoard.nearby.map(row => ({ ...row, nickname: row.nickname + "与梅林一起守护圆桌的长昵称玩家😀", points:row.points-123456798 }));
 const scenes = {
+  "stats-summary":[cards.statsCard(require('../tests/helpers/share-fixtures').profile,require('../tests/helpers/share-fixtures').stats,Date.UTC(2026,9,26,10))],
   monthly:monthlyCards(report),
   full:monthlyCards(monthlyFixture()),
   entertainment:monthlyCards(report,true),

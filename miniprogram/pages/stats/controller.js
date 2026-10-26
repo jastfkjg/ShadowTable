@@ -2,6 +2,7 @@ const api = require("../../api");
 const { presentStats, presentFun, backToMe, personalPreview } = require("../../profile");
 const { recordInfo } = require("../../fun-copy");
 const dialog = require("../../dialog");
+const { queryString } = require("../../share-card");
 function preserveFactions(stats, previous) {
   return { ...stats, byFaction: stats.byFaction.map(row => {
     const old = previous?.byFaction?.find(item => item.faction === row.faction);
@@ -26,7 +27,7 @@ function detail(row, kind) {
 }
 module.exports = function createController() { return {
   data: { loading: true, error: "", stats: null, tab: "records", funRoles: {}, funFilter: "all",
-    roleFilter: "all", roleRows: null, statsDetail: null },
+    roleFilter: "all", roleRows: null, statsDetail: null, shareOpening: false, shareNotice: "" },
   onLoad(options = {}) {
     this.alive = true;
     this.setData({ tab: options.tab === "fun" ? "fun" : "records" });
@@ -74,6 +75,35 @@ module.exports = function createController() { return {
     this.funInfoOpen = true;
     try { await dialog.show(recordInfo(tile)); }
     finally { this.funInfoOpen = false; }
+  },
+  shareStats() {
+    if (!this.data.stats?.total) return;
+    return this.openSharedRecord({ kind: "stats" });
+  },
+  shareFunRecord(event) {
+    const tile = this.data.stats?.fun?.tiles.find(row => row.key === event.currentTarget.dataset.key && row.known);
+    if (tile) return this.openSharedRecord({ kind: "fun", metric: tile.id, mode: tile.mode });
+  },
+  openSharedRecord(selection) {
+    if (!this.alive || this.data.loading || this.data.error || this.data.shareOpening) return;
+    this.setData({ shareOpening: true, shareNotice: "" });
+    wx.navigateTo({ url: "/pages/shared/shared?" + queryString(selection),
+      fail: () => { if (this.alive) { this.setData({ shareNotice: "分享页暂时无法打开，请稍后重试。" }); wx.showToast({ title: this.data.shareNotice, icon: "none" }); } },
+      complete: () => { if (this.alive) this.setData({ shareOpening: false }); },
+    });
+  },
+  openShareImage(selection) {
+    if (!this.alive || this.data.loading || this.data.error || this.data.shareOpening) return;
+    this.setData({ shareOpening: true, shareNotice: "" });
+    wx.navigateTo({ url: "/pages/share/share?" + queryString(selection),
+      fail: () => {
+        if (!this.alive) return;
+        const shareNotice = "分享页暂时无法打开，请稍后重试。";
+        this.setData({ shareNotice });
+        wx.showToast({ title: shareNotice, icon: "none" });
+      },
+      complete: () => { if (this.alive) this.setData({ shareOpening: false }); },
+    });
   },
   blockStatsScroll() {},
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },

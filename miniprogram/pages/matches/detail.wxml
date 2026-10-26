@@ -2,6 +2,7 @@
 <template name="matchDetails">
         <view class="match-details">
           <view class="match-result"><text>{{item.winner==='good' || item.winner==='evil' || item.winner==='third'?item.winnerLabel+'获胜':'胜方未登记'}}</text><text class="match-source">{{item.sourceLabel}}</text></view>
+          <button class="shared-data-entry" bindtap="historyShareRecord" data-id="{{item.id}}" hover-class="stats-pressed"><image src="/assets/share.svg" aria-hidden="true" /><text>分享这场对局</text></button>
           <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
           <view wx:if="{{item.scoreEndReason}}" class="match-detail-row"><text>结束原因</text><text>{{item.scoreEndReason}}</text></view>
           <view wx:if="{{item.score.status==='scored'}}" class="score-breakdown">
