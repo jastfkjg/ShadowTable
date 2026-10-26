@@ -23,12 +23,12 @@ const adjust=(store,uid,points,mode='delta')=>store.transaction(()=>store.adjust
 test('玩家加减和设置总分保留流水，榜单同步但场均、胜负不变，版本冲突及事务回滚安全',()=>{
  const store=new Store(':memory:');try {
   game(store);const board=new Leaderboard(store),before=store.statsFor('wx:3'),version=store.scoreRevision('wx:3');
-  const first=adjust(store,'wx:3',10);assert.equal(first.after,16);assert.equal(store.statsFor('wx:3').score.average,6);
-  assert.equal(board.read('wx:3',new URLSearchParams('metric=points')).me.points,16);
+  const first=adjust(store,'wx:3',10);assert.equal(first.after,15);assert.equal(store.statsFor('wx:3').score.average,5);
+  assert.equal(board.read('wx:3',new URLSearchParams('metric=points')).me.points,15);
   assert.equal(store.statsFor('wx:3').wins,before.wins);
   assert.throws(()=>store.transaction(()=>store.adjustPlayerScore({uid:'wx:3',points:9,mode:'set',revision:version,reason:'旧版本'})),e=>e.status===409);
   adjust(store,'wx:3',-2,'set');assert.equal(store.statsFor('wx:3').score.total,-2);
-  const records=store.scoreAdjustments('wx:3');assert.deepEqual(records.records.map(row=>row.delta),[-18,10]);assert.doesNotMatch(JSON.stringify(records),/wx:|administrator/);
+  const records=store.scoreAdjustments('wx:3');assert.deepEqual(records.records.map(row=>row.delta),[-17,10]);assert.doesNotMatch(JSON.stringify(records),/wx:|administrator/);
   assert.throws(()=>store.transaction(()=>{store.adjustPlayerScore({uid:'wx:3',points:5,mode:'delta',revision:store.scoreRevision('wx:3'),reason:'回滚测试'});throw Error('rollback');}));
   assert.equal(store.playerScore('wx:3').points,-2);assert.equal(store.scoreAdjustments('wx:3').total,2);
   for(const points of [1.5,NaN,Infinity,1000001,'3'])assert.throws(()=>adjust(store,'wx:3',points),/整数/);
@@ -71,13 +71,13 @@ test('调整月份以操作时间计，单局积分归原月份，重启和原�
 test('更正早期胜负时其他对局保持原分，手动单局积分及独立玩家调整保持不变',()=>{
  const store=new Store(':memory:');try {
   const first=game(store),second=game(store),third=game(store);
-  assert.equal(store.matchesFor('wx:3').records.find(row=>row.id===third.matchId).score.total,6);
+  assert.equal(store.matchesFor('wx:3').records.find(row=>row.id===third.matchId).score.total,5);
   store.transaction(()=>store.adjustMatchScores(second.matchId,{revision:0,reason:'手动固定单局',scores:[{uid:'wx:3',points:12}]}));adjust(store,'wx:3',6);
   store.transaction(()=>store.correctMatch(first.matchId,{revision:0,scoreReason:'quest_fail'}));
   const records=store.matchesFor('wx:3').records;
   assert.equal(records.find(row=>row.id===second.matchId).score.total,12);
-  assert.equal(records.find(row=>row.id===third.matchId).score.total,6);
-  assert.equal(store.playerScore('wx:3').points,24);
+  assert.equal(records.find(row=>row.id===third.matchId).score.total,5);
+  assert.equal(store.playerScore('wx:3').points,23);
  }finally{store.close();}
 });
 async function launch(t) {

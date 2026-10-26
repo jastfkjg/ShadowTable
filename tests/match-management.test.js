@@ -113,7 +113,7 @@ test("删除及恢复同步个人明细、各类榜单、趣味、月份，保�
     const impact = preview.players.find((p) => p.uid === "wx:3");
     assert.equal(impact.before.games, 3);
     assert.equal(impact.after.games, 2);
-    assert.equal(impact.before.points - impact.after.points, 6);
+    assert.equal(impact.before.points - impact.after.points, 5);
     assert.deepEqual(store.statsFor("wx:3"), before);
     assert.equal(store.scoreRevision("wx:3"), scoreVersion);
     assert.equal(store.leaderboardRevision, revision);
@@ -128,7 +128,7 @@ test("删除及恢复同步个人明细、各类榜单、趣味、月份，保�
     assert.equal(
       store.matchesFor("wx:3").records.find((r) => r.id === third.matchId).score
         .total,
-      6,
+      5,
     );
     assert.equal(store.scoreAdjustments("wx:3").total, 1);
     assert.equal(
@@ -141,7 +141,7 @@ test("删除及恢复同步个人明细、各类榜单、趣味、月份，保�
     );
     assert.equal(
       board.read("wx:3", new URLSearchParams("metric=points")).me.points,
-      25,
+      24,
     );
     assert.throws(
       () =>

@@ -889,9 +889,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const historyUpdate = publicHistory.sync(this.data, history, room);
     const honors = honorPresentation.present(room.honors, api.assetUrl, this.honorAvatarFailures || new Set());
     const honorState = honorPresentation.sync(this.data, honors, this.data.historyOpen || this.data.playerCard || this.data.resultDialog || !this.foreground);
+    const identityProfileUpdate = {};
+    if (!privacyChanged && this.data.dealtIdentitySecret) {
+      const vision = roomSheet.presentVision(this.data.dealtIdentitySecret.information, seats);
+      if (JSON.stringify(vision) !== JSON.stringify(this.data.dealtIdentitySecret.vision))
+        identityProfileUpdate.dealtIdentitySecret = { ...this.data.dealtIdentitySecret, vision };
+    }
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
-      ...privacyUpdate, honors, ...honorState,
+      ...privacyUpdate, ...identityProfileUpdate, honors, ...honorState,
       ...(stageChanged ? { resultDialog: false } : {}),
       ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
       actionEntryLabel,
@@ -960,6 +966,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       serverConnected: true,
       needsLogin: false,
     });
+    if (identityProfileUpdate.dealtIdentitySecret) this.syncProcessSheetLayout();
     this.prepareRoomShare();
     if (
       (!room.needsSubmission || room.me.submitted) &&
@@ -1027,7 +1034,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.alive || !url || !this.data.seats.some(s => s.seat === Number(seat) && s.avatarUrl === url)) return;
     if (!this.avatarFailures) this.avatarFailures = new Set();
     this.avatarFailures.add(url);
-    this.setData({ seats: this.data.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s) });
+    const seats = this.data.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s);
+    const secret = this.data.dealtIdentitySecret;
+    this.setData({ seats, ...(secret ? { dealtIdentitySecret: { ...secret,
+      vision: roomSheet.presentVision(secret.information, seats) } } : {}) });
   },
   filterRooms(e) {
     const filter = e.currentTarget.dataset.filter;
@@ -1394,6 +1404,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     if (d.error) return "";
     const stage = d.room?.code + ":" + d.room?.stage;
+    if (d.dealtIdentityDialog) return stage + ":dealt:" + !!d.dealtIdentitySecret;
     if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
     if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
     if (d.fairyResult) return stage + ":fairy:" + d.fairyResult.revision + ":" + d.fairyResultRevealed;
@@ -1412,7 +1423,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const run = () => {
       if (!this.alive || !this.foreground || key !== this.processSheetKey()) return;
       const query = wx.createSelectorQuery().in(this);
-      for (const selector of [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"]) query.select(selector).boundingClientRect();
+      const selectors = this.data.dealtIdentityDialog
+        ? [".dealt-identity-backdrop", ".dealt-identity-top", ".dealt-identity-fields", ".dealt-identity-footer"]
+        : [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
+      for (const selector of selectors) query.select(selector).boundingClientRect();
       query.exec(rects => {
         if (!this.alive || !this.foreground || revision !== this.processLayoutRevision || key !== this.processSheetKey()) return;
         const height = roomSheet.fitBody(rects);
@@ -2338,7 +2352,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.dealtIdentityDialog) return true;
     if (this.identityReceipts().includes(key)) return false;
     this.mask();
-    this.setData({ dealtIdentityDialog: true });
+    this.setProcessData({ dealtIdentityDialog: true, processBodyHeight: 0 });
     return true;
   },
   async revealDealtIdentity() {
@@ -2352,11 +2366,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
         this.data.room.stage !== stage || secret.stage !== stage) return;
       this.rememberDealtIdentity();
-      this.setData({ dealtIdentitySecret: {
+      this.setProcessData({ processBodyHeight: 0, dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information, skillStatus: secret.skillStatus,
-        vision: roomSheet.presentVision(secret.information),
+        vision: roomSheet.presentVision(secret.information, this.data.seats),
         avoidance: avoidancePresentation.result(secret.avoidance),
       } });
     } catch (e) {

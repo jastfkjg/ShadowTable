@@ -1,7 +1,7 @@
 .leaderboard-page { --rank-line: rgba(177,191,198,.13); --rank-selected: rgba(229,198,139,.12); max-width: 600px; padding: 12px 16px calc(136px + env(safe-area-inset-bottom)); }
 .leaderboard-page.has-wide-rank { padding-bottom: calc(192px + env(safe-area-inset-bottom)); }
 .rank-toolbar, .rank-tools, .rank-period { display: flex; align-items: center; }
-.rank-toolbar { justify-content: space-between; gap: 12px; padding: 0 2px; }
+.rank-toolbar { justify-content: space-between; gap: 12px; min-height: 50px; padding: 0 2px; }
 .rank-period { flex-shrink: 0; padding: 3px; gap: 3px; background: var(--surface); border-radius: 12px; }
 .rank-period button { width: 64px; min-width: 48px; min-height: 44px; margin: 0; padding: 6px 10px; border-radius: 9px; color: var(--muted); font-size: 13px; font-weight: 400; }
 .rank-period button.selected { color: var(--text); background: #30424d; font-weight: 600; }
@@ -153,5 +153,4 @@ button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 16rpx; 
   .rank-sheet-handle { width: 32px; height: 4px; margin: 8px auto 3px; }
 }
 
-.rank-month-label { display:flex; flex-direction:column; gap:5px; padding:8px 4px; color:var(--accent); font-size:16px; font-weight:600; }
-.rank-month-caption { color:var(--muted); font-size:12px; font-weight:400; }
+.rank-month-label { padding:0 4px; color:var(--accent); font-size:16px; font-weight:600; }

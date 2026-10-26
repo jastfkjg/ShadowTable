@@ -54,6 +54,24 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   return { ...context.window.test, scrolls, lookups, navigations, events, document: context.document, scheduled: () => scheduled, scheduledDelay: () => scheduledDelay };
 }
 const response = (body) => ({ status: 200, json: async () => body });
+test('网页初始视野仅展示可见玩家资料，昵称转义、头像失败回退，关闭后不残留', () => {
+  const c = client(async () => { throw new Error('不应请求额外资料'); });
+  c.state.seats = [{ seat: 3, name: '<林间>', avatarUrl: '/api/avatars/fox', role: '秘密角色' }, { seat: 7, name: '不可见玩家' }];
+  c.state.dealtIdentityDialog = true;
+  assert.doesNotMatch(c.viewDealtIdentity(), /fox|林间/);
+  c.state.dealtIdentitySecret = { role: '梅林', faction: '好人阵营', factionTone: 'good', information: '你看见的举手座位：3（莫德雷德不在视野中）' };
+  let html = c.viewDealtIdentity();
+  assert.match(html, /&lt;林间&gt;/);
+  assert.match(html, /data-seat-avatar-url="\/api\/avatars\/fox"/);
+  assert.doesNotMatch(html, /秘密角色|不可见玩家|identity-vision-role/);
+  c.seatAvatarError({ dataset: { seat: '3', seatAvatarUrl: '/api/avatars/fox' } });
+  html = c.viewDealtIdentity();
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /vision-player-avatar/);
+  c.ACTIONS.closeDealtIdentity();
+  assert.equal(c.state.dealtIdentitySecret, null);
+  assert.equal(c.viewDealtIdentity(), '');
+});
 test('网页收卡通过主题弹窗展示，未确认不读，身份或操作面板打开时延后提醒', async () => {
   const calls = [], dialogs = [];
   let notice = { through: 'grant-1', amount: 2, grants: 1, kind: 'generic', reasons: ['感谢参加聚会！'] }, accepted = false;

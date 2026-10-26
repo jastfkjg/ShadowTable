@@ -217,7 +217,7 @@ const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
 const privateSource = privateView(tableSource,'wx:replay-5');
-const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait,vision:presentVision(privateSource.information)};
+const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait,vision:presentVision(privateSource.information,tablePlaying.seats)};
 const tableReadySource = newRoom('201375','host','子龙','knights',12);
 for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
 enter(tableReadySource,'spectator','围观玩家');
@@ -316,6 +316,26 @@ tableScenes['avoidance-empty'] = { ...avoidanceDraft, avoidance: { ...avoidanceD
 tableScenes['avoidance-effective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'effective',roleName:'梅林'})} };
 tableScenes['avoidance-ineffective'] = { ...tablePlaying, dealtIdentityDialog:true, dealtIdentitySecret:{...privateData,avoidance:avoidancePresentation.result({status:'ineffective',roleName:privateData.role})} };
 // Project the same native four-rectangle fit used by the controller.
+const merlinSource=tableFixtures.setup();
+function placePreviewRole(role,seat) {
+  const target=merlinSource.players.find(player=>player.seat===seat),old=merlinSource.players.find(player=>merlinSource.roles[player.uid]===role);
+  [merlinSource.roles[target.uid],merlinSource.roles[old.uid]]=[merlinSource.roles[old.uid],merlinSource.roles[target.uid]];
+}
+for(const [role,seat] of [['morgana',1],['merlin',2],['mordred',3],['assassin',7]]) placePreviewRole(role,seat);
+merlinSource.knights.initialRoles={...merlinSource.roles};
+const identityNames=['小橙','子龙','林间','初夏','北川','舟舟','阿木','七月','阿辰','小鱼','向晚','晚风'];
+const identityAvatars=['19','04','13','18','14','21','20','16','15','22','27','28'];
+merlinSource.players.forEach((player,index)=>Object.assign(player,{name:identityNames[index],avatarUrl:'/pages/profile/assets/avatars/crayon-'+identityAvatars[index]+'.jpg'}));
+for(const [role,tone] of [['merlin','good'],['morgana','evil']]) {
+  const player=merlinSource.players.find(player=>merlinSource.roles[player.uid]===role),secret=privateView(merlinSource,player.uid);
+  tableScenes['ui-identity-'+role]=tableScene(merlinSource,player.uid,{dealtIdentityDialog:true,dealtIdentitySecret:{...secret,
+    factionTone:tone,portrait:portrait(secret.role,tone).portrait,vision:presentVision(secret.information,merlinSource.players)}});
+}
+for(const [name,profiles] of [['long-name',merlinSource.players.map(player=>player.seat===3?{...player,name:'这是一个很长的完整玩家昵称'}:player)],
+  ['avatar-failed',merlinSource.players.map(player=>({...player,avatarFailed:true}))]]) {
+  const scene=tableScenes['ui-identity-morgana'],secret=scene.dealtIdentitySecret;
+  tableScenes['ui-identity-'+name]={...scene,dealtIdentitySecret:{...secret,vision:presentVision(secret.information,profiles)}};
+}
 // Focused review scenes use the shipped templates and actual private endpoint
 // projection; the forced role allocation makes the requested example stable.
 const reviewSource = newRoom('201375','review-1','子龙','knights',12);
@@ -326,10 +346,10 @@ for(const player of reviewSource.players) reviewSource.roles[player.uid]='servan
 Object.assign(reviewSource.roles,{'review-1':'morgana','review-3':'mordred','review-7':'assassin'});
 reviewSource.knights.initialRoles={...reviewSource.roles};
 const reviewSecret=privateView(reviewSource,'review-1');
-const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information)};
-tableScenes['ui-identity-morgana']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
+const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information,reviewSource.players)};
+tableScenes['ui-identity-morgana-no-avatars']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
 for(const [name,information] of [['anonymous','梅林与莫甘娜位于：3、7号。你无法区分谁是梅林。'],['long','完整的私密视野说明。'.repeat(35)]]) {
-  tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information)}});
+  tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information,reviewSource.players)}});
 }
 reviewSource.knights.fairy=1;reviewSource.knights.fairyVisited=[8];
 tableFixtures.run(reviewSource,'beginActivity',{kind:'fairy'});
@@ -343,7 +363,7 @@ for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
 }
 tableScenes['ui-host-fairy']=tableScene(reviewSource,'review-1',{settleHint:'还差 1 人提交'});
 tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom,phase:'teamVote',closeWaiting:{mode:'settle',label:'提前结算投票'}}};
-const processProjection=`<script>window.fitProcessSheet=()=>{const sheet=document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
+const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
 for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}',processProjection);
 for(const [gallery,items] of [['table-pages',[['player-card','玩家战绩'],['table-ready','准备阶段'],['table-playing','最近结果'],['table-identity','身份与视野']]],['table-dialogs',[['table-covered','身份已遮盖'],['table-revealed','主动查看身份'],['table-task','选择任务牌'],['table-selected','确认提交']]],['game-actions',[['player-card','玩家战绩'],['skill-servant','使用技能'],['skill-blueAwakened-selected','选择目标'],['host-quest','发起任务']]],['game-privacy',[['new-identity','获得新身份'],['identity-history','身份历程'],['fairy-result','查验结果'],['table-vote','队伍表决']]]]) {
   fs.writeFileSync(path.join(output,gallery+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#09141c;color:#f2eee5;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{padding:28px 40px;width:1638px}header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}strong{font-size:26px}header span,p{color:#b1bfc6;font-size:12px}.screens{display:flex;gap:24px}h2{font-size:14px;margin:0 0 12px;font-weight:500}h2 span{color:#e5c68b;margin-right:10px}iframe{display:block;width:390px;height:844px;border:1px solid #344752;border-radius:28px;background:#101c24}p{margin-top:20px}</style><main><header><strong>桌边助手</strong><span>深色改造 · 实际页面模板</span></header><div class="screens">${items.map(([name,title],i)=>`<section><h2><span>0${i+1}</span>${title}</h2><iframe src="${name}.html" title="${title}"></iframe></section>`).join('')}</div><p>保留游戏规则与私密流程 · 示例数据 · 需真机验收</p></main></html>`);

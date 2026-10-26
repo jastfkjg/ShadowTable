@@ -105,20 +105,23 @@
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
-<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop table-sheet-backdrop" catchtouchmove="blockScroll">
-  <view class="error-dialog dealt-identity-dialog table-sheet {{dealtIdentitySecret?'is-revealed':'is-covered'}}" role="dialog" aria-modal="true" aria-label="身份已发放">
-    <view class="table-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/table-cards.svg" /></view><text>身份已发放</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeDealtIdentity" aria-label="关闭并遮盖身份">×</button></view></view>
-    <scroll-view class="table-sheet-body dealt-identity-body" scroll-y enhanced show-scrollbar="{{false}}">
-      <view class="table-sheet-fields">
+<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop table-sheet-backdrop dealt-identity-backdrop" catchtouchmove="blockScroll">
+  <view class="error-dialog dealt-identity-dialog table-sheet {{dealtIdentitySecret?'is-revealed':'is-covered'}} {{dealtIdentitySecret.role==='莫甘娜'?'is-morgana':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="身份已发放">
+    <view class="table-sheet-top dealt-identity-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/table-cards.svg" /></view><text>身份已发放</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeDealtIdentity" aria-label="关闭并遮盖身份">×</button></view></view>
+    <scroll-view class="table-sheet-body dealt-identity-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="table-sheet-fields dealt-identity-fields">
         <view class="small muted identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
         <block wx:if="{{dealtIdentitySecret}}">
           <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
-          <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view>
+          <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view></view>
           <view class="identity-vision">
-            <view class="identity-vision-heading">你的视野</view>
+            <view class="identity-vision-heading"><text>你的视野</text><text wx:if="{{dealtIdentitySecret.vision.players.length}}" class="identity-vision-count">{{dealtIdentitySecret.vision.players.length}} 人</text></view>
             <block wx:if="{{dealtIdentitySecret.vision.players.length}}">
               <view class="identity-vision-label">{{dealtIdentitySecret.vision.label}}</view>
-              <view class="identity-vision-players"><view wx:for="{{dealtIdentitySecret.vision.players}}" wx:key="seat" class="identity-vision-player"><view class="identity-vision-seat">{{item.seat}}<text class="identity-vision-unit">号</text></view><view wx:if="{{item.role}}" class="identity-vision-role">{{item.role}}</view></view></view>
+              <view class="identity-vision-players"><view wx:for="{{dealtIdentitySecret.vision.players}}" wx:key="seat" class="identity-vision-player">
+                <view class="vision-player-avatar" aria-hidden="true"><text>{{item.avatarInitial}}</text><image wx:if="{{item.avatarUrl && !item.avatarFailed}}" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="true" /></view>
+                <view class="vision-player-copy"><view class="vision-player-primary"><text class="identity-vision-seat">{{item.seat}}<text class="identity-vision-unit">号</text></text><text class="vision-player-name">{{item.name}}</text></view><view wx:if="{{item.role}}" class="identity-vision-role">{{item.role}}</view></view>
+              </view></view>
               <view wx:if="{{dealtIdentitySecret.vision.note}}" class="identity-vision-note">{{dealtIdentitySecret.vision.note}}</view>
             </block>
             <view wx:else class="identity-vision-text">{{dealtIdentitySecret.information}}</view>
@@ -129,7 +132,7 @@
         <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
       </view>
     </scroll-view>
-    <view class="table-sheet-footer">
+    <view class="table-sheet-footer dealt-identity-footer">
       <button wx:if="{{dealtIdentitySecret}}" hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
       <block wx:else><button hover-class="none" class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button><button hover-class="none" class="text-button" bindtap="closeDealtIdentity">稍后查看</button></block>
     </view>

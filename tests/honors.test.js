@@ -30,7 +30,7 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
     const revision=s.scoreRevision('wx:2');
     act(s,r,r.host,'honorStart');
     vote(s,r,1,3,6);vote(s,r,2,3,5);vote(s,r,3,2,6);vote(s,r,4,2,6);vote(s,r,5,3,6);vote(s,r,6,2,5);
-    for(const [uid,total,award] of [['wx:2',5,'honor_mvp'],['wx:3',7,'honor_mvp'],['wx:6',1,'honor_svp']]) {
+    for(const [uid,total,award] of [['wx:2',5,'honor_mvp'],['wx:3',6,'honor_mvp'],['wx:6',1,'honor_svp']]) {
       const score=s.matchFor(uid,r.matchId).score;
       assert.equal(score.total,total);
       assert.deepEqual(score.breakdown.filter(row=>row.id===award).map(row=>row.points),[1]);

@@ -29,3 +29,27 @@ test('无视野、无同伴、未来格式和混合说明保留全文，不尝�
     assert.deepEqual(present(text), { label: '', players: [], note: '', text });
   }
 });
+test('视野仅补充可见座位的公开头像昵称，不从玩家对象推断角色或泄露其他座位', () => {
+  const profiles = [{ seat: 3, name: '林间', avatarUrl: '/api/avatars/fox', role: '莫德雷德', secret: '不能复制' },
+    { seat: 7, name: '阿木', avatarUrl: '', role: '刺客' }, { seat: 9, name: '不在视野中' }];
+  const before = JSON.stringify(profiles);
+  const anonymous = present('你看见的举手座位：3、7（莫德雷德不在视野中）', profiles);
+  assert.deepEqual(anonymous.players, [
+    { seat: 3, role: '', name: '林间', avatarInitial: '林', avatarUrl: '/api/avatars/fox', avatarFailed: false },
+    { seat: 7, role: '', name: '阿木', avatarInitial: '阿', avatarUrl: '', avatarFailed: false },
+  ]);
+  assert.doesNotMatch(JSON.stringify(anonymous), /不能复制|刺客/);
+  assert.ok(!anonymous.players.some(player => player.seat === 9));
+  const named = present('初始见面匪：3号（莫德雷德）、7号（刺客）。', profiles);
+  assert.deepEqual(named.players.map(p => p.role), ['莫德雷德', '刺客']);
+  assert.equal(JSON.stringify(profiles), before);
+});
+test('缺失玩家资料和失败头像保留座位及首字回退，未知说明不附加玩家信息', () => {
+  const profiles = [{ seat: 3, name: '🌙月亮', avatarUrl: '/api/avatars/broken', avatarFailed: true },
+    { seat: 7, name: '空位', occupied: false }];
+  const result = present('你看见的举手座位：3、7', profiles);
+  assert.equal(result.players[0].avatarInitial, '🌙');
+  assert.equal(result.players[0].avatarFailed, true);
+  assert.deepEqual(result.players[1], { seat: 7, role: '', name: '玩家', avatarInitial: '友', avatarUrl: '', avatarFailed: false });
+  assert.deepEqual(present('未来格式：3号拥有特殊状态。', profiles).players, []);
+});

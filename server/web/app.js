@@ -3595,10 +3595,10 @@ function roomListItems(rooms) {
   function viewDealtIdentity() {
     if (!state.dealtIdentityDialog || state.error) return "";
     var secret = state.dealtIdentitySecret;
-    return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
+    return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog' + (secret?.role === '莫甘娜' ? ' is-morgana' : '') + '" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
       '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="small muted identity-privacy-note">仅供本人查看</div>' +
-      (secret ? viewAvoidanceResult(secret.avoidance) + '<div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
-        '</div>' + viewIdentityVision(secret.information) +
+      (secret ? viewAvoidanceResult(secret.avoidance) + '<div class="dealt-web-role-heading"><div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
+        '</div></div>' + viewIdentityVision(secret.information) +
         (secret.skillStatus ? '<div class="dealt-skill-status"><div class="dealt-skill-status-title">技能状态 · ' + esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>' : '') +
         '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' +
         btn("primary", "closeDealtIdentity", "记住了，遮盖身份") :
@@ -3607,11 +3607,14 @@ function roomListItems(rooms) {
         btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div>';
   }
   function viewIdentityVision(information) {
-    var vision = identityVision.present(information);
-    return '<div class="identity-vision"><div class="identity-vision-heading">你的视野</div>' +
+    var vision = identityVision.present(information, state.seats);
+    return '<div class="identity-vision"><div class="identity-vision-heading"><span>你的视野</span>' +
+      (vision.players.length ? '<span class="identity-vision-count">' + vision.players.length + ' 人</span>' : '') + '</div>' +
       (vision.players.length ? '<div class="identity-vision-label">' + esc(vision.label) + '</div><div class="identity-vision-players">' +
-        vision.players.map(player => '<div class="identity-vision-player"><div class="identity-vision-seat">' + player.seat + '<span class="identity-vision-unit">号</span></div>' +
-          (player.role ? '<div class="identity-vision-role">' + esc(player.role) + '</div>' : '') + '</div>').join('') + '</div>' +
+        vision.players.map(player => '<div class="identity-vision-player"><div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
+          (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') +
+          '</div><div class="vision-player-copy"><div class="vision-player-primary"><span class="identity-vision-seat">' + player.seat + '<span class="identity-vision-unit">号</span></span><span class="vision-player-name">' + esc(player.name) + '</span></div>' +
+          (player.role ? '<div class="identity-vision-role">' + esc(player.role) + '</div>' : '') + '</div></div>').join('') + '</div>' +
         (vision.note ? '<div class="identity-vision-note">' + esc(vision.note) + '</div>' : '') : '<div class="identity-vision-text">' + esc(vision.text) + '</div>') + '</div>';
   }
   function viewIdentityChange() {

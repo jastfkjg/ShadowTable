@@ -171,6 +171,24 @@ test('游戏弹层原生测量随展开状态更新，关闭、换阶段和后�
   p.syncProcessSheetLayout();p.foreground=false;
   layout.callbacks[4]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
 });
+test('初始身份按内容收紧高度，揭示后重新测量且关闭后旧回调失效', () => {
+  const layout={callbacks:[]},p=page({},new Map(),layout);
+  const rects=[{width:390,height:844},{height:78},{height:180},{height:78}];
+  p.data.room={code:'123456',stage:'stage1',me:{seat:1}};
+  p.setProcessData({dealtIdentityDialog:true});
+  p.setProcessData({dealtIdentitySecret:{role:'梅林'}});
+  layout.callbacks[0](rects);
+  assert.equal(p.data.processBodyHeight,0);
+  layout.callbacks[1]([rects[0],rects[1],{height:420},rects[3]]);
+  assert.equal(p.data.processBodyHeight,420);
+  p.syncProcessSheetLayout();
+  layout.callbacks[2]([rects[0],rects[1],{height:1000},rects[3]]);
+  assert.equal(p.data.processBodyHeight,600);
+  p.syncProcessSheetLayout();
+  p.data.dealtIdentityDialog=false;
+  layout.callbacks[3](rects);
+  assert.equal(p.data.processBodyHeight,600);
+});
 async function settle(p) {
   while (p.data.busy) await new Promise((r) => setTimeout(r, 1));
   assert.equal(p.data.error, "");
@@ -184,6 +202,37 @@ function dealtRoom(overrides = {}) {
     capacity: 6, players: [{ seat: 1, name: "甲" }], me: { seat: 1, identityRevision: 0 },
     team: [], history: [], ...overrides };
 }
+test('初始身份视野补充当前公开资料，头像失败与资料刷新同步，遮盖后清空私密关联', async () => {
+  const room = dealtRoom({ players: [{ seat: 1, name: '自己' }, { seat: 3, name: '林间', avatarUrl: '/api/avatars/fox', role: '不能推断的角色' }, { seat: 5, name: '不可见玩家' }] });
+  const storage = new Map();
+  const p = page({ assetUrl: url => 'https://table.example' + url, request: async path => structuredClone(path.endsWith('/private')
+    ? { stage: room.stage, role: '梅林', faction: '好人阵营', information: '你看见的举手座位：3（莫德雷德不在视野中）' } : room) }, storage);
+  p.roomCode = room.code;
+  await p.refresh();
+  assert.equal(p.data.dealtIdentitySecret, null);
+  await p.revealDealtIdentity();
+  let visible = p.data.dealtIdentitySecret.vision.players;
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0].name, '林间');
+  assert.equal(visible[0].role, '');
+  const oldUrl = visible[0].avatarUrl;
+  assert.equal(oldUrl, 'https://table.example/api/avatars/fox');
+  p.seatAvatarError({ currentTarget: { dataset: { seat: 3, url: oldUrl } } });
+  assert.equal(p.data.dealtIdentitySecret.vision.players[0].avatarFailed, true);
+  await p.refresh();
+  assert.equal(p.data.dealtIdentitySecret.vision.players[0].avatarFailed, true);
+  room.players[1].name = '新的完整昵称'; room.players[1].avatarUrl = '/api/avatars/new';
+  await p.refresh();
+  visible = p.data.dealtIdentitySecret.vision.players;
+  assert.equal(visible[0].name, '新的完整昵称');
+  assert.equal(visible[0].avatarInitial, '新');
+  assert.equal(visible[0].avatarFailed, false);
+  p.seatAvatarError({ currentTarget: { dataset: { seat: 3, url: oldUrl } } });
+  assert.equal(p.data.dealtIdentitySecret.vision.players[0].avatarFailed, false);
+  p.closeDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret, null);
+  assert.doesNotMatch(JSON.stringify([...storage]), /林间|新的完整昵称|举手座位/);
+});
 test("身份历程默认展开最近旧身份，关闭保留当前卡，遮盖和后台清空历程", async () => {
   const room = dealtRoom({ me: { seat: 1, identityRevision: 1 } });
   const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营" },

@@ -5,7 +5,7 @@
       <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
       <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
     </view>
-    <view wx:else class="rank-month-label"><text>本月积分</text><text class="rank-month-caption">每月 1 日清零</text></view>
+    <view wx:else class="rank-month-label"><text>本月积分</text></view>
     <view class="rank-tools">
       <button class="disclosure-button rank-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/record-info.svg" aria-hidden="true" /><text>规则</text></button>
     </view>

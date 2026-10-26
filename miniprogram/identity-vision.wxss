@@ -1,14 +1,24 @@
-/* Private vision is the memory anchor; ability status is supporting detail. */
-.identity-vision { margin: 0; padding: 17px; border: 1px solid rgba(229,198,139,.24); border-radius: 16px; background: rgba(229,198,139,.045); }
-.identity-vision-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--accent); font-size: 14px; font-weight: 600; }
+/* Public profile details help recognize seats; private roles stay in the vision. */
+.identity-vision { margin: 0; padding: 11px; border: 1px solid rgba(229,198,139,.24); border-radius: 13px; background: rgba(229,198,139,.035); }
+.identity-vision-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: var(--accent); font-size: 14px; font-weight: 600; }
 .identity-vision-heading::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--accent); }
-.identity-vision-label { margin-bottom: 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.identity-vision-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.identity-vision-player { min-width: 0; padding: 13px 10px; border-radius: 11px; background: var(--control-bg, #14232c); text-align: center; }
-.identity-vision-seat { color: var(--accent); font-size: 30px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.identity-vision-unit { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
-.identity-vision-role { margin-top: 7px; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
-.identity-vision-note { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.identity-vision-count { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; }
+.identity-vision-label { margin-bottom: 7px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.identity-vision-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.identity-vision-player { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 46px; box-sizing: border-box; padding: 8px; border-radius: 9px; background: var(--control-bg, #14232c); text-align: left; }
+.vision-player-avatar { position: relative; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; overflow: hidden; border-radius: 8px; background: #31414a; color: var(--text); font-size: 15px; }
+.vision-player-avatar image, .vision-player-avatar img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.vision-player-copy { flex: 1; min-width: 0; }
+.vision-player-primary { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.identity-vision-seat { color: var(--accent); font-size: 17px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.identity-vision-unit { margin-left: 1px; color: var(--muted); font-size: 10px; font-weight: 400; }
+.vision-player-name { min-width: 0; color: var(--text); font-size: 13px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.identity-vision-role { margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
+.identity-vision-note { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .identity-vision-text { color: var(--text); font-size: 17px; font-weight: 500; line-height: 1.8; overflow-wrap: anywhere; }
-.dealt-skill-status { margin: 14px 0 0; padding: 0 3px; color: var(--muted); font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.dealt-skill-status { margin: 10px 0 0; padding: 0 3px; color: var(--muted); font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
 .dealt-skill-status-title { margin-bottom: 3px; font-weight: 500; }
+.dealt-identity-dialog { background: #08131a; }
+.dealt-identity-dialog .dealt-web-role-heading { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0 12px; text-align: left; }
+.dealt-identity-dialog .dealt-web-role-heading .identity-title { margin: 0; font-size: 21px; line-height: 1.35; }
+.dealt-identity-dialog .dealt-web-role-heading .muted { font-size: 12px; }
