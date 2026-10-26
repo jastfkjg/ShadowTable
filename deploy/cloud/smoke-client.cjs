@@ -40,9 +40,9 @@ async function main() {
     const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
     if (!assets.size) throw new Error("Web entry has no assets");
     // These images are referenced by rendered views rather than the HTML shell.
-    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg",
+    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg",
       ...["home-table-blue", "home-refresh", "home-clock", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
-      ...["info", "heart", "sword", "swords", "shield", "spark", "medal", "users"].map(name => "/assets/record-" + name + ".svg"),
+      ...["info", "heart", "sword", "swords", "shield", "spark", "medal", "users", "calendar", "list", "coin"].map(name => "/assets/record-" + name + ".svg"),
       ...["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"].map(name => "/assets/roles/" + name + ".png"),
       ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {
@@ -51,6 +51,11 @@ async function main() {
       const content = await request(url.pathname + url.search);
       if (!content.trim()) throw new Error(`Empty web asset: ${asset}`);
       if (url.pathname.endsWith(".js")) new (require("node:vm").Script)(content, { filename: asset });
+      // Follow shared stylesheet imports too; reading only the HTML shell would
+      // miss a stylesheet left out of the image's explicit packaging list.
+      if (url.pathname.endsWith(".css")) for (const match of content.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?/g)) {
+        assets.add(new URL(match[1], url).href);
+      }
     }
     const data = JSON.parse(await request("/api/guest-login", {
       method: "POST",
@@ -70,6 +75,9 @@ async function main() {
     if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(report.month) || !Array.isArray(report.mainBoards)) throw new Error("Monthly report is unavailable in the image");
     const badges = JSON.parse(await request("/api/me/badges", { headers: { Authorization: "Bearer " + data.token } }));
     if (!Array.isArray(badges.badges) || badges.maxEquipped !== 3) throw new Error("Honor badge API is unavailable in the image");
+    const clearing = JSON.parse(await request("/api/me/record-clearing", { headers: auth }));
+    if (!Array.isArray(clearing.months) || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(clearing.currentMonth) || clearing.timezone !== "Asia/Shanghai")
+      throw new Error("Record clearing API is unavailable in the image");
     for (const badge of require(require("node:path").join(process.cwd(), "miniprogram/badges")).catalogue) {
       const image = await request(badge.imageUrl);
       if (Buffer.byteLength(image) < 1000) throw new Error(`Badge artwork was not packaged: ${badge.id}`);

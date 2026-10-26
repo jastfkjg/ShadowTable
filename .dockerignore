@@ -37,6 +37,10 @@
 !miniprogram/assets/roles/assassin.png
 !miniprogram/assets/roles/*.png
 !miniprogram/assets/table-cards.svg
+!miniprogram/assets/chevron-left.svg
+!miniprogram/assets/record-calendar.svg
+!miniprogram/assets/record-list.svg
+!miniprogram/assets/record-coin.svg
 !miniprogram/assets/monthly-report-background.jpg
 !miniprogram/assets/monthly-*.svg
 !miniprogram/assets/board-search.svg
@@ -59,6 +63,9 @@
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
+!miniprogram/pages/data-management/
+!miniprogram/pages/data-management/presentation.js
+!miniprogram/pages/data-management/layout.wxss
 !miniprogram/pages/badges/
 !miniprogram/pages/badges/badges.wxss
 !miniprogram/pages/profile/
