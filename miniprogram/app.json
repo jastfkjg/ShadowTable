@@ -6,7 +6,6 @@
     "pages/stats/stats",
     "pages/leaderboard/leaderboard",
     "pages/monthly/monthly",
-    "pages/share/share",
     "pages/shared/shared",
     "pages/matches/matches",
     "pages/scores/scores",
@@ -19,6 +18,10 @@
     "pages/web-login/web-login"
   ],
   "subPackages": [
+    {
+      "root": "pages/share",
+      "pages": ["share"]
+    },
     {
       "root": "pages/data-management",
       "pages": ["data-management"]

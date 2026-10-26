@@ -491,6 +491,52 @@ function renderMainPanel(factory, index, data) {
   return find(tree);
 }
 
+test('首页与我的朋友圈分享使用品牌封面，返回前台恢复两个系统菜单，切标签更新分享参数', async () => {
+  for(const route of ['lobby','me']) {
+    const menus=[];
+    const api={...apiBase,request:async url=>url==='/api/boards'?{boards:BOARDS}:url.endsWith('/profile')?profile:url.endsWith('/stats')?emptyStats:{rooms:[],records:[],total:0}};
+    const {p}=page(route,api,{home:true,wx:{showShareMenu:options=>menus.push(options)}});
+    try {
+      p.onLoad();assert.equal(menus.length,1);
+      const initial=route==='lobby'?0:1;
+      assert.equal(p.onShareTimeline().query,'main='+initial);
+      assert.equal(p.onShareTimeline().title,'来一局阿瓦隆，一起入座');
+      assert.equal(p.onShareTimeline().imageUrl,'/assets/share-cover.jpg');
+      assert.equal(p.onShareAppMessage().path,'/pages/lobby/lobby');
+      await p.onShow();assert.equal(menus.length,2);
+      await p.switchMainTab(1-initial);
+      assert.equal(p.onShareTimeline().query,'main='+(1-initial));
+      assert.deepEqual(Array.from(menus[0].menus),['shareAppMessage','shareTimeline']);
+      assert.doesNotMatch(JSON.stringify(p.onShareTimeline()),/nickname|roomCode|profile|stats/);
+    } finally {p.onUnload();}
+  }
+});
+test('首页朋友圈单页模式仅显示品牌介绍，不登录、不读取个人数据或本地登录存储', async () => {
+  const context={window:{},global:{},console};vm.createContext(context);
+  const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
+  for(const route of ['lobby','me']) for(const main of ['0','1']){
+    const {p}=page(route,{login(){throw Error('不得登录');},request(){throw Error('不得读取个人数据');}},{home:true,wx:{
+      getEnterOptionsSync:()=>({scene:1154}),getStorageSync(){throw Error('不得读取登录存储');},showShareMenu(){throw Error('不得调用受限菜单');},
+    }});
+    p.onLoad({main});p.onReady();await p.onShow();
+    assert.equal(p.data.singlePage,true);assert.equal(p.data.activeTab,Number(main));
+    assert.equal(p.lobbyController,undefined);assert.equal(p.personalController,undefined);
+    const content=JSON.stringify(factory('pages/'+route+'/'+route+'.wxml')(p.data));
+    assert.match(content,/和朋友，一起入座/);assert.doesNotMatch(content,/main-panel|wx-app-nav|编辑资料|创建房间/);
+    await p.switchMainTab(1-Number(main));assert.equal(p.data.activeTab,Number(main));
+    assert.equal(p.getPersonalPreview('stats'),null);
+    p.onHide();p.onUnload();
+  }
+});
+test('朋友圈进入完整首页恢复分享时的标签，无效标签参数使用入口默认值',()=>{
+  for(const route of ['lobby','me']) for(const main of ['0','1','bad']){
+    const {p}=page(route,apiBase,{home:true});
+    p.onLoad({main});
+    assert.equal(p.data.singlePage,false);
+    assert.equal(p.data.activeTab,main==='bad'?(route==='lobby'?0:1):Number(main));
+    p.onUnload();
+  }
+});
 test('首页在同一窗口保留两个区域、表单和滚动位置，切回时刷新且不调用页面导航', async () => {
   const scrolls = [], pages = [];
   const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
@@ -1113,48 +1159,64 @@ test('其他房间的待确认加入保持原请求，邀请不会恢复或覆�
   assert.equal(c.p.data.invitation.code, '654321');
   assert.deepEqual(c.navigations, []);
 });
-test('战绩两入口只在具体数据快照准备完成后开放分享，链接不携带个人筛选', async () => {
+test('战绩两入口进入即开放系统菜单，三页自动分享概览且无需选择卡片', async () => {
   for (const route of ['stats','matches']) {
-    const menus=[],fixtures=require('./helpers/record-share-fixtures');
+    const menus=[],selections=[],fixtures=require('./helpers/record-share-fixtures');
     const rawStats={...emptyStats,...require('./helpers/share-fixtures').stats,byBoard:[],recent:[]};
-    const {p}=page(route,{...apiBase,request:async(url,method,selection)=>url==='/api/me/shares'?fixtures[selection.kind]:url.includes('/matches')?{records:[{id:'selected-match',boardName:'阿瓦隆 · 经典基础',role:'梅林',faction:'good',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats},{home:true,wx:{showShareMenu:o=>menus.push(o)}});
+    const {p}=page(route,{...apiBase,request:async(url,method,selection)=>{
+      if(url==='/api/me/shares'){selections.push(selection);return fixtures[selection.kind];}
+      return url.includes('/matches')?{records:[{id:'private-match',boardName:'阿瓦隆 · 经典基础',role:'梅林',faction:'good',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats;
+    }},{home:true,wx:{showShareMenu:o=>menus.push(o),hideShareMenu(){throw Error('正常页面不得关闭分享');}}});
     try {
-      await p.onLoad({tab:'fun'});
-      for(const tab of ['fun','records','matches']) {
-        await p.switchPanel(tab);
-        if(tab==='fun') {p.selectedFunShareKey=p.statisticsController.data.stats.fun.tiles.find(row=>row.known).key;p.scheduleRecordsShare();}
-        if(tab==='matches')p.historyToggleRecord({currentTarget:{dataset:{id:'selected-match'}}});
-        await Promise.resolve();await p.sharePromise;
-        assert.ok(p.preparedShare,route+':'+tab+' '+p.shareKey);
-        assert.deepEqual(Array.from(menus.at(-1).menus),['shareAppMessage','shareTimeline']);
-        const friend=p.onShareAppMessage(),timeline=p.onShareTimeline();
-        assert.equal(friend.path,'/pages/shared/shared?share='+p.preparedShare.id);
-        assert.equal(timeline.query,'tab='+tab+'&share='+p.preparedShare.id);
-        assert.equal(friend.title,timeline.title);
-        assert.equal(friend.imageUrl,'/assets/share-cover.jpg');
-        assert.equal(timeline.imageUrl,friend.imageUrl);
-        assert.doesNotMatch(JSON.stringify([friend,timeline]),/private-match|scored|merlin_evade|我的战绩/);
+      const loading=p.onLoad({tab:'fun'});
+      assert.equal(menus.length,1);
+      assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro=fun');
+      await loading;
+      for(const [tab,kind] of [['fun','funSummary'],['records','stats'],['matches','matches']]) {
+        await p.switchPanel(tab);await new Promise(resolve=>setImmediate(resolve));await p.sharePromise;
+        assert.equal(p.preparedShare.kind,kind);
+        assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?share='+p.preparedShare.id);
+        assert.equal(p.onShareTimeline().query,'tab='+tab+'&share='+p.preparedShare.id);
+        assert.doesNotMatch(JSON.stringify(p.onShareAppMessage()),/private-match|scored|merlin_evade/);
       }
+      assert.deepEqual(selections.map(row=>row.kind),['funSummary','stats','matches']);
     } finally {p.onUnload();}
   }
 });
-test('快照准备期间切换分享对象时，迟到的旧结果不能开放菜单或覆盖当前对象', async () => {
+test('快照准备期间切换页面，旧结果不能覆盖当前概览，菜单始终保留有效兜底', async () => {
   const pending=[],menus=[],fixtures=require('./helpers/record-share-fixtures');
   const rawStats={...emptyStats,total:1,wins:1,losses:0,winRate:100};
   const {p}=page('stats',{...apiBase,request:async(url,method,selection)=>{
     if(url==='/api/me/shares')return new Promise(resolve=>pending.push({selection,resolve}));
     return url.includes('/matches')?{records:[{id:'selected',role:'梅林',boardName:'经典',outcome:'win',endedAt:1,members:[]}],total:1,hasMore:false}:rawStats;
-  }},{home:true,wx:{showShareMenu:options=>menus.push(options)}});
+  }},{home:true,wx:{showShareMenu:options=>menus.push(options),hideShareMenu(){throw Error('不得关闭菜单');}}});
   try {
     await p.onLoad();await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(pending.length,1);assert.equal(menus.length,0);
-    await p.switchPanel('matches');p.historyToggleRecord({currentTarget:{dataset:{id:'selected'}}});
+    assert.equal(pending.length,1);assert.equal(menus.length,1);
+    await p.switchPanel('matches');
+    assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro=matches');
     await new Promise(resolve=>setImmediate(resolve));assert.equal(pending.length,2);
     pending[0].resolve(fixtures.stats);await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(p.preparedShare,null);assert.equal(menus.length,0);
-    pending[1].resolve(fixtures.match);await p.sharePromise;
-    assert.equal(p.preparedShare.id,fixtures.match.id);assert.equal(menus.length,1);
+    assert.equal(p.preparedShare,null);assert.equal(menus.length,1);
+    pending[1].resolve(fixtures.matches);await p.sharePromise;
+    assert.equal(p.preparedShare.id,fixtures.matches.id);
   } finally {p.onUnload();}
+});
+test('空记录、个人数据失败及快照接口失败时三页菜单仍能转发品牌介绍', async()=>{
+  for(const mode of ['empty','data-error','share-error']) for(const tab of ['records','matches','fun']){
+    let shown=0;
+    const rawStats=mode==='empty'?emptyStats:{...emptyStats,...require('./helpers/share-fixtures').stats,byBoard:[],recent:[]};
+    const {p}=page('stats',{...apiBase,request:async(url)=>{
+      if(mode==='data-error'||url==='/api/me/shares')throw Error('offline');
+      return url.includes('/matches')?{records:[],total:0,hasMore:false}:rawStats;
+    }},{home:true,wx:{showShareMenu(){shown++;},hideShareMenu(){throw Error('不得关闭菜单');}}});
+    try{
+      await p.onLoad({tab});await new Promise(resolve=>setImmediate(resolve));await p.sharePromise;
+      assert.equal(shown,1);assert.equal(p.preparedShare||null,null);
+      assert.equal(p.onShareAppMessage().path,'/pages/shared/shared?intro='+tab);
+      assert.equal(p.onShareTimeline().query,'tab='+tab+'&intro='+tab);
+    }finally{p.onUnload();}
+  }
 });
 test('朋友圈单页模式两个入口只读取公开快照，不登录、不读取本人数据或展示个人操作', async () => {
   const context={window:{},global:{},console};vm.createContext(context);

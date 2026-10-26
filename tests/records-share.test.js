@@ -5,6 +5,17 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname,'../miniprogram/records-share.js'),'utf8');
 
+test('未准备好、失败或无效快照返回可匿名阅读的品牌入口',()=>{
+  const shares=require('../miniprogram/records-share');
+  for(const tab of ['records','matches','fun']) for(const snapshot of [undefined,null,{id:'bad'}]){
+    assert.equal(shares.friendContent(tab,snapshot).path,'/pages/shared/shared?intro='+tab);
+    assert.equal(shares.timelineContent(tab,snapshot).query,'intro='+tab);
+    assert.ok(shares.introFor(tab).heading);
+  }
+  assert.equal(shares.introFor('__proto__'),null);
+  assert.equal(shares.isSharedEntry({path:'pages/stats/stats',query:{intro:'fun'}}),true);
+});
+
 test('主包与分包的单页导航配置使用微信支持的枚举值', () => {
   const root=path.join(__dirname,'../miniprogram');
   const app=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8'));

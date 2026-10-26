@@ -2,12 +2,19 @@ const shares = require("../../records-share");
 const api = require("../../api");
 const { present } = require("../../shared-record-view");
 module.exports = function createSharedPage() { return {
-  data: { loading: true, error: "", sharedRecord: null, authoring: false, posterAvailable: false },
+  data: { loading: true, error: "", sharedRecord: null, intro: null, singlePage: false, authoring: false, posterAvailable: false },
   onLoad(options = {}) {
     this.alive = true;
     this.foreground = true;
     this.singlePage = shares.isSinglePage();
     this.shareId = options.share;
+    if (options.share == null && shares.introFor(options.intro)) {
+      this.introTab = options.intro;
+      this.setData({ loading: false, intro: shares.introFor(options.intro), singlePage: this.singlePage });
+      wx.setNavigationBarTitle?.({ title: this.data.intro.label });
+      if (!this.singlePage) wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
+      return;
+    }
     if (!this.shareId && !this.singlePage && ["stats", "match", "fun"].includes(options.kind)) {
       this.selection = options.kind === "stats" ? { kind: "stats" } : options.kind === "match" ? { kind: "match", match: options.match }
         : { kind: "fun", metric: options.metric, mode: options.mode };
@@ -40,11 +47,19 @@ module.exports = function createSharedPage() { return {
       if (this.alive && sequence === this.sequence) this.setData({ loading: false });
     }
   },
-  retrySharedRecord() { return this.loadSharedRecord(); },
+  retrySharedRecord() { if (!this.introTab) return this.loadSharedRecord(); },
+  openPersonalRecords() {
+    if (!this.alive || this.singlePage || !this.introTab || this.openingPersonal) return;
+    this.openingPersonal = true;
+    wx.redirectTo({ url: "/pages/stats/stats?tab=" + this.introTab,
+      fail: () => { if (this.alive) wx.showToast?.({ title: "暂时无法打开，请重试", icon: "none" }); },
+      complete: () => { this.openingPersonal = false; },
+    });
+  },
   onShow() {
     this.foreground = true;
-    if (this.alive && this.snapshot) {
-      wx.setNavigationBarTitle?.({ title: this.data.sharedRecord.pageTitle });
+    if (this.alive && (this.snapshot || this.introTab)) {
+      wx.setNavigationBarTitle?.({ title: this.data.intro?.label || this.data.sharedRecord.pageTitle });
       if (!this.singlePage) wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
     }
   },
@@ -54,7 +69,7 @@ module.exports = function createSharedPage() { return {
     if (this.data.authoring && this.data.posterAvailable && this.snapshot && !this.data.loading)
       wx.navigateTo({ url: "/pages/share/share?kind=stats" });
   },
-  onShareAppMessage() { return shares.friendContent("records", this.snapshot); },
-  onShareTimeline() { return shares.timelineContent("records", this.snapshot); },
+  onShareAppMessage() { return shares.friendContent(this.introTab || "records", this.snapshot); },
+  onShareTimeline() { return shares.timelineContent(this.introTab || "records", this.snapshot); },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.snapshot = null; },
 }; };

@@ -38,13 +38,14 @@ scenes.long = { sharedRecord: present(long) };
 const zero = structuredClone(fixtures.fun);zero.data.count = 0;zero.data.rate = 0;zero.data.records = [];
 scenes.zero = { sharedRecord: present(zero) };
 scenes.error = { error: "分享不存在或已失效" };scenes.loading = { loading: true };
+for(const tab of ['records','matches','fun']) scenes['intro-'+tab]={loading:false,error:'',singlePage:true,intro:require('../miniprogram/records-share').introFor(tab)};
 const docs = {};
 for (const [key, data] of Object.entries(scenes)) {
   const doc = '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><style>' + styles + "</style>"
     + html(factory("pages/shared/shared.wxml")(data)) + "</html>";
   fs.writeFileSync(path.join(output, key + ".html"), doc);docs[key] = doc;
 }
-const labels = { stats: "个人战绩", match: "单局对局", fun: "趣味成绩" };
+const labels = { stats: "个人战绩", matches: "对局记录概览", funSummary: "趣味记录概览" };
 const gallery = '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>body{margin:0;padding:28px 32px;background:#edeae4;color:#192830;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}h1{font-size:23px;margin:0 0 8px}.note{font-size:12px;color:#69747b;margin:0 0 22px}.screens{display:flex;gap:28px}h2{font-size:14px;font-weight:500;margin:0 0 12px}iframe{display:block;width:375px;height:1000px;border:1px solid #354650;border-radius:18px;background:#101c24}</style><h1>朋友圈分享 · 实际模板实现</h1><p class="note">示例数据 / 内容区域预览，微信原生导航和操作栏由微信提供</p><div class="screens">'
   + Object.keys(labels).map(key => '<section><h2>' + labels[key] + '</h2><iframe title="' + key + '" srcdoc="' + escape(docs[key]) + '"></iframe></section>').join("") + "</div></html>";
 fs.writeFileSync(path.join(output, "gallery.html"), gallery);

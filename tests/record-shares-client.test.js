@@ -9,11 +9,12 @@ const { present } = require("../miniprogram/shared-record-view");
 const root = path.resolve(__dirname, "../miniprogram");
 function client({ single = false, publicRead, create } = {}) {
   let definition, logins = 0, requests = 0, menu = 0;
+  const navigations=[];
   const wx = {
     getEnterOptionsSync: () => ({ scene: single ? 1154 : 1001 }),
     getStorageSync() { throw Error("公开分享不得读登录存储"); },
     request(options) { requests++; assert.equal(options.header, undefined); publicRead ? publicRead(options) : options.success({ statusCode: 200, data: fixtures.stats }); },
-    showShareMenu() { assert.equal(single, false); menu++; }, hideShareMenu() {}, setNavigationBarTitle() {}, navigateTo() {},
+    showShareMenu() { assert.equal(single, false); menu++; }, hideShareMenu() {}, setNavigationBarTitle() {}, navigateTo() {}, redirectTo:options=>navigations.push(options),
   };
   const api = { assetUrl: value => "https://test.invalid" + value,
     login: async () => { logins++; }, request: async (url, method, selection) => { assert.equal(url, "/api/me/shares"); assert.equal(method, "POST"); return create ? create(selection) : fixtures[selection.kind]; } };
@@ -25,7 +26,7 @@ function client({ single = false, publicRead, create } = {}) {
   }
   load(path.join(root, "pages/shared/shared.js"));
   const p = { ...definition, data: structuredClone(definition.data), setData: function(values) { Object.assign(this.data, values); } };
-  return { p, wx, logins: () => logins, requests: () => requests, menus: () => menu };
+  return { p, wx, navigations, logins: () => logins, requests: () => requests, menus: () => menu };
 }
 test("朋友圈和好友分享链接匿名读取同一快照，不登录、不碰登录存储", async () => {
   for (const single of [true, false]) {
@@ -39,6 +40,22 @@ test("朋友圈和好友分享链接匿名读取同一快照，不登录、不�
       assert.equal(c.p.onShareTimeline().query, "share=" + fixtures.stats.id);
       assert.equal(c.menus(), single ? 0 : 1);
     } finally { c.p.onUnload(); }
+  }
+});
+test("品牌兜底在普通与单页模式均无需登录或接口即可展示和再次分享", async () => {
+  for(const single of [true,false]) for(const tab of ['records','matches','fun']) {
+    const c=client({single});
+    try {
+      await c.p.onLoad({intro:tab});
+      assert.equal(c.p.data.loading,false);assert.equal(c.p.data.error,'');assert.ok(c.p.data.intro.heading);
+      assert.equal(c.logins(),0);assert.equal(c.requests(),0);
+      assert.equal(c.p.onShareAppMessage().path,'/pages/shared/shared?intro='+tab);
+      assert.equal(c.p.onShareTimeline().query,'intro='+tab);
+      assert.equal(c.menus(),single?0:1);
+      c.p.openPersonalRecords();c.p.openPersonalRecords();
+      assert.equal(c.navigations.length,single?0:1);
+      if(!single)assert.equal(c.navigations[0].url,'/pages/stats/stats?tab='+tab);
+    } finally {c.p.onUnload();}
   }
 });
 test("创建后才开放分享，未准备好不开放菜单，失败可重试且保留原选择", async () => {
@@ -94,6 +111,14 @@ test("展示零次数、零胜率和负积分，日期使用北京时间且不�
   assert.equal(present(match).metrics[1].value, "+0");
   match.data.events[0].round=null;
   assert.equal(present(match).events[0].round,"任务结果");
+});
+test("页面概览显示完整范围的统计和最近五局，趣味真实零与未知分别呈现", () => {
+  const matches=present(fixtures.matches);
+  assert.equal(matches.hero,'19');assert.equal(matches.related.length,5);
+  assert.deepEqual(matches.metrics.map(row=>row.value),['10','8','1']);
+  const summary=present(fixtures.funSummary);
+  assert.deepEqual(summary.items.map(row=>row.countLabel),['3','0','—']);
+  assert.equal(summary.hero,'1');assert.equal(summary.unit,'项');
 });
 test("访客模板仅展示分享内容，没有打开按钮、本人操作或虚构的过程", () => {
   const context = { window: {}, global: {}, console };vm.createContext(context);

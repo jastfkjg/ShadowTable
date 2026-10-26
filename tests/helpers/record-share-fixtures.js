@@ -16,4 +16,15 @@ const fun = { ...base, id: "3".repeat(48), kind: "fun", title: "子龙的成功�
   description: "担任梅林时，在针对自己的出刀中成功躲过的次数。",
   records: [0, 4, 8].map((days, index) => ({ boardName: "阿瓦隆 · 十二骑士", role: "梅林", faction: "good", endedAt: createdAt - days * 86400000 - 18 * 60000, count: 1 })),
 } };
-module.exports = { stats, match, fun };
+const matches = { ...base, id:"4".repeat(48), kind:"matches", title:"子龙的阿瓦隆对局记录 · 19局", data:{
+  total:19,wins:10,losses:8,excluded:1,scope:"全部时间 · 全部玩法",
+  records:Array.from({length:5},(_,i)=>({boardName:"阿瓦隆 · 经典基础",role:i%2?"刺客":"梅林",faction:i%2?"evil":"good",endedAt:createdAt-i*86400000,outcome:i%2?"loss":"win",score:i%2?-1:3})),
+} };
+const funSummary = { ...base,id:"5".repeat(48),kind:"funSummary",title:"子龙的阿瓦隆趣味记录",data:{
+  total:3,recorded:1,known:2,scope:"全部时间 · 全部趣味记录",items:[
+    {label:"闪身步大神",roleLabel:"梅林",icon:"/assets/roles/merlin.png",known:true,count:3,unit:"次",rateLabel:"成功率 60%",sampleLabel:"3 / 5 次",stateLabel:"查看说明"},
+    {label:"最强派西",roleLabel:"派西维尔",icon:"/assets/roles/percival.png",known:true,count:0,unit:"局",rateLabel:"成功率 0%",sampleLabel:"0 / 1 局",stateLabel:"暂无次数"},
+    {label:"职业刺客",roleLabel:"刺客",icon:"/assets/roles/assassin.png",known:false,count:null,unit:"",rateLabel:"",sampleLabel:"",stateLabel:"尚无完整记录"},
+  ],
+} };
+module.exports = { stats, match, fun, matches, funSummary };

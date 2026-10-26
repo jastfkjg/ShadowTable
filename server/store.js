@@ -578,7 +578,7 @@ class Store {
       FROM visible_match_players p WHERE p.uid=? AND json_extract(p.snapshot,'$.role') IS NOT NULL ORDER BY label`).all(uid);
     return { boards: boards.map(row => ({ id: row.id, label: row.label || row.id })), roles: roles.map(row => ({ id: row.label, label: row.label })) };
   }
-  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null, filters = {}, focusId = null) {
+  matchesFor(uid, offset = 0, limit = 20, scoredOnly = false, funFilter = null, filters = {}, focusId = null, includeSummary = false) {
     let filter = scoredOnly ? " AND EXISTS (SELECT 1 FROM active_match_scores s WHERE s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored')" : "";
     const args = [uid];
     if (filters.from !== undefined) { filter += " AND p.ended>=? AND p.ended<?"; args.push(filters.from, filters.to); }
@@ -596,12 +596,14 @@ class Store {
       offset = this.db.prepare("SELECT count(*) AS total FROM visible_match_players p WHERE p.uid=?" + filter
         + " AND (p.ended>? OR (p.ended=? AND p.match_id>?))").get(...args, target.ended, target.ended, target.match_id).total;
     }
-    const total = this.db.prepare("SELECT count(*) AS total FROM visible_match_players p WHERE uid=?" + filter).get(...args).total;
+    const counts = this.db.prepare("SELECT count(*) AS total" + (includeSummary ? ", coalesce(sum(p.outcome='win'),0) AS wins, coalesce(sum(p.outcome='loss'),0) AS losses, coalesce(sum(CASE WHEN p.outcome IN ('win','loss') THEN 0 ELSE 1 END),0) AS excluded" : "")
+      + " FROM visible_match_players p WHERE p.uid=?" + filter).get(...args);
+    const total = counts.total;
     const rows = this.db.prepare(`SELECT p.match_id, m.snapshot AS game, p.snapshot AS player
       FROM visible_match_players p JOIN matches m ON m.id=p.match_id
       WHERE p.uid=? ${filter} ORDER BY p.ended DESC,p.match_id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
     const records = rows.map(row => this.presentMatch(row));
-    return { records, total, offset, hasMore: offset + records.length < total };
+    return { records, total, offset, hasMore: offset + records.length < total, ...(includeSummary ? { summary: counts } : {}) };
   }
   matchFor(uid, id) {
     const row = this.db.prepare(`SELECT p.match_id,m.snapshot AS game,p.snapshot AS player

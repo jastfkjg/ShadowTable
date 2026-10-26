@@ -88,19 +88,6 @@ module.exports = function createController() { return {
       complete: () => { if (this.alive) this.setData({ shareOpening: false }); },
     });
   },
-  openShareImage(selection) {
-    if (!this.alive || this.data.loading || this.data.error || this.data.shareOpening) return;
-    this.setData({ shareOpening: true, shareNotice: "" });
-    wx.navigateTo({ url: "/pages/share/share?" + queryString(selection),
-      fail: () => {
-        if (!this.alive) return;
-        const shareNotice = "分享页暂时无法打开，请稍后重试。";
-        this.setData({ shareNotice });
-        wx.showToast({ title: shareNotice, icon: "none" });
-      },
-      complete: () => { if (this.alive) this.setData({ shareOpening: false }); },
-    });
-  },
   blockStatsScroll() {},
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
   filterFun(e) {

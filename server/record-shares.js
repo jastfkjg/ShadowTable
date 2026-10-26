@@ -60,15 +60,57 @@ function funData(store, uid, input) {
     rateName: tile.rateLabel ? tile.rateLabel.slice(0, tile.rateLabel.indexOf(" ")) : "发生率",
     description: clean(info.info.description), records };
 }
+function matchesData(store, uid, input) {
+  const raw = input.filters === undefined ? {} : input.filters;
+  check(raw && typeof raw === "object" && !Array.isArray(raw) && Object.entries(raw).every(([key, value]) => ["period", "board", "matchRole", "outcome"].includes(key) && typeof value === "string"), "对局分享筛选无效");
+  check(input.scored === undefined || typeof input.scored === "boolean", "对局分享筛选无效");
+  const filters = require("./match-filters").parseMatchFilters(new URLSearchParams(raw), store.clock());
+  const f = input.fun;
+  if (f !== undefined) check(f && typeof f === "object" && !Array.isArray(f) && Object.keys(f).every(key => ["metric", "mode", "role"].includes(key))
+    && typeof f.metric === "string" && typeof f.mode === "string" && Object.hasOwn(fun.metrics, f.metric) && Object.hasOwn(fun.modes, f.mode)
+    && (f.role === undefined || f.role === "" || typeof f.role === "string" && /^[A-Za-z]{1,32}$/.test(f.role)), "对局分享筛选无效");
+  const result = store.matchesFor(uid, 0, 5, !!input.scored, f || null, filters, null, true);
+  check(result.total > 0, "当前范围还没有可分享的对局");
+  const scopes = [({ all: "全部时间", month: "本月", "7d": "近7天", "30d": "近30天" })[filters.period]];
+  if (filters.from !== undefined) {
+    const day = time => new Date(time + 8 * 3600000).toISOString().slice(0, 10);
+    scopes.push(day(filters.from) + " 至 " + day(filters.to - 1));
+  }
+  if (filters.board) scopes.push(clean(store.matchFilterOptions(uid).boards.find(row => row.id === filters.board)?.label || filters.board));
+  if (filters.role) scopes.push(clean(filters.role));
+  if (filters.outcome) scopes.push(({ win: "胜利", loss: "失利", excluded: "不计入战绩" })[filters.outcome]);
+  if (input.scored) scopes.push("已计分");
+  if (f) scopes.push(fun.modes[f.mode], clean(funCopy.honors[f.metric]?.title || fun.metrics[f.metric].label), ...(f.role ? [f.role] : []));
+  return { ...result.summary, scope: scopes.join(" · "), records: result.records.map(row => ({
+    boardName: clean(row.boardName), role: clean(row.role), faction: row.faction, endedAt: row.endedAt, outcome: row.outcome,
+    score: row.score?.status === "scored" ? row.score.total : null,
+  })) };
+}
+function funSummaryData(store, uid, input) {
+  check(input.filter === undefined || ["all", "counted"].includes(input.filter), "趣味分享筛选无效");
+  const all = funCopy.records(store.funFor(uid)).tiles;
+  check(all.some(tile => tile.known && tile.knownGames > 0), "还没有可分享的完整趣味记录");
+  const tiles = input.filter === "counted" ? all.filter(tile => tile.hasCount) : all;
+  check(tiles.length > 0, "当前范围还没有可分享的趣味记录");
+  return { total: tiles.length, recorded: tiles.filter(tile => tile.hasCount).length,
+    known: tiles.filter(tile => tile.known).length, scope: "全部时间 · " + (input.filter === "counted" ? "有次数的记录" : "全部趣味记录"),
+    items: tiles.map(tile => ({ label: clean(tile.title), roleLabel: clean(tile.roleLabel), icon: tile.icon, iconTone: tile.iconTone,
+      known: tile.known, count: tile.known ? tile.count : null, unit: tile.unit,
+      rateLabel: tile.rateLabel, sampleLabel: tile.sampleLabel, stateLabel: tile.stateLabel,
+    })) };
+}
 function create(store, uid, input) {
   check(input && typeof input === "object" && !Array.isArray(input), "分享参数无效");
-  const allowed = { stats: ["kind"], match: ["kind", "match"], fun: ["kind", "metric", "mode"] };
+  const allowed = { stats: ["kind"], match: ["kind", "match"], fun: ["kind", "metric", "mode"], matches: ["kind", "filters", "scored", "fun"], funSummary: ["kind", "filter"] };
   check(typeof input.kind === "string" && Object.hasOwn(allowed, input.kind) && Object.keys(input).every(key => allowed[input.kind].includes(key)), "分享参数无效");
   const profile = readProfile(store, uid);
   const player = { name: clean(profile.nickname) || "新朋友", avatarUrl: profile.avatarUrl || "" };
-  const data = input.kind === "stats" ? statsData(store.statsFor(uid), store.clock()) : input.kind === "match" ? matchData(store, uid, input.match) : funData(store, uid, input);
+  const data = input.kind === "stats" ? statsData(store.statsFor(uid), store.clock()) : input.kind === "match" ? matchData(store, uid, input.match)
+    : input.kind === "matches" ? matchesData(store, uid, input) : input.kind === "funSummary" ? funSummaryData(store, uid, input) : funData(store, uid, input);
   const title = input.kind === "stats" ? `${player.name}的阿瓦隆战绩 · 胜率 ${data.winRate}%`
     : input.kind === "match" ? `${player.name}的${data.boardName}对局`
+    : input.kind === "matches" ? `${player.name}的阿瓦隆对局记录 · ${data.total}局`
+    : input.kind === "funSummary" ? `${player.name}的阿瓦隆趣味记录`
     : `${player.name}的${data.label} · ${data.count}${data.unit}`;
   const payload = { version: 1, kind: input.kind, player, title, data };
   const fingerprint = createHash("sha256").update(JSON.stringify(payload)).digest("hex");

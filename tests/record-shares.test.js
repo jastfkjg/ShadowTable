@@ -9,15 +9,15 @@ const { saveProfile } = require("../server/profile");
 const shares = require("../server/record-shares");
 const { createApp } = require("../server/app");
 const NOW = Date.UTC(2026, 9, 26, 10), UID = "wx:share-owner";
-function seed(store, id = randomUUID()) {
-  store.archiveMatch({ id, board: "classic", boardName: "阿瓦隆 · 经典基础", capacity: 6,
-    winner: "good", startedAt: NOW - 60000, endedAt: NOW,
+function seed(store, id = randomUUID(), options = {}) {
+  store.archiveMatch({ id, board: options.board || "classic", boardName: "阿瓦隆 · 经典基础", capacity: 6,
+    winner: options.outcome === "loss" ? "evil" : options.outcome === "excluded" ? null : "good", startedAt: NOW - 60000, endedAt: options.endedAt ?? NOW,
     replay: { complete: true, initialPlayers: [], events: [
       { kind: "quest", round: 1, success: true, cards: [{ actor: { uid: "private-player" }, value: "success" }] },
       { kind: "vision", round: 1, information: "PRIVATE-VISION", actor: { uid: UID } },
       { kind: "quest", round: 2, success: false },
     ] },
-    players: [{ uid: UID, name: "private-table-alias", role: "梅林", faction: "good", outcome: "win", seat: 1,
+    players: [{ uid: UID, name: "private-table-alias", role: options.role || "梅林", faction: "good", outcome: options.outcome || "win", seat: 1,
       score: { status: "scored", total: 3, breakdown: [{ label: "PRIVATE-REASON", points: 3 }] } },
     { uid: "wx:another-player", name: "PRIVATE-OTHER-NAME", role: "刺客", faction: "evil", outcome: "loss", seat: 2 }],
   });
@@ -45,6 +45,40 @@ test("公开分享只保存选定的本人统计投影，相同内容去重，�
     assert.throws(() => shares.create(store, UID, { kind: "stats", total: 999 }), /分享参数无效/);
     assert.throws(() => shares.create(store, UID, { kind: ["stats"] }), /分享参数无效/);
   } finally { store.close(); }
+});
+test("对局概览对完整筛选范围计数，只展示最近五局且不导出成员与内部记录标识",()=>{
+  const store=setup();
+  try{
+    for(let i=0;i<9;i++)seed(store,randomUUID(),{outcome:i<6?'win':i<8?'loss':'excluded',endedAt:NOW-i*86400000});
+    const summary=shares.create(store,UID,{kind:'matches'});
+    assert.deepEqual([summary.data.total,summary.data.wins,summary.data.losses,summary.data.excluded],[9,6,2,1]);
+    assert.equal(summary.data.records.length,5);
+    assert.doesNotMatch(JSON.stringify(summary),/PRIVATE-|private-|uid|members|match_id|information|cards|breakdown/);
+    const filtered=shares.create(store,UID,{kind:'matches',filters:{period:'7d',matchRole:'梅林',outcome:'win'}});
+    assert.equal(filtered.data.total,6);assert.equal(filtered.data.records.length,5);assert.match(filtered.data.scope,/近7天.*梅林.*胜利/);
+    const loss=shares.create(store,UID,{kind:'matches',filters:{outcome:'loss'}});
+    assert.deepEqual([loss.data.total,loss.data.wins,loss.data.losses],[2,0,2]);
+    assert.equal(shares.read(store,summary.id).data.total,9);
+    for(const patch of [{filters:{uid:UID}},{filters:{period:['all']}},{scored:'1'},{fun:{metric:['merlin_evade'],mode:'classic'}},{filters:{outcome:'bad'}}])
+      assert.throws(()=>shares.create(store,UID,{kind:'matches',...patch}),/筛选无效/);
+    assert.throws(()=>shares.create(store,'wx:stranger',{kind:'matches'}),/没有可分享/);
+  }finally{store.close();}
+});
+test("趣味概览保留真实零与未知，筛选有次数时不混入其他项目且拒绝伪造内容",()=>{
+  const store=setup();
+  try{
+    const id=seed(store);
+    store.db.prepare("INSERT OR REPLACE INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)").run(id,UID,'classic','merlin_evade','merlin','梅林',0,2,'known',NOW);
+    store.db.prepare("INSERT OR REPLACE INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)").run(id,UID,'classic','merlin_hit','merlin','梅林',1,2,'known',NOW);
+    const all=shares.create(store,UID,{kind:'funSummary',filter:'all'});
+    assert.equal(all.data.items.find(row=>row.label==='闪身步大神').count,0);
+    assert.ok(all.data.items.some(row=>!row.known&&row.count===null));
+    const counted=shares.create(store,UID,{kind:'funSummary',filter:'counted'});
+    assert.ok(counted.data.items.length>0);assert.ok(counted.data.items.every(row=>row.count>0));
+    assert.doesNotMatch(JSON.stringify(all),/PRIVATE-|private-|uid|members|match_id/);
+    assert.throws(()=>shares.create(store,UID,{kind:'funSummary',filter:'unknown'}),/筛选无效/);
+    assert.throws(()=>shares.create(store,UID,{kind:'funSummary',items:[]}),/分享参数无效/);
+  }finally{store.close();}
 });
 test("单局分享校验记录归属，仅投影本人身份、公开任务结果和积分数值", () => {
   const store = setup();
@@ -105,7 +139,8 @@ test("HTTP 创建要求登录，持有分享链接可匿名读取，普通个人
   const app = createApp({ database: ":memory:", clock: () => NOW, devAuth: true });
   const token = "1".repeat(64);
   app.store.addSession(createHash("sha256").update(token).digest("hex"), UID);
-  saveProfile(app.store, UID, { nickname: "子龙", version: 0 });seed(app.store);
+  saveProfile(app.store, UID, { nickname: "子龙", version: 0 });const matchId=seed(app.store);
+  app.store.db.prepare("INSERT OR REPLACE INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)").run(matchId,UID,'classic','merlin_evade','merlin','梅林',0,1,'known',NOW);
   try {
     await new Promise((resolve, reject) => { app.server.once("error", reject); app.server.listen(0, "127.0.0.1", resolve); });
     const base = "http://127.0.0.1:" + app.server.address().port;
@@ -119,5 +154,11 @@ test("HTTP 创建要求登录，持有分享链接可匿名读取，普通个人
     assert.equal((await fetch(base + "/api/shares/" + shared.id + "?uid=another")).status, 404);
     assert.equal((await post({ kind: "match", match: "unknown" })).status, 404);
     assert.equal((await post({ kind: "stats", player: "forged" })).status, 400);
+    for(const kind of ['matches','funSummary']){
+      const created=await post({kind});assert.equal(created.status,200);
+      const snapshot=await created.json();assert.equal(snapshot.kind,kind);
+      const anonymous=await fetch(base+'/api/shares/'+snapshot.id);
+      assert.equal(anonymous.status,200);assert.deepEqual(await anonymous.json(),snapshot);
+    }
   } finally { await new Promise(resolve => app.server.close(resolve)); app.store.close(); }
 });

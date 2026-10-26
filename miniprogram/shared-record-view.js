@@ -1,6 +1,6 @@
 const { portrait } = require("./role-portraits");
 const factions = { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" };
-const labels = { stats: "战绩分享", match: "对局分享", fun: "趣味成绩分享" };
+const labels = { stats: "战绩分享", match: "对局分享", fun: "趣味成绩分享", matches: "对局记录概览", funSummary: "趣味记录概览" };
 const value = number => Number.isFinite(number) ? String(number) : "—";
 const rate = number => Number.isFinite(number) ? value(number) + "%" : "—";
 const metric = (number, label) => ({ value: String(number), label });
@@ -15,12 +15,19 @@ function present(snapshot, assetUrl = path => path) {
   const data = snapshot.data, kind = snapshot.kind;
   const view = { kind, pageTitle: labels[kind], name: snapshot.player.name, initial: Array.from(snapshot.player.name)[0] || "友",
     avatar: snapshot.player.avatarUrl ? assetUrl(snapshot.player.avatarUrl) : "", asOf: time(snapshot.createdAt),
-    ownerLabel: kind === "stats" ? "分享了阿瓦隆战绩" : kind === "match" ? "分享了一场对局" : "分享了一项趣味成绩" };
+    ownerLabel: kind === "stats" ? "分享了阿瓦隆战绩" : kind === "match" ? "分享了一场对局" : kind === "matches" ? "分享了对局记录概览" : kind === "funSummary" ? "分享了趣味记录概览" : "分享了一项趣味成绩" };
   if (kind === "stats") return { ...view, hero: value(data.winRate), unit: Number.isFinite(data.winRate) ? "%" : "", heroLabel: "总胜率", scope: "全部时间 · 全部玩法",
     metrics: [metric(data.total, "对局"), metric(data.wins + " / " + data.losses, "胜 / 负"), metric(data.scoreMonth, Number((data.scorePeriod || time(snapshot.createdAt).slice(0, 7)).split(".")[1]) + "月积分")],
     factions: data.factions.map(row => ({ ...row, label: factions[row.faction] || factions.unknown, rate: rate(row.winRate),
       bar: "width:" + Math.max(0, Math.min(100, row.winRate || 0)) + "%;" })),
     roles: data.roles.map(row => ({ ...row, ...portrait(row.role, row.faction), rate: rate(row.winRate) })) };
+  if (kind === "matches") return { ...view, hero: value(data.total), unit: "局", heroLabel: "当前范围的对局", scope: data.scope,
+    metrics: [metric(data.wins, "胜场"), metric(data.losses, "负场"), metric(data.excluded, "未计入战绩")],
+    related: data.records.map((row, index) => ({ id: index, title: row.boardName + " · " + row.role, time: time(row.endedAt),
+      value: (({win:"胜利",loss:"失利",excluded:"未计入"})[row.outcome] || "未计入") + (Number.isFinite(row.score) ? " · " + (row.score >= 0 ? "+" : "") + row.score + "分" : "") })) };
+  if (kind === "funSummary") return { ...view, hero: value(data.recorded), unit: "项", heroLabel: "有次数的趣味记录", scope: data.scope,
+    metrics: [metric(data.total, "记录项目"), metric(data.recorded, "有次数"), metric(data.known, "有完整记录")],
+    items: data.items.map((row, index) => ({ ...row, id: index, countLabel: row.known ? value(row.count) : "—" })) };
   if (kind === "match") return { ...view, ...portrait(data.role, data.faction), role: data.role,
     context: data.boardName.replace(/\s*[（(]\d+人[）)]\s*$/, "") + " · " + data.capacity + " 人",
     result: data.outcome === "excluded" ? "本局未计入战绩" : (factions[data.winner] || "胜方未登记") + (data.winner ? "获胜" : ""),
