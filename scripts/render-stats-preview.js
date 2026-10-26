@@ -73,6 +73,16 @@ const matchRecords = presentMatches([
   ...Array.from({length:13},(_,i)=>({...match,id:'earlier-'+i,role:'莫甘娜',endedAt:new Date(2026,9,10,22,59-i).getTime(),outcome:i<2?'win':i<5?'loss':'excluded',replayAvailable:false,score:{status:'legacy'}})),
 ]);
 const history = {...createHistory().data,loading:false,loaded:true,filtersAvailable:true,records:matchRecords,total:17,outcomeSummary:'3 胜 · 5 负 · 9 场不计入',outcomeCounts:{wins:3,losses:5,excluded:9}};
+function filterPreview(selected = {}, long = false) {
+  const controller = createHistory();
+  controller.data = structuredClone(history);
+  controller.setData = values => Object.assign(controller.data, values);
+  controller.filterOptions = { boards: [{id:'knights',label:long?'阿瓦隆 · 十二骑士与扩展角色配置（十二人局）':'十二骑士'}],
+    roles: [{id:'gaheris',label:long?'觉醒蓝刀客·加赫雷斯（结算身份）':'蓝刀客·加赫雷斯'}] };
+  controller.toggleFilters();
+  for (const [key, index] of Object.entries(selected)) controller.chooseFilter({currentTarget:{dataset:{key,index}}});
+  return controller.data;
+}
 const compactStats = presentStats({ total: 3, wins: 1, winRate: 33.3, byFaction: [], byRole: [], byBoard: [], recent: [], fun: { legacyGames: 1, cards: [
   { id: 'knights:survival', metrics: [{ ...metric('survival_revive', 0, 0, true), value: null }, metric('survival_knifed', 1, 0, true)] },
   { id: 'knights:shield', title: '好人', metrics: [shield] },
@@ -102,7 +112,9 @@ const scenes = {
   'history-expanded': {tab:'matches',historyStarted:true,history:{...history,records:matchRecords.map((record,index)=>({...record,expanded:index<2,membersExpanded:index===1}))}},
   'history-timeline': {tab:'matches',historyStarted:true,history:{...history,records:[timelineRecord],total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},
   'history-timeline-long': {tab:'matches',historyStarted:true,history:{...history,records:[{...timelineRecord,fun:require('../miniprogram/fun-copy').story({...timelineRecord.fun,events:[...timelineEvents,{id:'long',round:1,kind:'knife',role:'觉醒蓝刀客·加赫雷斯',label:'刀中友方',detail:'9号同阵营 · 目标因魔术师换号避开伤害 · 实际承受者12号'},{id:'final',role:'红骑士',label:'未生效',detail:'本局最终结果未记录'}]})}],total:1,outcomeSummary:''}},
-  'history-filters': {tab:'matches',historyStarted:true,history:{...history,filtersExpanded:true}},
+  'history-filters': {tab:'matches',historyStarted:true,history:filterPreview()},
+  'history-filters-selected': {tab:'matches',historyStarted:true,history:filterPreview({period:2,board:1,matchRole:1,outcome:1})},
+  'history-filters-long': {tab:'matches',historyStarted:true,history:filterPreview({period:3,board:1,matchRole:1,outcome:3},true)},
   'history-empty': {tab:'matches',historyStarted:true,history:{...history,records:[],total:0,outcomeSummary:'',outcomeCounts:null}},
   'history-long': {tab:'matches',historyStarted:true,history:{...history,records:stressRecords,total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},
 };
@@ -123,7 +135,8 @@ for (const [name, id] of [['fun-grid-info','survival_knifed'],['fun-grid-info-lo
 for (const [tab,kind] of [['records','stats'],['matches','match'],['fun','fun']]) scenes['single-page-'+tab] = { singlePage:true, sharedSurface:true, tab,
   publicShare:{loading:false,error:'',authoring:false,sharedRecord:require('../miniprogram/shared-record-view').present(require('../tests/helpers/record-share-fixtures')[kind])} };
 const styles = css('app.wxss') + css('components/app-nav/app-nav.wxss') + css('pages/stats/stats.wxss') + css('components/app-dialog/app-dialog.wxss');
-const projection = 'body{margin:0}button{font:inherit;border:0;width:100%}span{display:inline}img{object-fit:contain}body .records-shell{padding-bottom:28px}.records-pane{overflow-y:auto}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
+// Match the native default button width so browser QA catches missing overrides.
+const projection = 'body{margin:0}button{position:relative;overflow:hidden;font:inherit;border:0}button:not([size=mini]){margin-left:auto;margin-right:auto;width:184px}span{display:inline}img{object-fit:contain}body .records-shell{padding-bottom:28px}.records-pane{overflow-y:auto}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
 fs.mkdirSync(output, { recursive: true });
 for (const [name, data] of Object.entries(scenes)) fs.writeFileSync(path.join(output, name + '.html'), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>战绩 · ${name}</title><style>${projection}${styles}</style>${html(factory('pages/stats/stats.wxml')({statistics:{},history:{},historyStarted:false,scrollTops:{},...data}))}${data.info ? html(factory('components/app-dialog/app-dialog.wxml')({dialog:data.info,bodyHeight:0})) : ''}<div class="preview-homebar"></div></html>`);
 const meProfile=presentProfile({nickname:'子龙',identityType:'wx',avatarUrl:''});

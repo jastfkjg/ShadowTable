@@ -241,6 +241,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     isLobby: lobby,
     loading: true,
     roomsRefreshing: false,
+    roomsSyncLabel: "",
     busy: false,
     error: "",
     reconnecting: false,
@@ -405,6 +406,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   onResize() {
     this.dismissRoomSwipe();
+    this.syncPlayerCardLayout();
     this.showIdentityHintWhenVisible();
     this.syncRoomSheetLayout("entry");
     this.syncRoomSheetLayout("rules");
@@ -658,8 +660,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.connectionRecovered();
       const items = roomListItems(roomList.availableRooms(rooms));
       this.roomsServerTime = serverTime || Date.now();
+      const synced = new Date(this.roomsServerTime);
+      const roomsSyncLabel = `${String(synced.getHours()).padStart(2, "0")}:${String(synced.getMinutes()).padStart(2, "0")}`;
       this.dismissRoomSwipe();
-      this.updateChangedData({ memberRooms: items, activeRooms: items.filter(r => r.status === "playing" && r.available !== false),
+      this.updateChangedData({ memberRooms: items, roomsSyncLabel, activeRooms: items.filter(r => r.status === "playing" && r.available !== false),
         ...roomList.present(items, this.data.roomListFilter, this.roomsServerTime), serverConnected: true, network: true });
     }
   },
@@ -713,6 +717,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.recovering = false;
       this.schedule();
     }
+  },
+  retryLobbyConnection() {
+    if (!this.alive || !this.foreground || this.recovering || this.data.busy || this.data.loading || this.data.roomsRefreshing) return;
+    // Login recovery is deliberately excluded from automatic retries.
+    return this.data.needsLogin ? this.retry() : this.recoverConnection();
   },
   schedule() {
     clearTimeout(this.timer);
@@ -1236,6 +1245,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   resumePending() { if (this.data.pendingTableCode) return this.enterTable(this.data.pendingTableCode); },
   async openRoom(e) {
+    if (this.data.isLobby && (this.data.reconnecting || !this.data.network || this.data.needsLogin)) return;
     if (this.consumeRoomSwipeTap()) return;
     if (this.data.roomSwipeCode) { this.dismissRoomSwipe(); return; }
     if (this.data.busy || this.pending || this.data.enteringCode || this.data.loading) return;
@@ -1280,6 +1290,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   switchEntry(e) {
     if (this.data.busy || this.pending) return;
+    if (this.data.isLobby && (this.data.reconnecting || !this.data.network || this.data.needsLogin)) return;
     this.dismissRoomSwipe();
     const mode = e.currentTarget.dataset.mode;
     if (!["join", "create"].includes(mode)) return;

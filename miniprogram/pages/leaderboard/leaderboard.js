@@ -9,7 +9,7 @@ Page({
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
   onShow() { this.foreground = true; return this.load(); },
-  onResize() { if (this.data.metricsExpanded) this.measureFunOptions(this.data.funOptionsScrollTarget); },
+  onResize() { this.syncPlayerCardLayout(); if (this.data.metricsExpanded) this.measureFunOptions(this.data.funOptionsScrollTarget); },
   onHide() { this.foreground = false; this.closePlayerCard(); },
   openRankPlayerCard(e) {
     const id = e.currentTarget.dataset.id, row = this.data.board?.rows.find(row => row.publicId === id);

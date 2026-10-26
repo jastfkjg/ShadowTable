@@ -97,7 +97,7 @@ module.exports = function createController() { return {
   chooseFilter(e) {
     if (this.fetching || !this.data.filtersAvailable || !this.data.filtersExpanded) return;
     const group = this.data.draftFilterGroups.find(item => item.key === e.currentTarget.dataset.key);
-    const option = group?.options[Number(e.detail.value)];
+    const option = group?.options[Number(e.detail?.value ?? e.currentTarget.dataset.index)];
     if (!option || option.id === this.data.draftFilters[group.key]) return;
     this.setData(draftState({ ...this.data.draftFilters, [group.key]: option.id }, this.filterOptions, this.data.draftFilterGroups));
   },

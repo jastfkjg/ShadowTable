@@ -164,21 +164,29 @@
 
 /* Shared player sheet also appears on leaderboards. Keep badge disclosures. */
 .player-card-backdrop { padding: 88px 0 0; }
-.player-card-sheet { width: 100%; max-width: 600px; max-height: calc(100vh - 88px); padding: 10px 18px calc(18px + env(safe-area-inset-bottom)); border: 1px solid var(--overlay-border); border-bottom: 0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; font-size: 13px; line-height: 1.6; }
+.player-card-sheet { width: 100%; max-width: 600px; max-height: calc(100vh - 88px); padding: 0; border: 1px solid var(--overlay-border); border-bottom: 0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; font-size: 13px; line-height: 1.6; }
+.player-card-sheet.is-measuring { visibility: hidden; }
+.player-card-top { flex-shrink: 0; padding: 10px 20px 14px; }
+.player-card-content { padding: 0 20px 1px; }
+.player-card-bottom { flex-shrink: 0; min-height: 18px; padding-bottom: env(safe-area-inset-bottom); }
 .player-card-handle, .table-sheet-handle { flex-shrink: 0; width: 36px; height: 4px; margin: 0 auto 8px; border-radius: 4px; background: #536570; }
-.player-card-heading { min-height: 44px; font-size: 20px; gap: 8px; margin-bottom: 12px; }
+.player-card-heading { min-height: 44px; font-size: 18px; gap: 8px; margin-bottom: 0; }
+.player-card-heading .table-symbol { width: 30px; height: 32px; border-radius: 10px; }
+.player-card-heading .table-symbol image { width: 19px; height: 19px; }
 button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; padding: 0; margin: 0 -8px 0 0; font-size: 27px; line-height: 44px; }
 .player-card-body { max-height: calc(100vh - 184px - env(safe-area-inset-bottom)); }
-.player-card-identity { gap: 12px; padding: 8px 0 18px; }
-.player-card-avatar { width: 54px; height: 54px; font-size: 25px; }
+.player-card-sheet.has-measured-body .player-card-body { max-height: none; }
+.player-card-identity { gap: 12px; min-height: 52px; padding: 0 0 20px; }
+.player-card-avatar { width: 48px; height: 48px; font-size: 25px; }
 .player-card-name { flex: 1 1 64px; }
-.player-card-display-name { font-size: 20px; line-height: 1.5; }
+.player-card-display-name { font-size: 21px; line-height: 1.4; }
+.player-card-name .small { margin-top: 3px; line-height: 20px; }
 .player-card-sheet .small { font-size: 12px; }
 .player-card-badges { flex: 0 0 132px; width: 132px; }
-.player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 66px); }
-.player-card-identity.is-long-name .player-card-badges { flex-basis: 132px; width: 132px; margin-left: 66px; }
+.player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 60px); }
+.player-card-identity.is-long-name .player-card-badges { flex-basis: 132px; width: 132px; margin-left: 60px; }
 .player-card-sheet button.player-badge-button { width: 44px; min-height: 44px; height: 44px; margin: 0; padding: 4px; }
-.player-card-sheet .player-badge-button image { width: 35px; height: 35px; }
+.player-card-sheet .player-badge-button image { width: 32px; height: 32px; }
 .player-card-section-title { font-size: 14px; }
 .player-card-overview-title { border: 0; padding: 0 0 12px; }
 .player-card-summary { padding: 4px 10px; border: 0; border-radius: 18px; background: var(--control-bg, #14232c); }
@@ -270,7 +278,7 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
   .table-room .seat-head { flex-wrap: wrap; }
   .table-room .seat-head-tags { margin-left: auto; }
   .table-room .lobby-action-inner { gap: 8px; }
-  .player-card-sheet { padding-left: 14px; padding-right: 14px; }
+  .player-card-top, .player-card-content { padding-left: 16px; padding-right: 16px; }
   .player-card-stat { padding-left: 10px; padding-right: 10px; }
   .player-card-faction-info .small { font-size: 11px; }
   .table-sheet-top { padding-left: 14px; padding-right: 14px; }

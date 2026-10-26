@@ -448,7 +448,7 @@ test('筛选弹层的关闭放弃草稿，重置只改草稿，重复确认不�
     return { records: [{ id: 'one', endedAt: 1, members: [] }], total: 1, hasMore: false, filterOptions: { boards: [], roles: [] } };
   } });
   await p.onLoad();
-  const choose = index => p.chooseFilter({ currentTarget: { dataset: { key: 'outcome' } }, detail: { value: index } });
+  const choose = index => p.chooseFilter({ currentTarget: { dataset: { key: 'outcome', index } }, detail: {} });
   choose(1); assert.equal(p.data.draftFilters.outcome, '');
   p.toggleFilters(); choose(1); p.closeFilters();
   assert.equal(p.data.filters.outcome, ''); assert.equal(urls.length, 1);
@@ -463,6 +463,26 @@ test('筛选弹层的关闭放弃草稿，重置只改草稿，重复确认不�
   p.resetDraftFilters(); await p.confirmFilters();
   assert.equal(p.data.filterCount, 0); assert.equal(urls.length, 3);
   p.fetching = true; p.toggleFilters(); assert.equal(p.data.filtersExpanded, false);
+});
+test('时间快捷选项与原生选择器共用草稿，确认前不请求，重置后恢复全部时间', async () => {
+  const urls = [];
+  const { p } = page('matches', { ...apiBase, request: async url => {
+    urls.push(url);
+    return { records: [], total: 0, hasMore: false, filterOptions: { boards: [{id:'knights',label:'十二骑士'}], roles: [] } };
+  } });
+  await p.onLoad(); p.toggleFilters();
+  p.chooseFilter({ currentTarget: { dataset: { key: 'period', index: 2 } }, detail: {} });
+  p.chooseFilter({ currentTarget: { dataset: { key: 'board' } }, detail: { value: '1' } });
+  assert.equal(p.data.draftFilters.period, '7d'); assert.equal(p.data.draftFilters.board, 'knights');
+  assert.equal(p.data.filters.period, 'all'); assert.equal(urls.length, 1);
+  p.chooseFilter({ currentTarget: { dataset: { key: 'period', index: 99 } } });
+  assert.equal(p.data.draftFilters.period, '7d');
+  await p.confirmFilters();
+  assert.match(urls.at(-1), /period=7d&board=knights/);
+  p.toggleFilters(); p.resetDraftFilters();
+  assert.equal(p.data.draftFilters.period, 'all');
+  assert.equal(p.data.draftFilterGroups.find(group => group.key === 'period').index, 0);
+  assert.equal(p.data.filters.period, '7d');
 });
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });

@@ -80,10 +80,6 @@ module.exports = function createController() { return {
     if (!this.data.stats?.total) return;
     return this.openSharedRecord({ kind: "stats" });
   },
-  shareFunRecord(event) {
-    const tile = this.data.stats?.fun?.tiles.find(row => row.key === event.currentTarget.dataset.key && row.known);
-    if (tile) return this.openSharedRecord({ kind: "fun", metric: tile.id, mode: tile.mode });
-  },
   openSharedRecord(selection) {
     if (!this.alive || this.data.loading || this.data.error || this.data.shareOpening) return;
     this.setData({ shareOpening: true, shareNotice: "" });

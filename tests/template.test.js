@@ -1553,7 +1553,10 @@ test('战绩分享入口在空战绩时隐藏，加载、读取失败和跳转�
 
 test('筛选弹层在滚动区域外，关闭时不渲染，展示时锁定列表滚动并显示草稿选项', () => {
   const history = { filtersAvailable: true, filtersExpanded: true, filters: { outcome: 'win' },
-    draftFilterGroups: [{ key: 'outcome', label: '胜负', index: 2, valueLabel: '失利', active: true, options: [{id:'',label:'全部结果'},{id:'win',label:'胜利'},{id:'loss',label:'失利'}] }], records: [], total: 0, loaded: true };
+    draftFilterGroups: [
+      { key: 'board', label: '板子', index: 1, valueLabel: '十二骑士', active: true, options: [{id:'',label:'全部板子'},{id:'knights',label:'十二骑士'}] },
+      { key: 'outcome', label: '胜负', index: 2, valueLabel: '失利', active: true, options: [{id:'',label:'全部结果'},{id:'win',label:'胜利'},{id:'loss',label:'失利'}] },
+    ], records: [], total: 0, loaded: true };
   const tree = renderHistoryShell(history);
   const body = nodes(tree).find(n => n.attr?.class === 'records-body');
   assert.ok(!byHandler(body, 'historyConfirmFilters'));
@@ -1561,7 +1564,11 @@ test('筛选弹层在滚动区域外，关闭时不渲染，展示时锁定列�
   const pane = nodes(tree).find(n => n.attr?.['data-tab'] === 'matches');
   assert.equal(pane.attr.scrollY, false);
   const picker = nodes(tree).find(n => n.tag === 'wx-picker');
-  assert.equal(picker.attr.value, 2);
+  assert.equal(picker.attr.value, 1);
+  const options = nodes(tree).filter(n => n.attr?.bindtap === 'historyChooseFilter');
+  assert.equal(options.length, 3);
+  assert.deepEqual(Array.from(options.filter(n => n.attr.ariaPressed), n => n.attr['data-index']), [2]);
+  assert.ok(options.every(n => n.attr['data-key'] === 'outcome'));
   assert.ok(byHandler(tree, 'historyResetDraftFilters')); assert.ok(byHandler(tree, 'historyConfirmFilters'));
   assert.ok(!byHandler(renderHistoryShell({ ...history, filtersExpanded: false }), 'historyConfirmFilters'));
 });
@@ -1932,9 +1939,11 @@ test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情�
   assert.equal(byHandler(locked,'toggleOwnedBadge'),undefined);
 });
 
-test('趣味卡片正文与回查箭头为独立按钮，箭头不嵌在正文按钮内', () => {
+test('趣味卡片只提供说明和独立回查箭头，不显示卡片分享入口', () => {
   const stats=require('../miniprogram/profile').presentStats(require('./helpers/fun-copy-fixtures').stats);
   const tree=renderStatsShell({tab:'fun',stats});
+  assert.equal(byHandler(tree,'shareFunRecord'),undefined);
+  assert.doesNotMatch(JSON.stringify(tree),/shared-data-entry|分享成绩/);
   const entries=nodes(tree).filter(n=>n.attr?.class==='fun-record-entry');
   assert.equal(entries.length,stats.fun.totalCount);
   for(const entry of entries){
