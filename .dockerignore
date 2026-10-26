@@ -8,6 +8,10 @@
 !miniprogram/builtin-avatars.js
 !miniprogram/avatar-library.js
 !miniprogram/fun-copy.js
+!miniprogram/fun-records.wxss
+!miniprogram/components/
+!miniprogram/components/app-dialog/
+!miniprogram/components/app-dialog/fun.wxss
 !miniprogram/badges.js
 !miniprogram/badge-awards.js
 !miniprogram/badge-awards.wxss
@@ -50,6 +54,7 @@
 !miniprogram/assets/record-sword.svg
 !miniprogram/assets/record-swords.svg
 !miniprogram/assets/record-shield.svg
+!miniprogram/assets/record-shield-good.svg
 !miniprogram/assets/record-spark.svg
 !miniprogram/assets/record-medal.svg
 !miniprogram/assets/record-users.svg
