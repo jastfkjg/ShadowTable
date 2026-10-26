@@ -7,7 +7,8 @@
 .rank-tools { gap: 4px; }
 button.rank-tool, button.rank-tool[disabled]:not([type]) { width: auto; min-width: 44px; min-height: 48px; margin: 0; padding: 4px; gap: 4px; color: var(--muted); font-size: 12px; }
 .rank-tool-icon { width: 15px; height: 15px; }
-.rank-info-icon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 11.5px; height: 11.5px; border: 1px solid currentColor; border-radius: 50%; font-size: 9.5px; line-height: 1; font-weight: 500; box-sizing: border-box; }
+button.rank-rules-tool, button.rank-rules-tool[disabled]:not([type]) { width: 44px; min-height: 44px; height: 44px; padding: 0; justify-content: flex-end; }
+.rank-rules-tool .rank-tool-icon { flex-shrink: 0; width: 22px; height: 22px; }
 .rank-metrics { display: flex; width: 100%; margin: 4px 0 0; border-bottom: 0.5px solid var(--rank-line); }
 button.rank-metric { flex: 1 1 0%; width: 0; min-width: 0; max-width: 25%; min-height: 48px; margin: 0; padding: 0; border: 0; border-radius: 0; font-size: 15px; color: var(--muted); text-align: center; overflow: visible; }
 .rank-metric-label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 9px 0; box-sizing: border-box; white-space: nowrap; }
@@ -99,21 +100,51 @@ button.fun-metric-option.selected { border-color: rgba(229,198,139,.5); backgrou
 .rank-sheet-footer { flex-shrink: 0; padding: 10px 16px 12px; border-top: 0.5px solid var(--rank-line); }
 .rank-sheet-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
 button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; background: var(--accent); color: var(--bg); font-size: 14px; font-weight: 600; }
-.rank-rules-body, .rank-details-body { box-sizing: border-box; height: 44vh; min-height: 0; padding: 10px 16px 16px; }
+.rank-rules-body { box-sizing: border-box; height: 44vh; min-height: 0; padding: 10px 16px 16px; }
 .rank-rules-metric { font-size: 14px; color: var(--accent); margin-bottom: 10px; }
 .rank-rule-line { color: var(--muted); font-size: 13px; line-height: 1.8; margin-bottom: 10px; }
-.rank-mine-content { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.rank-details-body .rank-mine-value, .rank-details-body .rank-mine-place { font-size: 22px; }
-.rank-details-body .rank-mine-metric { text-align: right; }
-.rank-status-label { font-size: 13px; color: var(--accent); margin-bottom: 6px; }
-.rank-visibility { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin-top: 12px; padding: 6px 0; border-top: 0.5px solid var(--rank-line); font-size: 14px; }
-.rank-visibility switch { flex-shrink: 0; }
-.rank-visibility-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--evil); }
+.rank-details-dialog { border-radius: 28px 28px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.rank-details-dialog .rank-sheet-handle { width: 48px; height: 4px; margin: 12px auto 10px; }
+.rank-details-dialog .rank-sheet-header { padding: 0 24px 20px; }
+.rank-details-dialog .rank-sheet-title { font-size: 23px; }
+button.rank-details-close { width: 44px; min-width: 44px; min-height: 44px; height: 44px; margin: 0; padding: 0; border: 1px solid var(--rank-line); border-radius: 50%; background: rgba(177,191,198,.05); color: var(--text); }
+.rank-close-icon { position: relative; width: 18px; height: 18px; }
+.rank-close-icon::before, .rank-close-icon::after { content: ''; position: absolute; top: 8px; left: 0; width: 18px; height: 2px; border-radius: 1px; background: currentColor; transform: rotate(45deg); }
+.rank-close-icon::after { transform: rotate(-45deg); }
+.rank-details-body { flex: 0 1 auto; height: auto; min-height: 0; max-height: calc(90vh - 116px - env(safe-area-inset-bottom)); box-sizing: border-box; padding: 0 24px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.rank-summary { display: flex; align-items: stretch; padding: 12px 0 8px; }
+.rank-summary-column { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.rank-summary-metric { margin-left: 24px; padding-left: 28px; border-left: 1px solid var(--rank-line); }
+.rank-summary-label { margin-bottom: 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.rank-summary-place, .rank-summary-value { display: flex; align-items: baseline; align-content: flex-end; flex-wrap: wrap; gap: 4px; min-width: 0; min-height: 46px; font-size: 40px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.rank-summary-place { color: var(--accent); }
+.rank-summary-value { font-size: 30px; }
+.rank-summary-number { min-width: 0; overflow-wrap: anywhere; }
+.rank-summary-unit { font-size: 18px; font-weight: 400; }
+.rank-summary-value .rank-summary-unit { color: var(--muted); font-size: 16px; }
+.rank-summary-compact { font-size: 26px; }
+.rank-summary-status { padding: 4px 0; color: var(--accent); font-size: 24px; font-weight: 600; line-height: 1.5; }
+.rank-summary-tied { margin-top: 6px; color: var(--muted); font-size: 12px; }
+.rank-status-label, .fun-mine-sample { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.rank-display-settings { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--rank-line); }
+.rank-visibility { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; margin: 0; padding: 0; border: 0; }
+.rank-visibility-copy { flex: 1; min-width: 0; }
+.rank-visibility-title { font-size: 17px; font-weight: 600; line-height: 1.5; }
+.rank-visibility-hint { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.rank-visibility-title, .rank-visibility-hint { display: block; }
+.rank-visibility input[role="switch"] { flex-shrink: 0; width: 52px; height: 32px; margin: 0; border: 1px solid var(--border); }
+.rank-visibility input[role="switch"]::after { top: 3px; left: 3px; width: 24px; height: 24px; background: var(--muted); transition: transform .15s ease, background .15s ease; }
+.rank-visibility input[role="switch"]:checked::after { left: 3px; transform: translateX(20px); background: #fff; }
+.rank-visibility-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--evil); }
 .rank-visibility-error button { flex-shrink: 0; width: auto; margin: 0; min-height: 44px; color: var(--accent); }
 .rank-category-empty { padding: 16px 0; }
+@media (max-width: 400px) {
+  .rank-summary-wide { flex-direction: column; gap: 16px; }
+  .rank-summary-wide .rank-summary-metric { margin-left: 0; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--rank-line); }
+}
 .rank-pressed { opacity: .7; }
 @keyframes rank-sheet-enter { from { opacity: .6; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .rank-sheet { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rank-sheet { animation: none; } .rank-visibility input[role="switch"]::after { transition: none; } }
 @media (max-height: 500px) {
   .rank-mine { position: static; margin-top: 24px; padding: 12px 0; }
   .leaderboard-page { padding-bottom: 24px; }
@@ -132,6 +163,9 @@ button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; ba
   .fun-option-radio { width: 16px; height: 16px; border-width: 1px; }
   .fun-option-check { width: 4px; height: 7px; border-width: 0 1.5px 1.5px 0; margin-bottom: 2px; }
   .rank-sheet-handle { width: 32px; height: 4px; margin: 8px auto 3px; }
+  .rank-details-dialog { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .rank-details-dialog .rank-sheet-header { padding-bottom: 12px; }
+  .rank-details-body { max-height: calc(96vh - 100px - env(safe-area-inset-bottom)); }
 }
 
 .rank-value.is-compact { font-size: 18px; }

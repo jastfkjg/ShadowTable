@@ -353,7 +353,7 @@ class Store {
       average: rows.length ? Math.round(rows.reduce((sum,row) => sum + row.points,0) / rows.length * 100) / 100 : null });
     for (const row of byFaction) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction));
     for (const row of byRole) row.score = aggregate(scoreRows.filter(score => score.faction === row.faction && score.role === row.role));
-    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(delta),0) AS month, count(*) AS count FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,monthStart,monthEnd);
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS total, coalesce(sum(delta),0) AS month, count(*) AS count FROM visible_score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,monthStart,monthEnd);
     return { identityType: uid.split(":")[0], ...overview, byFaction, byRole, byBoard, recent, fun: this.funFor(uid),
       score: { ...aggregate(scoreRows), total: aggregate(scoreRows).total + manual.total, month: aggregate(scoreRows.filter(row => row.ended >= monthStart && row.ended < monthEnd)).total + manual.month, manualAdjustment: manual } };
   }
@@ -446,9 +446,10 @@ class Store {
     }
   }
   rebuildScores(uid, id) {
-    const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM active_match_scores s
+    const rows = this.db.prepare(`SELECT s.match_id,s.snapshot AS score,p.snapshot AS player,m.snapshot AS game FROM match_scores s
       JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN matches m ON m.id=s.match_id
-      WHERE s.uid=? AND s.match_id=? AND s.status='scored'`).all(uid,id);
+      WHERE s.uid=? AND s.match_id=? AND s.status='scored'
+        AND NOT EXISTS(SELECT 1 FROM match_controls c WHERE c.match_id=s.match_id AND c.state<>'active')`).all(uid,id);
     for (const row of rows) {
       const player=JSON.parse(row.player), game=JSON.parse(row.game);
       const score = scoring.scorePlayer(player,game.scoringFacts,game.scorePolicy,null,game.honorResult);
@@ -474,7 +475,7 @@ class Store {
   scoreForMonth(uid, month = monthAt(this.clock())) {
     const { start, end } = monthRange(month);
     const matchPoints = this.db.prepare("SELECT coalesce(sum(points),0) AS points,count(*) AS games FROM active_match_scores WHERE uid=? AND status='scored' AND ended>=? AND ended<?").get(uid,start,end);
-    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).points;
+    const manual = this.db.prepare("SELECT coalesce(sum(delta),0) AS points FROM visible_score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).points;
     return { points: matchPoints.points + manual, matchPoints: matchPoints.points, manualPoints: manual, games: matchPoints.games };
   }
   playerScore(uid) {
@@ -482,14 +483,14 @@ class Store {
     return {uid,points,matchPoints,manualPoints,games,revision:this.scoreRevision(uid)};
   }
   scoreAdjustments(uid, offset = 0, limit = 20) {
-    const total = this.db.prepare("SELECT count(*) AS total FROM score_adjustments WHERE uid=?").get(uid).total;
-    const records = this.db.prepare("SELECT id,delta,mode,before_points AS beforePoints,after_points AS afterPoints,reason,created FROM score_adjustments WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT ? OFFSET ?").all(uid,limit,offset);
+    const total = this.db.prepare("SELECT count(*) AS total FROM visible_score_adjustments WHERE uid=?").get(uid).total;
+    const records = this.db.prepare("SELECT id,delta,mode,before_points AS beforePoints,after_points AS afterPoints,reason,created FROM visible_score_adjustments WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT ? OFFSET ?").all(uid,limit,offset);
     return {records,total,hasMore:offset+records.length<total};
   }
   scoreLedger(uid, offset = 0, limit = 20, revision = null) {
     const score = this.playerScore(uid), { start, end } = monthRange(monthAt(this.clock()));
     if (revision !== null && revision !== score.revision) throw new RuleError("积分明细已更新，请刷新查看", 409);
-    const adjustments = this.db.prepare("SELECT count(*) AS n FROM score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).n;
+    const adjustments = this.db.prepare("SELECT count(*) AS n FROM visible_score_adjustments WHERE uid=? AND created>=? AND created<?").get(uid,start,end).n;
     // Merge before pagination; never combine independently paged source lists.
     const rows = this.db.prepare(`WITH entries AS (
       SELECT 'match:'||s.match_id AS id,'match' AS type,s.match_id AS matchId,s.ended AS occurredAt,s.points,
@@ -499,7 +500,7 @@ class Store {
       JOIN matches m ON m.id=s.match_id WHERE s.uid=? AND s.status='scored' AND s.ended>=? AND s.ended<?
       UNION ALL
       SELECT 'adjustment:'||id,'adjustment',NULL,created,delta,NULL,NULL,NULL,reason,before_points,after_points,mode,rowid
-      FROM score_adjustments WHERE uid=? AND created>=? AND created<?
+      FROM visible_score_adjustments WHERE uid=? AND created>=? AND created<?
     ) SELECT * FROM entries ORDER BY occurredAt DESC,type DESC,sequence DESC,id DESC LIMIT ? OFFSET ?`).all(uid, start, end, uid, start, end, limit, offset);
     const records = rows.map(({ sequence, ...row }) => row);
     const total = score.games + adjustments;

@@ -371,6 +371,29 @@ function createApp({
         res.setHeader("Cache-Control", "no-store");
         return send(200, { ...store.statsFor(uid), ...(!uid.startsWith("test:") ? { monthlyReset: readMonthlyReset(store, uid) } : {}) });
       }
+      if (path === "/api/me/record-clearing") {
+        res.setHeader("Cache-Control", "no-store");
+        const clearing = require("./record-clearing");
+        if (req.method === "GET") {
+          for (const key of requestUrl.searchParams.keys()) check(key === "month" && requestUrl.searchParams.getAll(key).length === 1, "清理月份参数无效");
+          return send(200, requestUrl.searchParams.has("month") ? clearing.preview(store, uid, requestUrl.searchParams.get("month")) : clearing.months(store, uid));
+        }
+        check(req.method === "POST" && !requestUrl.search, "接口不存在", 404);
+        const b = await body(req), id = req.headers["idempotency-key"];
+        check(typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id), "缺少合法请求编号");
+        const fingerprint = hash(JSON.stringify([path, b]));
+        const result = store.transaction(() => {
+          const cached = store.receipt(uid, id);
+          if (cached) {
+            check(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409);
+            return JSON.parse(cached.result);
+          }
+          const value = clearing.clear(store, uid, b);
+          store.addReceipt(uid, id, fingerprint, value);
+          return value;
+        });
+        return send(200, result);
+      }
       if (req.method === "POST" && path === "/api/me/monthly-reset") {
         const b = await body(req);
         check(b && Object.keys(b).length === 1 && typeof b.month === "string", "月份参数无效");

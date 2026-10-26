@@ -6,6 +6,9 @@ const { avatarStyles } = require("../../miniprogram/avatar-library");
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const assets = {
+  "/record-clearing.js": ["../../miniprogram/pages/data-management/presentation.js", "text/javascript; charset=utf-8"],
+  "/record-clearing-layout.css": ["../../miniprogram/pages/data-management/layout.wxss", "text/css; charset=utf-8"],
+  "/record-clearing.css": ["record-clearing.css", "text/css; charset=utf-8"],
   "/badges.js": ["../../miniprogram/badges.js", "text/javascript; charset=utf-8"],
   "/badge-awards.js": ["../../miniprogram/badge-awards.js", "text/javascript; charset=utf-8"],
   "/badge-awards.css": ["../../miniprogram/badge-awards.wxss", "text/css; charset=utf-8"],
@@ -17,6 +20,7 @@ const assets = {
   "/identity-vision.css": ["../../miniprogram/identity-vision.wxss", "text/css; charset=utf-8"],
   "/avoidance.js": ["../../miniprogram/avoidance.js", "text/javascript; charset=utf-8"],
   "/avoidance.css": ["../../miniprogram/avoidance.wxss", "text/css; charset=utf-8"],
+  "/assets/chevron-left.svg": ["../../miniprogram/assets/chevron-left.svg", "image/svg+xml"],
   "/assets/table-cards.svg": ["../../miniprogram/assets/table-cards.svg", "image/svg+xml"],
   "/board-detail.js": ["../../miniprogram/board-detail.js", "text/javascript; charset=utf-8"],
   "/board-detail.css": ["board-detail.css", "text/css; charset=utf-8"],
@@ -56,7 +60,7 @@ for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = [badge.permanent ? 'assets/' + badge.imageUrl.split('/').pop() : '../../miniprogram' + badge.imageUrl, 'image/png'];
 for (const badge of require('../../miniprogram/badges').catalogue.filter(b => b.largeImageUrl))
   assets[badge.largeImageUrl] = ['assets/october_2026_book-large.png', 'image/png'];
-for (const name of ['info','heart','sword','swords','shield','spark','medal','users'])
+for (const name of ['info','heart','sword','swords','shield','spark','medal','users','calendar','list','coin'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
 function serve(req, res, path) {

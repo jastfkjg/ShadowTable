@@ -7,7 +7,7 @@
       <button wx:if="{{metric==='points'}}" class="{{period==='day'?'selected':''}}" bindtap="choosePeriod" data-id="day" aria-pressed="{{period==='day'}}" hover-class="none">今日</button>
     </view>
     <view class="rank-tools">
-      <button class="disclosure-button rank-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/record-info.svg" aria-hidden="true" /><text>规则</text></button>
+      <button class="disclosure-button rank-tool rank-rules-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/home-help.svg" aria-hidden="true" /></button>
     </view>
   </view>
   <view class="rank-metrics" aria-label="排行指标">
@@ -75,13 +75,28 @@
   <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close" bindtap="toggleRules" hover-class="none">关闭</button></view><scroll-view scroll-y class="rank-rules-body"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.periodLabel}}</view><view wx:for="{{board.ruleLines}}" wx:key="*this" class="rank-rule-line">{{item}}</view></scroll-view></view>
 </view>
 <view wx:if="{{mineExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop rank-details-backdrop" catchtap="toggleMine" catchtouchmove="blockScroll">
-  <view class="rank-sheet rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">我的榜单</view><button class="rank-sheet-close" bindtap="toggleMine" hover-class="none">关闭</button></view>
-    <scroll-view scroll-y class="rank-details-body"><view class="rank-mine-content"><view><view class="rank-mine-label">我的排名</view><view class="rank-mine-place">{{board.me.placeLabel || (board.me.rank?'第 '+board.me.rank+' 名':'未上榜')}}</view></view><view class="rank-mine-metric"><view class="rank-mine-label">{{board.valueHeading || board.metricLabel}}</view><view class="rank-mine-value">{{board.me.value}}<text class="rank-unit">{{board.me.unit}}</text></view></view></view>
+  <view class="rank-sheet rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置">
+    <view class="rank-sheet-handle" aria-hidden="true"></view>
+    <view class="rank-sheet-header"><view class="rank-sheet-title">我的榜单</view><button class="rank-sheet-close rank-details-close" bindtap="toggleMine" aria-label="关闭我的榜单" hover-class="rank-pressed"><view class="rank-close-icon" aria-hidden="true"></view></button></view>
+    <scroll-view scroll-y class="rank-details-body">
+      <view class="rank-summary {{board.me.valueCompact || board.me.rank>9999?'rank-summary-wide':''}}">
+        <view class="rank-summary-column">
+          <view class="rank-summary-label">我的排名</view>
+          <view wx:if="{{board.me.rank}}" class="rank-summary-place {{board.me.rank>99?'rank-summary-compact':''}}" aria-label="{{(board.me.tied?'并列':'')+'第'+board.me.rank+'名'}}"><text class="rank-summary-unit">第</text><text class="rank-summary-number">{{board.me.rank}}</text><text class="rank-summary-unit">名</text></view>
+          <view wx:else class="rank-summary-status">{{board.me.placeLabel || '未上榜'}}</view>
+          <view wx:if="{{board.me.rank && board.me.tied}}" class="rank-summary-tied">并列</view>
+        </view>
+        <view class="rank-summary-column rank-summary-metric">
+          <view class="rank-summary-label">{{metric==='points'?'当前积分':(board.valueHeading || board.metricLabel)}}</view>
+          <view class="rank-summary-value {{board.me.valueCompact?'rank-summary-compact':''}}"><text class="rank-summary-number">{{board.me.value}}</text><text class="rank-summary-unit">{{board.me.unit}}</text></view>
+        </view>
+      </view>
       <view wx:if="{{!board.me.rank}}" class="rank-status-label">{{board.me.statusLabel}}</view>
       <view wx:if="{{board.fun}}" class="small muted fun-mine-sample">{{board.me.sampleLabel}}<text wx:if="{{board.me.unknownGames}}"> · {{board.me.unknownGames}} 局未记录</text></view>
-      <label wx:if="{{board.me.status!=='unsupported'}}" class="rank-visibility"><text>{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</text><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
-      <view wx:if="{{board.me.status!=='unsupported'}}" class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。公开昵称和成绩可能出现在附近排名分享图中。关闭后仍可分享本人成绩；已发送图片不会撤回。</view>
-      <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button bindtap="retryVisibility" disabled="{{visibilitySaving}}" hover-class="none">重试</button></view>
+      <view wx:if="{{board.me.status!=='unsupported'}}" class="rank-display-settings">
+        <label class="rank-visibility"><view class="rank-visibility-copy"><view class="rank-visibility-title">{{visibilitySaving?'正在保存…':'在排行榜公开展示'}}</view><view class="rank-visibility-hint">仅影响榜单展示，战绩仍可查看</view></view><switch checked="{{visible}}" bindchange="changeVisibility" disabled="{{visibilitySaving}}" color="#e5c68b" aria-label="在排行榜公开展示" /></label>
+        <view wx:if="{{visibilityError}}" class="rank-visibility-error" role="alert"><text>{{visibilityError}}</text><button bindtap="retryVisibility" disabled="{{visibilitySaving}}" hover-class="none">重试</button></view>
+      </view>
     </scroll-view>
   </view>
 </view>

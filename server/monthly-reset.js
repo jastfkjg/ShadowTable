@@ -10,7 +10,7 @@ function readMonthlyReset(store, uid) {
   // New accounts start at zero; their first month does not need a reset notice.
   const existing = store.db.prepare(`SELECT 1 FROM profiles WHERE uid=? AND updated<?
     UNION ALL SELECT 1 FROM match_players WHERE uid=? AND ended<?
-    UNION ALL SELECT 1 FROM score_adjustments WHERE uid=? AND created<? LIMIT 1`).get(uid,start,uid,start,uid,start);
+    UNION ALL SELECT 1 FROM visible_score_adjustments WHERE uid=? AND created<? LIMIT 1`).get(uid,start,uid,start,uid,start);
   if (!seen && !existing) {
     acknowledgeMonthlyReset(store, uid, month);
     return null;

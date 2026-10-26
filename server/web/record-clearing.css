@@ -1,0 +1,18 @@
+@import url('/record-clearing-layout.css');
+.page.data-page-shell { max-width:600px; padding:0; }
+.data-web-header { position:sticky; top:0; z-index:100; display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center; height:64px; padding:0 16px; border-bottom:1px solid rgba(177,191,198,.07); background:var(--bg); }
+.data-web-header h1 { margin:0; font-size:16px; font-weight:600; text-align:center; }
+.data-web-header h1:focus { outline:none; }
+.data-web-header .data-web-back { min-height:44px; width:44px; padding:0; justify-content:flex-start; background:transparent; }
+.data-web-back img { display:block; width:22px; height:22px; }
+.data-management-page h2,.data-confirm-title { margin:0; }
+.data-section-heading h3 { margin:0; font:inherit; }
+.data-management-page p,.data-confirm-content p { margin-bottom:0; }
+.data-month-select { position:relative; cursor:pointer; }
+select.data-month-input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; color-scheme:dark; font:inherit; }
+.data-month-select:focus-within { outline:2px solid var(--accent); outline-offset:3px; }
+.data-page-footer button:focus-visible,.data-confirm-sheet button:focus-visible,.data-rules-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.data-confirm-scope-title { margin:0 0 10px; }
+.data-confirm-body { overflow-y:auto; }
+body:has(.data-confirm-backdrop) { overflow:hidden; }
+.data-clear:active,.data-confirm-sheet button:active { opacity:.74; }

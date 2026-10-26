@@ -26,6 +26,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableBadges = require('../miniprogram/badges');
   context.window.shadowtableHonors = require('../miniprogram/honors');
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
+  context.window.shadowtableRecordClearing = require('../miniprogram/pages/data-management/presentation');
   context.window.shadowtableMonthlyReport = require('../miniprogram/monthly-report');
   context.window.shadowtableMonthlyCard = require('../miniprogram/monthly-report-card');
   context.window.shadowtablePublicHistory = require('../miniprogram/public-history');
@@ -44,7 +45,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
       viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
-      viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
+      viewRecordClearing, viewRecordClearingConfirmation, loadRecordClearing, viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
       getWebSessionTag() { return webSessionTag; },
       setConfirm(fn) { confirm = fn; },
       setRefresh(fn) { refresh = fn; },
@@ -2351,4 +2352,65 @@ test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入�
       assert.doesNotMatch(c.viewRoom(), /data-action="openAvoidance"/);
     }
   } finally { c.stop(); }
+});
+
+test('网页 A 概览打开 C 确认面板，取消不提交，失败重试保留原请求并失效旧统计', async () => {
+  const preview = { month: '2026-10', version: 'a'.repeat(64), summary: { records: 3, validGames: 2, funGames: 1, scoredGames: 2, adjustments: 1, points: -2 } };
+  const posts = [];
+  let first = true, cleared = false;
+  const c = client(async (url, options = {}) => {
+    if (options.method === 'POST') {
+      posts.push([options.headers['Idempotency-Key'], options.body]); cleared = true;
+      if (first) { first = false; throw Error('网络未确认'); }
+      return response({ month: '2026-10' });
+    }
+    return response(url === '/api/me/record-clearing' ? { months: cleared ? [] : ['2026-10', '2026-09'], currentMonth: '2026-10' } : preview);
+  });
+  await c.applyRoute('#/data-management');
+  assert.match(c.viewRecordClearing(), /data-month-card|data-metrics|永久徽章|回避卡/);
+  assert.equal(c.viewRecordClearingConfirmation(), '');
+  await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts.length, 0);
+  c.ACTIONS.clearPersonalRecords(); assert.equal(posts.length, 0);
+  assert.match(c.viewRecordClearingConfirmation(), /role="dialog"|核对清理范围|2026 年 10 月|暂不清理/);
+  c.ACTIONS.closeRecordClearingConfirmation(); assert.equal(c.viewRecordClearingConfirmation(), '');
+  c.state.stats = { total: 8 }; c.state.monthlyImages = ['old-poster'];
+  c.ACTIONS.clearPersonalRecords(); await c.ACTIONS.confirmPersonalRecordClearing();
+  assert.match(c.viewRecordClearingConfirmation(), /重试并核对结果|网络未确认/);
+  await c.CHANGES.clearingMonth({ value: '2026-09' }); assert.equal(c.state.clearingMonth, '2026-10');
+  c.ACTIONS.closeRecordClearingConfirmation(); c.ACTIONS.clearPersonalRecords();
+  await c.ACTIONS.confirmPersonalRecordClearing(); assert.deepEqual(posts[0], posts[1]);
+  assert.equal(c.state.stats, null); assert.equal(c.state.monthlyImages.length, 0); assert.equal(c.state.clearingConfirming, false);
+  assert.match(c.state.clearingNotice, /已清除/); assert.doesNotMatch(c.viewRecordClearing(), /data-action="clearPersonalRecords"/);
+});
+test('网页清理冲突关闭面板并重新预览；离开和后台丢弃未提交确认', async () => {
+  let version = 'a'.repeat(64), posts = 0;
+  const c = client(async (url, options = {}) => {
+    if (options.method === 'POST') { posts++; version = 'b'.repeat(64); return { status: 409, json: async () => ({ error: '该月数据已变化，请重新预览后确认清除' }) }; }
+    return response(url.includes('?') ? { month: '2026-10', version, summary: { records: 1, validGames: 1, funGames: 0, scoredGames: 1, adjustments: 0, points: 1 } } : { months: ['2026-10'], currentMonth: '2026-10' });
+  });
+  await c.applyRoute('#/data-management'); c.ACTIONS.clearPersonalRecords(); await c.ACTIONS.confirmPersonalRecordClearing();
+  assert.equal(c.state.clearingPreview.version, version); assert.match(c.state.clearingError, /重新预览/); assert.equal(c.state.clearingConfirming, false);
+  await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts, 1);
+  c.ACTIONS.clearPersonalRecords(); c.document.hidden = true; c.events.visibilitychange();
+  assert.equal(c.state.clearingConfirming, false); await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts, 1);
+  c.document.hidden = false; c.ACTIONS.clearPersonalRecords(); await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts, 2);
+  let resolve;
+  const slow = client(() => new Promise(r => { resolve = r; }));
+  slow.state.page = 'data-management'; const loading = slow.loadRecordClearing();
+  slow.state.page = 'help'; resolve(response({ months: ['2026-10'], currentMonth: '2026-10' })); await loading;
+  assert.equal(slow.state.clearingPreview, null);
+});
+test('网页确认面板支持 Escape 和键盘循环焦点，提交期间关闭和重复提交无效', async () => {
+  let release, posts = 0;
+  const c = client(async (url, options = {}) => {
+    if (options.method === 'POST') { posts++; return new Promise(resolve => { release = () => resolve(response({})); }); }
+    return response(url.includes('?') ? { month: '2026-09', version: 'a'.repeat(64), summary: { records: 1, validGames: 1, funGames: 0, scoredGames: 1, adjustments: 0, points: 0 } } : { months: ['2026-09'], currentMonth: '2026-10' });
+  });
+  await c.applyRoute('#/data-management');
+  assert.equal(c.state.clearingPreview.metrics[2].label, '该月积分');
+  c.ACTIONS.clearPersonalRecords(); c.events.keydown({ key: 'Escape', preventDefault() {} }); assert.equal(c.state.clearingConfirming, false);
+  c.ACTIONS.clearPersonalRecords(); const saving = c.ACTIONS.confirmPersonalRecordClearing();
+  c.ACTIONS.closeRecordClearingConfirmation(); assert.equal(c.state.clearingConfirming, true);
+  await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts, 1);
+  release(); await saving; assert.equal(c.state.clearingConfirming, false);
 });

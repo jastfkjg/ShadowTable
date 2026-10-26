@@ -8,17 +8,26 @@ const fail = (ok, message, status = 400) => {
 const states = { active: "正常", excluded: "不计战绩", deleted: "已删除" };
 
 function initialize(store) {
-  store.db.exec(`CREATE TABLE IF NOT EXISTS match_controls(
+  require("./record-clearing").initialize(store);
+  store.transaction(() => store.db.exec(`CREATE TABLE IF NOT EXISTS match_controls(
     match_id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('active','excluded','deleted')),
     previous_state TEXT NOT NULL DEFAULT 'active', previous_reason TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '', updated INTEGER NOT NULL);
-    CREATE VIEW IF NOT EXISTS visible_match_players AS
+    DROP VIEW IF EXISTS visible_match_players;
+    DROP VIEW IF EXISTS active_match_scores;
+    DROP VIEW IF EXISTS visible_score_adjustments;
+    CREATE VIEW visible_match_players AS
       SELECT p.match_id,p.uid,p.board,p.faction,
         CASE WHEN c.state='excluded' THEN 'excluded' ELSE p.outcome END AS outcome,p.ended,p.snapshot
       FROM match_players p LEFT JOIN match_controls c ON c.match_id=p.match_id
-      WHERE c.state IS NULL OR c.state<>'deleted';
-    CREATE VIEW IF NOT EXISTS active_match_scores AS
+      WHERE (c.state IS NULL OR c.state<>'deleted') AND NOT EXISTS(
+        SELECT 1 FROM player_record_clears x WHERE x.uid=p.uid AND x.kind='match' AND x.record_id=p.match_id);
+    CREATE VIEW active_match_scores AS
       SELECT s.rowid AS rowid,s.* FROM match_scores s LEFT JOIN match_controls c ON c.match_id=s.match_id
-      WHERE c.state IS NULL OR c.state='active';`);
+      WHERE (c.state IS NULL OR c.state='active') AND NOT EXISTS(
+        SELECT 1 FROM player_record_clears x WHERE x.uid=s.uid AND x.kind='match' AND x.record_id=s.match_id);
+    CREATE VIEW visible_score_adjustments AS
+      SELECT a.rowid AS rowid,a.* FROM score_adjustments a WHERE NOT EXISTS(
+        SELECT 1 FROM player_record_clears x WHERE x.uid=a.uid AND x.kind='adjustment' AND x.record_id=a.id);`));
 }
 function control(store, id) {
   return (

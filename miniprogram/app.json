@@ -19,6 +19,10 @@
   ],
   "subPackages": [
     {
+      "root": "pages/data-management",
+      "pages": ["data-management"]
+    },
+    {
       "root": "pages/profile",
       "pages": [
         "profile"

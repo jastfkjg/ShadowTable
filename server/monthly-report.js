@@ -54,7 +54,7 @@ class MonthlyReport {
     const scores = new Map(db.prepare(`SELECT s.uid,count(*) AS games,sum(s.points) AS points
       FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
       WHERE ${valid} AND s.status='scored' GROUP BY s.uid`).all(start, end).map(row => [row.uid, row]));
-    const adjustments = new Map(db.prepare("SELECT uid,sum(delta) AS points FROM score_adjustments WHERE created>=? AND created<? GROUP BY uid").all(start, end).map(row => [row.uid, row.points]));
+    const adjustments = new Map(db.prepare("SELECT uid,sum(delta) AS points FROM visible_score_adjustments WHERE created>=? AND created<? GROUP BY uid").all(start, end).map(row => [row.uid, row.points]));
     const players = aggregates.map(row => ({ ...identity(row), total: row.total, wins: row.wins, losses: row.total - row.wins,
       winRate: percent(row.wins, row.total), goodTotal: row.goodTotal, goodWins: row.goodWins, evilTotal: row.evilTotal, evilWins: row.evilWins,
       scoredGames: scores.get(row.uid)?.games || 0, points: (scores.get(row.uid)?.points || 0) + (adjustments.get(row.uid) || 0), adjustmentPoints: adjustments.get(row.uid) || 0 }));

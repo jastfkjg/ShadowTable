@@ -52,6 +52,7 @@
       </view>
     </view>
     <view class="personal-links me-links me-links-secondary"><view class="me-link-group">
+      <navigator class="personal-link" url="/pages/data-management/data-management" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-rose"><view class="me-icon me-icon-database" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">数据管理</view><view class="me-link-caption">按月清除个人战绩</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-book" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">帮助与规则</view><view class="me-link-caption">流程、角色与板子说明</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
       <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-info" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">关于桌边助手</view></view><view class="me-chevron" aria-hidden="true"></view></button>
     </view></view>

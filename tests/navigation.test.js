@@ -1374,7 +1374,7 @@ test('个人入口使用原生导航与即时轻按态，不触发默认白色�
   const tree = renderMainPanel(factory,1,{profile:{displayName:'林间'},error:'断线'});
   const nodes = n => typeof n === 'object' ? [n,...(n.children || []).flatMap(nodes)] : [];
   const links = nodes(tree).filter(n => n.tag === 'wx-navigator');
-  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/stats/stats','/pages/scores/scores','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['badges','leaderboard','monthly','help'].map(name => `/pages/${name}/${name}`)]);
+  assert.deepEqual(links.map(n => n.attr.url), ['/pages/profile/profile','/pages/stats/stats','/pages/stats/stats','/pages/scores/scores','/pages/scores/scores','/pages/matches/matches','/pages/stats/stats?tab=fun',...['badges','leaderboard','monthly','data-management','help'].map(name => `/pages/${name}/${name}`)]);
   assert.equal(nodes(tree).find(n => n.attr?.class === 'me-results-detail').attr.url, '/pages/stats/stats');
   assert.equal(nodes(tree).find(n => n.attr?.class === 'me-score-detail').attr.url, '/pages/scores/scores');
   const points = nodes(tree).find(n => n.attr?.class === 'me-points');
@@ -2713,4 +2713,68 @@ test('徽章详情按内容测量高度并适配窗口，忽略关闭后的测�
   p.onResize();measure({height:900});assert.equal(p.data.badgeDetailHeight,540);
   open();const stale=measure;p.closeBadgeDetail();stale({height:420});assert.equal(p.data.badgeDetailHeight,0);
   p.onHide();assert.equal(p.data.badgeManaging,false);
+});
+
+test('小程序 A 概览与 C 确认面板分开，取消不提交，网络未确认重用原请求', async () => {
+  const raw = { month: '2026-10', version: 'a'.repeat(64), summary: { records: 2, validGames: 1, funGames: 1, scoredGames: 1, adjustments: 1, points: -4 } };
+  const posts = [];
+  let first = true, cleared = false;
+  const personal = { matchesPreview: {}, sequence: 0, updateChangedData(patch) { this.patch = patch; } };
+  const { p } = page('data-management', { ...apiBase, request: async (url, method, body, id) => {
+    if (method === 'POST') {
+      posts.push([body, id]); cleared = true;
+      if (first) { first = false; throw Error('网络未确认'); }
+      return { month: '2026-10' };
+    }
+    return url.includes('?') ? raw : { months: cleared ? [] : ['2026-10', '2026-09'], currentMonth: '2026-10' };
+  } }, { storage: new Map([['session', 'same-account']]), pages: [{ personalController: personal }] });
+  p.onLoad(); await p.onShow();
+  assert.equal(p.data.preview.label, '2026 年 10 月');
+  assert.equal(p.data.preview.metrics[2].negative, true); assert.equal(p.data.preview.metrics[2].label, '本月积分');
+  await p.confirmClearRecords(); assert.equal(posts.length, 0);
+  p.clearRecords(); assert.equal(p.data.confirming, true); assert.equal(posts.length, 0);
+  await p.chooseMonth({ detail: { value: 1 } }); assert.equal(p.data.month, '2026-10');
+  p.closeConfirmation(); assert.equal(p.data.confirmation, null); assert.equal(posts.length, 0);
+  p.clearRecords(); await p.confirmClearRecords(); assert.equal(p.data.pending, true); assert.equal(p.data.confirming, true);
+  p.closeConfirmation(); p.clearRecords();
+  assert.equal(p.data.confirmation.version, raw.version);
+  await p.confirmClearRecords(); assert.deepEqual(posts[0], posts[1]);
+  assert.equal(p.data.pending, false); assert.equal(p.data.confirming, false); assert.match(p.data.notice, /已清除/);
+  assert.equal(personal.matchesPreview, null); assert.equal(personal.patch.stats, null);
+});
+test('小程序切后台取消未提交确认，迟到预览隔离，数据冲突后必须重新核对', async () => {
+  let release;
+  const { p: slow } = page('data-management', { ...apiBase, request: () => new Promise(resolve => { release = resolve; }) });
+  slow.onLoad(); const loading = slow.onShow(); await new Promise(resolve => setImmediate(resolve));
+  slow.onHide(); release({ months: ['2026-10'], currentMonth: '2026-10' }); await loading;
+  assert.equal(slow.data.preview, null);
+  let version = 'a'.repeat(64), posts = 0;
+  const { p } = page('data-management', { ...apiBase, request: async (url, method) => {
+    if (method === 'POST') { posts++; version = 'b'.repeat(64); throw Object.assign(Error('该月数据已变化'), { status: 409 }); }
+    return url.includes('?') ? { month: '2026-10', version, summary: { records: 1, validGames: 1, funGames: 0, scoredGames: 1, adjustments: 0, points: 1 } } : { months: ['2026-10'], currentMonth: '2026-10' };
+  } });
+  p.onLoad(); await p.onShow(); p.clearRecords(); p.onHide();
+  assert.equal(p.data.confirmation, null); assert.equal(p.data.confirming, false);
+  await p.confirmClearRecords(); assert.equal(posts, 0);
+  await p.onShow(); p.clearRecords(); await p.confirmClearRecords();
+  assert.equal(p.data.preview.version, version); assert.equal(p.data.pending, false); assert.equal(p.data.confirming, false);
+  await p.confirmClearRecords(); assert.equal(posts, 1);
+  p.clearRecords(); await p.confirmClearRecords(); assert.equal(posts, 2);
+});
+test('小程序确认面板防止重复提交，测量适配小屏且关闭后忽略迟到测量', async () => {
+  let resolvePost, measure;
+  const raw = { month: '2026-09', version: 'a'.repeat(64), summary: { records: 1, validGames: 1, funGames: 0, scoredGames: 1, adjustments: 0, points: 10 } };
+  const { p } = page('data-management', { ...apiBase, request: async (url, method) => {
+    if (method === 'POST') return new Promise(resolve => { resolvePost = resolve; });
+    return url.includes('?') ? raw : { months: ['2026-09'], currentMonth: '2026-10' };
+  } }, { wx: { getWindowInfo: () => ({ windowHeight: 400 }) } });
+  p.onLoad(); await p.onShow(); assert.equal(p.data.preview.metrics[2].label, '该月积分'); assert.equal(p.data.preview.isCurrent, false);
+  p.createSelectorQuery = () => { const q = { select() { return q; }, boundingClientRect() { return q; }, exec(fn) { measure = fn; } }; return q; };
+  p.clearRecords(); measure([{ height: 500 }, { height: 100 }, { height: 110 }]); assert.equal(p.data.confirmationBodyHeight, 148);
+  const late = measure; p.closeConfirmation(); late([{ height: 300 }, { height: 100 }, { height: 110 }]); assert.equal(p.data.confirmationBodyHeight, 0);
+  p.clearRecords(); const saving = p.confirmClearRecords();
+  assert.equal(p.data.saving, true); const original = p.pending;
+  await p.confirmClearRecords(); assert.equal(p.pending, original);
+  p.closeConfirmation(); assert.equal(p.data.confirming, true);
+  resolvePost({}); await saving; assert.equal(p.data.confirming, false);
 });

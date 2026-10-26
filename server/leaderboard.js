@@ -86,7 +86,7 @@ class Leaderboard {
       .all(range.start, ...(range.end === null ? [] : [range.end]), ...(faction ? [faction] : []));
     if (metric === "points") {
       const adjustments=this.store.db.prepare(`SELECT a.uid,sum(a.delta) AS points,f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
-        FROM score_adjustments a LEFT JOIN profiles f ON f.uid=a.uid WHERE a.created>=? ${range.end===null?'':'AND a.created<?'} GROUP BY a.uid`)
+        FROM visible_score_adjustments a LEFT JOIN profiles f ON f.uid=a.uid WHERE a.created>=? ${range.end===null?'':'AND a.created<?'} GROUP BY a.uid`)
         .all(range.start,...(range.end===null?[]:[range.end]));
       const byUid=new Map(aggregates.map(row=>[row.uid,row]));
       for (const adjustment of adjustments) {

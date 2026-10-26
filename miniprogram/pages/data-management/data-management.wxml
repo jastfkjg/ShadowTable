@@ -1,0 +1,51 @@
+<template name="clearingMetrics">
+  <view class="data-metrics">
+    <view wx:for="{{value.metrics}}" wx:key="id" class="data-metric {{item.accent?'is-accent':''}} {{item.negative?'is-negative':''}} {{item.compact?'is-compact':''}}">
+      <view class="data-metric-value">{{item.value}}<text wx:if="{{item.unit}}" class="data-metric-unit">{{item.unit}}</text></view>
+      <text class="data-metric-label">{{item.label}}</text>
+    </view>
+  </view>
+  <view class="data-card-caption">{{value.caption}}</view>
+</template>
+<template name="clearingRetained">
+  <view class="data-retained">
+    <image class="data-retained-icon" src="/assets/record-shield.svg" aria-hidden="true" />
+    <view><view class="data-retained-title">同桌记录与已发放权益保留</view><view class="data-retained-copy">共享对局、永久徽章和回避卡不受影响</view></view>
+  </view>
+</template>
+<view aria-hidden="{{confirming}}">
+  <app-nav title="数据管理" back="{{true}}" bindback="back" />
+  <view class="page data-management-page">
+    <view class="data-intro"><view class="data-title">按月清理战绩</view><view class="data-subtitle">选择一个月份，管理你的个人记录</view></view>
+    <view wx:if="{{notice}}" class="data-success" role="status">{{notice}}</view>
+    <view wx:if="{{error && !pending}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="me-pressed" wx:if="{{!pending}}" class="secondary" bindtap="load" disabled="{{loading || saving || confirming}}">重新预览</button></view>
+    <view wx:if="{{months.length}}" class="data-month-card">
+      <picker class="data-month-picker" range="{{monthLabels}}" value="{{monthIndex}}" bindchange="chooseMonth" disabled="{{loading || saving || confirming || pending}}" aria-label="{{'清理月份，'+monthLabels[monthIndex]}}">
+        <view class="data-month-select"><image class="data-icon" src="/assets/record-calendar.svg" aria-hidden="true" /><text class="data-month-title">{{preview ? preview.label : monthLabels[monthIndex]}}</text><text wx:if="{{month===currentMonth}}" class="data-month-tag">本月</text><view class="data-chevron is-down" aria-hidden="true"></view></view>
+      </picker>
+      <template wx:if="{{preview}}" is="clearingMetrics" data="{{value:preview}}" />
+      <view wx:elif="{{loading}}" class="data-status" role="status">正在读取清理范围…</view>
+    </view>
+    <view wx:elif="{{loading}}" class="data-status" role="status">正在读取清理范围…</view>
+    <view wx:elif="{{!error}}" class="data-empty"><image src="/assets/record-calendar.svg" aria-hidden="true" /><view>暂无可清除的个人战绩</view><view class="data-subtitle">之后的新对局继续正常累计</view></view>
+    <block wx:if="{{preview}}">
+      <view class="data-section-heading"><text>清理后将同步更新</text><text class="data-section-caption">仅影响本人</text></view>
+      <view class="data-impact-group"><view wx:for="{{impacts}}" wx:key="id" class="data-impact-row"><view class="data-icon-well is-{{item.tone}}"><image class="data-icon" src="{{item.icon}}" aria-hidden="true" /></view><view class="data-impact-copy"><view class="data-impact-title">{{item.title}}</view><view class="data-impact-description">{{item.description}}</view></view></view></view>
+    </block>
+    <template is="clearingRetained" />
+    <button class="disclosure-button data-rules-toggle" bindtap="toggleRules" aria-expanded="{{rulesExpanded}}" aria-controls="clearing-rules" hover-class="none"><text>清理规则与保留内容</text><view class="data-chevron {{rulesExpanded?'is-up':'is-down'}}" aria-hidden="true"></view></button>
+    <view wx:if="{{rulesExpanded}}" id="clearing-rules" class="data-rules-copy">{{rules}}</view>
+    <view wx:if="{{pending}}" class="data-pending" role="status">{{saving ? '正在清除，请稍候…' : error || '清理结果尚未确认，请重试原请求以核对结果。'}}</view>
+  </view>
+  <view wx:if="{{preview || pending}}" class="data-page-footer"><view class="data-footer-note"><text class="data-warning-icon" aria-hidden="true">!</text><text>清除后无法自行恢复</text></view><button hover-class="me-pressed" class="data-clear" bindtap="clearRecords" disabled="{{loading || saving || confirming || (!pending && !preview.canClear)}}"><text>{{saving ? '正在清除…' : pending ? '重试并核对清理结果' : '清理 '+preview.shortLabel+'战绩'}}</text><view wx:if="{{!saving}}" class="data-chevron" aria-hidden="true"></view></button></view>
+</view>
+<app-dialog id="app-dialog" />
+<view wx:if="{{confirming && confirmation}}" class="data-confirm-backdrop" catchtap="closeConfirmation" catchtouchmove="blockScroll">
+  <view class="data-confirm-sheet" role="dialog" aria-modal="true" aria-label="核对清理范围" catchtap="blockScroll">
+    <view class="data-confirm-top"><view class="data-sheet-handle" aria-hidden="true"></view><view class="data-confirm-heading"><view class="data-confirm-title">核对清理范围</view><button class="data-confirm-close" bindtap="closeConfirmation" disabled="{{saving}}" aria-label="关闭确认面板" hover-class="me-pressed">×</button></view><view class="data-confirm-month"><image class="data-icon" src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{confirmation.label}}</text><text wx:if="{{confirmation.isCurrent}}" class="data-month-tag">本月</text></view></view>
+    <scroll-view class="data-confirm-body" scroll-y enhanced show-scrollbar="{{false}}" style="{{confirmationBodyHeight?'height:'+confirmationBodyHeight+'px;':''}}">
+      <view class="data-confirm-content"><view class="data-confirm-overview"><template is="clearingMetrics" data="{{value:confirmation}}" /></view><view class="data-confirm-scope"><view class="data-confirm-scope-title">这些数据将一并清理</view><view wx:for="{{sheetLines}}" wx:key="text" class="data-scope-line"><image class="data-icon" src="{{item.icon}}" aria-hidden="true" /><text>{{item.text}}</text></view></view><template is="clearingRetained" /><view wx:if="{{error}}" class="data-confirm-error" role="alert">{{error}}</view><view wx:if="{{pending && !saving}}" class="data-confirm-pending" role="status">结果尚未确认，请重试原请求。重试不会清除后来新增的对局。</view></view>
+    </scroll-view>
+    <view class="data-confirm-footer"><view class="data-footer-note is-danger"><text class="data-warning-icon" aria-hidden="true">!</text><text>清除后无法自行恢复</text></view><view class="data-confirm-actions"><button class="data-confirm-cancel" bindtap="closeConfirmation" disabled="{{saving}}" hover-class="me-pressed">暂不清理</button><button class="data-confirm-submit" bindtap="confirmClearRecords" loading="{{saving}}" disabled="{{saving}}" hover-class="me-pressed">{{saving ? '正在清除…' : pending ? '重试并核对结果' : '确认清除'}}</button></view></view>
+  </view>
+</view>
