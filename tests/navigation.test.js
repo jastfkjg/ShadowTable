@@ -2667,7 +2667,7 @@ test('我的页展示上月战绩，确认失败可重试，已确认和退后�
   pendingStats.resolve({ ...emptyStats, monthlyReset: notice }); await hiddenRead; assert.equal(p.data.monthlyReset, null);
 });
 
-test('积分榜仅显示本月入口，其他榜默认本月且保留全部，切回积分强制本月', async () => {
+test('积分榜默认本月并可切今日，刷新保留今日，其他榜仅支持全部和本月', async () => {
   const urls = [];
   const { p } = page('leaderboard', { ...apiBase, request: async url => {
     urls.push(url); const q = new URL('https://test.invalid' + url).searchParams;
@@ -2675,9 +2675,30 @@ test('积分榜仅显示本月入口，其他榜默认本月且保留全部，�
   } });
   await p.onShow(); assert.match(urls[0], /metric=points&period=month/);
   await p.choosePeriod({ currentTarget: { dataset: { id: 'all' } } }); assert.equal(urls.length, 1);
+  await p.choosePeriod({ currentTarget: { dataset: { id: 'day' } } }); assert.match(urls.at(-1), /metric=points&period=day/);
+  await p.onShow(); assert.match(urls.at(-1), /metric=points&period=day/);
   await p.chooseMetric({ currentTarget: { dataset: { id: 'games' } } }); assert.match(urls.at(-1), /period=month/);
+  const reads = urls.length;
+  await p.choosePeriod({ currentTarget: { dataset: { id: 'day' } } }); assert.equal(urls.length, reads);
   await p.choosePeriod({ currentTarget: { dataset: { id: 'all' } } }); assert.match(urls.at(-1), /period=all/);
   await p.chooseMetric({ currentTarget: { dataset: { id: 'points' } } }); assert.match(urls.at(-1), /metric=points&period=month/);
+});
+
+test('今日积分切换失败可重试，翻页和旧服务回退使用有效周期', async () => {
+  const urls = []; let failDay = true, unavailable = false;
+  const { p } = page('leaderboard', { ...apiBase, request: async url => {
+    urls.push(url); const q = new URL('https://test.invalid' + url).searchParams;
+    if (q.get('period') === 'day' && failDay) throw Error('断线');
+    if (q.get('metric') === 'points' && unavailable) throw Object.assign(Error('排行榜参数无效'), { status: 400 });
+    return rankResult(q.get('metric'), { period: q.get('period'), hasMore: true, nextOffset: 20, version: 'day-version' });
+  } });
+  await p.onShow();
+  await p.choosePeriod({ currentTarget: { dataset: { id: 'day' } } });
+  assert.equal(p.data.period, 'month'); assert.equal(p.data.board.period, 'month');
+  failDay = false; await p.retry(); assert.equal(p.data.period, 'day');
+  await p.loadMore(); assert.match(urls.at(-1), /period=day&offset=20&version=day-version/);
+  unavailable = true; await p.load();
+  assert.match(urls.at(-1), /metric=games&period=month/); assert.equal(p.data.metric, 'games');
 });
 
 test('徽章详情按内容测量高度并适配窗口，忽略关闭后的测量结果', async () => {

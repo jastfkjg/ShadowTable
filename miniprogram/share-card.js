@@ -140,7 +140,7 @@ function parseSelection(options) {
     return { kind: "monthly", month: options.month, ...(options.edition ? { edition: options.edition } : {}) };
   if (options.kind === "fun" && /^(classic|knights|other|voted):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };
-  if (options.kind !== "leaderboard" || !["all", "month"].includes(options.period) ||
+  if (options.kind !== "leaderboard" || !(options.metric === "points" ? ["all", "month", "day"] : ["all", "month"]).includes(options.period) ||
     !(hasOwn(metricNames, options.metric) || /^fun_[a-z_]+$/.test(options.metric || ""))) throw new Error("分享内容无效，请返回原页面重新生成。");
   const selection = { kind: "leaderboard", metric: options.metric, period: options.period };
   if (options.metric.startsWith("fun_")) {
@@ -180,7 +180,8 @@ function leaderboardCard(profile, board) {
   const error = leaderboardShareError(board);
   if (error) throw new Error(error);
   const me = board.me, points = board.metric === "points", games = board.metric === "games";
-  const period = board.period === "month" ? shanghaiTime(board.periodStart, true).replace(".", " 年 ") + " 月" : "";
+  const period = board.period === "day" ? shanghaiTime(board.periodStart).split(" ")[0].replace(".", " 年 ").replace(".", " 月 ") + " 日"
+    : board.period === "month" ? shanghaiTime(board.periodStart, true).replace(".", " 年 ") + " 月" : "";
   const title = board.fun ? clean(board.metricLabel) + "榜" : metricNames[board.metric];
   const role = board.roleOptions?.find(row => row.id === board.role)?.label;
   const rank = me.status === "ranked" && me.rank > 0 ? me.rank : null;

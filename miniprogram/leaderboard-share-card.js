@@ -93,7 +93,7 @@
     if (box.showNeighborhood) {
       let top = box.neighborhoodTop;
       p.text("与我相邻", LEFT, top, 32, colors.text, 600, "left", 600);
-      p.text(card.context ? "本月" + card.nearbyLabel : card.nearbyLabel, RIGHT, top + 5, 23, colors.muted, 260, "right");
+      p.text((card.period === "day" ? "今日" : card.period === "month" ? "本月" : "") + card.nearbyLabel, RIGHT, top + 5, 23, colors.muted, 260, "right");
       top += 76;
       if (card.gap) { p.line(LEFT + 4, top + 17, LEFT + 36, "rgba(229,198,139,.5)"); p.text(card.gap, LEFT + 48, top, 25, colors.gold, 840); top += 56; }
       box.before.forEach((entry, index) => { drawLane(entry, top, index === box.before.length - 1 ? "上一名次" : "相邻名次"); top += entry.height; });
@@ -117,7 +117,7 @@
     p.line(LEFT, box.metricsTop, RIGHT);
     if (card.performance) {
       const top = box.metricsTop + 27, performance = card.performance;
-      p.text(card.period === "month" ? "本月计分表现" : "计分表现", LEFT + 5, top, 28, colors.muted);
+      p.text(card.period === "day" ? "今日计分表现" : card.period === "month" ? "本月计分表现" : "计分表现", LEFT + 5, top, 28, colors.muted);
       p.text(performance.wins + " 胜 / " + performance.losses + " 负", LEFT + 5, top + 62, 45, colors.good, 610, "left", 500);
       p.text("共 " + performance.total + " 场计分对局", LEFT + 5, top + 130, 25, colors.muted, 610);
       p.text(performance.rate, RIGHT - 5, top + 55, 58, colors.gold, 310, "right", 500);

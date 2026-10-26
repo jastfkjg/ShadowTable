@@ -246,6 +246,48 @@ test('本月按上海时区结束时间取半开区间，月初缓存切换，�
     assert.notEqual(last.version,next.version); assert.equal(next.me.total,1);
   } finally { store.close(); }
 });
+test('今日积分按北京时间半开日区间累计计分局和调整，零分并列，跨日更新快照', () => {
+  let now = NOW;
+  const store = new Store(':memory:', { clock: () => now });
+  try {
+    const board = new Leaderboard(store), { start, end } = periodRange('day', NOW);
+    assert.equal(new Date(start).toISOString(), '2026-09-27T16:00:00.000Z');
+    assert.equal(new Date(end).toISOString(), '2026-09-28T16:00:00.000Z');
+    const score = (uid, endedAt, points, outcome = 'win') => store.transaction(() => store.archiveMatch({
+      id: randomUUID(), board: 'classic', endedAt,
+      players: [{ uid, name: '私密昵称', faction: 'good', outcome, score: { status: 'scored', total: points, breakdown: [] } }],
+    }));
+    for (const [time, points, delta] of [[start - 1, 100, 30], [start, 5, 2], [end - 1, -5, -2], [end, 9, 7]]) {
+      now = time;
+      score('wx:me', time, points, points < 0 ? 'loss' : 'win');
+      store.transaction(() => store.adjustPlayerScore({ uid: 'wx:me', mode: 'delta', points: delta, revision: store.scoreRevision('wx:me') }));
+    }
+    score('wx:tie', start, 0);
+    score('wx:hidden', start, 1000); profile(store, 'wx:hidden', false);
+    score('guest:viewer', start, 2000);
+    score('wx:yesterday', start - 1, 100);
+    games(store, 'wx:unscored', 1, 1, { endedAt: start });
+    const day = query(board, 'wx:me', 'metric=points&period=day&nearby=1');
+    assert.equal(day.period, 'day'); assert.equal(day.timezone, 'Asia/Shanghai');
+    assert.equal(day.periodStart, start); assert.equal(day.periodEnd, end);
+    assert.equal(day.me.points, 0); assert.equal(day.me.total, 2); assert.equal(day.me.wins, 1);
+    assert.equal(day.me.rank, 1); assert.equal(day.me.status, 'ranked');
+    assert.deepEqual(day.rows.map(row => [row.rank, row.points, row.tied]), [[1, 0, true], [1, 0, true]]);
+    assert.equal(day.nearby.length, 2);
+    assert.equal(query(board, 'wx:yesterday', 'metric=points&period=day').me.status, 'no_games');
+    assert.equal(query(board, 'wx:unscored', 'metric=points&period=day').me.total, 0);
+    const month = query(board, 'wx:me', 'metric=points');
+    assert.equal(month.period, 'month'); assert.equal(month.me.points, 146);
+    assert.equal(query(board, 'wx:me', 'metric=points&period=all').version, month.version);
+    const last = board.read('wx:me', new URLSearchParams('metric=points&period=day'), end - 1);
+    assert.equal(last.version, day.version);
+    const next = board.read('wx:me', new URLSearchParams('metric=points&period=day'), end);
+    assert.notEqual(next.version, last.version); assert.equal(next.me.points, 16); assert.equal(next.me.total, 1);
+    assert.throws(() => board.read('wx:me', new URLSearchParams('metric=points&period=day&version=' + last.version), end), e => e.status === 409);
+    for (const metric of ['games', 'overall', 'good', 'evil', 'fun_good_shield'])
+      assert.throws(() => query(board, 'wx:me', 'metric=' + metric + '&period=day'), e => e.status === 400);
+  } finally { store.close(); }
+});
 test('排名先覆盖所有合格玩家，前100位分页稳定，榜外本人有真实名次', () => {
   const store = new Store(':memory:');
   try {

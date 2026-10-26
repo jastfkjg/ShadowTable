@@ -3,6 +3,13 @@ const assert = require('node:assert/strict');
 const { presentBoard, funOptions } = require('../miniprogram/leaderboard-presentation');
 const availableFunMetrics = require('../server/fun').publicMetrics();
 const stats = { publicId:'me', nickname:'我', total:3, wins:2, winRate:66.7, points:-12, rank:1, status:'ranked' };
+test('积分周期规则区分今日和本月，今日不显示月初清零说明', () => {
+  const day = presentBoard({ metric: 'points', period: 'day', rows: [stats], me: stats });
+  assert.equal(day.periodLabel, '今日'); assert.match(day.ruleLines[0], /北京时间.*当日零点.*次日零点/);
+  assert.doesNotMatch(day.ruleLines.join(), /每月|上月|全部榜/);
+  const month = presentBoard({ metric: 'points', period: 'month', rows: [stats], me: stats });
+  assert.equal(month.periodLabel, '本月'); assert.match(month.ruleLines.join(), /每月 1 日/);
+});
 test('所有常规榜单展示独立主值、单位和有效样本，负积分不丢失', () => {
   for (const [metric,value,unit,secondary] of [['points','-12','分','3 场计分局'],['games','3','局','2 胜 · 胜率 66.7%'],['overall','66.7','%','2 胜 · 3 局'],['good','66.7','%','2 胜 · 3 局'],['evil','66.7','%','2 胜 · 3 局']]) {
     const board=presentBoard({metric,rows:[stats],me:stats});

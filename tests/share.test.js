@@ -83,6 +83,21 @@ test("排名图片保留附近玩家并隐藏分区标题", () => {
   assert.equal(adjusted.hero,"-5");assert.equal(adjusted.rankLabel,"未上榜");assert.equal(adjusted.metrics[2].value,"—");
   assert.equal(cards.shanghaiTime(Date.UTC(2026, 8, 30, 16)), "2026.10.01 00:00");
 });
+test("今日积分分享保留日周期与北京时间日期，其他榜拒绝日周期", async () => {
+  const board = { ...copy(fixtures.board), period: 'day', periodStart: Date.parse('2026-10-15T16:00:00Z') };
+  const selection = cards.boardSelection(board);
+  assert.deepEqual(cards.parseSelection(selection), selection);
+  const card = cards.leaderboardCard(fixtures.profile, board);
+  assert.equal(card.period, 'day'); assert.equal(card.context, '2026 年 10 月 16 日');
+  const { p, requests } = page({ api: { login: async () => {}, request: async url => {
+    requests.push(url); return copy(url.endsWith('/profile') ? fixtures.profile : board);
+  } } });
+  await p.onLoad(selection); await p.onReady();
+  assert.equal(requests.find(url => url.includes('/leaderboard')), '/api/leaderboard?metric=points&period=day&nearby=1');
+  assert.match(p.data.description, /2026 年 10 月 16 日/);
+  for (const metric of ['games', 'overall', 'good', 'evil', 'fun_good_shield'])
+    assert.throws(() => cards.parseSelection({ ...selection, metric }), /分享内容无效/);
+});
 test("缺少完整本人邻近数据时保留个人卡，并列或百分比榜不制造分差", () => {
   const board=copy(fixtures.board), build=()=>cards.leaderboardCard(fixtures.profile,board);
   board.nearby[1].points=286;board.nearby[1].rank=8;

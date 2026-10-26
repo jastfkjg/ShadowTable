@@ -46,7 +46,7 @@ Page({
     const sequence = this.sequence = (this.sequence || 0) + 1;
     let { metric } = { ...this.data, ...selection };
     const { board } = this.data;
-    const period = metric === "points" ? "month" : (selection.period || this.data.period);
+    let period = rankPresentation.normalizePeriod(metric, selection.period || this.data.period);
     const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
     const selected = { ...this.data, ...selection };
     const funMode = countOnly ? "all" : selected.funMode, funSort = countOnly ? "count" : selected.funSort;
@@ -65,6 +65,7 @@ Page({
         // Older services know the existing leaderboards but reject the new metric.
         pointsUnavailable = metric === "points"; funUnavailable = metric.startsWith("fun_");
         metric = "games"; append = false;
+        period = rankPresentation.normalizePeriod(metric, period);
         response = await api.request("/api/leaderboard?metric=games&period=" + period);
       }
       const result = presentLeaderboard(response);
@@ -116,7 +117,7 @@ Page({
   chooseFunSort(e) { const funSort=e.currentTarget.dataset.id; if(!(this.data.board?.countOnly && funSort === "rate") && ["count","rate"].includes(funSort) && funSort!==this.data.funSort) return this.load(false,{funSort}); },
   choosePeriod(e) {
     const period = e.currentTarget.dataset.id;
-    if (this.data.metric === "points" || !["all", "month"].includes(period) || period === this.data.period) return;
+    if (!rankPresentation.periodsFor(this.data.metric).includes(period) || period === this.data.period) return;
     return this.load(false, { period });
   },
   toggleMine() { this.closePlayerCard(); this.setData({ mineExpanded: !this.data.mineExpanded, metricsExpanded: false, rulesExpanded: false }); },

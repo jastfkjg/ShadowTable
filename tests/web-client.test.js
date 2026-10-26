@@ -1736,6 +1736,36 @@ function webRanks(metric='games',extra={}) {
     rows:[{publicId:'public-player',nickname:'<script>坏名字</script>',avatarUrl:null,rank:1,total:20,wins:10,winRate:50,isSelf:true}],
     me:{status:'ranked',rank:1,total:20,wins:10,winRate:50,remaining:0},...extra};
 }
+test('网页积分榜默认本月，可切今日与刷新，其他榜周期保持全部和本月', async () => {
+  const urls = []; let failDay = false, unavailable = false;
+  const c = client(async url => {
+    urls.push(url); const q = new URL('https://test.invalid' + url).searchParams;
+    if (q.get('period') === 'day' && failDay) throw Error('断线');
+    if (q.get('metric') === 'points' && unavailable) return { status: 400, json: async () => ({ error: '排行榜参数无效' }) };
+    return response(webRanks(q.get('metric'), { period: q.get('period'), hasMore: true, nextOffset: 20, version: 'day-version' }));
+  });
+  await c.applyRoute('#/leaderboard'); assert.match(urls.at(-1), /metric=points&period=month/);
+  let toolbar = () => c.viewLeaderboard().split('class="rank-metrics"')[0];
+  assert.match(toolbar(), /本月.*今日/); assert.doesNotMatch(toolbar(), /全部/);
+  const reads = urls.length;
+  await c.ACTIONS.rankPeriod({ dataset: { value: 'all' } }); assert.equal(urls.length, reads);
+  failDay = true; await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } });
+  assert.equal(c.state.rankPeriod, 'month'); assert.equal(c.state.rankBoard.period, 'month');
+  failDay = false; await c.ACTIONS.rankRetry(); assert.equal(c.state.rankPeriod, 'day');
+  await c.ACTIONS.rankRefresh(); assert.match(urls.at(-1), /metric=points&period=day/);
+  await c.ACTIONS.rankMore(); assert.match(urls.at(-1), /period=day&offset=20&version=day-version/);
+  for (const metric of ['games', 'overall', 'good', 'evil']) {
+    await c.ACTIONS.rankMetric({ dataset: { value: metric } }); assert.equal(c.state.rankPeriod, 'month');
+    assert.match(toolbar(), /全部.*本月/); assert.doesNotMatch(toolbar(), /今日/);
+    const count = urls.length;
+    await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } }); assert.equal(urls.length, count);
+  }
+  await c.ACTIONS.rankPeriod({ dataset: { value: 'all' } }); assert.equal(c.state.rankPeriod, 'all');
+  await c.ACTIONS.rankMetric({ dataset: { value: 'points' } }); assert.equal(c.state.rankPeriod, 'month');
+  await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } });
+  unavailable = true; await c.ACTIONS.rankRefresh();
+  assert.match(urls.at(-1), /metric=games&period=month/);
+});
 test('网页切换周期保留榜单且不插入加载提示，切换失败仍能重试目标周期', async () => {
   const requests=[];
   const c=client(url=>new Promise((resolve,reject)=>requests.push({url,resolve,reject})));

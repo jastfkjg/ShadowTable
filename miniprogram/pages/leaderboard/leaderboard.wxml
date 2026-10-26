@@ -1,11 +1,11 @@
 <app-nav title="排行榜" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page leaderboard-page {{board.fun?'fun-leaderboard':''}} {{board.me.rank>99?'has-wide-rank':''}}">
   <view class="rank-toolbar">
-    <view wx:if="{{metric!=='points'}}" class="rank-period" aria-label="统计周期">
-      <button class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
+    <view class="rank-period" aria-label="统计周期">
+      <button wx:if="{{metric!=='points'}}" class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
       <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
+      <button wx:if="{{metric==='points'}}" class="{{period==='day'?'selected':''}}" bindtap="choosePeriod" data-id="day" aria-pressed="{{period==='day'}}" hover-class="none">今日</button>
     </view>
-    <view wx:else class="rank-month-label"><text>本月积分</text></view>
     <view class="rank-tools">
       <button class="disclosure-button rank-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/record-info.svg" aria-hidden="true" /><text>规则</text></button>
     </view>
@@ -72,7 +72,7 @@
   </view>
 </view>
 <view wx:if="{{rulesExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop" catchtap="toggleRules" catchtouchmove="blockScroll">
-  <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close" bindtap="toggleRules" hover-class="none">关闭</button></view><scroll-view scroll-y class="rank-rules-body"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.period==='month'?'本月':'全部'}}</view><view wx:for="{{board.ruleLines}}" wx:key="*this" class="rank-rule-line">{{item}}</view></scroll-view></view>
+  <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close" bindtap="toggleRules" hover-class="none">关闭</button></view><scroll-view scroll-y class="rank-rules-body"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.periodLabel}}</view><view wx:for="{{board.ruleLines}}" wx:key="*this" class="rank-rule-line">{{item}}</view></scroll-view></view>
 </view>
 <view wx:if="{{mineExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop rank-details-backdrop" catchtap="toggleMine" catchtouchmove="blockScroll">
   <view class="rank-sheet rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">我的榜单</view><button class="rank-sheet-close" bindtap="toggleMine" hover-class="none">关闭</button></view>

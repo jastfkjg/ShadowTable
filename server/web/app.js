@@ -1043,7 +1043,8 @@
     closePlayerCard(false);
     const sequence = ++rankSequence, route = routeSequence;
     let metric = selection.rankMetric || state.rankMetric;
-    const period = metric === 'points' ? 'month' : selection.rankPeriod || state.rankPeriod, board = state.rankBoard;
+    const board = state.rankBoard;
+    let period = rankPresentation.normalizePeriod(metric, selection.rankPeriod || state.rankPeriod);
     const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
     const funMode = countOnly ? "all" : selection.rankFunMode || state.rankFunMode, funSort = countOnly ? "count" : selection.rankFunSort || state.rankFunSort, funRole = countOnly ? "" : selection.rankFunRole ?? state.rankFunRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
@@ -1058,6 +1059,7 @@
         if (sequence !== rankSequence || route !== routeSequence) return;
         pointsUnavailable = metric === 'points'; funUnavailable = metric.startsWith('fun_');
         metric = 'games'; append = false;
+        period = rankPresentation.normalizePeriod(metric, period);
         result = await request('/api/leaderboard?metric=games&period=' + period);
       }
       if (sequence !== rankSequence || route !== routeSequence) return;
@@ -1132,7 +1134,8 @@
     const locked = state.rankLoading || state.rankMoreLoading || state.rankVisibilitySaving;
     const overlay = state.rankMineExpanded || state.rankRulesExpanded || state.rankMetricsExpanded;
     let html = personalTitle('排行榜', '') + '<section class="leaderboard-page' + (board?.fun ? ' fun-leaderboard' : '') + '" aria-label="排行榜"><div class="rank-workspace"' + (overlay ? ' inert' : '') + '>';
-    html += '<div class="rank-toolbar">' + (metric === 'points' ? '<div class="rank-month-label"><strong>本月积分</strong><span>每月 1 日清零</span></div>' : '<div class="rank-period" role="group" aria-label="统计周期">' + [['all','全部'],['month','本月']].map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div>') + '<div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
+    const periods = metric === 'points' ? [['month','本月'],['day','今日']] : [['all','全部'],['month','本月']];
+    html += '<div class="rank-toolbar"><div class="rank-period" role="group" aria-label="统计周期">' + periods.map(item => '<button type="button" class="' + (state.rankPeriod === item[0] ? 'selected' : '') + '" data-action="rankPeriod" data-value="' + item[0] + '" aria-pressed="' + (state.rankPeriod === item[0]) + '">' + item[1] + '</button>').join('') + '</div><div class="rank-tools"><button type="button" class="rank-tool" data-action="rankToggleRules" aria-expanded="' + !!state.rankRulesExpanded + '" aria-label="榜单规则"' + (!board ? ' disabled' : '') + '>规则<span class="rank-info-icon" aria-hidden="true">i</span></button>' + btn('rank-tool','rankRefresh','刷新',null,locked) + '</div></div>';
     html += '<div class="rank-metrics" role="group" aria-label="排行指标">' + rankGroups.map(item => {
       const selected = metric === item[0] || item[0] === 'fun' && metric.startsWith('fun_') || item[0] === 'overall' && ['overall','good','evil'].includes(metric);
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
@@ -1153,7 +1156,7 @@
     const me = board.me;
     html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="' + !!state.rankMineExpanded + '" aria-label="我的排名，详情与公开设置"><span class="rank-mine-stats"><span class="rank-mine-brief"><span class="rank-mine-label">我的排名</span><span class="rank-mine-place">' + esc(me.placeLabel) + '</span></span><span class="rank-mine-brief"><span class="rank-mine-label">' + esc(board.valueHeading) + '</span><span class="rank-mine-value">' + value(me) + '</span></span></span><span class="rank-mine-entry">我的榜单<span class="rank-chevron" aria-hidden="true"></span></span></button></aside></div>';
     if (state.rankMetricsExpanded) html += viewRankMetricSheet();
-    if (state.rankRulesExpanded) html += rankSheetStart('rank-rules-sheet','榜单规则','rankToggleRules') + '<div class="rank-rules-body"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + (board.period === 'month' ? '本月' : '全部') + '</div>' + board.ruleLines.map(line => '<p class="rank-rule-line">' + esc(line) + '</p>').join('') + '</div></section></div>';
+    if (state.rankRulesExpanded) html += rankSheetStart('rank-rules-sheet','榜单规则','rankToggleRules') + '<div class="rank-rules-body"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + board.periodLabel + '</div>' + board.ruleLines.map(line => '<p class="rank-rule-line">' + esc(line) + '</p>').join('') + '</div></section></div>';
     if (state.rankMineExpanded) html += rankSheetStart('rank-details-dialog','我的榜单','rankToggleMine','我的排名与公开设置') + '<div class="rank-details-body"><div class="rank-mine-content"><div><div class="rank-mine-label">我的排名</div><div class="rank-mine-place">' + esc(me.placeLabel) + '</div></div><div class="rank-mine-metric"><div class="rank-mine-label">' + esc(board.valueHeading) + '</div><div class="rank-mine-value">' + value(me) + '</div></div></div>' + (!me.rank ? '<div class="rank-status-label">' + esc(me.statusLabel) + '</div>' : '') + (board.fun ? '<div class="small muted fun-mine-sample">' + esc(me.sampleLabel) + (me.unknownGames ? ' · ' + me.unknownGames + ' 局未记录' : '') + '</div>' : '') + (me.status !== 'unsupported' ? '<label class="rank-visibility"><span>' + (state.rankVisibilitySaving ? '正在保存…' : '在排行榜公开展示') + '</span><input type="checkbox" role="switch" aria-label="在排行榜公开展示" data-change="rankVisibility"' + (state.rankVisible ? ' checked' : '') + (state.rankVisibilitySaving ? ' disabled' : '') + ' /></label><div class="small muted">此开关仅控制是否出现在排行榜，玩家战绩均可查看。</div>' : '') + (state.rankVisibilityError ? '<div class="rank-visibility-error" role="alert">' + esc(state.rankVisibilityError) + btn('text-button','rankVisibilityRetry','重试',null,state.rankVisibilitySaving) + '</div>' : '') + '</div></section></div>';
     return html + '</section>';
   }
@@ -4864,7 +4867,7 @@ function roomListItems(rooms) {
       if (metric !== state.rankMetric) await loadLeaderboard(false, {rankMetric:metric,rankFunMode:'all',rankFunRole:''});
       app.querySelector('.fun-metric-toggle')?.focus({preventScroll:true});
     },
-    rankPeriod: el => { if (state.rankMetric !== 'points' && ['all','month'].includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
+    rankPeriod: el => { if (rankPresentation.periodsFor(state.rankMetric).includes(el.dataset.value) && el.dataset.value !== state.rankPeriod) return loadLeaderboard(false, { rankPeriod: el.dataset.value }); },
     rankMore: () => loadLeaderboard(true),
     rankVisibilityRetry: () => changeRankVisibility(rankVisibilityTarget),
     rankRetry: () => loadLeaderboard(state.rankMoreError, rankFailedSelection || {}),

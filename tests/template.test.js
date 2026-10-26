@@ -291,6 +291,18 @@ test('图片预览准备完成后才能发送或保存；不支持发送与相�
   assert.ok(!nodes(ready).some(node=>node.attr?.bindtap==='chooseMode'));
   assert.doesNotMatch(JSON.stringify(ready),/榜单前三位/);
 });
+test('榜单周期控件仅在积分榜显示本月与今日，选中状态和规则标题同步', () => {
+  const template = factory('pages/leaderboard/leaderboard.wxml');
+  for (const [metric, period, expected] of [['points', 'month', ['month', 'day']], ['points', 'day', ['month', 'day']], ['games', 'all', ['all', 'month']], ['overall', 'month', ['all', 'month']], ['fun_good_shield', 'all', ['all', 'month']]]) {
+    const board = require('../miniprogram/leaderboard-presentation').presentBoard({ metric, period, rows: [], me: {} });
+    const tree = template({ metric, period, board, rulesExpanded: true });
+    const buttons = nodes(tree).filter(node => node.attr?.bindtap === 'choosePeriod');
+    assert.deepEqual(buttons.map(node => node.attr['data-id']), expected);
+    assert.deepEqual(buttons.filter(node => node.attr.ariaPressed).map(node => node.attr['data-id']), [period]);
+    if (metric === 'points') assert.match(JSON.stringify(tree), new RegExp('积分 · ' + (period === 'day' ? '今日' : '本月')));
+    if (metric !== 'points') assert.doesNotMatch(JSON.stringify(buttons), /今日/);
+  }
+});
 test('榜单顶部移除分享入口，保留规则与忙碌状态提示', () => {
   const template=factory('pages/leaderboard/leaderboard.wxml');
   const renderRank=data=>template({loading:false,loadingMore:false,visibilitySaving:false,shareOpening:false,...data});

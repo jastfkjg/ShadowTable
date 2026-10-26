@@ -40,13 +40,14 @@ const base={period:'all',availableFunMetrics:defs,availableMetrics:['points','ga
 const shield={...base,metric:'fun_defense_ally',fun:true,title:'绝对防御',metricLabel:'保护友方次数',sort:'count',unit:'次',rows:[{...rows[0],count:1,opportunities:1,knownGames:1,rate:100}],me:{...rows[0],status:'ranked',count:1,opportunities:1,knownGames:1,rate:100},eligibleCount:1};
 function scene(response,extra={}) {
   const board=presentLeaderboard(response),options=presentation.funOptions(defs),option=options.find(item=>item.key===response.metric)||options[0];
-  return {...definition.data,loading:false,funAvailable:true,board,metric:response.metric,funSelected:!!response.fun,funSort:response.sort||'count',funOptions:options,
+  return {...definition.data,loading:false,funAvailable:true,board,metric:response.metric,period:response.period,funSelected:!!response.fun,funSort:response.sort||'count',funOptions:options,
     funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,funOptionsCanScroll:true,...extra};
 }
-const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric})]));
+const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric,period:metric==='points'?'month':base.period})]));
+scenes['points-day']=scene({...base,metric:'points',period:'day'});
 const previewPlayers=[['阿伟',1,19,6,3],['wyc',2,12,6],['元',3,11,6,10],['橙C',3,11,4],['玉虚宫',5,10,6],['大V',6,9,5,8],['子龙',6,9,6,7],['老高',6,9,6,4],['小明',9,7,3]]
   .map(([nickname,rank,points,total,avatar],i)=>({publicId:'preview-'+i,nickname,rank,points,total,wins:1,winRate:16.7,isSelf:nickname==='子龙',avatarUrl:avatar?'/pages/profile/assets/avatars/crayon-'+String(avatar).padStart(2,'0')+'.jpg':''}));
-scenes.redesign=scene({...base,metric:'points',rows:previewPlayers,eligibleCount:9,me:{...previewPlayers[6],status:'ranked'}});
+scenes.redesign=scene({...base,metric:'points',period:'month',rows:previewPlayers,eligibleCount:9,me:{...previewPlayers[6],status:'ranked'}});
 const allyRows=[{publicId:'ally-a',nickname:'玥玥子',rank:1,count:1,opportunities:4,knownGames:4,rate:25},{publicId:'ally-b',nickname:'元',rank:1,count:1,opportunities:5,knownGames:5,rate:20}];
 const ally={...shield,metric:'fun_kill_ally',title:'痛击队友',metricLabel:'击杀友方次数',rows:allyRows,eligibleCount:2,me:{status:'not_enough',rank:null,count:0,opportunities:1,knownGames:1,rate:0,remaining:1}};
 scenes.ally=scene(ally);
@@ -65,7 +66,7 @@ scenes.rules=scene({...base,metric:'overall'},{rulesExpanded:true});
 scenes.mine=scene(shield,{mineExpanded:true});
 scenes.empty=scene({...base,metric:'games',rows:[],eligibleCount:0,me:{status:'hidden',rank:null,total:0,wins:0,winRate:null}});
 scenes.rate=scene({...shield,sort:'rate',unit:'%',metricLabel:'成功挡刀率',threshold:1},{mineExpanded:true});
-scenes.long=scene({...base,metric:'points',rows:[{...rows[0],nickname:'很长的玩家昵称用于检查换行与对齐',points:-1234567,rank:12345}],me:{...base.me,rank:12345,points:-1234567}});
+scenes.long=scene({...base,metric:'points',period:'month',rows:[{...rows[0],nickname:'很长的玩家昵称用于检查换行与对齐',points:-1234567,rank:12345}],me:{...base.me,rank:12345,points:-1234567}});
 const styles=css('app.wxss')+css('components/app-nav/app-nav.wxss')+css('pages/leaderboard/leaderboard.wxss');
 const projection='.preview-nav{position:relative}.preview-clock{position:absolute;top:14px;left:28px;z-index:101;font-size:14px;font-weight:600}.preview-capsule{position:absolute;right:16px;top:50px;z-index:101;display:flex;align-items:center;justify-content:space-evenly;width:87px;height:32px;border:1px solid #65747b;border-radius:18px;background:#0c171d;font-size:14px}.preview-capsule i{width:1px;height:17px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}';
 fs.mkdirSync(output,{recursive:true});
