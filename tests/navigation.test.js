@@ -394,9 +394,9 @@ test('旧接口的趣味统计、历史摘要和详情统一文案，保留计�
     : { records: [legacy.match], total: 1, hasMore: false } };
   const { p: stats } = page('stats', api);
   await stats.onLoad({ tab: 'fun' });
-  assert.equal(stats.data.stats.fun.cards[0].enemyLabel, '刀中敌方');
-  assert.equal(stats.data.stats.fun.cards[0].allyLabel, '刀中友方');
-  assert.equal(stats.data.stats.fun.cards[0].metrics[1].count, 1);
+  assert.equal(stats.data.stats.fun.tiles[0].label, '刀中敌方');
+  assert.equal(stats.data.stats.fun.tiles[1].label, '刀中友方');
+  assert.equal(stats.data.stats.fun.tiles[1].count, 1);
   const { p: matches } = page('matches', api);
   await matches.onLoad({});
   assert.equal(matches.data.records[0].funLabel, '成功挡刀 · 刀中友方');
@@ -1780,7 +1780,7 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
   const aggregate=require('../server/fun').aggregate;
   const fun=aggregate([{match_id:'old',mode:'knights',metric:'knife_enemy',role:'gareth',role_label:'加雷斯',status:'unknown',count:0,opportunities:0}]);
   const stats=page('stats',{...apiBase,request:async()=>({...emptyStats,fun})}).p;await stats.onLoad({tab:'fun'});
-  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.cards[0].metrics[0].valueLabel,'—');assert.equal(stats.data.stats.fun.cards[0].roles[0].countLabel,'—');
+  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.tiles[0].valueLabel,'—');assert.equal(stats.data.stats.fun.tiles[0].roles[0].countLabel,'—');
   const urls=[];const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[]}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unfiltered',members:[]}],total:1}},{}]});
   await p.onLoad({fun:'knife_enemy',mode:'knights',role:'gareth'});await p.loadMore();
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
@@ -2777,4 +2777,38 @@ test('小程序确认面板防止重复提交，测量适配小屏且关闭后�
   await p.confirmClearRecords(); assert.equal(p.pending, original);
   p.closeConfirmation(); assert.equal(p.data.confirming, true);
   resolvePost({}); await saving; assert.equal(p.data.confirming, false);
+});
+
+test('趣味次数筛选覆盖反向称号，切换标签和刷新后保留筛选，清空可回到全部', async () => {
+  const { p } = page('stats', { ...apiBase, request: async () => require('./helpers/fun-copy-fixtures').stats }, { home: true });
+  await p.onLoad({ tab: 'fun' });
+  const select = filter => p.filterFun({ currentTarget: { dataset: { filter } } });
+  select('counted');
+  assert.equal(p.data.statistics.funFilter, 'counted');
+  assert.equal(p.data.statistics.stats.fun.recordedCount, 1);
+  assert.equal(p.data.statistics.stats.fun.recordedTiles[0].id, 'knife_ally');
+  await p.switchPanel('records'); await p.switchPanel('fun'); await p.load();
+  assert.equal(p.data.statistics.funFilter, 'counted');
+  select('invalid'); assert.equal(p.data.statistics.funFilter, 'counted');
+  select('all'); assert.equal(p.data.statistics.stats.fun.tiles.length, 3);
+  assert.equal(p.data.statistics.funFilter, 'all');
+  p.onUnload();
+});
+
+test('趣味卡片打开说明不切换标签或请求对局，防止重复弹窗；只有箭头进入对局', async () => {
+  const rows=[{metric:'survival_knifed',mode:'knights',role:'all',role_label:'玩家',match_id:'m',status:'known',count:4,opportunities:0}];
+  const requests=[],dialogs=[]; let dismiss;
+  const {p}=page('stats',{...apiBase,request:async url=>{requests.push(url);return url.includes('/stats')?{...emptyStats,fun:require('../server/fun').aggregate(rows)}:{records:[],total:0};}}, {home:true,wx:{showModal:options=>{dialogs.push(options);return new Promise(resolve=>dismiss=resolve)}}});
+  await p.onLoad({tab:'fun'});
+  const tile=p.data.statistics.stats.fun.tiles[0];
+  const pending=p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
+  await p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
+  assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'全民公敌'); assert.match(dialogs[0].content,/不含枪和决斗/);
+  assert.equal(p.data.tab,'fun'); assert.equal(p.data.historyStarted,false); assert.equal(requests.length,1);
+  dismiss({confirm:true}); await pending;
+  assert.equal(p.statisticsController.funInfoOpen,false);
+  await p.openFunMatches({currentTarget:{dataset:{url:tile.url}}});
+  assert.equal(p.data.tab,'matches'); assert.equal(dialogs.length,1);
+  assert.match(requests.at(-1),/fun=survival_knifed&mode=knights/);
+  p.onUnload();
 });

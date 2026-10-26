@@ -627,7 +627,7 @@
     toolThreshold: 1,
     showRoomSettings: false,
     showTransfer: false,
-    statsOpen: false, stats: null, statsTab: "records", funRulesExpanded: false, statsLoading: false, statsError: "",
+    statsOpen: false, stats: null, statsTab: "records", funFilter: "all", statsLoading: false, statsError: "",
     monthlyReset: null, resetSaving: false, resetError: '',
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
@@ -731,6 +731,7 @@
     await applyRoute(hash);
   }
   async function applyRoute(hash) {
+    closeFunInfo?.();
     if (state.page === 'login' && routeInfo(hash).page !== 'login' && !await cancelWebLogin()) return;
     const sequence = ++routeSequence, route = routeInfo(hash);
     ++monthlySequence;
@@ -1368,7 +1369,35 @@
       toastEl.classList.remove("show");
     }, 1600);
   }
-  function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false) {
+  let closeFunInfo = null;
+  function showFunRecord(record) {
+    if (!modal.hidden) return Promise.resolve(false);
+    const host=document.getElementById('modal-fun-record'),box=modal.querySelector('.error-dialog');
+    const info=record.info,opener=document.activeElement,overflow=document.body.style?.overflow;
+    host.innerHTML='<button type="button" class="fun-info-close" aria-label="关闭记录说明">×</button><header class="fun-info-hero"><div class="fun-info-category">'+esc(info.category)+'</div><img class="fun-info-icon" src="'+esc(record.contextIcon)+'" alt="" /><div class="fun-info-title" id="fun-info-title">'+esc(record.title)+'</div><div class="fun-info-count">'+esc(record.contextLabel)+' <span>'+esc(record.contextValue)+'</span></div></header><div class="fun-info-scroll" tabindex="0" aria-label="记录含义"><div class="fun-info-content"><div class="fun-info-description">'+esc(info.description)+'</div>'+(info.rules.length?'<div class="fun-info-rules">'+info.rules.map(row=>'<div class="fun-info-rule"><span class="fun-info-label">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('')+'</div>':'')+'<div class="fun-info-identity">适用身份 · '+esc(info.identity)+'</div></div></div>';
+    box.hidden=true;host.hidden=false;modal.hidden=false;
+    if(document.body.style) document.body.style.overflow='hidden';
+    const close=host.querySelector('.fun-info-close');close.focus();
+    return new Promise(resolve=>{
+      let closed=false;
+      function done(){
+        if(closed)return;closed=true;modal.hidden=true;host.hidden=true;box.hidden=false;host.innerHTML='';
+        modal.removeEventListener('keydown',onKey);close.onclick=null;closeFunInfo=null;
+        if(document.body.style)document.body.style.overflow=overflow;
+        if(opener?.isConnected)opener.focus();resolve(false);
+      }
+      function onKey(e){
+        if(e.key==='Escape'){e.preventDefault();done();}
+        if(e.key==='Tab'){
+          e.preventDefault();const controls=Array.from(host.querySelectorAll('button,[tabindex="0"]')),index=controls.indexOf(document.activeElement);
+          controls[(index+(e.shiftKey?-1:1)+controls.length)%controls.length]?.focus();
+        }
+      }
+      close.onclick=done;closeFunInfo=done;modal.addEventListener('keydown',onKey);
+    });
+  }
+  function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false, record = null) {
+    if (record) return showFunRecord(record);
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
@@ -1402,35 +1431,20 @@
       modal.hidden = false;
       (showCancel === false ? modalOk : modalCancel).focus();
       function onKey(event) {
-        if (event.key === "Escape" && showCancel !== false) {
-          event.preventDefault();
-          done(false);
-        } else if (event.key === "Tab") {
-          event.preventDefault();
-          (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus();
-        }
+        if (event.key === "Escape" && showCancel !== false) { event.preventDefault(); done(false); }
+        else if (event.key === "Tab") { event.preventDefault(); (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus(); }
       }
       modal.addEventListener("keydown", onKey);
       function done(val) {
         modal.hidden = true;
         modal.removeEventListener("keydown", onKey);
         if (opener && opener.isConnected) opener.focus();
-        modalOk.onclick = null;
-        modalCancel.onclick = null;
-        box?.classList.remove('is-avoidance-grant');
-        box?.classList.remove('is-room-confirm');
-        modal.classList.remove('is-room-confirm-backdrop');
-        modalOk.classList.remove('is-danger');
-        context.hidden = true;
-        grantContext.hidden = true;
-        resolve(val);
+        modalOk.onclick = null; modalCancel.onclick = null;
+        box?.classList.remove('is-avoidance-grant'); box?.classList.remove('is-room-confirm');
+        modal.classList.remove('is-room-confirm-backdrop'); modalOk.classList.remove('is-danger');
+        context.hidden = true; grantContext.hidden = true; resolve(val);
       }
-      modalOk.onclick = function () {
-        done(true);
-      };
-      modalCancel.onclick = function () {
-        done(false);
-      };
+      modalOk.onclick = () => done(true); modalCancel.onclick = () => done(false);
     });
   }
   function confirmRoomAction(kind, room) {
@@ -2274,43 +2288,21 @@ function roomListItems(rooms) {
 
   function viewFunStats(data) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
-    let html = data.legacyGames ? '<p class="small muted">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>' : '';
-    if (!data.cards.length) return html + '<p class="fun-empty muted">暂无趣味记录</p>';
-    for (const card of data.cards) {
-      const rows = card.metrics.filter(row => !row.id.endsWith('aim_enemy')), primary = rows.find(row => row.positive ?? row.ranked) || rows[0];
-      const combat = [':knife',':gun',':duel',':kill'].some(suffix => card.id.endsWith(suffix));
-      const roleLabel = /:(defense|kill)$/.test(card.id) ? primary.roleLabel : '';
-      if (primary.id.startsWith("honor_")) html += '<div class="fun-section-title">玩家票选</div>';
-      html += '<article class="fun-card"><div class="fun-heading"><h2>' + esc(card.title) + '</h2></div>' + (roleLabel ? '<p class="fun-description small muted">适用身份：' + esc(roleLabel) + '</p>' : '') + (card.description ? '<p class="fun-description small muted">' + esc(card.description) + '</p>' : '') + '<div class="fun-metrics' + (combat ? ' three' : '') + '">';
-      for (const row of rows) {
-        const color = row.id.startsWith('honor_') ? row.id === 'honor_mvp' ? 'mvp' : 'svp' : (row.positive ?? row.ranked) ? 'good' : row.honorTitle || /_(ally|hit|bust|miss)$/.test(row.id) ? 'evil' : 'muted';
-        html += '<button type="button" class="fun-metric" data-action="funRecords" data-metric="'+esc(row.id)+'" data-mode="'+esc(row.mode)+'"><span class="fun-number '+color+'">'+(row.value===null ? '—' : row.count)+'<span class="small muted"> '+esc(row.unit)+'</span></span><span class="small">'+esc(row.honorTitle || row.label)+' ›</span>' + (row.honorTitle ? '<span class="small muted">' + esc(row.label) + '</span>' : '') + '</button>';
-      }
-      html += '</div>';
-      if (combat && primary.opportunities) {
-        let position = 0;
-        html += '<svg class="fun-bar" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">' + rows.map(row => {
-          const width = row.count / row.opportunities * 100, start = position; position += width;
-          return '<rect class="fun-bar-' + ((row.positive ?? row.ranked) ? 'good' : row.id.endsWith('ally') ? 'evil' : 'muted') + '" x="'+start+'" y="0" width="'+width+'" height="1" />';
-        }).join('') + '</svg>';
-      }
-      if (primary.countOnly && !primary.id.startsWith("honor_")) html += '<p class="fun-caption small muted">按实际发生次数累计 · 点击查看对局</p>';
-      else if (primary.countOnly) html += '<p class="fun-caption small muted">按获奖局数统计 · 点击查看对局</p>';
-      else html += '<p class="fun-caption small muted">' + (combat ? esc(primary.label) + '率' : '成功率') + ' ' + (primary.rate===null ? '暂无机会' : primary.rate.toFixed(1)+'%') + ' · ' + primary.opportunities + (combat ? ' 次出手' : ' 次机会') + '<br>' + primary.knownGames + ' 局有记录' + (primary.unknownGames ? ' · '+primary.unknownGames+' 局未记录' : '') + '</p>';
-      if (state.funRulesExpanded && card.id.endsWith(':shield')) html += '<p class="small muted">挡刀率按终局面对最终非空刀的有效机会计算。</p>';
-      if (state.funRulesExpanded && roleLabel) html += '<p class="small muted">适用身份：' + esc(primary.roleDetail) + '</p>';
-      const aim = card.metrics.find(row=>row.id.endsWith('aim_enemy'));
-      if (state.funRulesExpanded && aim?.rate!==null && aim) html += '<p class="small muted">选敌率 '+aim.rate.toFixed(1)+'%；选中敌方但被挡下仍计未生效。</p>';
-      if (combat && primary.byRole.length) {
-        html += '<details class="fun-roles"><summary>按出刀角色查看</summary>';
-        for (const role of primary.byRole) html += '<div class="fun-role"><div>'+esc(role.label)+' · '+role.opportunities+' 次出手</div><div class="fun-role-metrics">' + rows.map(row=>btn('text-button','funRecords',row.label+' '+(row.byRole.find(r=>r.role===role.role)?.value === null ? '—' : row.byRole.find(r=>r.role===role.role)?.count || 0)+' ›',{metric:row.id,mode:row.mode,role:role.role})).join('')+'</div></div>';
-        html += '</details>';
-      }
+    const records = funCopy.records(data);
+    if (!records.totalCount) return '<p class="fun-empty muted">暂无趣味记录</p>';
+    const tiles = state.funFilter === 'counted' ? records.recordedTiles : records.tiles;
+    let html = '<div class="fun-content">';
+    html += '<div class="fun-records-filters" role="group" aria-label="趣味记录筛选">' + [['all','全部',records.totalCount],['counted','有次数',records.recordedCount]].map(([id,label,count]) => '<button type="button" data-action="filterFun" data-filter="' + id + '" class="' + (state.funFilter === id ? 'selected' : '') + '" aria-pressed="' + (state.funFilter === id) + '">' + label + ' ' + count + '</button>').join('') + '</div>';
+    if (!tiles.length) html += '<div class="fun-records-empty">还没有累计次数的记录<button type="button" data-action="filterFun" data-filter="all">查看全部记录 ›</button></div>';
+    html += '<div class="fun-records-grid">';
+    for (const tile of tiles) {
+      html += '<article class="fun-record' + (tile.hasCount ? '' : ' is-quiet') + '"><div class="fun-record-main' + (tile.rateLabel ? ' has-rate' : '') + '"><button type="button" class="fun-record-entry" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog" aria-label="' + esc(tile.accessibilityLabel) + '"><span class="fun-record-identity"><img class="fun-record-icon' + (tile.iconTone === 'portrait' ? ' is-portrait' : '') + '" src="' + esc(tile.icon) + '" alt="" /><span>' + esc(tile.roleLabel) + '</span></span><span class="fun-record-title">' + esc(tile.title) + '</span><span class="fun-record-bottom"><span class="fun-record-value ' + tile.color + '"><span>' + esc(tile.valueLabel) + '</span>' + (tile.unit ? '<span class="fun-record-unit">' + esc(tile.unit) + '</span>' : '') + '</span></span><span class="fun-record-caption">' + esc(tile.rateLabel || tile.stateLabel) + (tile.sampleLabel ? '<span class="fun-record-sample">' + esc(tile.sampleLabel) + '</span>' : '') + '</span></button><button type="button" class="fun-record-link" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" aria-label="查看' + esc(tile.title) + '相关对局">›</button></div>';
+      if (tile.roles.length) html += '<details><summary class="fun-record-role-toggle">按角色查看</summary><div class="fun-record-roles">' + tile.roles.map(role => '<div class="fun-record-role-wrap"><button type="button" class="fun-record-role" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog"><span>' + esc(role.label) + '</span><span class="fun-record-role-count">' + esc(role.countLabel) + (role.value == null ? '' : ' ' + esc(tile.unit)) + '</span></button><button type="button" class="fun-record-link is-role" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" data-role="' + esc(role.role) + '" aria-label="查看' + esc(role.label) + '的' + esc(tile.title) + '相关对局">›</button></div>').join('') + '</div></details>';
       html += '</article>';
     }
-    html += '<button class="disclosure-button fun-role-toggle" data-action="toggleFunRules" aria-expanded="'+!!state.funRulesExpanded+'">统计说明 '+(state.funRulesExpanded?'⌃':'⌄')+'</button>';
-    if (state.funRulesExpanded) html += '<p class="small muted fun-note">派西按初始身份统计：三蓝且梅林未被刺计最强派西，三红或梅林被刺计竭尽全力，一局最多一次。梅林、刺客只统计最终刺杀机会。守卫实际挡下伤害、魔术师换号让原目标避开伤害才计保护，比例分母为实际保护总次数。职业杀手、痛击队友合并轮内刀、枪、决斗造成的实际出局，缴械不计击杀。按技能发生时的阵营区分友方与对方；缺失过程不按零次计算。</p>';
-    return html;
+    html += '</div>';
+    if (data.legacyGames) html += '<p class="fun-records-note">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>';
+    return html + '</div>';
   }
   function viewFunRankFilters(board) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
@@ -4952,8 +4944,15 @@ function roomListItems(rooms) {
     retryPlayerCard: () => state.playerCard && !state.playerCardLoading && (state.page === 'monthly' ? openMonthlyPlayer(state.playerCard.id) : state.playerCard.scope === 'leaderboard' ? openRankPlayerCard(state.playerCard.id) : openPlayerCard(state.playerCard.seat)),
     toggleProposalSeat: el => toggleProposalSeat(Number(el.dataset.seat)),
     recoverConnection: recoverConnection,
-    toggleFunRules: () => setState({funRulesExpanded:!state.funRulesExpanded}),
+    filterFun: el => { if (['all','counted'].includes(el.dataset.filter)) setState({funFilter:el.dataset.filter}); },
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
+    funDetails: el => {
+      if (state.page !== 'stats' || state.statsTab !== 'fun') return;
+      const tile = funCopy.records(state.stats?.fun).tiles.find(row => row.key === el.dataset.key);
+      if (!tile) return;
+      const info = funCopy.recordInfo(tile);
+      return confirm(info.title, info.content, false, info.confirmText, null, null, false, info);
+    },
     funRecords: el => navigate('matches?fun='+encodeURIComponent(el.dataset.metric)+'&mode='+encodeURIComponent(el.dataset.mode)+(el.dataset.role ? '&role='+encodeURIComponent(el.dataset.role) : '')),
     funRankMetric: el => { if(el.dataset.value!==state.rankMetric && state.rankFunMetrics.some(item=>item.key===el.dataset.value)) return loadLeaderboard(false,{rankMetric:el.dataset.value,rankFunMode:'all',rankFunRole:''}); },
     funRankSort: el => { if(['count','rate'].includes(el.dataset.value)) return loadLeaderboard(false,{rankFunSort:el.dataset.value}); },

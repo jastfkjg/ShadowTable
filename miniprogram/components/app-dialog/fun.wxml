@@ -1,0 +1,16 @@
+<view class="app-dialog fun-info" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+  <button class="fun-info-close" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed" aria-label="关闭记录说明">×</button>
+  <view class="fun-info-hero">
+    <view class="fun-info-category">{{dialog.info.category}}</view>
+    <image class="fun-info-icon" src="{{dialog.contextIcon}}" mode="aspectFit" aria-hidden="true" />
+    <view class="fun-info-title">{{dialog.title}}</view>
+    <view class="fun-info-count">{{dialog.contextLabel}} <text>{{dialog.contextValue}}</text></view>
+  </view>
+  <scroll-view class="fun-info-scroll" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}" aria-label="记录含义">
+    <view class="fun-info-content">
+      <view class="fun-info-description">{{dialog.info.description}}</view>
+      <view wx:if="{{dialog.info.rules.length}}" class="fun-info-rules"><view wx:for="{{dialog.info.rules}}" wx:key="label" class="fun-info-rule"><text class="fun-info-label">{{item.label}}</text><text>{{item.value}}</text></view></view>
+      <view class="fun-info-identity">适用身份 · {{dialog.info.identity}}</view>
+    </view>
+  </scroll-view>
+</view>

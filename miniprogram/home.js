@@ -101,7 +101,7 @@ module.exports = function createHomePage(initialTab = 0) {
     about() { return this.personalController.about(); },
     dismissMonthlyReset() { return this.personalController.dismissMonthlyReset(); },
     blockMonthlyResetScroll() {},
-    onShareAppMessage() { return { title: "桌边助手 · ShadowTable", path: "/pages/lobby/lobby" }; },
+    onShareAppMessage() { return { title: "来一局阿瓦隆，一起入座", path: "/pages/lobby/lobby", imageUrl: "/assets/share-cover.jpg" }; },
   };
   const lifecycles = new Set(["onLoad", "onReady", "onShow", "onHide", "onUnload", "onPageScroll", "onResize", "onShareAppMessage", "mask"]);
   for (const name of Object.keys(lobby)) {

@@ -1,0 +1,41 @@
+/* Card bodies explain a record; separate arrows open its games. */
+.fun-content { --fun-record-line:rgba(177,191,198,.14); --fun-record-quiet:var(--control-bg); --fun-record-selected:#303b3d; --fun-record-purple:#c8b2ec; --fun-record-svp:#aac7e5; }
+.fun-records-filters { display:flex; gap:8px; margin:0 0 16px; }
+.fun-records-filters button { flex:1; min-width:0; width:0; min-height:44px; margin:0; padding:8px 12px; justify-content:center; border-radius:10px; color:var(--muted); font-size:13px; font-weight:400; }
+.fun-records-filters button.selected { color:var(--accent); background:var(--fun-record-selected); }
+.fun-records-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:stretch; }
+.fun-record { display:flex; flex-direction:column; min-width:0; overflow:hidden; background:var(--surface); border-radius:15px; }
+.fun-record.is-quiet { background:var(--fun-record-quiet); }
+button.fun-record-entry { flex:1; display:flex; align-items:stretch; justify-content:flex-start; flex-direction:column; gap:0; width:100%; min-width:0; min-height:148px; margin:0; padding:12px 14px 13px; border-radius:15px; text-align:left; font-weight:400; white-space:normal; }
+.fun-record-identity { display:flex; align-items:center; gap:7px; min-height:29px; color:var(--muted); font-size:12px; line-height:1.4; }
+.fun-record-identity>text,.fun-record-identity>span { min-width:0; overflow-wrap:anywhere; }
+.fun-record-icon { width:21px; height:23px; flex-shrink:0; object-fit:contain; }
+.fun-record-icon.is-portrait { width:27px; height:29px; margin-left:-2px; }
+.fun-record.is-quiet .fun-record-icon { opacity:.7; }
+.fun-record-title { flex:1; min-height:24px; margin-top:9px; color:var(--text); font-size:17px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.fun-record.is-quiet .fun-record-title { color:var(--muted); }
+.fun-record-bottom { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; }
+.fun-record-value { display:flex; align-items:baseline; flex-wrap:wrap; min-width:0; gap:4px; font-size:26px; font-weight:600; line-height:1.2; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.fun-record-value>text,.fun-record-value>span { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.fun-record-unit { font-size:12px; font-weight:400; }
+.fun-record-value.good { color:var(--good); }.fun-record-value.evil { color:var(--evil); }.fun-record-value.mvp { color:var(--accent); }.fun-record-value.svp { color:var(--fun-record-svp); }.fun-record-value.purple { color:var(--fun-record-purple); }.fun-record-value.muted { display:flex; color:var(--muted); }
+.fun-record-caption { padding-right:24px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 6px; min-height:18px; margin-top:8px; color:var(--muted); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.fun-record-sample { font-variant-numeric:tabular-nums; }
+button.fun-record-role-toggle,summary.fun-record-role-toggle { display:flex; justify-content:space-between; gap:8px; width:calc(100% - 28px); min-height:44px; margin:0 14px; padding:9px 0; border-top:1px solid var(--fun-record-line); border-radius:0; color:var(--muted); font-size:12px; font-weight:400; }
+.fun-record-roles { padding:0 12px 10px; }
+button.fun-record-role { display:block; width:100%; min-width:0; min-height:52px; margin:0; padding:10px 0; border-top:1px solid var(--fun-record-line); border-radius:0; color:var(--text); font-size:12px; font-weight:400; text-align:left; overflow-wrap:anywhere; }
+.fun-record-role-count { color:var(--muted); margin-top:3px; }
+.fun-records-note { margin:20px 4px 0; color:var(--muted); font-size:12px; line-height:1.7; }
+.fun-empty,.fun-records-empty { padding:24px 4px; color:var(--muted); font-size:14px; }
+.fun-records-empty button { width:auto; min-height:44px; margin:8px 0 0; padding:8px 0; color:var(--accent); font-size:13px; }
+.fun-content button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+@media(max-width:350px) {.fun-records-grid { gap:10px; }button.fun-record-entry { padding-left:11px; padding-right:11px; }.fun-record-title { font-size:16px; }.fun-record-identity { gap:5px; } }
+
+summary.fun-record-role-toggle { min-height:44px; margin:0 14px; padding:12px 0; border-top:1px solid var(--fun-record-line); color:var(--muted); font-size:12px; cursor:pointer; }
+.fun-record-role-count { display:block; }
+
+.fun-record-main { position:relative; display:flex; flex:1; min-width:0; }
+button.fun-record-link { position:absolute; right:0; bottom:33px; display:flex; align-items:center; justify-content:center; width:44px; min-height:44px; margin:0; padding:0; border-radius:9px; color:var(--muted); font-size:23px; font-weight:400; }
+.has-rate .fun-record-caption { min-height:36px; }.has-rate>.fun-record-link { bottom:51px; }
+.fun-record-bottom { padding-right:25px; }.fun-record-role-wrap { position:relative; }button.fun-record-role { padding-right:40px; }
+button.fun-record-link.is-role { top:0; bottom:0; }

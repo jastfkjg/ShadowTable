@@ -117,3 +117,13 @@ test('所有小程序路由都包含共享宿主，业务代码不再使用原�
   assert.equal(present({showCancel:false}).confirmText,'知道了');
   assert.equal(present({danger:true}).danger,true);
 });
+
+test('趣味称号卡按主题区测量正文，右上角关闭后释放宿主', async () => {
+  const {host,tap}=component(),selectors=[];
+  host.createSelectorQuery=()=>{const q={select(s){selectors.push(s);return q},boundingClientRect(){return q},exec(cb){cb([{height:600},{height:218},{height:1000}])}};return q};
+  const tile=require('../miniprogram/fun-copy').records({cards:[{id:'knights:survival',metrics:[{id:'survival_knifed',mode:'knights',value:4,count:4,byRole:[]}]}]}).tiles[0];
+  const job=host.show(require('../miniprogram/fun-copy').recordInfo(tile));
+  assert.equal(host.data.dialog.variant,'fun-record'); assert.equal(host.data.dialog.contextValue,'4 次');
+  assert.equal(selectors[1],'.fun-info-hero'); assert.equal(host.data.bodyHeight,334);
+  host.cancel(tap()); assert.equal((await job).cancel,true); assert.equal(host.data.dialog,null);
+});

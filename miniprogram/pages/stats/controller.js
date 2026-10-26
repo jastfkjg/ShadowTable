@@ -1,5 +1,7 @@
 const api = require("../../api");
 const { presentStats, presentFun, backToMe, personalPreview } = require("../../profile");
+const { recordInfo } = require("../../fun-copy");
+const dialog = require("../../dialog");
 function preserveFactions(stats, previous) {
   return { ...stats, byFaction: stats.byFaction.map(row => {
     const old = previous?.byFaction?.find(item => item.faction === row.faction);
@@ -23,7 +25,7 @@ function detail(row, kind) {
     scoreAverageLabel: row.scoreAverageLabel || "—" };
 }
 module.exports = function createController() { return {
-  data: { loading: true, error: "", stats: null, tab: "records", funRoles: {},
+  data: { loading: true, error: "", stats: null, tab: "records", funRoles: {}, funFilter: "all",
     roleFilter: "all", roleRows: null, statsDetail: null },
   onLoad(options = {}) {
     this.alive = true;
@@ -65,8 +67,20 @@ module.exports = function createController() { return {
     if (row) this.setData({ statsDetail: detail(row, "faction") });
   },
   closeStatsDetails() { this.setData({ statsDetail: null }); },
+  async openFunDetails(e) {
+    if (!this.alive || this.funInfoOpen) return;
+    const tile = this.data.stats?.fun.tiles.find(row => row.key === e.currentTarget.dataset.key);
+    if (!tile) return;
+    this.funInfoOpen = true;
+    try { await dialog.show(recordInfo(tile)); }
+    finally { this.funInfoOpen = false; }
+  },
   blockStatsScroll() {},
   chooseTab(e) { const tab = e.currentTarget.dataset.id; if (["records","fun"].includes(tab)) this.setData({ tab }); },
+  filterFun(e) {
+    const filter = e.currentTarget.dataset.filter;
+    if (["all", "counted"].includes(filter)) this.setData({ funFilter: filter });
+  },
   toggleFunRoles(e) { const id = e.currentTarget.dataset.id; this.setData({ funRoles: { ...this.data.funRoles, [id]: !this.data.funRoles[id] } }); },
   toggleFaction(e) {
     const faction = e.currentTarget.dataset.faction;

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { wxmlToJs } = require('miniprogram-compiler');
-const { presentStats, presentMatches, presentProfile } = require('../miniprogram/profile');
+const { presentStats, presentMatches, presentProfile, presentFun } = require('../miniprogram/profile');
 const createHistory = require('../miniprogram/pages/matches/controller');
 const root = path.resolve(__dirname, '../miniprogram');
 const output = path.resolve(__dirname, '../output/playwright/stats');
@@ -90,13 +90,13 @@ const timelineRecord = {...presentMatches([{...match,id:'timeline',role:'红骑�
 const scenes = {
   overview: {tab:'records',statistics:{stats}}, fun: {tab:'fun',statistics:{stats}},
   'fun-compact': {tab:'fun',statistics:{stats:compactStats}},
-  'fun-compact-roles': {tab:'fun',statistics:{stats:compactStats,funRoles:{'knights:knife':true,'knights:kill':true}}},
+  'fun-compact-roles': {tab:'fun',statistics:{stats:compactStats,funRoles:{'knights:knife_enemy':true,'knights:kill_enemy':true}}},
   expanded: {tab:'records',statistics:{stats:{...stats,byFaction:stats.byFaction.map(row=>({...row,expanded:true}))}}},
   'good-roles': {tab:'records',statistics:{stats,roleFilter:'good',roleRows:stats.byRole.filter(row=>row.faction==='good')}},
   'evil-roles': {tab:'records',statistics:{stats,roleFilter:'evil',roleRows:stats.byRole.filter(row=>row.faction==='evil')}},
   'role-detail': {tab:'records',statistics:{stats,statsDetail:{...stats.byRole[3],kind:'role',title:stats.byRole[3].role,losses:0}}},
   'faction-detail': {tab:'records',statistics:{stats,statsDetail:{...stats.byFaction[0],kind:'faction',title:stats.byFaction[0].label,losses:4}}},
-  roles: {tab:'fun',statistics:{stats,funRoles:{'knights:knife':true}}},
+  roles: {tab:'fun',statistics:{stats,funRoles:{'knights:knife_enemy':true}}},
   empty: {tab:'records',statistics:{stats:presentStats({total:0,wins:0,winRate:null,byFaction:[],byRole:[],byBoard:[],recent:[]})}},
   history: {tab:'matches',historyStarted:true,history},
   'history-expanded': {tab:'matches',historyStarted:true,history:{...history,records:matchRecords.map((record,index)=>({...record,expanded:index<2,membersExpanded:index===1}))}},
@@ -106,10 +106,24 @@ const scenes = {
   'history-empty': {tab:'matches',historyStarted:true,history:{...history,records:[],total:0,outcomeSummary:'',outcomeCounts:null}},
   'history-long': {tab:'matches',historyStarted:true,history:{...history,records:stressRecords,total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},
 };
-const styles = css('app.wxss') + css('components/app-nav/app-nav.wxss') + css('pages/stats/stats.wxss');
+// Accepted title grid, using the counts from the design review as sample data.
+const gridCounts = { honor_mvp:1, honor_svp:0, survival_revive:0, survival_knifed:4,
+  percival_green:0, percival_bust:1, merlin_evade:1, merlin_hit:0, good_shield:2, assassin_hit:0, assassin_miss:2 };
+const gridFun = fun.aggregate(fun.publicMetrics().map(def => ({ metric:def.id, mode:def.countOnly && def.id.startsWith('honor_')?'voted':'knights',
+  role:'all', role_label:def.title, match_id:'preview', status:Object.hasOwn(gridCounts,def.id)?'known':'unknown', count:gridCounts[def.id]||0,
+  opportunities:def.countOnly?0:def.id==='good_shield'?6:def.id.startsWith('assassin_')?2:Object.hasOwn(gridCounts,def.id)?1:0 })));
+const gridStats = { ...stats, fun:presentFun(gridFun) };
+scenes['fun-grid'] = {tab:'fun',statistics:{stats:gridStats,funFilter:'all'}};
+scenes['fun-grid-counted'] = {tab:'fun',statistics:{stats:gridStats,funFilter:'counted'}};
+scenes['fun-grid-empty-filter'] = {tab:'fun',statistics:{stats:{...stats,fun:presentFun({cards:[{id:'knights:survival',metrics:[{...metric('survival_revive',0,0,true),value:null}]}]})},funFilter:'counted'}};
+for (const [name, id] of [['fun-grid-info','survival_knifed'],['fun-grid-info-long','kill_enemy'],['fun-grid-info-rate','good_shield'],['fun-grid-info-zero','percival_green']]) {
+  const tile = gridStats.fun.tiles.find(row => row.id === id);
+  scenes[name] = { ...scenes['fun-grid'], info:require('../miniprogram/dialog').present(require('../miniprogram/fun-copy').recordInfo(tile)) };
+}
+const styles = css('app.wxss') + css('components/app-nav/app-nav.wxss') + css('pages/stats/stats.wxss') + css('components/app-dialog/app-dialog.wxss');
 const projection = 'body{margin:0}button{font:inherit;border:0;width:100%}span{display:inline}img{object-fit:contain}body .records-shell{padding-bottom:28px}.records-pane{overflow-y:auto}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
 fs.mkdirSync(output, { recursive: true });
-for (const [name, data] of Object.entries(scenes)) fs.writeFileSync(path.join(output, name + '.html'), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>战绩 · ${name}</title><style>${projection}${styles}</style>${html(factory('pages/stats/stats.wxml')({statistics:{},history:{},historyStarted:false,scrollTops:{},...data}))}<div class="preview-homebar"></div></html>`);
+for (const [name, data] of Object.entries(scenes)) fs.writeFileSync(path.join(output, name + '.html'), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>战绩 · ${name}</title><style>${projection}${styles}</style>${html(factory('pages/stats/stats.wxml')({statistics:{},history:{},historyStarted:false,scrollTops:{},...data}))}${data.info ? html(factory('components/app-dialog/app-dialog.wxml')({dialog:data.info,bodyHeight:0})) : ''}<div class="preview-homebar"></div></html>`);
 const meProfile=presentProfile({nickname:'子龙',identityType:'wx',avatarUrl:''});
 meProfile.avatarUrl='/pages/profile/assets/avatars/crayon-07.jpg';
 const meStyles=css('app.wxss')+css('components/app-nav/app-nav.wxss')+css('pages/me/me.wxss')+css('custom-tab-bar/index.wxss');

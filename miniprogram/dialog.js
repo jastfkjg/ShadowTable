@@ -14,7 +14,8 @@ function present(options = {}) {
   return {
     ...(options.variant === "room-confirm" ? { variant: "room-confirm", emphasis: emphasisAt >= 0 ? options.emphasis : "", contentBefore: emphasisAt >= 0 ? options.content.slice(0, emphasisAt) : "", contentAfter: emphasisAt >= 0 ? options.content.slice(emphasisAt + options.emphasis.length) : "" } : {}),
     ...(options.variant === 'badge-awards' ? { variant: 'badge-awards', awards: options.awards } : {}),
-    ...(options.variant === "avoidance-grant" ? { variant: "avoidance-grant", lead: typeof options.lead === "string" ? options.lead : "" } : {}),
+    ...(options.variant === "fun-record" ? { variant: options.variant, info: options.info } : {}),
+    ...(options.variant === "avoidance-grant" ? { variant: options.variant, lead: typeof options.lead === "string" ? options.lead : "" } : {}),
     title: options.title || "操作提示",
     content: options.content || "",
     contextLabel: options.contextLabel || "",

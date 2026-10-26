@@ -1,3 +1,4 @@
+@import "./fun.wxss";
 @import "../../badge-awards.wxss";
 @import "../../room-confirmation.wxss";
 .app-dialog-backdrop { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:24px; background:var(--overlay-scrim,rgba(2,10,15,.7)); }

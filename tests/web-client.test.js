@@ -403,7 +403,7 @@ test('网页读取旧趣味响应时同步转换统计、比例、历史摘要�
     : { records: [legacy.match], total: 1, hasMore: false }));
   await c.applyRoute('#/stats?tab=fun');
   const stats = c.viewStats();
-  assert.match(stats, /刀中敌方率 0\.0%/);
+  assert.match(stats, /刀中敌方率 0%/);
   assert.match(stats, /刀中友方/);
   assert.doesNotMatch(stats, /命中同伴|命中敌方/);
   await c.applyRoute('#/matches');
@@ -1881,14 +1881,14 @@ test('网页排行榜底栏直接开关，失败重试保留请求，资料页�
   c.state.rankBoard.me.status='unsupported';await c.CHANGES.rankVisibility({checked:true});assert.equal(posts.length,3);
   await c.applyRoute('#/profile');assert.doesNotMatch(c.viewProfileEditor(),/profileLeaderboard|在排行榜公开展示/);
 });
-test('网页趣味卡片用可点击数字和CSP兼容比例条，未知角色不显示虚构的零',async()=>{
+test('网页趣味卡片正文显示说明，箭头回查，比例带分母且不伪造未知次数',async()=>{
   const {aggregate}=require('../server/fun');
   const rows=['enemy','ally','failed','aim_enemy'].map((suffix,i)=>({match_id:'known',mode:'knights',metric:'knife_'+suffix,role:'gareth',role_label:'<坏标签>',status:'known',count:[2,0,1,3][i],opportunities:3}));
   const unknown=['enemy','ally','failed','aim_enemy'].map(suffix=>({match_id:'unknown',mode:'knights',metric:'knife_'+suffix,role:'gaheris',role_label:'加荷里斯',status:'unknown',count:0,opportunities:0}));
   const c=client(async()=>response({total:2,wins:1,winRate:50,byFaction:[],byRole:[],byBoard:[],recent:[],fun:aggregate([...rows,...unknown],1)}));
   await c.applyRoute('#/stats?tab=fun');assert.equal(c.state.statsTab,'fun');const html=c.viewStats();
-  assert.match(html,/<button[^>]+data-metric="knife_enemy"[^>]*><span class="fun-number good">2/);assert.doesNotMatch(html,/&lt;span|style="width:/);assert.match(html,/<svg class="fun-bar"/);
-  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/刀中敌方 —/);assert.match(html,/&lt;坏标签&gt;/);
+  assert.match(html,/data-action="funDetails" data-key="knights:knife_enemy".*?fun-record-title">刀中敌方<.*?fun-record-value good"><span>2<\/span>/);assert.doesNotMatch(html,/&lt;span|style="width:|fun-bar|次数最多/);assert.match(html,/刀中敌方率 66\.7%.*?2 \/ 3 次/);
+  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/加荷里斯<\/span><span class="fun-record-role-count">—<\/span>.*?data-role="gaheris"/);assert.match(html,/&lt;坏标签&gt;/);
 });
 test('网页趣味回查深链与分页保留过滤，清除回到全部，不混入管理员积分调整',async()=>{
   const urls=[];const c=client(async url=>{urls.push(url);return response({records:[{id:String(urls.length),endedAt:1,members:[],role:'梅林',outcome:'win',fun:{events:[],highlights:[],reason:'旧数据'}}],total:2,hasMore:urls.length===1,adjustments:{records:[{id:'a',delta:2,reason:'积分调整'}],total:1,hasMore:false}});});
@@ -2413,4 +2413,42 @@ test('网页确认面板支持 Escape 和键盘循环焦点，提交期间关闭
   c.ACTIONS.closeRecordClearingConfirmation(); assert.equal(c.state.clearingConfirming, true);
   await c.ACTIONS.confirmPersonalRecordClearing(); assert.equal(posts, 1);
   release(); await saving; assert.equal(c.state.clearingConfirming, false);
+});
+
+test('网页称号网格按实际次数筛选，反向称号可见，空筛选有返回全部入口', async () => {
+  const fixture = require('./helpers/fun-copy-fixtures').stats;
+  let reads = 0;
+  const c = client(async () => { reads++; return response(fixture); });
+  await c.applyRoute('#/stats?tab=fun');
+  assert.match(c.viewStats(), /全部 3/);
+  c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
+  let html = c.viewStats();
+  assert.match(html, /data-metric="knife_ally"/);
+  assert.doesNotMatch(html, /data-metric="knife_enemy"|次数最多/);
+  c.ACTIONS.filterFun({ dataset: { filter: 'invalid' } }); assert.equal(c.state.funFilter, 'counted');
+  assert.equal(reads, 1);
+  c.state.stats = { ...c.state.stats, fun: { cards: [] } };
+  assert.match(c.viewStats(), /暂无趣味记录/);
+  c.state.stats = { ...c.state.stats, fun: { cards: [{ id: 'knights:survival', metrics: [{ id: 'survival_revive', mode: 'knights', count: 0, value: null, byRole: [] }] }] } };
+  html = c.viewStats(); assert.match(html, /还没有累计次数的记录/); assert.match(html, /查看全部记录/);
+  c.ACTIONS.filterFun({ dataset: { filter: 'all' } });
+  assert.match(c.viewStats(), /尚无完整记录/);
+});
+
+test('网页点击趣味正文只显示说明，点击箭头才回查并保留指标和玩法', async () => {
+  const stats={total:1,wins:1,losses:0,winRate:100,byFaction:[],byRole:[],byBoard:[],recent:[],fun:require('../server/fun').aggregate([{metric:'survival_knifed',mode:'knights',role:'all',role_label:'玩家',match_id:'m',status:'known',count:4,opportunities:0}])};
+  const urls=[],dialogs=[];
+  const c=client(async url=>{urls.push(url);return response(url.includes('/stats')?stats:{records:[],total:0})});
+  c.setConfirm(async(...args)=>{dialogs.push(args);return true});
+  await c.applyRoute('#/stats?tab=fun');
+  const html=c.viewStats();
+  assert.match(html,/data-action="funDetails" data-key="knights:survival_knifed"/);
+  assert.match(html,/class="fun-record-link" data-action="funRecords" data-metric="survival_knifed"/);
+  await c.ACTIONS.funDetails({dataset:{key:'knights:survival_knifed'}});
+  assert.equal(c.state.page,'stats'); assert.equal(urls.length,1);
+  assert.equal(dialogs[0][0],'全民公敌'); assert.match(dialogs[0][1],/不含枪和决斗/);
+  assert.equal(dialogs[0][7].contextValue,'4 次');
+  await c.ACTIONS.funRecords({dataset:{metric:'survival_knifed',mode:'knights'}});
+  assert.equal(c.state.page,'matches'); assert.equal(dialogs.length,1);
+  assert.match(urls.at(-1),/fun=survival_knifed&mode=knights/);
 });

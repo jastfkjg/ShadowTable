@@ -1565,15 +1565,15 @@ test('趣味单指标把比例和样本一起呈现，未知与零机会不显�
   const renderMetric = extra => renderStatsShell({tab:'fun',stats:{fun:presentFun({legacyGames:0,cards:[{id:'classic:shield',title:'好人',metrics:[{...metric,...extra}]}]})}});
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
   const zero = renderMetric({});
-  assert.match(textOf(zero), /1 次机会.*0%.*成功率/);
+  assert.match(textOf(zero), /成功率 0%0 \/ 1 次/);
   assert.ok(byHandler(zero,'openFunMatches'));
   const unknown = textOf(renderMetric({value:null,rate:null}));
-  assert.match(unknown,/暂无完整样本.*—/); assert.doesNotMatch(unknown,/成功率|成功 0/);
+  assert.match(unknown,/—.*尚无完整记录/); assert.doesNotMatch(unknown,/成功率|成功 0/);
   const noChance = textOf(renderMetric({opportunities:0,rate:null}));
   assert.match(noChance,/暂无有效机会/); assert.doesNotMatch(noChance,/成功率|0%/);
 });
 
-test('趣味页按玩法和终局／轮内技能分组，保持全部指标与回查入口', () => {
+test('趣味称号网格保持全部指标、玩法范围与回查入口', () => {
   const { presentFun } = require('../miniprogram/profile');
   const metric = (id,mode) => ({id,mode,label:id,unit:'次',count:1,value:1,rate:100,opportunities:1,knownGames:1,unknownGames:0,positive:true,ranked:true,byRole:[]});
   const fun = presentFun({legacyGames:0,cards:[
@@ -1581,11 +1581,11 @@ test('趣味页按玩法和终局／轮内技能分组，保持全部指标与�
     {id:'classic:assassin',title:'刺客',metrics:[metric('assassin_hit','classic')]},
     {id:'knights:knife',title:'刀客刀法',metrics:[metric('knife_enemy','knights')]},
   ]});
-  assert.deepEqual(fun.cards.map(card=>card.sectionTitle),['经典 · 终局表现','','十二骑士 · 轮内技能']);
-  assert.equal(fun.cards[0].icon,'/assets/record-shield-good.svg');
+  assert.deepEqual(fun.tiles.map(tile=>tile.roleLabel),['经典 · 非梅林好人','经典 · 刺客','十二骑士 · 刀客']);
+  assert.equal(fun.tiles[0].icon,'/assets/record-shield-good.svg');
   const tree=renderStatsShell({tab:'fun',stats:{fun}});
   assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);
-  assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-card').length,3);
+  assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-record ').length,3);
 });
 
 test('趣味精简卡片保留称号、未知次数和回查，移除释义说明', () => {
@@ -1594,12 +1594,12 @@ test('趣味精简卡片保留称号、未知次数和回查，移除释义说�
   const fun = presentFun({ legacyGames:1, cards:[{ id:'knights:survival', metrics:[
     { ...metric, id:'survival_revive', value:null }, { ...metric, id:'survival_knifed', value:0 },
   ] }] });
-  assert.equal(fun.cards[0].sectionTitle, '');
-  assert.equal(fun.cards[0].headerNote, '');
+  assert.equal(fun.tiles[0].title, '我在阿瓦隆玩重生');
+  assert.equal(fun.tiles[0].rateLabel, '');
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
   const compact = renderStatsShell({ tab:'fun', stats:{fun} });
-  assert.match(textOf(compact), /—我在阿瓦隆玩重生.*0全民公敌/);
-  assert.doesNotMatch(textOf(compact), /复活按实际回场|缺失数据|按实际发生次数/);
+  assert.match(textOf(compact), /我在阿瓦隆玩重生—.*全民公敌0次/);
+  assert.doesNotMatch(textOf(compact), /复活按实际回场|按实际发生次数/);
   assert.ok(!byHandler(compact, 'toggleFunRules'));
   assert.equal(nodes(compact).filter(n => n.attr?.bindtap === 'openFunMatches').length, 2);
 });
@@ -1923,4 +1923,31 @@ test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情�
   assert.match(byHandler(detail,'toggleOwnedBadge').attr.class,/secondary/);
   const locked=render({...data,selectedBadge:badgeCollection.items.find(b=>!b.owned)});
   assert.equal(byHandler(locked,'toggleOwnedBadge'),undefined);
+});
+
+test('趣味卡片正文与回查箭头为独立按钮，箭头不嵌在正文按钮内', () => {
+  const stats=require('../miniprogram/profile').presentStats(require('./helpers/fun-copy-fixtures').stats);
+  const tree=renderStatsShell({tab:'fun',stats});
+  const entries=nodes(tree).filter(n=>n.attr?.class==='fun-record-entry');
+  assert.equal(entries.length,stats.fun.totalCount);
+  for(const entry of entries){
+    assert.equal(entry.attr.bindtap,'openFunDetails'); assert.equal(entry.attr.ariaHaspopup,'dialog');
+    assert.ok(entry.attr['data-key']); assert.equal(entry.attr['data-url'],undefined);
+    assert.equal(byHandler(entry,'openFunMatches'),undefined);
+  }
+  const arrows=nodes(tree).filter(n=>n.attr?.class==='fun-record-link');
+  assert.equal(arrows.length,entries.length);
+  for(const arrow of arrows){assert.equal(arrow.attr.bindtap,'openFunMatches'); assert.ok(arrow.attr['data-url']);}
+});
+
+test('趣味弹窗使用 B 主题区和规则明细，仅保留右上角关闭按钮', () => {
+  const copy=require('../miniprogram/fun-copy');
+  const tile=copy.records({cards:[{id:'knights:survival',metrics:[{id:'survival_knifed',mode:'knights',value:4,count:4,byRole:[]}]}]}).tiles[0];
+  const dialog={...require('../miniprogram/dialog').present(copy.recordInfo(tile)),id:7};
+  const tree=factory('components/app-dialog/app-dialog.wxml')({dialog,bodyHeight:200});
+  const buttons=nodes(tree).filter(n=>n.tag==='wx-button');
+  assert.equal(buttons.length,1);assert.equal(buttons[0].attr.bindtap,'cancel');assert.equal(buttons[0].attr['data-id'],7);
+  assert.match(JSON.stringify(tree),/fun-info-hero|fun-info-rules/);
+  assert.doesNotMatch(JSON.stringify(tree),/app-dialog-actions|app-dialog-confirm|知道了|关闭说明/);
+  assert.ok(nodes(tree).some(n=>n.attr?.class==='fun-info-scroll'&&n.attr.scrollY));
 });
