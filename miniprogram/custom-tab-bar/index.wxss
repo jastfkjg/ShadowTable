@@ -13,6 +13,7 @@
   background: #101c24;
 }
 .tab-item {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -32,6 +33,7 @@
 }
 .tab-item::after { border: 0; }
 .tab-item.is-selected { color: #e5c68b; }
+.tab-item.is-selected::before { content:""; position:absolute; bottom:0; left:50%; width:22px; height:2px; transform:translateX(-50%); border-radius:2px; background:currentColor; }
 .tab-item:active { opacity: 1; }
-.tab-icon { display: block; width: 24px; height: 24px; }
+.tab-icon { display: block; width: 26px; height: 26px; }
 .tab-label { font-size: 10px; line-height: 14px; }

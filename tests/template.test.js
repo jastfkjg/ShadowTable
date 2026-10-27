@@ -52,7 +52,7 @@ test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发�
   const room = { code:'123456', phase:'lobby', capacity:6, boardName:'经典基础', players:[], team:[], history:[], me:{seat:1,isHost:true,ready:false} };
   const text = JSON.stringify(renderTable({ ...base, isLobby:false, room }));
   assert.match(text, /发放身份/);
-  assert.doesNotMatch(text, /home-brand-symbol|home-table-blue|home-action-symbol|home-clock/);
+  assert.doesNotMatch(text, /home-brand-art|home-wordmark|home-table-blue|home-action-symbol|home-clock/);
 });
 test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
   const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌', skillHistory: [{ id: 0, round: 2, text: '刀8号' }] },

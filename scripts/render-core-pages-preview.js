@@ -36,6 +36,7 @@ function html(node) {
   if (!node.tag || node.tag === "wx-block") return (node.children || []).map(html).join("");
   if (node.tag === "wx-connection-state") return previewConnection ? html(factory("components/connection-state/connection-state.wxml")(previewConnection)) : "";
   if (node.tag === "wx-app-nav") return '<div class="preview-nav">' + html(factory("components/app-nav/app-nav.wxml")({ ...node.attr, statusBarHeight: 44, navHeight: 44, totalHeight: 88 })) + '<span class="preview-clock">15:50</span><div class="preview-capsule">•••<i></i><b>⊙</b></div></div>';
+  if (node.tag === "wx-image" && node.attr?.mode === "aspectFill") node = { ...node, attr: { ...node.attr, style: (node.attr.style || "") + ";object-fit:cover" } };
   if (node.tag === "wx-scroll-view") node = { ...node, attr: { ...node.attr, style: (node.attr?.style || "") + ";overflow-x:" + (node.attr?.scrollX ? "auto" : "hidden") + ";overflow-y:" + (node.attr?.scrollY ? "auto" : "hidden") } };
   const tag = ({ "wx-text": "span", "wx-button": "button", "wx-image": "img", "wx-input": "input", "wx-form": "form", "wx-label": "label", "wx-navigator": "a" })[node.tag] || "div";
   const attrs = Object.entries(node.attr || {}).flatMap(([key, value]) => {
@@ -135,6 +136,8 @@ const homeBase = { ...createTable({ lobby: true }).data, loading: false, serverC
 const room = (code, status, people, relation, activity, extra = {}) => ({ code, status, statusLabel: status === "lobby" ? "待开局" : status === "playing" ? "进行中" : "已结束", boardName: "阿瓦隆 · 十二骑士", peopleLabel: people, compactRelation: relation, activityLabel: activity, entryLabel: status === "ended" ? "查看牌桌" : "返回牌桌", available: true, updatedAt: 1, canSwipeDissolve: true, isHost: true, isMember: true, canLeave: true, ...extra });
 const rooms = [room("201375", "lobby", "12/12 人已入座", "我是房主 · 1号", "今天 15:50"), room("534718", "lobby", "1/12 人已入座", "我是房主 · 1号", "10/13 14:53"), room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:33", { boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false })];
 const homeScenes = {
+  "home-brand-fallback": { homeWordmarkFailed:true },
+  "home-crayon": { memberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "15:27"), room("993636", "lobby", "7/10人已入座", "房主：大V · 我在8号", "昨天23:03", { boardName:"阿瓦隆 · 十二骑士（10人）", isHost:false, canSwipeDissolve:false })], visibleMemberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "15:27"), room("993636", "lobby", "7/10人已入座", "房主：大V · 我在8号", "昨天23:03", { boardName:"阿瓦隆 · 十二骑士（10人）", isHost:false, canSwipeDissolve:false })] },
   "home-connection-connecting": { loading: true, serverConnected: false, memberRooms: [], visibleMemberRooms: [] },
   "home-connection-reconnecting": { reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
   "home-connection-retrying": { loading: true, reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
