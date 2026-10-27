@@ -1691,6 +1691,28 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .profile-edit { width: auto; flex: 0 0 auto; min-height: 44px; color: var(--accent); padding: 8px 0 8px 8px; font-size: 14px; }
 .account-note { margin: 0 0 24px; max-width: 40em; }
 .personal-section { border-top: 1px solid var(--border); padding: 12px 0 28px; }
+.score-rules h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 24px 0 12px; font-size: 16px; }
+.score-rules h3 .small { font-weight: 400; }
+.score-rules-table { overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.score-rules table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.score-rules .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.score-rules th, .score-rules td { padding: 15px 4px; text-align: center; overflow-wrap: anywhere; }
+.score-rules thead { background: var(--control-bg); }
+.score-rules thead th { font-size: 12px; font-weight: 400; }
+.score-rules th:first-child { width: 27%; padding-left: 12px; text-align: left; }
+.score-rules tbody tr { border-top: 1px solid var(--border); }
+.score-rules-caption { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.score-rules-role { font-size: 14px; font-weight: 500; }
+.score-rules-role.good { color: var(--third); }
+.score-rules-role.evil { color: var(--evil); }
+.score-rules td { font-size: 21px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.score-rules td.is-zero { color: var(--muted); font-weight: 400; }
+.score-rules-bonus { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.score-rules-bonus h4 { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin: 0 0 6px; font-size: 15px; font-weight: 500; }
+.score-rules-bonus h4 span { font-size: 20px; color: var(--accent); white-space: nowrap; }
+.score-rules-bonus p { margin: 0; }
+.score-rules-bonus.is-shield { padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.score-rules-bonus.is-shield h4 span { font-size: 26px; }
 .personal-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 18px 0 26px; }
 .metric-value { font-size: 28px; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .accent { color: var(--accent); }

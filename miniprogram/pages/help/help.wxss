@@ -57,5 +57,31 @@ button.help-board-link { min-height: 44px; width: 100%; min-width: 0; margin: 0;
 .help-scoring-page .help-score-scope { padding: 18px; background: var(--surface); border-radius: 16px; }
 .help-scoring-page .help-score-scope .help-heading { margin-bottom: 8px; }
 .help-score-heading { margin: 24px 0 16px; }
+.help-score-answers { padding-left: 0; padding-right: 0; }
+.help-score-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.help-score-title > text { font-size: 12px; color: var(--muted); }
+.help-score-intro { margin: 8px 0 16px; }
+.help-score-table { border: 1px solid var(--help-line); border-radius: 16px; overflow: hidden; background: var(--surface); }
+.help-score-row { display: grid; grid-template-columns: minmax(0,1.2fr) repeat(3,minmax(0,1fr)); align-items: stretch; }
+.help-score-row + .help-score-row { border-top: 1px solid var(--help-line); }
+.help-score-role, .help-score-cell { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 15px 4px; line-height: 1.6; overflow-wrap: anywhere; }
+.help-score-role { padding-left: 12px; font-size: 14px; font-weight: 500; }
+.help-score-role.good { color: var(--third); }
+.help-score-role.evil { color: var(--evil); }
+.help-score-cell { text-align: center; }
+.help-score-table-head { color: var(--text); background: var(--control-bg); font-size: 12px; }
+.help-score-table-head .help-score-role { font-size: 12px; font-weight: 400; color: var(--muted); }
+.help-score-caption { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.help-score-number { color: var(--accent); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.help-score-number.is-zero { color: var(--muted); font-weight: 400; }
+.help-score-bonuses { border-top: 1px solid var(--help-line); }
+.help-score-bonus { padding: 16px 0; border-bottom: 1px solid var(--help-line); }
+.help-score-bonus-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; font-size: 15px; font-weight: 500; }
+.help-score-bonus-points { color: var(--accent); font-size: 20px; font-weight: 600; white-space: nowrap; }
+.help-score-bonus-points > text { font-size: 12px; font-weight: 400; }
+.help-score-bonus.is-shield { margin-top: 12px; padding: 16px; border: 1px solid var(--help-line); border-radius: 16px; background: var(--surface); }
+.help-score-bonus.is-shield .help-score-bonus-points { font-size: 26px; }
+.help-score-scope { margin-top: 24px; }
+.help-score-scope .help-heading { margin-bottom: 8px; }
 @media (max-width: 350px) { .help-page { padding-left: 14px; padding-right: 14px; } .help-title { font-size: 20px; } .help-intro-art { width: 54px; height: 76px; } .help-step-body { margin-left: 0; } .help-answers { padding-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .help-chevron { transition: none; } }

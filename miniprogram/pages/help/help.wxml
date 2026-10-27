@@ -2,10 +2,32 @@
   <view wx:if="{{scoringLoading && !scoringRules}}" class="help-copy" role="status">正在读取计分规则…</view>
   <view wx:if="{{scoringError && !connectionVisible}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
   <block wx:if="{{scoringRules}}">
-    <view class="help-score-scope"><view wx:if="{{scoringOnly}}" class="help-heading">计分范围</view><view class="help-copy">{{scoringRules.scopeLabel}}</view></view>
-    <view wx:if="{{scoringOnly}}" class="help-heading help-score-heading">加分项目</view>
-    <view wx:for="{{scoringRules.items}}" wx:key="id" class="help-answer"><view class="help-step-title">{{item.label}}</view><view class="help-copy">{{item.text}}</view></view>
-    <view wx:if="{{scoringOnly && scoringRules.notes.length}}" class="help-heading help-score-heading">补充说明</view>
+    <block wx:if="{{scoringRules.table}}">
+      <view class="help-score-title"><view class="help-heading">基础积分</view><text>每人 / 分</text></view>
+      <view class="help-copy help-score-intro">{{scoringRules.table.note}}</view>
+      <view class="help-score-table" aria-label="角色与三种结局的基础积分对照表">
+        <view class="help-score-row help-score-table-head">
+          <view class="help-score-role">角色 / 阵营</view>
+          <view wx:for="{{scoringRules.table.columns}}" wx:key="id" class="help-score-cell"><view>{{item.label}}</view><view class="help-score-caption">{{item.caption}}</view></view>
+        </view>
+        <view wx:for="{{scoringRules.table.rows}}" wx:key="id" wx:for-item="row" class="help-score-row">
+          <view class="help-score-role {{row.faction}}">{{row.label}}</view>
+          <view wx:for="{{scoringRules.table.columns}}" wx:key="id" wx:for-index="scoreIndex" class="help-score-cell help-score-number {{row.scores[scoreIndex] === 0 ? 'is-zero' : ''}}">{{row.scores[scoreIndex] > 0 ? '+' : ''}}{{row.scores[scoreIndex]}}</view>
+        </view>
+      </view>
+      <view class="help-heading help-score-heading">额外加分</view>
+      <view class="help-score-bonuses">
+        <view wx:for="{{scoringRules.bonuses}}" wx:key="id" class="help-score-bonus {{item.id === 'shield' ? 'is-shield' : ''}}">
+          <view class="help-score-bonus-title"><text>{{item.label}}</text><text class="help-score-bonus-points">{{item.points > 0 ? '+' : ''}}{{item.points}}<text> 分</text></text></view>
+          <view class="help-copy">{{item.text}}</view>
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <view wx:for="{{scoringRules.items}}" wx:key="id" class="help-answer"><view class="help-step-title">{{item.label}}</view><view class="help-copy">{{item.text}}</view></view>
+    </block>
+    <view class="help-score-scope"><view class="help-heading">计分范围</view><view class="help-copy">{{scoringRules.scopeLabel}}</view></view>
+    <view wx:if="{{scoringRules.notes.length}}" class="help-heading help-score-heading">补充说明</view>
     <view wx:for="{{scoringRules.notes}}" wx:key="*this" class="help-copy help-note">{{item}}</view>
   </block>
 </template>
@@ -21,7 +43,7 @@
     <view class="help-references">
       <view wx:for="{{references}}" wx:key="id" wx:for-item="reference" class="help-section">
         <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleReference" data-id="{{reference.id}}" data-index="{{reference.index}}" aria-expanded="{{reference.expanded}}" aria-controls="{{'help-reference-'+reference.id}}"><image class="help-reference-icon" src="{{'/assets/'+reference.icon+'.svg'}}" aria-hidden="true" /><view class="help-toggle-copy"><view class="help-heading">{{reference.title}}</view><view class="help-caption">{{reference.subtitle}}</view></view><view class="help-chevron {{reference.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
-        <view wx:if="{{reference.expanded}}" class="help-answers" id="{{'help-reference-'+reference.id}}">
+        <view wx:if="{{reference.expanded}}" class="help-answers {{reference.id === 'scoring' ? 'help-score-answers' : ''}}" id="{{'help-reference-'+reference.id}}">
           <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible}}" />
           <block wx:elif="{{reference.id === 'boards'}}">
             <view wx:if="{{loadingBoards && !connectionVisible}}" class="help-copy" role="status">正在加载板子介绍…</view>

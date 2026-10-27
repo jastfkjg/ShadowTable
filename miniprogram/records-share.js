@@ -6,15 +6,15 @@ const panels = {
 };
 
 function tabFor(tab) { return Object.prototype.hasOwnProperty.call(panels, tab) ? tab : "records"; }
-function friendContent(tab, snapshot) {
+function friendContent(tab, snapshot, imageUrl = cover) {
   tab = tabFor(tab);
-  if (validId(snapshot?.id)) return { title: snapshot.title, path: "/pages/shared/shared?share=" + snapshot.id, imageUrl: cover };
-  return { title: panels[tab].title, path: "/pages/shared/shared?intro=" + tab, imageUrl: cover };
+  if (validId(snapshot?.id)) return { title: snapshot.title, path: "/pages/shared/shared?share=" + snapshot.id, imageUrl };
+  return { title: panels[tab].title, path: "/pages/shared/shared?intro=" + tab, imageUrl };
 }
-function timelineContent(tab, snapshot) {
+function timelineContent(tab, snapshot, imageUrl = cover) {
   tab = tabFor(tab);
-  if (validId(snapshot?.id)) return { title: snapshot.title, query: "share=" + snapshot.id, imageUrl: cover };
-  return { title: panels[tab].title, query: "intro=" + tab, imageUrl: cover };
+  if (validId(snapshot?.id)) return { title: snapshot.title, query: "share=" + snapshot.id, imageUrl };
+  return { title: panels[tab].title, query: "intro=" + tab, imageUrl };
 }
 function introFor(tab) { return Object.prototype.hasOwnProperty.call(panels, tab) ? panels[tab] : null; }
 const validId = value => typeof value === "string" && /^[a-f0-9]{48}$/.test(value);

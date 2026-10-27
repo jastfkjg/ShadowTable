@@ -117,6 +117,18 @@ const scoreScenes = {
   ]) },
 };
 for (const [name, data] of Object.entries(scoreScenes)) write(name, "pages/scores/scores.wxml", { ...scoreBase, ...data }, css("pages/scores/scores.wxss"));
+let helpData;
+vm.runInNewContext(fs.readFileSync(path.join(root, "pages/help/help.js"), "utf8"), { require: () => ({}), Page: page => { helpData = page.data; } });
+const scoringRules = require("../server/scoring").publicRules();
+const scoringBase = { ...helpData, scoringOnly: true, scoringRules, scoringLoading: false, scoringError: "" };
+const legacyScoringRules = { ...scoringRules }; delete legacyScoringRules.table; delete legacyScoringRules.bonuses;
+for (const [name, data] of Object.entries({
+  "scoring-rules": {},
+  "scoring-rules-help": { scoringOnly: false, references: [{ id: "scoring", title: "计分规则", subtitle: "计分范围与加分项目", icon: "record-cup", expanded: true }] },
+  "scoring-rules-legacy": { scoringRules: legacyScoringRules },
+  "scoring-rules-loading": { scoringRules: null, scoringLoading: true },
+  "scoring-rules-error": { scoringRules: null, scoringError: "计分规则暂未加载，请重试。" },
+})) write(name, "pages/help/help.wxml", { ...scoringBase, ...data }, css("pages/help/help.wxss"));
 const homeBase = { ...createTable({ lobby: true }).data, loading: false, serverConnected: true };
 const room = (code, status, people, relation, activity, extra = {}) => ({ code, status, statusLabel: status === "lobby" ? "待开局" : status === "playing" ? "进行中" : "已结束", boardName: "阿瓦隆 · 十二骑士", peopleLabel: people, compactRelation: relation, activityLabel: activity, entryLabel: status === "ended" ? "查看牌桌" : "返回牌桌", available: true, updatedAt: 1, canSwipeDissolve: true, isHost: true, isMember: true, canLeave: true, ...extra });
 const rooms = [room("201375", "lobby", "12/12 人已入座", "我是房主 · 1号", "今天 15:50"), room("534718", "lobby", "1/12 人已入座", "我是房主 · 1号", "10/13 14:53"), room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:33", { boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false })];

@@ -1309,7 +1309,7 @@ button.seat.seat-empty[disabled]:not([type]) { background: var(--bg); border-sty
 .page.table-lobby { padding-bottom: calc(192rpx + env(safe-area-inset-bottom)); }
 .lobby-room-header { padding-bottom: 24rpx; border-bottom: 1rpx solid var(--border); }
 .lobby-room-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
-.room-share-canvas { position: fixed; left: -2000px; top: 0; width: 600px; height: 480px; pointer-events: none; }
+.room-share-canvas, .record-share-canvas { position: fixed; left: -2000px; top: 0; width: 600px; height: 480px; pointer-events: none; }
 button.lobby-header-link.room-invite-button { min-height: 48px; }
 button.room-invite-pressed { opacity: .65; }
 .room-invitation { padding: 64rpx 0 24rpx; }

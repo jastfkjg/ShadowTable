@@ -1,2 +1,3 @@
 <include src="../records/shell.wxml" />
+<canvas type="2d" id="record-share-canvas" class="record-share-canvas" aria-hidden="{{true}}" />
 <app-dialog id="app-dialog" />

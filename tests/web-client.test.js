@@ -42,7 +42,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { grantNotifier, request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance,
+      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance, viewScoreRules,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewRecordClearing, viewRecordClearingConfirmation, loadRecordClearing, viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
@@ -2451,4 +2451,22 @@ test('网页点击趣味正文只显示说明，点击箭头才回查并保留�
   await c.ACTIONS.funRecords({dataset:{metric:'survival_knifed',mode:'knights'}});
   assert.equal(c.state.page,'matches'); assert.equal(dialogs.length,1);
   assert.match(urls.at(-1),/fun=survival_knifed&mode=knights/);
+});
+
+test('网页规则按角色和结局展示基础积分及额外奖励，兼容旧服务与错误重试', () => {
+  const c = client(async () => response({}));
+  c.state.scoringRules = require('../server/scoring').publicRules();
+  let html = c.viewScoreRules();
+  assert.match(html, /<table>/); assert.match(html, /scope="col"/); assert.match(html, /scope="row"/);
+  assert.match(html, /未刺中梅林/); assert.match(html, /刺中梅林/); assert.match(html, /3红车/);
+  assert.match(html, /\+12/); assert.match(html, /\+9/); assert.match(html, /\+6 分/);
+  assert.match(html, /梅林、派西除外/); assert.match(html, /is-zero">0<\/td>/);
+  c.state.scoringRules.table.rows[0].label = '<梅林>';
+  assert.match(c.viewScoreRules(), /&lt;梅林&gt;/);
+  delete c.state.scoringRules.table;
+  html = c.viewScoreRules();
+  assert.doesNotMatch(html, /<table>/); assert.match(html, /梅林／派西角色奖励/);
+  c.state.scoringRules = null; c.state.scoringError = '计分规则暂未加载，请重试。';
+  html = c.viewScoreRules(); assert.match(html, /role="alert"/); assert.match(html, /loadScoreRules/);
+  assert.doesNotMatch(html, /正在读取/);
 });

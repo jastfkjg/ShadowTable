@@ -90,7 +90,30 @@ function publicRules(rules = policy()) {
   const names = { faction: { good: "好人", evil: "坏人", third: "第三方" },
     outcome: { win: "获胜", loss: "失利" }, roleId: roleNames, reason: reasonNames, honor: { mvp: "公投 MVP", svp: "公投 SVP" },
     isTarget: { true: "最终刺杀目标为本人", false: "最终刺杀目标不是本人" } };
+  const columns = [
+    { id: "evade", label: "未刺中梅林", caption: "蓝队胜", reason: "assassination", winner: "good" },
+    { id: "hit", label: "刺中梅林", caption: "红队胜", reason: "assassination", winner: "evil" },
+    { id: "quest_fail", label: "3红车", caption: "红队胜", reason: "quest_fail", winner: "evil" },
+  ];
+  const rows = [
+    { id: "merlin", label: "梅林", faction: "good" },
+    { id: "percival", label: "派西维尔", faction: "good" },
+    { id: "servant", label: "其他好人", faction: "good" },
+    { id: "evil", label: "红队全员", faction: "evil" },
+  ].map(row => ({ ...row, scores: columns.map(column => scorePlayer(
+    { seat: 2, roleId: row.id, faction: row.faction, outcome: row.faction === column.winner ? "win" : "loss" },
+    { reason: column.reason, target: 1 }, rules, null).total) }));
+  const bonusDescriptions = {
+    shield: "蓝队获胜时，被最终刺杀的其他好人额外加分，梅林、派西除外。空刀或刺到红队不加分。",
+    honor_mvp: "有效计分局中，胜方公投最佳额外加分。",
+    honor_svp: "有效计分局中，败方公投最佳额外加分。",
+  };
   return { title: rules.title, scopeLabel: rules.scopeLabel, version: rules.version,
+    table: { columns: columns.map(({ id, label, caption }) => ({ id, label, caption })), rows,
+      note: "前两列适用：蓝队3蓝车，或红队提前起刀。表内为每人基础积分，额外奖励另计。" },
+    bonuses: rules.awards.filter(award => Object.hasOwn(bonusDescriptions, award.id)).map(award => ({
+      id: award.id, label: award.label, points: award.points, text: bonusDescriptions[award.id],
+    })),
     items: rules.awards.map(award => {
       const details = Object.entries(award.when).map(([key, value]) => {
         const labels = [].concat(value).map(item => (key === "roleIdNot" ? roleNames[item] : names[key]?.[item]) || String(item)).join("／");

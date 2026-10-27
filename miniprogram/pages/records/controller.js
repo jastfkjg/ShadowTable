@@ -3,6 +3,7 @@ const createHistory = require("../matches/controller");
 const { backToMe } = require("../../profile");
 const { withoutAvatar } = require("../../honors");
 const recordsShare = require("../../records-share");
+const recordCover = require("../../record-share-cover");
 const createSharedPage = require("../shared/controller");
 
 // Both public routes enter the same retained surface; tabs never add pages.
@@ -20,6 +21,7 @@ module.exports = function createRecordsPage(initialTab = "records") {
       if (this.data.sharedSurface) {
         const host = this;
         this.sharedController = createSharedPage();
+        this.sharedController.coverOwner = host;
         this.sharedController.setData = values => {
           Object.assign(this.sharedController.data, values);
           if (host.alive) host.setData({ publicShare: { ...this.sharedController.data } });
@@ -34,13 +36,19 @@ module.exports = function createRecordsPage(initialTab = "records") {
       this.historyController = this.attachController(history, "history");
       return this.ensurePanel(tab);
     },
+    onReady() {
+      if (this.sharedController) return this.sharedController.onReady();
+      this.shareCanvasReady = true;
+      this.prepareRecordsCover();
+    },
+    prepareRecordsCover() { return recordCover.prepare(this, this.data.tab, this.preparedShare); },
     onShareAppMessage() {
       if (this.sharedController) return this.sharedController.onShareAppMessage();
-      return recordsShare.friendContent(this.data.tab, this.preparedShare);
+      return recordCover.friendContent(this, this.data.tab, this.preparedShare);
     },
     onShareTimeline() {
       if (this.sharedController) return this.sharedController.onShareTimeline();
-      const content = recordsShare.timelineContent(this.data.tab, this.preparedShare);
+      const content = recordCover.timelineContent(this, this.data.tab, this.preparedShare);
       return { ...content, query: "tab=" + this.data.tab + "&" + content.query };
     },
     retrySharedRecord() { return this.sharedController?.retrySharedRecord(); },
@@ -91,11 +99,13 @@ module.exports = function createRecordsPage(initialTab = "records") {
       if (key && key === this.shareKey) return;
       this.shareKey = key;
       this.preparedShare = null;
+      this.prepareRecordsCover();
       const sequence = this.shareSequence = (this.shareSequence || 0) + 1;
       if (!selection) { this.sharePromise = null; return; }
       this.sharePromise = recordsShare.create(selection).then(snapshot => {
         if (!this.alive || !this.foreground || sequence !== this.shareSequence || !recordsShare.validId(snapshot?.id)) return null;
         this.preparedShare = snapshot;
+        this.prepareRecordsCover();
         return snapshot;
       }).catch(() => { if (this.alive && sequence === this.shareSequence) this.shareKey = null; return null; });
     },

@@ -26,11 +26,11 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
   const s=new Store(':memory:');
   try {
     const r=fixture(s,undefined,{scoreEnabled:true}),rank=new Leaderboard(s);
-    assert.equal(rank.read('wx:2',new URLSearchParams('metric=points')).me.points,4);
+    assert.equal(rank.read('wx:2',new URLSearchParams('metric=points')).me.points,12);
     const revision=s.scoreRevision('wx:2');
     act(s,r,r.host,'honorStart');
     vote(s,r,1,3,6);vote(s,r,2,3,5);vote(s,r,3,2,6);vote(s,r,4,2,6);vote(s,r,5,3,6);vote(s,r,6,2,5);
-    for(const [uid,total,award] of [['wx:2',5,'honor_mvp'],['wx:3',6,'honor_mvp'],['wx:6',1,'honor_svp']]) {
+    for(const [uid,total,award] of [['wx:2',13,'honor_mvp'],['wx:3',16,'honor_mvp'],['wx:6',1,'honor_svp']]) {
       const score=s.matchFor(uid,r.matchId).score;
       assert.equal(score.total,total);
       assert.deepEqual(score.breakdown.filter(row=>row.id===award).map(row=>row.points),[1]);
@@ -42,13 +42,13 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
     assert.throws(()=>s.scoreLedger('wx:2',0,20,revision),e=>e.status===409);
     s.transaction(()=>honors.closeForRoom(s,s.get(r.code)));
     s.transaction(()=>s.save(s.get(r.code)));
-    assert.equal(s.playerScore('wx:2').points,5);
-    assert.equal(s.playerScore('wx:1').points,4);
+    assert.equal(s.playerScore('wx:2').points,13);
+    assert.equal(s.playerScore('wx:1').points,12);
     assert.equal(s.playerScore('wx:5').points,0);
     s.transaction(()=>s.manageMatches({action:'exclude',matches:[{id:r.matchId,revision:0}]}));
     assert.equal(s.playerScore('wx:2').points,0);
     s.transaction(()=>s.manageMatches({action:'include',matches:[{id:r.matchId,revision:s.matchScoreData(r.matchId).revision}]}));
-    assert.equal(s.playerScore('wx:2').points,5);
+    assert.equal(s.playerScore('wx:2').points,13);
   } finally {s.close();}
 });
 test('票选结算事务回滚不发分，未达人数、未计分与旧规则局不发票选积分',()=>{
@@ -81,29 +81,29 @@ test('更正刀口保留票选奖励，改变胜方撤回奖励；手动总分�
     assert.equal(s.playerScore('wx:2').points,10);
     assert.ok(s.matchFor('wx:2',r.matchId).score.breakdown.some(row=>row.id==='honor_mvp'));
     s.transaction(()=>s.adjustMatchScores(r.matchId,{revision:1,scores:[{uid:'wx:2',points:null}]}));
-    assert.equal(s.playerScore('wx:2').points,5);
+    assert.equal(s.playerScore('wx:2').points,13);
     s.transaction(()=>s.correctMatch(r.matchId,{revision:2,scoreReason:'assassination',scoreTarget:2}));
-    assert.equal(s.playerScore('wx:2').points,5);
+    assert.equal(s.playerScore('wx:2').points,13);
     assert.equal(s.playerScore('wx:5').points,1);
     s.transaction(()=>s.correctMatch(r.matchId,{revision:3,scoreReason:'assassination',scoreTarget:1}));
     assert.equal(honors.view(s,s.get(r.code),r.host).status,'invalidated');
-    assert.equal(s.playerScore('wx:2').points,1);
-    assert.equal(s.playerScore('wx:5').points,3);
+    assert.equal(s.playerScore('wx:2').points,2);
+    assert.equal(s.playerScore('wx:5').points,9);
     assert.ok(!s.matchFor('wx:2',r.matchId).score.breakdown.some(row=>row.id.startsWith('honor_')));
   } finally {s.close();}
 });
-test('三绿刺中梅林坏人每人三分，MVP 额外加一分',()=>{
+test('三绿刺中梅林坏人每人九分，MVP 额外加一分',()=>{
   const s=new Store(':memory:');
   try {
     const r=fixture(s,undefined,{scoreEnabled:true});
     s.transaction(()=>s.correctMatch(r.matchId,{revision:0,scoreReason:'assassination',scoreTarget:1}));
     act(s,r,r.host,'honorStart');
     vote(s,r,1,5,2);vote(s,r,3,5,2);vote(s,r,4,5,2);act(s,r,r.host,'honorClose');
-    assert.equal(s.playerScore('wx:5').points,4);
-    assert.equal(s.playerScore('wx:6').points,3);
-    assert.equal(s.playerScore('wx:2').points,2);
+    assert.equal(s.playerScore('wx:5').points,10);
+    assert.equal(s.playerScore('wx:6').points,9);
+    assert.equal(s.playerScore('wx:2').points,3);
     assert.deepEqual(s.matchFor('wx:5',r.matchId).score.breakdown,[
-      {id:'evil_win',label:'坏人获胜',points:3},{id:'honor_mvp',label:'MVP 票选奖励',points:1}
+      {id:'evil_win',label:'坏人获胜',points:9},{id:'honor_mvp',label:'MVP 票选奖励',points:1}
     ]);
   } finally {s.close();}
 });
@@ -115,12 +115,12 @@ test('票选奖励归对局原月份，重启后保留得分且不会重复结�
   try {
     const r=fixture(s,undefined,{scoreEnabled:true,endedAt});
     act(s,r,r.host,'honorStart');[1,3,4].forEach(i=>vote(s,r,i));act(s,r,r.host,'honorClose');
-    assert.equal(s.scoreForMonth('wx:2','2026-10').points,5);
+    assert.equal(s.scoreForMonth('wx:2','2026-10').points,13);
     assert.equal(s.playerScore('wx:2').points,0);
     s.close();s=new Store(database,{clock:()=>now});
     s.transaction(()=>honors.closeForRoom(s,s.get(r.code)));
-    assert.equal(s.matchFor('wx:2',r.matchId).score.total,5);
-    assert.equal(s.scoreForMonth('wx:2','2026-10').points,5);
+    assert.equal(s.matchFor('wx:2',r.matchId).score.total,13);
+    assert.equal(s.scoreForMonth('wx:2','2026-10').points,13);
     assert.equal(s.playerScore('wx:2').points,0);
   } finally {s.close();fs.rmSync(dir,{recursive:true,force:true});}
 });

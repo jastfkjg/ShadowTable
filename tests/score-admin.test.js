@@ -23,12 +23,12 @@ const adjust=(store,uid,points,mode='delta')=>store.transaction(()=>store.adjust
 test('玩家加减和设置总分保留流水，榜单同步但场均、胜负不变，版本冲突及事务回滚安全',()=>{
  const store=new Store(':memory:');try {
   game(store);const board=new Leaderboard(store),before=store.statsFor('wx:3'),version=store.scoreRevision('wx:3');
-  const first=adjust(store,'wx:3',10);assert.equal(first.after,15);assert.equal(store.statsFor('wx:3').score.average,5);
-  assert.equal(board.read('wx:3',new URLSearchParams('metric=points')).me.points,15);
+  const first=adjust(store,'wx:3',10);assert.equal(first.after,25);assert.equal(store.statsFor('wx:3').score.average,15);
+  assert.equal(board.read('wx:3',new URLSearchParams('metric=points')).me.points,25);
   assert.equal(store.statsFor('wx:3').wins,before.wins);
   assert.throws(()=>store.transaction(()=>store.adjustPlayerScore({uid:'wx:3',points:9,mode:'set',revision:version,reason:'旧版本'})),e=>e.status===409);
   adjust(store,'wx:3',-2,'set');assert.equal(store.statsFor('wx:3').score.total,-2);
-  const records=store.scoreAdjustments('wx:3');assert.deepEqual(records.records.map(row=>row.delta),[-17,10]);assert.doesNotMatch(JSON.stringify(records),/wx:|administrator/);
+  const records=store.scoreAdjustments('wx:3');assert.deepEqual(records.records.map(row=>row.delta),[-27,10]);assert.doesNotMatch(JSON.stringify(records),/wx:|administrator/);
   assert.throws(()=>store.transaction(()=>{store.adjustPlayerScore({uid:'wx:3',points:5,mode:'delta',revision:store.scoreRevision('wx:3'),reason:'回滚测试'});throw Error('rollback');}));
   assert.equal(store.playerScore('wx:3').points,-2);assert.equal(store.scoreAdjustments('wx:3').total,2);
   for(const points of [1.5,NaN,Infinity,1000001,'3'])assert.throws(()=>adjust(store,'wx:3',points),/整数/);
@@ -47,7 +47,7 @@ test('单局多人改分、负分、恢复自动计分和结果重算保留手�
   assert.equal(store.statsFor('wx:3').score.total,15);
   assert.equal(store.matchesFor('wx:3').records[0].score.manualOverride.reason,'现场奖励修正');
   store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:2,reason:'恢复自动规则',scores:[{uid:'wx:3',points:null},{uid:'wx:5',points:null}]}));
-  assert.equal(store.statsFor('wx:3').score.total,5);assert.equal(store.statsFor('wx:5').score.total,3);
+  assert.equal(store.statsFor('wx:3').score.total,5);assert.equal(store.statsFor('wx:5').score.total,9);
   assert.equal(store.matchesFor('wx:3').records[0].score.manualOverride,undefined);
   const revision=store.scoreRevision('wx:3');
   assert.throws(()=>store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:3,reason:'非法批量',scores:[{uid:'wx:3',points:50},{uid:'other',points:20}]})));
@@ -71,13 +71,13 @@ test('调整月份以操作时间计，单局积分归原月份，重启和原�
 test('更正早期胜负时其他对局保持原分，手动单局积分及独立玩家调整保持不变',()=>{
  const store=new Store(':memory:');try {
   const first=game(store),second=game(store),third=game(store);
-  assert.equal(store.matchesFor('wx:3').records.find(row=>row.id===third.matchId).score.total,5);
+  assert.equal(store.matchesFor('wx:3').records.find(row=>row.id===third.matchId).score.total,15);
   store.transaction(()=>store.adjustMatchScores(second.matchId,{revision:0,reason:'手动固定单局',scores:[{uid:'wx:3',points:12}]}));adjust(store,'wx:3',6);
   store.transaction(()=>store.correctMatch(first.matchId,{revision:0,scoreReason:'quest_fail'}));
   const records=store.matchesFor('wx:3').records;
   assert.equal(records.find(row=>row.id===second.matchId).score.total,12);
-  assert.equal(records.find(row=>row.id===third.matchId).score.total,5);
-  assert.equal(store.playerScore('wx:3').points,23);
+  assert.equal(records.find(row=>row.id===third.matchId).score.total,15);
+  assert.equal(store.playerScore('wx:3').points,33);
  }finally{store.close();}
 });
 async function launch(t) {
@@ -103,7 +103,7 @@ test('管理积分无需填写原因，仍检查鉴权来源，跨登录重试�
  const player=a.store.playerScore('wx:1'),body={uid:'wx:1',points:8,mode:'delta',revision:player.revision,requestId:randomUUID()};
  assert.equal((await a.request('/api/admin/score-adjustments',body,{Origin:'https://evil.test'})).status,403);
  assert.equal((await a.request('/api/admin/score-adjustments',{...body,reason:{}})).status,400);
- const first=await a.request('/api/admin/score-adjustments',body);assert.equal(first.status,200);assert.equal(first.data.after,12);
+ const first=await a.request('/api/admin/score-adjustments',body);assert.equal(first.status,200);assert.equal(first.data.after,20);
  await a.login();assert.deepEqual((await a.request('/api/admin/score-adjustments',body)).data,first.data);
  assert.equal((await a.request('/api/admin/score-adjustments',{...body,points:9})).status,409);
  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='adjust-player-score'").get().n,1);

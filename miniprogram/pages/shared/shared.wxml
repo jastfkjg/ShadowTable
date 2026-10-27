@@ -1,3 +1,4 @@
 <import src="./content.wxml" />
 <template is="sharedRecordContent" data="{{loading,error,connectionVisible,sharedRecord,intro,singlePage,authoring,posterAvailable}}" />
+<canvas type="2d" id="record-share-canvas" class="record-share-canvas" aria-hidden="{{true}}" />
 <app-dialog id="app-dialog" />

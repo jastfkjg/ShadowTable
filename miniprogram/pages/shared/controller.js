@@ -1,6 +1,7 @@
 const shares = require("../../records-share");
 const api = require("../../api");
 const { present } = require("../../shared-record-view");
+const recordCover = require("../../record-share-cover");
 module.exports = function createSharedPage() { return {
   data: { loading: true, error: "", sharedRecord: null, intro: null, singlePage: false, authoring: false, posterAvailable: false },
   onLoad(options = {}) {
@@ -22,6 +23,10 @@ module.exports = function createSharedPage() { return {
     }
     return this.loadSharedRecord();
   },
+  onReady() {
+    this.shareCanvasReady = true;
+    recordCover.prepare(this, this.introTab || "records", this.snapshot);
+  },
   async loadSharedRecord() {
     if (this.fetching) return;
     this.fetching = true;
@@ -36,6 +41,7 @@ module.exports = function createSharedPage() { return {
       const sharedRecord = present(snapshot, api.assetUrl);
       this.snapshot = snapshot;
       this.setData({ sharedRecord });
+      recordCover.prepare(this, this.introTab || "records", snapshot);
       if (this.foreground) {
         wx.setNavigationBarTitle?.({ title: sharedRecord.pageTitle });
         if (!this.singlePage) wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
@@ -69,7 +75,7 @@ module.exports = function createSharedPage() { return {
     if (this.data.authoring && this.data.posterAvailable && this.snapshot && !this.data.loading)
       wx.navigateTo({ url: "/pages/share/share?kind=stats" });
   },
-  onShareAppMessage() { return shares.friendContent(this.introTab || "records", this.snapshot); },
-  onShareTimeline() { return shares.timelineContent(this.introTab || "records", this.snapshot); },
+  onShareAppMessage() { return recordCover.friendContent(this, this.introTab || "records", this.snapshot); },
+  onShareTimeline() { return recordCover.timelineContent(this, this.introTab || "records", this.snapshot); },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.snapshot = null; },
 }; };

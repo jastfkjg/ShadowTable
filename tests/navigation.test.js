@@ -500,9 +500,10 @@ test('首页与我的朋友圈分享使用品牌封面，返回前台恢复两�
       p.onLoad();assert.equal(menus.length,1);
       const initial=route==='lobby'?0:1;
       assert.equal(p.onShareTimeline().query,'main='+initial);
-      assert.equal(p.onShareTimeline().title,'来一局阿瓦隆，一起入座');
+      assert.equal(p.onShareTimeline().title,'桌边助手 · 阿瓦隆线下助手');
       assert.equal(p.onShareTimeline().imageUrl,'/assets/share-cover.jpg');
       assert.equal(p.onShareAppMessage().path,'/pages/lobby/lobby');
+      assert.equal(p.onShareAppMessage().title,'桌边助手 · 阿瓦隆线下助手');
       await p.onShow();assert.equal(menus.length,2);
       await p.switchMainTab(1-initial);
       assert.equal(p.onShareTimeline().query,'main='+(1-initial));
@@ -1259,6 +1260,51 @@ test('按钮与菜单分享同一房间实例，只用专用封面，不包含�
   assert.doesNotMatch(JSON.stringify(content), /梅林|私密同伴|players|ready|occupied/);
   c.p.clearRoom();
   assert.equal(c.p.onShareAppMessage().path, '/pages/lobby/lobby');
+});
+test('公开记录从三个路由转发时均使用宿主页画布，好友与朋友圈共享动态封面', async () => {
+  const snapshot = require('./helpers/record-share-fixtures').funSummary;
+  for (const route of ['stats', 'matches', 'shared']) {
+    const owners = [], selectors = [];
+    const ctx = new Proxy({ measureText: text => ({ width: Array.from(text).length * 28 }) }, { get: (target, key) => key in target ? target[key] : () => {} });
+    const canvas = { getContext: () => ctx, createImage: () => ({ width: 800, height: 640, set src(value) { queueMicrotask(() => this.onload()); } }) };
+    const c = page(route, apiBase, { home: true, wx: {
+      showShareMenu() {}, hideShareMenu() {}, request: o => o.success({ statusCode: 200, data: snapshot }),
+      createSelectorQuery: () => ({ in(owner) { owners.push(owner);return this; }, select(id) { selectors.push(id);return this; }, fields() { return this; }, exec(callback) { callback([{ node: canvas }]); } }),
+      canvasToTempFilePath(options, owner) { owners.push(owner);options.success({ tempFilePath: 'fun-cover.png' }); },
+    } });
+    try {
+      await c.p.onLoad({ share: snapshot.id });
+      assert.equal(c.p.onShareAppMessage().imageUrl, '/assets/share-cover.jpg');
+      c.p.onReady();
+      const share = c.p.onShareAppMessage();
+      assert.equal((await share.promise).imageUrl, 'fun-cover.png');
+      assert.equal(c.p.onShareTimeline().imageUrl, 'fun-cover.png');
+      assert.equal(c.p.onShareTimeline().query, 'share=' + snapshot.id);
+      assert.ok(owners.every(owner => owner === c.p));
+      assert.deepEqual(selectors, ['#record-share-canvas']);
+    } finally { c.p.onUnload(); }
+  }
+});
+test('本人记录三标签在快照生成后更新封面，玩法筛选与快照链接保持一致', async () => {
+  const fixtures = require('./helpers/record-share-fixtures'), drawn = [];
+  const rawStats = { ...emptyStats, ...require('./helpers/share-fixtures').stats, byBoard: [], recent: [] };
+  const ctx = new Proxy({ measureText: text => ({ width: Array.from(text).length * 28 }), fillText: text => drawn.push(text) }, { get: (target, key) => key in target ? target[key] : () => {} });
+  const canvas = { getContext: () => ctx, createImage: () => ({ width: 800, height: 640, set src(value) { queueMicrotask(() => this.onload()); } }) };
+  let exports = 0;
+  const c = page('stats', { ...apiBase, request: async (url, method, selection) => url === '/api/me/shares' ? fixtures[selection.kind]
+    : url.includes('/matches') ? { records: [{ id: 'private-match', boardName: '阿瓦隆 · 经典基础', role: '梅林', faction: 'good', outcome: 'win', endedAt: 1, members: [] }], total: 1, hasMore: false } : rawStats },
+  { home: true, wx: { showShareMenu() {}, createSelectorQuery: () => ({ in() { return this; }, select() { return this; }, fields() { return this; }, exec(callback) { callback([{ node: canvas }]); } }),
+    canvasToTempFilePath(options) { options.success({ tempFilePath: 'cover-' + (++exports) + '.png' }); } } });
+  try {
+    await c.p.onLoad();c.p.onReady();
+    for (const [tab, title, hero] of [['records', '战绩统计', '52.6%'], ['matches', '对局记录', '19 局'], ['fun', '趣味记录', '1 项']]) {
+      await c.p.switchPanel(tab);await new Promise(resolve => setImmediate(resolve));await c.p.sharePromise;
+      const content = await c.p.onShareAppMessage().promise;
+      assert.equal(content.path, '/pages/shared/shared?share=' + c.p.preparedShare.id);
+      assert.equal(c.p.onShareTimeline().imageUrl, content.imageUrl);
+      assert.ok(drawn.includes(title));assert.ok(drawn.includes(hero));
+    }
+  } finally { c.p.onUnload(); }
 });
 test('离开牌桌遮盖身份；未确认操作在内存中恢复并复用请求编号', async () => {
   let calls = 0; const ids = [];

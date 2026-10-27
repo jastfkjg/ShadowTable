@@ -111,7 +111,7 @@ module.exports = function createHomePage(initialTab = 0) {
     about() { return this.personalController.about(); },
     dismissMonthlyReset() { return this.personalController.dismissMonthlyReset(); },
     blockMonthlyResetScroll() {},
-    onShareAppMessage() { return { title: "来一局阿瓦隆，一起入座", path: "/pages/lobby/lobby", imageUrl: "/assets/share-cover.jpg" }; },
+    onShareAppMessage() { return { title: "桌边助手 · 阿瓦隆线下助手", path: "/pages/lobby/lobby", imageUrl: "/assets/share-cover.jpg" }; },
     onShareTimeline() {
       const { title, imageUrl } = this.onShareAppMessage();
       return { title, imageUrl, query: "main=" + this.data.activeTab };

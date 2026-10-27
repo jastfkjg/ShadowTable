@@ -2349,7 +2349,17 @@ function roomListItems(rooms) {
   }
   function viewScoreRules() {
     const rules = state.scoringRules;
-    return '<section class="personal-section"><h2 class="page-subtitle">积分规则</h2>' + (state.scoringError ? '<div role="alert">' + esc(state.scoringError) + btn('secondary','loadScoreRules','重试') : '') + (!rules ? '<div class="muted">正在读取积分规则…</div>' : '<p class="muted">' + esc(rules.scopeLabel) + '</p>' + rules.items.map(item => '<p><strong>' + esc(item.label) + '</strong><br><span class="muted">' + esc(item.text) + '</span></p>').join('') + rules.notes.map(note => '<p class="small muted">' + esc(note) + '</p>').join('')) + '</section>';
+    let html = '<section class="personal-section score-rules"><h2 class="page-subtitle">积分规则</h2>';
+    if (state.scoringError) html += '<div role="alert">' + esc(state.scoringError) + btn('secondary','loadScoreRules','重试') + '</div>';
+    if (!rules) return html + (state.scoringError ? '' : '<div class="muted" role="status">正在读取积分规则…</div>') + '</section>';
+    if (rules.table) {
+      html += '<h3>基础积分 <span class="small muted">每人 / 分</span></h3><p class="muted">' + esc(rules.table.note) + '</p>';
+      html += '<div class="score-rules-table"><table><caption class="sr-only">角色与三种结局的基础积分对照表</caption><thead><tr><th scope="col">角色 / 阵营</th>';
+      html += rules.table.columns.map(column => '<th scope="col">' + esc(column.label) + '<span class="score-rules-caption">' + esc(column.caption) + '</span></th>').join('') + '</tr></thead><tbody>';
+      html += rules.table.rows.map(row => '<tr><th scope="row" class="score-rules-role ' + esc(row.faction) + '">' + esc(row.label) + '</th>' + row.scores.map(points => '<td class="' + (points === 0 ? 'is-zero' : '') + '">' + (points > 0 ? '+' : '') + esc(points) + '</td>').join('') + '</tr>').join('');
+      html += '</tbody></table></div><h3>额外加分</h3>' + rules.bonuses.map(bonus => '<div class="score-rules-bonus ' + (bonus.id === 'shield' ? 'is-shield' : '') + '"><h4>' + esc(bonus.label) + '<span>' + (bonus.points > 0 ? '+' : '') + esc(bonus.points) + ' 分</span></h4><p class="muted">' + esc(bonus.text) + '</p></div>').join('');
+    } else html += rules.items.map(item => '<p><strong>' + esc(item.label) + '</strong><br><span class="muted">' + esc(item.text) + '</span></p>').join('');
+    return html + '<h3>计分范围</h3><p class="muted">' + esc(rules.scopeLabel) + '</p><h3>补充说明</h3>' + rules.notes.map(note => '<p class="small muted">' + esc(note) + '</p>').join('') + '</section>';
   }
   function viewStats() {
     var html = '<section class="stats-content" aria-label="我的战绩" aria-busy="' + state.statsLoading + '">';
