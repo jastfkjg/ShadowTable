@@ -1,6 +1,6 @@
 <app-nav title="确认网页登录" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page web-login-page">
-  <view wx:if="{{loading}}" class="status" role="status">正在读取登录请求…</view>
+  <view wx:if="{{loading && !connectionVisible}}" class="status" role="status">正在读取登录请求…</view>
   <block wx:elif="{{status==='confirmed' || status==='consumed'}}">
     <view class="login-title">已确认登录</view>
     <view class="login-copy">请返回发起登录的浏览器。网页将使用当前小程序账号，资料与战绩保持一致。</view>
@@ -24,12 +24,12 @@
     </view>
     <view class="login-copy">确认后，此浏览器可查看你的资料、战绩和身份，并以你的账号参与对局。仅确认你自己打开的网页。</view>
     <view class="login-copy">网页原有游客记录不会合并到此账号。</view>
-    <view wx:if="{{error}}" class="inline-error" role="alert">{{error}}</view>
+    <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert">{{error}}</view>
     <view wx:if="{{!terminal && request}}" class="login-actions">
       <button class="primary" bindtap="confirm" loading="{{busy}}" disabled="{{busy || loading || status!=='scanned'}}" hover-class="none">确认登录</button>
       <button class="secondary" bindtap="reject" disabled="{{busy || loading}}" hover-class="none">取消登录</button>
     </view>
-    <button wx:if="{{error && !terminal}}" class="secondary" bindtap="load" disabled="{{busy || loading}}" hover-class="none">重新读取请求</button>
+    <button wx:if="{{error && !connectionVisible && !terminal}}" class="secondary" bindtap="load" disabled="{{busy || loading}}" hover-class="none">重新读取请求</button>
     <button wx:if="{{terminal}}" class="secondary" bindtap="back" hover-class="none">返回小程序</button>
   </block>
 </view>

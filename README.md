@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/avalon-icon.png" alt="桌边助手图标" width="88" height="88">
+  <img src="docs/images/avalon-icon.png" alt="桌边助手头像：雾蓝蜡笔梅林" width="88" height="88">
 </p>
 
 <h1 align="center">桌边助手 · ShadowTable</h1>

@@ -12,8 +12,8 @@
 <app-nav title="月度战报" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page monthly-page">
   <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="选择月报月份"><view class="monthly-month-picker">{{report?report.monthLabel:month}}<view class="monthly-picker-arrow" aria-hidden="true" /></view></picker><view class="monthly-title">月度战报</view><view wx:if="{{report}}" class="monthly-preview-status"><view class="monthly-status-dot" aria-hidden="true" />{{report.statusLabel}}</view></view></view>
-  <view wx:if="{{loading}}" class="status" role="status">正在生成月度战报…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button class="secondary" bindtap="retry" disabled="{{loading}}" hover-class="none">重试</button></view>
+  <view wx:if="{{loading && !connectionVisible}}" class="status" role="status">正在生成月度战报…</view>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><text>{{error}}</text><button class="secondary" bindtap="retry" disabled="{{loading}}" hover-class="none">重试</button></view>
   <block wx:if="{{report && !loading}}">
     <view class="monthly-overview"><view><text class="monthly-overview-value">{{report.overview.games}}</text><text class="monthly-caption">有效对局</text></view><view><text class="monthly-overview-value">{{report.overview.players}}</text><text class="monthly-caption">参赛玩家</text></view><button hover-class="none" bindtap="openRules" aria-label="查看月报统计说明"><image src="/assets/record-info.svg" aria-hidden="true" /></button></view>
     <view wx:if="{{!report.canShare}}" class="monthly-empty"><view>这个月还没有有效对局</view><text class="monthly-caption">换一个月份，或完成对局后再来看看。</text></view>

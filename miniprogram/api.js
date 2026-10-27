@@ -1,8 +1,15 @@
 const config = require("./config");
+const connection = require("./page-connection");
 let retryAt = 0, cacheEpoch = 0;
 const roomCache = new Map();
 const copy = value => JSON.parse(JSON.stringify(value));
 function request(path, method = "GET", data, requestId) {
+  const observation = connection.begin(path, method);
+  return performRequest(path, method, data, requestId).then(value => {
+    connection.finish(observation);return value;
+  }, error => { connection.finish(observation, error);throw error; });
+}
+function performRequest(path, method = "GET", data, requestId) {
   if (Date.now() < retryAt)
     return Promise.reject(
       Object.assign(new Error("请求冷却中，请稍后重试"), {
@@ -76,8 +83,11 @@ function request(path, method = "GET", data, requestId) {
 let loginPromise;
 async function login() {
   if (loginPromise) return loginPromise;
+  const observation = wx.getStorageSync("session") ? null : connection.begin("/api/login", "AUTH");
   loginPromise = loginOnce();
-  try { return await loginPromise; } finally { loginPromise = null; }
+  try { const result = await loginPromise;connection.finish(observation);return result; }
+  catch (error) { connection.finish(observation, error);throw error; }
+  finally { loginPromise = null; }
 }
 async function loginOnce() {
   if (wx.getStorageSync("session")) return;

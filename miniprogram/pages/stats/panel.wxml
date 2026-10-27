@@ -1,7 +1,7 @@
 <template name="statisticsPanel">
 <view class="page personal-page stats-page">
-  <view wx:if="{{loading && !stats}}" class="status" role="status">正在读取战绩…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="stats-pressed" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
+  <view wx:if="{{loading && !stats && !connectionVisible}}" class="status" role="status">正在读取战绩…</view>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="stats-pressed" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
   <block wx:if="{{stats}}">
     <view class="overview-card" aria-label="战绩概览">
       <view class="overview-metrics">
