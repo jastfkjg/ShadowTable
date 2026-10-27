@@ -9,6 +9,7 @@ const resultRegistration = require("../../result-registration");
 const publicHistory = require("../../public-history");
 const roomSwipe = require("../../room-swipe");
 const roomList = require("../../room-list");
+const connectionFeedback = require("../../connection-feedback");
 const roomConfirmation = require("../../room-confirmation");
 const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
@@ -242,6 +243,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     loading: true,
     roomsRefreshing: false,
     roomsSyncLabel: "",
+    ...connectionFeedback.initial,
     busy: false,
     error: "",
     reconnecting: false,
@@ -397,6 +399,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.dismissRoomSwipe();
     this.resetEntryFocus();
     clearTimeout(this.timer);
+    clearTimeout(this.connectionClockTimer);
     this.mask();
   },
   onPageScroll() {
@@ -418,6 +421,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.clearRoomFeedback();
     this.cancelEntryAutoFocus();
     clearTimeout(this.timer);
+    clearTimeout(this.connectionClockTimer);
     wx.offNetworkStatusChange(this.networkListener);
     this.mask();
   },
@@ -494,6 +498,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   async bootstrap() {
     this.setData({ loading: true, error: "" });
+    const attempt = this.beginConnectionAttempt();
     try {
       if (this.invalidInvitation) { this.showInvitationError("房间邀请无效，请让朋友重新分享"); return; }
       await api.login();
@@ -542,6 +547,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.handleError(e);
     } finally {
       this.setData({ loading: false });
+      this.finishConnectionAttempt(attempt);
       this.schedule();
     }
   },
@@ -665,10 +671,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.dismissRoomSwipe();
       this.updateChangedData({ memberRooms: items, roomsSyncLabel, activeRooms: items.filter(r => r.status === "playing" && r.available !== false),
         ...roomList.present(items, this.data.roomListFilter, this.roomsServerTime), serverConnected: true, network: true });
+      this.syncConnectionFeedback();
     }
   },
   handleError(e) {
     this.mask();
+    this.connectionAttemptActive = false;
     if (e.status === 403 && e.message === "你已被房主移出房间") {
       this.pending = null;
       this.clearRoom();
@@ -679,9 +687,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if ((!e.status || e.status >= 500 || e.status === 429) && e.retryable !== false) {
       this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
       if (e.status === 429) this.rateLimitUntil = Date.now() + (e.retryAfterMs || 60000);
+      this.connectionFailure = e.status === 429 ? "rate" : /timeout|timed out|超时/i.test(e.message || "") ? "timeout" : "failed";
+      this.connectionRetryAt = this.data.network
+        ? Date.now() + Math.max(connectionFeedback.retryDelay(this.reconnectAttempts, Math.random()), (this.rateLimitUntil || 0) - Date.now()) : 0;
       this.setData({ reconnecting: true, error: "", recoverableError: false, serverConnected: false,
         hasPendingRequest: !!this.pending,
         notice: e.status === 429 && !this.pending ? "请求较多，冷却后会自动刷新" : "" });
+      this.syncConnectionFeedback();
       this.schedule();
       return;
     }
@@ -694,6 +706,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         !e.status || e.status === 401 || e.status === 429 || e.status >= 500,
       hasPendingRequest: !!this.pending,
     });
+    this.connectionRetryAt = 0;
+    this.syncConnectionFeedback();
   },
   blockScroll() {},
   dismissError() {
@@ -704,11 +718,51 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     });
   },
   connectionRecovered() {
+    // A successful list read cannot confirm an earlier uncertain write.
+    if (this.pending && this.data.hasPendingRequest) { this.syncConnectionFeedback(); return; }
     this.reconnectAttempts = 0;
+    this.connectionRetryAt = 0;
+    this.connectionFailure = "";
+    this.rateLimitUntil = 0;
     this.updateChangedData({ reconnecting: false });
+    this.syncConnectionFeedback();
+  },
+  syncConnectionFeedback() {
+    if (!this.alive) return;
+    const values = connectionFeedback.present(this.data, { active: this.connectionAttemptActive,
+      startedAt: this.connectionAttemptStartedAt, retryAt: this.connectionRetryAt,
+      failure: this.connectionFailure, rateLimitUntil: this.rateLimitUntil, pending: this.pending }, Date.now());
+    // Quiet background reads should not commit invisible initial idle fields.
+    if (values.connectionPhase === "idle" && !this.data.connectionPhase) return;
+    this.updateChangedData(values);
+  },
+  beginConnectionAttempt() {
+    if (this.connectionAttemptActive) return 0;
+    const token = this.connectionAttemptToken = (this.connectionAttemptToken || 0) + 1;
+    this.connectionAttemptActive = true;
+    this.connectionAttemptStartedAt = Date.now();
+    this.connectionRetryAt = 0;
+    this.syncConnectionFeedback();
+    this.schedule();
+    return token;
+  },
+  finishConnectionAttempt(token) {
+    if (!token || token !== this.connectionAttemptToken) return;
+    this.connectionAttemptActive = false;
+    this.syncConnectionFeedback();
+  },
+  startConnectionClock() {
+    clearTimeout(this.connectionClockTimer);
+    if (!this.alive || !this.foreground ||
+        !(this.connectionAttemptActive || this.data.network && this.connectionRetryAt > Date.now())) return;
+    this.connectionClockTimer = setTimeout(() => {
+      if (!this.alive || !this.foreground) return;
+      this.syncConnectionFeedback();
+      this.startConnectionClock();
+    }, 1000);
   },
   async recoverConnection() {
-    if (!this.alive || !this.foreground || this.recovering || this.data.busy || this.data.loading || this.data.needsLogin) return;
+    if (!this.alive || !this.foreground || this.recovering || this.connectionAttemptActive || this.data.busy || this.data.loading || this.data.roomsRefreshing || this.data.needsLogin) return;
     if (Date.now() < (this.rateLimitUntil || 0)) { this.schedule(); return; }
     this.recovering = true;
     try {
@@ -719,17 +773,24 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   retryLobbyConnection() {
-    if (!this.alive || !this.foreground || this.recovering || this.data.busy || this.data.loading || this.data.roomsRefreshing) return;
+    if (!this.alive || !this.foreground || this.recovering || this.connectionAttemptActive || this.data.busy || this.data.loading || this.data.roomsRefreshing) return;
+    if (Date.now() < (this.rateLimitUntil || 0)) { this.schedule(); return; }
     // Login recovery is deliberately excluded from automatic retries.
     return this.data.needsLogin ? this.retry() : this.recoverConnection();
   },
   schedule() {
     clearTimeout(this.timer);
+    if (this.data.reconnecting && this.data.network && !this.connectionAttemptActive && !this.connectionRetryAt)
+      this.connectionRetryAt = Date.now() + Math.max(connectionFeedback.retryDelay(this.reconnectAttempts, Math.random()), (this.rateLimitUntil || 0) - Date.now());
+    this.syncConnectionFeedback();
+    this.startConnectionClock();
     if (!this.foreground || !this.alive || (!this.roomCode && !this.data.reconnecting)) return;
+    if (!this.data.network || this.data.needsLogin || this.connectionAttemptActive) return;
     const delay = this.data.reconnecting
-      ? Math.min(15000, 1000 * 2 ** Math.min(4, Math.max(0, (this.reconnectAttempts || 1) - 1))) * (0.8 + Math.random() * 0.2)
+      ? Math.max(0, this.connectionRetryAt - Date.now(), this.data.busy || this.data.loading || this.data.roomsRefreshing ? 1000 : 0)
       : this.data.room?.honors?.status === "open" ? 2500 : ["lobby", "ended", "terminated"].includes(this.data.room?.phase) ? Math.min(10000, 2500 * (1 + Math.floor((this.unchangedPolls || 0) / 4))) : 2500;
     this.timer = setTimeout(async () => {
+      this.timer = null;
       if (this.data.reconnecting) {
         if (this.data.network) await this.recoverConnection();
       } else if (this.roomCode && !this.data.busy && !this.pending && !this.data.error && !this.recovering) {
@@ -1069,7 +1130,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       else await this.loadRooms();
       if (this.alive && !this.data.error && !this.data.reconnecting) wx.showToast?.({ title: "牌桌已更新", icon: "none" });
     } catch (e) { this.handleError(e); }
-    finally { this.setData({ roomsRefreshing: false }); }
+    finally { this.setData({ roomsRefreshing: false }); this.schedule(); }
   },
   openRoomMenu(e) {
     if (this.data.busy || this.pending) return;
@@ -1689,11 +1750,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   async retry() {
-    this.setData({ error: "", recoverableError: false });
-    if (this.pending) return this.executePending();
-    if (this.data.needsLogin || !this.data.boards.length)
-      return this.bootstrap();
+    const attempt = this.beginConnectionAttempt();
+    let reading = false;
     try {
+      this.setData({ error: "", recoverableError: false });
+      if (this.pending) return await this.executePending();
+      if (this.data.needsLogin || !this.data.boards.length) return await this.bootstrap();
+      reading = true;
       this.setData({ loading: true });
       if (this.roomCode) await this.refresh();
       else if (this.data.isLobby) await this.refreshLobby();
@@ -1702,7 +1765,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     } catch (e) {
       this.handleError(e);
     } finally {
-      this.setData({ loading: false });
+      if (reading) this.setData({ loading: false });
+      this.finishConnectionAttempt(attempt);
+      this.schedule();
     }
   },
   submitEntry(e) {

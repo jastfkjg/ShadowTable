@@ -11,6 +11,7 @@ const shareTitleWidth = Math.max(44, Math.min(windowWidth * .52, 2 * ((menu?.lef
 Component({
   properties: {
     title: { type: String, value: "" },
+    connectionContext: { type: String, value: "" },
     back: { type: Boolean, value: false },
     backLabel: { type: String, value: "返回" },
     backText: { type: String, value: "" },

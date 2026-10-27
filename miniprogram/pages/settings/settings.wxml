@@ -1,8 +1,8 @@
 <app-nav title="房间设置" back="{{true}}" backLabel="返回牌桌" bindback="back" />
 <view class="page settings-page">
-  <view wx:if="{{loading}}" class="muted">正在加载房间设置…</view>
-  <view wx:if="{{error}}" class="settings-error" role="alert">{{error}}</view>
-  <button hover-class="none" wx:if="{{error && authorized && (dirty || pendingSave)}}" class="secondary" bindtap="save" disabled="{{busy || refreshing || pendingTransfer || pendingKick}}">重试保存</button>
+  <view wx:if="{{loading && !connectionVisible}}" class="muted">正在加载房间设置…</view>
+  <view wx:if="{{error && !connectionVisible}}" class="settings-error" role="alert">{{error}}</view>
+  <button hover-class="none" wx:if="{{error && !connectionVisible && authorized && (dirty || pendingSave)}}" class="secondary" bindtap="save" disabled="{{busy || refreshing || pendingTransfer || pendingKick}}">重试保存</button>
   <block wx:if="{{!loading && authorized}}">
     <view class="settings-header">
       <view class="settings-eyebrow">房间 {{room.code}} · 管理员</view>

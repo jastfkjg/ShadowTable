@@ -1,6 +1,6 @@
 <template name="help-scoring">
   <view wx:if="{{scoringLoading && !scoringRules}}" class="help-copy" role="status">正在读取计分规则…</view>
-  <view wx:if="{{scoringError}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
+  <view wx:if="{{scoringError && !connectionVisible}}" role="alert" class="help-copy">{{scoringError}}<button hover-class="none" class="secondary" bindtap="loadScoreRules">重试</button></view>
   <block wx:if="{{scoringRules}}">
     <view class="help-score-scope"><view wx:if="{{scoringOnly}}" class="help-heading">计分范围</view><view class="help-copy">{{scoringRules.scopeLabel}}</view></view>
     <view wx:if="{{scoringOnly}}" class="help-heading help-score-heading">加分项目</view>
@@ -22,10 +22,10 @@
       <view wx:for="{{references}}" wx:key="id" wx:for-item="reference" class="help-section">
         <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleReference" data-id="{{reference.id}}" data-index="{{reference.index}}" aria-expanded="{{reference.expanded}}" aria-controls="{{'help-reference-'+reference.id}}"><image class="help-reference-icon" src="{{'/assets/'+reference.icon+'.svg'}}" aria-hidden="true" /><view class="help-toggle-copy"><view class="help-heading">{{reference.title}}</view><view class="help-caption">{{reference.subtitle}}</view></view><view class="help-chevron {{reference.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
         <view wx:if="{{reference.expanded}}" class="help-answers" id="{{'help-reference-'+reference.id}}">
-          <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError}}" />
+          <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible}}" />
           <block wx:elif="{{reference.id === 'boards'}}">
-            <view wx:if="{{loadingBoards}}" class="help-copy" role="status">正在加载板子介绍…</view>
-            <view wx:elif="{{boardError}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
+            <view wx:if="{{loadingBoards && !connectionVisible}}" class="help-copy" role="status">正在加载板子介绍…</view>
+            <view wx:elif="{{boardError && !connectionVisible}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
             <view wx:elif="{{!reference.boards.length}}" class="help-copy">暂无匹配的可用板子。</view>
             <view wx:for="{{reference.boards}}" wx:key="id" wx:for-item="board" class="help-board"><view class="help-step-title">{{board.name}}</view><view class="help-copy">{{board.description}}</view><view class="help-caption">选择人数，查看规则</view><view class="help-board-links {{board.choices.length === 1 ? 'help-board-links-single' : ''}}"><button hover-class="none" wx:for="{{board.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{board.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view></view>
           </block>
@@ -35,6 +35,6 @@
     </view>
     <view class="help-footnote">线下讨论，线上辅助记录与操作。</view>
   </block>
-  <template wx:else is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,scoringOnly}}" />
+  <template wx:else is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible,scoringOnly}}" />
 </view>
 <app-dialog id="app-dialog" />

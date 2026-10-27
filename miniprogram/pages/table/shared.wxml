@@ -179,16 +179,15 @@
       <view wx:if="{{isLobby}}" class="home-brand-symbol" aria-hidden="true"><image src="/assets/record-shield.svg" /></view>
       <text class="brand-mark">桌边助手</text>
       <button hover-class="none" class="connection-button" bindtap="connectionInfo" aria-label="{{reconnecting?'正在重连服务器':!network || needsLogin ? '服务器连接异常' : loading || roomsRefreshing || busy || hasPendingRequest ? '正在同步' : serverConnected ? '服务器连接正常' : '服务器连接未确认'}}">
-        <view class="connection-dot {{reconnecting?'pending':!network || needsLogin ? 'offline' : loading || roomsRefreshing || busy || hasPendingRequest ? 'pending' : serverConnected ? 'online' : 'offline'}}" />
-        <text wx:if="{{isLobby ? reconnecting || loading || roomsRefreshing || busy || hasPendingRequest : reconnecting || !network || needsLogin}}" class="connection-label">{{isLobby?'同步中':reconnecting?'重连中':!network || needsLogin?'连接断开':loading || roomsRefreshing || busy || hasPendingRequest?'同步中':serverConnected?'已连接':'连接中'}}</text>
+        <view class="connection-dot {{isLobby && connectionPhase==='connecting'?'pending':!network || needsLogin?'offline':reconnecting || loading || roomsRefreshing || busy || hasPendingRequest?'pending':serverConnected?'online':'offline'}}" />
+        <text wx:if="{{isLobby ? reconnecting || loading || roomsRefreshing || busy || hasPendingRequest || !network || needsLogin : reconnecting || !network || needsLogin}}" class="connection-label">{{isLobby?(connectionPhase==='connecting'?'同步中':needsLogin?'待登录':!network?'未连接':connectionPhase==='waiting' || reconnecting?'等待重连':'同步中'):reconnecting?'重连中':!network || needsLogin?'连接断开':loading || roomsRefreshing || busy || hasPendingRequest?'同步中':serverConnected?'已连接':'连接中'}}</text>
       </button>
     </view>
     <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry home-help" bindtap="openHelp" aria-label="打开使用帮助"><image class="home-help-icon" src="/assets/home-help.svg" aria-hidden="true" /></button>
   </view>
   <button hover-class="none" wx:if="{{!isLobby && !room && !loading && !invitation}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
-  <view wx:if="{{isLobby && !invitation && !room}}"><include src="../home/connection-state.wxml" /></view>
-  <view wx:if="{{!isLobby && loading && !invitation}}" class="status" role="status">正在连接牌桌…</view>
-  <view wx:if="{{error}}" class="dialog-backdrop" catchtouchmove="blockScroll">
+  <view wx:if="{{!room && !entrySheet}}"><include src="../home/connection-state.wxml" /></view>
+  <view wx:if="{{error && !needsLogin}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="操作提示">
       <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>
       <view class="dialog-message">{{error}}</view>
@@ -285,14 +284,12 @@
       <view class="process-sheet-footer table-sheet-footer"><view wx:if="{{toolType==='vote' || toolType==='quest' || (room.knights && toolType==='assassination')}}" class="process-selection-summary small muted">已选 {{toolSeats.length}} 人{{toolType==='vote' && !toolSeats.length?' · 全员投票':''}}</view><button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">{{toolType==='quest'?'发起任务':toolType==='vote'?(toolSeats.length?'发起投票':'发起全员投票'):'发起'}}</button><button hover-class="none" class="text-button" bindtap="closeTool" disabled="{{busy}}">取消</button></view>
     </view>
   </view>
-  <view wx:if="{{!isLobby && reconnecting}}" class="notice" role="status"><view>{{hasPendingRequest?'正在确认提交结果，请勿重复提交':'连接中断，正在重连；当前显示上次同步的内容'}}</view><button hover-class="none" class="text-button" bindtap="recoverConnection" disabled="{{busy || loading}}">立即重试</button></view>
-  <view wx:if="{{notice && !(isLobby && reconnecting)}}" class="notice">{{notice}}</view>
+  <view wx:if="{{notice && !reconnecting}}" class="notice">{{notice}}</view>
   <view wx:if="{{invitation && !room && !isLobby}}" class="room-invitation">
     <text class="invitation-eyebrow">朋友邀请你同桌</text>
     <view class="invitation-title">{{invitation.code ? '房间 '+invitation.code : '房间邀请'}}</view>
     <view wx:if="{{invitation.boardName}}" class="invitation-board">{{invitation.boardName}}</view>
     <view wx:if="{{invitationError}}" class="invitation-message" role="alert">{{invitationError}}</view>
-    <view wx:elif="{{loading || busy}}" class="invitation-message" role="status">{{hasPendingRequest?'正在确认加入结果…':'正在进入房间…'}}</view>
     <form wx:if="{{invitationNeedsName && !invitationError}}" bindsubmit="submitInvitation" class="invitation-form">
       <label class="label" for="invite-nickname">玩家昵称</label>
       <input id="invite-nickname" class="input {{entryNameError?'has-error':''}}" name="nickname" type="nickname" maxlength="16" value="{{name}}" bindinput="inputName" placeholder="填写或选择微信昵称" disabled="{{busy || hasPendingRequest}}" />
@@ -433,8 +430,8 @@
         <button hover-class="none" wx:if="{{room.me.isHost}}" class="lobby-header-link lobby-settings" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}"><image class="lobby-header-icon" src="/assets/room-settings.svg" aria-hidden="true" /><text class="lobby-header-label">房间设置</text><view class="lobby-header-chevron" aria-hidden="true" /></button>
       </view>
       <view wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="small muted" role="status">{{room.phase==='ended' || room.phase==='terminated'?'本局已结束，你正在旁观；房主重开后可手动入座。':'本局进行中，你正在旁观；下一局可手动入座。'}}</view>
-      <button hover-class="none" wx:if="{{reconnecting || !network || needsLogin}}" class="lobby-connection" bindtap="connectionInfo" aria-label="查看连接状态"><view class="connection-dot {{reconnecting?'pending':'offline'}}" /><text>{{reconnecting?'正在重连…':'连接断开，点击查看'}}</text></button>
     </view>
+    <include src="../home/connection-state.wxml" />
     <view wx:if="{{showRoomRules && !error}}" class="dialog-backdrop room-rules-backdrop" catchtouchmove="blockScroll">
       <view class="error-dialog room-rules-sheet {{roomRulesMeasuring?'is-measuring':''}} {{roomRulesBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="角色配置">
         <view class="room-rules-sheet-top"><view class="entry-sheet-handle" aria-hidden="true" /><view class="entry-sheet-heading"><view class="entry-sheet-title"><view class="room-sheet-symbol" aria-hidden="true"><image src="/assets/sheet-shield.svg" /></view><text>角色配置</text></view><button class="room-rules-close" hover-class="entry-option-pressed" bindtap="closeRoomRules" aria-label="关闭角色配置"><view class="room-sheet-close-icon" aria-hidden="true" /></button></view></view>

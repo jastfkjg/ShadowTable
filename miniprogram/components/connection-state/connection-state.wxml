@@ -1,0 +1,1 @@
+<view wx:if="{{connectionVisible}}" class="page-connection"><include src="../../pages/home/connection-state.wxml" /></view>

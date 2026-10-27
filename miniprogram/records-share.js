@@ -31,6 +31,7 @@ async function create(selection) {
 function read(id) {
   if (!validId(id)) return Promise.reject(new Error("分享链接无效，请让好友重新分享。"));
   // A Moments single page has no login or shared storage. Do not use api.request.
+  const connection = require("./page-connection"), observation = connection.begin("/api/shares/" + id);
   return new Promise((resolve, reject) => wx.request({
     url: require("./api").assetUrl("/api/shares/" + id), method: "GET", timeout: 10000,
     success(response) {
@@ -38,7 +39,7 @@ function read(id) {
       else reject(Object.assign(new Error(response.data?.error || "分享暂时无法读取，请稍后重试。"), { status: response.statusCode }));
     },
     fail: () => reject(new Error("分享暂时无法读取，请检查网络后重试。")),
-  }));
+  })).then(value => { connection.finish(observation);return value; }, error => { connection.finish(observation, error);throw error; });
 }
 function isSinglePage(options) {
   if (typeof options?.scene === "number") return options.scene === 1154;

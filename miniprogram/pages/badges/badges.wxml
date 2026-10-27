@@ -2,8 +2,8 @@
 <view class="page badge-page">
   <view class="badge-period-row"><text class="badge-caption">{{badgeCollection ? badgeCollection.monthLabel : '本月荣誉'}}</text><button class="badge-rules" bindtap="showBadgeRules" hover-class="badge-pressed">规则<image class="badge-info-icon" src="/assets/record-info.svg" aria-hidden="true" /></button></view>
   <view class="badge-hero"><view><view class="badge-title">荣誉收藏</view><view class="badge-caption">月榜荣誉与永久纪念</view></view><view class="badge-total"><view class="badge-total-value">{{badgeCollection ? badgeCollection.ownedCount : '—'}}<text> / {{badgeCollection ? badgeCollection.totalCount : badgeTotalCount}}</text></view><text class="badge-caption">已拥有</text></view></view>
-  <view wx:if="{{badgeManagerLoading}}" class="status" role="status">正在读取徽章…</view>
-  <view wx:if="{{badgeManagerError}}" class="inline-error" role="alert"><text>{{badgeManagerError}}</text><button class="secondary" bindtap="loadBadgeManager" disabled="{{badgeManagerLoading || badgeManagerSaving}}" hover-class="badge-pressed">刷新徽章</button></view>
+  <view wx:if="{{badgeManagerLoading && !connectionVisible}}" class="status" role="status">正在读取徽章…</view>
+  <view wx:if="{{badgeManagerError && !connectionVisible}}" class="inline-error" role="alert"><text>{{badgeManagerError}}</text><button class="secondary" bindtap="loadBadgeManager" disabled="{{badgeManagerLoading || badgeManagerSaving}}" hover-class="badge-pressed">刷新徽章</button></view>
   <block wx:if="{{badgeCollection}}">
     <view class="badge-equipment">
       <view class="badge-section-heading"><view><text>当前佩戴</text><text class="badge-equipped-count">{{badgeCollection.equippedCount}} / 3</text></view><button class="disclosure-button badge-manage" bindtap="manageBadges" disabled="{{badgeManagerSaving || badgeManagerLoading || !badgeCollection.ownedCount}}" aria-expanded="{{badgeManaging}}" hover-class="none">{{badgeManaging?'完成':'管理'}}<view wx:if="{{!badgeManaging}}" class="badge-chevron" aria-hidden="true"></view></button></view>

@@ -1,7 +1,7 @@
 <app-nav title="编辑资料" back="{{true}}" backLabel="{{backLabel || '返回我的'}}" bindback="back" />
 <view class="page personal-page profile-page {{pendingSave ? 'has-pending-save' : ''}} {{keyboardHeight ? 'has-keyboard' : ''}}">
-  <view wx:if="{{loading && !profile}}" class="status">正在读取资料…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
+  <view wx:if="{{loading && !profile && !connectionVisible}}" class="status">正在读取资料…</view>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" wx:if="{{conflict || !profile}}" class="secondary" bindtap="reload">重新载入资料</button></view>
   <form wx:if="{{profile}}" bindsubmit="save">
     <view class="avatar-editor">
       <view class="profile-identity-row">

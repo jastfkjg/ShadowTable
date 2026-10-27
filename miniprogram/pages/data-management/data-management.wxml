@@ -24,9 +24,9 @@
         <view class="data-month-select"><image class="data-icon" src="/assets/record-calendar.svg" aria-hidden="true" /><text class="data-month-title">{{preview ? preview.label : monthLabels[monthIndex]}}</text><text wx:if="{{month===currentMonth}}" class="data-month-tag">本月</text><view class="data-chevron is-down" aria-hidden="true"></view></view>
       </picker>
       <template wx:if="{{preview}}" is="clearingMetrics" data="{{value:preview}}" />
-      <view wx:elif="{{loading}}" class="data-status" role="status">正在读取清理范围…</view>
+      <view wx:elif="{{loading && !connectionVisible}}" class="data-status" role="status">正在读取清理范围…</view>
     </view>
-    <view wx:elif="{{loading}}" class="data-status" role="status">正在读取清理范围…</view>
+    <view wx:elif="{{loading && !connectionVisible}}" class="data-status" role="status">正在读取清理范围…</view>
     <view wx:elif="{{!error}}" class="data-empty"><image src="/assets/record-calendar.svg" aria-hidden="true" /><view>暂无可清除的个人战绩</view><view class="data-subtitle">之后的新对局继续正常累计</view></view>
     <block wx:if="{{preview}}">
       <view class="data-section-heading"><text>清理后将同步更新</text><text class="data-section-caption">仅影响本人</text></view>
@@ -44,7 +44,7 @@
   <view class="data-confirm-sheet" role="dialog" aria-modal="true" aria-label="核对清理范围" catchtap="blockScroll">
     <view class="data-confirm-top"><view class="data-sheet-handle" aria-hidden="true"></view><view class="data-confirm-heading"><view class="data-confirm-title">核对清理范围</view><button class="data-confirm-close" bindtap="closeConfirmation" disabled="{{saving}}" aria-label="关闭确认面板" hover-class="me-pressed">×</button></view><view class="data-confirm-month"><image class="data-icon" src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{confirmation.label}}</text><text wx:if="{{confirmation.isCurrent}}" class="data-month-tag">本月</text></view></view>
     <scroll-view class="data-confirm-body" scroll-y enhanced show-scrollbar="{{false}}" style="{{confirmationBodyHeight?'height:'+confirmationBodyHeight+'px;':''}}">
-      <view class="data-confirm-content"><view class="data-confirm-overview"><template is="clearingMetrics" data="{{value:confirmation}}" /></view><view class="data-confirm-scope"><view class="data-confirm-scope-title">这些数据将一并清理</view><view wx:for="{{sheetLines}}" wx:key="text" class="data-scope-line"><image class="data-icon" src="{{item.icon}}" aria-hidden="true" /><text>{{item.text}}</text></view></view><template is="clearingRetained" /><view wx:if="{{error}}" class="data-confirm-error" role="alert">{{error}}</view><view wx:if="{{pending && !saving}}" class="data-confirm-pending" role="status">结果尚未确认，请重试原请求。重试不会清除后来新增的对局。</view></view>
+      <view class="data-confirm-content"><connection-state context="{{confirming}}" /><view class="data-confirm-overview"><template is="clearingMetrics" data="{{value:confirmation}}" /></view><view class="data-confirm-scope"><view class="data-confirm-scope-title">这些数据将一并清理</view><view wx:for="{{sheetLines}}" wx:key="text" class="data-scope-line"><image class="data-icon" src="{{item.icon}}" aria-hidden="true" /><text>{{item.text}}</text></view></view><template is="clearingRetained" /><view wx:if="{{error && !connectionVisible}}" class="data-confirm-error" role="alert">{{error}}</view><view wx:if="{{pending && !saving}}" class="data-confirm-pending" role="status">结果尚未确认，请重试原请求。重试不会清除后来新增的对局。</view></view>
     </scroll-view>
     <view class="data-confirm-footer"><view class="data-footer-note is-danger"><text class="data-warning-icon" aria-hidden="true">!</text><text>清除后无法自行恢复</text></view><view class="data-confirm-actions"><button class="data-confirm-cancel" bindtap="closeConfirmation" disabled="{{saving}}" hover-class="me-pressed">暂不清理</button><button class="data-confirm-submit" bindtap="confirmClearRecords" loading="{{saving}}" disabled="{{saving}}" hover-class="me-pressed">{{saving ? '正在清除…' : pending ? '重试并核对结果' : '确认清除'}}</button></view></view>
   </view>

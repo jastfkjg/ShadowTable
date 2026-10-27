@@ -49,7 +49,7 @@
       </view>
       <view class="entry-sheet-footer">
         <view wx:if="{{entryError}}" class="entry-field-error" role="alert">{{entryError}}</view>
-        <view wx:if="{{hasPendingRequest || reconnecting}}" class="entry-field-help" role="status">{{hasPendingRequest?'请求尚未确认，连接恢复后会自动重试，请勿重复提交。':'正在恢复连接…'}}</view>
+        <include src="./connection-state.wxml" />
         <button class="primary entry-submit" hover-class="entry-option-pressed" form-type="submit" bindtap="resetEntryFocus" data-action="{{entryMode==='join'?'join':'create'}}" loading="{{busy && busyAction==='enter'}}" disabled="{{hasPendingRequest || loading || busy || !network || reconnecting}}"><text>{{busy && busyAction==='enter'?(entryMode==='join'?'加入中…':'创建中…'):entryMode==='join'?(nicknameSetup?'确认昵称并加入房间':'加入房间'):(nicknameSetup?'确认昵称并创建':'创建')+' '+capacity+' 人房间'}}</text><view wx:if="{{!busy}}" class="room-sheet-chevron" aria-hidden="true" /></button>
       </view>
     </view>

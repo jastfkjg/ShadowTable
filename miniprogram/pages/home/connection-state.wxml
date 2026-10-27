@@ -1,13 +1,17 @@
 <!-- Connection feedback takes space only while connection or confirmation is pending. -->
-<view wx:if="{{loading || reconnecting || !network || needsLogin || hasPendingRequest}}" class="home-connection {{reconnecting || !network || needsLogin?'is-reconnecting':''}}">
+<view wx:if="{{loading || reconnecting || !network || needsLogin || hasPendingRequest || connectionPhase==='connecting'}}" class="home-connection {{connectionPhase==='offline' || (!connectionPhase && !network)?'is-offline':reconnecting || needsLogin?'is-reconnecting':''}}">
   <view class="home-connection-symbol" aria-hidden="true">
-    <view wx:if="{{needsLogin || !network || reconnecting}}" class="home-connection-signal"><view /><view /><view /><view /></view>
-    <view wx:else class="home-connection-spinner" />
+    <image wx:if="{{connectionPhase==='offline' || (!connectionPhase && !network)}}" class="home-connection-offline-icon" src="/assets/connection-offline.svg" />
+    <view wx:elif="{{connectionPhase==='waiting' || (!connectionPhase && reconnecting)}}" class="home-connection-clock" />
+    <view wx:else class="home-connection-signal"><view /><view /><view /><view /></view>
   </view>
-  <view class="home-connection-copy" role="status" aria-live="polite" aria-atomic="true">
-    <text class="home-connection-title">{{needsLogin?'登录已过期':hasPendingRequest?'正在确认提交结果':!network?'网络已断开':reconnecting?'网络较慢，正在重连':'正在连接牌桌'}}</text>
-    <text class="home-connection-detail">{{needsLogin?'重新登录后即可同步牌桌':hasPendingRequest?'请勿重复提交，恢复后会自动确认':reconnecting && notice?notice:!network?(memberRooms.length?'已保留上次同步的牌桌':'网络恢复后会自动连接'):reconnecting?(memberRooms.length?'已保留上次同步的牌桌':'连接后即可获取你的牌桌'):'连接后即可创建或加入房间'}}</text>
+  <view class="home-connection-copy">
+    <view class="home-connection-title" role="status" aria-live="polite" aria-atomic="true">{{connectionTitle || (needsLogin?'登录已过期':!network?'网络已断开':reconnecting?'暂时无法连接':'正在连接牌桌')}}</view>
+    <text class="home-connection-detail">{{connectionDetail || (needsLogin?'重新登录后即可同步牌桌':!network?'请检查 Wi-Fi 或移动网络':hasPendingRequest?'上次操作还在确认，请勿重复操作':reconnecting?'可重新连接以更新牌桌':'连接后即可创建或加入房间')}}</text>
   </view>
-  <button wx:if="{{needsLogin || reconnecting || !network}}" class="home-connection-retry" hover-class="room-swipe-pressed" bindtap="retryLobbyConnection" disabled="{{busy || loading || roomsRefreshing}}" aria-label="{{needsLogin?'重新登录并同步牌桌':'重新连接并同步牌桌'}}">{{needsLogin?'登录':loading?'重试中':'重试'}}</button>
-  <view wx:else class="home-connection-dots" aria-hidden="true"><view /><view /><view /></view>
+  <view wx:if="{{(connectionPhase==='connecting' && network) || (!connectionPhase && loading && network && !needsLogin)}}" class="home-connection-running" aria-busy="true">
+    <view class="home-connection-spinner" aria-hidden="true" />
+    <text>已等待 {{connectionElapsedSeconds || 0}} 秒</text>
+  </view>
+  <button wx:else class="home-connection-retry" hover-class="room-swipe-pressed" bindtap="retryLobbyConnection" disabled="{{!!(busy || loading || roomsRefreshing || connectionCanRetry===false)}}" aria-label="{{needsLogin?'重新登录':'重新连接'}}">{{needsLogin?'登录':connectionCanRetry===false && connectionPhase==='waiting'?'稍后重试':'重新连接'}}</button>
 </view>

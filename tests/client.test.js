@@ -43,6 +43,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../public-history') return require('../miniprogram/public-history');
         if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
         if (name === '../../room-list') return require('../miniprogram/room-list');
+        if (name === '../../connection-feedback') return require('../miniprogram/connection-feedback');
         if (name === '../../room-confirmation') return require('../miniprogram/room-confirmation');
         if (name === '../../room-sheet-presentation') return require('../miniprogram/room-sheet-presentation');
         if (name === '../../role-portraits') return require('../miniprogram/role-portraits');

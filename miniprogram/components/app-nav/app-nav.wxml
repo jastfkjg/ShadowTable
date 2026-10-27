@@ -5,3 +5,4 @@
     <text wx:else class="app-nav-title">{{title}}</text>
   </view>
 </view>
+<connection-state context="{{title}}:{{connectionContext}}" />

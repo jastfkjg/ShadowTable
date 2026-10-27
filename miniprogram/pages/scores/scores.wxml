@@ -17,8 +17,8 @@
 </template>
 <app-nav title="积分明细" back="{{true}}" bindback="back" />
 <view class="page scores-page">
-  <view wx:if="{{loading && !loaded}}" class="status">正在读取积分明细…</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
+  <view wx:if="{{loading && !loaded && !connectionVisible}}" class="status">正在读取积分明细…</view>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
   <view wx:if="{{notice}}" class="ledger-notice" role="status">{{notice}}</view>
   <block wx:if="{{loaded}}">
     <view class="score-overview">
@@ -42,7 +42,7 @@
         </view>
       </view>
     </block>
-    <view wx:if="{{moreError}}" class="ledger-more-error" role="alert"><view>{{moreError}}</view><button bindtap="retryMore" class="ledger-more" hover-class="ledger-pressed">重新加载</button></view>
+    <view wx:if="{{moreError && !connectionVisible}}" class="ledger-more-error" role="alert"><view>{{moreError}}</view><button bindtap="retryMore" class="ledger-more" hover-class="ledger-pressed">重新加载</button></view>
     <button wx:elif="{{hasMore && !error}}" class="ledger-more" bindtap="loadMore" disabled="{{loadingMore || loading}}" loading="{{loadingMore}}" hover-class="ledger-pressed">{{loadingMore?'正在加载…':'加载更多'}}</button>
     <view wx:elif="{{records.length && !error}}" class="ledger-end"><view class="ledger-end-rule" aria-hidden="true"></view><text>已显示全部记录</text><view class="ledger-end-rule" aria-hidden="true"></view></view>
   </block>

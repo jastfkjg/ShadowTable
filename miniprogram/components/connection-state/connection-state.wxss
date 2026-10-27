@@ -1,0 +1,4 @@
+@import "../../connection-state.wxss";
+:host { display:block; flex-shrink:0; }
+.page-connection { padding:12px 16px 0; }
+.home-connection { margin-bottom:4px; }

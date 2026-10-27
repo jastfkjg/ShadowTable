@@ -247,7 +247,7 @@ test("wx.uploadFile携带会话与幂等编号，解析字符串响应，401只�
   const wx = { getStorageSync: key => storage.get(key), removeStorageSync: key => storage.delete(key),
     uploadFile: value => { options = value; return { onProgressUpdate(callback) { callback({ progress: 42 }); } }; } };
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(path.join(root, "api.js"), "utf8"), { module, wx, require: () => ({ baseUrl: "https://api.example.test" }) });
+  vm.runInNewContext(fs.readFileSync(path.join(root, "api.js"), "utf8"), { module, wx, require: name => name === "./page-connection" ? require("../miniprogram/page-connection") : ({ baseUrl: "https://api.example.test" }) });
   let progress;
   const result = module.exports.uploadAvatar("wxfile://avatar", "fresh-code", "same-request-id-123", value => { progress = value; });
   assert.equal(options.header.Authorization, "Bearer session-one"); assert.equal(options.header["Idempotency-Key"], "same-request-id-123");

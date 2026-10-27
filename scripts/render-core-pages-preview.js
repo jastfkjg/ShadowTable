@@ -11,6 +11,7 @@ const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
 const roomSwipe = require("../miniprogram/room-swipe");
 const roomList = require("../miniprogram/room-list");
+const connectionFeedback = require("../miniprogram/connection-feedback");
 const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
@@ -29,9 +30,11 @@ const css = file => fs.readFileSync(path.join(root, file), "utf8")
   .replace(/@import\s+"([^"]+)";/g, (_, name) => css(path.relative(root, path.resolve(root, path.dirname(file), name))))
   .replace(/(^|[\s>+~])(text|image|picker|scroll-view|view)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + ({ text: "span", image: "img", picker: "div", view: "div", "scroll-view": "div" })[tag])
   .replace(/^page\s*\{/m, "body {").replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
+let previewConnection = null;
 function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
   if (!node.tag || node.tag === "wx-block") return (node.children || []).map(html).join("");
+  if (node.tag === "wx-connection-state") return previewConnection ? html(factory("components/connection-state/connection-state.wxml")(previewConnection)) : "";
   if (node.tag === "wx-app-nav") return '<div class="preview-nav">' + html(factory("components/app-nav/app-nav.wxml")({ ...node.attr, statusBarHeight: 44, navHeight: 44, totalHeight: 88 })) + '<span class="preview-clock">15:50</span><div class="preview-capsule">•••<i></i><b>⊙</b></div></div>';
   if (node.tag === "wx-scroll-view") node = { ...node, attr: { ...node.attr, style: (node.attr?.style || "") + ";overflow-x:" + (node.attr?.scrollX ? "auto" : "hidden") + ";overflow-y:" + (node.attr?.scrollY ? "auto" : "hidden") } };
   const tag = ({ "wx-text": "span", "wx-button": "button", "wx-image": "img", "wx-input": "input", "wx-form": "form", "wx-label": "label", "wx-navigator": "a" })[node.tag] || "div";
@@ -49,10 +52,17 @@ function html(node) {
 }
 // Include native button clipping so nested rounded outlines cannot hide QA defects.
 const projection = 'body{margin:0}button,input{font:inherit}button{position:relative;overflow:hidden;border:0;width:100%}span{display:inline}img{object-fit:contain}a{text-decoration:none;color:inherit}input{box-sizing:border-box}[hidden]{display:none!important}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;z-index:500;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
-const common = css("app.wxss") + css("components/app-nav/app-nav.wxss") + css("components/app-dialog/app-dialog.wxss");
+const common = css("app.wxss") + css("components/app-nav/app-nav.wxss") + css("components/app-dialog/app-dialog.wxss") + css("components/connection-state/connection-state.wxss");
 fs.mkdirSync(output, { recursive: true });
 const scenes = [];
 function write(name, file, data, styles, extra = "") {
+  data = { ...data };
+  const key = data.personal && data.activeTab === 1 ? "personal" : data.publicShare && data.sharedSurface ? "publicShare" : data.statistics ? data.tab === "matches" ? "history" : "statistics" : "";
+  const owner = key ? data[key] = { ...data[key] } : data;
+  const manual = file === "pages/table/table.wxml" || data.lobby && data.activeTab !== 1;
+  const runtime = owner.connectionPreview || (owner.loading && !owner.error ? { active:true, startedAt:Date.now() } : null);
+  previewConnection = !manual && runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
+  if (previewConnection) owner.connectionVisible = true;
   const rendered = html(factory(file)(data));
   const dialog = data.appDialog || data.lobby?.appDialog;
   const alert = dialog ? html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...presentDialog(dialog), id: 1 } })) : "";
@@ -117,6 +127,9 @@ const homeScenes = {
   "home-connection-offline": { network: false, reconnecting: true, serverConnected: false, roomsSyncLabel: "21:16", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
   "home-connection-no-cache": { reconnecting: true, serverConnected: false, memberRooms: [], visibleMemberRooms: [] },
   "home-connection-ready": { roomsSyncLabel: "21:17", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-timeout": { reconnecting: true, serverConnected: false, roomsSyncLabel: "23:03", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-pending": { loading: true, reconnecting: true, hasPendingRequest: true, serverConnected: false, roomsSyncLabel: "23:03", memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
+  "home-connection-cooldown": { reconnecting: true, serverConnected: false, memberRooms: [rooms[0]], visibleMemberRooms: [rooms[0]] },
   home: {}, "home-empty": { memberRooms: [], visibleMemberRooms: [] }, "home-loading": { loading: true, memberRooms: [], visibleMemberRooms: [] },
   "home-offline": { network: false, serverConnected: false }, "home-swipe": { roomSwipeCode: rooms[0].code, roomSwipeOffset: -roomSwipe.width(rooms[0]) },
   "home-swipe-single": { roomSwipeCode: rooms[2].code, roomSwipeOffset: -roomSwipe.width(rooms[2]) },
@@ -129,6 +142,16 @@ const homeScenes = {
   "home-keyboard": { entrySheet: true, entryMode: "join", entryKeyboardHeight: 320, entryFocusedField: "code", code: "2013", name: "子龙", nicknameSetup: false },
   "home-long": { memberRooms: [...rooms, ...rooms], visibleMemberRooms: [room("201375", "playing", "12/12 人已入座 · 3人准备", "房主：昵称较长的玩家名字测试 · 我在12号", "2026/10/16 15:50", { note: "这是一个用于检查窄屏长备注换行的牌桌记录", boardName: "阿瓦隆 · 十二骑士与扩展角色配置测试（12人）" })] },
 };
+const feedbackNow = Date.now();
+for (const [name, runtime] of Object.entries({
+  "home-connection-connecting": { active:true, startedAt:feedbackNow-3000 },
+  "home-connection-reconnecting": { failure:"failed", retryAt:feedbackNow+5000 },
+  "home-connection-retrying": { active:true, startedAt:feedbackNow-3000 },
+  "home-connection-no-cache": { failure:"failed", retryAt:feedbackNow+5000 },
+  "home-connection-timeout": { failure:"timeout", retryAt:feedbackNow+5000 },
+  "home-connection-pending": { active:true, startedAt:feedbackNow-3000, pending:{after:"enter",path:"/api/rooms"} },
+  "home-connection-cooldown": { failure:"rate", retryAt:feedbackNow+60000, rateLimitUntil:feedbackNow+60000 },
+})) homeScenes[name].connectionRuntime = runtime;
 const roomsNow = Date.now();
 const organizedRooms = [room("201375", "lobby", "6/12 人已入座", "我是房主 · 1号", "今天 12:30", { updatedAt: roomsNow }),
   ...Array.from({ length: 5 }, (_, i) => room(String(273840 + i), "ended", "11 人", "房主：大V · 我在4号", i ? "昨天 21:24" : "今天 11:20", {
@@ -196,7 +219,9 @@ Object.assign(homeScenes, {
   'entry-long': entryScene(12,'knights',{name:'昵称较长的玩家名字测试',entryNameError:'昵称未能保存，请检查网络后重试'}),
 });
 for (const [name, data] of Object.entries(homeScenes)) {
-  const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...data };
+  const { connectionRuntime, ...scene } = data;
+  const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...scene };
+  Object.assign(lobby, connectionFeedback.present(lobby, connectionRuntime || {}, feedbackNow));
   lobby.availableRoomCount = roomList.availableRooms(lobby.memberRooms).length;
   const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, ...tabBarVisibility({ data: { lobby } }, 0), list: [
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },

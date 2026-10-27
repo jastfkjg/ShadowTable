@@ -27,9 +27,9 @@
       <text wx:if="{{board.fun && !loading}}" class="fun-rank-count">{{board.participantLabel}}</text>
     </view>
   </view>
-  <view wx:if="{{loading && !board}}" class="status" role="status">正在读取榜单…</view>
+  <view wx:if="{{loading && !board && !connectionVisible}}" class="status" role="status">正在读取榜单…</view>
   <view wx:if="{{notice}}" class="rank-notice small muted" role="status">{{notice}}</view>
-  <view wx:if="{{error}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}" hover-class="none">重试</button></view>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}" hover-class="none">重试</button></view>
   <block wx:if="{{board}}">
     <view wx:if="{{loading || loadingMore || visibilitySaving || shareOpening}}" class="rank-share-status small muted" role="status">{{shareOpening?'正在打开分享页…':visibilitySaving?'正在保存公开设置…':'正在读取榜单…'}}</view>
     <view wx:if="{{shareNotice}}" class="rank-share-status small muted" role="alert">{{shareNotice}}</view>
