@@ -114,6 +114,25 @@ async function server() {
     },
   };
 }
+test('房间刷新同步板子简称，切换板子和清空房间不残留旧标题', async () => {
+  const {newRoom,publicView}=require('../server/engine');
+  const source=newRoom('514047','host','子龙','classic',6);
+  let boardName='阿瓦隆 · 经典基础';
+  const p=page({request:async()=>({...publicView(source,'host'),boardName})});
+  p.roomCode='514047';
+  await p.refresh();
+  assert.equal(p.data.roomNavTitle,'经典基础');
+  assert.equal(p.data.room.boardName,boardName);
+  boardName='阿瓦隆 · 十二骑士（10人）';
+  await p.refresh();
+  assert.equal(p.data.roomNavTitle,'十二骑士');
+  assert.equal(p.data.room.boardName,boardName);
+  boardName='';
+  await p.refresh();
+  assert.equal(p.data.roomNavTitle,'牌桌');
+  p.clearRoom();
+  assert.equal(p.data.roomNavTitle,'');
+});
 test('房间配置测量完成后才显示，重新打开丢弃旧测量并允许测量失败时关闭', () => {
   const layout = { callbacks: [] }, p = page({}, new Map(), layout);
   const rects = [{ width: 390, height: 844 }, { height: 86 }, { height: 300 }, { height: 100 }];

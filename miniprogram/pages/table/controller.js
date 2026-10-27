@@ -254,6 +254,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     notice: "",
     roomFeedback: "",
     room: null,
+    roomNavTitle: "",
     ...initialPlayerCardData,
     latestResult: null,
     processBodyHeight: 0,
@@ -382,6 +383,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.prepareRoomShare();
   },
   onShow() {
+    if (this.closeEntryOnReturn) {
+      this.closeEntryOnReturn = false;
+      this.setData({ entrySheet: false });
+    }
     if (this.data.isLobby) selectTab(this, 0);
     this.returningHome = false;
     this.foreground = true;
@@ -655,11 +660,18 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ error: "房间 " + held.code + " 还有未确认操作，请先返回处理" }); return;
     }
     this.roomCode = null;
-    this.setData({ entrySheet: false });
     this.resetEntryFocus();
-    if (!this.foreground) return;
+    if (!this.foreground) {
+      this.setData({ entrySheet: false });
+      return;
+    }
     await new Promise(resolve => wx.navigateTo({ url: "/pages/table/table?code=" + code + "&resume=1",
-      fail: () => this.setData({ error: "未能打开牌桌，请在我的牌桌中重试" }), complete: resolve }));
+      // Keep the outgoing sheet visible throughout the native transition. Close
+      // it when the retained lobby is shown again after a successful navigation.
+      success: () => { this.closeEntryOnReturn = true; },
+      fail: () => this.setData(this.data.entrySheet
+        ? { entryError: "未能打开牌桌，请在我的牌桌中重试" }
+        : { error: "未能打开牌桌，请在我的牌桌中重试" }), complete: resolve }));
   },
   async loadRooms() {
     const sequence = this.roomsReadSequence = (this.roomsReadSequence || 0) + 1;
@@ -676,7 +688,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.syncConnectionFeedback();
     }
   },
-  handleError(e) {
+  handleError(e, { suppressDialog = false } = {}) {
     this.mask();
     this.connectionAttemptActive = false;
     if (e.status === 403 && e.message === "你已被房主移出房间") {
@@ -701,7 +713,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
     this.setData({ reconnecting: false });
     this.setData({
-      error: e.message,
+      error: suppressDialog ? "" : e.message,
       serverConnected: !!e.status && e.status < 500 && e.status !== 401,
       needsLogin: e.status === 401,
       recoverableError:
@@ -994,7 +1006,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.notice === "请求较多，冷却后会自动刷新"
           ? ""
           : this.data.notice,
-      room,
+      room, roomNavTitle: roomSheet.shortBoardName(room.boardName) || "牌桌",
       roomRoleGroups: roomSheet.presentRoleGroups(room.roleConfiguration),
       canStart:
         room.players.length === room.capacity &&
@@ -1093,6 +1105,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     wx.removeStorageSync("roomCode");
     this.setData({
       room: null,
+      roomNavTitle: "",
       resultDialog: false, statsOpen: false, stats: null,
       toolType: "",
       toolSeats: [],
@@ -1356,7 +1369,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   inputCode(e) {
     const code = e.detail.value.replace(/\D/g, "").slice(0, 6);
-    this.setData({ code, entryCodeError: "", entryError: "" });
+    const hadError = !!this.data.entryCodeError;
+    this.setData({ code, entryCodeError: "", entryError: "" }, () => { if (hadError) this.syncRoomSheetLayout("entry"); });
     return code;
   },
   switchEntry(e) {
@@ -1525,12 +1539,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       success: ({ data }) => {
         if (!this.alive || !this.foreground || !this.data.entrySheet || revision !== this.entrySheetRevision || this.data.busy || this.pending) return;
         const code = String(data || "").trim();
-        if (!/^\d{6}$/.test(code)) return this.setData({ entryCodeError: "请复制完整的 6 位数字房间码" });
-        this.setData({ code, entryCodeError: "", entryError: "", entryFocusedField: "code" });
+        if (!/^\d{6}$/.test(code)) return this.setData({ entryCodeError: "请复制完整的 6 位数字房间码" }, () => this.syncRoomSheetLayout("entry"));
+        this.setData({ code, entryCodeError: "", entryError: "", entryFocusedField: "code" }, () => this.syncRoomSheetLayout("entry"));
       },
       fail: () => {
         if (this.alive && this.foreground && this.data.entrySheet && revision === this.entrySheetRevision && !this.data.busy && !this.pending)
-          this.setData({ entryCodeError: "未能读取剪贴板，请手动输入房间码" });
+          this.setData({ entryCodeError: "未能读取剪贴板，请手动输入房间码" }, () => this.syncRoomSheetLayout("entry"));
       },
     });
   },
@@ -1750,9 +1764,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         else this.setData({ invitationNeedsName: true, entryError: e.message, error: "" });
         return;
       }
-      this.handleError(e);
-      if (pending.after === "enter" && this.data.entrySheet && !this.pending && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429) {
-        this.setData({ error: "", entryError: e.message });
+      const inlineEntryError = pending.after === "enter" && this.data.entrySheet && !this.pending && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429;
+      this.handleError(e, { suppressDialog: inlineEntryError });
+      if (inlineEntryError) {
+        const roomNotFound = e.status === 404 && e.message === "房间不存在" && /^\/api\/rooms\/\d{6}\/join$/.test(pending.path);
+        this.setData(roomNotFound ? { error: "", entryError: "", entryCodeError: "未找到该房间", entryScrollTarget: "entry-code-block" } : { error: "", entryError: e.message }, () => this.syncRoomSheetLayout("entry"));
       }
       if (e.status === 409 && pending.after === "enter" && this.data.isLobby) await this.refreshLobby({ preserveName: true });
     } finally {
@@ -1794,7 +1810,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.entrySheet) {
       const entryNameError = this.data.name ? "" : "请填写昵称";
       const entryCodeError = this.data.entryMode === "join" && !/^\d{6}$/.test(this.data.code) ? "请输入完整的 6 位数字房间码" : "";
-      this.setData({ entryNameError, entryCodeError, entryError: "" });
+      this.setData({ entryNameError, entryCodeError, entryError: "" }, () => this.syncRoomSheetLayout("entry"));
       if (entryNameError || entryCodeError) {
         this.setData({ entryFocusedField: entryNameError ? "nickname" : "code" });
         return;

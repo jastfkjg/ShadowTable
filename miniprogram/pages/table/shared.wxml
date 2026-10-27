@@ -173,8 +173,8 @@
   </view>
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
-<app-nav wx:elif="{{!homeShell}}" title="牌桌" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
-<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
+<app-nav wx:elif="{{!homeShell}}" title="{{room ? (roomNavTitle || '牌桌') : '牌桌'}}" constrainTitle="{{!!room}}" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
+<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.phase==='lobby' && busy && (busyAction==='seat' || busyAction==='stand') && network && !hasPendingRequest && !loading && !reconnecting ? 'seat-request-pending' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
   <view wx:if="{{!invitation && !room}}" class="brand">
     <image wx:if="{{isLobby}}" class="home-brand-art" src="/assets/home-header.jpg" mode="aspectFill" aria-hidden="true" />
     <view class="brand-identity">
@@ -413,7 +413,11 @@
     <view class="lobby-room-header">
       <view class="room-summary">
         <button hover-class="none" class="copy-room lobby-room-code" bindtap="copyRoomCode" aria-label="{{'复制房间号'+room.code}}"><text>房间 {{room.code}}</text><view class="lobby-copy-icon" aria-hidden="true" /></button>
-        <button wx:if="{{room.phase==='lobby'}}" class="lobby-header-link room-invite-button" hover-class="room-invite-pressed" open-type="share" disabled="{{busy || loading || hasPendingRequest || reconnecting || !network}}" aria-label="{{'邀请好友加入房间'+room.code}}"><image class="lobby-header-icon" src="/assets/room-invite.svg" aria-hidden="true" /><text class="lobby-header-label">邀请好友</text><view class="lobby-header-chevron is-placeholder" aria-hidden="true" /></button>
+        <view wx:if="{{room.phase==='lobby'}}" class="lobby-header-actions {{room.me.isHost?'is-host':'is-guest'}}">
+          <button class="lobby-header-link room-invite-button" hover-class="room-invite-pressed" open-type="share" disabled="{{busy || loading || hasPendingRequest || reconnecting || !network}}" aria-label="{{'邀请好友加入房间'+room.code}}"><image class="lobby-header-icon" src="/assets/room-invite.svg" aria-hidden="true" /></button>
+          <button class="lobby-header-link" hover-class="room-invite-pressed" bindtap="openRoomRules" aria-label="查看本局角色配置与计分说明" aria-haspopup="dialog"><image class="lobby-header-icon" src="/assets/room-config.svg" aria-hidden="true" /></button>
+          <button wx:if="{{room.me.isHost}}" class="lobby-header-link" hover-class="room-invite-pressed" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}" aria-label="打开房间设置"><image class="lobby-header-icon" src="/assets/room-settings.svg" aria-hidden="true" /></button>
+        </view>
         <view wx:elif="{{room.me.seat!==null}}" class="room-identity-anchor">
           <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{room.me.seat+'号 · '+(revealed?'遮盖我的身份':'查看我的身份')}}"><view wx:if="{{!(busy && busyAction==='identity')}}" class="room-identity-icon" aria-hidden="true" /><text>{{revealed?'遮盖身份':'查看身份'}}</text></button>
           <view wx:if="{{identityHintVisible && !dealtIdentityDialog && !actionDialog && !identityChange && !fairyResult && !error && !toolType && !showRoomRules && !showRoomSettings}}" class="identity-entry-hint">
@@ -422,16 +426,17 @@
           </view>
         </view>
       </view>
-      <view class="lobby-room-row lobby-board-row">
-        <text class="lobby-board-name">{{room.boardName}}</text>
-        <button hover-class="none" class="lobby-header-link" bindtap="openRoomRules" aria-label="查看角色配置与计分说明"><image class="lobby-header-icon" src="/assets/room-config.svg" aria-hidden="true" /><text class="lobby-header-label">本局配置</text><view class="lobby-header-chevron" aria-hidden="true" /></button>
-      </view>
       <view class="lobby-room-status">
-        <text class="lobby-chip {{room.phase==='lobby'?'lobby-phase-chip':room.phase==='ended' || room.phase==='terminated'?'':'room-playing-chip'}}">{{room.phase==='lobby'?'准备中':room.phase==='ended'?'已结束':room.phase==='terminated'?'已终止':'对局中'}}</text>
-        <text wx:if="{{room.scoreSettings}}" class="lobby-chip" aria-label="{{room.scoreNotice || (room.scoreSettings.enabled?'本局计分已开启':'本局未开启计分')}}">{{room.scoreSettings.enabled?'计分局':'不计分'}}</text>
-        <text wx:if="{{room.testRoom}}" class="lobby-chip">测试房间</text>
-        <text wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="lobby-chip">围观中</text>
-        <button hover-class="none" wx:if="{{room.me.isHost}}" class="lobby-header-link lobby-settings" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}"><image class="lobby-header-icon" src="/assets/room-settings.svg" aria-hidden="true" /><text class="lobby-header-label">房间设置</text><view class="lobby-header-chevron" aria-hidden="true" /></button>
+        <view class="lobby-status-tags">
+          <text class="lobby-chip {{room.phase==='lobby'?'lobby-phase-chip':room.phase==='ended' || room.phase==='terminated'?'':'room-playing-chip'}}">{{room.phase==='lobby'?'准备中':room.phase==='ended'?'已结束':room.phase==='terminated'?'已终止':'对局中'}}</text>
+          <text wx:if="{{room.scoreSettings}}" class="lobby-chip" aria-label="{{room.scoreNotice || (room.scoreSettings.enabled?'本局计分已开启':'本局未开启计分')}}">{{room.scoreSettings.enabled?'计分局':'不计分'}}</text>
+          <text wx:if="{{room.testRoom}}" class="lobby-chip">测试房间</text>
+          <text wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="lobby-chip">围观中</text>
+        </view>
+        <view wx:if="{{room.phase!=='lobby'}}" class="lobby-header-actions {{room.me.isHost?'is-host':'is-guest'}}">
+          <button class="lobby-header-link" hover-class="room-invite-pressed" bindtap="openRoomRules" aria-label="查看本局角色配置与计分说明" aria-haspopup="dialog"><image class="lobby-header-icon" src="/assets/room-config.svg" aria-hidden="true" /></button>
+          <button wx:if="{{room.me.isHost}}" class="lobby-header-link" hover-class="room-invite-pressed" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}" aria-label="打开房间设置"><image class="lobby-header-icon" src="/assets/room-settings.svg" aria-hidden="true" /></button>
+        </view>
       </view>
       <view wx:if="{{room.phase!=='lobby' && room.me.seat===null}}" class="small muted" role="status">{{room.phase==='ended' || room.phase==='terminated'?'本局已结束，你正在旁观；房主重开后可手动入座。':'本局进行中，你正在旁观；下一局可手动入座。'}}</view>
     </view>
@@ -551,7 +556,7 @@
           <button wx:if="{{room.me.seat!==null && room.me.avoidance}}" class="avoidance-entry" bindtap="openAvoidance" disabled="{{busy || hasPendingRequest || !network}}" hover-class="none" aria-label="{{'回避卡'+room.me.avoidance.balance+'张，'+(room.me.avoidance.selected?'本局已选择角色':'选择本局回避角色')}}"><view class="avoidance-entry-line"><image src="/assets/table-cards.svg" aria-hidden="true" /><text>×{{room.me.avoidance.balance}}</text></view><text class="avoidance-entry-state">{{room.me.avoidance.selected?'已选择':'回避卡'}}</text></button>
           <button wx:if="{{room.me.seat!==null}}" hover-class="none" class="{{room.me.ready?'secondary lobby-cancel':'primary lobby-ready-button'}}" bindtap="ready" disabled="{{hasPendingRequest || busy || !network}}" loading="{{busy && busyAction==='ready'}}">{{room.me.ready?'取消准备':'准备'}}</button>
           <text wx:else class="lobby-spectator-hint">{{seatOccupiedCount < room.capacity?'选择空位入座':'座位已满，正在围观'}}</text>
-          <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{canStart?'primary':'secondary'}} lobby-start" bindtap="start" disabled="{{hasPendingRequest || busy || !network || !canStart}}" aria-label="{{canStart?'发放身份':'发放身份，'+startHint}}">发放身份</button>
+          <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{canStart?'primary is-startable':'secondary'}} lobby-start" bindtap="start" disabled="{{hasPendingRequest || busy || !network || !canStart}}" aria-label="{{canStart?'发放身份':'发放身份，'+startHint}}">发放身份</button>
         </view>
       </view>
       <button hover-class="none" class="leave-button" bindtap="leave" disabled="{{hasPendingRequest || busy}}">

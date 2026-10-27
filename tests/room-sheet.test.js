@@ -1,7 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { BOARDS } = require('../server/engine');
-const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require('../miniprogram/room-sheet-presentation');
+const { shortBoardName, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult } = require('../miniprogram/room-sheet-presentation');
+
+test('板子简称保留玩法差异和未知名称，人数后缀不重复占用导航空间', () => {
+  for (const [name,expected] of [['阿瓦隆 · 经典基础','经典基础'],['阿瓦隆 · 十二骑士（10人）','十二骑士'],['阿瓦隆 · 11人逆仆','11人逆仆'],['其他游戏 · 特别玩法','其他游戏 · 特别玩法'],['旧版10人配置（请更换板子）','旧版10人配置（请更换板子）'],['','']])
+    assert.equal(shortBoardName(name),expected);
+  assert.equal(presentBoardOption({name:'阿瓦隆 · 十二骑士（10人）'},10).shortName,'十二骑士');
+});
 
 test('公开角色配置添加插画，所有板子人数、原始文本和阵营保持一致', () => {
   for (const board of BOARDS.filter(b => b.available)) for (const [capacity, groups] of Object.entries(board.roleConfigurations)) {

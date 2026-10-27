@@ -40,7 +40,7 @@ button.avoidance-role.is-selected,button.avoidance-role.is-selected[disabled]:no
 .avoidance-result.is-effective { border-color:rgba(229,198,139,.35); }
 .avoidance-result.is-effective > view { color:var(--accent); }
 .avoidance-result text { display:block;color:var(--muted);font-size:12px;margin-top:2px; }
-.table-room button.avoidance-entry { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;width:68px;min-width:0;min-height:48px;margin:0;padding:3px 0;border-radius:12px;color:var(--accent);background:rgba(229,198,139,.08);font-size:11px;line-height:1.5; }
+.table-room button.avoidance-entry, .table-room button.avoidance-entry[disabled]:not([type]) { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;width:68px;min-width:0;min-height:48px;margin:0;padding:3px 0;border-radius:12px;color:var(--accent);background:rgba(229,198,139,.08);font-size:11px;line-height:1.5; }
 .avoidance-entry-line { display:flex;align-items:center;gap:4px; }
 .avoidance-entry-line image { width:17px;height:17px; }
 .avoidance-entry-state { font-size:10px;color:var(--muted); }

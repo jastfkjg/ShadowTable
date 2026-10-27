@@ -16,7 +16,7 @@ const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision } = require("../miniprogram/room-sheet-presentation");
+const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -35,7 +35,7 @@ function html(node) {
   if (typeof node === "string" || typeof node === "number") return safe(node);
   if (!node.tag || node.tag === "wx-block") return (node.children || []).map(html).join("");
   if (node.tag === "wx-connection-state") return previewConnection ? html(factory("components/connection-state/connection-state.wxml")(previewConnection)) : "";
-  if (node.tag === "wx-app-nav") return '<div class="preview-nav">' + html(factory("components/app-nav/app-nav.wxml")({ ...node.attr, statusBarHeight: 44, navHeight: 44, totalHeight: 88 })) + '<span class="preview-clock">15:50</span><div class="preview-capsule">•••<i></i><b>⊙</b></div></div>';
+  if (node.tag === "wx-app-nav") return '<div class="preview-nav">' + html(factory("components/app-nav/app-nav.wxml")({ ...node.attr, statusBarHeight: 44, navHeight: 44, totalHeight: 88, ...(node.attr.constrainTitle ? {titleWidth:1,shareTitleShift:0} : {}) })) + '<span class="preview-clock">15:50</span><div class="preview-capsule">•••<i></i><b>⊙</b></div></div>';
   if (node.tag === "wx-image" && node.attr?.mode === "aspectFill") node = { ...node, attr: { ...node.attr, style: (node.attr.style || "") + ";object-fit:cover" } };
   if (node.tag === "wx-scroll-view") node = { ...node, attr: { ...node.attr, style: (node.attr?.style || "") + ";overflow-x:" + (node.attr?.scrollX ? "auto" : "hidden") + ";overflow-y:" + (node.attr?.scrollY ? "auto" : "hidden") } };
   const tag = ({ "wx-text": "span", "wx-button": "button", "wx-image": "img", "wx-input": "input", "wx-form": "form", "wx-label": "label", "wx-navigator": "a" })[node.tag] || "div";
@@ -53,11 +53,14 @@ function html(node) {
 }
 // Include native button clipping so nested rounded outlines cannot hide QA defects.
 const projection = 'body{margin:0}button,input{font:inherit}button{position:relative;overflow:hidden;border:0;width:100%}span{display:inline}img{object-fit:contain}a{text-decoration:none;color:inherit}input{box-sizing:border-box}[hidden]{display:none!important}.preview-nav{position:relative;flex-shrink:0}.preview-clock{position:absolute;z-index:101;top:14px;left:28px;font-size:14px;font-weight:600}.preview-capsule{position:absolute;z-index:101;right:16px;top:50px;height:32px;width:87px;border:1px solid #65747b;border-radius:18px;display:flex;align-items:center;justify-content:space-evenly;font-size:14px;background:#0c171d}.preview-capsule i{height:17px;width:1px;background:#65747b}.preview-capsule b{font-size:24px;font-weight:500}.preview-homebar{position:fixed;z-index:500;bottom:8px;left:50%;transform:translateX(-50%);height:4px;width:132px;border-radius:4px;background:#c5cbd0;pointer-events:none}';
+// Mirror native capsule-aware title sizing in this responsive HTML projection.
+const navProjection = '.preview-nav .app-nav-title.is-constrained{max-width:min(48vw,calc(100vw - 226px))!important;transform:none!important}@media(max-width:359px){.preview-nav .app-nav-title.is-constrained{max-width:min(48vw,calc(100vw - 202px))!important;transform:translateX(-12px)!important}}';
 const common = css("app.wxss") + css("components/app-nav/app-nav.wxss") + css("components/app-dialog/app-dialog.wxss") + css("components/connection-state/connection-state.wxss");
 fs.mkdirSync(output, { recursive: true });
 const scenes = [];
 function write(name, file, data, styles, extra = "") {
   data = { ...data };
+  if (file === 'pages/table/table.wxml' && data.room) data.roomNavTitle = shortBoardName(data.room.boardName) || '牌桌';
   const key = data.personal && data.activeTab === 1 ? "personal" : data.publicShare && data.sharedSurface ? "publicShare" : data.statistics ? data.tab === "matches" ? "history" : "statistics" : "";
   const owner = key ? data[key] = { ...data[key] } : data;
   const manual = file === "pages/table/table.wxml" || data.lobby && data.activeTab !== 1;
@@ -69,7 +72,7 @@ function write(name, file, data, styles, extra = "") {
   const rendered = html(factory(file)(data));
   const dialog = data.appDialog || data.lobby?.appDialog;
   const alert = dialog ? html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...presentDialog(dialog), id: 1 } })) : "";
-  fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>桌边助手 · ${name} · 实际模板</title><style>${projection}${common}${styles}${dialog?'.tab-bar{display:none}.preview-homebar{z-index:5100}':''}</style>${rendered}${extra}${alert}<div class="preview-homebar"></div></html>`);
+  fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>桌边助手 · ${name} · 实际模板</title><style>${projection}${navProjection}${common}${styles}${dialog?'.tab-bar{display:none}.preview-homebar{z-index:5100}':''}</style>${rendered}${extra}${alert}<div class="preview-homebar"></div></html>`);
   scenes.push(name);
 }
 // Browser projection of the native selector-query measurement, not app behavior.
@@ -272,6 +275,20 @@ for(let i=2;i<=12;i++) enter(tableReadySource,'player-'+i,'陪测'+(i-1));
 enter(tableReadySource,'spectator','围观玩家');
 tableReadySource.players[0].ready=true;
 const tableReady = tableScene(tableReadySource,'host',{startHint:'等待其他玩家准备',canStart:false});
+// Compact preparation header: include empty seats and both permission levels.
+const headerSource = newRoom('514047','host','子龙','classic',6);
+function headerScene(uid, extra = {}) {
+  const source = structuredClone(headerSource);
+  if (uid === 'player') enter(source,'player','大V');
+  if (uid === 'spectator') {
+    enter(source,'spectator','围观玩家');
+    source.spectators = [{...source.players.find(p => p.uid === uid),seat:null}];
+    source.players = source.players.filter(p => p.uid !== uid);
+  }
+  const scene = tableScene(source,uid,{canStart:false,...extra});
+  scene.seats = Array.from({length:6},(_,i) => scene.seats.find(p => p.seat === i+1) || {seat:i+1,name:'空位',occupied:false,avatarInitial:'+'});
+  return scene;
+}
 const tableUnreadySource = structuredClone(tableReadySource);
 tableUnreadySource.players[0].ready = false;
 const tableAllReadySource = structuredClone(tableReadySource);
@@ -289,6 +306,10 @@ const tableScenes = {
       {faction:'evil',label:'坏人阵营',total:5,wins:4,rateValue:'80.0'},
       {faction:'good',label:'好人阵营',total:13,wins:6,rateValue:'46.2'}]}},
   'table-ready':tableReady, 'table-playing':tablePlaying,
+  'table-header-host':headerScene('host'),
+  'table-header-player':headerScene('player'),
+  'table-header-spectator':headerScene('spectator'),
+  'table-header-pending':headerScene('host',{hasPendingRequest:true}),
   'table-unready':tableScene(tableUnreadySource,'host',{startHint:'等待其他玩家准备',canStart:false}),
   'table-can-start':tableScene(tableAllReadySource,'host',{canStart:true,startHint:'全员已准备，可以发放身份'}),
   'table-player-ready':tableScene(tablePlayerReadySource,'player-2'),
@@ -416,6 +437,9 @@ for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
 }
 tableScenes['ui-host-fairy']=tableScene(reviewSource,'review-1',{settleHint:'还差 1 人提交'});
 tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom,phase:'teamVote',closeWaiting:{mode:'settle',label:'提前结算投票'}}};
+tableScenes['table-nav-long-host']={...tableScenes['table-host-task'],room:{...tableScenes['table-host-task'].room,boardName:'阿瓦隆 · 这是一个用于测试的特别长的未来板子名称',testRoom:true,scoreSettings:{enabled:false}}};
+tableScenes['table-nav-many-status-spectator']={...tableScenes['table-spectator'],room:{...tableScenes['table-spectator'].room,testRoom:true,scoreSettings:{enabled:false}}};
+tableScenes['table-nav-knights-10']={...tableReady,room:{...tableReady.room,boardName:'阿瓦隆 · 十二骑士（10人）'}};
 const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
 const playerCardProjection=`<script>window.fitPlayerCard=()=>{const sheet=document.querySelector('.player-card-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.player-card-backdrop','.player-card-top','.player-card-content','.player-card-bottom'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.player-card-body').style.height=height+'px';sheet.classList.add('has-measured-body');}sheet.classList.remove('is-measuring');};addEventListener('load',window.fitPlayerCard);addEventListener('resize',window.fitPlayerCard);</script>`;
 for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}.player-card-bottom{padding-bottom:34px}',processProjection+playerCardProjection);

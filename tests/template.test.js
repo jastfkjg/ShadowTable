@@ -54,6 +54,107 @@ test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发�
   assert.match(text, /发放身份/);
   assert.doesNotMatch(text, /home-brand-art|home-wordmark|home-table-blue|home-action-symbol|home-clock/);
 });
+test('座位请求保持控件外观稳定，同时继续禁用操作', () => {
+  const room = { code:'514047', phase:'lobby', capacity:6, players:[], team:[], history:[], me:{seat:1,isHost:true,avoidance:{balance:1}} };
+  const data = { ...base, room, seats:[{seat:1,name:'甲',occupied:true,mine:true}], canStart:false };
+  for (const busyAction of ['seat', 'stand']) {
+    const tree = renderTable({...data,busy:true,busyAction});
+    assert.ok(nodes(tree).some(n => n.attr?.class?.includes('seat-request-pending')));
+    for (const handler of ['seat', 'ready', 'openAvoidance', 'start', 'leave'])
+      assert.equal(byHandler(tree, handler).attr.disabled, true, handler);
+    assert.doesNotMatch(byHandler(tree, 'start').attr.class, /is-startable/);
+    assert.match(byHandler(renderTable({...data,canStart:true,busy:true,busyAction}), 'start').attr.class, /is-startable/);
+  }
+  for (const change of [{busy:true,busyAction:'ready'}, {busy:true,busyAction:'seat',network:false}, {busy:true,busyAction:'stand',hasPendingRequest:true}])
+    assert.ok(!nodes(renderTable({...data,...change})).some(n => n.attr?.class?.includes('seat-request-pending')));
+  const css = require('node:fs').readFileSync(path.join(root, 'pages/table/presentation.wxss'), 'utf8');
+  const avoidanceCss = require('node:fs').readFileSync(path.join(root, 'avoidance.wxss'), 'utf8');
+  assert.match(avoidanceCss, /button\.avoidance-entry\[disabled\]:not\(\[type\]\)\s*\{[^}]*color:var\(--accent\);background:rgba\(229,198,139,\.08\)/);
+  assert.match(css, /button\.seat\.mine\[disabled\]:not\(\[type\]\)\s*\{\s*border-color:\s*var\(--accent\)/);
+  assert.match(css, /button\.lobby-start\.is-startable\[disabled\]/);
+  assert.match(css, /button\.leave-button\[disabled\]\s*\{\s*opacity:\s*1/);
+});
+test('准备页图标工具栏按房主权限显示，保留原生邀请、配置和待处理保护', () => {
+  const room = { code:'514047', phase:'lobby', capacity:6, boardName:'阿瓦隆 · 经典基础', players:[], team:[], history:[], me:{seat:1,isHost:true} };
+  for (const [isHost, seat] of [[true,1],[false,2],[false,null]]) {
+    const data = { ...base, room:{...room,me:{isHost,seat}} };
+    const tree = renderTable(data);
+    const toolbar = nodes(tree).find(n => n.attr?.class?.startsWith('lobby-header-actions '));
+    const buttons = toolbar.children.filter(n => n.tag === 'wx-button');
+    assert.equal(buttons.length, isHost ? 3 : 2);
+    assert.equal(buttons[0].attr.openType, 'share');
+    assert.equal(buttons[0].attr.disabled, false);
+    assert.match(buttons[0].attr.ariaLabel, /514047/);
+    assert.equal(buttons[1].attr.bindtap, 'openRoomRules');
+    assert.equal(!!byHandler(toolbar, 'toggleRoomSettings'), isHost);
+    for (const button of buttons) {
+      assert.ok(button.attr.ariaLabel);
+      assert.equal(button.attr.hoverClass, 'room-invite-pressed');
+      assert.equal(button.children.length, 1);
+      assert.equal(button.children[0].tag, 'wx-image');
+      assert.equal(button.children[0].attr.ariaHidden, 'true');
+    }
+    assert.equal(nodes(tree).filter(n => n.attr?.bindtap === 'openRoomRules').length, 1);
+    for (const blocked of [{busy:true},{loading:true},{hasPendingRequest:true},{reconnecting:true},{network:false}]) {
+      const pending = renderTable({...data,...blocked});
+      assert.equal(nodes(pending).find(n => n.attr?.openType === 'share').attr.disabled, true);
+    }
+    if (isHost) assert.equal(byHandler(renderTable({...data,hasPendingRequest:true}), 'toggleRoomSettings').attr.disabled, true);
+  }
+});
+test('开局后图标工具栏沿用角色权限，身份入口及遮盖、加载、断网状态不变', () => {
+  const room = {code:'514047',capacity:6,boardName:'阿瓦隆 · 经典基础',players:[],team:[],history:[]};
+  for (const phase of ['identity','proposal','teamVote','quest','tools','offlineFinal','ended','terminated']) {
+    for (const [isHost,seat] of [[true,1],[false,2],[false,null]]) {
+      const data = {...base,room:{...room,phase,me:{isHost,seat}}};
+      const tree = renderTable(data);
+      const status = nodes(tree).find(n=>n.attr?.class==='lobby-room-status');
+      const toolbar = nodes(status).find(n=>n.attr?.class?.startsWith('lobby-header-actions '));
+      const buttons = toolbar.children.filter(n=>n.tag==='wx-button');
+      assert.equal(buttons.length,isHost?2:1);
+      assert.equal(buttons[0].attr.bindtap,'openRoomRules');
+      assert.equal(!!byHandler(toolbar,'toggleRoomSettings'),isHost);
+      assert.equal(nodes(tree).filter(n=>n.attr?.bindtap==='openRoomRules').length,1);
+      assert.equal(nodes(tree).some(n=>n.attr?.openType==='share'),false);
+      for(const button of buttons) {
+        assert.ok(button.attr.ariaLabel);
+        assert.equal(button.attr.hoverClass,'room-invite-pressed');
+        assert.equal(button.children.length,1);
+        assert.equal(button.children[0].tag,'wx-image');
+      }
+      if(isHost)assert.equal(byHandler(renderTable({...data,hasPendingRequest:true}),'toggleRoomSettings').attr.disabled,true);
+      const summary = nodes(tree).find(n=>n.attr?.class==='room-summary');
+      assert.ok(byHandler(summary,'copyRoomCode'));
+      assert.equal(!!byHandler(summary,'reveal'),seat!==null);
+      if(seat===null)continue;
+      for(const revealed of [false,true]) {
+        const state={...data,revealed};
+        const identity=byHandler(renderTable(state),'reveal');
+        assert.equal(identity.attr.ariaLabel,seat+'号 · '+(revealed?'遮盖我的身份':'查看我的身份'));
+        assert.equal(identity.attr.disabled,false);
+        assert.equal(byHandler(renderTable({...state,network:false}),'reveal').attr.disabled,!revealed);
+        assert.equal(byHandler(renderTable({...state,busy:true}),'reveal').attr.disabled,!revealed);
+        assert.equal(byHandler(renderTable({...state,busy:true,busyAction:'identity'}),'reveal').attr.loading,true);
+      }
+    }
+  }
+});
+test('牌桌导航显示简称、配置保留完整板名，准备与开局后不重复显示板名行', () => {
+  const room = {code:'514047',capacity:10,boardName:'阿瓦隆 · 十二骑士（10人）',players:[],team:[],history:[],me:{isHost:true,seat:1}};
+  for(const phase of ['lobby','quest','ended']) {
+    const tree=renderTable({...base,room:{...room,phase},roomNavTitle:'十二骑士',showRoomRules:true});
+    const nav=nodes(tree).find(n=>n.tag==='wx-app-nav');
+    assert.equal(nav.attr.title,'十二骑士');
+    assert.equal(nav.attr.constrainTitle,true);
+    assert.equal(nodes(tree).some(n=>n.attr?.class==='lobby-board-name'),false);
+    const sheet=nodes(tree).find(n=>n.attr?.class?.includes('room-rules-sheet '));
+    assert.match(JSON.stringify(sheet),/阿瓦隆 · 十二骑士（10人）/);
+    const status=nodes(tree).find(n=>n.attr?.class==='lobby-room-status');
+    assert.equal(!!nodes(status).find(n=>n.attr?.class?.startsWith('lobby-header-actions ')),phase!=='lobby');
+  }
+  const loading=renderTable({...base,isLobby:false,room:null});
+  assert.equal(nodes(loading).find(n=>n.tag==='wx-app-nav').attr.title,'牌桌');
+});
 test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
   const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌', skillHistory: [{ id: 0, round: 2, text: '刀8号' }] },
     { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌', skillHistory: [{ id: 0, round: 1, text: '刀9号' }] }];
@@ -1703,6 +1804,11 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   assert.equal(code.attr.adjustPosition, false);
   assert.equal(code.attr.type, 'number');
   assert.equal(nodes(sheet).filter(n => n.attr?.role === 'alert').length, 1);
+  const missingRoom = render({ ...base, entrySheet: true, entryMode: 'join', name: '子龙', code: '123456', entryCodeError: '未找到该房间' });
+  const error = nodes(missingRoom).find(n => n.attr?.role === 'alert');
+  assert.match(JSON.stringify(error), /未找到该房间/);
+  assert.match(JSON.stringify(error), /请检查房间码是否正确/);
+  assert.match(nodes(missingRoom).find(n => n.attr?.class?.includes('entry-code-field')).attr.class, /has-error/);
 });
 
 test('创建和加入表单的铅笔为可点击按钮，昵称焦点绑定生效，请求期间禁用', () => {

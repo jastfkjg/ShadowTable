@@ -11,7 +11,7 @@ function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}],
   const navigations = [];
   const wx = {
     getStorageSync: key => storage.get(key), setStorageSync: (key,value) => storage.set(key,value), removeStorageSync: key => storage.delete(key),
-    navigateTo: o => { navigations.push(o.url); o.complete?.(); }, switchTab: o => navigations.push(o.url),
+    navigateTo: o => { navigations.push(o.url); o.success?.(); o.complete?.(); }, switchTab: o => navigations.push(o.url),
     navigateBack: () => navigations.push('back'), showToast() {},
     onNetworkStatusChange() {}, offNetworkStatusChange() {},
     enableAlertBeforeUnload() {}, disableAlertBeforeUnload() {},
@@ -938,6 +938,33 @@ test('首页进入独立牌桌，切后台时建房成功不强行跳转；邀�
   await first.p.mutate('/api/rooms',{name:'林间'},'enter'); assert.equal(first.navigations.length,0);
   const invited = page('table',api); invited.p.inviteCode='654321'; await invited.p.bootstrap();
   assert.equal(invited.p.data.invitation.code,'654321'); assert.equal(invited.p.data.invitationNeedsName,true); assert.deepEqual(invited.navigations,[]);
+});
+test('进入牌桌时保留面板直到返回首页，跳转失败时保留表单和提示', async () => {
+  for (const success of [true, false]) {
+    let navigation;
+    const { p } = page('lobby', { ...apiBase, request: async url => url === '/api/me/profile' ? profile : { rooms: [] } },
+      { wx: { navigateTo(options) { navigation = options; } } });
+    p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+    p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+    const opening = p.enterTable('123456');
+    assert.equal(p.data.entrySheet, true);
+    if (success) {
+      p.onHide();
+      assert.equal(p.data.entrySheet, true);
+      navigation.success(); navigation.complete();
+      await opening;
+      assert.equal(p.data.entrySheet, true);
+      p.onShow();
+      assert.equal(p.data.entrySheet, false);
+    } else {
+      navigation.fail(); navigation.complete();
+      await opening;
+      assert.equal(p.data.entrySheet, true);
+      assert.match(p.data.entryError, /未能打开牌桌/);
+      assert.equal(p.data.error, '');
+    }
+    p.onUnload();
+  }
 });
 test('返回已有牌桌沿用成员接口，服务端尚未部署邀请接口时仍可进入', async () => {
   const room = newRoom('654321', 'host', '子龙');
@@ -2592,6 +2619,9 @@ test('原生表单在键盘展开或收起时单次点击即可提交最新值�
         response.resolve({ code: values.code });
         await submitting;
         assert.equal(navigations[0], '/pages/table/table?code=062819&resume=1');
+        assert.equal(controller.data.entrySheet, true);
+        controller.onHide();
+        controller.onShow();
         assert.equal(controller.data.entrySheet, false);
         assert.equal(controller.data.busy, false);
       } finally {
@@ -2616,10 +2646,20 @@ test('加入面板中的业务错误保留表单，未确认的网络请求锁�
   p.setData({ loading: false, name: '子龙', nicknameSetup: false });
   p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
   const form = { detail: { value: { code: '123456' } } };
+  const errorFrames = [];
+  const setData = p.setData;
+  p.setData = function(patch, callback) { setData.call(this, patch, callback); errorFrames.push(this.data.error); };
   p.submitEntry(form); while (p.data.busy) await new Promise(setImmediate);
   assert.equal(p.data.entrySheet, true);
-  assert.equal(p.data.entryError, '房间不存在');
+  assert.equal(p.data.entryCodeError, '未找到该房间');
+  assert.equal(p.data.entryError, '');
+  assert.equal(p.data.code, '123456');
   assert.equal(p.data.error, '');
+  assert.ok(errorFrames.every(error => !error), '表单内业务错误不应短暂显示通用弹窗');
+  p.inputName({ detail: { value: '新昵称' } });
+  assert.equal(p.data.entryCodeError, '未找到该房间');
+  p.inputCode({ detail: { value: '12345' } });
+  assert.equal(p.data.entryCodeError, '');
   failure = 'network';
   p.submitEntry(form); while (p.data.busy) await new Promise(setImmediate);
   assert.equal(p.data.hasPendingRequest, true);
@@ -2632,7 +2672,31 @@ test('加入面板中的业务错误保留表单，未确认的网络请求锁�
   await p.retry();
   assert.equal(writes[1].id, writes[2].id);
   assert.deepEqual(writes[1].body, writes[2].body);
+  assert.equal(p.data.entrySheet, true);
+  p.onHide(); p.onShow();
   assert.equal(p.data.entrySheet, false);
+});
+
+test('加入面板其他业务错误仍显示通用提示，重新粘贴房间码清除字段错误', async () => {
+  const callbacks = [];
+  let message = '房间不存在', status = 404;
+  const { p } = page('lobby', { ...apiBase, request: async (url, method) => {
+    if (method !== 'POST') return { rooms: [] };
+    throw Object.assign(Error(message), { status });
+  } }, { wx: { getClipboardData(options) { callbacks.push(options); } } });
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
+  const form = { detail: { value: { code: '123456' } } };
+  p.submitEntry(form); while (p.data.busy) await new Promise(setImmediate);
+  assert.equal(p.data.entryCodeError, '未找到该房间');
+  p.pasteRoomCode(); callbacks.pop().success({ data: ' 062819 ' });
+  assert.equal(p.data.code, '062819');
+  assert.equal(p.data.entryCodeError, '');
+  message = '房间状态已变化'; status = 409;
+  p.submitEntry({ detail: { value: { code: '062819' } } });
+  while (p.data.busy) await new Promise(setImmediate);
+  assert.equal(p.data.entryCodeError, '');
+  assert.equal(p.data.entryError, '房间状态已变化');
 });
 
 test('分享邀请自动打开加入面板，首页列表合并房主信息且复制不触发访问', async t => {
@@ -2678,6 +2742,8 @@ test('首页表单打开立即收起底栏，关闭、成功进入房间和切�
   p.onHide(); await p.onShow();
   assert.equal(bar.data.entrySheetVisible, true);
   await p.enterTable('123456');
+  assert.equal(bar.data.entrySheetVisible, true);
+  p.onHide(); await p.onShow();
   assert.equal(bar.data.entrySheetVisible, false);
   open('create');
   await p.switchMainTab(1);

@@ -14,22 +14,20 @@
 .table-room .room-summary { gap: 8px; }
 .table-room button.lobby-room-code { gap: 8px; min-height: 44px; padding: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
 .table-room .lobby-copy-icon { width: 15px; height: 17px; margin-right: 5px; }
-.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { width: calc(45px + 4em); min-height: 44px; padding: 0 0 0 8px; justify-content: flex-start; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+.table-room button.lobby-header-link, .table-room button.lobby-header-link[disabled]:not([type]) { flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px; min-height: 48px; margin: 0; padding: 0; justify-content: center; border-radius: 12px; color: var(--muted); }
 .table-room button.lobby-header-link.room-invite-button, .table-room button.lobby-header-link.room-invite-button[disabled]:not([type]) { color: var(--accent); }
-.table-room .lobby-header-icon { display: block; flex-shrink: 0; width: 16px; height: 16px; }
-.table-room .lobby-header-label { flex: 0 0 4em; text-align: left; }
-.table-room .lobby-header-chevron { flex-shrink: 0; width: 5px; height: 5px; margin: 0 2px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }
-.table-room .lobby-header-chevron.is-placeholder { visibility: hidden; }
+.table-room .lobby-header-icon { display: block; flex-shrink: 0; width: 24px; height: 24px; }
+/* Room utilities share one row; identity remains in its original summary row. */
+.table-room .lobby-header-actions { display: flex; flex-shrink: 0; align-items: center; gap: 4px; margin-left: auto; }
+.table-room .lobby-header-actions.is-guest .lobby-header-icon { width: 26px; height: 26px; }
 .table-room button.room-identity, .table-room button.room-identity[disabled]:not([type]) { min-height: 44px; border-width: 3px 0; border-radius: 14px; padding: 0 12px; gap: 6px; font-size: 12px; }
 .table-room .room-identity-icon { width: 16px; height: 16px; }
-.table-room .lobby-board-row { margin: 0; gap: 10px; }
-.table-room .lobby-board-name { font-size: 13px; overflow-wrap: anywhere; }
-.table-room .lobby-room-status { gap: 6px; margin: 0; min-height: 44px; }
+.table-room .lobby-room-status { gap: 6px; margin: 0; min-height: 44px; flex-wrap: nowrap; }
+.table-room .lobby-status-tags { display: flex; flex: 1 1 0; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .table-room .lobby-chip { border: 0; padding: 3px 8px; border-radius: 8px; font-size: 11px; line-height: 1.6; background: rgba(177,191,198,.07); }
 .table-room .lobby-phase-chip { background: rgba(163,223,190,.10); color: var(--good); }
 .table-room .room-playing-chip { background: rgba(229,198,139,.10); color: var(--accent); }
 .table-room .lobby-connection { min-height: 44px; font-size: 12px; }
-.table-room .lobby-settings { margin-left: auto; }
 .table-room .identity-entry-hint { width: 250px; max-width: calc(100vw - 32px); font-size: 13px; }
 .table-room button.identity-hint-close { width: 44px; min-height: 44px; font-size: 24px; }
 
@@ -37,7 +35,7 @@
 .table-room .seats { gap: 8px; align-items: stretch; }
 .table-room .seats-compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .table-room .seats button.seat, .table-room .seats button.seat[disabled]:not([type]) { display: flex; flex-direction: column; gap: 6px; position: relative; min-width: 0; min-height: 112px; padding: 9px 7px 16px; border: 1px solid transparent; border-radius: 16px; background: var(--surface); color: var(--text); line-height: 1.4; }
-.table-room .seats button.seat.mine { border-color: var(--accent); }
+.table-room .seats button.seat.mine, .table-room .seats button.seat.mine[disabled]:not([type]) { border-color: var(--accent); }
 .table-room .seats button.seat.team, .table-room .seats button.seat.selected { background: #293d39; box-shadow: inset 0 0 0 1px var(--good); }
 .table-room .seats button.seat.mine.team, .table-room .seats button.seat.mine.selected { border-color: var(--accent); }
 .table-room .seat-head { min-height: 18px; gap: 2px; align-items: flex-start; }
@@ -161,6 +159,13 @@
 .table-room .finish-game-footer button, .table-room button.leave-button { min-height: 44px; font-size: 13px; }
 .table-room button.leave-button, .table-room button.leave-button[disabled]:not([type]) { gap: 8px; background: transparent; color: var(--evil); }
 .table-room .leave-button-icon { display: block; flex-shrink: 0; width: 18px; height: 18px; }
+/* Seat commands still disable controls to prevent duplicate requests, without dimming the room. */
+.table-room.seat-request-pending button.room-invite-button[disabled],
+.table-room.seat-request-pending button.avoidance-entry[disabled],
+.table-room.seat-request-pending button.lobby-ready-button[disabled],
+.table-room.seat-request-pending button.lobby-cancel[disabled],
+.table-room.seat-request-pending button.lobby-start.is-startable[disabled],
+.table-room.seat-request-pending button.leave-button[disabled] { opacity: 1; }
 
 /* Shared player sheet also appears on leaderboards. Keep badge disclosures. */
 .player-card-backdrop { padding: 88px 0 0; }

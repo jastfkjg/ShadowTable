@@ -36,6 +36,22 @@ test("深色窗口由静态配置提供，导航挂载和页面显示不再写�
   nav.pageLifetimes?.show?.();
 });
 
+test("长标题按胶囊位置限制宽度，横竖屏切换后重新计算", () => {
+  let width=375,left=272;
+  const nav=definition('components/app-nav/app-nav.js',{
+    getWindowInfo:()=>({windowWidth:width,statusBarHeight:20}),
+    getMenuButtonBoundingClientRect:()=>({left,top:26,height:32}),
+  });
+  const instance={data:{...nav.data},setData(patch){Object.assign(this.data,patch);}};
+  function clearOfCapsule(){return (width+instance.data.titleWidth)/2-instance.data.shareTitleShift<=left-8;}
+  assert.equal(clearOfCapsule(),true);
+  width=320;left=217;nav.pageLifetimes.resize.call(instance,{size:{windowWidth:width}});
+  assert.equal(clearOfCapsule(),true);
+  width=844;left=741;nav.pageLifetimes.resize.call(instance,{windowWidth:width});
+  assert.equal(clearOfCapsule(),true);
+  assert.ok(instance.data.titleWidth<=width*.48);
+});
+
 test("后台仍遮盖身份，不再通过原生底栏外观 API 重绘；缺少外观 API 可正常执行", () => {
   let masked = 0;
   const pages = [{ mask() { masked++; } }, {}];

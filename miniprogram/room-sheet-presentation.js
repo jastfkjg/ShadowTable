@@ -1,6 +1,10 @@
 const { portrait } = require("./role-portraits");
 const identityVision = require("./identity-vision");
 
+function shortBoardName(name) {
+  return String(name || "").trim().replace(/^阿瓦隆\s*·\s*/, "").replace(/\s*[（(]\s*\d+\s*人\s*[）)]\s*$/, "").trim();
+}
+
 function presentBoardOption(board, capacity) {
   const hints = {
     classic: capacity === 9 ? "逆仆指认" : capacity === 8 ? "线下刺梅林" : capacity === 7 ? "单奥伯伦" : "梅派入门",
@@ -12,7 +16,7 @@ function presentBoardOption(board, capacity) {
   };
   const entryHint = board.id?.startsWith("knights") ? "技能与B牌" : hints[board.id];
   return { ...board,
-    shortName: (board.namesByCapacity?.[capacity] || board.name || "游戏板子").replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
+    shortName: shortBoardName(board.namesByCapacity?.[capacity] || board.name) || "游戏板子",
     entryHint: entryHint || board.description?.trim() || "查看完整角色与玩法",
   };
 }
@@ -54,4 +58,4 @@ function presentFairyResult(result) {
   return { ...result, displaySeat: match ? Number(match[1]) : null,
     displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
 }
-module.exports = { presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present };
+module.exports = { shortBoardName, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present };
