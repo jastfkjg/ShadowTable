@@ -54,19 +54,24 @@ test('首页装饰不进入牌桌，准备阶段继续使用原有座位和发�
   assert.match(text, /发放身份/);
   assert.doesNotMatch(text, /home-brand-art|home-wordmark|home-table-blue|home-action-symbol|home-clock/);
 });
-test('座位请求保持控件外观稳定，同时继续禁用操作', () => {
+test('座位及准备请求保持其他控件外观稳定，同时继续禁用操作', () => {
   const room = { code:'514047', phase:'lobby', capacity:6, players:[], team:[], history:[], me:{seat:1,isHost:true,avoidance:{balance:1}} };
   const data = { ...base, room, seats:[{seat:1,name:'甲',occupied:true,mine:true}], canStart:false };
-  for (const busyAction of ['seat', 'stand']) {
+  for (const busyAction of ['seat', 'stand', 'ready']) {
     const tree = renderTable({...data,busy:true,busyAction});
-    assert.ok(nodes(tree).some(n => n.attr?.class?.includes('seat-request-pending')));
+    assert.ok(nodes(tree).some(n => n.attr?.class?.includes('lobby-request-pending')));
     for (const handler of ['seat', 'ready', 'openAvoidance', 'start', 'leave'])
       assert.equal(byHandler(tree, handler).attr.disabled, true, handler);
     assert.doesNotMatch(byHandler(tree, 'start').attr.class, /is-startable/);
     assert.match(byHandler(renderTable({...data,canStart:true,busy:true,busyAction}), 'start').attr.class, /is-startable/);
+    assert.equal(byHandler(tree, 'ready').attr.loading, busyAction === 'ready');
+    const cancel = renderTable({...data,room:{...room,me:{...room.me,ready:true}},busy:true,busyAction});
+    assert.match(byHandler(cancel, 'ready').attr.class, /lobby-cancel/);
+    assert.equal(byHandler(cancel, 'ready').attr.disabled, true);
+    assert.equal(byHandler(cancel, 'ready').attr.loading, busyAction === 'ready');
   }
-  for (const change of [{busy:true,busyAction:'ready'}, {busy:true,busyAction:'seat',network:false}, {busy:true,busyAction:'stand',hasPendingRequest:true}])
-    assert.ok(!nodes(renderTable({...data,...change})).some(n => n.attr?.class?.includes('seat-request-pending')));
+  for (const change of [{busy:true,busyAction:'start'}, {busy:true,busyAction:'ready',network:false}, {busy:true,busyAction:'seat',network:false}, {busy:true,busyAction:'stand',hasPendingRequest:true}])
+    assert.ok(!nodes(renderTable({...data,...change})).some(n => n.attr?.class?.includes('lobby-request-pending')));
   const css = require('node:fs').readFileSync(path.join(root, 'pages/table/presentation.wxss'), 'utf8');
   const avoidanceCss = require('node:fs').readFileSync(path.join(root, 'avoidance.wxss'), 'utf8');
   assert.match(avoidanceCss, /button\.avoidance-entry\[disabled\]:not\(\[type\]\)\s*\{[^}]*color:var\(--accent\);background:rgba\(229,198,139,\.08\)/);

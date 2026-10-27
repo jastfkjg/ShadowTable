@@ -159,13 +159,13 @@
 .table-room .finish-game-footer button, .table-room button.leave-button { min-height: 44px; font-size: 13px; }
 .table-room button.leave-button, .table-room button.leave-button[disabled]:not([type]) { gap: 8px; background: transparent; color: var(--evil); }
 .table-room .leave-button-icon { display: block; flex-shrink: 0; width: 18px; height: 18px; }
-/* Seat commands still disable controls to prevent duplicate requests, without dimming the room. */
-.table-room.seat-request-pending button.room-invite-button[disabled],
-.table-room.seat-request-pending button.avoidance-entry[disabled],
-.table-room.seat-request-pending button.lobby-ready-button[disabled],
-.table-room.seat-request-pending button.lobby-cancel[disabled],
-.table-room.seat-request-pending button.lobby-start.is-startable[disabled],
-.table-room.seat-request-pending button.leave-button[disabled] { opacity: 1; }
+/* Lobby commands still disable controls to prevent duplicate requests, without dimming the room. */
+.table-room.lobby-request-pending button.room-invite-button[disabled],
+.table-room.lobby-request-pending button.avoidance-entry[disabled],
+.table-room.lobby-request-pending button.lobby-ready-button[disabled],
+.table-room.lobby-request-pending button.lobby-cancel[disabled],
+.table-room.lobby-request-pending button.lobby-start.is-startable[disabled],
+.table-room.lobby-request-pending button.leave-button[disabled] { opacity: 1; }
 
 /* Shared player sheet also appears on leaderboards. Keep badge disclosures. */
 .player-card-backdrop { padding: 88px 0 0; }

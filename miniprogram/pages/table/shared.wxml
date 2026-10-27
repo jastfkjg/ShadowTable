@@ -174,7 +174,7 @@
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
 <app-nav wx:elif="{{!homeShell}}" title="{{room ? (roomNavTitle || '牌桌') : '牌桌'}}" constrainTitle="{{!!room}}" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
-<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.phase==='lobby' && busy && (busyAction==='seat' || busyAction==='stand') && network && !hasPendingRequest && !loading && !reconnecting ? 'seat-request-pending' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
+<view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.phase==='lobby' && busy && (busyAction==='seat' || busyAction==='stand' || busyAction==='ready') && network && !hasPendingRequest && !loading && !reconnecting ? 'lobby-request-pending' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
   <view wx:if="{{!invitation && !room}}" class="brand">
     <image wx:if="{{isLobby}}" class="home-brand-art" src="/assets/home-header.jpg" mode="aspectFill" aria-hidden="true" />
     <view class="brand-identity">
