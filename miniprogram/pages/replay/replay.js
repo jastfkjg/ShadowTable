@@ -14,7 +14,8 @@ Page({
       await api.login();
       const result = await api.request("/api/me/matches/" + encodeURIComponent(this.id) + "/replay");
       if (this.alive) { this.rawReplay = result.replay; this.setData(presentReplay(this.rawReplay, this.data.view)); }
-    } catch (error) { if (this.alive) this.setData({ replay: null, error: error.message }); }
+    } catch (error) { if (this.alive) this.setData({ error: error.message,
+      ...(error.status && error.status < 500 && ![401,429].includes(error.status) ? { replay:null } : {}) }); }
     finally { this.fetching = false; if (this.alive) this.setData({ loading: false }); }
   },
   chooseView(e) {

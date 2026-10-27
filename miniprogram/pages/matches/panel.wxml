@@ -1,3 +1,4 @@
+<import src="../../loading-placeholder.wxml" />
 <import src="./detail.wxml" />
 <template name="historyPanel">
 <view class="page personal-page matches-page">
@@ -14,7 +15,7 @@
     <button wx:if="{{filterCount}}" class="matches-filter-clear" bindtap="historyClearFilters" disabled="{{loading || loadingMore}}" hover-class="none">清空筛选</button>
     <view wx:elif="{{loaded && outcomeSummary}}" class="matches-outcome-summary"><block wx:if="{{outcomeCounts}}"><text class="win">{{outcomeCounts.wins}} 胜</text><text aria-hidden="true">·</text><text class="loss">{{outcomeCounts.losses}} 负</text><block wx:if="{{outcomeCounts.excluded}}"><text aria-hidden="true">·</text><text>{{outcomeCounts.excluded}} 未计入</text></block></block><text wx:else>{{outcomeSummary}}</text></view>
   </view>
-  <view wx:if="{{loading && !loaded && !records.length && !connectionVisible}}" class="status">正在读取对局记录…</view>
+  <template wx:if="{{loading && !loaded && !records.length}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <button wx:if="{{focusId}}" class="matches-focus-reset" bindtap="historyClearFocus" disabled="{{loading || loadingMore}}" hover-class="none">查看全部对局</button>
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="historyRetry" disabled="{{loading || loadingMore}}">重新加载</button></view>
   <view wx:if="{{(loaded || !loading) && !error && !total}}" class="matches-empty muted"><view>{{filterCount?'没有符合筛选条件的对局':funFilter?'暂无相关趣味记录':scoredOnly?'暂无计分对局':'暂无对局记录'}}</view><view wx:if="{{filterCount}}" class="match-note">可调整条件，或清空筛选查看记录。</view></view>

@@ -1,4 +1,5 @@
 <import src="./public-history.wxml" />
+<import src="../../loading-placeholder.wxml" />
 <include src="./public-history.wxml" />
 <view wx:if="{{roomFeedback && !error}}" class="room-feedback {{homeShell?'above-tab':''}}" role="status" aria-live="polite">{{roomFeedback}}</view>
 <import src="../home/role-groups.wxml" />
@@ -187,6 +188,7 @@
   </view>
   <button hover-class="none" wx:if="{{!isLobby && !room && !loading && !invitation}}" class="secondary" bindtap="returnHome">返回对局，创建或加入房间</button>
   <view wx:if="{{!room && !entrySheet}}"><include src="../home/connection-state.wxml" /></view>
+  <template wx:if="{{!isLobby && loading && !room && !invitation}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <view wx:if="{{error && !needsLogin}}" class="dialog-backdrop" catchtouchmove="blockScroll">
     <view class="error-dialog" role="dialog" aria-modal="true" aria-label="操作提示">
       <view class="dialog-title">{{recoverableError?'连接需要恢复':'暂时无法完成'}}</view>

@@ -1692,7 +1692,7 @@ test('小程序切换周期保留榜单和底栏，完成后一次更新，失�
   const render=()=>JSON.stringify(factory('pages/leaderboard/leaderboard.wxml')(p.data));
   const tick=()=>new Promise(resolve=>setImmediate(resolve));
   const first=p.onShow();await tick();
-  assert.match(render(),/正在读取榜单/);
+  assert.match(render(),/loading-placeholder/);
   requests[0].resolve(rankResult());await first;
   const board=p.data.board,frames=[];
   const setData=p.setData;

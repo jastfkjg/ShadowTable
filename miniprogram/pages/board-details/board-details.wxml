@@ -1,6 +1,7 @@
+<import src="../../loading-placeholder.wxml" />
 <app-nav title="板子详情" back="{{true}}" backLabel="返回" bindback="back" />
 <view wx:if="{{loading || error}}" class="page board-detail-status">
-  <view wx:if="{{loading && !connectionVisible}}" class="muted" role="status">正在加载板子详情…</view>
+  <template wx:if="{{loading && !board}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <block wx:if="{{error && !connectionVisible}}"><view class="settings-error" role="alert">{{error}}</view><button hover-class="none" class="secondary" bindtap="retry">重新加载</button><button hover-class="none" class="text-button" bindtap="back">返回</button></block>
 </view>
 <block wx:if="{{!loading && !error && board}}">

@@ -1,6 +1,7 @@
+<import src="../../loading-placeholder.wxml" />
 <app-nav title="确认网页登录" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page web-login-page">
-  <view wx:if="{{loading && !connectionVisible}}" class="status" role="status">正在读取登录请求…</view>
+  <template wx:if="{{loading && !request}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <block wx:elif="{{status==='confirmed' || status==='consumed'}}">
     <view class="login-title">已确认登录</view>
     <view class="login-copy">请返回发起登录的浏览器。网页将使用当前小程序账号，资料与战绩保持一致。</view>

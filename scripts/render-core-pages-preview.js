@@ -60,8 +60,10 @@ function write(name, file, data, styles, extra = "") {
   const key = data.personal && data.activeTab === 1 ? "personal" : data.publicShare && data.sharedSurface ? "publicShare" : data.statistics ? data.tab === "matches" ? "history" : "statistics" : "";
   const owner = key ? data[key] = { ...data[key] } : data;
   const manual = file === "pages/table/table.wxml" || data.lobby && data.activeTab !== 1;
-  const runtime = owner.connectionPreview || (owner.loading && !owner.error ? { active:true, startedAt:Date.now() } : null);
-  previewConnection = !manual && runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
+  const runtime = owner.connectionPreview;
+  previewConnection = manual ? null : owner.connectionPreviewState
+    ? owner.connectionPreviewState.connectionVisible ? owner.connectionPreviewState : null
+    : runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
   if (previewConnection) owner.connectionVisible = true;
   const rendered = html(factory(file)(data));
   const dialog = data.appDialog || data.lobby?.appDialog;
@@ -234,6 +236,7 @@ for (const [name, data] of Object.entries(homeScenes)) {
   const { connectionRuntime, ...scene } = data;
   const lobby = { ...homeBase, memberRooms: rooms, visibleMemberRooms: rooms, ...scene };
   Object.assign(lobby, connectionFeedback.present(lobby, connectionRuntime || {}, feedbackNow));
+  lobby.connectionDeferred = !connectionRuntime && lobby.loading && !lobby.reconnecting;
   lobby.availableRoomCount = roomList.availableRooms(lobby.memberRooms).length;
   const tabs = html(factory("custom-tab-bar/index.wxml")({ selected: 0, ...tabBarVisibility({ data: { lobby } }, 0), list: [
     { pagePath: "pages/lobby/lobby", text: "对局", icon: "/assets/tab-table.png", activeIcon: "/assets/tab-table-active.png" },

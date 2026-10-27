@@ -1,6 +1,7 @@
+<import src="../../loading-placeholder.wxml" />
 <template name="funPanel">
   <view class="page personal-page stats-page fun-page">
-    <view wx:if="{{loading && !stats && !connectionVisible}}" class="status">正在读取趣味记录…</view>
+    <template wx:if="{{loading && !stats}}" is="loadingPlaceholder" data="{{kind:'metrics'}}" />
     <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button hover-class="none" class="secondary" bindtap="load" disabled="{{loading}}">重试</button></view>
     <view wx:if="{{stats}}" class="fun-content">
       <view wx:if="{{!stats.fun.available}}" class="muted">趣味记录将在服务更新后开放</view>

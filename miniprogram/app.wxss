@@ -4,6 +4,7 @@
 @import "./avoidance.wxss";
 @import "./identity-vision.wxss";
 @import "./connection-state.wxss";
+@import "./loading-placeholder.wxss";
 page {
   --bg: #101c24;
   --surface: #1b2b35;

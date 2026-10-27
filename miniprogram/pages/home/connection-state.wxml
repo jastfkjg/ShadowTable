@@ -1,5 +1,5 @@
 <!-- Connection feedback takes space only while connection or confirmation is pending. -->
-<view wx:if="{{loading || reconnecting || !network || needsLogin || hasPendingRequest || connectionPhase==='connecting'}}" class="home-connection {{connectionPhase==='offline' || (!connectionPhase && !network)?'is-offline':reconnecting || needsLogin?'is-reconnecting':''}}">
+<view wx:if="{{(!connectionDeferred || reconnecting || !network || needsLogin || hasPendingRequest) && (loading || reconnecting || !network || needsLogin || hasPendingRequest || connectionPhase==='connecting')}}" class="home-connection {{connectionPhase==='offline' || (!connectionPhase && !network)?'is-offline':reconnecting || needsLogin?'is-reconnecting':''}}">
   <view class="home-connection-symbol" aria-hidden="true">
     <image wx:if="{{connectionPhase==='offline' || (!connectionPhase && !network)}}" class="home-connection-offline-icon" src="/assets/connection-offline.svg" />
     <view wx:elif="{{connectionPhase==='waiting' || (!connectionPhase && reconnecting)}}" class="home-connection-clock" />

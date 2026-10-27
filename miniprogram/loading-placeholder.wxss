@@ -1,0 +1,13 @@
+.loading-placeholder { padding:8px 0; }
+.loading-placeholder-profile { display:flex; align-items:center; gap:16px; min-height:84px; margin-bottom:20px; }
+.loading-placeholder-avatar { flex:0 0 56px; height:56px; border-radius:16px; background:#263842; }
+.loading-placeholder-name { width:44%; }
+.loading-placeholder-name > view { height:16px; border-radius:5px; background:#263842; }
+.loading-placeholder-name > view + view { width:65%; height:10px; margin-top:14px; }
+.loading-placeholder-metrics { display:flex; align-items:center; justify-content:space-around; min-height:168px; margin-bottom:20px; border-radius:22px; background:var(--surface); }
+.loading-placeholder-metrics > view { width:17%; height:32px; border-radius:7px; background:#2b3d47; }
+.loading-placeholder-list { padding:4px 18px; border-radius:20px; background:var(--surface); }
+.loading-placeholder-row { padding:22px 0; }
+.loading-placeholder-row + .loading-placeholder-row { border-top:1px solid rgba(177,191,198,.08); }
+.loading-placeholder-row > view { width:44%; height:13px; border-radius:4px; background:#2b3d47; }
+.loading-placeholder-row > view + view { width:78%; height:9px; margin-top:13px; background:#263842; }

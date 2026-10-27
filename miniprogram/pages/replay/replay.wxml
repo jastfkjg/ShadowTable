@@ -1,8 +1,9 @@
+<import src="../../loading-placeholder.wxml" />
 <app-nav class="replay-nav" title="对局复盘" back="{{true}}" bindback="back" />
 <view class="page replay-page">
-  <view wx:if="{{loading && !connectionVisible}}" class="status">正在读取对局复盘…</view>
+  <template wx:if="{{loading && !replay}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
-  <block wx:if="{{replay && !loading && !error}}">
+  <block wx:if="{{replay}}">
     <view class="replay-overview">
     <view class="replay-date"><image src="/assets/record-calendar.svg" aria-hidden="true" /><text>{{replay.dateLabel}} · {{replay.capacity}}人 · 已结束</text></view>
     <view class="replay-heading"><text class="replay-board">{{replay.boardName}}</text><text class="replay-badge {{replay.self.outcome}}">{{replay.outcomeLabel}}</text></view>

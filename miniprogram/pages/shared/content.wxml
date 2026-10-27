@@ -1,7 +1,8 @@
+<import src="../../loading-placeholder.wxml" />
 <template name="sharedRecordContent">
   <scroll-view class="shared-scroll" scroll-y="{{true}}" show-scrollbar="{{false}}" aria-label="玩家分享的成绩">
     <view class="shared-page"><connection-state context="{{loading}}:{{error}}" />
-      <view wx:if="{{loading && !connectionVisible}}" class="shared-status" role="status">正在读取分享的成绩…</view>
+      <template wx:if="{{loading && !sharedRecord}}" is="loadingPlaceholder" data="{{kind:'metrics'}}" />
       <view wx:elif="{{error && !connectionVisible}}" class="shared-status" role="alert"><view>{{error}}</view><button class="secondary shared-retry" bindtap="retrySharedRecord" hover-class="stats-pressed">重新加载</button></view>
       <view wx:elif="{{intro}}" class="shared-intro">
         <image class="shared-intro-cover" src="/assets/share-cover.jpg" mode="widthFix" aria-label="桌边助手，一起入座" />

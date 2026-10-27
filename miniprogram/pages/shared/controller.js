@@ -32,7 +32,7 @@ module.exports = function createSharedPage() { return {
     this.fetching = true;
     const sequence = this.sequence = (this.sequence || 0) + 1;
     this.snapshot = null;
-    this.setData({ loading: true, error: "", sharedRecord: null });
+    this.setData({ loading: true, error: "" });
     if (!this.singlePage) wx.hideShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
     try {
       const snapshot = this.selection ? await shares.create(this.selection) : await shares.read(this.shareId);
@@ -47,7 +47,8 @@ module.exports = function createSharedPage() { return {
         if (!this.singlePage) wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
       }
     } catch (error) {
-      if (this.alive && sequence === this.sequence) this.setData({ error: error.message });
+      if (this.alive && sequence === this.sequence) this.setData({ error: error.message,
+        ...(error.status && error.status < 500 && ![401,429].includes(error.status) ? { sharedRecord:null } : {}) });
     } finally {
       this.fetching = false;
       if (this.alive && sequence === this.sequence) this.setData({ loading: false });

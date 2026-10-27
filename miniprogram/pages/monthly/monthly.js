@@ -18,7 +18,8 @@ Page({
   async load(month = this.data.month) {
     this.closePlayerCard();
     const sequence = this.sequence = (this.sequence || 0) + 1;
-    this.setData({ month, loading: true, error: "", report: null, detailBoards: [], rulesExpanded: false });
+    this.setData({ month, loading: true, error: "", rulesExpanded: false,
+      ...(this.data.report?.month === month ? {} : { report: null, detailBoards: [] }) });
     try {
       await api.login();
       const response = await api.request("/api/monthly-report?month=" + encodeURIComponent(month));
@@ -32,7 +33,8 @@ Page({
       this.setData({ report, maxMonth: report.currentMonth, minMonth: report.firstMonth < month ? report.firstMonth : month,
         detailBoards: monthly.detailBoards(report, "count", this.data.entertainment) });
     } catch (error) {
-      if (this.alive && sequence === this.sequence) this.setData({ error: error.status === 404 ? "当前服务尚未开放月度战报，请更新服务端后重试。" : error.message });
+      if (this.alive && sequence === this.sequence) this.setData({ error: error.status === 404 ? "当前服务尚未开放月度战报，请更新服务端后重试。" : error.message,
+        ...(error.status && error.status < 500 && ![401,429].includes(error.status) ? { report:null, detailBoards:[] } : {}) });
     } finally { if (this.alive && sequence === this.sequence) this.setData({ loading: false }); }
   },
   chooseMonth(e) { const month = e.detail.value; if (month !== this.data.month) return this.load(month); },

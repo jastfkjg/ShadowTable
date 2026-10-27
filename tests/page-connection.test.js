@@ -1,61 +1,91 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
+const fs = require("node:fs"), path = require("node:path");
 const root = path.resolve(__dirname, "../miniprogram");
-const settle = () => new Promise(setImmediate);
-function harness(route = "pages/scores/scores") {
-  let now = 10000, next = 0, listener, pages;
-  const jobs = new Map(), calls = [], updates = [];
-  const page = { route, data: { loading: true }, setData(value) { Object.assign(this.data, value); } };
-  pages = [page];
-  const clock = { setTimeout(fn, ms) { const id = ++next;jobs.set(id, { fn, at: now + ms });return id; }, clearTimeout(id) { jobs.delete(id); } };
-  const wx = { getStorageSync: () => "session", onNetworkStatusChange(fn) { listener = fn; }, offNetworkStatusChange(fn) { if (listener === fn) listener = null; },
-    getNetworkType(options) { options.success({ networkType: "wifi" }); },
-    request(options) { calls.push(options); }, removeStorageSync() {},
-  };
-  const cache = new Map();
-  function load(file) {
-    if (file.endsWith("/config.js")) return { baseUrl: "https://example.test" };
-    if (file.endsWith("/connection-feedback.js")) return require(file);
-    if (cache.has(file)) return cache.get(file).exports;
-    const mod = { exports: {} };cache.set(file, mod);
-    vm.runInNewContext(fs.readFileSync(file, "utf8"), { module: mod,
-      require: name => load(path.resolve(path.dirname(file), name + ".js")), wx,
-      Date: { now: () => now, parse: Date.parse }, Math: Object.assign(Object.create(Math), { random: () => 1 }), getCurrentPages: () => pages, ...clock }, { filename: file });
-    return mod.exports;
+const { harness, settle } = require("./helpers/connection-client");
+test("首次读取在500毫秒内完成从不显示卡片，隐藏与卸载会取消延迟展示", async () => {
+  for (const hide of [false, true]) {
+    const h = harness();
+    try {
+      const reading = h.page.load();await h.advance(350);
+      assert.equal(h.last().connectionVisible,false);assert.equal(h.last().connectionInitialLoading,true);
+      if(hide)h.release();
+      h.calls[0].success({statusCode:200,data:{records:[]}});await reading;await h.advance(1000);
+      assert.ok(h.updates.every(value => !value.connectionVisible));assert.equal(h.jobs.size,0);
+    } finally {h.release();}
   }
-  const connection = load(path.join(root, "page-connection.js")), api = load(path.join(root, "api.js"));
-  const release = connection.activate(page, value => updates.push(structuredClone(value)));
-  page.load = async () => {
-    page.data.loading = true;
-    try { return await api.request("/api/me/score-ledger?offset=0"); }
-    catch (error) { page.data.error = error.message; }
-    finally { page.data.loading = false; }
-  };
-  return { page, api, connection, calls, updates, jobs, release, last: () => updates.at(-1),
-    network(connected) { listener?.({ isConnected: connected }); },
-    setPages(value) { pages = value; },
-    async advance(ms) {
-      const end = now + ms;
-      for (;;) {
-        const due = [...jobs].filter(([, job]) => job.at <= end).sort((a,b) => a[1].at-b[1].at || a[0]-b[0])[0];
-        if (!due) break;
-        now = due[1].at;jobs.delete(due[0]);due[1].fn();await settle();
-      }
-      now = end;await settle();
-    },
-  };
-}
+});
+test("首次读取切后台后再返回，完成时不会重新闪出已取消的加载提示", async () => {
+  const h=harness();let resumed;
+  try{
+    const reading=h.page.load();await h.advance(250);h.release();await h.advance(1000);
+    resumed=h.connection.activate(h.page,v=>h.updates.push(structuredClone(v)));
+    h.calls[0].success({statusCode:200,data:{records:[]}});await reading;await h.advance(0);
+    assert.ok(h.updates.every(v=>!v.connectionVisible));assert.equal(h.jobs.size,0);
+  }finally{resumed?.();h.release();}
+});
+test("已有可用内容时，即使刷新较慢也保持静默；真实失败立即切换异常反馈", async () => {
+  const h = harness();
+  try {
+    h.page.data.loaded=true;h.page.data.records=[];
+    const reading=h.page.load();await h.advance(3000);
+    assert.ok(h.updates.every(value=>!value.connectionVisible));assert.equal(h.jobs.size,0);
+    h.calls[0].fail({errMsg:"request:fail timeout"});await reading;await h.advance(0);
+    assert.equal(h.last().connectionVisible,true);assert.equal(h.last().connectionTitle,"连接超时");
+  }finally{h.release();}
+});
+test("连续与并行接口共用一次首次加载，秒数不重置、卡片不反复开关", async () => {
+  const h=harness();
+  try {
+    const first=h.api.request("/api/me/score-ledger?stage=1");await h.advance(700);
+    assert.equal(h.last().connectionVisible,true);
+    h.calls[0].success({statusCode:200,data:{}});await first;
+    const a=h.api.request("/api/me/score-ledger?stage=2"),b=h.api.request("/api/me/score-ledger?stage=3");
+    await h.advance(1300);assert.equal(h.last().connectionElapsedSeconds,2);
+    h.calls[1].success({statusCode:200,data:{}});await a;
+    assert.equal(h.last().connectionVisible,true);
+    h.calls[2].success({statusCode:200,data:{}});await b;h.page.data.loading=false;await h.advance(0);
+    const visible=h.updates.map(v=>v.connectionVisible),start=visible.indexOf(true),end=visible.lastIndexOf(true);
+    assert.ok(visible.slice(start,end+1).every(Boolean));assert.equal(h.last().connectionVisible,false);
+  } finally {h.release();}
+});
+test("健康连接主动重新连接立即反馈，不受首次加载延迟影响", async () => {
+  const h=harness();
+  try{
+    h.page.data.loaded=true;const retry=h.connection.retry(h.page);await settle();
+    assert.equal(h.last().connectionVisible,true);assert.equal(h.last().connectionElapsedSeconds,0);
+    h.calls[0].success({statusCode:200,data:{}});await retry;await h.advance(0);
+    assert.equal(h.last().connectionVisible,false);
+  }finally{h.release();}
+});
+test("从战绩返回我的时实际控制器静默刷新，保留资料战绩直到新数据到达", async () => {
+  const h=harness("pages/me/me"),definition=h.loadModule(path.join(root,"pages/me/controller.js"))();
+  const owner={...definition,data:structuredClone(definition.data),setData(value){Object.assign(this.data,value);}};
+  const profile={nickname:"子龙",displayName:"子龙",identityType:"wx",initial:"子"};
+  const stats={total:19,wins:10,losses:9,winRate:52.6,byFaction:[],byBoard:[],recent:[],score:{total:35,month:35}};
+  Object.assign(owner.data,{profile,stats,loading:false});owner.onLoad();
+  h.page.lobbyController={};h.page.personalController=owner;h.page.data.activeTab=1;
+  const stop=h.connection.activate(h.page,value=>h.updates.push(structuredClone(value)));
+  try{
+    const reading=owner.onShow();await settle();await h.advance(3000);
+    assert.equal(owner.data.profile,profile);assert.equal(owner.data.stats,stats);
+    assert.ok(h.updates.every(value=>!value.connectionVisible));
+    for(const request of h.calls){const data=request.url.endsWith('/profile')?{...profile,version:2}:request.url.endsWith('/stats')?{...stats,total:20}:{rooms:[],records:[],total:0};request.success({statusCode:200,data});}
+    await reading;await h.advance(0);
+    assert.equal(owner.data.stats.total,20);assert.ok(h.updates.every(value=>!value.connectionVisible));
+  }finally{stop();h.release();owner.onUnload();}
+});
 test("页面实际请求驱动动效、秒数与自动重读；成功后收起且不再更新", async () => {
   const h = harness();
   try {
-    const reading = h.page.load();assert.equal(h.last().connectionPhase, "connecting");
-    await h.advance(3000);assert.equal(h.last().connectionElapsedSeconds, 3);
+    const reading = h.page.load();assert.equal(h.last().connectionVisible, false);
+    await h.advance(500);assert.equal(h.last().connectionPhase, "connecting");
+    await h.advance(2500);assert.equal(h.last().connectionElapsedSeconds, 3);
     h.calls[0].fail({ errMsg: "request:fail timeout" });await reading;await settle();
     assert.equal(h.last().connectionTitle, "连接超时");assert.equal(h.last().connectionRetrySeconds, 1);
     assert.equal(h.last().connectionPhase, "waiting");assert.equal(h.last().connectionCanRetry, true);
     await h.advance(1000);assert.equal(h.calls.length, 2);assert.equal(h.last().connectionPhase, "connecting");
-    h.calls[1].success({ statusCode: 200, data: { records: [] } });await settle();
+    h.calls[1].success({ statusCode: 200, data: { records: [] } });await settle();await h.advance(0);
     assert.equal(h.last().connectionVisible, false);assert.equal(h.jobs.size, 0);
     const count = h.updates.length;await h.advance(30000);assert.equal(h.updates.length, count);
   } finally { h.release(); }
@@ -80,7 +110,7 @@ test("并行读取部分成功不会掩盖失败；冷却倒计时不能由手�
 test("断网停止计划，恢复网络再读；隐藏页面取消计时、监听及迟到响应", async () => {
   const h = harness();
   const reading = h.page.load();h.calls[0].fail({ errMsg: "request:fail timeout" });await reading;
-  h.network(false);assert.equal(h.last().connectionPhase, "offline");assert.equal(h.jobs.size, 0);
+  h.network(false);await h.advance(0);assert.equal(h.last().connectionPhase, "offline");assert.equal(h.jobs.size, 0);
   await h.advance(30000);assert.equal(h.calls.length, 1);
   h.network(true);await settle();assert.equal(h.calls.length, 2);
   h.release();assert.equal(h.jobs.size, 0);

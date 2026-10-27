@@ -1,6 +1,7 @@
+<import src="../../loading-placeholder.wxml" />
 <template name="personalPanel">
 <view class="page personal-page me-page tab-page">
-  <view wx:if="{{loading && !profile && !connectionVisible}}" class="status" role="status">正在读取个人资料…</view>
+  <template wx:if="{{loading && !profile}}" is="loadingPlaceholder" data="{{kind:'personal'}}" />
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
   <block wx:if="{{profile}}">
     <navigator class="me-profile" url="/pages/profile/profile" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="编辑资料，头像和昵称">

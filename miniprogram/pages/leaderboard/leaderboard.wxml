@@ -1,3 +1,4 @@
+<import src="../../loading-placeholder.wxml" />
 <app-nav title="排行榜" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page personal-page leaderboard-page {{board.fun?'fun-leaderboard':''}} {{board.me.rank>99?'has-wide-rank':''}}">
   <view class="rank-toolbar">
@@ -27,7 +28,7 @@
       <text wx:if="{{board.fun && !loading}}" class="fun-rank-count">{{board.participantLabel}}</text>
     </view>
   </view>
-  <view wx:if="{{loading && !board && !connectionVisible}}" class="status" role="status">正在读取榜单…</view>
+  <template wx:if="{{loading && !board}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <view wx:if="{{notice}}" class="rank-notice small muted" role="status">{{notice}}</view>
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="retry" disabled="{{loading || loadingMore}}" hover-class="none">重试</button></view>
   <block wx:if="{{board}}">

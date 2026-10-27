@@ -17,9 +17,9 @@ const text = node => typeof node === "string" ? node : (node.children || []).map
 const room = { code: "620816", status: "lobby", statusLabel: "待开局", available: true,
   boardName: "阿瓦隆 · 十二骑士", capacity: 12, occupied: 8, seat: 3, peopleLabel: "8 / 12 人已入座" };
 
-test("首次连接只显示一个连接状态，无缓存时使用骨架且不提前显示空牌桌", () => {
+test("首次连接先保留状态点与骨架，不立即插入卡片或提前显示空牌桌", () => {
   const tree = render({ ...createTable({ lobby: true }).data });
-  assert.equal(text(tree).split("正在连接牌桌").length - 1, 1);
+  assert.equal(byClass(tree, "home-connection").length, 0);
   assert.equal(byClass(tree, "home-room-skeleton").length, 2);
   assert.doesNotMatch(text(tree), /还没有牌桌|立即重试|连接中断/);
   assert.equal(byClass(tree, "connection-button").length, 1);
@@ -221,6 +221,20 @@ test("牌桌使用实际请求秒数和重试计划，恢复后收起提示并�
     assert.equal(p.data.connectionPhase,"idle");assert.equal(p.data.reconnecting,false);
     assert.ok(clock.jobs.size > 0, "连接恢复后保留正常牌桌轮询");
   } finally { p.onHide();p.onUnload();assert.equal(clock.jobs.size,0); }
+});
+test("大厅和牌桌首次加载延迟500毫秒，短请求无卡片，主动重连立即显示", async () => {
+  for(const lobby of [true,false]){
+    const clock=fakeClock(),p=controller({}, {clock,realSchedule:true,lobby});
+    try{
+      const first=p.beginConnectionAttempt();assert.equal(p.data.connectionDeferred,true);
+      await clock.advance(499);assert.equal(p.data.connectionDeferred,true);
+      await clock.advance(1);assert.equal(p.data.connectionDeferred,false);
+      p.setData({loading:false});p.finishConnectionAttempt(first);p.schedule();
+      assert.equal(p.data.connectionPhase,"idle");
+      const manual=p.beginConnectionAttempt(true);assert.equal(p.data.connectionDeferred,false);
+      assert.equal(p.data.connectionPhase,"connecting");p.finishConnectionAttempt(manual);p.schedule();
+    }finally{p.onHide();p.onUnload();assert.equal(clock.jobs.size,0);}
+  }
 });
 
 test("读列表失败保留数据与同步时间，手动重试合并并发且成功后恢复入口", async () => {

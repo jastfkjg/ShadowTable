@@ -117,7 +117,7 @@ test('小程序网页登录确认页显示真实网站与账号，加载、过�
   assert.equal(byHandler(tree, 'confirm').attr.disabled, false);
   assert.equal(byHandler(renderLogin({ ...ready, busy: true }), 'confirm').attr.disabled, true);
   assert.ok(!byHandler(renderLogin({ ...ready, terminal: true, error: '小程序码已过期' }), 'confirm'));
-  assert.ok(!byHandler(renderLogin({ ...ready, loading: true }), 'confirm'));
+  assert.equal(byHandler(renderLogin({ ...ready, loading: true }), 'confirm').attr.disabled, true);
   const done = renderLogin({ ...ready, status: 'confirmed' });
   assert.ok(!byHandler(done, 'confirm')); assert.ok(byHandler(done, 'back'));
 });

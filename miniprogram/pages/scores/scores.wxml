@@ -1,3 +1,4 @@
+<import src="../../loading-placeholder.wxml" />
 <template name="ledgerContent">
   <view class="ledger-row {{item.pointsCompact?'ledger-row-compact':''}}">
     <view class="ledger-symbol {{!item.isMatch?'is-adjustment':''}}" aria-hidden="true"><image wx:if="{{item.rolePortrait}}" class="ledger-portrait" src="{{item.rolePortrait}}" mode="aspectFit" /><image wx:else src="{{item.isMatch?'/assets/record-coin.svg':'/assets/record-adjust.svg'}}" /></view>
@@ -17,7 +18,7 @@
 </template>
 <app-nav title="积分明细" back="{{true}}" bindback="back" />
 <view class="page scores-page">
-  <view wx:if="{{loading && !loaded && !connectionVisible}}" class="status">正在读取积分明细…</view>
+  <template wx:if="{{loading && !loaded}}" is="loadingPlaceholder" data="{{kind:'list'}}" />
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" bindtap="load" disabled="{{loading}}" hover-class="none">重新加载</button></view>
   <view wx:if="{{notice}}" class="ledger-notice" role="status">{{notice}}</view>
   <block wx:if="{{loaded}}">

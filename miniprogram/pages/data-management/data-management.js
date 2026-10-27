@@ -24,12 +24,13 @@ Page({
   async load() {
     if (this.data.saving || this.pending || this.data.confirming) return;
     const sequence = this.sequence = (this.sequence || 0) + 1;
-    this.setData({ loading: true, preview: null, error: "" });
+    this.setData({ loading: true, error: "", ...(this.data.preview?.month === this.data.month ? {} : { preview:null }) });
     try {
       const result = await api.request("/api/me/record-clearing");
       if (!this.active || sequence !== this.sequence) return;
       const month = result.months.includes(this.data.month) ? this.data.month : result.months[0] || "";
-      this.setData({ months: result.months, currentMonth: result.currentMonth, monthLabels: result.months.map(value => clearing.monthLabel(value) + (value === result.currentMonth ? "（本月）" : "")), month, monthIndex: Math.max(0, result.months.indexOf(month)) });
+      this.setData({ months: result.months, currentMonth: result.currentMonth, monthLabels: result.months.map(value => clearing.monthLabel(value) + (value === result.currentMonth ? "（本月）" : "")), month, monthIndex: Math.max(0, result.months.indexOf(month)),
+        ...(this.data.preview?.month === month ? {} : { preview:null }) });
       if (month) {
         const preview = await api.request("/api/me/record-clearing?month=" + month);
         if (this.active && sequence === this.sequence) this.setData({ preview: clearing.present(preview, result.currentMonth) });

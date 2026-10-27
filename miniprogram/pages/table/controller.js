@@ -244,6 +244,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     roomsRefreshing: false,
     roomsSyncLabel: "",
     ...connectionFeedback.initial,
+    connectionDeferred: true,
     busy: false,
     error: "",
     reconnecting: false,
@@ -732,15 +733,22 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const values = connectionFeedback.present(this.data, { active: this.connectionAttemptActive,
       startedAt: this.connectionAttemptStartedAt, retryAt: this.connectionRetryAt,
       failure: this.connectionFailure, rateLimitUntil: this.rateLimitUntil, pending: this.pending }, Date.now());
+    if (this.connectionAttemptMode === "initial" && (this.data.room || this.data.invitation || this.data.memberRooms.length || this.data.serverConnected))
+      this.connectionAttemptMode = "silent";
+    values.connectionDeferred = !!this.connectionAttemptActive && (this.connectionAttemptMode === "silent" ||
+      this.connectionAttemptMode === "initial" && Date.now() < this.connectionDisplayAt);
     // Quiet background reads should not commit invisible initial idle fields.
     if (values.connectionPhase === "idle" && !this.data.connectionPhase) return;
     this.updateChangedData(values);
   },
-  beginConnectionAttempt() {
+  beginConnectionAttempt(immediate = false) {
     if (this.connectionAttemptActive) return 0;
     const token = this.connectionAttemptToken = (this.connectionAttemptToken || 0) + 1;
     this.connectionAttemptActive = true;
     this.connectionAttemptStartedAt = Date.now();
+    this.connectionAttemptMode = immediate || this.data.reconnecting || this.pending || this.data.needsLogin ? "immediate"
+      : this.data.room || this.data.invitation || this.data.memberRooms.length || this.data.serverConnected ? "silent" : "initial";
+    this.connectionDisplayAt = Date.now() + 500;
     this.connectionRetryAt = 0;
     this.syncConnectionFeedback();
     this.schedule();
@@ -754,12 +762,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   startConnectionClock() {
     clearTimeout(this.connectionClockTimer);
     if (!this.alive || !this.foreground ||
-        !(this.connectionAttemptActive || this.data.network && this.connectionRetryAt > Date.now())) return;
+        !(this.connectionAttemptActive && this.connectionAttemptMode !== "silent" || this.data.network && this.connectionRetryAt > Date.now())) return;
+    const delay = this.connectionAttemptMode === "initial" && Date.now() < this.connectionDisplayAt ? this.connectionDisplayAt - Date.now() : 1000;
     this.connectionClockTimer = setTimeout(() => {
       if (!this.alive || !this.foreground) return;
       this.syncConnectionFeedback();
       this.startConnectionClock();
-    }, 1000);
+    }, delay);
   },
   async recoverConnection() {
     if (!this.alive || !this.foreground || this.recovering || this.connectionAttemptActive || this.data.busy || this.data.loading || this.data.roomsRefreshing || this.data.needsLogin) return;
@@ -1750,7 +1759,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   async retry() {
-    const attempt = this.beginConnectionAttempt();
+    const attempt = this.beginConnectionAttempt(true);
     let reading = false;
     try {
       this.setData({ error: "", recoverableError: false });

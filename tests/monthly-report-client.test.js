@@ -52,6 +52,15 @@ test("月报切换月份和回前台拒绝旧响应，失败能重试，娱乐�
   assert.ok(urls.every(url => url.startsWith("/api/monthly-report?month=")));
   p.onUnload();
 });
+test("同月回前台刷新和短暂网络失败保留已展示战报，切换月份清除旧月份内容", async () => {
+  let finish, fail=false;
+  const response=monthlyFixture(),p=page("pages/monthly/monthly.js",{login:async()=>{},request:()=>new Promise((resolve,reject)=>{finish=()=>fail?reject(Error("请求超时")):resolve(response);})});
+  p.onLoad({month:response.month});const first=p.onShow();await tick();finish();await first;
+  const shown=p.data.report,details=p.data.detailBoards;
+  const updating=p.onShow();await tick();assert.equal(p.data.report,shown);assert.equal(p.data.detailBoards,details);
+  fail=true;finish();await updating;assert.equal(p.data.report,shown);assert.equal(p.data.loading,false);
+  const next=p.load("2026-08");await tick();assert.equal(p.data.report,null);finish();await next;p.onUnload();
+});
 test("月报分享页只读取月报，所有榜单生成一张长图，预览保存发送使用同一张图", async () => {
   const response = monthlyFixture();
   response.mainBoards[0].rows = Array.from({ length: 26 }, (_, index) => ({ ...response.mainBoards[0].rows[0], publicId: "p" + index, nickname: "玩家" + index, rank: 1, tied: true }));

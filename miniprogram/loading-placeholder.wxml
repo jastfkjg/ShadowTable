@@ -1,0 +1,7 @@
+<template name="loadingPlaceholder">
+  <view class="loading-placeholder is-{{kind || 'list'}}" role="status" aria-label="正在加载内容" aria-busy="true">
+    <view wx:if="{{kind==='personal'}}" class="loading-placeholder-profile"><view class="loading-placeholder-avatar" /><view class="loading-placeholder-name"><view /><view /></view></view>
+    <view wx:if="{{kind==='personal' || kind==='metrics'}}" class="loading-placeholder-metrics"><view /><view /><view /></view>
+    <view class="loading-placeholder-list"><view wx:for="{{[0,1,2]}}" wx:key="*this" class="loading-placeholder-row"><view /><view /></view></view>
+  </view>
+</template>
