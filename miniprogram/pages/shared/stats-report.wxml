@@ -1,0 +1,48 @@
+<template name="sharedStatsReport">
+  <view class="shared-report">
+    <image class="shared-report-wordmark" src="/assets/home-wordmark.png" mode="aspectFit" aria-label="桌边助手" />
+    <view class="shared-report-title">阿瓦隆 · 圆桌战报</view>
+    <view class="shared-report-owner">
+      <image wx:if="{{sharedRecord.avatar}}" class="shared-avatar" src="{{sharedRecord.avatar}}" mode="aspectFill" binderror="sharedAvatarError" aria-label="{{sharedRecord.name+'的头像'}}" />
+      <view wx:else class="shared-avatar shared-initial" aria-hidden="true">{{sharedRecord.initial}}</view>
+      <text>{{sharedRecord.name}}</text>
+    </view>
+    <view class="shared-scope">{{sharedRecord.scope}}</view>
+    <view class="shared-report-medallion">
+      <image class="shared-report-seal" src="/assets/record-share-seal.svg" mode="aspectFit" aria-hidden="true" />
+      <view class="shared-report-hero-label">{{sharedRecord.heroLabel}}</view>
+      <view class="shared-report-hero">{{sharedRecord.hero}}<text>{{sharedRecord.unit}}</text></view>
+      <view class="shared-report-result">{{sharedRecord.resultLabel}}</view>
+    </view>
+    <view class="shared-report-metrics {{sharedRecord.metrics[0].value.length>6 || sharedRecord.metrics[2].value.length>6?'is-long':''}}">
+      <view wx:for="{{sharedRecord.metrics}}" wx:key="label" class="shared-report-metric {{index===2?'is-score':''}}">
+        <view>{{item.value}}<text wx:if="{{index!==1}}">{{index===0?'局':'分'}}</text></view>
+        <text>{{index===0?'累计对局':item.label}}</text>
+      </view>
+    </view>
+    <view wx:if="{{sharedRecord.factions.length}}" class="shared-report-section">
+      <view class="shared-section-heading"><text>阵营表现</text><text>胜场 / 局数</text></view>
+      <view class="shared-report-factions">
+        <view wx:for="{{sharedRecord.factions}}" wx:key="faction" class="shared-report-faction">
+          <view class="shared-report-faction-name"><image wx:if="{{item.faction==='good' || item.faction==='evil'}}" src="{{item.faction==='good'?'/assets/record-shield-good.svg':'/assets/record-share-sword.svg'}}" mode="aspectFit" aria-hidden="true" /><text>{{item.label}}</text></view>
+          <view class="shared-report-rate">{{item.rate}}</view>
+          <view class="shared-bar"><view class="is-{{item.faction}}" style="{{item.bar}}"></view></view>
+          <view class="shared-report-sample">{{item.wins}} 胜 / {{item.total}} 局</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{sharedRecord.roles.length}}" class="shared-report-section">
+      <view class="shared-section-heading"><text>常玩角色</text><text>按对局数 · 前 {{sharedRecord.roles.length}} 位</text></view>
+      <view class="shared-report-roles">
+        <view wx:for="{{sharedRecord.roles}}" wx:key="roleKey" class="shared-report-role">
+          <image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" />
+          <view class="shared-report-role-name">{{item.role}}</view>
+          <view class="shared-report-role-rate">{{item.rate}}</view>
+          <view class="shared-report-sample">{{item.total}} 局</view>
+          <view class="shared-report-sample">{{item.wins}} 胜 {{item.losses}} 负</view>
+        </view>
+      </view>
+    </view>
+    <view class="shared-report-end" aria-hidden="true"></view>
+  </view>
+</template>

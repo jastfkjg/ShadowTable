@@ -1,0 +1,67 @@
+.shared-page.shared-report-page { --text:#f4ead7; --muted:#b0c3cf; --accent:#e8c780; --report-surface:#172831; --report-line:rgba(177,191,198,.13); --report-frame:rgba(229,198,139,.22); --report-detail:rgba(229,198,139,.35); max-width:430px; padding:20px 20px calc(24px + env(safe-area-inset-bottom)); }
+.shared-report { position:relative; overflow:hidden; padding:21px 17px 23px; border:1px solid var(--report-frame); border-radius:25px; background:var(--report-surface); }
+.shared-report::before, .shared-report::after { content:''; position:absolute; top:16px; width:24px; height:24px; border-top:1px solid var(--report-detail); pointer-events:none; }
+.shared-report::before { left:16px; border-left:1px solid var(--report-detail); border-radius:7px 0 0; }
+.shared-report::after { right:16px; border-right:1px solid var(--report-detail); border-radius:0 7px 0 0; }
+.shared-report-wordmark { display:block; width:110px; height:37px; margin:0 auto; }
+.shared-report-title { margin-top:7px; font:600 26px/1.4 "Songti SC",STSong,serif; letter-spacing:3px; text-align:center; }
+.shared-report-owner { display:flex; justify-content:center; align-items:center; gap:7px; margin:11px auto 0; max-width:100%; }
+.shared-report-owner .shared-avatar { width:26px; height:26px; border-radius:9px; }
+.shared-report-owner .shared-initial { font-size:14px; }
+.shared-report-owner > text { min-width:0; font-size:13px; font-weight:600; overflow-wrap:anywhere; word-break:break-all; }
+.shared-report .shared-scope { margin-top:7px; font-size:11px; text-align:center; }
+.shared-report-medallion { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:218px; margin:8px auto 9px; }
+.shared-report-seal { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.shared-report-hero-label { position:relative; font-size:12px; letter-spacing:4px; color:var(--muted); }
+.shared-report-hero { position:relative; margin:4px 0; color:var(--accent); font-size:clamp(36px,15vw,58px); font-weight:600; line-height:1.2; letter-spacing:-2px; font-variant-numeric:tabular-nums; }
+.shared-report-hero > text { margin-left:2px; font-size:24px; font-weight:400; letter-spacing:0; }
+.shared-report-result { position:relative; color:var(--muted); font-size:12px; }
+.shared-report-metrics { display:flex; gap:4px; padding:17px 0 20px; border-bottom:1px solid var(--report-line); }
+.shared-report-metric { flex:1; min-width:0; text-align:center; overflow-wrap:anywhere; }
+.shared-report-metric + .shared-report-metric { border-left:1px solid var(--report-line); }
+.shared-report-metric > view { font-size:26px; font-weight:600; line-height:1.2; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+.shared-report-metric > view > text { margin-left:3px; font-size:12px; font-weight:400; letter-spacing:0; }
+.shared-report-metric > text { display:block; margin-top:7px; color:var(--muted); font-size:11px; }
+.shared-report-metric.is-score > view { color:var(--accent); }
+.shared-report-metrics.is-long { flex-direction:column; gap:12px; }
+.shared-report-metrics.is-long .shared-report-metric { text-align:left; }
+.shared-report-metrics.is-long .shared-report-metric + .shared-report-metric { border-left:0; }
+.shared-report-metrics.is-long .shared-report-metric > view { min-width:0; font-size:24px; }
+.shared-report-metrics.is-long .shared-report-metric > text { margin-top:4px; }
+.shared-report-section { margin-top:20px; }
+.shared-report .shared-section-heading { flex-wrap:wrap; gap:4px 8px; margin-bottom:15px; font-size:14px; font-weight:600; }
+.shared-report .shared-section-heading > text:first-child { flex-shrink:0; }
+.shared-report-factions { display:flex; flex-wrap:wrap; gap:20px 22px; }
+.shared-report-faction { flex:1; min-width:100px; }
+.shared-report-faction-name { display:flex; align-items:center; gap:5px; font-size:12px; }
+.shared-report-faction-name > image { flex-shrink:0; width:16px; height:16px; }
+.shared-report-faction-name > text { min-width:0; overflow-wrap:anywhere; }
+.shared-report-rate { margin-top:7px; font-size:26px; font-weight:600; line-height:1.2; font-variant-numeric:tabular-nums; }
+.shared-report .shared-bar { height:4px; margin-top:8px; background:var(--report-line); }
+.shared-report-sample { margin-top:4px; color:var(--muted); font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+.shared-report-roles { display:flex; justify-content:center; align-items:flex-start; gap:7px; text-align:center; }
+.shared-report-role { flex:0 1 25%; min-width:0; }
+.shared-report-role > image { display:block; width:60px; max-width:100%; height:68px; margin:0 auto 5px; }
+.shared-report-role-name { min-height:34px; font-size:12px; line-height:1.4; font-weight:500; overflow-wrap:anywhere; word-break:break-all; }
+.shared-report-role-rate { margin:5px 0 2px; color:var(--accent); font-size:18px; font-weight:600; line-height:1.3; font-variant-numeric:tabular-nums; }
+.shared-report-role .shared-report-sample { margin-top:2px; }
+.shared-report-end { width:35px; height:2px; margin:22px auto 0; border-radius:2px; background:var(--accent); opacity:.7; }
+.shared-report-page .shared-stamp { margin:18px 0; text-align:center; font-size:11px; }
+.shared-image-actions { display:flex; gap:12px; }
+.shared-image-actions > button { flex:1; width:0; min-width:0; min-height:49px; padding:12px 8px; margin:0; border-radius:14px; font-size:15px; font-weight:600; }
+.shared-image-actions > button.shared-image-send { background:var(--accent); color:var(--bg); }
+.shared-image-actions > button.shared-image-save { border:1px solid var(--control-border); color:var(--text); }
+.shared-image-status { margin-top:10px; color:var(--muted); font-size:12px; text-align:center; }
+.shared-image-error { margin-top:12px; color:var(--evil); font-size:13px; overflow-wrap:anywhere; }
+.shared-image-error > button { width:100%; min-height:44px; padding:8px; margin:4px 0 0; color:var(--accent); font-size:13px; }
+.shared-report-canvas { position:fixed; left:-1100px; top:0; width:1080px; height:1080px; pointer-events:none; }
+@media (max-width:350px) {
+  .shared-page.shared-report-page { padding-left:16px; padding-right:16px; }
+  .shared-report { padding-left:14px; padding-right:14px; }
+  .shared-report-title { font-size:23px; letter-spacing:1px; }
+  .shared-report-metric > view { font-size:22px; }
+  .shared-report-role-name { font-size:11px; }
+  .shared-report-role-rate { font-size:17px; }
+  .shared-report-roles { flex-wrap:wrap; gap:18px 10px; }
+  .shared-report-role { flex-basis:calc(50% - 5px); }
+}

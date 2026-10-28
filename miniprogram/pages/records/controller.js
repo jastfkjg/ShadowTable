@@ -53,7 +53,10 @@ module.exports = function createRecordsPage(initialTab = "records") {
     },
     retrySharedRecord() { return this.sharedController?.retrySharedRecord(); },
     sharedAvatarError() { return this.sharedController?.sharedAvatarError(); },
-    sharedPoster() { return this.sharedController?.sharedPoster(); },
+    sendSharedImage() { return this.sharedController?.sendSharedImage(); },
+    saveSharedImage() { return this.sharedController?.saveSharedImage(); },
+    retrySharedImage() { return this.sharedController?.retrySharedImage(); },
+    openSharedAlbumSettings() { return this.sharedController?.openSharedAlbumSettings(); },
     openPersonalRecords() { return this.sharedController?.openPersonalRecords(); },
     onShow() {
       this.foreground = true;

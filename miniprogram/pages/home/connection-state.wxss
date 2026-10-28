@@ -1,7 +1,6 @@
 @import "../../connection-state.wxss";
-.home-lobby button.home-action.is-connection-disabled[disabled]:not([type]) { opacity:1; background:#192934; }
-.home-lobby button.home-action-join.is-connection-disabled[disabled]:not([type]) { background:#252e2e; box-shadow:inset 0 0 0 1px rgba(229,198,139,.17); }
-.home-lobby .is-connection-disabled .home-action-title { color:#c2cdd3; }.home-lobby .home-action-join.is-connection-disabled .home-action-title { color:#c3b18e; }
+.home-lobby button.home-action.is-connection-disabled[disabled]:not([type]) { opacity:1; background:#192d39; box-shadow:inset 0 0 0 1px var(--home-entry-border); }
+.home-lobby .is-connection-disabled .home-action-title { color:#c2cdd3; }
 .home-lobby .is-connection-disabled .home-action-hint { color:#a7b8c2; }
 .home-lobby .is-connection-disabled .home-action-symbol, .home-lobby .is-connection-disabled .home-entry-arrow { opacity:.78; }
 .home-lobby .home-room-sync { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:-4px 4px 13px; color:var(--muted); font-size:12px; line-height:20px; }

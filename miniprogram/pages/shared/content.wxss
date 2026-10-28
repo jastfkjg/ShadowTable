@@ -1,3 +1,4 @@
+@import "./stats-report.wxss";
 .shared-scroll { height:100vh; width:100%; background:var(--bg); color:var(--text); }
 .shared-page { max-width:600px; margin:0 auto; padding:20px 24px calc(36px + env(safe-area-inset-bottom)); box-sizing:border-box; font-size:14px; line-height:1.6; }
 .shared-brand { margin-bottom:24px; color:var(--accent); font-size:13px; }
@@ -23,19 +24,9 @@
 .shared-section { margin-top:25px; }
 .shared-section-heading { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:15px; font-size:16px; font-weight:500; }
 .shared-section-heading > text:last-child { color:var(--muted); font-size:11px; font-weight:400; text-align:right; }
-.shared-faction { margin:18px 0; }
-.shared-faction-copy { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
-.shared-faction-copy > view > text { margin-left:8px; color:var(--muted); font-size:11px; }
-.shared-faction-copy > text { font-size:17px; }
 .shared-bar { height:4px; margin-top:10px; overflow:hidden; border-radius:4px; background:var(--surface); }
 .shared-bar > view { height:100%; background:var(--third); border-radius:4px; }
 .shared-bar .is-good { background:var(--good); }.shared-bar .is-evil { background:var(--evil); }
-.shared-role-row { display:flex; align-items:center; gap:10px; padding:13px 0; border-bottom:1px solid var(--border); }
-.shared-role-row:last-child { border-bottom:0; }
-.shared-role-row > image { flex-shrink:0; width:35px; height:43px; }
-.shared-role-main { flex:1; min-width:0; overflow-wrap:anywhere; }
-.shared-role-main > text { display:block; margin-top:3px; color:var(--muted); font-size:11px; }
-.shared-role-row > text { color:var(--accent); font-size:17px; }
 .shared-result { font-size:28px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
 .shared-role-scene { display:flex; align-items:center; justify-content:space-between; position:relative; min-height:202px; margin-top:8px; }
 .shared-role-copy { flex:1; min-width:0; position:relative; z-index:1; }
@@ -57,7 +48,6 @@
 .shared-related > view > text { display:block; color:var(--muted); font-size:11px; margin-top:5px; }.shared-related > text { flex-shrink:0; color:var(--accent); font-size:12px; }
 .shared-stamp { margin-top:26px; color:var(--muted); font-size:11px; }
 .shared-author-note { margin-top:20px; color:var(--muted); font-size:12px; }
-button.shared-poster { min-height:44px; padding:8px 0; justify-content:flex-start; font-size:13px; color:var(--accent); background:transparent; }
 .shared-status { padding:64px 0; color:var(--muted); text-align:center; }.shared-retry { margin-top:20px; }.shared-page .stats-pressed { opacity:.75; }
 button.shared-data-entry { display:flex; align-items:center; gap:7px; width:100%; min-height:44px; margin:0; padding:9px 14px; border-radius:0; background:transparent; color:var(--accent); font-size:12px; font-weight:400; }
 .shared-data-entry > image { width:16px; height:16px; }

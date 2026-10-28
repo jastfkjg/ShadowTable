@@ -176,7 +176,6 @@
 <app-nav wx:elif="{{!homeShell}}" title="{{room ? (roomNavTitle || '牌桌') : '牌桌'}}" constrainTitle="{{!!room}}" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
 <view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.phase==='lobby' && busy && (busyAction==='seat' || busyAction==='stand' || busyAction==='ready') && network && !hasPendingRequest && !loading && !reconnecting ? 'lobby-request-pending' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
   <view wx:if="{{!invitation && !room}}" class="brand">
-    <image wx:if="{{isLobby}}" class="home-brand-art" src="/assets/home-header.jpg" mode="aspectFill" aria-hidden="true" />
     <view class="brand-identity">
       <image wx:if="{{isLobby && !homeWordmarkFailed}}" class="home-wordmark" src="/assets/home-wordmark.png" mode="aspectFit" binderror="homeBrandError" aria-label="桌边助手" />
       <text wx:else class="brand-mark">桌边助手</text>
@@ -355,11 +354,11 @@
     <view wx:if="{{pendingTableCode}}" class="inline-error"><view>房间 {{pendingTableCode}} 有一项操作尚未确认。</view><button hover-class="none" class="secondary" bindtap="resumePending">返回牌桌处理</button></view>
     <view class="home-entry-actions">
       <button class="home-action home-action-create {{loading || reconnecting || !network || needsLogin?'is-connection-disabled':''}}" hover-class="room-swipe-pressed" data-mode="create" bindtap="switchEntry" disabled="{{!!(busy || loading || hasPendingRequest || reconnecting || !network || needsLogin)}}" aria-label="创建房间，选择人数和玩法">
-        <view class="home-action-symbol" aria-hidden="true"><image class="home-action-icon" src="/assets/home-create-cards.png" mode="aspectFit" /></view>
+        <view class="home-action-symbol" aria-hidden="true"><image class="home-action-icon" src="/assets/home-create-outline.svg" mode="aspectFit" /></view>
         <view class="home-action-copy"><view class="home-action-heading"><text class="home-action-title"><text class="home-action-word">创建</text><text class="home-action-word">房间</text></text><view class="home-entry-arrow" aria-hidden="true" /></view><text class="home-action-hint"><text class="home-action-word">选人数，</text><text class="home-action-word">开新局</text></text></view>
       </button>
       <button class="home-action home-action-join {{loading || reconnecting || !network || needsLogin?'is-connection-disabled':''}}" hover-class="room-swipe-pressed" data-mode="join" data-action="join" bindtap="switchEntry" disabled="{{!!(busy || loading || hasPendingRequest || reconnecting || !network || needsLogin)}}" aria-label="加入房间，输入6位房间码">
-        <view class="home-action-symbol" aria-hidden="true"><image class="home-action-icon" src="/assets/home-join-door.png" mode="aspectFit" /></view>
+        <view class="home-action-symbol" aria-hidden="true"><image class="home-action-icon" src="/assets/home-join-outline.svg" mode="aspectFit" /></view>
         <view class="home-action-copy"><view class="home-action-heading"><text class="home-action-title"><text class="home-action-word">加入</text><text class="home-action-word">房间</text></text><view class="home-entry-arrow" aria-hidden="true" /></view><text class="home-action-hint"><text class="home-action-word">输入6位</text><text class="home-action-word">房间码</text></text></view>
       </button>
     </view>

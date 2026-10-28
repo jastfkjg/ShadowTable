@@ -1,0 +1,10 @@
+[   20088ms] SyntaxError: Failed to execute 'write' on 'Document': Identifier 'role' has already been declared
+    at eval (eval at <anonymous> (eval at evaluate (:368:30)), <anonymous>:1:36)
+    at eval (eval at evaluate (:368:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:370:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+[   44166ms] SyntaxError: Failed to execute 'write' on 'Document': Unexpected token '}'
+    at eval (eval at <anonymous> (eval at evaluate (:368:30)), <anonymous>:1:36)
+    at eval (eval at evaluate (:368:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:370:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)

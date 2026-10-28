@@ -1,15 +1,17 @@
 # 首页 A「雾蓝轻绘」素材
 
+2026-10-28 首页改用 B 简洁版：保留 `miniprogram/assets/home-wordmark.png`，入口改用 `home-create-outline.svg` 和 `home-join-outline.svg`。以下记录 A 版素材来源；三张停用插画已移至 `docs/artwork/home-a/` 存档，避免继续占用小程序主包。
+
 视觉采用深蓝、奶油白、雾蓝与暖金，以小尺寸蜡笔梅林衔接头像及分享封面。页面按紧凑品牌区、创建／加入双入口、真实牌桌列表组织。入口沿用轻按反馈，刷新状态旋转、房间侧滑沿用原动效；减少动态效果设置继续生效。
 
-素材通过内置 image_gen 生成，参考用户选定的 A 版与精简版。生成原图保留在 Codex generated_images；项目实际引用的文件均保存到 miniprogram/assets/，不依赖该外部目录。
+素材通过内置 image_gen 生成，参考用户选定的 A 版与精简版。生成原图保留在 Codex generated_images；项目文件及停用素材保存在下表路径，不依赖该外部目录。
 
 | 素材 | 项目路径 | 输出 | 用途 |
 | --- | --- | --- | --- |
-| 品牌插画 | miniprogram/assets/home-header.jpg | 800×267，11436 字节，mozjpeg 52 | 无字背景，右侧梅林，左侧留白 |
+| 品牌插画（已停用） | docs/artwork/home-a/home-header.jpg | 800×267，11436 字节，mozjpeg 52 | 无字背景，右侧梅林，左侧留白 |
 | 手绘字标 | miniprogram/assets/home-wordmark.png | 320×107，6728 字节，透明 PNG，40 色 | 桌边助手品牌字标，加载失败回退原生文字 |
-| 创建图标 | miniprogram/assets/home-create-cards.png | 128×128，6236 字节，透明 PNG，48 色 | 三张星纹卡牌 |
-| 加入图标 | miniprogram/assets/home-join-door.png | 128×128，9370 字节，透明 PNG，48 色 | 蓝色拱门与金色箭头 |
+| 创建图标（已停用） | docs/artwork/home-a/home-create-cards.png | 128×128，6236 字节，透明 PNG，48 色 | 三张星纹卡牌 |
+| 加入图标（已停用） | docs/artwork/home-a/home-join-door.png | 128×128，9370 字节，透明 PNG，48 色 | 蓝色拱门与金色箭头 |
 
 四张素材合计 33770 字节。除品牌字标外，入口文案、连接状态、房间名称、号码、人数、座位、时间与操作均为原生 WXML／真实数据；未把 UI 截图整张嵌入页面。样式限制在首页和共享底栏，不改变创建／加入、复制、刷新、管理和侧滑行为。
 

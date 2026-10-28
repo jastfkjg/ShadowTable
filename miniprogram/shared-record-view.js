@@ -16,7 +16,7 @@ function present(snapshot, assetUrl = path => path) {
   const view = { kind, pageTitle: labels[kind], name: snapshot.player.name, initial: Array.from(snapshot.player.name)[0] || "友",
     avatar: snapshot.player.avatarUrl ? assetUrl(snapshot.player.avatarUrl) : "", asOf: time(snapshot.createdAt),
     ownerLabel: kind === "stats" ? "分享了阿瓦隆战绩" : kind === "match" ? "分享了一场对局" : kind === "matches" ? "分享了对局记录概览" : kind === "funSummary" ? "分享了趣味记录概览" : "分享了一项趣味成绩" };
-  if (kind === "stats") return { ...view, hero: value(data.winRate), unit: Number.isFinite(data.winRate) ? "%" : "", heroLabel: "总胜率", scope: "全部时间 · 全部玩法",
+  if (kind === "stats") return { ...view, hero: value(data.winRate), unit: Number.isFinite(data.winRate) ? "%" : "", heroLabel: "总胜率", scope: "全部时间 · 全部玩法", resultLabel: data.wins + " 胜 · " + data.losses + " 负",
     metrics: [metric(data.total, "对局"), metric(data.wins + " / " + data.losses, "胜 / 负"), metric(data.scoreMonth, Number((data.scorePeriod || time(snapshot.createdAt).slice(0, 7)).split(".")[1]) + "月积分")],
     factions: data.factions.map(row => ({ ...row, label: factions[row.faction] || factions.unknown, rate: rate(row.winRate),
       bar: "width:" + Math.max(0, Math.min(100, row.winRate || 0)) + "%;" })),
