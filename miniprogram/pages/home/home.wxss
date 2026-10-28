@@ -1,7 +1,8 @@
 /* Home-only presentation. Every new rule is scoped away from the table. */
 @import "../../room-list.wxss";
 @import "./connection-state.wxss";
-.home-lobby { --home-divider:rgba(177,191,198,.13); --home-state-bg:rgba(163,223,190,.08); --home-entry-surface:#193442; --home-entry-border:rgba(153,199,245,.14); --text:#f4ead7; --muted:#b0c3cf; --surface:#182f3d; --accent:#e8c780; max-width:600px; padding:8px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
+/* Inherit the shared surface, text and accent palette used by the personal page. */
+.home-lobby { --home-divider:rgba(177,191,198,.13); --home-state-bg:rgba(163,223,190,.08); --home-entry-surface:var(--surface); --home-entry-border:rgba(177,191,198,.07); max-width:600px; padding:8px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
 .home-lobby .brand { position:relative; min-height:88px; box-sizing:border-box; border:0; padding:4px 0 6px; margin:0 0 10px; flex-wrap:nowrap; gap:8px; }
 .home-lobby .brand-identity { position:relative; z-index:1; flex-wrap:wrap; max-width:calc(100% - 44px); gap:0 6px; }
 .home-lobby .home-wordmark { display:block; flex-shrink:0; width:156px; height:52px; }
@@ -13,7 +14,7 @@
 .home-lobby .brand-identity .connection-button { justify-content:flex-start; width:auto; min-width:44px; min-height:44px; margin:0; padding:0; gap:4px; }.home-lobby .connection-label { font-size:11px; font-weight:400; }.home-lobby .connection-dot { width:6px; height:6px; }
 .home-lobby .home-entry-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .home-lobby button.room-filter { min-width:44px; min-height:44px; font-size:12px; }
-.home-lobby button.home-action, .home-lobby button.home-action[disabled]:not([type]) { position:relative; display:flex; flex-direction:row; justify-content:flex-start; align-items:center; gap:10px; width:100%; min-width:0; min-height:100px; padding:14px 12px; margin:0; border:0; border-radius:18px; background:var(--home-entry-surface); color:var(--text); box-shadow:inset 0 0 0 1px var(--home-entry-border); line-height:1.5; text-align:left; transition:opacity 120ms ease; }
+.home-lobby button.home-action, .home-lobby button.home-action[disabled]:not([type]) { position:relative; display:flex; flex-direction:row; justify-content:flex-start; align-items:center; gap:10px; width:100%; min-width:0; min-height:112px; padding:14px 12px; margin:0; border:0; border-radius:18px; background:var(--home-entry-surface); color:var(--text); box-shadow:inset 0 0 0 1px var(--home-entry-border); line-height:1.5; text-align:left; transition:opacity 120ms ease; }
 .home-lobby .home-action-create .home-action-title, .home-lobby .home-action-create .home-entry-arrow { color:var(--accent); }
 .home-lobby .home-action-symbol { display:flex; align-items:center; justify-content:center; flex:0 0 36px; width:36px; height:40px; margin:0; background:transparent; }
 .home-lobby .home-action-icon { display:block; width:100%; height:100%; }
@@ -24,7 +25,7 @@
 .home-lobby .home-action-hint { display:block; margin-top:6px; font-size:12px; font-weight:400; color:var(--muted); line-height:1.5; }
 .home-lobby .home-entry-arrow { flex-shrink:0; width:6px; height:6px; border-top:1.5px solid currentColor; border-right:1.5px solid currentColor; transform:rotate(45deg); }
 .home-lobby .room-directory-heading { margin:22px 2px 12px; font-size:21px; font-weight:700; }
-.home-lobby .room-directory .member-room.room-list-item { border-radius:20px; box-shadow:inset 0 0 0 1px rgba(176,195,207,.07); }
+.home-lobby .room-directory .member-room.room-list-item { border-radius:20px; box-shadow:none; }
 .home-lobby .room-directory .room-list-title { font-size:17px; font-weight:600; }
 .home-lobby .room-directory .room-status { font-size:13px; font-weight:500; }
 .home-lobby .room-directory .room-list-code, .home-lobby .room-directory .room-list-meta { font-size:14px; }
