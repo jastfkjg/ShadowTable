@@ -14,6 +14,7 @@
   const roomSwipe = window.shadowtableRoomSwipe;
   const roomList = window.shadowtableRoomList;
   const roomConfirmation = window.shadowtableRoomConfirmation;
+  const aboutPresentation = window.shadowtableAbout;
   const boardDetailPresentation = window.shadowtableBoardDetail;
   const avoidancePresentation = window.shadowtableAvoidance;
   const identityVision = window.shadowtableIdentityVision;
@@ -1396,13 +1397,18 @@
       close.onclick=done;closeFunInfo=done;modal.addEventListener('keydown',onKey);
     });
   }
-  function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false, record = null) {
-    if (record) return showFunRecord(record);
+  function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false, info = null) {
+    const about = info?.variant === 'about' ? info : null;
+    if (info && !about) return showFunRecord(info);
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
       modalTitle.textContent = title;
       const box = modal.querySelector('.error-dialog'), grantContext = document.getElementById('modal-grant-context');
+      const aboutEmblem = document.getElementById('modal-about-emblem'), aboutSubtitle = document.getElementById('modal-about-subtitle'), aboutDivider = document.getElementById('modal-about-divider');
+      aboutEmblem.hidden = aboutSubtitle.hidden = aboutDivider.hidden = !about;
+      aboutSubtitle.textContent = about?.subtitle || '';
+      if (about) box?.classList.add('is-about');
       const context = document.getElementById('modal-room-context');
       context.hidden = !roomContext;
       if (roomContext) {
@@ -1422,8 +1428,9 @@
           + '<div class="dialog-grant-hint' + (receipt.lead ? ' has-lead' : '') + '">' + esc(content) + '</div>';
       } else {
         box?.classList.remove('is-avoidance-grant');
-        const emphasisAt = roomContext?.emphasis ? content.indexOf(roomContext.emphasis) : -1;
-        if (emphasisAt >= 0) modalMessage.innerHTML = esc(content.slice(0, emphasisAt)) + '<span class="dialog-emphasis">' + esc(roomContext.emphasis) + '</span>' + esc(content.slice(emphasisAt + roomContext.emphasis.length));
+        const emphasis = roomContext?.emphasis || about?.emphasis;
+        const emphasisAt = emphasis ? content.indexOf(emphasis) : -1;
+        if (emphasisAt >= 0) modalMessage.innerHTML = esc(content.slice(0, emphasisAt)) + '<span class="' + (about ? 'app-about-emphasis' : 'dialog-emphasis') + '">' + esc(emphasis) + '</span>' + esc(content.slice(emphasisAt + emphasis.length));
         else modalMessage.textContent = content;
       }
       modalOk.textContent = confirmLabel || "确定";
@@ -1431,7 +1438,7 @@
       modal.hidden = false;
       (showCancel === false ? modalOk : modalCancel).focus();
       function onKey(event) {
-        if (event.key === "Escape" && showCancel !== false) { event.preventDefault(); done(false); }
+        if (event.key === "Escape" && (showCancel !== false || about)) { event.preventDefault(); done(false); }
         else if (event.key === "Tab") { event.preventDefault(); (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus(); }
       }
       modal.addEventListener("keydown", onKey);
@@ -1441,6 +1448,8 @@
         if (opener && opener.isConnected) opener.focus();
         modalOk.onclick = null; modalCancel.onclick = null;
         box?.classList.remove('is-avoidance-grant'); box?.classList.remove('is-room-confirm');
+        box?.classList.remove('is-about');
+        aboutEmblem.hidden = aboutSubtitle.hidden = aboutDivider.hidden = true;
         modal.classList.remove('is-room-confirm-backdrop'); modalOk.classList.remove('is-danger');
         context.hidden = true; grantContext.hidden = true; resolve(val);
       }
@@ -5009,7 +5018,7 @@ function roomListItems(rooms) {
     finishProfileNickname,
     reloadProfile: async () => { if (!state.profileDirty || await confirm('重新载入资料？', '当前未保存的修改将丢弃。')) { profilePending = null; try { await login(); await loadProfile(state.page === 'profile'); } catch (e) { setState({ profileError: e.message }); } } },
     removeProfileAvatar: () => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.avatar = null; state.profileDraft.avatarPreview = null; profileDirty(); } },
-    about: () => confirm('关于桌边助手', 'ShadowTable · 为面对面的阿瓦隆聚会而做。身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', false),
+    about: () => { const value = aboutPresentation.present(); return confirm(value.title, value.content, false, value.confirmText, null, null, false, value); },
     returnHome: returnHome,
     connectionInfo: connectionInfo,
     retry: retry,

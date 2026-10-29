@@ -4,19 +4,28 @@
     "pages/me/me",
     "pages/badges/badges",
     "pages/stats/stats",
-    "pages/leaderboard/leaderboard",
-    "pages/monthly/monthly",
     "pages/shared/shared",
     "pages/matches/matches",
     "pages/scores/scores",
     "pages/match-detail/match-detail",
-    "pages/replay/replay",
     "pages/table/table",
     "pages/settings/settings",
     "pages/board-details/board-details",
     "pages/web-login/web-login"
   ],
   "subPackages": [
+    {
+      "root": "pages/leaderboard",
+      "pages": ["leaderboard"]
+    },
+    {
+      "root": "pages/monthly",
+      "pages": ["monthly"]
+    },
+    {
+      "root": "pages/replay",
+      "pages": ["replay"]
+    },
     {
       "root": "pages/help",
       "pages": ["help"]

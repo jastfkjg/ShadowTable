@@ -44,3 +44,28 @@ test("资料编辑原路由仅注册在普通分包，头像随该分包加载�
   assert.ok(!fs.existsSync(path.join(root, "assets/avatars")), "旧目录不能重复计入主包");
   for (const tab of config.tabBar.list) assert.ok(config.pages.includes(tab.pagePath));
 });
+
+test("页面路由唯一且文件齐全，静态依赖只访问本包或主包", () => {
+  const routes = [...config.pages, ...packages.flatMap(pkg => pkg.pages.map(page => pkg.root + "/" + page))];
+  assert.equal(new Set(routes).size, routes.length, "页面不能同时注册在多个包中");
+  for (const route of routes) for (const extension of ["js", "json", "wxml"]) {
+    assert.ok(fs.statSync(path.join(root, route + "." + extension)).isFile(), route + "." + extension);
+  }
+  const owner = file => packages.find(pkg => file.startsWith(pkg.root + "/"))?.root || "main";
+  for (const file of files(root)) {
+    const extension = path.extname(file);
+    if (![".js", ".wxml", ".wxss", ".json"].includes(extension)) continue;
+    const relative = path.relative(root, file).split(path.sep).join("/");
+    const source = fs.readFileSync(file, "utf8");
+    const pattern = extension === ".js" ? /\brequire\(\s*["']([^"']+)["']\s*\)/g
+      : extension === ".wxml" ? /<(?:import|include)\b[^>]*\bsrc=["']([^"']+)["']/g
+      : extension === ".wxss" ? /@import\s+["']([^"']+)["']/g : null;
+    const imports = pattern ? [...source.matchAll(pattern)].map(match => match[1])
+      : extension === ".json" ? Object.values(JSON.parse(source).usingComponents || {}) : [];
+    for (const dependency of imports.filter(value => /^(\.|\/)/.test(value))) {
+      const absolute = dependency.startsWith("/") ? path.join(root, dependency) : path.resolve(path.dirname(file), dependency);
+      const target = path.relative(root, absolute).split(path.sep).join("/");
+      assert.ok(owner(target) === "main" || owner(target) === owner(relative), relative + " 跨包引用 " + dependency);
+    }
+  }
+});

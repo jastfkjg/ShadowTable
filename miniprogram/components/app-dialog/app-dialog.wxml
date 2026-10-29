@@ -1,8 +1,14 @@
 <view wx:if="{{dialog}}" class="app-dialog-backdrop {{dialog.variant==='room-confirm'?'is-room-confirm-backdrop':''}}" catchtouchmove="blockScroll" catchtap="blockScroll">
   <block wx:if="{{dialog.variant==='badge-awards'}}"><include src="./awards.wxml" /></block>
   <block wx:elif="{{dialog.variant==='fun-record'}}"><include src="./fun.wxml" /></block>
-  <view wx:else class="app-dialog {{dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
-    <view wx:if="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
+  <view wx:else class="app-dialog {{dialog.variant==='about'?'is-about':dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+    <view wx:if="{{dialog.variant==='about'}}" class="app-about-header">
+      <view class="app-about-emblem" aria-hidden="true"><image src="{{dialog.contextIcon}}" mode="aspectFit" /></view>
+      <view class="app-dialog-title">{{dialog.title}}</view>
+      <view class="app-about-subtitle">{{dialog.subtitle}}</view>
+      <view class="app-about-divider" aria-hidden="true"></view>
+    </view>
+    <view wx:elif="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
       <view class="app-dialog-grant-icon" aria-hidden="true"><image src="{{dialog.contextIcon}}" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>
     </view>
