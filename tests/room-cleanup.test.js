@@ -33,7 +33,7 @@ test("已结束房间满72小时自动从列表隐藏，旧入口不能续期，
     const token = "a".repeat(64), uid = "wx:replay-5", store = app.store;
     store.addSession(createHash("sha256").update(token).digest("hex"), uid);
     const room = completed(); store.save(room);
-    const records = store.matchesFor(uid), replay = store.replayFor(uid, room.matchRecord.id), stats = store.statsFor(uid);
+    const records = store.matchesFor(uid), replay = store.replayFor(uid, room.matchRecord.id);
     now += 3 * DAY - 1;
     assert.equal((await app.request("/api/me/rooms", token)).data.rooms[0].available, true);
     now++;
@@ -48,6 +48,8 @@ test("已结束房间满72小时自动从列表隐藏，旧入口不能续期，
     assert.equal((await app.request("/api/me/rooms/" + room.code, token, { action: "visit" })).status, 410);
     assert.ok(store.get(room.code), "到期判定不依赖后台物理删除或备份任务");
     assert.deepEqual(store.replayFor(uid, room.matchRecord.id), replay);
+    // Compare cleanup at the same clock value; the expiry interval may cross a month.
+    const stats = store.statsFor(uid);
     assert.equal(cleanup(store).rooms, 1); assert.equal(store.get(room.code), null);
     assert.deepEqual((await app.request("/api/me/rooms", token)).data.rooms, []);
     assert.deepEqual(store.matchesFor(uid), records); assert.deepEqual(store.statsFor(uid), stats);

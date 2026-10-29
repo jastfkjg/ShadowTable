@@ -48,8 +48,9 @@ Component({
       if (!(this.data.dialog?.content || this.data.dialog?.lead) || !this.createSelectorQuery) return;
       const id = this.data.dialog.id;
       const grant = this.data.dialog.variant === "avoidance-grant";
+      const heading = this.data.dialog.variant === "about" ? '.app-about-header' : grant ? '.app-dialog-grant-header' : '.app-dialog-title';
       const query = this.createSelectorQuery();
-      for (const selector of ['.app-dialog-backdrop', grant ? '.app-dialog-grant-header' : '.app-dialog-title', '.app-dialog-context', '.app-dialog-actions', '.app-dialog-message']) query.select(selector).boundingClientRect();
+      for (const selector of ['.app-dialog-backdrop', heading, '.app-dialog-context', '.app-dialog-actions', '.app-dialog-message']) query.select(selector).boundingClientRect();
       query.exec(rects => {
         if (this.data.dialog?.id !== id || !rects?.[0] || !rects[4]) return;
         const [backdrop, title, context, actions, message] = rects;

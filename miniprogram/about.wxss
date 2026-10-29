@@ -1,0 +1,17 @@
+/* About uses the shared dialog lifecycle with its own compact visual hierarchy. */
+.app-dialog.is-about, .error-dialog.is-about { display:flex; flex-direction:column; width:100%; max-width:350px; max-height:calc(100vh - 48px - env(safe-area-inset-bottom)); box-sizing:border-box; overflow:hidden; padding:20px 22px 18px; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-radius:24px; background:var(--surface,#1b2b35); color:var(--text,#f2eee5); text-align:center; }
+.app-about-header { flex-shrink:0; }
+.app-about-emblem { display:flex; flex-shrink:0; align-items:center; justify-content:center; width:66px; height:66px; box-sizing:border-box; margin:0 auto; border:1px solid var(--overlay-border,rgba(177,191,198,.24)); border-radius:50%; background:var(--control-bg,#14232c); }
+.app-about-emblem image, .app-about-emblem img { display:block; width:58px; height:58px; }
+.is-about .app-dialog-title, .is-about .dialog-title { flex-shrink:0; margin:14px 0 0; padding:0; border:0; color:var(--text,#f2eee5); font-size:23px; font-weight:600; line-height:1.5; letter-spacing:.2px; overflow-wrap:anywhere; }
+.app-about-subtitle { flex-shrink:0; margin-top:4px; color:var(--muted,#b1bfc6); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.app-about-divider { flex-shrink:0; width:28px; height:2px; margin:16px auto 14px; border-radius:2px; background:var(--control-border,#8295a0); opacity:.65; }
+.is-about .app-dialog-body { min-height:0; margin-top:0; }
+.is-about .app-dialog-message, .is-about .dialog-message { min-height:0; margin:0; color:var(--muted,#b1bfc6); font-size:15px; line-height:1.9; white-space:pre-wrap; overflow-wrap:anywhere; }
+.is-about .dialog-message { overflow-y:auto; overscroll-behavior:contain; }
+.is-about .app-dialog-emphasis, .app-about-emphasis { color:var(--accent,#e5c68b); }
+.is-about .app-dialog-actions, .is-about .dialog-actions { flex-shrink:0; margin-top:18px; }
+.is-about .app-dialog-actions button, .is-about .dialog-actions button { min-height:48px; border-radius:12px; font-size:16px; font-weight:600; line-height:1.5; }
+.is-about .dialog-actions button:focus-visible { outline:2px solid var(--accent,#e5c68b); outline-offset:3px; }
+@media(max-width:350px) { .app-dialog.is-about, .error-dialog.is-about { padding:20px 18px 18px; }.is-about .app-dialog-title, .is-about .dialog-title { font-size:22px; }.is-about .app-dialog-message, .is-about .dialog-message { font-size:14px; } }
+@media(max-height:500px) { .app-dialog.is-about, .error-dialog.is-about { max-height:calc(100vh - 32px); padding:16px 22px; }.app-about-emblem { width:48px; height:48px; }.app-about-emblem image, .app-about-emblem img { width:42px; height:42px; }.is-about .app-dialog-title, .is-about .dialog-title { margin-top:8px; font-size:21px; }.app-about-divider { margin-top:12px; margin-bottom:10px; }.is-about .app-dialog-actions, .is-about .dialog-actions { margin-top:14px; } }
