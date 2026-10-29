@@ -6,6 +6,9 @@ const { avatarStyles } = require("../../miniprogram/avatar-library");
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const assets = {
+  "/about.js": ["../../miniprogram/about.js", "text/javascript; charset=utf-8"],
+  "/about.css": ["../../miniprogram/about.wxss", "text/css; charset=utf-8"],
+  "/assets/about-merlin.svg": ["../../miniprogram/assets/about-merlin.svg", "image/svg+xml"],
   "/fun-info.css": ["../../miniprogram/components/app-dialog/fun.wxss", "text/css; charset=utf-8"],
   "/fun-records.css": ["../../miniprogram/fun-records.wxss", "text/css; charset=utf-8"],
   "/record-clearing.js": ["../../miniprogram/pages/data-management/presentation.js", "text/javascript; charset=utf-8"],

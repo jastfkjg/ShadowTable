@@ -40,7 +40,7 @@ async function main() {
     const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
     if (!assets.size) throw new Error("Web entry has no assets");
     // These images are referenced by rendered views rather than the HTML shell.
-    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg",
+    for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg", "/assets/about-merlin.svg",
       ...["home-table-blue", "home-refresh", "home-clock", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
       ...["info", "heart", "sword", "swords", "shield", "shield-good", "spark", "medal", "users", "calendar", "list", "coin"].map(name => "/assets/record-" + name + ".svg"),
       ...["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"].map(name => "/assets/roles/" + name + ".png"),

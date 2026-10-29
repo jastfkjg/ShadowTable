@@ -206,7 +206,7 @@ for (const [name, appDialog] of Object.entries({
   'dialog-leave': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:false }),
   'dialog-leave-host': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:true }),
   'dialog-dissolve': roomConfirmation.present('delete', { code:'858201', status:'lobby' }),
-  'dialog-information': { title:'关于桌边助手', content:'ShadowTable · 为面对面的阿瓦隆聚会而做。\n身份、投票与技能交给牌桌，讨论和故事留给同桌的朋友。', showCancel:false },
+  'dialog-information': require('../miniprogram/about').present(),
   'dialog-long': { title:'荣誉徽章规则', content:require('../miniprogram/badges').rules + '\n趣味徽章按次数榜授予。最多佩戴3枚。', showCancel:false },
 })) homeScenes[name] = { ...redesign, appDialog };
 function entryScene(capacity, boardId, extra = {}) {
