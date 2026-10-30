@@ -10,8 +10,8 @@
       <view class="badge-section-heading"><view><text>当前佩戴</text><text class="badge-equipped-count">{{badgeCollection.equippedCount}} / 3</text></view><button class="disclosure-button badge-manage" bindtap="manageBadges" disabled="{{badgeManagerSaving || badgeManagerLoading || !badgeCollection.ownedCount}}" aria-expanded="{{badgeManaging}}" hover-class="none">{{badgeManaging?'完成':'管理'}}<view wx:if="{{!badgeManaging}}" class="badge-chevron" aria-hidden="true"></view></button></view>
       <view class="badge-slots"><view wx:for="{{badgeCollection.slots}}" wx:key="id" class="badge-slot">
         <block wx:if="{{!item.empty}}"><button class="badge-slot-open" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{'查看'+item.title}}" hover-class="badge-pressed"><image class="badge-slot-image" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /><text class="badge-slot-title">{{item.title}}</text></button><button wx:if="{{badgeManaging}}" class="badge-remove" bindtap="toggleOwnedBadge" data-id="{{item.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" aria-label="{{'摘下'+item.title}}" hover-class="badge-pressed">摘下</button></block>
-        <button wx:else class="badge-slot-open badge-slot-empty" bindtap="chooseBadgeFilter" data-id="owned" aria-label="查看已拥有徽章以选择佩戴" hover-class="badge-pressed"><view class="badge-empty-ring" aria-hidden="true">＋</view><text class="badge-slot-title">待佩戴</text></button>
-      </view></view><view class="badge-caption badge-equipment-note">佩戴的徽章将展示在玩家名片中</view>
+        <button wx:else class="badge-slot-open badge-slot-empty" bindtap="openBadgePicker" data-slot="{{item.slotIndex}}" aria-label="{{'选择徽章佩戴到第'+(item.slotIndex+1)+'个位置'}}" hover-class="badge-pressed"><view class="badge-empty-ring" aria-hidden="true">＋</view><text class="badge-slot-title">待佩戴</text></button>
+      </view></view><view class="badge-caption badge-equipment-note">{{badgeManaging ? '摘下后可选择空位佩戴，调整展示顺序' : '佩戴的徽章将展示在玩家名片中'}}</view>
     </view>
     <view class="badge-filters" aria-label="筛选徽章"><button class="{{badgeFilter==='all'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="all" aria-pressed="{{badgeFilter==='all'}}" hover-class="badge-pressed">全部<text>{{badgeCollection.totalCount}}</text></button><button class="{{badgeFilter==='owned'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="owned" aria-pressed="{{badgeFilter==='owned'}}" hover-class="badge-pressed">已拥有<text>{{badgeCollection.ownedCount}}</text></button><button class="{{badgeFilter==='unowned'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="unowned" aria-pressed="{{badgeFilter==='unowned'}}" hover-class="badge-pressed">未拥有<text>{{badgeCollection.unownedCount}}</text></button></view>
     <view wx:if="{{!badgeCollection.visibleBadges.length}}" class="badge-empty-message">{{badgeFilter==='owned'?'本月暂无徽章，登上月榜第一即可获得。':'本月已拥有全部徽章。'}}</view>
@@ -19,7 +19,7 @@
     <view class="badge-caption badge-footer">点击徽章，查看详情与获取条件</view>
   </block>
 </view>
-<view wx:if="{{selectedBadge}}" class="badge-backdrop" bindtap="closeBadgeDetail" catchtouchmove="blockScroll">
+<view wx:if="{{selectedBadge && !badgePicker}}" class="badge-backdrop" bindtap="closeBadgeDetail" catchtouchmove="blockScroll">
   <view class="badge-detail" role="dialog" aria-modal="true" aria-label="{{selectedBadge.title}}" catchtap="blockScroll">
     <scroll-view scroll-y="{{true}}" class="badge-detail-scroll" style="{{badgeDetailHeight ? 'height:'+badgeDetailHeight+'px' : ''}}">
       <view class="badge-detail-content">
@@ -31,10 +31,20 @@
         <view class="badge-detail-status"><view wx:if="{{selectedBadge.equipped}}" class="badge-check" aria-hidden="true"></view><text>{{selectedBadge.status}}</text></view>
         <view wx:if="{{selectedBadge.flavor}}" class="badge-detail-description">{{selectedBadge.flavor}}</view>
         <view class="badge-detail-criteria"><view class="badge-detail-row"><text>获取条件</text><text>{{selectedBadge.detailCondition}}</text></view><view class="badge-detail-row"><text>持有规则</text><text>{{selectedBadge.holdingRule}}</text></view></view>
-        <view wx:if="{{selectedBadge.owned && !selectedBadge.equipped && badgeCollection.equippedCount >= 3}}" class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</view>
-        <button wx:if="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading || (!selectedBadge.equipped && badgeCollection.equippedCount >= 3)}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button><button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
+
+        <button wx:if="{{selectedBadge.owned && !selectedBadge.equipped && badgeCollection.equippedCount >= 3}}" class="primary badge-detail-action" bindtap="openBadgeReplacement" hover-class="badge-pressed">替换佩戴</button><button wx:elif="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button><button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
       </view>
     </scroll-view>
+  </view>
+</view>
+<view wx:if="{{badgePicker}}" class="badge-backdrop" bindtap="closeBadgePicker" catchtouchmove="blockScroll">
+  <view class="badge-detail" role="dialog" aria-modal="true" aria-label="{{badgePicker === 'add' ? '选择要佩戴的徽章' : '选择要替换的徽章'}}" catchtap="blockScroll">
+    <scroll-view scroll-y="{{true}}" class="badge-picker-scroll" style="height: min(75vh, {{(badgePicker === 'add' ? badgeCollection.availableBadges.length : badgeCollection.equippedBadges.length) * 80 + 160}}px)"><view class="badge-detail-content">
+      <view class="badge-detail-handle"></view><view class="badge-detail-header badge-picker-header"><text>{{badgePicker === 'add' ? '选择徽章' : '替换徽章'}}</text><button class="badge-detail-close" bindtap="closeBadgePicker" aria-label="关闭" hover-class="badge-pressed">×</button></view>
+      <view class="badge-picker-hint">{{badgePicker === 'add' ? '选择一枚徽章，佩戴到第'+(badgePickerSlot+1)+'个位置' : '选择要替换的已佩戴徽章'}}</view>
+      <view wx:if="{{badgePicker === 'add' && !badgeCollection.availableBadges.length}}" class="badge-empty-message">暂无其他已拥有的徽章，可在收藏中查看获取条件。</view>
+      <button wx:for="{{badgePicker === 'add' ? badgeCollection.availableBadges : badgeCollection.equippedBadges}}" wx:key="id" class="badge-picker-item" bindtap="toggleOwnedBadge" data-id="{{badgePicker === 'add' ? item.id : selectedBadge.id}}" data-replace-id="{{badgePicker === 'replace' ? item.id : ''}}" disabled="{{badgeManagerSaving}}" hover-class="badge-pressed"><image src="{{item.imageUrl}}" mode="aspectFit" /><view class="badge-picker-copy"><text class="badge-picker-title">{{item.title}}</text><text class="badge-picker-subtitle">{{badgePicker === 'add' ? '点击佩戴' : '点击替换'}}</text></view><text class="badge-picker-arrow">›</text></button>
+    </view></scroll-view>
   </view>
 </view>
 <app-dialog id="app-dialog" />

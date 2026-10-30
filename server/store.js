@@ -39,6 +39,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS room_entries(uid TEXT NOT NULL, code TEXT NOT NULL, snapshot TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', entered INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(uid,code));
       CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS profiles(uid TEXT PRIMARY KEY, nickname TEXT NOT NULL, avatar_hash TEXT, version INTEGER NOT NULL, updated INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS badge_order(uid TEXT NOT NULL, badge_id TEXT NOT NULL, period_start INTEGER NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(uid,badge_id,period_start));
       CREATE TABLE IF NOT EXISTS badge_preferences(uid TEXT NOT NULL, badge_id TEXT NOT NULL, period_start INTEGER NOT NULL, equipped INTEGER NOT NULL CHECK(equipped IN (0,1)), PRIMARY KEY(uid,badge_id,period_start));
       CREATE TABLE IF NOT EXISTS badge_versions(uid TEXT PRIMARY KEY, version INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS avatars(hash TEXT PRIMARY KEY, mime TEXT NOT NULL, data BLOB NOT NULL);
