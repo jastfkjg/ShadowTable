@@ -591,7 +591,7 @@
     hasPendingRequest: false,
     notice: "",
     room: null,
-    badgeFilter: 'all', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
+    badgeFilter: 'all', badgePicker: '', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
     playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "", playerCardBadge: null,
     boards: [],
     availableBoards: [],
@@ -744,7 +744,7 @@
     setState({ page: route.page, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
-      badgeFilter: 'all', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
+      badgeFilter: 'all', badgePicker: '', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
       ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
       monthlyReset: null, resetSaving: false, resetError: '',
@@ -1034,18 +1034,18 @@
     if (state.badgeManagerSaving) return;
     const sequence = ++badgeManagerSequence, route = routeSequence;
     const active = () => alive && state.page === 'badges' && sequence === badgeManagerSequence && route === routeSequence;
-    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '', badgeManaging: false });
+    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '', badgePicker: '', badgeManaging: false });
     try {
       const value = await request('/api/me/badges');
       if (active()) setState({ badgeCollection: value });
     } catch (e) { if (active()) setState({ badgeManagerError: e.message }); }
     finally { if (active()) setState({ badgeManagerLoading: false }); }
   }
-  async function toggleOwnedBadge(id) {
+  async function toggleOwnedBadge(id, replaceId, slotIndex) {
     if (state.badgeManagerSaving || state.badgeManagerLoading) return;
     const collection = state.badgeCollection, badge = collection?.badges.find(b => b.id === id);
     if (!badge) return;
-    if (!badge.equipped && collection.badges.filter(b => b.equipped).length >= 3) {
+    if (!badge.equipped && collection.badges.filter(b => b.equipped).length >= 3 && !replaceId) {
       setState({ badgeManagerError: '最多佩戴3枚徽章，请先摘下一枚' });
       return;
     }
@@ -1053,10 +1053,10 @@
     const active = () => alive && state.page === 'badges' && sequence === badgeManagerSequence && route === routeSequence;
     setState({ badgeManagerSaving: true, badgeManagerError: '' });
     try {
-      const value = await request('/api/me/badges', 'POST', { id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart }, requestId());
-      if (active()) { setState({ badgeCollection: value }); closeBadgeDetail(); }
+      const value = await request('/api/me/badges', 'POST', { id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart, ...(replaceId ? { replaceId } : {}), ...(Number.isInteger(slotIndex) ? { slotIndex } : {}) }, requestId());
+      if (active()) { setState({ badgeCollection: value, badgePicker: '' }); closeBadgeDetail(); }
     } catch (e) {
-      if (active()) setState({ badgeCollection: null, selectedBadgeId: '', badgeManagerError: e.message + '，请刷新徽章后重试。' });
+      if (active()) setState({ badgeCollection: null, selectedBadgeId: '', badgePicker: '', badgeManagerError: e.message + '，请刷新徽章后重试。' });
     } finally { if (active()) setState({ badgeManagerSaving: false }); }
   }
   function closeBadgeDetail() {
@@ -1067,16 +1067,16 @@
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;
     const busy = state.badgeManagerLoading || state.badgeManagerSaving;
-    let html = '<div class="badge-page"' + (state.selectedBadgeId ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1><span></span></header>';
+    let html = '<div class="badge-page"' + (state.selectedBadgeId || state.badgePicker ? ' inert' : '') + '><header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>荣誉徽章</h1><span></span></header>';
     html += '<div class="badge-period-row"><span class="badge-caption">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span><button type="button" class="badge-rules" data-action="badgeRules">规则<img class="badge-info-icon" src="/assets/record-info.svg" alt="" /></button></div><div class="badge-hero"><div><div class="badge-title">荣誉收藏</div><div class="badge-caption">月榜荣誉与永久纪念</div></div><div class="badge-total"><div class="badge-total-value">' + (c ? c.ownedCount : '—') + '<span> / ' + badgePresentation.catalogue.length + '</span></div><span class="badge-caption">已拥有</span></div></div>';
     if (state.badgeManagerLoading) html += '<div class="status" role="status">正在读取徽章…</div>';
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';
     html += '<section class="badge-equipment" aria-label="当前佩戴"><div class="badge-section-heading"><div><span>当前佩戴</span><span class="badge-equipped-count">' + c.equippedCount + ' / 3</span></div><button type="button" class="badge-manage" data-action="badgeManage" aria-expanded="' + !!state.badgeManaging + '"' + (busy || !c.ownedCount ? ' disabled' : '') + '>' + (state.badgeManaging ? '完成' : '管理<span class="badge-chevron" aria-hidden="true"></span>') + '</button></div><div class="badge-slots">';
     for (const b of c.slots) html += '<div class="badge-slot">' + (b.empty
-      ? '<button type="button" class="badge-slot-open badge-slot-empty" data-action="badgeFilter" data-id="owned" aria-label="查看已拥有徽章以选择佩戴"><span class="badge-empty-ring" aria-hidden="true">＋</span><span class="badge-slot-title">待佩戴</span></button>'
+      ? '<button type="button" class="badge-slot-open badge-slot-empty" data-action="openBadgePicker" data-slot="' + b.slotIndex + '" aria-label="选择徽章佩戴到第' + (b.slotIndex + 1) + '个位置"><span class="badge-empty-ring" aria-hidden="true">＋</span><span class="badge-slot-title">待佩戴</span></button>'
       : '<button type="button" class="badge-slot-open" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="查看' + esc(b.title) + '"><img class="badge-slot-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-slot-title">' + esc(b.title) + '</span></button>' + (state.badgeManaging ? '<button type="button" class="badge-remove" data-action="toggleOwnedBadge" data-id="' + esc(b.id) + '" aria-label="摘下' + esc(b.title) + '"' + (busy ? ' disabled' : '') + '>摘下</button>' : '')) + '</div>';
-    html += '</div><div class="badge-caption badge-equipment-note">佩戴的徽章将展示在玩家名片中</div></section><div class="badge-filters" role="group" aria-label="筛选徽章">';
+    html += '</div><div class="badge-caption badge-equipment-note">' + (state.badgeManaging ? '摘下后可选择空位佩戴，调整展示顺序' : '佩戴的徽章将展示在玩家名片中') + '</div></section><div class="badge-filters" role="group" aria-label="筛选徽章">';
     for (const [id, title, count] of [['all','全部',c.totalCount],['owned','已拥有',c.ownedCount],['unowned','未拥有',c.unownedCount]]) html += '<button type="button" class="' + (state.badgeFilter === id ? 'selected' : '') + '" data-action="badgeFilter" data-id="' + id + '" aria-pressed="' + (state.badgeFilter === id) + '">' + title + '<span>' + count + '</span></button>';
     html += '</div>';
     if (!c.visibleBadges.length) html += '<div class="badge-empty-message">' + (state.badgeFilter === 'owned' ? '本月暂无徽章，登上月榜第一即可获得。' : '本月已拥有全部徽章。') + '</div>';
@@ -1084,9 +1084,17 @@
     for (const b of c.visibleBadges) html += '<button type="button" class="badge-tile ' + (b.owned ? 'is-owned' : 'is-locked') + '" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="' + esc(b.title + '，' + b.status + '，查看详情') + '"><span class="badge-tile-status">' + (!b.owned ? '<span class="badge-lock" aria-hidden="true"></span>' : b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</span><img class="badge-tile-image" src="' + esc(b.imageUrl) + '" alt="" /><span class="badge-tile-copy"><span class="badge-tile-title">' + esc(b.title) + '</span><span class="badge-caption">' + esc(b.condition) + '</span></span></button>';
     html += '</div><div class="badge-caption badge-footer">点击徽章，查看详情与获取条件</div></div>';
     const b = c.items.find(b => b.id === state.selectedBadgeId);
-    if (b) {
+    if (b && !state.badgePicker) {
       const full = !b.equipped && c.equippedCount >= c.maxEquipped;
-      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content"><div class="badge-detail-handle" aria-hidden="true"></div><div class="badge-detail-header"><span>徽章详情</span><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button></div><div class="badge-detail-art"><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /></div><div class="badge-detail-category">' + esc((b.periodLabel || c.monthLabel) + ' · ' + b.category) + '</div><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-detail-status">' + (b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</div>' + (b.flavor ? '<p class="badge-detail-description">' + esc(b.flavor) + '</p>' : '') + '<div class="badge-detail-criteria"><div class="badge-detail-row"><span>获取条件</span><span>' + esc(b.detailCondition) + '</span></div><div class="badge-detail-row"><span>持有规则</span><span>' + esc(b.holdingRule) + '</span></div></div>' + (b.owned && full ? '<div class="badge-cap-hint">已佩戴3枚，请先摘下一枚。</div>' : '') + (b.owned ? btn((b.equipped ? 'secondary' : 'primary') + ' badge-detail-action','toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : '佩戴徽章',{id:b.id},busy || full) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</div></section></div>';
+      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content"><div class="badge-detail-handle" aria-hidden="true"></div><div class="badge-detail-header"><span>徽章详情</span><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情">×</button></div><div class="badge-detail-art"><img class="badge-detail-image ' + (!b.owned ? 'is-locked' : '') + '" src="' + esc(b.imageUrl) + '" alt="" /></div><div class="badge-detail-category">' + esc((b.periodLabel || c.monthLabel) + ' · ' + b.category) + '</div><h2 class="badge-detail-title" id="badge-detail-title">' + esc(b.title) + '</h2><div class="badge-detail-status">' + (b.equipped ? '<span class="badge-check" aria-hidden="true"></span>' : '') + esc(b.status) + '</div>' + (b.flavor ? '<p class="badge-detail-description">' + esc(b.flavor) + '</p>' : '') + '<div class="badge-detail-criteria"><div class="badge-detail-row"><span>获取条件</span><span>' + esc(b.detailCondition) + '</span></div><div class="badge-detail-row"><span>持有规则</span><span>' + esc(b.holdingRule) + '</span></div></div>' + (b.owned ? btn((b.equipped ? 'secondary' : 'primary') + ' badge-detail-action',full ? 'openBadgeReplacement' : 'toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : b.equipped ? '摘下徽章' : full ? '替换佩戴' : '佩戴徽章',{id:b.id},busy) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) + '</div></section></div>';
+    }
+    if (state.badgePicker) {
+      const adding = state.badgePicker === 'add', choices = adding ? c.availableBadges : c.equippedBadges;
+      html += '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-label="' + (adding ? '选择要佩戴的徽章' : '选择要替换的徽章') + '"><div class="badge-detail-content"><div class="badge-detail-handle"></div><div class="badge-detail-header badge-picker-header"><span>' + (adding ? '选择徽章' : '替换徽章') + '</span><button type="button" class="badge-detail-close" data-action="closeBadgePicker" aria-label="关闭">×</button></div>';
+      html += '<div class="badge-picker-hint">' + (adding ? '选择一枚徽章，佩戴到第' + (state.badgePickerSlot + 1) + '个位置' : '选择要替换的已佩戴徽章') + '</div>';
+      if (!choices.length) html += '<div class="badge-empty-message">暂无其他已拥有的徽章，可在收藏中查看获取条件。</div>';
+      for (const choice of choices) html += '<button type="button" class="badge-picker-item" data-action="pickBadge" data-id="' + esc(adding ? choice.id : state.selectedBadgeId) + '"' + (adding ? '' : ' data-replace-id="' + esc(choice.id) + '"') + (busy ? ' disabled' : '') + '><img src="' + esc(choice.imageUrl) + '" alt=""><span class="badge-picker-copy"><span class="badge-picker-title">' + esc(choice.title) + '</span><span class="badge-picker-subtitle">' + (adding ? '点击佩戴' : '点击替换') + '</span></span><span class="badge-picker-arrow">›</span></button>';
+      html += '</div></section></div>';
     }
     return html;
   }
@@ -4952,9 +4960,13 @@ function roomListItems(rooms) {
     loadBadgeManager,
     badgeManage: () => { if (!state.badgeManagerLoading && !state.badgeManagerSaving) setState({ badgeManaging: !state.badgeManaging }); },
     badgeFilter: el => { if (['all', 'owned', 'unowned'].includes(el.dataset.id)) { setState({ badgeFilter: el.dataset.id }); app.querySelector('.badge-filters .selected')?.focus({ preventScroll: true }); } },
+    openBadgePicker: el => { if (!state.badgeManagerSaving && !state.badgeManagerLoading) setState({ badgePicker: 'add', badgePickerSlot: Number(el.dataset.slot) }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },
+    openBadgeReplacement: () => { setState({ badgePicker: 'replace' }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },
+    closeBadgePicker: () => { if (!state.badgeManagerSaving) setState({ badgePicker: '' }); },
+    pickBadge: el => toggleOwnedBadge(el.dataset.id, el.dataset.replaceId, state.badgePicker === 'add' ? state.badgePickerSlot : undefined),
     showBadgeDetail: el => { if (state.badgeCollection && badgePresentation.catalogue.some(b => b.id === el.dataset.id)) { setState({ selectedBadgeId: el.dataset.id }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); } },
     closeBadgeDetail,
-    badgeRules: () => confirm('荣誉徽章规则', badgePresentation.rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时，请先摘下一枚。', false),
+    badgeRules: () => confirm('荣誉徽章规则', badgePresentation.rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', false),
     toggleOwnedBadge: el => toggleOwnedBadge(el.dataset.id),
     showPlayerCardBadge: el => showPlayerCardBadge(el.dataset.id),
     closePlayerCardBadge,
@@ -5675,8 +5687,8 @@ function roomListItems(rooms) {
       }
       return;
     }
-    if (!state.selectedBadgeId || state.page !== 'badges' || !modal.hidden) return;
-    if (event.key === 'Escape') { event.preventDefault(); closeBadgeDetail(); }
+    if ((!state.selectedBadgeId && !state.badgePicker) || state.page !== 'badges' || !modal.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); if (state.badgePicker) setState({ badgePicker: '' }); else closeBadgeDetail(); }
     if (event.key === 'Tab') {
       const controls = Array.from(app.querySelectorAll('.badge-detail button:not(:disabled)'));
       if (!controls.length) return;

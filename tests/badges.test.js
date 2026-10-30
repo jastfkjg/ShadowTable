@@ -168,7 +168,7 @@ test('最多默认佩戴3枚，拒绝第四枚；摘下不自动补位，自选�
     assert.deepEqual(readBadges(store,'wx:a'),before);
     const removed=wear(store,'wx:a','points',false);assert.equal(removed.equippedCount,2);
     wear(store,'wx:a','assassin_hit',true);
-    const selected=['games','overall','assassin_hit'];
+    const selected=['assassin_hit','games','overall'];
     assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),selected);
     store.close();store=new Store(join(dir,'db.sqlite'),{clock:()=>now});
     assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),selected);
@@ -189,7 +189,7 @@ test('兼容旧版超过3枚的佩戴偏好，手动摘下后不会被旧偏好�
     wear(store,'wx:a','points',false);
     assert.equal(equippedBadges(store,'wx:a').length,2);
     wear(store,'wx:a','assassin_hit',true);
-    assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),['games','overall','assassin_hit']);
+    assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),['assassin_hit','games','overall']);
   } finally {store.close();}
 });
 
@@ -205,4 +205,34 @@ test('小程序达到3枚时阻止额外佩戴请求，仍可摘下', async () =
     await p.toggleOwnedBadge({currentTarget:{dataset:{id:catalogue[0].id}}});assert.equal(calls,1);
     assert.equal(p.data.badgeCollection.equippedCount,0);
   } finally {api.request=request;api.requestId=requestId;}
+});
+
+test('空位保留且可指定佩戴位置，满额替换保留位置并校验冲突', () => {
+  const store = new Store(':memory:', {clock:()=>NOW});
+  try {
+    metric(store, 'wx:a', 'merlin_evade', 1);
+    wear(store, 'wx:a', 'games', false);
+    let current = readBadges(store, 'wx:a');
+    let collection = require('../miniprogram/badges').presentCollection(current);
+    assert.deepEqual(collection.slots.map(b=>b.id), ['points','empty-1','overall']);
+    const add = {id:'merlin_evade',equipped:true,slotIndex:1,version:current.version,periodStart:current.periodStart};
+    store.transaction(()=>saveBadge(store, 'wx:a', add));
+    assert.deepEqual(equippedBadges(store, 'wx:a').map(b=>b.id), ['points','merlin_evade','overall']);
+    assert.throws(()=>store.transaction(()=>saveBadge(store, 'wx:a', add)), e=>e.status===409);
+    current = readBadges(store, 'wx:a');
+    const input = {id:'games',equipped:true,replaceId:'overall',version:current.version,periodStart:current.periodStart};
+    store.transaction(()=>saveBadge(store, 'wx:a', input));
+    collection = require('../miniprogram/badges').presentCollection(readBadges(store, 'wx:a'));
+    assert.deepEqual(collection.slots.map(b=>b.id), ['points','merlin_evade','games']);
+    assert.deepEqual(require('../miniprogram/badges').presentCollection(collection, 'owned').slots.map(b=>b.id), ['points','merlin_evade','games']);
+    wear(store, 'wx:a', 'points', false);
+    wear(store, 'wx:a', 'games', false);
+    current = readBadges(store, 'wx:a');
+    assert.deepEqual(require('../miniprogram/badges').presentCollection(current).slots.map(b=>b.id), ['empty-0','merlin_evade','empty-2']);
+    store.transaction(()=>saveBadge(store, 'wx:a', {id:'points',equipped:true,slotIndex:2,version:current.version,periodStart:current.periodStart}));
+    current = readBadges(store, 'wx:a');
+    assert.deepEqual(require('../miniprogram/badges').presentCollection(current).slots.map(b=>b.id), ['empty-0','merlin_evade','points']);
+    assert.throws(()=>store.transaction(()=>saveBadge(store, 'wx:a', {id:'games',equipped:true,slotIndex:1,version:current.version,periodStart:current.periodStart})), e=>e.status===409);
+    assert.deepEqual(equippedBadges(store, 'wx:a').map(b=>b.id), ['merlin_evade','points']);
+  } finally { store.close(); }
 });

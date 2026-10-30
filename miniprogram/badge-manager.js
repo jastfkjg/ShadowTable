@@ -20,19 +20,20 @@ function badgeManagerMethods() {
       if (this.data.badgeManagerSaving || this.data.badgeManagerLoading) return;
       const collection = this.data.badgeCollection, badge = collection?.badges.find(b => b.id === e.currentTarget.dataset.id);
       if (!badge) return;
-      if (!badge.equipped && collection.badges.filter(b => b.equipped).length >= MAX_EQUIPPED) {
+      const replaceId = e.currentTarget.dataset.replaceId;
+      if (!badge.equipped && collection.badges.filter(b => b.equipped).length >= MAX_EQUIPPED && !replaceId) {
         this.setData({ badgeManagerError: '最多佩戴3枚徽章，请先摘下一枚' });
         return;
       }
       const sequence = this.badgeManagerSequence;
       this.setData({ badgeManagerSaving: true, badgeManagerError: '' });
       try {
-        const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart }, api.requestId());
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl), selectedBadge: null });
+        const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart, ...(replaceId ? { replaceId } : {}), ...(this.data.badgePicker === 'add' && Number.isInteger(this.data.badgePickerSlot) ? { slotIndex: this.data.badgePickerSlot } : {}) }, api.requestId());
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl), selectedBadge: null, badgePicker: '' });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) {
           // Reconcile an ambiguous network result before permitting another toggle.
-          this.setData({ badgeCollection: null, selectedBadge: null, badgeManagerError: e.message + '，请刷新徽章后重试。' });
+          this.setData({ badgeCollection: null, selectedBadge: null, badgePicker: '', badgeManagerError: e.message + '，请刷新徽章后重试。' });
         }
       } finally {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerSaving: false });

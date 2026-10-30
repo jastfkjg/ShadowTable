@@ -4,7 +4,7 @@ const { presentCollection, rules } = require('../../badges');
 const { initialBadgeManager, badgeManagerMethods } = require('../../badge-manager');
 const { backToMe } = require('../../profile');
 Page({
-  data: { ...initialBadgeManager, badgeFilter: 'all', selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0 },
+  data: { ...initialBadgeManager, badgeFilter: 'all', selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0, badgePicker: '', badgePickerSlot: null },
   ...badgeManagerMethods(),
   onLoad() { this.alive = true; },
   async onShow() {
@@ -18,7 +18,7 @@ Page({
       if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerLoading: false, badgeManagerError: e.message });
     }
   },
-  onHide() { this.alive = false; this.badgeManagerSequence++; this.setData({ ...initialBadgeManager, selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0 }); },
+  onHide() { this.alive = false; this.badgeManagerSequence++; this.setData({ ...initialBadgeManager, selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0, badgePicker: '' }); },
   onUnload() { this.alive = false; this.badgeManagerSequence++; },
   onResize() { if (this.data.selectedBadge) this.measureBadgeDetail(); },
   async onPullDownRefresh() { try { this.closeBadgeDetail(); await this.loadBadgeManager(); } finally { wx.stopPullDownRefresh(); } },
@@ -41,8 +41,11 @@ Page({
     }).exec();
   },
   closeBadgeDetail() { this.setData({ selectedBadge: null, badgeDetailHeight: 0 }); },
+  openBadgePicker(e) { if (!this.data.badgeManagerSaving && !this.data.badgeManagerLoading) this.setData({ badgePicker: 'add', badgePickerSlot: e.currentTarget.dataset.slot }); },
+  openBadgeReplacement() { this.setData({ badgePicker: 'replace', selectedBadge: this.data.selectedBadge }); },
+  closeBadgePicker() { if (!this.data.badgeManagerSaving) this.setData({ badgePicker: '' }); },
   manageBadges() { if (!this.data.badgeManagerSaving && !this.data.badgeManagerLoading) this.setData({ badgeManaging: !this.data.badgeManaging }); },
-  showBadgeRules() { dialog.show({ title: '荣誉徽章规则', content: rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时，请先摘下一枚。', showCancel: false }); },
+  showBadgeRules() { dialog.show({ title: '荣誉徽章规则', content: rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', showCancel: false }); },
   blockScroll() {},
   back: backToMe,
 });
