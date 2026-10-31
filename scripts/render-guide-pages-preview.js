@@ -5,6 +5,7 @@ const { createRequire } = require("node:module");
 const { wxmlToJs } = require("miniprogram-compiler");
 const { BOARDS } = require("../server/engine"), detail = require("../server/board-info");
 const presentation = require("../miniprogram/board-detail"), { decorateBoard } = require("../miniprogram/board-detail-art");
+const { boardMetadata } = require("../miniprogram/rule-discovery");
 const monthly = require("../miniprogram/monthly-report"), { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
 const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(__dirname, "../output/playwright/guide-pages-implemented");
 const context = { window: {}, global: {}, console }; vm.createContext(context);
@@ -33,7 +34,7 @@ function html(node) {
 function page(name, request) {
   const file = path.join(root, "pages", name, name + ".js"), realRequire = createRequire(file);
   let definition;
-  vm.runInNewContext(fs.readFileSync(file, "utf8"), { Page: value => { definition = value; }, require: name => name === "../../api" ? { request } : realRequire(name) });
+  vm.runInNewContext(fs.readFileSync(file, "utf8"), { Page: value => { definition = value; }, wx: {}, require: name => name === "../../api" ? { request, publicRequest: request } : realRequire(name) });
   return { ...definition, data: structuredClone(definition.data), alive: true, setData(patch) {
     for (const [key, value] of Object.entries(patch)) {
       const keys = key.replace(/\[(\d+)\]/g, ".$1").split("."); let target = this.data;
@@ -69,7 +70,7 @@ async function main() {
   scenes["monthly-long"] = ["monthly", { ...monthlyBase, report: { ...report, coreBoards: [{ ...report.coreBoards[0], rows: [{ ...report.coreBoards[0].rows[0], nickname: "非常非常长的玩家昵称用于检查换行", value: "-123456789", valueCompact: true }] }] } }];
   for (const source of BOARDS.filter(board => board.available)) for (const capacity of source.counts) {
     const board = decorateBoard(presentation.presentBoard({ ...source, detail: detail[source.id] }, capacity));
-    const data = { loading: false, error: "", board, navTop: 68, query: "", selectedGroup: board.groups[0]?.id || "", tab: board.defaultTab, chapters: board.chapters, currentChapter: 0, visibleRoles: presentation.visibleRoles(board, board.groups[0]?.id || "") };
+    const data = { loading: false, error: "", board, metadata: boardMetadata(source, board), canCreate: true, singlePage: false, navTop: 68, query: "", selectedGroup: board.groups[0]?.id || "", tab: board.defaultTab, chapters: board.chapters, currentChapter: 0, visibleRoles: presentation.visibleRoles(board, board.groups[0]?.id || "") };
     scenes[source.id + "-" + capacity] = ["board-details", data];
   }
   const boardBase = scenes["knights-12"][1];

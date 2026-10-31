@@ -24,10 +24,11 @@ function selectTab(page, selected) {
 function switchHomeTab(selected, options = {}) {
   if (![0, 1].includes(selected)) return;
   const app = typeof getApp === "function" ? getApp() : null;
-  const request = { selected };
+  const { entry, ...navigationOptions } = options;
+  const request = { selected, ...(selected === 0 && entry ? { entry } : {}) };
   if (app) app.homeTabRequest = request;
   wx.switchTab({
-    ...options,
+    ...navigationOptions,
     url: selected === 0 ? "/pages/lobby/lobby" : "/pages/me/me",
     fail(error) {
       if (app?.homeTabRequest === request) delete app.homeTabRequest;

@@ -5,6 +5,9 @@
 .detail-title { min-width: 0; font-size: 27px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 .detail-capacity { flex-shrink: 0; color: var(--muted); border: 1px solid rgba(177,191,198,.2); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
 .detail-subtitle { font-size: 13px; color: var(--muted); line-height: 1.85; margin-top: 7px; }
+.detail-rule-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--detail-line); }
+.detail-rule-actions button { flex: 1 1 120px; width: auto; min-height: 44px; margin: 0; padding: 10px 0; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.6; }
+.detail-rule-actions button.detail-create-entry { color: var(--accent); }
 .detail-tabs { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px; position: sticky; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--detail-line); }
 .detail-tab-list { display: flex; min-width: 0; gap: 22px; }
 button.detail-tab { width: auto; min-width: 44px; min-height: 50px; margin: 0; padding: 10px 0; border-radius: 0; font-size: 15px; font-weight: 400; color: var(--muted); position: relative; }

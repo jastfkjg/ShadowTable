@@ -638,6 +638,79 @@ test('独立页面通过原入口返回时指定目标区域，旧首页的选�
   assert.equal(appState.homeTabRequest, undefined);
   home.onUnload();
 });
+test('规则建桌入口在冷启动和保留首页中预选板子人数，仅打开表单且只消费一次', async () => {
+  const requests = [], appState = { homeTabRequest: { selected: 0, entry: { mode: 'create', board: 'knights-13', capacity: 13 } } };
+  const api = { ...apiBase, request: async (url, method) => { requests.push({ url, method }); return url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : { rooms: [] }; } };
+  const { p: home } = page('lobby', api, { home: true, appState });
+  try {
+    home.onLoad(); await home.onShow();
+    assert.equal(home.data.lobby.boardId, 'knights-13');
+    assert.equal(home.data.lobby.capacity, 13);
+    assert.equal(home.data.lobby.entrySheet, true);
+    assert.equal(home.data.lobby.entryMode, 'create');
+    assert.equal(home.lobbyController.publicEntry, undefined);
+    assert.ok(requests.every(request => !request.method || request.method === 'GET'));
+    home.lobbyController.closeEntry(); home.onHide(); await home.onShow();
+    assert.equal(home.data.lobby.entrySheet, false);
+    home.onHide();
+    appState.homeTabRequest = { selected: 0, entry: { mode: 'create', board: 'classic-court', capacity: 9 } };
+    await home.onShow();
+    assert.equal(home.data.lobby.boardId, 'classic-court');
+    assert.equal(home.data.lobby.capacity, 9);
+    assert.equal(home.data.lobby.entryMode, 'create');
+    assert.equal(home.data.lobby.name, '林间');
+  } finally { home.onUnload(); }
+});
+
+test('帮助建桌入口可从我的区域切到大厅；未确认操作和非法配置不被覆盖', async () => {
+  const appState = {}, notices = [];
+  const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [] } };
+  const { p: home } = page('me', api, { home: true, appState, wx: { showToast: options => notices.push(options.title) } });
+  try {
+    home.onLoad(); await home.onShow(); home.onHide();
+    appState.homeTabRequest = { selected: 0, entry: { mode: 'join' } };
+    await home.onShow();
+    assert.equal(home.data.activeTab, 0);
+    assert.equal(home.data.lobby.entryMode, 'join');
+    assert.equal(home.data.lobby.entrySheet, true);
+    const controller = home.lobbyController;
+    controller.closeEntry();
+    const original = { board: controller.data.boardId, capacity: controller.data.capacity };
+    controller.publicEntry = { mode: 'create', board: 'classic', capacity: 13 };
+    controller.openPublicEntry();
+    assert.equal(controller.data.entrySheet, false);
+    assert.equal(controller.data.boardId, original.board);
+    assert.match(notices.at(-1), /配置暂不可用/);
+    appState.pendingTableRequest = { code: '123456' };
+    controller.publicEntry = { mode: 'create', board: 'knights', capacity: 12 };
+    controller.openPublicEntry();
+    assert.equal(controller.publicEntry, undefined);
+    assert.equal(controller.data.entrySheet, false);
+    assert.equal(controller.data.capacity, original.capacity);
+    assert.equal(appState.pendingTableRequest.code, '123456');
+    assert.match(notices.at(-1), /未确认/);
+  } finally { home.onUnload(); }
+});
+
+test('规则建桌预选在公开入口冷启动失败后保留，重试成功再打开', async () => {
+  let offline = true;
+  const appState = { homeTabRequest: { selected: 0, entry: { mode: 'create', board: 'lancelot', capacity: 11 } } };
+  const api = { ...apiBase, login: async () => { if (offline) throw Error('offline'); }, request: async url => url === '/api/boards' ? { boards: BOARDS }
+    : url.endsWith('/profile') ? profile : { rooms: [] } };
+  const { p: home } = page('lobby', api, { home: true, appState });
+  try {
+    home.onLoad(); await home.onShow();
+    assert.equal(home.data.lobby.entrySheet, false);
+    assert.equal(home.lobbyController.publicEntry.board, 'lancelot');
+    offline = false; await home.lobbyController.bootstrap();
+    assert.equal(home.data.lobby.entrySheet, true);
+    assert.equal(home.data.lobby.boardId, 'lancelot');
+    assert.equal(home.data.lobby.capacity, 11);
+  } finally { home.onUnload(); }
+});
+
 test('榜单分享入口只传内容选择，拦截读取失败，不传个人成绩或内部标识', () => {
   const ranking=page('leaderboard',apiBase);
   ranking.p.setData({loading:false,board:{rows:[],me:{status:'not_enough',knownGames:4,opportunities:4,rate:50},metric:'fun_kill_enemy',period:'month',fun:true,mode:'knights',sort:'rate',role:'gareth',nextOffset:20,version:'private'}});

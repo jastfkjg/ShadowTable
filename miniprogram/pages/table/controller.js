@@ -376,6 +376,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
     };
     wx.onNetworkStatusChange(this.networkListener);
+    this.openPublicEntry();
     return this.bootstrap();
   },
   onReady() {
@@ -390,6 +391,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.isLobby) selectTab(this, 0);
     this.returningHome = false;
     this.foreground = true;
+    this.openPublicEntry();
     this.syncRoomSheetLayout("entry");
     this.syncRoomSheetLayout("rules");
     if (this.alive) {
@@ -555,6 +557,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     } finally {
       this.setData({ loading: false });
       this.finishConnectionAttempt(attempt);
+      this.openPublicEntry();
       this.schedule();
     }
   },
@@ -652,6 +655,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       if (profileResult.status === "rejected") throw profileResult.reason;
       if (roomsResult.status === "rejected") throw roomsResult.reason;
+      this.openPublicEntry();
     } catch (e) { if (this.alive && sequence === this.lobbyRefreshSequence) this.handleError(e); }
   },
   async enterTable(code) {
@@ -1379,6 +1383,26 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const hadError = !!this.data.entryCodeError;
     this.setData({ code, entryCodeError: "", entryError: "" }, () => { if (hadError) this.syncRoomSheetLayout("entry"); });
     return code;
+  },
+  openPublicEntry() {
+    const entry = this.publicEntry;
+    if (!entry || !this.data.isLobby || !this.alive || !this.foreground) return;
+    const held = typeof getApp === "function" && getApp().pendingTableRequest;
+    if (this.pending || this.data.hasPendingRequest || this.data.busy || held || wx.getStorageSync("pendingEntry")) {
+      delete this.publicEntry;
+      wx.showToast?.({ title: "请先处理未确认的牌桌操作", icon: "none" });
+      return;
+    }
+    if (this.data.loading || this.data.reconnecting || !this.data.network || this.data.needsLogin || !this.data.boards.length) return;
+    delete this.publicEntry;
+    if (!["create", "join"].includes(entry.mode)) return;
+    if (entry.mode === "create" && entry.board) {
+      const source = this.data.boards.find(board => board.id === entry.board && board.available && board.counts.includes(Number(entry.capacity)));
+      if (!source) { wx.showToast?.({ title: "该配置暂不可用，请重新选择", icon: "none" }); return; }
+      this.setData({ boardId: source.id });
+      this.selectCapacity(Number(entry.capacity));
+    }
+    this.switchEntry({ currentTarget: { dataset: { mode: entry.mode } } });
   },
   switchEntry(e) {
     if (this.data.busy || this.pending) return;

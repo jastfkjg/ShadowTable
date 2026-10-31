@@ -2,12 +2,17 @@ const api = require("../../api");
 const presentation = require("../../board-detail");
 const { decorateBoard } = require("../../board-detail-art");
 const { switchHomeTab } = require("../../tab-navigation");
+const discovery = require("../../rule-discovery");
+const { isSinglePage } = require("../../records-share");
 Page({
   data: {
     directoryExpanded: false,
     loading: true,
     error: "",
     board: null,
+    metadata: null,
+    singlePage: false,
+    canCreate: false,
     tab: "rules",
     query: "",
     selectedGroup: "",
@@ -17,10 +22,14 @@ Page({
     navTop: 64,
     currentChapter: 0,
   },
-  onLoad(query) {
+  onLoad(query = {}) {
     this.alive = true;
     this.boardId = query.board || "";
     this.capacity = Number(query.capacity) || 0;
+    this.requestedCapacity = query.capacity;
+    this.fromRoom = query.from === "room";
+    this.setData({ singlePage: isSinglePage() });
+    wx.hideShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
     const info = wx.getWindowInfo?.() || wx.getSystemInfoSync();
     const status = info.statusBarHeight || 20,
       menu = wx.getMenuButtonBoundingClientRect?.();
@@ -37,16 +46,21 @@ Page({
     if (this._loading) return;
     this._loading = true;
     try {
-      const { boards } = await api.request("/api/boards");
+      const { boards } = await api.publicRequest("/api/boards");
       if (!this.alive) return;
       const source = (boards || []).find((board) => board.id === this.boardId);
       if (!source) throw new Error("未找到该板子");
+      if (this.requestedCapacity != null && !source.counts.includes(this.capacity)) throw new Error("该板子不支持此人数，请返回帮助页重新选择");
       const board = decorateBoard(presentation.presentBoard(source, this.capacity));
+      this.capacity = board.capacity;
+      const metadata = discovery.boardMetadata(source, board);
       this.expandedRoles = {};
       const selectedGroup = board.groups[0]?.id || "";
-      wx.setNavigationBarTitle({ title: board.name });
+      wx.setNavigationBarTitle({ title: metadata.title });
       this.setData({
         board,
+        metadata,
+        canCreate: !!source.available && !this.fromRoom && !this.data.singlePage,
         selectedGroup,
         tab: board.defaultTab,
         query: "",
@@ -56,6 +70,7 @@ Page({
         error: "",
         loading: false,
       });
+      wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
     } catch (error) {
       if (this.alive) this.setData({ error: error.message, loading: false });
     } finally {
@@ -65,6 +80,19 @@ Page({
   retry() {
     this.setData({ loading: true, error: "" });
     this.load();
+  },
+  onShareAppMessage() {
+    return this.data.metadata
+      ? discovery.share("/pages/board-details/board-details", this.data.metadata)
+      : discovery.share("/pages/help/help", discovery.helpMetadata());
+  },
+  onShareTimeline() {
+    return { title: this.data.metadata?.title || "阿瓦隆规则｜桌边助手", query: this.data.metadata?.query || "", imageUrl: "/assets/share-cover.jpg" };
+  },
+  createTable() {
+    if (!this.data.canCreate || this.data.loading || this.data.error) return;
+    switchHomeTab(0, { entry: { mode: "create", board: this.boardId, capacity: this.capacity },
+      fail: () => wx.showToast({ title: "未能打开建桌页面，请重试", icon: "none" }) });
   },
   setTab(event) {
     const tab = event.currentTarget.dataset.tab;

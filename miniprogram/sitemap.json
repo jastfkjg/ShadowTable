@@ -1,4 +1,8 @@
 {
-  "desc": "私密房间不参与搜索索引",
-  "rules": [{ "action": "disallow", "page": "*" }]
+  "desc": "仅公开帮助与板子规则参与搜索索引，房间及个人页面默认禁止",
+  "rules": [
+    { "action": "allow", "page": "pages/help/help" },
+    { "action": "allow", "page": "pages/board-details/board-details", "params": ["board", "capacity"], "matching": "inclusive" },
+    { "action": "disallow", "page": "*" }
+  ]
 }

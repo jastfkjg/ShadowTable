@@ -184,7 +184,9 @@ function mini(request) {
       },
       require: (name) =>
         name === "../../api"
-          ? { request }
+          ? { publicRequest: request }
+          : name === "../../rule-discovery" ? require("../miniprogram/rule-discovery")
+          : name === "../../records-share" ? { isSinglePage: () => false }
           : name === "../../board-detail"
             ? presentation
             : name === "../../board-detail-art"
@@ -257,7 +259,7 @@ test("小程序搜索、切换、目录展开后定位和折叠状态一致；�
   const result = { boards: [{ ...source, detail: details.knights }] };
   const m = mini(async () => result);
   await m.page.load();
-  assert.equal(m.title(), "阿瓦隆 · 十二骑士");
+  assert.equal(m.title(), "阿瓦隆 · 十二骑士 · 12人规则｜桌边助手");
   m.page.toggleRole(tap({ id: "0:0" }));
   assert.equal(m.page.data.visibleRoles[0].expanded, true);
   m.page.searchRoles({ detail: { value: "女巫" } });

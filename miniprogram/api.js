@@ -3,13 +3,13 @@ const connection = require("./page-connection");
 let retryAt = 0, cacheEpoch = 0;
 const roomCache = new Map();
 const copy = value => JSON.parse(JSON.stringify(value));
-function request(path, method = "GET", data, requestId) {
+function request(path, method = "GET", data, requestId, publicRead = false) {
   const observation = connection.begin(path, method);
-  return performRequest(path, method, data, requestId).then(value => {
+  return performRequest(path, method, data, requestId, publicRead).then(value => {
     connection.finish(observation);return value;
   }, error => { connection.finish(observation, error);throw error; });
 }
-function performRequest(path, method = "GET", data, requestId) {
+function performRequest(path, method = "GET", data, requestId, publicRead) {
   if (Date.now() < retryAt)
     return Promise.reject(
       Object.assign(new Error("请求冷却中，请稍后重试"), {
@@ -17,7 +17,7 @@ function performRequest(path, method = "GET", data, requestId) {
         retryAfterMs: retryAt - Date.now(),
       }),
     );
-  const token = wx.getStorageSync("session") || "";
+  const token = publicRead ? "" : wx.getStorageSync("session") || "";
   const cacheKey = token + path, cacheable = method === "GET" && /^\/api\/rooms\/\d{6}(?:\?instance=\d+)?$/.test(path);
   if (method !== "GET") { roomCache.clear(); cacheEpoch++; }
   const cached = cacheable && roomCache.get(cacheKey), epoch = cacheEpoch;
@@ -29,7 +29,7 @@ function performRequest(path, method = "GET", data, requestId) {
       timeout: 10000,
       header: {
         "content-type": "application/json",
-        Authorization: "Bearer " + token,
+        ...(!publicRead ? { Authorization: "Bearer " + token } : {}),
         ...(cached ? { "If-None-Match": cached.etag } : {}),
         ...(requestId ? { "Idempotency-Key": requestId } : {}),
       },
@@ -56,7 +56,7 @@ function performRequest(path, method = "GET", data, requestId) {
             e.retryAfterMs = Math.max(1000, Number.isFinite(wait) ? wait : 60000);
             retryAt = Date.now() + e.retryAfterMs;
           }
-          if (e.status === 401 && token === (wx.getStorageSync("session") || "")) { wx.removeStorageSync("session"); roomCache.clear(); cacheEpoch++; }
+          if (!publicRead && e.status === 401 && token === (wx.getStorageSync("session") || "")) { wx.removeStorageSync("session"); roomCache.clear(); cacheEpoch++; }
           reject(e);
         }
       },
@@ -140,4 +140,9 @@ function uploadAvatar(filePath, code, id, onProgress) {
     task?.onProgressUpdate?.(value => onProgress?.(value.progress));
   });
 }
-module.exports = { request, login, requestId, uploadAvatar, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };
+// Public rules must also work in Moments single-page mode, without shared storage.
+function publicRequest(path) {
+  if (!["/api/boards", "/api/scoring/rules"].includes(path)) return Promise.reject(new Error("不支持的公开内容"));
+  return request(path, "GET", undefined, undefined, true);
+}
+module.exports = { request, publicRequest, login, requestId, uploadAvatar, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };

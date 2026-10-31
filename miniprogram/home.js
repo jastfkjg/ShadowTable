@@ -54,8 +54,9 @@ module.exports = function createHomePage(initialTab = 0) {
       wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
       const app = typeof getApp === "function" ? getApp() : null;
       if (app?.homeTabRequest) {
-        const requested = app.homeTabRequest.selected;
+        const { selected: requested, entry } = app.homeTabRequest;
         delete app.homeTabRequest;
+        if (entry && requested === 0) this.lobbyController.publicEntry = entry;
         this.switchMainTab(requested);
       }
       this.foreground = true;

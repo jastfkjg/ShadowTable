@@ -8,7 +8,9 @@ function help(request) {
   const links = [];
   vm.runInNewContext(fs.readFileSync(require.resolve("../miniprogram/pages/help/help.js"), "utf8"), {
     Page: page => { definition = page; },
-    require: name => name === "../../api" ? { request } : { switchHomeTab() {} },
+    require: name => name === "../../api" ? { publicRequest: request }
+      : name === "../../rule-discovery" ? require("../miniprogram/rule-discovery")
+      : name === "../../records-share" ? { isSinglePage: () => false } : { switchHomeTab() {} },
     wx: { navigateTo: ({ url }) => links.push(url) },
   });
   const page = { ...definition, data: structuredClone(definition.data), setData(patch) {

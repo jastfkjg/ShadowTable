@@ -1,14 +1,16 @@
 const api = require("../../api");
 const { switchHomeTab } = require("../../tab-navigation");
+const discovery = require("../../rule-discovery");
+const { isSinglePage } = require("../../records-share");
 const guideSteps = {
   player: [
-    { title: "加入牌桌", text: "打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。", flow: "打开邀请 / 输入房间码", icon: "home-join-gold" },
+    { title: "加入牌桌", text: "打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。", flow: "打开邀请 / 输入房间码", icon: "home-join-gold", entryMode: "join", entryLabel: "前往加入牌桌" },
     { title: "入座并准备", text: "选择座位后点击准备，等待房主发牌。满座时可以先围观。", flow: "选择座位 → 点击准备", icon: "record-users" },
     { title: "私下查看身份", text: "记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。", flow: "查看身份 → 记住并遮盖", icon: "process-eye" },
     { title: "线下讨论，按提示操作", text: "需要你投票、出任务牌或使用技能时，页面会提示；确认提交后等待结算。", flow: "选择 → 确认提交 → 等待结算", icon: "process-vote" },
   ],
   host: [
-    { title: "建桌与邀请", text: "选择人数、板子和桌上昵称，创建房间后邀请朋友，或分享 6 位房间码。", flow: "选择人数与板子 → 邀请朋友", icon: "home-join-gold" },
+    { title: "建桌与邀请", text: "选择人数、板子和桌上昵称，创建房间后邀请朋友，或分享 6 位房间码。", flow: "选择人数与板子 → 邀请朋友", icon: "home-join-gold", entryMode: "create", entryLabel: "前往创建牌桌" },
     { title: "入座与发牌", text: "座位坐满、入座玩家全员准备后，房主才能发牌。每位玩家用自己的手机确认身份。", flow: "全员准备 → 发放身份", icon: "record-users" },
     { title: "按现场进度发起", text: "线下讨论后，由房主发起投票、任务或技能。任务需要选择队伍和失败票门槛；提交收齐后自动结算。", flow: "发起操作 → 全员提交 → 结算", icon: "process-vote" },
     { title: "登记结果与重开", text: "最终行刺在线下完成，由房主手动结束对局并登记胜方。结束后可在同一房间重新准备。", flow: "结束对局 → 登记胜方 → 再开一局", icon: "record-cup" },
@@ -18,6 +20,7 @@ const stepsFor = mode => guideSteps[mode].map((step, index) => ({ ...step, numbe
 
 Page({
   data: {
+    singlePage: false,
     scoringOnly: false,
     scoringExpanded: false,
     boards: [],
@@ -59,12 +62,25 @@ Page({
   onLoad(options = {}) {
     this.alive = true;
     const scoringOnly = options.section === "scoring";
-    this.setData({ scoringOnly, scoringExpanded: scoringOnly });
+    this.setData({ scoringOnly, scoringExpanded: scoringOnly, singlePage: isSinglePage() });
+    wx.setNavigationBarTitle?.({ title: discovery.helpMetadata(scoringOnly).title });
+    wx.showShareMenu?.({ menus: ["shareAppMessage", "shareTimeline"] });
     this.refreshReferences();
     if (!scoringOnly) this.loadBoards();
     this.loadScoreRules();
   },
   onUnload() { this.alive = false; },
+  onShareAppMessage() {
+    return discovery.share("/pages/help/help", discovery.helpMetadata(this.data.scoringOnly));
+  },
+  onShareTimeline() {
+    return { title: discovery.helpMetadata(this.data.scoringOnly).title, query: discovery.helpMetadata(this.data.scoringOnly).query, imageUrl: "/assets/share-cover.jpg" };
+  },
+  openEntry(event) {
+    const mode = event.currentTarget.dataset.mode;
+    if (this.data.singlePage || !["create", "join"].includes(mode)) return;
+    switchHomeTab(0, { entry: { mode }, fail: () => wx.showToast({ title: "未能打开牌桌大厅，请重试", icon: "none" }) });
+  },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();
     else switchHomeTab(0);
@@ -74,7 +90,7 @@ Page({
     this.fetchingBoards = true;
     this.setData({ loadingBoards: true, boardError: "" });
     try {
-      const { boards } = await api.request("/api/boards");
+      const { boards } = await api.publicRequest("/api/boards");
       if (!this.alive) return;
       const groups = new Map();
       for (const board of (boards || []).filter(b => b.available)) {
@@ -109,7 +125,7 @@ Page({
   async loadScoreRules() {
     this.setData({ scoringLoading: true, scoringError: "" });
     try {
-      const rules = await api.request("/api/scoring/rules");
+      const rules = await api.publicRequest("/api/scoring/rules");
       if (this.alive) this.setData({ scoringRules: rules });
     } catch (e) { if (this.alive) this.setData({ scoringError: "计分规则暂未加载，请重试。" }); }
     finally { if (this.alive) { this.setData({ scoringLoading: false }); this.refreshReferences(); } }
