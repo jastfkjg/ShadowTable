@@ -39,7 +39,9 @@ async function renderImage(page, card, options = {}) {
   } finally { context.restore(); }
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("图片生成超时，请重试。")), 10000);
-    wx.canvasToTempFilePath({ canvas, x: 0, y: 0, width, height, destWidth: width, destHeight: height, fileType: "png",
+    // Export the whole bitmap. Source crop dimensions use the canvas's displayed
+    // size in WeChat; backing-pixel dimensions would crop a scaled long poster.
+    wx.canvasToTempFilePath({ canvas, destWidth: width, destHeight: height, fileType: "png",
       success: result => { clearTimeout(timer); resolve(result.tempFilePath); },
       fail: () => { clearTimeout(timer); reject(new Error("图片生成失败，请重试。")); },
     }, page);

@@ -16,7 +16,7 @@ const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision } = require("../miniprogram/room-sheet-presentation");
+const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision, presentIdentityInformation } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -69,6 +69,12 @@ function write(name, file, data, styles, extra = "") {
     ? owner.connectionPreviewState.connectionVisible ? owner.connectionPreviewState : null
     : runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
   if (previewConnection) owner.connectionVisible = true;
+  for (const key of ['secret', 'dealtIdentitySecret', 'identityChange', 'actionSecret']) {
+    if (!data[key]) continue;
+    data[key] = { ...data[key], info: presentIdentityInformation(data[key], data.seats) };
+    if (data[key].identityHistory) data[key].identityHistory = data[key].identityHistory.map(record => ({ ...record,
+      info: record.detailAvailable ? presentIdentityInformation(record) : null }));
+  }
   const rendered = html(factory(file)(data));
   const dialog = data.appDialog || data.lobby?.appDialog;
   const alert = dialog ? html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...presentDialog(dialog), id: 1 } })) : "";
@@ -358,7 +364,7 @@ const identityHistory=[{...newIdentity,id:1,current:true,sinceLabel:'第2轮 · 
 Object.assign(tableScenes,{
   'new-identity':{...tablePlaying,identityChange:newIdentity,identityChangeRevealed:true},
   'new-identity-covered':{...tablePlaying,identityChange:newIdentity},
-  'new-identity-long':{...tablePlaying,identityChange:{...newIdentity,abilityText:newIdentity.abilityText.repeat(8)},identityChangeRevealed:true},
+  'new-identity-long':{...tablePlaying,identityChange:{...newIdentity,information:newIdentity.information.repeat(8)},identityChangeRevealed:true},
   'identity-history':{...tablePlaying,revealed:true,secret:{...newIdentity,identityHistory},identityHistoryOpen:true,identityHistoryExpandedId:0},
   'fairy-result':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人',information:'7号查验结果：坏人（第2轮）'}),fairyResultRevealed:true},
   'fairy-covered':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人'})},
@@ -441,6 +447,29 @@ tableScenes['ui-host-vote']={...tableScenes['ui-host-fairy'],room:{...reviewRoom
 tableScenes['table-nav-long-host']={...tableScenes['table-host-task'],room:{...tableScenes['table-host-task'].room,boardName:'阿瓦隆 · 这是一个用于测试的特别长的未来板子名称',testRoom:true,scoreSettings:{enabled:false}}};
 tableScenes['table-nav-many-status-spectator']={...tableScenes['table-spectator'],room:{...tableScenes['table-spectator'].room,testRoom:true,scoreSettings:{enabled:false}}};
 tableScenes['table-nav-knights-10']={...tableReady,room:{...tableReady.room,boardName:'阿瓦隆 · 十二骑士（10人）'}};
+// Compact identity review: actual rules/vision from the private endpoint.
+const compactRoles = ['merlin', 'percival', 'servant', 'assassin', 'morgana', 'mordred', 'oberon', ...Object.keys(require('../server/variants').roles)];
+for (const role of compactRoles) {
+  const source = tableFixtures.setup(), uid = 'wx:replay-5';
+  if (role !== 'servant') for (const player of source.players) if (source.roles[player.uid] === role) source.roles[player.uid] = 'servant';
+  source.roles[uid] = role;
+  source.knights.initialRoles = { ...source.roles };
+  source.knights.players[uid].b = ['blueGuard','gargoyle','witch','magician','paladin','blueKnight','redKnight','blueAwakened','redAwakened','blueHunter','redHunter','prophet'].includes(role);
+  if (role === 'prophet') {
+    source.knights.players[uid].nightInfo = '第3轮B牌坏人：无';
+    source.knights.players[uid].fairyInfo = '8号查验结果：好人（第1轮）';
+    source.knights.players[uid].identityHistory = [{ id: 0, role: '亚瑟的忠臣', faction: '好人阵营', information: '没有视野。', detailAvailable: true, round: 1, reason: 'initial' }];
+  }
+  if (role === 'gargoyle') source.knights.players[uid].gargoyleHistory = [
+    { number: 1, initial: true, seat: 4, canKill: true }, { number: 2, seat: 10, canKill: false },
+  ];
+  const secret = privateView(source, uid), tone = secret.faction === '好人阵营' ? 'good' : secret.faction === '盗贼阵营' ? 'third' : 'evil';
+  tableScenes['compact-identity-' + role] = tableScene(source, uid, { revealed: true,
+    secret: { ...secret, factionTone: tone, portrait: portrait(secret.role, tone).portrait } });
+}
+const compactLong = tableScenes['compact-identity-assassin'];
+tableScenes['compact-identity-long'] = { ...compactLong, seats: compactLong.seats.map(player => ({ ...player, name: '一个很长的完整玩家昵称测试' })),
+  secret: { ...compactLong.secret, role: '觉醒蓝刀客·加赫雷斯', identityHistory: [{ current: true }, { id: 0 }] } };
 const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
 const playerCardProjection=`<script>window.fitPlayerCard=()=>{const sheet=document.querySelector('.player-card-sheet');if(!sheet)return;const fit=${fitBody.toString()},rects=['.player-card-backdrop','.player-card-top','.player-card-content','.player-card-bottom'].map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector('.player-card-body').style.height=height+'px';sheet.classList.add('has-measured-body');}sheet.classList.remove('is-measuring');};addEventListener('load',window.fitPlayerCard);addEventListener('resize',window.fitPlayerCard);</script>`;
 for(const [name,data] of Object.entries(tableScenes)) write(name,'pages/table/table.wxml',data,'.preview-homebar{z-index:1200}.player-card-bottom{padding-bottom:34px}',processProjection+playerCardProjection);

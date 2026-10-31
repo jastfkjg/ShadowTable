@@ -160,7 +160,7 @@ test("搜索跨越牌组并支持技能关键词，清空后回到所选牌组�
   );
   assert.deepEqual(
     presentation.visibleRoles(view, "b-good", "石像鬼 查验").map((r) => r.name),
-    ["石像鬼"],
+    ["魔术师", "石像鬼"],
   );
   assert.equal(presentation.visibleRoles(view, "b-good", "不存在").length, 0);
   assert.equal(presentation.visibleRoles(view, "b-evil", "").length, 5);

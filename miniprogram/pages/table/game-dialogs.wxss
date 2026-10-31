@@ -110,9 +110,11 @@
 
 /* Private content is mounted only inside existing reveal guards. */
 .process-new-identity .process-sheet-body { height: 510px; max-height: calc(100vh - 248px - env(safe-area-inset-bottom)); }
-.process-new-identity .dealt-role-heading { margin: 8px 0 21px; }
-.process-new-identity .private-role-art { width: 72px; height: 72px; }
-.process-new-identity .identity-title { margin: 7px 0 5px; font-size: 25px; }
+.table-sheet-backdrop .process-new-identity, .table-sheet-backdrop .process-history { background: var(--surface); }
+.process-new-identity .dealt-role-heading { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0 12px; }
+.process-new-identity .private-role-art { width: 49px; height: 54px; margin: 0; }
+.process-new-identity .identity-title { margin: 0 0 2px; font-size: 21px; }
+.process-new-identity .private-faction { font-size: 12px; }
 .process-new-identity .private-info .label { display: flex; align-items: center; gap: 6px; margin: 0 0 7px; }
 .process-new-identity .private-info .label image { width: 14px; height: 14px; flex-shrink: 0; }
 .process-new-identity .private-info { font-size: 13px; line-height: 1.8; }

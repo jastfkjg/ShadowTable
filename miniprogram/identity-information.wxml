@@ -1,0 +1,46 @@
+<template name="identityInformation">
+  <view class="identity-information">
+    <block wx:if="{{info}}">
+      <view wx:if="{{info.showVision}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
+        <view class="identity-info-heading"><text>角色视野</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
+        <block wx:if="{{info.passive}}">
+          <view class="identity-info-result"><text>存活 B 牌坏人</text><text class="identity-info-value">{{info.passive.result}}</text></view>
+          <view class="identity-info-note">{{info.passive.note}}</view>
+        </block>
+        <block wx:else>
+          <view wx:if="{{info.vision.label}}" class="identity-info-caption">{{info.vision.label}}</view>
+          <view wx:if="{{info.vision.players.length}}" class="identity-info-players {{info.vision.wide?'is-wide':''}}">
+            <view wx:for="{{info.vision.players}}" wx:key="seat" class="identity-info-player">
+              <view wx:if="{{showAvatars}}" class="vision-player-avatar" aria-hidden="true"><text>{{item.avatarInitial}}</text><image wx:if="{{item.avatarUrl && !item.avatarFailed}}" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="true" /></view>
+              <text class="identity-info-seat">{{item.seat}}<text class="identity-info-unit">号</text></text>
+              <view wx:if="{{item.name || item.role}}" class="identity-info-player-copy"><text wx:if="{{item.name}}" class="identity-info-name">{{item.name}}</text><text wx:if="{{item.role}}" class="identity-info-role">{{item.role}}</text></view>
+            </view>
+          </view>
+          <view wx:else class="identity-info-text">{{info.vision.text}}</view>
+          <view wx:if="{{info.vision.note}}" class="identity-info-note">{{info.vision.note}}</view>
+        </block>
+      </view>
+      <view wx:if="{{info.inspections.length}}" class="identity-info-section">
+        <view class="identity-info-heading"><text>角色查验</text><text class="identity-info-meta">{{info.inspections.length}} 条记录</text></view>
+        <view wx:for="{{info.inspections}}" wx:key="id" class="identity-info-inspection">
+          <view class="identity-info-record-label"><text>{{item.label}}</text><text wx:if="{{item.source}}">{{item.source}}</text></view>
+          <view class="identity-info-result"><text class="identity-info-seat">{{item.seat}}<text class="identity-info-unit">号</text></text><text class="identity-info-inspection-result">{{item.result}}</text></view>
+        </view>
+      </view>
+      <view wx:if="{{info.fairy}}" class="identity-info-section identity-info-fairy">
+        <view class="identity-info-heading">仙女查验</view>
+        <view class="identity-info-fairy-result"><text class="identity-info-seat">{{info.fairy.seat}}<text class="identity-info-unit">号</text></text><text class="identity-info-value faction-{{info.fairy.tone}}">{{info.fairy.faction}}</text></view>
+      </view>
+      <view wx:if="{{info.ability}}" class="identity-info-section">
+        <view class="identity-info-heading">角色能力</view>
+        <view wx:if="{{info.ability.brief}}" class="identity-info-brief">{{info.ability.brief}}</view>
+        <view wx:for="{{info.ability.lines}}" wx:key="index" class="identity-info-ability {{info.ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{info.ability.structured?'：':''}}</text><text>{{item.text}}</text></view>
+        <view wx:if="{{info.ability.note}}" class="identity-info-note">{{info.ability.structured?'注意：':''}}{{info.ability.note}}</view>
+      </view>
+    </block>
+    <view wx:else class="identity-info-section"><view class="identity-info-heading">角色视野</view><view class="identity-info-text">{{fallback}}</view></view>
+  </view>
+</template>
+<template name="identitySkillStatus">
+  <view wx:if="{{status}}" class="compact-skill-status"><view class="compact-skill-heading"><image src="/assets/record-spark.svg" aria-hidden="true" /><text class="compact-skill-label">技能状态</text><text class="compact-skill-value">{{status.title}}</text></view><view wx:if="{{status.detail}}" class="identity-info-note">{{status.detail}}</view></view>
+</template>

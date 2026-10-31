@@ -1,3 +1,4 @@
+<import src="../../identity-information.wxml" />
 <import src="./public-history.wxml" />
 <import src="../../loading-placeholder.wxml" />
 <include src="./public-history.wxml" />
@@ -52,7 +53,7 @@
           <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><image wx:if="{{item.portrait}}" class="process-history-art" src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-history-role-copy"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><view class="identity-history-meta small muted">{{item.sinceLabel}}</view></view><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
           <view wx:if="{{item.current}}" class="identity-history-summary small muted">{{item.faction}}{{item.skillStatus?' · '+item.skillStatus.title:''}}</view>
           <view wx:if="{{item.skillHistory.length}}" class="identity-skill-history"><view wx:for="{{item.skillHistory}}" wx:for-item="skill" wx:for-index="skillIndex" wx:key="id" class="identity-skill-record"><text class="identity-skill-label small muted">{{skillIndex===0?'技能记录':''}}</text><view class="identity-skill-value"><text class="identity-skill-round small muted">第{{skill.round}}轮</text><text class="identity-skill-separator muted" aria-hidden="true">·</text><text class="identity-skill-text">{{skill.text}}</text></view></view></view>
-          <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="identity-history-faction small muted"><view class="identity-history-faction-dot faction-{{item.factionTone}}" aria-hidden="true" />{{item.faction}}</view><view class="identity-history-information">{{item.detailAvailable?item.information:'旧对局未记录当时视野，仅保留初始身份。'}}</view><view class="identity-history-readonly small muted"><image src="/assets/process-eye.svg" aria-hidden="true" /><text>曾用身份 · 仅供回看</text></view></view>
+          <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="identity-history-faction small muted"><view class="identity-history-faction-dot faction-{{item.factionTone}}" aria-hidden="true" />{{item.faction}}</view><template wx:if="{{item.detailAvailable}}" is="identityInformation" data="{{info:item.info, fallback:item.information}}" /><view wx:else class="identity-history-information">旧对局未记录当时视野，仅保留初始身份。</view><view class="identity-history-readonly small muted"><image src="/assets/process-eye.svg" aria-hidden="true" /><text>曾用身份 · 仅供回看</text></view></view>
         </view>
       </view>
     </view></scroll-view>
@@ -115,19 +116,8 @@
         <block wx:if="{{dealtIdentitySecret}}">
           <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
           <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view></view>
-          <view class="identity-vision">
-            <view class="identity-vision-heading"><text>你的视野</text><text wx:if="{{dealtIdentitySecret.vision.players.length}}" class="identity-vision-count">{{dealtIdentitySecret.vision.players.length}} 人</text></view>
-            <block wx:if="{{dealtIdentitySecret.vision.players.length}}">
-              <view class="identity-vision-label">{{dealtIdentitySecret.vision.label}}</view>
-              <view class="identity-vision-players"><view wx:for="{{dealtIdentitySecret.vision.players}}" wx:key="seat" class="identity-vision-player">
-                <view class="vision-player-avatar" aria-hidden="true"><text>{{item.avatarInitial}}</text><image wx:if="{{item.avatarUrl && !item.avatarFailed}}" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="true" /></view>
-                <view class="vision-player-copy"><view class="vision-player-primary"><text class="identity-vision-seat">{{item.seat}}<text class="identity-vision-unit">号</text></text><text class="vision-player-name">{{item.name}}</text></view><view wx:if="{{item.role}}" class="identity-vision-role">{{item.role}}</view></view>
-              </view></view>
-              <view wx:if="{{dealtIdentitySecret.vision.note}}" class="identity-vision-note">{{dealtIdentitySecret.vision.note}}</view>
-            </block>
-            <view wx:else class="identity-vision-text">{{dealtIdentitySecret.information}}</view>
-          </view>
-          <view wx:if="{{dealtIdentitySecret.skillStatus}}" class="dealt-skill-status"><view class="dealt-skill-status-title">技能状态 · {{dealtIdentitySecret.skillStatus.title}}</view>{{dealtIdentitySecret.skillStatus.detail}}</view>
+          <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true}}" />
+          <template is="identitySkillStatus" data="{{status:dealtIdentitySecret.skillStatus}}" />
           <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
         </block>
         <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
@@ -162,9 +152,9 @@
     <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
       <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
       <block wx:if="{{identityChangeRevealed}}">
-        <view class="dealt-role-heading"><image wx:if="{{identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view>
-        <view class="private-info-group"><view class="private-info"><view class="label"><image src="/assets/process-eye.svg" aria-hidden="true" />你的视野</view>{{identityChange.visionText || identityChange.information}}</view><view wx:if="{{identityChange.abilityText}}" class="private-info"><view class="label"><image src="/assets/record-spark.svg" aria-hidden="true" />角色能力</view>{{identityChange.abilityText}}</view></view>
-        <view wx:if="{{identityChange.skillStatus}}" class="process-skill-status"><image src="/assets/home-clock.svg" aria-hidden="true" /><view><view>{{identityChange.skillStatus.title}}</view><view wx:if="{{identityChange.skillStatus.detail}}" class="small muted">{{identityChange.skillStatus.detail}}</view></view></view>
+        <view class="dealt-role-heading"><image wx:if="{{identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view></view>
+        <template is="identityInformation" data="{{info:identityChange.info, fallback:identityChange.information}}" />
+        <template is="identitySkillStatus" data="{{status:identityChange.skillStatus}}" />
         <view wx:if="{{identityChange.timingNote}}" class="process-private-note small muted">{{identityChange.timingNote}}</view>
       </block>
       <view wx:else class="process-sealed"><view class="table-symbol blue"><image src="/assets/table-lock.svg" aria-hidden="true" /></view><view>新身份已遮盖</view><text class="small muted">请确认周围无人查看，再查看新身份。</text></view>
@@ -243,8 +233,8 @@
         <view wx:if="{{actionSecret}}" class="action-identity-details">
           <view class="identity-title faction-{{actionSecret.factionTone}}">{{actionSecret.role}}</view>
           <view class="muted">{{actionSecret.faction}}</view>
-          <view class="private-info"><view class="label">你的视角</view>{{actionSecret.information}}</view>
-<view wx:if="{{actionSecret.skillStatus}}" class="private-info"><view class="label">技能状态 · {{actionSecret.skillStatus.title}}</view>{{actionSecret.skillStatus.detail}}</view>
+          <template is="identityInformation" data="{{info:actionSecret.info, fallback:actionSecret.information}}" />
+          <template is="identitySkillStatus" data="{{status:actionSecret.skillStatus}}" />
         </view>
         <button hover-class="none" class="secondary" bindtap="revealActionIdentity" loading="{{busy && busyAction==='actionIdentity'}}" disabled="{{!actionSecret && (busy || !network || hasPendingRequest)}}">{{actionSecret?'立即遮盖':'查看身份与视角'}}</button>
       </view>
@@ -452,14 +442,16 @@
       </view>
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
-      <view wx:if="{{revealed}}" class="identity open">
-        <view class="inline-privacy-row"><view class="identity-privacy-note muted"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button inline-hide" bindtap="reveal">立即遮盖</button></view>
-        <view class="identity-card-topline"><text class="small muted">当前身份</text><button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="{{true}}" />身份历程 <text aria-hidden="{{true}}">›</text></button></view>
-        <view class="inline-role-heading"><image wx:if="{{secret.portrait}}" class="private-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="inline-role-copy"><view class="identity-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="private-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view><text wx:if="{{secret.outcome}}" class="inline-role-outcome {{secret.outcome==='本局你获胜'?'is-win':secret.outcome==='本局你失败'?'is-loss':''}}">{{secret.outcome}}</text></view>
-        <view class="inline-private-details">
-          <view class="private-info"><view class="label">你的视野</view>{{secret.information}}</view>
-          <view wx:if="{{secret.skillStatus}}" class="inline-skill-status"><view class="inline-skill-heading"><image src="/assets/record-spark.svg" aria-hidden="true" /><text class="inline-skill-label">技能状态</text><text class="inline-skill-value">{{secret.skillStatus.title}}</text></view><view wx:if="{{secret.skillStatus.detail}}" class="inline-skill-detail">{{secret.skillStatus.detail}}</view></view>
+      <view wx:if="{{revealed}}" class="identity open identity-compact">
+        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal">立即遮盖</button></view>
+        <view class="compact-role-heading">
+          <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
+          <view class="compact-role-copy"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="compact-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view>
+          <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
+        <view wx:if="{{secret.outcome}}" class="compact-outcome {{secret.outcome==='本局你获胜'?'faction-good':secret.outcome==='本局你失败'?'faction-evil':''}}">{{secret.outcome}}</view>
+        <template is="identityInformation" data="{{info:secret.info, fallback:secret.information}}" />
+        <template is="identitySkillStatus" data="{{status:secret.skillStatus}}" />
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>
     </block>

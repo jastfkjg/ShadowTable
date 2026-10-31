@@ -229,7 +229,7 @@
 .board-detail-dialog .detail-role-brief {
   color: #d0d8dc;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.65;
   overflow-wrap: break-word;
 }
 .board-detail-dialog .detail-chevron {
@@ -247,49 +247,38 @@
   margin-top: 3px;
 }
 .board-detail-dialog .detail-role.expanded {
-  margin: 12px -12px 0;
-  padding: 0 12px;
-  border: 0.5px solid #38546a;
-  border-radius: 11px;
-  background: #172a36;
+  border-bottom: 0.5px solid #2b3d48;
 }
 .board-detail-dialog .detail-role.expanded .detail-role-toggle {
-  min-height: 56px;
-  padding-bottom: 8px;
+  padding-bottom: 14px;
 }
 .board-detail-dialog .detail-role-body {
   padding-bottom: 16px;
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.65;
 }
 .board-detail-dialog .detail-fact {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+  overflow-wrap: anywhere;
   margin-bottom: 10px;
 }
 .board-detail-dialog .detail-fact-label {
-  flex: 0 0 28px;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
 }
 .board-detail-dialog .detail-fact-text {
-  flex: 1;
-  min-width: 0;
   color: #e0e5e8;
   overflow-wrap: break-word;
 }
 .board-detail-dialog .detail-exception {
-  padding: 10px 12px;
-  background: #342d30;
-  border-left: 2px solid #cfa196;
-  border-radius: 0 6px 6px 0;
-  color: #e4c9c4;
+  padding-top: 10px;
+  margin-top: 12px;
+  border-top: 1px solid #2b3d48;
+  color: var(--muted);
   font-size: 13px;
-  line-height: 1.8;
+  line-height: 1.65;
 }
 .board-detail-dialog .detail-exception-title {
-  color: var(--evil);
+  color: var(--accent);
   font-weight: 600;
   margin-bottom: 3px;
 }

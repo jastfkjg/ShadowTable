@@ -18,6 +18,7 @@
   const boardDetailPresentation = window.shadowtableBoardDetail;
   const avoidancePresentation = window.shadowtableAvoidance;
   const identityVision = window.shadowtableIdentityVision;
+  const rolePortraits = window.shadowtableRolePortraits;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -633,7 +634,7 @@
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyCategory: 'overall', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -1217,7 +1218,7 @@
     return row.avatarUrl && !row.avatarFailed ? '<img class="rank-avatar" src="' + esc(row.avatarUrl) + '" alt="" data-rank-avatar-id="' + esc(row.publicId) + '" />' : '<span class="rank-avatar rank-avatar-fallback" aria-hidden="true">' + esc(Array.from(row.nickname || '友')[0]) + '</span>';
   }
   function rankSheetStart(kind, title, action, label = title) {
-    const close = kind === 'rank-details-dialog' ? '<button type="button" class="rank-sheet-close rank-details-close" data-action="' + action + '" aria-label="关闭我的榜单"><span class="rank-close-icon" aria-hidden="true"></span></button>' : btn('rank-sheet-close', action, '关闭');
+    const close = kind === 'rank-details-dialog' || kind === 'rank-rules-sheet' ? '<button type="button" class="rank-sheet-close ' + (kind === 'rank-details-dialog' ? 'rank-details-close' : 'rank-rules-close') + '" data-action="' + action + '" aria-label="关闭' + title + '"><span class="rank-close-icon" aria-hidden="true"></span></button>' : btn('rank-sheet-close', action, '关闭');
     return '<div class="dialog-backdrop rank-sheet-backdrop" data-rank-dismiss="' + action + '"><section class="rank-sheet ' + kind + '" role="dialog" aria-modal="true" aria-label="' + label + '"><div class="rank-sheet-handle" aria-hidden="true"></div><div class="rank-sheet-header"><h2 class="rank-sheet-title">' + title + '</h2>' + close + '</div>';
   }
   function viewRankMetricSheet() {
@@ -1239,6 +1240,12 @@
       list.addEventListener('scroll', updateFunOptionsScrollHint, {passive:true});
       list.funScrollBound = true;
     }
+  }
+  function viewRankRulesSheet(board) {
+    let html = rankSheetStart('rank-rules-sheet', '榜单规则', 'rankToggleRules');
+    html += '<div class="rank-rules-scope"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + esc(board.periodLabel) + '</div><span class="rank-rules-timezone">北京时间</span></div><div class="rank-rules-body"><div class="rank-rules-period"><img class="rank-rules-calendar" src="/assets/record-calendar.svg" alt="" /><div class="rank-rules-period-copy"><div class="rank-rules-period-title">' + esc(board.ruleSummary.title) + '</div>' + board.ruleSummary.lines.map(line => '<div class="rank-rules-period-line">' + esc(line) + '</div>').join('') + '</div></div>';
+    html += board.ruleSections.map(section => '<section class="rank-rule-section"><div class="rank-rule-heading"><span class="rank-rule-number" aria-hidden="true">' + section.number + '</span><h3 class="rank-rule-title">' + esc(section.title) + '</h3></div>' + (section.main.length ? '<div class="rank-rule-main">' + section.main.map(part => '<span' + (part.emphasis ? ' class="rank-rule-emphasis"' : '') + '>' + esc(part.text) + '</span>').join('') + '</div>' : '') + section.lines.map(line => '<div class="rank-rule-line">' + esc(line) + '</div>').join('') + (section.note ? '<div class="rank-rule-note"><img src="/assets/record-info.svg" alt="" /><span>' + esc(section.note) + '</span></div>' : '') + '</section>').join('');
+    return html + '</div><div class="rank-rules-footer">' + btn('rank-confirm', 'rankToggleRules', '我知道了') + '</div></section></div>';
   }
   function viewLeaderboard() {
     const board = rankPresentation.presentBoard(state.rankBoard), metric = state.rankMetric;
@@ -1267,7 +1274,7 @@
     const me = board.me;
     html += '<aside class="rank-mine" aria-label="我的排名"><button class="rank-mine-toggle" data-action="rankToggleMine" aria-expanded="' + !!state.rankMineExpanded + '" aria-label="我的排名，详情与公开设置"><span class="rank-mine-stats"><span class="rank-mine-brief"><span class="rank-mine-label">我的排名</span><span class="rank-mine-place">' + esc(me.placeLabel) + '</span></span><span class="rank-mine-brief"><span class="rank-mine-label">' + esc(board.valueHeading) + '</span><span class="rank-mine-value">' + value(me) + '</span></span></span><span class="rank-mine-entry">我的榜单<span class="rank-chevron" aria-hidden="true"></span></span></button></aside></div>';
     if (state.rankMetricsExpanded) html += viewRankMetricSheet();
-    if (state.rankRulesExpanded) html += rankSheetStart('rank-rules-sheet','榜单规则','rankToggleRules') + '<div class="rank-rules-body"><div class="rank-rules-metric">' + esc(board.valueHeading) + ' · ' + board.periodLabel + '</div>' + board.ruleLines.map(line => '<p class="rank-rule-line">' + esc(line) + '</p>').join('') + '</div></section></div>';
+    if (state.rankRulesExpanded) html += viewRankRulesSheet(board);
     if (state.rankMineExpanded) {
       html += rankSheetStart('rank-details-dialog','我的榜单','rankToggleMine','我的排名与公开设置') + '<div class="rank-details-body"><div class="rank-summary' + (me.valueCompact || me.rank > 9999 ? ' rank-summary-wide' : '') + '"><div class="rank-summary-column"><div class="rank-summary-label">我的排名</div>';
       html += me.rank ? '<div class="rank-summary-place' + (me.rank > 99 ? ' rank-summary-compact' : '') + '" aria-label="' + esc((me.tied ? '并列' : '') + '第' + me.rank + '名') + '">' + '<span class="rank-summary-unit">第</span><span class="rank-summary-number">' + esc(me.rank) + '</span><span class="rank-summary-unit">名</span></div>' + (me.tied ? '<div class="rank-summary-tied">并列</div>' : '') : '<div class="rank-summary-status">' + esc(me.placeLabel) + '</div>';
@@ -1294,28 +1301,23 @@
       if (sequence === monthlySequence && route === routeSequence && state.page === 'monthly') setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message });
     }
   }
-  function monthlyHeading(title, iconPath, meta, extraClass = '') {
-    return '<div class="monthly-section-title ' + extraClass + '"><span class="monthly-heading-label"><img class="monthly-heading-icon" src="' + esc(iconPath) + '" alt=""><span>' + esc(title) + '</span></span><span class="monthly-top-label">' + esc(meta) + '</span></div>';
-  }
   function viewMonthlyBoard(board) {
     if (!board.rows.length) return '';
-    return '<section class="monthly-board" aria-label="' + esc(board.title) + '">' + monthlyHeading(board.title, board.iconPath, 'TOP 3') + '<div class="monthly-caption monthly-board-caption">' + esc(board.subtitle) + '</div><ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row' + (row.rank === 1 ? ' monthly-row-first' : '') + '" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank monthly-rank-' + row.rank + '" aria-hidden="true"><img src="/assets/monthly-laurel-' + row.rank + '.svg" alt=""><span>' + esc(row.rankLabel) + '</span></span><span class="monthly-avatar monthly-avatar-' + row.rank + '" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name-line"><span class="monthly-name">' + esc(row.nickname) + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol></section>';
+    return '<section class="monthly-board" aria-label="' + esc(board.title) + '"><header class="monthly-board-header"><img class="monthly-heading-icon" src="' + esc(board.iconPath) + '" alt=""><div class="monthly-heading-copy"><h2 class="monthly-section-title">' + esc(board.title) + '</h2><p class="monthly-caption monthly-board-caption">' + esc(board.subtitle) + '</p></div><span class="monthly-top-label">前三名</span></header><ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row' + (row.rank === 1 ? ' monthly-row-first' : '') + '" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank monthly-rank-' + row.rank + '" aria-hidden="true"><img src="/assets/monthly-laurel-' + row.rank + '.svg" alt=""><span>' + esc(row.rankLabel) + '</span></span><span class="monthly-avatar" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name-line"><span class="monthly-name">' + esc(row.nickname) + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol></section>';
   }
   function viewMonthlyReport() {
-    const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt();
-    let html = personalTitle('月度战报', '') + '<section class="monthly-page"><header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt=""><div class="monthly-hero-content"><label class="monthly-month-picker"><span>' + esc(report?.monthLabel || month) + '</span><span class="monthly-picker-arrow" aria-hidden="true"></span><input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label><div class="monthly-title">月度战报</div></div></header>';
+    const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt(), category = state.monthlyCategory;
+    let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page' + (report?.canShare ? ' monthly-has-share' : '') + '"><header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt=""><div class="monthly-hero-content"><label class="monthly-month-picker"><span class="monthly-year">' + esc(month.slice(0, 4)) + ' 年</span><span class="monthly-month-line"><span class="monthly-month-number">' + Number(month.slice(5)) + '</span><span class="monthly-month-unit">月</span><span class="monthly-picker-arrow" aria-hidden="true"></span></span><input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label>' + (report ? '<div class="monthly-preview-status"><span class="monthly-status-dot' + (report.status === 'preview' ? '' : ' monthly-status-complete') + '" aria-hidden="true"></span>' + (report.status === 'preview' ? '本月实时更新' : '完整月报') + '</div>' : '') + '</div></header>';
     if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
     if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
     if (!report || state.monthlyLoading) return html + '</section>';
-    html += '<div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '</div>';
+    html += '<div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '<button type="button" data-action="monthlyRules" aria-label="查看月报统计说明"><img src="/assets/record-info.svg" alt=""></button></div>';
     if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
     else {
-      html += [...report.coreBoards, ...report.extraBoards].map(viewMonthlyBoard).join('');
-      if (report.hasFunBoards) {
-        html += '<div class="monthly-tabs" role="group" aria-label="趣味榜类型">' + [['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" data-action="monthlyEdition" data-value="' + id + '" aria-pressed="' + ((id === 'fun') === !!state.monthlyEntertainment) + '" class="' + (((id === 'fun') === !!state.monthlyEntertainment) ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
-        html += monthlyPresentation.detailBoards(report, 'count', !!state.monthlyEntertainment).map(viewMonthlyBoard).join('');
-      }
-      html += btn('monthly-share', 'monthlyShare', state.monthlySharing ? '正在生成图片…' : state.monthlyEntertainment ? '生成娱乐版分享图' : '生成月报分享图', null, state.monthlySharing);
+      html += '<div class="monthly-tabs" role="tablist" aria-label="月报类别">' + [['overall', '综合榜单'], ['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" id="monthly-tab-' + id + '" role="tab" data-action="monthlyEdition" data-value="' + id + '" aria-selected="' + (id === category) + '" aria-controls="monthly-board-panel" class="' + (id === category ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
+      const boards = category === 'overall' ? [...report.coreBoards, ...report.extraBoards] : monthlyPresentation.detailBoards(report, 'count', !!state.monthlyEntertainment);
+      html += '<div class="monthly-boards" id="monthly-board-panel" role="tabpanel" aria-labelledby="monthly-tab-' + category + '">' + boards.map(viewMonthlyBoard).join('') + '</div>';
+      html += '<div class="monthly-share-bar"><div class="monthly-share-inner"><button type="button" class="monthly-share" data-action="monthlyShare"' + (state.monthlySharing || state.monthlyLoading || state.monthlyError ? ' disabled' : '') + '><img src="/assets/share-dark.svg" alt="">' + (state.monthlySharing ? '正在生成图片…' : '生成月报分享图') + '</button></div></div>';
       if (state.monthlyImages?.length) {
         html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[0] + '" alt="' + esc(report.monthLabel + '月度战报完整长图') + '"></div>';
         html += btn('secondary', 'monthlyDownload', '保存长图') + '</div>';
@@ -1325,13 +1327,13 @@
   }
   async function shareMonthlyReport() {
     if (!state.monthlyReport?.canShare || state.monthlySharing || state.monthlyLoading || state.monthlyError) return;
-    const route = routeSequence, sequence = monthlySequence, month = state.monthlyMonth, entertainment = !!state.monthlyEntertainment;
+    const route = routeSequence, sequence = monthlySequence, month = state.monthlyMonth;
     const active = () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly' && foreground;
     setState({ monthlySharing: true, monthlyImages: [], monthlyError: '' });
     try {
       const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
       if (!active()) return;
-      const cards = monthlyCard.cards(response, entertainment);
+      const cards = monthlyCard.cards(response);
       const paths = [...new Set(cards.flatMap(card => monthlyCard.imagePaths(card)))];
       const avatars = new Map(await Promise.all(paths.map(path => new Promise(resolve => {
         const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
@@ -3733,24 +3735,40 @@ function roomListItems(rooms) {
     return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog' + (secret?.role === '莫甘娜' ? ' is-morgana' : '') + '" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
       '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="small muted identity-privacy-note">仅供本人查看</div>' +
       (secret ? viewAvoidanceResult(secret.avoidance) + '<div class="dealt-web-role-heading"><div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
-        '</div></div>' + viewIdentityVision(secret.information) +
-        (secret.skillStatus ? '<div class="dealt-skill-status"><div class="dealt-skill-status-title">技能状态 · ' + esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>' : '') +
+        '</div></div>' + viewIdentityInformation(secret, state.seats, true) +
+        viewSkillStatus(secret) +
         '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' +
         btn("primary", "closeDealtIdentity", "记住了，遮盖身份") :
         '<div class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</div>' +
         btn("primary", "revealDealtIdentity", state.busy ? "正在读取…" : "查看身份", null, state.busy || !state.network) +
         btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div>';
   }
-  function viewIdentityVision(information) {
-    var vision = identityVision.present(information, state.seats);
-    return '<div class="identity-vision"><div class="identity-vision-heading"><span>你的视野</span>' +
-      (vision.players.length ? '<span class="identity-vision-count">' + vision.players.length + ' 人</span>' : '') + '</div>' +
-      (vision.players.length ? '<div class="identity-vision-label">' + esc(vision.label) + '</div><div class="identity-vision-players">' +
-        vision.players.map(player => '<div class="identity-vision-player"><div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
-          (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') +
-          '</div><div class="vision-player-copy"><div class="vision-player-primary"><span class="identity-vision-seat">' + player.seat + '<span class="identity-vision-unit">号</span></span><span class="vision-player-name">' + esc(player.name) + '</span></div>' +
-          (player.role ? '<div class="identity-vision-role">' + esc(player.role) + '</div>' : '') + '</div></div>').join('') + '</div>' +
-        (vision.note ? '<div class="identity-vision-note">' + esc(vision.note) + '</div>' : '') : '<div class="identity-vision-text">' + esc(vision.text) + '</div>') + '</div>';
+  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false) {
+    var info = identityVision.presentIdentity(secret, profiles), vision = info.vision;
+    function heading(label, meta) {
+      return '<div class="identity-info-heading"><span>' + esc(label) + '</span>' + (meta ? '<span class="identity-info-meta">' + esc(meta) + '</span>' : '') + '</div>';
+    }
+    function note(text) { return text ? '<div class="identity-info-note">' + esc(text) + '</div>' : ''; }
+    function seat(number) { return '<span class="identity-info-seat">' + esc(number) + '<span class="identity-info-unit">号</span></span>'; }
+    var html = '<div class="identity-information">';
+    if (info.showVision) {
+      html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + heading('角色视野', info.passive?.round ? '第 ' + info.passive.round + ' 轮' : vision.label === '初始见面匪' ? '初始视野' : '');
+      if (info.passive) html += '<div class="identity-info-result"><span>存活 B 牌坏人</span><span class="identity-info-value">' + esc(info.passive.result) + '</span></div>' + note(info.passive.note);
+      else {
+        if (vision.label) html += '<div class="identity-info-caption">' + esc(vision.label) + '</div>';
+        html += vision.players.length ? '<div class="identity-info-players' + (vision.wide ? ' is-wide' : '') + '">' + vision.players.map(player => '<div class="identity-info-player">' +
+          (showAvatars ? '<div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
+            (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') + '</div>' : '') + seat(player.seat) +
+          ((player.name || player.role) ? '<div class="identity-info-player-copy">' + (player.name ? '<span class="identity-info-name">' + esc(player.name) + '</span>' : '') + (player.role ? '<span class="identity-info-role">' + esc(player.role) + '</span>' : '') + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="identity-info-text">' + esc(vision.text) + '</div>';
+        html += note(vision.note);
+      }
+      html += '</div>';
+    }
+    if (info.inspections.length) html += '<div class="identity-info-section">' + heading('角色查验', info.inspections.length + ' 条记录') + info.inspections.map(record =>
+      '<div class="identity-info-inspection"><div class="identity-info-record-label"><span>' + esc(record.label) + '</span><span>' + esc(record.source) + '</span></div><div class="identity-info-result">' + seat(record.seat) + '<span class="identity-info-inspection-result">' + esc(record.result) + '</span></div></div>').join('') + '</div>';
+    if (info.fairy) html += '<div class="identity-info-section identity-info-fairy">' + heading('仙女查验') + '<div class="identity-info-fairy-result">' + seat(info.fairy.seat) + '<span class="identity-info-value faction-' + info.fairy.tone + '">' + esc(info.fairy.faction) + '</span></div></div>';
+    if (info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + (info.ability.brief ? '<div class="identity-info-brief">' + esc(info.ability.brief) + '</div>' : '') + info.ability.lines.map(line => '<div class="identity-info-ability' + (info.ability.structured ? ' structured' : '') + '">' + (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (info.ability.structured ? '：' : '') + '</span>' : '') + '<span>' + esc(line.text) + '</span></div>').join('') + note((info.ability.structured && info.ability.note ? '注意：' : '') + info.ability.note) + '</div>';
+    return html + '</div>';
   }
   function viewIdentityChange() {
     if (!state.identityChange || state.error) return "";
@@ -3759,7 +3777,7 @@ function roomListItems(rooms) {
       '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
       '<div class="dialog-title">你已获得新身份</div>' +
       '<div class="small muted">仅供本人查看 · ' +
-      (ic.passiveVision ? "视野随技能结算自动更新" : "新技能下一轮可用") +
+      "使用时机见角色说明与技能状态" +
       "</div>" +
       (state.identityChangeRevealed
         ? '<div class="identity-title faction-' +
@@ -3768,9 +3786,7 @@ function roomListItems(rooms) {
           esc(ic.role) +
           '</div><div class="muted">' +
           esc(ic.faction) +
-          '</div><div class="private-info">' +
-          esc(ic.information) +
-          "</div>" +
+          '</div>' + viewIdentityInformation(ic) +
           viewSkillStatus(ic) +
           btn("primary", "acknowledgeIdentity", "记住了，遮盖身份", null, state.busy)
         : '<div class="private-info muted">身份已遮盖，请确认周围无人查看。</div>' +
@@ -3833,8 +3849,7 @@ function roomListItems(rooms) {
   }
   function viewSkillStatus(secret) {
     if (!secret || !secret.skillStatus) return "";
-    return '<div class="private-info"><div class="label">技能状态 · ' +
-      esc(secret.skillStatus.title) + '</div>' + esc(secret.skillStatus.detail) + '</div>';
+    return '<div class="compact-skill-status"><div class="compact-skill-heading"><img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(secret.skillStatus.title) + '</span></div>' + (secret.skillStatus.detail ? '<div class="identity-info-note">' + esc(secret.skillStatus.detail) + '</div>' : '') + '</div>';
   }
   function viewIdentityHistory() {
     var history = state.secret?.identityHistory || [];
@@ -3848,7 +3863,7 @@ function roomListItems(rooms) {
         '<div class="identity-history-meta small muted">' + esc(record.sinceLabel) + '</div>';
       if (record.current) html += '<div class="identity-history-summary small muted">' + esc(record.faction) + (record.skillStatus ? ' · ' + esc(record.skillStatus.title) : '') + '</div>';
       html += viewSkillHistory(record);
-      if (!record.current) html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + esc(record.detailAvailable ? record.information : '旧对局未记录当时视野，仅保留初始身份。') + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
+      if (!record.current) html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + (record.detailAvailable ? viewIdentityInformation(record, null) : esc('旧对局未记录当时视野，仅保留初始身份。')) + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
       html += '</div>';
     });
     return html + '</div></div><div class="identity-history-footer"><div class="small muted">本局记录 · 仅你可见</div>' + btn('secondary', 'hideIdentityHistory', '立即遮盖') + '</div></section></div>';
@@ -3922,9 +3937,7 @@ function roomListItems(rooms) {
           esc(s.role) +
           '</div><div class="muted">' +
           esc(s.faction) +
-          '</div><div class="private-info"><div class="label">你的视角</div>' +
-          esc(s.information) +
-          "</div>" + viewSkillStatus(s) + "</div>";
+          '</div>' + viewIdentityInformation(s) + viewSkillStatus(s) + "</div>";
       }
       html +=
         btn(
@@ -4252,27 +4265,18 @@ function roomListItems(rooms) {
         "</div></div></div>";
     }
     if (r.phase !== "lobby" && r.me.seat !== null) {
-      if (state.revealed && state.secret)
-        html +=
-          '<div class="identity open">' +
-          (state.secret.identityHistory?.length > 1 ? '<div class="identity-card-topline"><span class="small muted">当前身份</span><button type="button" class="identity-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button></div>' : '') +
-          '<div class="identity-title faction-' +
-          (state.secret.factionTone || "") +
-          '">' +
-          esc(state.secret.role) +
-          '</div><span class="muted">' +
-          esc(state.secret.faction) +
-          '</span><div class="private-info">' +
-          esc(state.secret.information) +
-          (state.secret.outcome
-            ? '<span class="label">' + esc(state.secret.outcome) + "</span>"
-            : "") +
-          "</div>" +
-          viewSkillStatus(state.secret) +
-          viewSkillHistory(state.secret, true) +
-          btn("secondary", "reveal", "立即遮盖") +
-          "</div>";
+      if (state.revealed && state.secret) {
+        var identity = state.secret;
+        var art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
+        html += '<div class="identity open identity-compact">' +
+          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div>' + btn('text-button compact-hide', 'reveal', '立即遮盖') + '</div>' +
+          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div><span class="compact-faction faction-' + (identity.factionTone || '') + '">● ' + esc(identity.faction) + '</span></div>' +
+          (identity.identityHistory?.length > 1 ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
+          (identity.outcome ? '<div class="compact-outcome ' + (identity.outcome === '本局你获胜' ? 'faction-good' : identity.outcome === '本局你失败' ? 'faction-evil' : '') + '">' + esc(identity.outcome) + '</div>' : '') +
+          viewIdentityInformation(identity) + viewSkillStatus(identity) + viewSkillHistory(identity, true) + '</div>';
+      }
     }
+
     var operationFirst = !["tools", "ended", "lobby"].includes(r.phase);
     var phaseHtml =
       '<div class="phase-strip"><div class="phase-heading"><span class="phase-label">当前阶段</span><span class="phase-name">' +
@@ -4760,8 +4764,8 @@ function roomListItems(rooms) {
       if (b.groups.length > 1) html += '<div class="detail-filters' + (query ? ' searching' : '') + '">' + b.groups.map(function (group) { return '<button type="button" class="detail-filter' + (state.boardDetailGroup === group.id ? ' selected' : '') + (group.id === 'b-evil' ? ' filter-evil' : '') + '" data-action="boardDetailGroup" data-value="' + esc(group.id) + '" aria-pressed="' + (state.boardDetailGroup === group.id) + '">' + esc(group.label) + '</button>'; }).join('') + '</div>';
       html += '<div class="detail-hint"><span class="detail-info-icon" aria-hidden="true">i</span><span>' + esc(query ? '搜索当前板子的全部角色与技能' : b.roleHint) + '</span></div><div class="detail-role-list">';
       html += rows.map(function (role) {
-        return '<article class="detail-role' + (role.expanded ? ' expanded' : '') + '" id="board-role-' + role.id + '"><button type="button" class="detail-role-toggle" data-action="toggleBoardRole" data-value="' + role.id + '" aria-expanded="' + role.expanded + '" aria-controls="role-body-' + role.id + '"><span class="detail-role-copy"><span class="detail-role-heading"><span class="detail-role-name tone-' + esc(role.tone || '') + '">' + esc(role.name) + '</span><span class="detail-role-type">' + esc(role.showGroup ? role.groupLabel : role.type) + '</span></span>' + (!role.expanded ? '<span class="detail-role-brief">' + esc(role.brief) + '</span>' : '') + '</span><span class="detail-chevron' + (role.expanded ? ' up' : '') + '" aria-hidden="true"></span></button>' +
-          (role.expanded ? '<div class="detail-role-body" id="role-body-' + role.id + '">' + role.facts.map(function (fact) { return '<div class="detail-fact"><span class="detail-fact-label">' + esc(fact.label) + '</span><span class="detail-fact-text">' + esc(fact.text) + '</span></div>'; }).join('') + (role.exception ? '<div class="detail-exception"><div class="detail-exception-title">' + esc(role.exceptionTitle) + '</div><div>' + esc(role.exception) + '</div></div>' : '') + '</div>' : '') + '</article>';
+        return '<article class="detail-role' + (role.expanded ? ' expanded' : '') + '" id="board-role-' + role.id + '"><button type="button" class="detail-role-toggle" data-action="toggleBoardRole" data-value="' + role.id + '" aria-expanded="' + role.expanded + '" aria-controls="role-body-' + role.id + '"><span class="detail-role-copy"><span class="detail-role-heading"><span class="detail-role-name tone-' + esc(role.tone || '') + '">' + esc(role.name) + '</span><span class="detail-role-type">' + esc(role.showGroup ? role.groupLabel : role.type) + '</span></span>' + ('<span class="detail-role-brief">' + esc(role.brief) + '</span>') + '</span><span class="detail-chevron' + (role.expanded ? ' up' : '') + '" aria-hidden="true"></span></button>' +
+          (role.expanded ? '<div class="detail-role-body" id="role-body-' + role.id + '">' + role.facts.map(function (fact) { return '<div class="detail-fact"><span class="detail-fact-label">' + esc(fact.label) + '：</span><span class="detail-fact-text">' + esc(fact.text) + '</span></div>'; }).join('') + (role.exception ? '<div class="detail-exception"><div class="detail-exception-title">' + esc(role.exceptionTitle) + '</div><div>' + esc(role.exception) + '</div></div>' : '') + '</div>' : '') + '</article>';
       }).join('') + '</div>' + (!rows.length ? '<div class="detail-empty" role="status">未找到匹配角色，请换个关键词。</div>' : '') + '</section>';
     } else html += '<section id="detail-rule-panel" role="tabpanel" aria-label="玩法规则">' + (chapters.length ? '<div class="detail-rule-intro"><span>共 ' + chapters.length + ' 章 · 按需展开阅读</span>' + btn('detail-expand-all', 'toggleAllBoardChapters', chapters.every(c => c.expanded) ? '收起全部' : '展开全部') + '</div>' : '') + chapters.map(viewBoardChapter).join('') + (!b.hasDetail ? '<div class="detail-empty">本板子暂无详细说明，以上为角色配置。</div>' : '') + '</section>';
     html += '</div></div></div>';
@@ -4921,8 +4925,8 @@ function roomListItems(rooms) {
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
       (state.page === 'table' && state.room?.phase === 'lobby' ? ' has-lobby-actions' : '') + (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
-      (['profile', 'badges', 'data-management'].includes(state.page) ? '' : viewBrand()) +
+      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (['profile', 'badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewErrorDialog() +
       viewActionDialog() +
@@ -4952,18 +4956,19 @@ function roomListItems(rooms) {
     clearingRules() { setState({ clearingRulesExpanded: !state.clearingRulesExpanded }); },
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
-    monthlyEdition: el => { if (['honors', 'fun'].includes(el.dataset.value)) setState({ monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
+    monthlyEdition: el => { if (['overall', 'honors', 'fun'].includes(el.dataset.value)) setState({ monthlyCategory: el.dataset.value, monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
+    monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
     monthlyShare: shareMonthlyReport,
     monthlyDownload: downloadMonthlyImage,
     openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,
-    badgeManage: () => { if (!state.badgeManagerLoading && !state.badgeManagerSaving) setState({ badgeManaging: !state.badgeManaging }); },
-    badgeFilter: el => { if (['all', 'owned', 'unowned'].includes(el.dataset.id)) { setState({ badgeFilter: el.dataset.id }); app.querySelector('.badge-filters .selected')?.focus({ preventScroll: true }); } },
     openBadgePicker: el => { if (!state.badgeManagerSaving && !state.badgeManagerLoading) setState({ badgePicker: 'add', badgePickerSlot: Number(el.dataset.slot) }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },
     openBadgeReplacement: () => { setState({ badgePicker: 'replace' }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },
     closeBadgePicker: () => { if (!state.badgeManagerSaving) setState({ badgePicker: '' }); },
     pickBadge: el => toggleOwnedBadge(el.dataset.id, el.dataset.replaceId, state.badgePicker === 'add' ? state.badgePickerSlot : undefined),
+    badgeManage: () => { if (!state.badgeManagerLoading && !state.badgeManagerSaving) setState({ badgeManaging: !state.badgeManaging }); },
+    badgeFilter: el => { if (['all', 'owned', 'unowned'].includes(el.dataset.id)) { setState({ badgeFilter: el.dataset.id }); app.querySelector('.badge-filters .selected')?.focus({ preventScroll: true }); } },
     showBadgeDetail: el => { if (state.badgeCollection && badgePresentation.catalogue.some(b => b.id === el.dataset.id)) { setState({ selectedBadgeId: el.dataset.id }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); } },
     closeBadgeDetail,
     badgeRules: () => confirm('荣誉徽章规则', badgePresentation.rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', false),

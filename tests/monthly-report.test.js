@@ -79,7 +79,7 @@ test("积分含当月调整及零分计分局，胜率荣誉门槛10局，按原
     assert.equal(wins.rows[1].rank, 2); assert.equal(wins.rows[2].rank, 3); assert.equal(wins.rows[1].tied, false);
   } finally { store.close(); }
 });
-test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜与娱乐榜隔离", () => {
+test("趣味榜仅使用已知机会，次数和比例分开，完整分享同时包含荣誉与娱乐榜", () => {
   const store = new Store(":memory:");
   try {
     const reports = new MonthlyReport(store);
@@ -103,8 +103,10 @@ test("趣味榜仅使用已知机会，次数和比例分开，精选正向榜�
     const standin=report.funBoards.find(board=>board.id==='good_shield:count');
     assert.equal(standin.title,'金牌替身');assert.equal(standin.rows[0].count,2);
     assert.ok(presentation.detailBoards(report,'count',false).some(board=>board.metric==='good_shield'));
-    const standard = JSON.stringify(cardRenderer.cards(response)), entertainment = JSON.stringify(cardRenderer.cards(response, true));
-    assert.doesNotMatch(standard, /歪刀/); assert.match(entertainment, /背锅侠/);
+    const shared = cardRenderer.cards(response);
+    assert.ok(shared[0].sections.some(section=>section.id==="good_shield"));
+    assert.match(JSON.stringify(shared), /背锅侠/);
+    assert.equal(shared[0].edition,undefined);
   } finally { store.close(); }
 });
 test("前三名保留超过100人的并列，生成单张长图，公开投影不携带原始数据", () => {
@@ -120,7 +122,7 @@ test("前三名保留超过100人的并列，生成单张长图，公开投影�
     assert.equal(pages.flatMap(page => page.sections).filter(section => section.title.startsWith("积分榜")).flatMap(section => section.rows).length, 105);
     assert.doesNotMatch(JSON.stringify(pages), /secret|should-not-export|uid|publicId|matches/);
     assert.match(cards.describe(pages[0]), /月度战报/); assert.deepEqual(cards.dimensions(pages[0]), cardRenderer.dimensions(pages[0]));
-    assert.deepEqual(cards.parseSelection({ kind: "monthly", month: "2026-09", edition: "fun" }), { kind: "monthly", month: "2026-09", edition: "fun" });
+    assert.deepEqual(cards.parseSelection({ kind: "monthly", month: "2026-09", edition: "fun" }), { kind: "monthly", month: "2026-09" });
     assert.throws(() => cards.parseSelection({ kind: "monthly", month: "2026-13" }), /无效/);
     assert.throws(() => cards.parseSelection({ kind: "monthly", month: "2026-09", edition: "raw" }), /无效/);
   } finally { store.close(); }

@@ -171,7 +171,7 @@ test('身份历程入口只在已揭示且发生变化时出现，旧身份仅�
   assert.ok(byHandler(tree, 'hideIdentityHistory'));
   assert.match(text, /旧视野|初始|当前/);
   assert.match(text, /刀8号/); assert.match(text, /刀9号/);
-  const card = nodes(tree).find(node => node.attr?.class === 'identity open');
+  const card = nodes(tree).find(node => node.attr?.class?.split(' ').includes('identity-compact'));
   assert.match(JSON.stringify(card), /技能记录/); assert.match(JSON.stringify(card), /刀8号/);
   const collapsed = JSON.stringify(renderTable({ ...data, identityHistoryExpandedId: null }));
   assert.match(collapsed, /刀9号/); assert.doesNotMatch(collapsed, /旧视野/);
@@ -2077,4 +2077,28 @@ test('趣味弹窗使用 B 主题区和规则明细，仅保留右上角关闭�
   assert.match(JSON.stringify(tree),/fun-info-hero|fun-info-rules/);
   assert.doesNotMatch(JSON.stringify(tree),/app-dialog-actions|app-dialog-confirm|知道了|关闭说明/);
   assert.ok(nodes(tree).some(n=>n.attr?.class==='fun-info-scroll'&&n.attr.scrollY));
+});
+
+test('紧凑身份信息在当前、发牌、新身份和旧身份中统一分区，遮盖后不渲染派生结果', () => {
+  const {presentIdentity}=require('../miniprogram/identity-vision');
+  const secret={role:'月下先知',faction:'好人阵营',factionTone:'good',portrait:'/assets/roles/prophet.png',information:'被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。 第3轮B牌坏人：无 8号查验结果：好人（第1轮）',skillStatus:{title:'被动视野'}};
+  secret.info=presentIdentity(secret);
+  const room={code:'123456',phase:'tools',capacity:12,me:{seat:1},players:[],team:[],history:[]};
+  const data={...base,room};
+  const scenarios=[
+    [{...data,revealed:true,secret},{...data,revealed:false,secret}],
+    [{...data,dealtIdentityDialog:true,dealtIdentitySecret:secret},{...data,dealtIdentityDialog:true,dealtIdentitySecret:null}],
+    [{...data,identityChange:secret,identityChangeRevealed:true},{...data,identityChange:secret,identityChangeRevealed:false}],
+  ];
+  for(const [shown,hidden] of scenarios){
+    const tree=renderTable(shown),text=JSON.stringify(tree);
+    assert.match(text,/角色视野/);assert.match(text,/存活 B 牌坏人/);assert.match(text,/仙女查验/);
+    assert.equal(nodes(tree).filter(n=>n.attr?.class==='identity-info-section identity-info-fairy').length,1);
+    assert.doesNotMatch(text,/（第1轮）|无 8号查验结果/);
+    assert.doesNotMatch(JSON.stringify(renderTable(hidden)),/月下先知|存活 B 牌坏人|仙女查验|prophet\.png/);
+  }
+  const old={...secret,id:0,current:false,detailAvailable:true,sinceLabel:'开局 · A牌'};
+  const historical={...data,revealed:true,secret:{role:'新身份',identityHistory:[{id:1,current:true,role:'新身份'},old]},identityHistoryOpen:true,identityHistoryExpandedId:0};
+  assert.match(JSON.stringify(renderTable(historical)),/存活 B 牌坏人/);
+  assert.doesNotMatch(JSON.stringify(renderTable({...historical,identityHistoryExpandedId:null})),/存活 B 牌坏人/);
 });

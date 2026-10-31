@@ -25,24 +25,26 @@ test("月报分类保留所有并列玩家与门槛，切换后分享版式和�
   assert.equal(p.data.report.mainBoards.find(b => b.id === "overall").threshold, 10);
   p.chooseCategory({ currentTarget: { dataset: { id: "honors" } } });
   assert.ok(p.data.detailBoards.every(board => board.positive && board.sort === "count"));
-  p.chooseCategory({ currentTarget: { dataset: { id: "fun" } } }); p.share(); assert.match(links.at(-1), /edition=fun/);
-  p.chooseCategory({ currentTarget: { dataset: { id: "overall" } } }); p.share(); assert.doesNotMatch(links.at(-1), /edition=fun/);
+  p.chooseCategory({ currentTarget: { dataset: { id: "fun" } } }); p.share(); assert.equal(links.at(-1), "/pages/share/share?kind=monthly&month=2026-09");
+  p.chooseCategory({ currentTarget: { dataset: { id: "overall" } } }); p.share(); assert.equal(links.at(-1), links[0]);
   p.openRules(); assert.equal(p.data.rulesExpanded, true); p.onHide(); assert.equal(p.data.rulesExpanded, false);
   assert.equal(p.data.report.funBoards.find(board => board.metric === "merlin_evade").portrait, "/assets/roles/merlin.png");
   assert.equal(JSON.stringify(response), original);
 });
-test("月报切换月份和回前台拒绝旧响应，失败能重试，娱乐分享保留所选月份", async () => {
+test("月报切换月份和回前台拒绝旧响应，失败能重试，各分类分享保留所选月份", async () => {
   const pending = [], urls = [], response = monthlyFixture(), links = [];
   const api = { login: async () => {}, request: url => { urls.push(url); return new Promise((resolve, reject) => pending.push({ resolve, reject })); } };
   const p = page("pages/monthly/monthly.js", api, { navigateTo: options => { links.push(options.url); options.complete(); } });
   p.onLoad({ month: "2026-09" });
   const first = p.onShow(); await tick();
   const second = p.load("2026-08"); await tick();
+  assert.equal(p.data.monthYear, "2026"); assert.equal(p.data.monthNumber, "8");
   pending[1].resolve({ ...response, month: "2026-08", ...{ periodStart: monthRange("2026-08").start, periodEnd: monthRange("2026-08").end } }); await second;
   pending[0].resolve(response); await first;
   assert.equal(p.data.report.month, "2026-08"); assert.equal(p.data.month, "2026-08");
+  assert.equal(p.data.monthNumber, "8");
   p.chooseEdition({ currentTarget: { dataset: { id: "fun" } } }); p.share();
-  assert.equal(links[0], "/pages/share/share?kind=monthly&month=2026-08&edition=fun");
+  assert.equal(links[0], "/pages/share/share?kind=monthly&month=2026-08");
   const failure = p.load(); await tick(); pending[2].reject(Object.assign(new Error("missing"), { status: 404 })); await failure;
   assert.match(p.data.error, /尚未开放/); p.share(); assert.equal(links.length, 1);
   const retry = p.retry(); await tick(); p.onHide(); pending[3].resolve(response); await retry;
@@ -67,10 +69,13 @@ test("月报分享页只读取月报，所有榜单生成一张长图，预览�
   const urls = [], sent = [], saved = [], previews = [], render = [];
   const api = { login: async () => {}, request: async url => { urls.push(url); return response; } };
   const p = page("pages/share/share.js", api, { showShareImageMenu: options => sent.push(options), saveImageToPhotosAlbum: options => saved.push(options), previewImage: options => previews.push(options) }, async (p, card) => { render.push(card); return "wxfile://monthly-long"; });
-  await p.onLoad({ kind: "monthly", month: "2026-09" }); await p.onReady();
+  await p.onLoad({ kind: "monthly", month: "2026-09", edition: "fun" }); await p.onReady();
   assert.deepEqual(urls, ["/api/monthly-report?month=2026-09"]); assert.equal(p.data.pageTitle, "分享月报");
   assert.equal(render.length, 1); assert.equal(render[0].sections[0].rows.length,26);
   assert.ok(render[0].sections.some(section=>section.type==="honor"));
+  assert.ok(render[0].sections.some(section=>section.id==="assassin_miss"));
+  assert.ok(render[0].sections.some(section=>section.id==="merlin_evade"));
+  assert.equal(render[0].title,"月度战报"); assert.equal(render[0].edition,undefined);
   assert.equal(p.data.imagePath, "wxfile://monthly-long"); p.send(); sent[0].complete(); p.save(); saved[0].complete(); p.preview();
   assert.equal(sent[0].path, "wxfile://monthly-long"); assert.equal(saved[0].filePath, "wxfile://monthly-long");
   assert.deepEqual(Array.from(previews[0].urls),["wxfile://monthly-long"]);
@@ -125,7 +130,7 @@ test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重�
   assert.ok(renderer.dimensions(pages[0]).height > 15000);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
-  assert.equal(pages[0].sections.filter(section=>section.showGroupTitle).length,1);
+  assert.equal(pages[0].sections.filter(section=>section.showGroupTitle).length,2);
   assert.equal(pages[0].sections.filter(section=>section.id==="merlin_evade").length,1);
   const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
@@ -149,7 +154,7 @@ test("原生月报等待本地背景与远程头像，头像失败仍绘制背�
   loaded.filter(image=>image!==background&&!image.path.endsWith(avatarPath)).forEach(image=>image.onload());
   background.onload();
   assert.equal(await rendering, "wxfile://monthly-artwork");
-  assert.equal(drawn.filter(image => image === background).length, 1);
+  assert.equal(drawn.filter(image => image === background).length, 2);
   assert.ok(labels.includes("北")); assert.equal(exported.destHeight, renderer.dimensions(card).height);
 });
 test("超长月报按比例控制原生画布尺寸，仍只导出一张包含末尾荣誉的 PNG", async () => {
@@ -165,6 +170,13 @@ test("超长月报按比例控制原生画布尺寸，仍只导出一张包含�
   assert.equal(await rendering,"wxfile://one-long-poster");
   assert.equal(exports.length,1);assert.equal(canvas.height,8192);assert.ok(canvas.width<1080);
   assert.equal(exports[0].destHeight,canvas.height);assert.equal(exports[0].destWidth,canvas.width);
+  // WeChat source crops are in the displayed 1080px canvas coordinate space,
+  // while the poster bitmap is narrower. Its right and bottom edges must survive.
+  const exported=exports[0],displayWidth=1080,displayHeight=1080;
+  const capturedWidth=exported.width===undefined?canvas.width:exported.width/displayWidth*canvas.width;
+  const capturedHeight=exported.height===undefined?canvas.height:exported.height/displayHeight*canvas.height;
+  assert.ok(capturedWidth>=canvas.width,"导出必须包含右侧成绩，不能用位图宽度裁切显示画布");
+  assert.ok(capturedHeight>=canvas.height,"导出必须包含末尾娱乐榜和页脚");
   assert.ok(scales[0][0]>0&&scales[0][0]<1);assert.equal(scales[0][0],scales[0][1]);
   assert.ok(labels.includes("并列玩家104"));assert.ok(labels.includes("绝对防御"));
 });

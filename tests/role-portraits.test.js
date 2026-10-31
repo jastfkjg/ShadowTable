@@ -41,3 +41,10 @@ test("角色资源均为有透明留白的紧凑PNG，缩略图不携带浅色�
   }
   assert.ok(total < 256 * 1024, "角色缩略图超过256KiB");
 });
+
+test('网页与小程序共享角色插画映射，浏览器加载不依赖 CommonJS', () => {
+  const vm=require('node:vm'),context={window:{}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../miniprogram/role-portraits'),'utf8'),context);
+  for(const [role,faction] of [['月下先知','good'],['石像鬼','evil'],['蓝盗贼','third'],['未来角色','unknown']])
+    assert.equal(JSON.stringify(context.window.shadowtableRolePortraits.portrait(role,faction)),JSON.stringify(portrait(role,faction)));
+});

@@ -5,8 +5,8 @@
 <h1 align="center">桌边助手 · ShadowTable</h1>
 
 <p align="center"><strong>线下讨论，线上发牌。</strong></p>
-<p align="center">为阿瓦隆聚会准备的桌游助手：私密身份、秘密投票、任务与技能结算，以及每一局之后的战绩与复盘。</p>
-<p align="center">微信小程序 / 网页版 · 5–13 人 · 6 类玩法 · Node.js + SQLite</p>
+<p align="center">为面对面阿瓦隆准备：私密发牌、秘密投票、任务与技能结算，<br>以及散场之后的战绩、复盘、荣誉与月度战报。</p>
+<p align="center">微信小程序 + 网页版 · 5–13 人 · 6 类玩法 · 可自部署</p>
 
 <p align="center">
   <a href="#快速上手">快速上手</a> ·
@@ -19,6 +19,8 @@
 
 ## 界面预览
 
+深蓝牌桌、蜡笔角色与暗金荣誉。点击图片可查看大图。
+
 <table>
   <tr>
     <th align="center">牌桌大厅</th>
@@ -26,13 +28,23 @@
     <th align="center">战绩统计</th>
   </tr>
   <tr>
-    <td width="33%"><img src="docs/images/preview-lobby.webp" alt="牌桌大厅：创建、加入与恢复最近的牌桌" width="260"></td>
-    <td width="33%"><img src="docs/images/preview-table.webp" alt="对局页面：座位、私密身份入口与任务结果" width="260"></td>
-    <td width="33%"><img src="docs/images/preview-stats.webp" alt="我的战绩：胜率、积分与角色图鉴" width="260"></td>
+    <td width="33%" align="center"><a href="docs/images/preview-lobby.webp"><img src="docs/images/preview-lobby.webp" alt="牌桌大厅：蜡笔品牌、创建与加入入口、最近的牌桌" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-table.webp"><img src="docs/images/preview-table.webp" alt="对局页面：座位、私密身份入口与公开操作记录" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-stats.webp"><img src="docs/images/preview-stats.webp" alt="战绩统计：胜率、月度积分、阵营表现与角色图鉴" width="260"></a></td>
+  </tr>
+  <tr>
+    <th align="center">对局复盘</th>
+    <th align="center">月度战报</th>
+    <th align="center">荣誉收藏</th>
+  </tr>
+  <tr>
+    <td width="33%" align="center"><a href="docs/images/preview-replay.webp"><img src="docs/images/preview-replay.webp" alt="对局复盘：全局与我的视角、分轮过程和身份轨迹" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-monthly.webp"><img src="docs/images/preview-monthly.webp" alt="月度战报：月份选择、有效对局与参赛人数、综合榜单" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-badges.webp"><img src="docs/images/preview-badges.webp" alt="荣誉收藏：已佩戴徽章、收藏筛选与徽章获取条件" width="260"></a></td>
   </tr>
 </table>
 
-预览使用当前小程序 WXML / WXSS 模板与示例数据生成，微信原生组件的实际表现以真机为准。
+预览由当前小程序 WXML / WXSS 模板与示例数据生成；微信原生组件的实际表现以开发者工具和真机为准。
 
 ## 快速上手
 
@@ -45,7 +57,7 @@
 1. **组一桌**：房主选择人数与板子，朋友通过邀请或 6 位房间码加入。
 2. **入座发牌**：选择座位并准备；满座且全员准备后，房主发牌，每人在自己的手机上查看身份与初始视野。
 3. **面对面玩**：线下讨论，房主按现场进度发起投票、任务或技能；提交收齐后自动结算。
-4. **结算再开**：线下完成最终盘刀，由房主登记结果或选择“不计战绩”；同一牌桌可以重新准备，再开一局。
+4. **结算再开**：线下完成最终盘刀，由房主登记结果或选择“不计战绩”；同桌重新准备即可再开，个人战绩与复盘在“我的”查看。
 
 准备阶段可换座或站起围观；满座、游戏进行中及本局结束后，新成员均可加入旁观，重开后再手动入座。切换牌桌或返回大厅会保留当前座位。
 
@@ -53,17 +65,18 @@
 
 ## 功能亮点
 
-| 场景                 | 可以做什么                                                                                                           |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **私密身份与视野**   | 主动揭示身份、初始互认与技能视野；小程序进入后台后遮盖私密内容，房主也不能查询全员身份或秘密提交。                   |
-| **投票、任务与技能** | 按需发起操作，查看提交进度，收齐后自动结算；任务支持选择队员与失败票门槛，十二骑士支持同时技能、换牌与复活。         |
-| **多人多桌**         | 邀请好友、旁观、换座、房主转交、同房重开；恢复牌桌、个人备注与左滑管理让多桌切换更方便。                             |
-| **战绩与复盘**       | 按时间、板子、角色和胜负筛选对局；按阵营与角色查看统计，回看分轮过程、初始／最终身份及身份变化轨迹。                 |
-| **积分与荣誉**       | 月度积分、明细流水、排行榜、趣味记录、MVP / SVP 票选与 18 枚月榜荣誉徽章；月度战报与排行榜成绩可生成分享图片。       |
-| **个人资料与回避卡** | 160 款内置头像，可选开启自定义上传；发牌前用回避卡选择不想抽到的角色，实际避开才扣卡，支持管理员发放与累计胜负奖励。 |
-| **开发与自部署**     | 原生微信小程序、网页版玩家入口、本地陪测面板和可选管理平台，共用单体 Node.js 服务与 SQLite。                         |
+| 场景 | 可以做什么 |
+| --- | --- |
+| **私密身份与视野** | 本人主动揭示身份、初始互认与技能视野；小程序进入后台后遮盖私密内容，房主也不能查询全员身份或秘密提交。 |
+| **投票、任务与技能** | 按现场节奏发起操作，查看提交进度，收齐后自动结算；选择任务队员与失败票门槛，十二骑士支持同时技能、换牌与复活。 |
+| **多人多桌** | 邀请好友、旁观、换座、房主转交与同房重开；最近牌桌、个人备注、左滑管理和历史牌桌方便聚会时切换。 |
+| **战绩与复盘** | 组合筛选时间、板子、角色、胜负、计分与趣味条件；按阵营和角色查看统计，回看分轮过程与身份变化轨迹。 |
+| **积分与排行榜** | 月度积分、明细流水、公开榜单、趣味记录与 MVP / SVP 票选；查看本人上榜进度，生成排行榜成绩分享图。 |
+| **荣誉与月报** | 18 枚月榜徽章与 5 枚永久内测纪念徽章，最多佩戴 3 枚；月报分综合榜单、趣味荣誉和娱乐榜，可导出完整分享长图。 |
+| **个人资料与回避卡** | 160 款内置头像，可选开启自定义上传；发牌前选择不想抽到的角色，实际避开才扣卡，支持管理员发放与累计胜负奖励。 |
+| **个人数据管理** | 按月预览并清除本人的战绩、积分与趣味统计贡献，榜单同步重算；已发永久徽章、回避卡及同桌玩家记录保留。 |
 
-详细使用方式、战绩统计口径与隐私约定见 [玩家指南](docs/player-guide.md)。
+小程序和网页版共用 Node.js + SQLite 服务，配有本地陪测面板和可选管理平台。详细操作、统计口径与隐私约定见 [玩家指南](docs/player-guide.md)。
 
 ## 支持的玩法
 
@@ -86,14 +99,14 @@
 
 ### 1. 启动服务
 
-需要 **Node.js ≥ 22.13.0** 和 npm。项目使用内置 `node:sqlite`，生产镜像使用 Node 24；无需 Redis 或消息队列。
+需要 **Node.js ≥ 22.13.0** 和 npm。项目使用内置 `node:sqlite`，生产镜像使用 Node 24，无需另装数据库、Redis 或消息队列。
 
 ```sh
 npm ci
 npm run dev
 ```
 
-默认数据库为 `data/shadowtable.sqlite`。开发命令同时启用开发登录、本地陪测和网页版：
+默认监听 `127.0.0.1:8787`，数据库保存在 `data/shadowtable.sqlite`。`npm run dev` 同时启用开发登录、本地陪测和网页版，首次启动即可体验：
 
 | 入口     | 地址                           | 用途                                     |
 | -------- | ------------------------------ | ---------------------------------------- |
@@ -134,6 +147,22 @@ npm run check    # 主要服务端与客户端脚本语法检查
 ```
 
 CI 还会检查部署脚本与容器流程；自动化覆盖及需要真机验收的范围见 [验证记录](docs/verification.md)。
+
+<details>
+<summary>生成页面预览</summary>
+
+安装依赖后，使用现有脚本从小程序模板生成静态 HTML：
+
+```sh
+node scripts/render-core-pages-preview.js  # 大厅、牌桌与复盘
+node scripts/render-stats-preview.js       # 个人战绩与趣味记录
+node scripts/render-monthly-preview.js     # 月报页面与分享长图
+node scripts/render-badges-preview.js      # 荣誉收藏与玩家战绩卡
+```
+
+产物位于 `output/playwright/`，仅用于布局检查。README 预览图统一使用 390 × 844 的视口，以 2 倍分辨率保存为 WebP，存放于 `docs/images/`。静态预览不连接真实牌桌，也不代替微信原生交互验收。
+
+</details>
 
 ### 目录结构
 
@@ -178,7 +207,7 @@ NODE_ENV=production DEV_AUTH=0 DEV_PANEL=0 PORT=8787 npm start
 3. **发布小程序**：配置自己的 AppID、HTTPS `baseUrl` 和 request 合法域名，将客户端 `devAuth` 设为 `false`，AppSecret 仅保留在服务端。
 4. **验收客户端**：检查登录、发牌与结算；在微信开发者工具确认主包／分包体积。资料编辑页及 160 张头像位于普通分包，资源已纳入服务端镜像。
 
-服务内置每日本机在线备份与数据保留策略；自动清理要求最近 48 小时内存在已校验备份，历史战绩、积分和进行中牌局保留。管理平台支持房间管理、正式陪测、战绩更正、积分与回避卡管理及操作审计。详见 [维护说明](docs/operations.md)。
+服务内置每日本机在线备份与数据保留策略；自动清理要求最近 48 小时内存在已校验备份，历史战绩、积分和进行中牌局保留。玩家主动按月清除个人记录的范围见 [数据管理说明](docs/player-guide.md#按月清除个人战绩)。管理平台支持房间管理、正式陪测、战绩更正、积分与回避卡管理及操作审计。详见 [维护说明](docs/operations.md)。
 
 ## 项目文档
 
@@ -187,8 +216,9 @@ NODE_ENV=production DEV_AUTH=0 DEV_PANEL=0 PORT=8787 npm start
 | 牌桌操作、旁观、个人资料与隐私 | [玩家指南](docs/player-guide.md)                                                                            |
 | 角色配置、技能与扩展板规则     | [规则说明](docs/rules.md) · [待确认项](docs/rule-questions.md) · [规则原文](docs/sources/custom-boards.txt) |
 | 计分条件、月度积分与后台更正   | [积分系统](docs/scoring.md)                                                                                 |
-| 趣味指标、票选与荣誉徽章       | [趣味记录](docs/fun-records.md) · [月榜荣誉徽章](docs/honor-badges.md)                                      |
+| 趣味指标、票选、月榜与永久徽章 | [趣味记录](docs/fun-records.md) · [荣誉徽章](docs/honor-badges.md)                                          |
 | 月度统计与分享长图             | [月度战报](docs/monthly-report.md)                                                                          |
+| 按月清除本人的战绩与统计       | [个人数据管理](docs/player-guide.md#按月清除个人战绩)                                                       |
 | 网页与小程序使用同一账号       | [扫码登录说明](docs/web-login.md)                                                                           |
 | 开启自定义头像与审核           | [自定义头像](docs/avatar-uploads.md)                                                                        |
 | 服务结构、数据模型与接口       | [架构与协议](docs/architecture.md)                                                                          |

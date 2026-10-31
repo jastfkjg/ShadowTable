@@ -136,8 +136,9 @@ function parseSelection(options) {
   }
   if (options.kind === "stats") return { kind: "stats" };
   if (options.kind === "funSummary") return { kind: "funSummary" };
+  // Old entertainment links now open the same complete monthly report.
   if (options.kind === "monthly" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") && [undefined, "fun"].includes(options.edition))
-    return { kind: "monthly", month: options.month, ...(options.edition ? { edition: options.edition } : {}) };
+    return { kind: "monthly", month: options.month };
   if (options.kind === "fun" && /^(classic|knights|other|voted):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };
   if (options.kind !== "leaderboard" || !(options.metric === "points" ? ["all", "month", "day"] : ["all", "month"]).includes(options.period) ||

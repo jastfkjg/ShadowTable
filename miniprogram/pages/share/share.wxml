@@ -6,13 +6,13 @@
 <view class="{{monthly?'monthly-share-shell':''}}">
 <app-nav title="{{pageTitle || '分享成绩'}}" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page share-page {{monthly?'monthly-share-page':''}}">
-  <view wx:if="{{monthly && imagePath}}" class="share-preview-heading"><text>高清长图</text><text>上下滑动查看全图</text></view>
+  <view wx:if="{{monthly && imagePath}}" class="share-preview-heading"><text>完整长图</text><button class="share-zoom-hint" bindtap="preview" aria-label="放大查看完整月报" hover-class="none"><image src="/assets/share-zoom.svg" aria-hidden="true" /><text>点图放大</text></button></view>
   <scroll-view wx:if="{{monthly}}" class="share-scroll" scroll-y="{{true}}"><template is="share-content" data="{{loading,rendering,imagePath,error,description,acting}}" /></scroll-view>
   <template wx:else is="share-content" data="{{loading,rendering,imagePath,error,description,acting}}" />
   <view class="share-footer">
   <view class="share-actions">
-    <button wx:if="{{imageMenu}}" class="share-send" bindtap="send" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{!connectionVisible && (loading || rendering || (!imagePath && !error))}}" hover-class="none">{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'发给好友'}}</button>
-    <button class="share-save {{imageMenu?'':'share-save-primary'}}" bindtap="save" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{!connectionVisible && (loading || rendering || (!imagePath && !error))}}" hover-class="none">{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'保存图片'}}</button>
+    <button wx:if="{{imageMenu}}" class="share-send" bindtap="send" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{!connectionVisible && (loading || rendering || (!imagePath && !error))}}" hover-class="none"><image wx:if="{{monthly && imagePath && !loading && !rendering}}" class="share-action-icon" src="/assets/share-send-dark.svg" aria-hidden="true" />{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'发给好友'}}</button>
+    <button class="share-save {{imageMenu?'':'share-save-primary'}}" bindtap="save" disabled="{{!imagePath || loading || rendering || acting}}" loading="{{!connectionVisible && (loading || rendering || (!imagePath && !error))}}" hover-class="none"><image wx:if="{{monthly && imagePath && !loading && !rendering}}" class="share-action-icon" src="{{imageMenu?'/assets/share-save.svg':'/assets/share-save-dark.svg'}}" aria-hidden="true" />{{loading?'正在读取…':rendering || (!imagePath && !error)?'正在生成…':'保存图片'}}</button>
   </view>
   <view wx:if="{{!imageMenu}}" class="share-notice">当前微信可先保存图片，再到聊天或朋友圈发送。</view>
   <view wx:if="{{actionError}}" class="share-action-error" role="alert">{{actionError}}<button hover-class="none" wx:if="{{albumDenied}}" bindtap="openAlbumSettings">打开相册权限设置</button></view>

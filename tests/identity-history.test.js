@@ -162,7 +162,7 @@ test("十二骑士11/12/13人局保存多次身份变化，倒序回看且只向
     assert.equal(first[0].current, true);
     assert.equal(first[0].sinceLabel, "第1轮 · 换牌");
     assert.equal(first[1].initial, true);
-    assert.match(first[1].information, /可刀刀客或B角色一次/);
+    assert.match(first[1].information, /有一次开刀机会/);
     assert.equal(first[1].skillStatus, undefined);
     assert.equal(first[1].action, undefined);
     skills(room, { p3: "target:2" });
@@ -172,7 +172,7 @@ test("十二骑士11/12/13人局保存多次身份变化，倒序回看且只向
     assert.deepEqual(view.identityHistory[2], first[1]);
     assert.deepEqual(privateView(JSON.parse(JSON.stringify(room)), "p2").identityHistory, view.identityHistory);
     for (const player of room.players) {
-      assert.doesNotMatch(JSON.stringify(publicView(room, player.uid)), /identityHistory|identitySince|可刀刀客或B角色一次/);
+      assert.doesNotMatch(JSON.stringify(publicView(room, player.uid)), /identityHistory|identitySince|有一次开刀机会/);
       if (player.uid !== "p2") assert.equal(privateView(room, player.uid).identityHistory.length, 1);
     }
     assert.throws(() => privateView(room, "spectator"), /围观玩家没有身份/);

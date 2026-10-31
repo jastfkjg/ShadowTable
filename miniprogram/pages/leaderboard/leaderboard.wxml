@@ -73,7 +73,21 @@
   </view>
 </view>
 <view wx:if="{{rulesExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop" catchtap="toggleRules" catchtouchmove="blockScroll">
-  <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则"><view class="rank-sheet-handle" aria-hidden="true"></view><view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close" bindtap="toggleRules" hover-class="none">关闭</button></view><scroll-view scroll-y class="rank-rules-body"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.periodLabel}}</view><view wx:for="{{board.ruleLines}}" wx:key="*this" class="rank-rule-line">{{item}}</view></scroll-view></view>
+  <view class="rank-sheet rank-rules-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="榜单规则">
+    <view class="rank-sheet-handle" aria-hidden="true"></view>
+    <view class="rank-sheet-header"><view class="rank-sheet-title">榜单规则</view><button class="rank-sheet-close rank-rules-close" bindtap="toggleRules" aria-label="关闭榜单规则" hover-class="rank-pressed"><view class="rank-close-icon" aria-hidden="true"></view></button></view>
+    <view class="rank-rules-scope"><view class="rank-rules-metric">{{board.valueHeading}} · {{board.periodLabel}}</view><text class="rank-rules-timezone">北京时间</text></view>
+    <scroll-view scroll-y class="rank-rules-body" enhanced show-scrollbar="{{false}}">
+      <view class="rank-rules-period"><image class="rank-rules-calendar" src="/assets/record-calendar.svg" aria-hidden="true" /><view class="rank-rules-period-copy"><view class="rank-rules-period-title">{{board.ruleSummary.title}}</view><view wx:for="{{board.ruleSummary.lines}}" wx:key="*this" class="rank-rules-period-line">{{item}}</view></view></view>
+      <view wx:for="{{board.ruleSections}}" wx:key="id" class="rank-rule-section">
+        <view class="rank-rule-heading"><text class="rank-rule-number" aria-hidden="true">{{item.number}}</text><view class="rank-rule-title">{{item.title}}</view></view>
+        <view wx:if="{{item.main.length}}" class="rank-rule-main"><text wx:for="{{item.main}}" wx:for-item="part" wx:key="text" class="{{part.emphasis?'rank-rule-emphasis':''}}">{{part.text}}</text></view>
+        <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="rank-rule-line">{{line}}</view>
+        <view wx:if="{{item.note}}" class="rank-rule-note"><image src="/assets/record-info.svg" aria-hidden="true" /><text>{{item.note}}</text></view>
+      </view>
+    </scroll-view>
+    <view class="rank-rules-footer"><button class="rank-confirm" bindtap="toggleRules" hover-class="rank-pressed">我知道了</button></view>
+  </view>
 </view>
 <view wx:if="{{mineExpanded && board}}" class="dialog-backdrop rank-sheet-backdrop rank-details-backdrop" catchtap="toggleMine" catchtouchmove="blockScroll">
   <view class="rank-sheet rank-details-dialog" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="我的排名与公开设置">

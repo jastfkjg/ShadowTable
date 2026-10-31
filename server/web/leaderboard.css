@@ -100,9 +100,34 @@ button.fun-metric-option.selected { border-color: rgba(229,198,139,.5); backgrou
 .rank-sheet-footer { flex-shrink: 0; padding: 10px 16px 12px; border-top: 0.5px solid var(--rank-line); }
 .rank-sheet-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
 button.rank-confirm { min-height: 48px; width: 100%; margin: 0; padding: 8px; background: var(--accent); color: var(--bg); font-size: 14px; font-weight: 600; }
-.rank-rules-body { box-sizing: border-box; height: 44vh; min-height: 0; padding: 10px 16px 16px; }
-.rank-rules-metric { font-size: 14px; color: var(--accent); margin-bottom: 10px; }
-.rank-rule-line { color: var(--muted); font-size: 13px; line-height: 1.8; margin-bottom: 10px; }
+.rank-rules-sheet { border-radius: 28px 28px 0 0; }
+.rank-rules-sheet .rank-sheet-handle { width: 40px; height: 4px; margin: 12px auto; }
+.rank-rules-sheet .rank-sheet-header { padding: 0 24px; }
+.rank-rules-sheet .rank-sheet-title { font-size: 24px; line-height: 36px; }
+button.rank-rules-close { width: 44px; min-width: 44px; min-height: 44px; height: 44px; padding: 0; margin: 0 -7px 0 0; border-radius: 50%; }
+.rank-rules-scope { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; margin-bottom: 20px; padding: 0 24px; }
+.rank-rules-metric { min-width: 0; color: var(--accent); font-size: 13px; line-height: 22px; }
+.rank-rules-timezone { flex-shrink: 0; color: var(--muted); font-size: 12px; line-height: 22px; }
+.rank-rules-body { flex: 0 1 auto; box-sizing: border-box; height: auto; min-height: 0; max-height: calc(90vh - 195px - env(safe-area-inset-bottom)); padding: 0 24px; overflow-x: hidden; }
+.rank-rules-period { display: flex; align-items: flex-start; gap: 12px; padding: 15px 16px 16px; border: 1px solid rgba(229,198,139,.13); border-radius: 14px; background: rgba(229,198,139,.065); }
+.rank-rules-calendar { flex-shrink: 0; width: 22px; height: 22px; margin-top: 2px; }
+.rank-rules-period-copy { flex: 1; min-width: 0; }
+.rank-rules-period-title { color: var(--accent); font-size: 16px; font-weight: 600; line-height: 25px; }
+.rank-rules-period-line { color: var(--muted); font-size: 12px; line-height: 21px; }
+.rank-rules-period-title + .rank-rules-period-line { margin-top: 5px; }
+.rank-rule-section { padding: 21px 0 19px; border-bottom: 1px solid var(--rank-line); }
+.rank-rule-section:last-child { border-bottom: 0; padding-bottom: 2px; }
+.rank-rule-heading { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 9px; }
+.rank-rule-number { color: var(--accent); font-size: 11px; font-weight: 500; line-height: 20px; font-variant-numeric: tabular-nums; }
+.rank-rule-title { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; }
+.rank-rule-main { font-size: 15px; line-height: 25px; }
+.rank-rule-emphasis { font-weight: 600; }
+.rank-rule-line { color: var(--muted); font-size: 14px; line-height: 24px; }
+.rank-rule-main + .rank-rule-line { margin-top: 3px; }
+.rank-rule-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 9px; color: var(--muted); font-size: 12px; line-height: 20px; }
+.rank-rule-note img { flex-shrink: 0; width: 14px; height: 14px; margin-top: 3px; }
+.rank-rules-footer { flex-shrink: 0; padding: 21px 24px 16px; }
+.rank-rules-footer button.rank-confirm { border-radius: 13px; font-size: 16px; }
 .rank-details-dialog { border-radius: 28px 28px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 .rank-details-dialog .rank-sheet-handle { width: 48px; height: 4px; margin: 12px auto 10px; }
 .rank-details-dialog .rank-sheet-header { padding: 0 24px 20px; }
@@ -196,3 +221,11 @@ button.rank-details-close { width: 44px; min-width: 44px; min-height: 44px; heig
 .rank-sheet button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 html:has(.rank-sheet-backdrop) { overflow: hidden; }
 @media (max-height: 500px) { .rank-mine { left: auto; transform: none; max-width: none; } .rank-sheet { max-height: 96dvh; } }
+
+@media (max-height: 500px) {
+  .rank-rules-sheet .rank-sheet-header, .rank-rules-scope { padding-left: 16px; padding-right: 16px; }
+  .rank-rules-sheet .rank-sheet-title { font-size: 20px; }
+  .rank-rules-scope { margin-bottom: 12px; }
+  .rank-rules-body { max-height: calc(96dvh - 186px - env(safe-area-inset-bottom)); }
+  .rank-rules-footer { padding: 12px 16px; }
+}

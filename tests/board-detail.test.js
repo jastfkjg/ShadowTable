@@ -363,9 +363,12 @@ test("/api/boards 提供13人入口、三忠臣及本人数示例，其余规则
         assert.deepEqual(section.items.slice(1), base.detail.sections[i].items.slice(1));
       } else if (section.kind === "roles") {
         const expected = structuredClone(base.detail.sections[i]);
-        for (const role of expected.items)
-          if (/^(蓝|红)猎人$/.test(role.name))
-            role.text = role.text.replace("12 号邻座为 1 号与 11 号", "13 号邻座为 1 号与 12 号");
+        for (const role of expected.items) {
+          if (!/^(蓝|红)猎人$/.test(role.name)) continue;
+          role.text = role.text.replace("12 号邻座为 1 号与 11 号", "13 号邻座为 1 号与 12 号");
+          for (const fact of role.facts)
+            fact.text = fact.text.replace("12 号邻座为 1 号与 11 号", "13 号邻座为 1 号与 12 号");
+        }
         assert.deepEqual(section, expected);
       } else if (section.title === "湖中仙女") {
         assert.match(section.items[0], /^13 人局默认开启/);

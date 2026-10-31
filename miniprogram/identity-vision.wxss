@@ -22,3 +22,63 @@
 .dealt-identity-dialog .dealt-web-role-heading { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0 12px; text-align: left; }
 .dealt-identity-dialog .dealt-web-role-heading .identity-title { margin: 0; font-size: 21px; line-height: 1.35; }
 .dealt-identity-dialog .dealt-web-role-heading .muted { font-size: 12px; }
+
+/* Shared compact identity information, used by current, dealt and past cards. */
+.identity-information { min-width: 0; text-align: left; white-space: normal; font-weight: 400; }
+.identity-info-section { padding: 12px 0; min-width: 0; }
+.identity-info-section + .identity-info-section { border-top: 1px solid rgba(177,191,198,.16); }
+.identity-info-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 7px; color: var(--muted); font-size: 13px; font-weight: 500; line-height: 1.6; }
+.identity-info-meta { flex-shrink: 0; padding: 1px 6px; border-radius: 5px; background: var(--control-bg, #14232c); font-size: 11px; font-weight: 400; }
+.identity-info-result { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 16px; line-height: 1.6; }
+.identity-info-value { min-width: 0; font-size: 17px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.identity-info-note, .identity-info-caption { color: var(--muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.identity-info-note { margin-top: 5px; }
+.identity-info-caption { margin-bottom: 7px; }
+.identity-info-text { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.identity-info-inline { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.identity-info-inline .identity-info-heading, .identity-info-fairy .identity-info-heading { margin: 0; flex-shrink: 0; }
+.identity-info-inline .identity-info-text { font-size: 14px; }
+.identity-info-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.identity-info-players.is-wide { grid-template-columns: minmax(0, 1fr); }
+.identity-info-player { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 9px; border-radius: 8px; background: var(--control-bg, #14232c); }
+.identity-info-seat { flex-shrink: 0; font-size: 20px; font-weight: 600; line-height: 1.4; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.identity-info-unit { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.identity-info-player-copy { min-width: 0; flex: 1; }
+.identity-info-name { display: block; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.identity-info-role { display: block; margin-top: 1px; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.identity-info-player .vision-player-avatar { width: 26px; height: 26px; font-size: 13px; }
+.identity-info-fairy, .identity-info-fairy-result { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.identity-info-fairy-result { min-width: 0; flex-wrap: wrap; justify-content: flex-end; gap: 4px 14px; }
+.identity-info-inspection + .identity-info-inspection { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(177,191,198,.13); }
+.identity-info-record-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.identity-info-record-label > text:last-child, .identity-info-record-label > span:last-child { text-align: right; }
+.identity-info-inspection-result { min-width: 0; font-size: 15px; text-align: right; overflow-wrap: anywhere; }
+.identity-info-ability { display: flex; align-items: baseline; gap: 10px; font-size: 15px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.identity-info-ability + .identity-info-ability { margin-top: 7px; }
+.identity-info-ability > text:last-child, .identity-info-ability > span:last-child { min-width: 0; }
+.identity-info-ability-label { flex-shrink: 0; font-size: 14px; font-weight: 600; }
+.identity-info-brief { margin-bottom: 12px; font-size: 15px; line-height: 1.65; color: var(--text); }
+.identity-info-ability.structured { display: block; font-size: 14px; line-height: 1.65; }
+.identity-info-ability.structured + .identity-info-ability { margin-top: 10px; }
+.compact-skill-status { box-sizing: border-box; min-width: 0; margin-top: 1px; padding: 9px 11px; border-radius: 11px; background: var(--control-bg, #14232c); text-align: left; }
+.compact-skill-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 20px; font-size: 13px; line-height: 1.6; }
+.compact-skill-heading image, .compact-skill-heading img { width: 16px; height: 16px; flex-shrink: 0; }
+.compact-skill-label { color: var(--muted); }
+.compact-skill-value { margin-left: auto; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.identity.open.identity-compact { margin: 16px 0; padding: 4px 16px 14px; border: 0; border-radius: 21px; background: var(--surface); text-align: left; }
+.identity-compact .identity-information { border-top: 1px solid rgba(177,191,198,.16); }
+.compact-privacy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.compact-privacy-note { display: flex; flex-shrink: 0; align-items: center; gap: 5px; white-space: nowrap; }
+.compact-privacy-note image, .compact-privacy-note img { width: 14px; height: 14px; flex-shrink: 0; }
+.identity-compact button.compact-hide { flex: 0 0 auto; width: auto; min-height: 44px; margin: 0; padding: 0; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; border: 0; }
+.compact-role-heading { display: flex; align-items: center; gap: 10px; padding: 4px 0 13px; }
+.compact-role-art { display: block; width: 49px; height: 54px; object-fit: contain; flex-shrink: 0; }
+.compact-role-copy { flex: 1; min-width: 0; }
+.compact-role-title { font-size: 21px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.compact-faction { display: block; margin-top: 2px; font-size: 12px; line-height: 1.6; }
+button.identity-history-entry.compact-history-entry { flex-shrink: 0; width: auto; min-height: 44px; margin: 0; padding: 0; gap: 4px; font-size: 12px; line-height: 1.6; }
+.compact-history-entry .identity-history-icon { width: 14px; height: 14px; }
+.compact-outcome { margin: -3px 0 10px; font-size: 13px; text-align: right; }
+.compact-hide:not([disabled]):active, .compact-history-entry:not([disabled]):active { opacity: .65; }
+.compact-hide:focus-visible, .compact-history-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 359px) { .compact-role-heading { gap: 8px; } .compact-role-title { font-size: 20px; } .identity-info-player { gap: 6px; padding: 8px; } }

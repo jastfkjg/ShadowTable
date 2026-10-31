@@ -134,7 +134,7 @@ test("静态资源同源托管：HTML 与 CSP、Content-Type、未知路径落�
     (await a.raw("/app.js")).headers["content-type"],
     /javascript/,
   );
-  for (const [path, type] of [["/room-confirmation.js", /javascript/], ["/room-confirmation.css", /text\/css/]]) {
+  for (const [path, type] of [["/room-confirmation.js", /javascript/], ["/room-confirmation.css", /text\/css/], ["/role-portraits.js", /javascript/], ["/identity-vision.js", /javascript/], ["/identity-vision.css", /text\/css/]]) {
     const asset = await a.raw(path);
     assert.equal(asset.status, 200);
     assert.match(asset.headers["content-type"], type);
@@ -144,6 +144,11 @@ test("静态资源同源托管：HTML 与 CSP、Content-Type、未知路径落�
     (await a.raw("/icon.svg")).headers["content-type"],
     /image\/svg\+xml/,
   );
+  for (const path of ["/assets/table-lock.svg", "/assets/record-spark.svg", "/assets/roles/prophet.png"]) {
+    const asset = await a.raw(path);
+    assert.equal(asset.status, 200);
+    assert.match(asset.headers["content-type"], /image\//);
+  }
   assert.equal((await a.raw("/nope.js")).status, 401);
   assert.equal((await a.raw("/style.css", {})).status, 401);
 });

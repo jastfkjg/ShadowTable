@@ -678,35 +678,6 @@ function privateIdentity(room, uid) {
     else if (["assassin", "mordred", "morgana"].includes(role))
       information = `初始见面匪：${namedInitialAllies(["assassin", "mordred", "morgana"])}。`;
 
-    const skillDescription = {
-      blueGuard: "秘密守护一人，免疫一次出局才消耗。",
-      gargoyle: "抽到时随机查验一名在场玩家；每轮可查验一人是否拥有主动击杀能力，不获知具体身份。",
-      witch: "秘密指定替死者；替死者能被守护，不触发被动开枪。指定圣骑士替死时，圣骑士本轮反伤仍结算并直接出局。",
-      magician:
-        "秘密交换两个号码，本轮技能按换号结算；交换号码参与实际结算即消耗技能，不会连带出局。",
-      paladin:
-        "被动反伤：本轮以刀、决斗、枪击杀你的玩家全部反伤出局，你正常存活；触发后的后续技能环节失去技能。不能反伤红女巫，替女巫出局时本轮反伤仍正常结算。",
-      blueKnight: "决斗坏人，刀错自己出局；莫德雷德视为好人。",
-      redKnight: "决斗好人，刀错自己出局；莫德雷德视为好人。",
-      blueAwakened: "可击杀任意一人一次。",
-      redAwakened: "可击杀任意一人一次。",
-      blueHunter: "主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动枪。",
-      redHunter: "主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动枪。",
-      prophet:
-        "被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。",
-    }[role];
-    if (skillDescription) information += " " + skillDescription;
-    else if (
-      [
-        "gareth",
-        "gaheris",
-        "blueLancelot",
-        "redLancelot",
-        "redSwordsman",
-        "assassin",
-      ].includes(role)
-    )
-      information += " 可刀刀客或B角色一次；刀错不出局，仍消耗技能。";
     if (role === "gargoyle") {
       const history = knights.gargoyleHistory(state);
       const partialHistory = history.some((result) => result.number === null);
@@ -719,13 +690,14 @@ function privateIdentity(room, uid) {
       }
     }
     if (role === "prophet") {
-      information = skillDescription;
+      information = "";
       if (state.nightInfo) information += ` ${state.nightInfo}`;
       else information += " 等待技能结算后自动更新。";
     }
   }
   const fairyResult = fairy.result(room, uid);
   if (fairyResult?.fairyInfo) information += ` ${fairyResult.fairyInfo}`;
+  if (room.knights) information += require("./knight-role-help").identityHelp(role, room.capacity);
   return {
     game: room.game,
     stage: room.stage,

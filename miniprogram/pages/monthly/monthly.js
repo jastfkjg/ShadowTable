@@ -2,14 +2,16 @@ const api = require("../../api");
 const monthly = require("../../monthly-report");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const { backToMe } = require("../../profile");
+const monthHeading = month => ({ monthYear: month.slice(0, 4), monthNumber: String(Number(month.slice(5))) });
 Page({
-  data: { ...initialPlayerCardData, month: "", maxMonth: monthly.monthAt(), minMonth: "2000-01", report: null, loading: true, error: "", category: "overall", entertainment: false, detailBoards: [], shareOpening: false, rulesExpanded: false, navTop: 64 },
+  data: { ...initialPlayerCardData, month: "", monthYear: "", monthNumber: "", maxMonth: monthly.monthAt(), minMonth: "2000-01", report: null, loading: true, error: "", category: "overall", entertainment: false, detailBoards: [], shareOpening: false, rulesExpanded: false, navTop: 64 },
   ...playerCardMethods(api),
   onLoad(options = {}) {
     this.alive = true; this.foreground = true;
     const info = wx.getWindowInfo?.() || wx.getSystemInfoSync?.() || {}, status = info.statusBarHeight || 20, menu = wx.getMenuButtonBoundingClientRect?.();
     const gap = menu && menu.top > status ? menu.top - status : 6;
-    this.setData({ month: /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") ? options.month : monthly.monthAt(), navTop: status + (menu?.height ? menu.height + gap * 2 : 44) });
+    const month = /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") ? options.month : monthly.monthAt();
+    this.setData({ month, ...monthHeading(month), navTop: status + (menu?.height ? menu.height + gap * 2 : 44) });
   },
   onShow() { this.foreground = true; return this.load(); },
   onHide() { this.foreground = false; this.closePlayerCard(); this.closeRules(); },
@@ -18,7 +20,7 @@ Page({
   async load(month = this.data.month) {
     this.closePlayerCard();
     const sequence = this.sequence = (this.sequence || 0) + 1;
-    this.setData({ month, loading: true, error: "", rulesExpanded: false,
+    this.setData({ month, ...monthHeading(month), loading: true, error: "", rulesExpanded: false,
       ...(this.data.report?.month === month ? {} : { report: null, detailBoards: [] }) });
     try {
       await api.login();
@@ -51,7 +53,7 @@ Page({
   share() {
     if (!this.data.report?.canShare || this.data.loading || this.data.error || this.data.shareOpening) return;
     this.setData({ shareOpening: true });
-    wx.navigateTo({ url: "/pages/share/share?kind=monthly&month=" + this.data.report.month + (this.data.entertainment ? "&edition=fun" : ""),
+    wx.navigateTo({ url: "/pages/share/share?kind=monthly&month=" + this.data.report.month,
       fail: () => { if (this.alive) wx.showToast({ title: "分享页暂时无法打开，请重试", icon: "none" }); },
       complete: () => { if (this.alive) this.setData({ shareOpening: false }); } });
   },

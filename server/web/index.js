@@ -22,6 +22,7 @@ const assets = {
   "/": ["index.html", "text/html; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/identity-vision.js": ["../../miniprogram/identity-vision.js", "text/javascript; charset=utf-8"],
+  "/role-portraits.js": ["../../miniprogram/role-portraits.js", "text/javascript; charset=utf-8"],
   "/identity-vision.css": ["../../miniprogram/identity-vision.wxss", "text/css; charset=utf-8"],
   "/avoidance.js": ["../../miniprogram/avoidance.js", "text/javascript; charset=utf-8"],
   "/avoidance.css": ["../../miniprogram/avoidance.wxss", "text/css; charset=utf-8"],
@@ -55,7 +56,7 @@ const assets = {
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-table-blue", "home-refresh", "home-clock", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "record-more", "share-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];

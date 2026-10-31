@@ -32,6 +32,9 @@
     石像鬼: ["方式", "视野"],
   };
   function roleDetails(role) {
+    if (Array.isArray(role.facts)) return {
+      facts: role.facts, exception: role.exception || "", exceptionTitle: role.exceptionTitle || "注意",
+    };
     const sentences =
       String(role.text || "").match(/[^。！？]+[。！？]?/g) || [];
     const facts = [],
@@ -141,7 +144,7 @@
             groupId,
             groupLabel: label,
             type:
-              roleTypes[role.name] ||
+              role.type || roleTypes[role.name] ||
               (/刀客|刺客/.test(role.name) ? "主动 · 攻击" : role.meta || ""),
             brief:
               role.brief ||
@@ -191,7 +194,7 @@
         ? "A 牌初始身份 · B 牌复活身份"
         : "",
       roleHint: groups.some((group) => group.id.startsWith("b-"))
-        ? "新抽 B 牌从下一轮技能环节启用"
+        ? "新抽 B 牌的行动从下一轮开始，自动效果见角色说明"
         : "点角色展开完整说明",
       defaultTab: hasRoles ? "roles" : "rules",
       roleConfiguration,

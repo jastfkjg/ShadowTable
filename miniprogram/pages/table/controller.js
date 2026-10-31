@@ -985,7 +985,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!privacyChanged && this.data.dealtIdentitySecret) {
       const vision = roomSheet.presentVision(this.data.dealtIdentitySecret.information, seats);
       if (JSON.stringify(vision) !== JSON.stringify(this.data.dealtIdentitySecret.vision))
-        identityProfileUpdate.dealtIdentitySecret = { ...this.data.dealtIdentitySecret, vision };
+        identityProfileUpdate.dealtIdentitySecret = { ...this.data.dealtIdentitySecret, vision,
+          info: roomSheet.presentIdentityInformation(this.data.dealtIdentitySecret, seats) };
+    }
+    if (!privacyChanged && this.data.secret) {
+      const info = roomSheet.presentIdentityInformation(this.data.secret, seats);
+      if (JSON.stringify(info) !== JSON.stringify(this.data.secret.info))
+        identityProfileUpdate.secret = { ...this.data.secret, info };
     }
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
@@ -1130,7 +1136,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const seats = this.data.seats.map(s => s.avatarUrl === url ? { ...s, avatarFailed: true } : s);
     const secret = this.data.dealtIdentitySecret;
     this.setData({ seats, ...(secret ? { dealtIdentitySecret: { ...secret,
-      vision: roomSheet.presentVision(secret.information, seats) } } : {}) });
+      vision: roomSheet.presentVision(secret.information, seats),
+      info: roomSheet.presentIdentityInformation(secret, seats) } } : {}) });
   },
   filterRooms(e) {
     const filter = e.currentTarget.dataset.filter;
@@ -2411,6 +2418,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
             faction: secret.faction,
             factionTone: factionTone(secret.faction),
             information: secret.information,
+            info: roomSheet.presentIdentityInformation(secret, this.data.seats),
             skillStatus: secret.skillStatus,
             avoidance: avoidancePresentation.result(secret.avoidance),
           },
@@ -2473,6 +2481,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information, skillStatus: secret.skillStatus,
+        info: roomSheet.presentIdentityInformation(secret, this.data.seats),
         vision: roomSheet.presentVision(secret.information, this.data.seats),
         avoidance: avoidancePresentation.result(secret.avoidance),
       } });
@@ -2533,8 +2542,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         secret.factionTone = factionTone(secret.faction);
         secret.avoidance = avoidancePresentation.result(secret.avoidance);
         secret.portrait = portrait(secret.role, secret.factionTone).portrait;
+        secret.info = roomSheet.presentIdentityInformation(secret, this.data.seats);
         secret.identityHistory = (secret.identityHistory || []).map(record => ({
           ...record, factionTone: factionTone(record.faction), portrait: portrait(record.role, factionTone(record.faction)).portrait,
+          info: record.detailAvailable ? roomSheet.presentIdentityInformation(record) : null,
         }));
         this.rememberDealtIdentity();
         this.setData({
@@ -2647,7 +2658,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.closeAction();
         secret.factionTone = factionTone(secret.faction);
         this.setProcessData({
-          identityChange: roomSheet.presentPrivateIdentity(secret, secret.factionTone),
+          identityChange: roomSheet.presentPrivateIdentity(secret, secret.factionTone, this.data.seats),
           identityChangeRevealed: false,
           revealed: false,
           secret: null,

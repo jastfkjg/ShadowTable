@@ -36,7 +36,7 @@ Page({
       const [profile, result] = await Promise.all([kind === "monthly" ? Promise.resolve(null) : api.request("/api/me/profile"), kind === "monthly" ? api.request("/api/monthly-report?month=" + encodeURIComponent(query.month)) : kind === "leaderboard" ? readLeaderboard(query) : api.request("/api/me/stats")]);
       if (!this.alive || sequence !== this.sequence) return;
       const now = Date.now();
-      this.card = kind === "monthly" ? monthlyCards.cards(result, query.edition === "fun")[0] : kind === "leaderboard" ? cards.leaderboardCard(profile, result)
+      this.card = kind === "monthly" ? monthlyCards.cards(result)[0] : kind === "leaderboard" ? cards.leaderboardCard(profile, result)
         : kind === "stats" ? cards.statsCard(profile, result, now) : kind === "funSummary" ? cards.funSummaryCard(profile, result, now) : cards.funCard(profile, result, query.card, query.metric, now);
       this.setData({ description: cards.describe(this.card) });
     } catch (error) { if (this.alive && sequence === this.sequence) this.setData({ error: error.message }); }

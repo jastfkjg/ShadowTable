@@ -1,3 +1,7 @@
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.shadowtableRolePortraits = factory();
+})(typeof window !== "undefined" ? window : this, function () {
 // Role art is shared by archetype; the full recorded role and faction stay visible.
 const portraits = {
   "梅林": "merlin", "派西维尔": "percival", "派西": "percival",
@@ -27,4 +31,5 @@ function portrait(role, faction) {
     factionLabel: factionLabels[faction] || factionLabels.unknown,
   };
 }
-module.exports = { portrait };
+return { portrait };
+});

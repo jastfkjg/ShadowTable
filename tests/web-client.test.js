@@ -37,6 +37,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableBoardDetail = require('../miniprogram/board-detail');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   context.window.shadowtableIdentityVision = require('../miniprogram/identity-vision');
+  context.window.shadowtableRolePortraits = require('../miniprogram/role-portraits');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
@@ -2139,7 +2140,7 @@ test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背�
   c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
 });
 
-test('网页月报默认完整展示且不重复榜单，荣誉使用头像明细并隐藏空榜', () => {
+test('网页月报分类保留完整榜单，切换后统一分享入口并隐藏空榜', () => {
   const report = require('../tests/helpers/monthly-fixtures').monthlyFixture();
   report.mainBoards[1].rows = [];
   report.funBoards.filter(board => board.metric === 'assassin_hit').forEach(board => { board.rows = []; });
@@ -2151,11 +2152,23 @@ test('网页月报默认完整展示且不重复榜单，荣誉使用头像明�
   assert.doesNotMatch(html, /好人胜率榜|坏人胜率榜|战绩榜|职业刺客|暂无满足|<img src=x/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(html, /查看完整月报|收起完整月报|monthly-honor-row/);
-  assert.equal((html.match(/class="monthly-board" aria-label="闪身步大神"/g) || []).length, 1);
   assert.match(html, /monthly-avatar/);
-  assert.match(html, /成功率 80% · 10 次机会/);
   assert.match(html, /桌边常驻王/);
   assert.match(html, /生成月报分享图/);
+  assert.doesNotMatch(html, /class="monthly-board" aria-label="闪身步大神"/);
+  c.ACTIONS.monthlyEdition({ dataset: { value: 'honors' } });
+  const honors = c.viewMonthlyReport();
+  assert.equal((honors.match(/class="monthly-board" aria-label="闪身步大神"/g) || []).length, 1);
+  assert.match(honors, /成功率 80% · 10 次机会/);
+  assert.doesNotMatch(honors, /class="monthly-board" aria-label="积分榜"/);
+  c.ACTIONS.monthlyEdition({ dataset: { value: 'fun' } });
+  assert.match(c.viewMonthlyReport(), /背锅侠/);
+  assert.match(c.viewMonthlyReport(), /生成月报分享图/);
+  assert.doesNotMatch(c.viewMonthlyReport(), /生成娱乐版/);
+  assert.equal(c.state.monthlyEntertainment, true);
+  c.ACTIONS.monthlyEdition({ dataset: { value: 'overall' } });
+  assert.equal(c.state.monthlyEntertainment, false);
+  assert.match(c.viewMonthlyReport(), /class="monthly-board" aria-label="积分榜"/);
   for (const board of [...report.mainBoards, ...report.funBoards]) board.rows = [];
   c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
   const empty = c.viewMonthlyReport();
@@ -2170,9 +2183,13 @@ test('网页月报只导出一张完整长图，预览和下载无分页入口',
   c.document.createElement=tag=>tag==='canvas'?{getContext:()=>ctx,toDataURL(){rendered.push({width:this.width,height:this.height});return 'data:image/png;base64,long-poster';}}:{click(){downloads.push({href:this.href,name:this.download});},remove(){}};
   c.document.body={appendChild(){}};
   Object.assign(c.state,{page:'monthly',monthlyMonth:report.month,monthlyReport:require('../miniprogram/monthly-report').presentReport(report)});
-  await c.ACTIONS.monthlyShare();
-  assert.equal(c.state.monthlyError,'');assert.equal(rendered.length,1);assert.ok(rendered[0].height>1920);
-  assert.equal(c.state.monthlyImages.length,1);assert.ok(labels.includes('绝对防御'));
+  for(const category of ['overall','honors','fun']) {
+    c.ACTIONS.monthlyEdition({dataset:{value:category}});labels.length=0;
+    const before=rendered.length;await c.ACTIONS.monthlyShare();
+    assert.equal(c.state.monthlyError,'');assert.equal(rendered.length,before+1);assert.ok(rendered.at(-1).height>1920);
+    assert.equal(c.state.monthlyImages.length,1);assert.ok(labels.includes('绝对防御'));assert.ok(labels.includes('背锅侠'));
+    assert.doesNotMatch(labels.join(''),/娱乐版/);
+  }
   assert.doesNotMatch(c.viewMonthlyReport(),/上一张|下一张|自动分图|第1张/);
   assert.match(c.viewMonthlyReport(),/保存长图/);
   c.ACTIONS.monthlyDownload();assert.deepEqual(downloads,[{href:'data:image/png;base64,long-poster',name:'桌边助手-月度战报-2026-09.png'}]);
@@ -2469,4 +2486,21 @@ test('网页规则按角色和结局展示基础积分及额外奖励，兼容�
   c.state.scoringRules = null; c.state.scoringError = '计分规则暂未加载，请重试。';
   html = c.viewScoreRules(); assert.match(html, /role="alert"/); assert.match(html, /loadScoreRules/);
   assert.doesNotMatch(html, /正在读取/);
+});
+
+test('网页所有身份展示使用分区结果，轮次括号仅在展示中移除，遮盖清空', () => {
+  const c=client(async()=>{throw new Error('不应请求');});
+  const secret={role:'月下先知',faction:'好人阵营',factionTone:'good',information:'被动视野：每轮技能结束后自动更新存活B牌坏人座位，可随时在此查看。 第3轮B牌坏人：无 8号查验结果：好人（第1轮）',skillStatus:{title:'被动视野'}};
+  c.state.room=dealtWebRoom();c.state.secret=secret;c.state.revealed=true;
+  const html=c.viewRoom();
+  assert.match(html,/identity-compact/);assert.match(html,/存活 B 牌坏人/);assert.match(html,/仙女查验/);
+  assert.doesNotMatch(html,/（第1轮）|无 8号查验结果/);
+  assert.match(secret.information,/（第1轮）/);
+  c.state.dealtIdentityDialog=true;c.state.dealtIdentitySecret=secret;
+  assert.match(c.viewDealtIdentity(),/identity-info-fairy/);
+  assert.doesNotMatch(c.viewDealtIdentity(),/（第1轮）/);
+  c.state.dealtIdentityDialog=false;c.state.dealtIdentitySecret=null;
+  c.ACTIONS.reveal();
+  assert.equal(c.state.secret,null);
+  assert.doesNotMatch(c.viewRoom(),/月下先知|存活 B 牌坏人|仙女查验/);
 });
