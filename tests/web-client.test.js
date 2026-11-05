@@ -38,6 +38,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   context.window.shadowtableIdentityVision = require('../miniprogram/identity-vision');
   context.window.shadowtableRolePortraits = require('../miniprogram/role-portraits');
+  context.window.shadowtableRoomSheets = require('../miniprogram/room-sheet-presentation');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
@@ -779,14 +780,14 @@ test("网页座位昵称转义且轮询更新人数和准备统计", async () =>
   assert.equal(c.state.seatReadyCount, 1);
   assert.match(c.viewRoom(), /class="seat-name">完整昵称&lt;甲&gt;/);
   assert.doesNotMatch(c.viewRoom(), /秘密角色|玩家名单|关闭名单/);
-  assert.match(c.viewRoom(), /已准备 1\/2/);
+  assert.match(c.viewRoom(), /2\/13 人入座 · 1 人已准备/);
   room.players[0].ready = true;
   room.players[1].seat = 4;
   room.players[1].name = "更新后的完整昵称";
   await c.refresh();
   assert.equal(c.state.seatReadyCount, 2);
   assert.match(c.viewRoom(), /aria-label="4号，更新后的完整昵称/);
-  assert.match(c.viewRoom(), /已准备 2\/2/);
+  assert.match(c.viewRoom(), /2\/13 人入座 · 2 人已准备/);
   assert.equal(writes, 0);
 });
 test("网页房主进度可展开收起，刷新保留状态，新操作默认收起", async () => {
@@ -910,8 +911,8 @@ test("网页座位头像失败回退且轮询不重试，换座跟随玩家，�
   room.phase = "lobby";
   room.players[0].ready = true;
   await c.refresh();
-  assert.match(c.viewRoom(), /class="seat-status seat-ready">已准备<\/span>/);
-  assert.match(c.viewRoom(), /class="seat-empty-label">点击入座<\/span>/);
+  assert.match(c.viewRoom(), /class="seat-ready-badge" aria-hidden="true"/);
+  assert.match(c.viewRoom(), /class="seat-empty-label">入座<\/span>/);
 });
 test("网页首次提醒无需秘密请求，主动揭示后关闭并清空，刷新不重弹且重开再提醒", async () => {
   let room = dealtWebRoom(), reads = 0;
@@ -1166,7 +1167,6 @@ test("网页围观不显示准备或私密身份，自己的座位可点击站�
   c.state.room = publicView(r, "host");
   c.state.seats = [{ seat: 1, name: "房主", mine: true, occupied: true }];
   let html = c.viewRoom();
-  assert.match(html, /点自己站起/);
   assert.match(html, /data-action="seat" data-seat="1" aria-label="[^"]*" aria-description="点击站起围观">/);
   command(r, "host", { type: "stand", stage: r.stage });
   c.state.room = publicView(r, "host");
@@ -1945,13 +1945,14 @@ test('个人页隐藏回避卡和趣味预览，昵称仍转义动态文字，�
   assert.doesNotMatch(html, /&lt;span|<img src=x/);
   assert.match(html, /&lt;img src=x onerror=attack\(\)&gt;昵称/);
   assert.doesNotMatch(html, /&gt;战报/);
-  const overview = html.slice(html.indexOf('<div class="me-overview">'), html.indexOf('<div class="personal-links'));
+  const overview = html.slice(html.indexOf('<div class="me-overview">'), html.indexOf('<section class="personal-links'));
   const controls = [...overview.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
-  assert.equal(controls.length, 3);
+  assert.equal(controls.length, 4);
   assert.ok(controls.every(([, , content]) => !content.includes('<button')));
   assert.match(controls[0][1], /data-action="navigate" data-page="stats"/);
-  assert.match(controls[1][1], /data-action="scoreRecords"/);
-  assert.match(controls[2][1], /data-action="navigate" data-page="help"/);
+  assert.match(controls[1][1], /data-action="navigate" data-page="stats"/);
+  assert.match(controls[2][1], /data-action="scoreRecords"/);
+  assert.match(controls[3][1], /data-action="scoreRecords"/);
   await c.applyRoute('#/leaderboard');
   assert.doesNotMatch(c.viewLeaderboard(), /role="switch"/);
   c.ACTIONS.rankToggleMine();

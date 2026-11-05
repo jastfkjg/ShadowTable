@@ -233,7 +233,8 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
     assert.equal(image.headers['content-type'], 'image/jpeg');
     assert.deepEqual(image.bytes, readFileSync(join(__dirname, '../miniprogram', item.path)));
   }
-  for (const path of ['/assets/avatars/avatar-99.jpg', '/assets/edit.svg', '/miniprogram/builtin-avatars.js', '/toString'])
+  assert.match((await a.raw('/assets/edit.svg')).headers['content-type'], /image\/svg\+xml/);
+  for (const path of ['/assets/avatars/avatar-99.jpg', '/assets/home-create.svg', '/miniprogram/builtin-avatars.js', '/toString'])
     assert.equal((await a.raw(path)).status, 401);
   assert.equal((await a.raw(builtinAvatars[0].path, {})).status, 401);
   const disabled = await setup(t);

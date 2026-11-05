@@ -34,5 +34,13 @@
   function cleanupNotice(removed) {
     return removed ? "已移除 " + removed + " 个失效房间" : "牌桌状态已更新，暂无需要清理的失效房间";
   }
-  return { activity, availableRooms, present, cleanupNotice, HISTORY_AFTER };
+  function currentRoom(rooms) {
+    const active = rooms.filter(row => /^\d{6}$/.test(row.code || "") && row.available !== false && row.isMember !== false && ["playing", "lobby"].includes(row.status));
+    active.sort((a, b) => Number(b.status === "playing") - Number(a.status === "playing") || Number(b.seat != null) - Number(a.seat != null) || (b.lastEnteredAt || b.updatedAt || 0) - (a.lastEnteredAt || a.updatedAt || 0));
+    const room = active[0];
+    return room ? { ...room, statusLabel: room.status === "playing" ? "进行中" : "待开局",
+      boardLabel: (room.boardName || "阿瓦隆").replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
+      relationLabel: room.seat != null ? "我在 " + room.seat + " 号" : room.isHost ? "我是房主" : "旁观中" } : null;
+  }
+  return { activity, availableRooms, present, cleanupNotice, currentRoom, HISTORY_AFTER };
 });

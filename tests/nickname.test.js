@@ -230,11 +230,12 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   const source = readFileSync(resolve(__dirname, '../server/web/app.js'), 'utf8');
   context.window.shadowtableRoomSwipe = require('../miniprogram/room-swipe');
   context.window.shadowtableRoomList = require('../miniprogram/room-list');
+  context.window.shadowtableRoomSheets = require('../miniprogram/room-sheet-presentation');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
-    window.test = { state, applyRoute, ACTIONS, viewEntry };
+    window.test = { state, applyRoute, ACTIONS, viewEntrySheet, submitEntry };
   })();`, context);
   return { ...context.window.test, fields, storage };
 }
@@ -254,14 +255,20 @@ test('网页与小程序使用相同的首次确认规则，重试不重复保�
   }, storage);
   await client.applyRoute('#/lobby'); client.state.loading = false;
   assert.equal(client.state.name, '已填过的本桌名');
-  assert.match(client.viewEntry(), /确认昵称并加入房间/);
-  client.fields.nickname.value = '首次确认名'; client.ACTIONS.join(); await webIdle(client);
+  assert.equal(client.viewEntrySheet(), '');
+  client.ACTIONS.switchEntry({ dataset: { mode: 'join' } });
+  assert.match(client.viewEntrySheet(), /确认昵称并加入房间/);
+  client.fields.nickname.value = '首次确认名'; client.submitEntry(); await webIdle(client);
   await client.ACTIONS.retry();
   assert.deepEqual(posts[0], posts[1]); assert.equal(posts[0].body.profileVersion, 1);
   assert.equal(client.state.profile.nickname, '首次确认名');
   await client.applyRoute('#/lobby');
-  assert.doesNotMatch(client.viewEntry(), /确认昵称并加入房间/);
+  assert.equal(client.viewEntrySheet(), '');
   assert.equal(client.state.name, '首次确认名');
-  client.fields.nickname.value = '本桌化名'; client.ACTIONS.create(); await webIdle(client);
+  client.state.availableBoards = [];
+  client.state.capacities = [6];
+  client.ACTIONS.switchEntry({ dataset: { mode: 'create' } });
+  assert.doesNotMatch(client.viewEntrySheet(), /确认昵称并创建/);
+  client.fields.nickname.value = '本桌化名'; client.submitEntry(); await webIdle(client);
   assert.equal(posts.at(-1).body.confirmNickname, undefined); assert.equal(profile.nickname, '首次确认名');
 });

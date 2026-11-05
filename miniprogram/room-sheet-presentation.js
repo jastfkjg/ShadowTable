@@ -1,5 +1,8 @@
-const { portrait } = require("./role-portraits");
-const identityVision = require("./identity-vision");
+(function (root, factory) {
+  if (typeof module === "object" && module.exports)
+    module.exports = factory(require("./role-portraits"), require("./identity-vision"));
+  else root.shadowtableRoomSheets = factory(root.shadowtableRolePortraits, root.shadowtableIdentityVision);
+})(typeof window === "undefined" ? this : window, function ({ portrait }, identityVision) {
 
 function shortBoardName(name) {
   return String(name || "").trim().replace(/^阿瓦隆\s*·\s*/, "").replace(/\s*[（(]\s*\d+\s*人\s*[）)]\s*$/, "").trim();
@@ -59,4 +62,5 @@ function presentFairyResult(result) {
   return { ...result, displaySeat: match ? Number(match[1]) : null,
     displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
 }
-module.exports = { shortBoardName, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present, presentIdentityInformation: identityVision.presentIdentity };
+return { shortBoardName, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present, presentIdentityInformation: identityVision.presentIdentity };
+});

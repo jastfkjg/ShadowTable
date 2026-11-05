@@ -4,14 +4,7 @@ const api = require("../../api");
 const { presentProfile, presentStats } = require("../../profile");
 const { selectTab } = require("../../tab-navigation");
 const { presentMonthlyReset } = require("../../monthly-reset");
-function currentRoom(rooms) {
-  const active = rooms.filter(row => /^\d{6}$/.test(row.code || "") && row.available !== false && row.isMember !== false && ["playing", "lobby"].includes(row.status));
-  active.sort((a, b) => Number(b.status === "playing") - Number(a.status === "playing") || Number(b.seat != null) - Number(a.seat != null) || (b.lastEnteredAt || b.updatedAt || 0) - (a.lastEnteredAt || a.updatedAt || 0));
-  const room = active[0];
-  return room ? { ...room, statusLabel: room.status === "playing" ? "进行中" : "待开局",
-    boardLabel: (room.boardName || "阿瓦隆").replace(/^阿瓦隆\s*·\s*/, "").replace(/（\d+人）$/, ""),
-    relationLabel: room.seat != null ? "我在 " + room.seat + " 号" : room.isHost ? "我是房主" : "旁观中" } : null;
-}
+const { currentRoom } = require("../../room-list");
 module.exports = function createMePage() { return {
   data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "" },
   onLoad() { this.alive = true; },

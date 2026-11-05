@@ -5,6 +5,15 @@ const builtinAvatars = require("../../miniprogram/builtin-avatars");
 const { avatarStyles } = require("../../miniprogram/avatar-library");
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+const webTags = { view: "div", text: "span", image: "img", navigator: "button", "scroll-view": "div" };
+function webStyles(content) {
+  return content.toString()
+    // Web loads the shared dependencies through its own asset links.
+    .replace(/^@import[^\n]*\n/gm, "")
+    .replace(/(^|[\s>+~,])(view|text|image|navigator|scroll-view)(?=[\s.:#\[>+~,{])/gm,
+      (_, before, tag) => before + webTags[tag])
+    .replace(/(-?\d*\.?\d+)rpx\b/g, (_, value) => Number(value) / 2 + "px");
+}
 const assets = {
   "/about.js": ["../../miniprogram/about.js", "text/javascript; charset=utf-8"],
   "/about.css": ["../../miniprogram/about.wxss", "text/css; charset=utf-8"],
@@ -23,6 +32,11 @@ const assets = {
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/identity-vision.js": ["../../miniprogram/identity-vision.js", "text/javascript; charset=utf-8"],
   "/role-portraits.js": ["../../miniprogram/role-portraits.js", "text/javascript; charset=utf-8"],
+  "/room-sheets.js": ["../../miniprogram/room-sheet-presentation.js", "text/javascript; charset=utf-8"],
+  "/home.css": ["../../miniprogram/pages/home/home.wxss", "text/css; charset=utf-8"],
+  "/room-sheets.css": ["../../miniprogram/pages/home/room-sheets.wxss", "text/css; charset=utf-8"],
+  "/me.css": ["../../miniprogram/pages/me/me.wxss", "text/css; charset=utf-8"],
+  "/app-shell.css": ["app-shell.css", "text/css; charset=utf-8"],
   "/identity-vision.css": ["../../miniprogram/identity-vision.wxss", "text/css; charset=utf-8"],
   "/avoidance.js": ["../../miniprogram/avoidance.js", "text/javascript; charset=utf-8"],
   "/avoidance.css": ["../../miniprogram/avoidance.wxss", "text/css; charset=utf-8"],
@@ -58,6 +72,10 @@ for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "lau
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
 for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "record-more", "share-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
+for (const name of ["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"])
+  assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
+for (const name of ["home-wordmark", "tab-table", "tab-table-active", "tab-me", "tab-me-active"])
+  assets["/assets/" + name + ".png"] = ["../../miniprogram/assets/" + name + ".png", "image/png"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const role of ["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"])
@@ -76,7 +94,8 @@ function serve(req, res, path) {
   let content = asset[0] === null
     ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0]));
-  if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + ({ view: "div", text: "span", image: "img" })[tag]);
+  if (["/home.css", "/room-sheets.css", "/me.css"].includes(path)) content = webStyles(content);
+  if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + webTags[tag]);
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
   res.setHeader("X-Frame-Options", "DENY");

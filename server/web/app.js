@@ -19,6 +19,7 @@
   const avoidancePresentation = window.shadowtableAvoidance;
   const identityVision = window.shadowtableIdentityVision;
   const rolePortraits = window.shadowtableRolePortraits;
+  const roomSheets = window.shadowtableRoomSheets;
 
   // ===== DOM =====
   var app = document.getElementById("app");
@@ -597,7 +598,9 @@
     boards: [],
     availableBoards: [],
     entryMode: "join",
-    showRules: false,
+    entrySheet: false,
+    entryError: "",
+    homeWordmarkFailed: false,
     showRoomRules: false,
     showBoardDetails: false,
     boardDetail: null,
@@ -713,6 +716,7 @@
     if (table) return { page: 'table', code: table[1] };
     const parts = (hash || '').split('?'), query = new URLSearchParams(parts[1] || '');
     if (parts[0] === '#/matches') return { page: 'matches', scored: query.get('scored') === '1', fun: query.get('fun') ? { metric: query.get('fun'), mode: query.get('mode') || 'classic', role: query.get('role') || '' } : null };
+    if (parts[0] === '#/help') return { page: 'help', fromLobby: query.get('from') === 'lobby' };
     if (parts[0] === '#/stats') return { page: 'stats', tab: query.get('tab') === 'fun' ? 'fun' : 'records' };
     if (parts[0] === '#/monthly') return { page: 'monthly', month: query.get('month') || monthlyPresentation.monthAt() };
     var name = (hash || '').replace(/^#\//, '');
@@ -742,8 +746,8 @@
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
     if(route.page==='matches'){scoreAdjustmentRecords=[];scoreAdjustmentTotal=0;scoreAdjustmentMore=false;scoreAdjustmentError='';}
-    setState({ page: route.page, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
-      ...(route.code ? { code: route.code } : {}), error: '', notice: '', showRoomSettings: false, showRoomRules: false,
+    setState({ page: route.page, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+      ...(route.code ? { code: route.code } : {}), error: '', notice: '', entrySheet: false, entryError: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', badgePicker: '', badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
@@ -768,7 +772,7 @@
       } else if (route.page === 'lobby') {
         await Promise.all([loadRooms(), loadProfile()]);
         if (!state.nameEdited) setState({ name: (!needsNicknameSetup() ? state.profile?.nickname : '') || storage.get('nickname') || '' });
-      } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats()]);
+      } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats(), loadRooms().catch(() => {})]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
       else if (route.page === 'leaderboard') await loadLeaderboard();
@@ -876,14 +880,11 @@
       setState({ profileError: e.message, profileConflict: e.status === 409 });
     } finally { setState({ profileSaving: false }); }
   }
-  function navIcon(name) {
-    const paths = name === 'table' ? '<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h12v14h-2M9 10h6m-6 5h4"/>' : '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>';
-    return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
-  }
   function viewNavigation() {
-    if (!['lobby','me'].includes(state.page)) return '';
-    return '<nav class="bottom-navigation" aria-label="主导航">' + [['lobby','对局','table'],['me','我的','me']].map(function (item) {
-      return '<button type="button" data-action="navigate" data-page="' + item[0] + '" class="nav-destination ' + (state.page === item[0] ? 'active' : '') + '"' + (state.page === item[0] ? ' aria-current="page"' : '') + '>' + navIcon(item[2]) + '<span>' + item[1] + '</span></button>';
+    if (!['lobby','me'].includes(state.page) || state.entrySheet) return '';
+    return '<nav class="bottom-navigation" aria-label="主导航">' + [['lobby','对局','table'],['me','我的','me']].map(([page, label, icon]) => {
+      const active = state.page === page;
+      return `<button type="button" data-action="navigate" data-page="${page}" class="nav-destination${active ? ' active' : ''}"${active ? ' aria-current="page"' : ''}><img class="nav-icon" src="/assets/tab-${icon}${active ? '-active' : ''}.png" alt="" /><span>${label}</span></button>`;
     }).join('') + '</nav>';
   }
   function avatarView(url, nickname, large = false) {
@@ -919,18 +920,42 @@
   }
   function viewMe() {
     const profile = state.profile, stats = state.stats;
-    let html = '<div class="me-overview-page">' + personalTitle('我的','',false) + viewProfileError();
-    if (!profile) return html + (state.profileLoading ? '<div class="status" role="status">正在读取个人资料…</div>' : '') + '</div>';
-    html += '<div class="profile-hero">' + avatarView(profile.avatarUrl,profile.nickname) + '<div class="profile-identity"><div class="profile-name">' + esc(profile.nickname || '新朋友') + '</div></div>' + btn('profile-edit','navigate','编辑',{page:'profile'}) + '</div>';
+    let html = viewProfileError();
+    if (!profile) return html + (state.profileLoading ? '<div class="status" role="status">正在读取个人资料…</div>' : '');
+    html += `<button type="button" class="me-profile" data-action="navigate" data-page="profile" aria-label="编辑资料，头像和昵称"><span class="me-profile-main">${avatarView(profile.avatarUrl, profile.nickname)}<span class="profile-identity"><span class="profile-name">${esc(profile.nickname || '新朋友')}</span><span class="me-profile-caption">编辑资料<span class="me-chevron" aria-hidden="true"></span></span></span></span></button>`;
     if (profile.identityType === 'guest') html += '<div class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</div>';
+    const metric = (value, label, compact = false) => `<span class="me-metric"><span class="metric-value${compact ? ' me-value-compact' : ''}">${esc(value ?? '—')}</span><span class="small muted">${label}</span></span>`;
+    const chevron = '<span class="me-chevron" aria-hidden="true"></span>';
+    const points = stats?.score?.total;
+    html += `<div class="me-overview">
+      <div class="me-overview-heading"><div class="me-overview-title"><span class="me-icon me-icon-stats" aria-hidden="true"></span>我的战绩</div><button type="button" class="me-results-detail" data-action="navigate" data-page="stats"><span class="me-overview-action">查看战绩${chevron}</span></button></div>
+      <div class="me-overview-metrics">
+        <button type="button" class="me-results" data-action="navigate" data-page="stats" aria-label="查看详细战绩统计"><span class="personal-metrics">${metric(stats?.total, '总局数', stats?.total >= 10000)}${metric(stats?.winRate == null ? '—' : stats.winRate + '%', '胜率')}</span></button>
+        <div class="me-points"><button type="button" class="me-points-link" data-action="scoreRecords" aria-label="查看积分明细">${metric(points, '积分', points >= 10000 || points <= -1000)}</button></div>
+      </div>
+      <div class="me-overview-note"><span>${state.statsError ? '战绩暂未载入' : stats ? esc(stats.wins + ' 胜 · ' + (stats.losses ?? stats.total - stats.wins) + ' 负') : '战绩读取中…'}</span><button type="button" class="me-score-detail" data-action="scoreRecords">积分明细${chevron}</button></div>
+    </div>`;
+    if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
+
+    const current = roomList.currentRoom(state.memberRooms);
+    if (current) {
+      html += `<button type="button" class="me-current-room" data-action="openRoom" data-code="${esc(current.code)}" aria-label="${esc('返回牌桌，房间' + current.code + '，' + current.statusLabel + '，' + current.relationLabel)}"${state.busy || pending ? ' disabled' : ''}><span class="me-room-icon" aria-hidden="true"></span><span class="me-room-copy"><span class="me-room-title">当前牌桌<span class="me-room-state ${esc(current.status)}">${esc(current.statusLabel)}</span></span><span class="me-room-caption">${esc(current.boardLabel + ' · ' + current.capacity + '人 · ' + current.relationLabel)}</span></span><span class="me-room-return">返回${chevron}</span></button>`;
+    }
+    const group = (title, links) => `<section class="personal-links me-links${title ? '' : ' me-links-secondary'}">${title ? `<h2 class="me-section-label">${title}</h2>` : ''}<div class="me-link-group">${links.map(([page, label, note, icon, tone]) => `<button class="personal-link" type="button" ${page ? `data-action="navigate" data-page="${page}"` : 'data-action="about"'}><span class="me-icon-well me-well-${tone}"><span class="me-icon me-icon-${icon}" aria-hidden="true"></span></span><span class="me-link-copy"><span class="me-link-title">${label}</span>${note ? `<span class="me-link-caption">${note}</span>` : ''}</span>${chevron}</button>`).join('')}</div></section>`;
+    html += group('我的记录', [
+      ['matches', '对局记录', '回看身份、胜负与对局过程', 'history', 'blue'],
+      ['stats?tab=fun', '趣味记录', '刀法、挡刀，还有那些名场面', 'spark', 'purple'],
+      ['badges', '荣誉徽章', '查看本月荣誉，佩戴你的徽章', 'medal', 'gold'],
+    ]) + group('一起看看', [
+      ['leaderboard', '排行榜', '看看同桌朋友的表现', 'rank', 'green'],
+      ['monthly', '月度战报', '回顾这个月一起打过的局', 'calendar', 'orange'],
+    ]) + group('', [
+      ['data-management', '数据管理', '按月清除个人战绩', 'database', 'rose'],
+      ['help', '帮助与规则', '流程、角色与板子说明', 'book', 'slate'],
+      ['', '关于桌边助手', '', 'info', 'slate'],
+    ]);
     html += '<div class="web-account-row"><span class="small muted">' + (profile.identityType === 'wx' ? '小程序账号 · 资料与战绩共用' : '游客账号') + '</span>' + (webSessionTag ? btn('text-button', 'continueAsGuest', storage.get('guestSession') ? '退出并返回原游客' : '退出网页登录', null, state.webLoginBusy) : webAuthEnabled ? btn('text-button', 'navigate', '使用小程序账号登录', { page: 'login' }) : '') + '</div>';
     if (state.webLoginError) html += '<div class="inline-error" role="alert">' + esc(state.webLoginError) + '</div>';
-    html += '<div class="me-overview"><section class="personal-section me-results" aria-label="我的战绩"><button type="button" class="me-overview-link me-results-link" data-action="navigate" data-page="stats" aria-label="查看详细战绩统计"><span class="section-title history-heading"><span>战绩概览</span><span class="me-results-detail" aria-hidden="true">详情<span class="me-chevron"></span></span></span>';
-    html += '<span class="personal-metrics"><span class="me-metric"><span class="metric-value">' + (stats ? stats.total : '—') + '</span><span class="small muted">总局数</span></span><span class="me-metric"><span class="metric-value">' + (stats ? stats.wins : '—') + '</span><span class="small muted">胜场</span></span><span class="me-metric"><span class="metric-value accent">' + (!stats || stats.winRate === null ? '—' : stats.winRate + '%') + '</span><span class="small muted">胜率</span></span></span></button>';
-    if (state.statsError) html += '<div class="inline-error" role="alert">' + esc(state.statsError) + btn('text-button','loadStats','重试') + '</div>';
-    html += '</section>' + viewScoreOverview(stats?.score) + '</div>';
-    const link = (page, title, note, icon) => '<button class="personal-link" type="button" data-action="navigate" data-page="'+page+'"><span class="me-icon me-icon-'+icon+'" aria-hidden="true"></span><span class="me-link-copy"><span>'+title+'</span>'+(note?'<span class="small muted link-note">'+esc(note)+'</span>':'')+'</span><span aria-hidden="true">›</span></button>';
-    html += '<div class="personal-links me-links-primary">' + link('matches','对局记录','','history') + link('stats?tab=fun','趣味记录','','spark') + link('badges','荣誉徽章','','medal') + link('leaderboard','排行榜','','rank') + link('monthly','月度战报','','calendar') + '</div><div class="personal-links me-links-secondary">' + link('data-management','数据管理','按月清除个人战绩','database') + link('help','帮助与规则','','book') + btn('personal-link','about','关于桌边助手 ›') + '</div></div>';
     return html;
   }
   let clearingSequence = 0, clearingPending = null, clearingConfirmationRoute = -1, clearingConfirmationAccount = null;
@@ -1367,7 +1392,7 @@
     document.body.appendChild(link); link.click(); link.remove();
   }
   function viewHelp() {
-    return personalTitle('帮助与规则','') + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
+    return (state.helpFromLobby ? btn('text-button page-back', 'navigate', '‹ 返回对局', { page: 'lobby' }) : '') + personalTitle('帮助与规则', '', !state.helpFromLobby) + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
   }
 
   // ===== modal / toast =====
@@ -1682,6 +1707,8 @@
       code: "",
       error: "",
       entryMode: "join",
+      entrySheet: false,
+      entryError: "",
       showRoomRules: false,
       showBoardDetails: false,
       boardDetail: null,
@@ -1707,7 +1734,6 @@
       boardId: b.id,
       boardName: (b.namesByCapacity || {})[capacity] || b.name,
       boardRoleConfiguration: (b.roleConfigurations || {})[capacity] || [],
-      showRules: false,
     });
   }
   function pickBoard(boardId) {
@@ -1721,7 +1747,6 @@
       boardName: (b.namesByCapacity || {})[state.capacity] || b.name,
       boardRoleConfiguration:
         (b.roleConfigurations || {})[state.capacity] || [],
-      showRules: false,
     });
   }
 function roomListItems(rooms) {
@@ -1806,8 +1831,12 @@ function roomListItems(rooms) {
         setState({
           notice: e.status === 404 ? "牌桌已删除或不存在" : e.status === 410 ? "房间已失效，已从列表隐藏" : e.message === "你已被房主移出房间" ? e.message : "你已离开这张牌桌",
         });
-        if (e.status === 403 && e.message !== '你已被房主移出房间') setState({ code: code, entryMode: 'join', notice: '输入本桌昵称，加入房间 ' + code });
-        await loadRooms();
+        if (e.status === 403 && e.message !== '你已被房主移出房间') {
+          openJoinInvitation(code);
+          await Promise.all([loadRooms(), loadProfile()]);
+          if (state.page === "lobby" && state.entrySheet && state.code === code && !state.nameEdited)
+            setState({ name: (!needsNicknameSetup() ? state.profile?.nickname : '') || storage.get('nickname') || '' });
+        } else await loadRooms();
         return;
       }
       throw e;
@@ -2097,8 +2126,10 @@ function roomListItems(rooms) {
         storage.set("roomCode", result.code);
         storage.set("nickname", p.data.name || state.name);
         state.nameEdited = false;
+        state.entrySheet = false;
         state.page = 'table'; currentRoute = '#/table/' + result.code;
         window.history.pushState({}, '', currentRoute);
+        window.scrollTo(0, 0);
       }
       if (["entryHide", "entryRestore", "entryNote", "entryCleanup"].includes(p.after)) {
         setState({ roomMenu: null, noteRoom: null,
@@ -2121,7 +2152,9 @@ function roomListItems(rooms) {
         if (p.after === "enter") storage.remove("pendingEntry");
       }
       setState({ notice: "" });
-      handleError(e);
+      if (p.after === "enter" && state.entrySheet && !pending)
+        setState({ entryError: e.message });
+      else handleError(e);
       if (e.status === 409 && p.after === 'enter') await loadProfile();
     } finally {
       setState({ busy: false });
@@ -2225,9 +2258,6 @@ function roomListItems(rooms) {
     return html + '</div><div class="score-footer '+(otherEntry?'has-other-entry':'')+'">'+otherEntry+(flow.resultNextHint?'<p class="score-next-hint" role="status" aria-live="polite">'+esc(flow.resultNextHint)+'</p>':'')+'<div class="dialog-actions">' + btn('secondary score-back-button',modeBack?'toggleResultOther':'backResult',modeBack?'返回':step==='reason'?'取消':'上一步',null,state.busy || !!pending) + (step==='review' ? btn('primary','saveResult','确认并结束',null,!flow.resultReady || state.busy || !!pending) : '<button type="button" class="primary" data-action="nextResult"'+(!flow.resultNextEnabled || state.busy || pending?' disabled':'')+'>下一步<span class="score-forward" aria-hidden="true"></span></button>') + '</div></div></div></div>';
   }
 
-  function viewScoreOverview(score) {
-    return '<section class="personal-section score-overview" aria-label="我的积分"><button type="button" class="me-overview-link me-points-link" data-action="scoreRecords" aria-label="查看积分明细"><span class="section-title history-heading"><span>积分</span><span class="me-results-detail" aria-hidden="true">明细<span class="me-chevron"></span></span></span><span class="personal-metrics"><span class="me-metric"><span class="metric-value accent">' + (score?.total ?? '—') + '</span><span class="small muted">积分</span></span></span></button><button type="button" class="me-rules-trigger" data-action="navigate" data-page="help" aria-label="查看积分规则"><svg class="me-rules-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity=".08"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.6-2.5 2-2.5 3.7M12 16h.01"/></svg></button></section>';
-  }
   function viewScoreBreakdown(score, expanded = false) {
     if (!score || score.status !== 'scored') return '<div class="small muted">' + esc(score?.reason || '积分功能启用前的记录') + '</div>';
     if (expanded) return '<div class="score-breakdown"><div class="match-detail-row score-total"><span>本局积分</span><span class="match-score-value">' + (score.total >= 0 ? '+' : '') + score.total + '<span class="match-score-unit">分</span></span></div>' + (score.breakdown || []).map(award => '<div class="match-detail-row"><span>' + esc(award.label) + '</span><span>' + (award.points >= 0 ? '+' : '') + award.points + '分</span></div>').join('') + (score.manualOverride ? '<div class="match-detail-row"><span>管理员调整原因</span><span>' + esc(score.manualOverride.reason) + '</span></div>' : '') + '</div>';
@@ -2424,28 +2454,51 @@ function roomListItems(rooms) {
   }
 
   // ===== entry actions =====
+  function entryUnavailable() {
+    return state.loading || state.reconnecting || !state.network || state.needsLogin;
+  }
   function switchEntry(mode) {
+    if (state.busy || pending || entryUnavailable() || !["create", "join"].includes(mode)) return;
+    closeRoomSwipe();
+    setState({ entryMode: mode, entrySheet: true, entryError: "", error: "", notice: "" });
+    app.querySelector('.entry-sheet-close')?.focus({ preventScroll: true });
+  }
+  function openJoinInvitation(code) {
+    setState({ code, entryMode: "join", entrySheet: true, entryError: "" });
+    app.querySelector('.entry-sheet')?.focus();
+  }
+  function closeEntry() {
     if (state.busy || pending) return;
-    setState({ entryMode: mode, error: "", notice: "" });
+    setState({ entrySheet: false, entryError: "" });
+    app.querySelector(`.home-action[data-mode="${state.entryMode}"]`)?.focus({ preventScroll: true });
   }
-  function create() {
-    var name = nicknameValue();
-    if (!name) return setState({ error: "请填写昵称" });
-    state.name = name;
-    mutate(
-      "/api/rooms",
-      { name: name, board: state.boardId, capacity: state.capacity, ...entryNicknameData() },
-      "enter",
-    );
+  async function pasteRoomCode() {
+    const field = app.querySelector('.entry-sheet #code');
+    const canPaste = () => field?.isConnected && !field.disabled && !state.busy && !pending;
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!/^\d{6}$/.test(text)) throw new Error("invalid code");
+      if (!canPaste()) return;
+      setState({ code: text, entryError: "" });
+      field.focus();
+    } catch (_) {
+      if (canPaste()) setState({ entryError: "请手动输入或粘贴 6 位房间码" });
+    }
   }
-  function join() {
-    var name = nicknameValue();
-    var code = codeValue();
-    if (!name || !/^\d{6}$/.test(code))
-      return setState({ error: "请填写昵称和6位房间码" });
+  function submitEntry() {
+    if (!state.entrySheet || state.busy || pending || entryUnavailable()) return;
+    const name = nicknameValue(), joining = state.entryMode === "join", code = codeValue();
+    if (!name || joining && !/^\d{6}$/.test(code)) {
+      setState({ entryError: !name ? "请填写昵称" : "请输入 6 位房间码" });
+      app.querySelector(!name ? '#nickname' : '#code')?.focus();
+      return;
+    }
     state.name = name;
     state.code = code;
-    mutate("/api/rooms/" + code + "/join", { name: name, ...entryNicknameData() }, "enter");
+    state.entryError = "";
+    return joining
+      ? mutate("/api/rooms/" + code + "/join", { name, ...entryNicknameData() }, "enter")
+      : mutate("/api/rooms", { name, board: state.boardId, capacity: state.capacity, ...entryNicknameData() }, "enter");
   }
   async function openRoom(code) {
     if (state.roomSwipeCode) { closeRoomSwipe(); return; }
@@ -2455,7 +2508,7 @@ function roomListItems(rooms) {
     })[0];
     if (target && target.isHost && target.seat === null && !target.isMember) {
       if (!(state.name || "").trim()) {
-        setState({ code: target.code, entryMode: "join", error: "请填写昵称后重新入座" });
+        openJoinInvitation(target.code);
         return;
       }
       return mutate(
@@ -3794,42 +3847,33 @@ function roomListItems(rooms) {
       "</div></div>"
     );
   }
+  function viewShellHeader() {
+    const table = state.page === 'table';
+    const title = table ? roomSheets.shortBoardName(state.room?.boardName) || '牌桌' : state.page === 'me' ? '我的' : '对局';
+    return `<header class="app-shell-header${table ? ' is-table' : ''}"${state.entrySheet || state.showRoomRules || state.showBoardDetails ? ' inert' : ''}><div class="app-shell-header-inner">
+      ${table ? `<button type="button" class="app-shell-back" data-action="returnHome" aria-label="返回对局，保留当前座位"${state.busy ? ' disabled' : ''}><img src="/assets/chevron-left.svg" alt="" />对局</button><div class="app-shell-connection">${viewConnectionButton()}</div>` : ''}
+      <h1 class="app-shell-title" tabindex="-1" data-page-heading title="${esc(title)}">${esc(title)}</h1>
+    </div></header>`;
+  }
+  function viewConnectionButton(showStatus = false) {
+    const offline = !state.network || state.needsLogin;
+    const syncing = state.reconnecting || state.loading || state.roomsRefreshing || state.busy || state.hasPendingRequest;
+    const dot = offline ? 'offline' : syncing ? 'pending' : state.serverConnected ? 'online' : 'offline';
+    const label = state.needsLogin ? '待登录' : !state.network ? '未连接' : state.reconnecting ? '等待重连' : syncing ? '同步中' : state.serverConnected ? '连接正常' : '连接未确认';
+    return `<button type="button" class="connection-button" data-action="connectionInfo" aria-label="服务器${label}"><span class="connection-dot ${dot}" aria-hidden="true"></span>${showStatus && (offline || syncing) ? `<span class="connection-label">${label}</span>` : ''}</button>`;
+  }
   function viewBrand() {
-    var dot =
-      !state.network || state.needsLogin
-        ? "offline"
-        : state.loading || state.roomsRefreshing || state.busy || state.hasPendingRequest
-          ? "pending"
-          : state.serverConnected
-            ? "online"
-            : "offline";
-    var label =
-      !state.network || state.needsLogin
-        ? "连接异常"
-        : state.loading || state.roomsRefreshing || state.busy || state.hasPendingRequest
-          ? "正在同步"
-          : state.serverConnected
-            ? "连接正常"
-            : "连接未确认";
-    return (
-      '<div class="brand"><div class="brand-identity"><span class="brand-mark">桌边助手</span>' +
-      '<button type="button" class="connection-button" data-action="connectionInfo" aria-label="服务器' +
-      esc(state.reconnecting ? "重连中" : label) +
-      '"><span class="connection-dot ' + (state.reconnecting ? "pending" : dot) + '"></span>' +
-      (state.reconnecting || !state.network || state.needsLogin ? '<span class="connection-label">' + (state.reconnecting ? '重连中' : '连接断开') + '</span>' : '') +
-      '</button></div>' +
-      (state.room || state.page === 'table' ? '<button type="button" class="switch-table home-entry" data-action="returnHome" aria-label="返回对局，保留当前座位"' + (state.busy ? ' disabled' : '') + '><span class="home-icon" aria-hidden="true"></span><span>对局</span></button>' : '') +
-      '</div>'
-
-    );
+    if (state.page !== 'lobby') return '<div class="brand"><div class="brand-identity"><span class="brand-mark">桌边助手</span>' + viewConnectionButton(true) + '</div></div>';
+    const mark = state.homeWordmarkFailed ? '<span class="brand-mark">桌边助手</span>' : '<img class="home-wordmark" src="/assets/home-wordmark.png" alt="桌边助手" />';
+    return `<div class="brand"><div class="brand-identity">${mark}${viewConnectionButton(true)}<span class="home-brand-subtitle">阿瓦隆线下助手</span></div><button type="button" class="switch-table home-help" data-action="navigate" data-page="help?from=lobby" aria-label="打开使用帮助"><img class="home-help-icon" src="/assets/home-help.svg" alt="" /></button></div>`;
   }
   function viewErrorDialog() {
     if (!state.error) return "";
     return (
-      '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
-      '<div class="dialog-title">' +
+      '<div class="dialog-backdrop app-error-backdrop"><div class="error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="app-error-title" aria-describedby="app-error-message">' +
+      '<div class="dialog-title" id="app-error-title">' +
       (state.recoverableError ? "连接需要恢复" : "暂时无法完成") +
-      '</div><div class="dialog-message">' +
+      '</div><div class="dialog-message" id="app-error-message">' +
       esc(state.error) +
       '</div><div class="dialog-actions">' +
       (state.recoverableError && !state.hasPendingRequest
@@ -4115,79 +4159,80 @@ function roomListItems(rooms) {
     const disabled = state.busy || state.loading || state.roomsRefreshing || pending;
     return `<section class="room-archive-section${expanded ? ' is-expanded' : ''}"><button type="button" class="disclosure-button room-archive-toggle" data-action="toggleRoomHistory" aria-label="${expanded ? '收起' : '展开'}历史牌桌" aria-expanded="${expanded}" aria-controls="room-history-list"${disabled ? ' disabled' : ''}><span class="room-archive-title">历史牌桌</span><span class="room-archive-chevron${expanded ? ' is-expanded' : ''}" aria-hidden="true"></span></button><div id="room-history-list">${expanded ? rooms.map(m => viewPersonalRoom(m, true)).join('') : ''}</div></section>`;
   }
-  function viewEntry() {
-    var active = state.memberRooms.filter(r => r.status === 'playing' && r.available !== false);
-    var html = (active.length ? '<div class="resume-section"><span class="eyebrow">正在进行</span>' + active.map(r => '<button type="button" class="resume-room" data-action="openRoom" data-code="' + esc(r.code) + '"><span><span>继续对局 · ' + esc(r.code) + '</span><span class="small muted link-note">' + esc(r.boardName) + ' · ' + r.capacity + '人</span></span><span aria-hidden="true">→</span></button>').join('') + '</div>' : '') +
-      '<div class="lobby-heading"><h1 class="page-title" tabindex="-1" data-page-heading>今晚，开一桌。</h1></div>';
-    html +=
-      '<form class="panel entry-panel"><label class="label" for="nickname">' + (needsNicknameSetup() ? '玩家昵称' : '本桌昵称') + '</label>' +
-      '<input class="input" id="nickname" name="nickname" maxlength="16" data-input="name" value="' +
-      esc(state.name) +
-      '" placeholder="' + (needsNicknameSetup() ? '填写玩家昵称' : '使用个人昵称，也可为本桌修改') + '"' + (state.busy ? ' disabled' : '') + ' />' +
-      (needsNicknameSetup() ? '<div class="small muted">用于牌桌和排行榜，可在“我的”中修改。</div>' : '') +
-      '<div class="entry-tabs">' +
-      btn("entry-tab" + (state.entryMode !== "join" ? " active" : ""), "switchEntry", "创建房间", { mode: "create" }, state.busy) +
-      btn("entry-tab" + (state.entryMode === "join" ? " active" : ""), "switchEntry", "加入房间", { mode: "join" }, state.busy) +
-      "</div>";
-    if (state.entryMode !== "join") {
-      html += '<div class="field-title">人数</div>';
-      html += '<select class="input" data-change="entryCapacity">';
-      for (var i = 0; i < state.capacities.length; i++) {
-        var n = state.capacities[i];
-        html +=
-          '<option value="' +
-          n +
-          '"' +
-          (state.capacity === n ? " selected" : "") +
-          ">" +
-          n +
-          "人</option>";
-      }
-      html += "</select>";
-      html += '<div class="field-title">板子</div>';
-      if (state.availableBoards.length === 1)
-        html += '<div class="single-board">' + esc(state.boardName) + "</div>";
-      else {
-        html += '<select class="input" data-change="entryBoard">';
-        for (var j = 0; j < state.availableBoards.length; j++) {
-          var b = state.availableBoards[j];
-          html +=
-            '<option value="' +
-            esc(b.id) +
-            '"' +
-            (state.boardId === b.id ? " selected" : "") +
-            ">" +
-            esc((b.namesByCapacity || {})[state.capacity] || b.name) +
-            "</option>";
-        }
-        html += "</select>";
-      }
-      html +=
-        btn("text-button rules-toggle", "toggleRules", state.showRules ? "收起配置" : "角色配置") +
-        (state.showRules
-          ? '<div class="rules-detail">' +
-            state.boardRoleConfiguration
-              .map(function (r) {
-                return (
-                  '<div class="role-line">' + esc(r.label) + "：" + esc(r.roles) + "</div>"
-                );
-              })
-              .join("") +
-            "</div>"
-          : "") +
-        btn("primary", "create", (needsNicknameSetup() ? "确认昵称并创建 " : "创建 ") + state.capacity + " 人房间", null, state.loading || state.busy);
+  function viewRoomRoleGroups(groups, compact = false) {
+    return `<div class="room-role-groups${compact ? ' is-compact' : ''}">${roomSheets.presentRoleGroups(groups).map(group => `<div class="room-role-group">
+      <div class="room-role-faction"><div><span class="room-role-dot is-${esc(group.faction)}" aria-hidden="true"></span><span>${esc(group.label)}</span></div>${group.count ? `<span>${esc(group.count)} 人</span>` : ''}</div>
+      ${group.entries.length ? `<div class="room-role-grid">${group.entries.map(role => `<div class="room-role"><img src="${esc(role.portrait)}" alt="" /><div class="room-role-name">${compact ? esc(role.name) : `<div>${esc(role.roleTitle)}</div>${role.roleSubtitle ? `<div>${esc(role.roleSubtitle)}</div>` : ''}`}${role.countLabel ? `<span class="room-role-count">${esc(role.countLabel)}</span>` : ''}</div></div>`).join('')}</div>` : `<div class="room-role-text">${esc(group.roles)}</div>`}
+    </div>`).join('')}</div>`;
+  }
+  function viewSheetHeading(title, icon, closeAction, rules = false) {
+    return `<div class="${rules ? 'room-rules-sheet-top' : 'entry-sheet-top'}">
+      <div class="entry-sheet-handle" aria-hidden="true"></div><div class="entry-sheet-heading">
+        <h2 class="entry-sheet-title" id="room-sheet-title"><span class="room-sheet-symbol${icon === 'home-join-gold' ? ' is-gold' : ''}"><img src="/assets/${icon}.svg" alt="" /></span>${title}</h2>
+        <button type="button" class="${rules ? 'room-rules-close' : 'entry-sheet-close'}" data-action="${closeAction}" aria-label="关闭${title}"${!rules && (state.busy || pending) ? ' disabled' : ''}><span class="room-sheet-close-icon" aria-hidden="true"></span></button>
+      </div>
+    </div>`;
+  }
+  function viewEntrySheet() {
+    if (!state.entrySheet || state.page !== "lobby") return "";
+    const joining = state.entryMode === 'join';
+    const locked = state.busy || pending || entryUnavailable(), disabled = locked ? ' disabled' : '';
+    const setup = needsNicknameSetup(), title = joining ? '加入房间' : '创建房间';
+    const avatar = state.profile?.avatarUrl;
+    const check = '<span class="entry-selection-check" aria-hidden="true"></span>';
+    let fields = `<label class="label" for="nickname">${setup ? '玩家昵称' : '本桌昵称'}</label>
+      <div class="entry-name-field">${avatar ? `<img class="entry-avatar" src="${esc(avatar)}" alt="" />` : '<span class="entry-avatar entry-avatar-fallback"><img src="/assets/sheet-user.svg" alt="" /></span>'}
+      <input class="input entry-name-input" id="nickname" name="nickname" maxlength="16" autocomplete="nickname" data-input="name" value="${esc(state.name)}" placeholder="填写玩家昵称"${disabled} />
+      <button type="button" class="entry-name-edit" data-action="editEntryName" aria-label="修改昵称"${disabled}><img class="entry-name-pencil" src="/assets/edit.svg" alt="" /></button></div>
+      ${setup ? '<p class="entry-field-help">昵称用于牌桌和排行榜</p>' : ''}`;
+    if (joining) {
+      fields += `<div class="entry-code-section"><div class="entry-field-heading"><label class="field-title" for="code">房间码</label><button type="button" class="entry-paste" data-action="pasteRoomCode"${disabled}><img src="/assets/sheet-copy.svg" alt="" />粘贴</button></div>
+        <input class="input entry-code-input" id="code" name="code" inputmode="numeric" maxlength="6" data-input="code" value="${esc(state.code)}" placeholder="------" aria-describedby="entry-code-help"${disabled} />
+        <p id="entry-code-help" class="entry-field-help">向房主获取 6 位房间码</p></div>`;
     } else {
-      html +=
-        '<label class="field-title" for="code">房间码</label>' +
-        '<input class="input room-input" id="code" name="code" inputmode="numeric" maxlength="6" data-input="code" value="' +
-        esc(state.code) +
-        '" placeholder="输入6位房间码" />' +
-        btn("primary", "join", needsNicknameSetup() ? "确认昵称并加入房间" : "加入房间", null, state.loading || state.busy);
+      const boards = state.availableBoards.map(board => roomSheets.presentBoardOption(board, state.capacity));
+      const option = board => `<span class="entry-board-option-name">${esc(board.shortName)}</span><span class="entry-board-option-hint">${esc(board.entryHint)}</span>`;
+      fields += `<div class="entry-field-heading"><div class="field-title"><img src="/assets/record-users.svg" alt="" />游戏人数</div><span class="entry-current-count">${state.capacity} 人</span></div>
+        <div class="capacity-grid" role="group" aria-label="游戏人数">${state.capacities.map(capacity => {
+          const active = capacity === state.capacity;
+          return `<button type="button" class="capacity-option${active ? ' active' : ''}" data-action="entryCapacity" data-value="${capacity}" aria-pressed="${active}"${disabled}><span>${capacity}<span class="entry-capacity-unit">人</span></span>${active ? check : ''}</button>`;
+        }).join('')}</div>
+        <div class="entry-field-heading"><div class="field-title"><img src="/assets/home-table-blue.svg" alt="" />游戏板子</div>${boards.length > 1 ? `<span class="entry-available-label">${boards.length} 种可选</span>` : ''}</div>
+        ${boards.length > 1 ? `<div class="board-options" role="group" aria-label="游戏板子">${boards.map(board => {
+          const active = board.id === state.boardId;
+          return `<button type="button" class="board-option${active ? ' active' : ''}" data-action="entryBoard" data-value="${esc(board.id)}" aria-pressed="${active}"${disabled}>${option(board)}${active ? check : ''}</button>`;
+        }).join('')}</div>` : boards[0] ? `<div class="entry-single-board"><span class="room-sheet-symbol"><img src="/assets/home-table-blue.svg" alt="" /></span><div>${option(boards[0])}</div></div>` : ''}
+        <div class="entry-role-heading"><span class="entry-board-title">初始角色</span><button type="button" class="entry-board-details" data-action="openBoardDetails"${locked || !boards.length ? ' disabled' : ''}><img src="/assets/sheet-book.svg" alt="" />板子详情<span class="room-sheet-chevron" aria-hidden="true"></span></button></div>
+        ${viewRoomRoleGroups(state.boardRoleConfiguration, true)}`;
     }
-    html += "</form>";
+    const submit = state.busy ? (joining ? '加入中…' : '创建中…') : joining
+      ? (setup ? '确认昵称并加入房间' : title)
+      : (setup ? '确认昵称并创建 ' : '创建 ') + state.capacity + ' 人房间';
+    return `<div class="entry-backdrop" data-entry-backdrop${state.error || state.showBoardDetails ? ' inert' : ''}>
+      <form class="entry-panel entry-sheet${joining ? '' : ' is-create'}" data-form="entry" role="dialog" aria-modal="true" aria-labelledby="room-sheet-title" tabindex="-1">
+        <div class="entry-sheet-layout">${viewSheetHeading(title, joining ? 'home-join-gold' : 'home-create-blue', 'closeEntry')}
+          <div class="entry-sheet-body"><div class="entry-sheet-fields">${fields}</div></div>
+          <div class="entry-sheet-footer">${state.entryError ? `<p class="entry-field-error" role="alert">${esc(state.entryError)}</p>` : ''}
+            ${entryUnavailable() ? '<p class="entry-field-help" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接暂不可用，恢复后可继续') + '</p>' : ''}
+            ${state.reconnecting && state.network ? btn('text-button entry-retry', 'recoverConnection', '立即重试', null, state.busy || state.loading) : ''}
+            <button type="submit" class="primary entry-submit"${disabled}>${submit}<span class="room-sheet-chevron" aria-hidden="true"></span></button>
+          </div>
+        </div>
+      </form>
+    </div>`;
+  }
+  function viewEntry() {
+    const locked = state.busy || pending || entryUnavailable();
+    const entry = (mode, label, first, last, hintStart, hintEnd) => `<button type="button" class="home-action home-action-${mode}" data-action="switchEntry" data-mode="${mode}" aria-label="${label}" aria-haspopup="dialog"${locked ? ' disabled' : ''}>
+      <span class="home-action-symbol"><img class="home-action-icon" src="/assets/home-${mode}-outline.svg" alt="" /></span>
+      <span class="home-action-copy"><span class="home-action-heading"><span class="home-action-title"><span class="home-action-word">${first}</span><span class="home-action-word">${last}</span></span><span class="home-entry-arrow" aria-hidden="true"></span></span>
+      <span class="home-action-hint"><span class="home-action-word">${hintStart}</span><span class="home-action-word">${hintEnd}</span></span></span>
+    </button>`;
+    let html = '<div class="home-entry-actions">' + entry('create', '创建房间，选择人数和玩法', '创建', '房间', '选人数，', '开新局') +
+      entry('join', '加入房间，输入6位房间码', '加入', '房间', '输入6位', '房间码') + '</div>';
 
     var partition = roomList.present(state.memberRooms, state.roomListFilter, state.roomsServerTime || Date.now());
-    html += '<section class="room-directory"><div class="section-title history-heading room-directory-heading"><span>我的牌桌</span><button type="button" class="history-toggle room-refresh" data-action="refreshRooms" aria-label="' + (state.roomsRefreshing ? '正在刷新牌桌' : '刷新我的牌桌') + '"' + (state.busy || state.loading || state.roomsRefreshing || pending ? ' disabled' : '') + '><img class="room-refresh-icon' + (state.roomsRefreshing ? ' is-refreshing' : '') + '" src="/assets/home-refresh.svg" alt="" /></button></div>';
+    html += '<section class="room-directory"><div class="section-title history-heading room-directory-heading"><span>我的牌桌</span><button type="button" class="history-toggle room-refresh" data-action="refreshRooms" aria-label="' + (state.roomsRefreshing ? '正在刷新牌桌' : '刷新我的牌桌') + '"' + (locked || state.roomsRefreshing ? ' disabled' : '') + '><img class="room-refresh-icon' + (state.roomsRefreshing ? ' is-refreshing' : '') + '" src="/assets/home-refresh.svg" alt="" /></button></div>';
     if (partition.currentRoomCount >= 6 || state.roomListFilter !== "all") {
       html += '<div class="room-filters">' + [["all","全部"],["playing","进行中"],["lobby","待开局"],["ended","已结束"]].map(function (f) {
         return '<button type="button" class="room-filter ' + (state.roomListFilter === f[0] ? 'active' : '') + '" data-action="filterRooms" data-filter="' + f[0] + '" aria-pressed="' + (state.roomListFilter === f[0]) + '">' + f[1] + '</button>';
@@ -4201,11 +4246,13 @@ function roomListItems(rooms) {
       html += viewRoomArchive(partition.historyRooms, state.historyExpanded);
       html += '</div>';
     }
-    if (!partition.availableRoomCount && !state.loading) html += '<div class="room-empty"><div>还没有牌桌</div><div class="room-empty-actions">' + btn("secondary","switchEntry","加入房间",{mode:"join",scroll:"true"},state.busy || !!pending) + btn("secondary","switchEntry","创建房间",{mode:"create",scroll:"true"},state.busy || !!pending) + '</div></div>';
+    if (!partition.availableRoomCount) {
+      html += entryUnavailable() ? '<div class="room-empty" role="status">连接恢复后将显示牌桌</div>' : '<div class="room-empty"><div class="room-empty-title">还没有牌桌</div><div class="room-empty-hint">创建新房间，或输入房间码与朋友同桌。</div></div>';
+    }
     else if (!partition.visibleMemberRooms.length && !(partition.showHistorySection && partition.historyRooms.length)) html += '<div class="room-empty">没有符合条件的牌桌' + btn("history-toggle","filterRooms","查看全部",{filter:"all"}) + '</div>';
     html += '</section>';
     if (state.roomMenu && !state.error) {
-      var m = state.roomMenu, locked = state.busy || !!pending;
+      const m = state.roomMenu, locked = state.busy || !!pending;
       html += '<div class="dialog-backdrop room-menu-backdrop"><section class="error-dialog room-list-dialog room-menu-dialog' + (m.available === false ? ' is-expired' : '') + '" role="dialog" aria-modal="true" aria-labelledby="room-menu-title" aria-describedby="room-menu-code"><div class="room-menu-handle" aria-hidden="true"></div><div class="room-menu-header"><div id="room-menu-title" class="room-menu-heading">房间管理</div><button type="button" class="room-menu-close" data-action="closeRoomMenu" aria-label="关闭房间管理"' + (locked ? ' disabled' : '') + '><span class="room-menu-cross" aria-hidden="true"></span></button></div><div class="room-menu-body"><div class="room-menu-context"><span class="room-menu-table-icon"><img src="/assets/home-table-blue.svg" alt="" /></span><div class="room-menu-copy"><div id="room-menu-code" class="room-menu-code">房间 <span>' + esc(m.code) + '</span></div><div class="room-menu-board">' + esc(m.boardName || '牌桌') + '</div></div>' + (m.available === false || m.statusLabel ? '<span class="room-menu-status">' + esc(m.available === false ? '已失效' : m.statusLabel) + '</span>' : '') + '</div><div class="room-menu-options">' +
         roomMenuButton("hide", m.available === false ? "移除失效记录" : "从列表移除", m.available === false ? "从你的牌桌列表清理这条记录" : "仅整理个人列表，保留成员关系与座位", locked) +
         (m.available !== false && m.isMember && m.canLeave === true ? roomMenuButton("leave", "离开房间", "退出成员关系，并释放座位", locked) : '') +
@@ -4215,55 +4262,50 @@ function roomListItems(rooms) {
     if (state.noteRoom && !state.error) html += '<div class="dialog-backdrop"><div class="error-dialog room-list-dialog" role="dialog" aria-modal="true" aria-label="个人备注"><div class="dialog-title">个人备注 · ' + esc(state.noteRoom.code) + '</div><label for="room-note" class="small muted">仅你可见，最多30字；留空可清除</label><input id="room-note" class="input" data-input="roomNote" maxlength="30" placeholder="例如：周五朋友局" value="' + esc(state.roomNoteDraft) + '"' + (state.busy || pending ? ' disabled' : '') + ' /><div class="dialog-actions">' + btn("secondary","closeRoomMenu","取消",null,state.busy || !!pending) + btn("primary","saveRoomNote","保存",null,state.busy || !!pending) + '</div></div></div>';
     return html;
   }
+  function viewRoomHeader(room) {
+    const lobby = room.phase === "lobby", spectator = room.me.seat == null;
+    const ended = ["ended", "terminated"].includes(room.phase);
+    const blocked = state.busy || pending || entryUnavailable();
+    const tool = (action, label, icon, disabled = false) => `<button type="button" class="lobby-header-link" data-action="${action}" aria-label="${label}" title="${label}"${action === 'openRoomRules' ? ' aria-haspopup="dialog"' : ''}${disabled ? ' disabled' : ''}><img class="lobby-header-icon" src="/assets/${icon}.svg" alt="" /></button>`;
+    const toolbar = `<div class="lobby-header-actions${room.me.isHost ? '' : ' is-guest'}" role="group" aria-label="牌桌工具">
+      ${lobby ? tool('copyInviteLink', '复制邀请链接', 'room-invite', blocked) : ''}
+      ${tool('openRoomRules', '查看本局角色配置与计分说明', 'room-config')}
+      ${room.me.isHost ? tool('toggleRoomSettings', '打开房间设置', 'room-settings', blocked) : ''}
+    </div>`;
+    const identityLabel = state.revealed ? '遮盖身份' : '查看身份';
+    return `<div class="lobby-room-header"><div class="room-summary">
+      <button type="button" class="copy-room lobby-room-code" data-action="copyRoomCode" aria-label="复制房间号${esc(room.code)}"><span>房间 ${esc(room.code)}</span><img src="/assets/sheet-copy.svg" alt="" /></button>
+      ${lobby ? toolbar : spectator ? '' : `<div class="room-identity-anchor"><button type="button" class="room-identity${state.identityHintVisible ? ' identity-entry-highlight' : ''}" data-action="reveal" aria-label="${room.me.seat}号 · ${identityLabel}"${!state.revealed && (state.busy || !state.network) ? ' disabled' : ''}><span class="room-identity-icon" aria-hidden="true"></span>${identityLabel}</button>
+        ${state.identityHintVisible && !state.dealtIdentityDialog && !identityOverlayBlocked() ? '<div class="identity-entry-hint"><span role="status">随时点这里，查看身份与视野。</span><button type="button" class="identity-hint-close" data-action="dismissIdentityHint" aria-label="关闭身份入口提示">×</button></div>' : ''}</div>`}
+    </div><div class="lobby-room-status"><div class="lobby-status-tags">
+      <span class="lobby-chip${lobby ? ' lobby-phase-chip' : ended ? '' : ' room-playing-chip'}">${lobby ? '准备中' : room.phase === 'ended' ? '已结束' : ended ? '已终止' : '对局中'}</span>
+      ${room.scoreSettings ? `<span class="lobby-chip" title="${esc(room.scoreNotice || '')}">${room.scoreSettings.enabled ? '计分局' : '不计分'}</span>` : ''}
+      ${room.testRoom ? '<span class="lobby-chip">测试房间</span>' : ''}
+      ${!lobby && spectator ? '<span class="lobby-chip">围观中</span>' : ''}
+    </div>${lobby ? '' : toolbar}</div>
+    ${!lobby && spectator ? '<div class="small muted" role="status">' + (ended ? '本局已结束，你正在旁观；房主重开后可手动入座。' : '本局进行中，你正在旁观；下一局可手动入座。') + '</div>' : ''}</div>`;
+  }
+  function viewRoomRules() {
+    const room = state.room;
+    if (!room || !state.showRoomRules || state.error) return '';
+    return `<div class="dialog-backdrop room-rules-backdrop" data-room-rules-backdrop${state.showBoardDetails ? ' inert' : ''}><section class="error-dialog room-rules-sheet" role="dialog" aria-modal="true" aria-labelledby="room-sheet-title" tabindex="-1">
+      ${viewSheetHeading('角色配置', 'sheet-shield', 'closeRoomRules', true)}
+      <div class="room-rules-body"><div class="room-rules-sheet-fields">
+        <div class="room-rules-summary"><div><img src="/assets/home-table-blue.svg" alt="" /><span>${esc(room.boardName)}</span></div><span class="room-rules-capacity">${room.capacity} 人</span></div>
+        ${viewRoomRoleGroups(room.roleConfiguration)}
+        <div class="room-rules-options">
+          ${room.scoreSettings ? `<div class="room-rules-option${room.scoreSettings.enabled ? ' is-enabled' : ''}"><img src="/assets/record-coin.svg" alt="" /><span>本局计分</span><span>${room.scoreSettings.enabled ? '已开启' : '未开启'}</span></div>` : ''}
+          ${room.scoreNotice ? `<div class="room-rules-notice">${esc(room.scoreNotice)}</div>` : ''}
+          ${room.testRoom ? '<div class="room-rules-option"><img src="/assets/sheet-flask.svg" alt="" /><span>测试房间 · 陪测</span><span>已开启</span></div>' : ''}
+        </div>
+        ${room.phase !== 'lobby' ? btn('text-button room-rules-invite', 'copyInviteLink', '复制邀请链接') : ''}
+      </div></div>
+      <div class="room-rules-sheet-footer"><button type="button" class="secondary" data-action="openBoardDetails"><img src="/assets/sheet-book.svg" alt="" />板子详情</button>${btn('primary', 'closeRoomRules', '知道了')}</div>
+    </section></div>`;
+  }
   function viewRoom() {
     var r = state.room;
-    var html = "";
-    html +=
-      '<div class="room-summary"><button type="button" class="copy-room" data-action="copyRoomCode"><span>房间 ' +
-      esc(r.code) +
-      '</span><span class="copy-label">复制</span></button><div class="summary-right">' +
-      (r.phase !== "lobby" && r.me.seat !== null
-        ? '<div class="room-identity-anchor">' + btn("room-identity" + (state.identityHintVisible ? " identity-entry-highlight" : ""), "reveal", r.me.seat + "号 · " + (state.revealed ? "遮盖身份" : "我的身份 ›"), null, !state.revealed && (state.busy || !state.network)) +
-          (state.identityHintVisible && !state.dealtIdentityDialog && !identityOverlayBlocked() ? '<div class="identity-entry-hint"><span role="status">随时点这里，查看身份与视野。</span><button type="button" class="identity-hint-close" data-action="dismissIdentityHint" aria-label="关闭身份入口提示">×</button></div>' : '') + '</div>'
-        : '<span class="summary-seat">' + (r.me.seat != null ? "你在 " + r.me.seat + " 号" : "") + '</span>') +
-      "</div></div>";
-    html +=
-      '<div class="row subline room-subline"><div class="room-board-info">' +
-      (r.testRoom ? '<span class="small room-test-label">测试房间 · 陪测已开启</span>' : "") +
-      '<span class="room-board-name">' +
-      esc(r.boardName) +
-      " · " +
-      r.capacity +
-      '人</span><button type="button" class="room-rules-button" data-action="openRoomRules">配置说明</button></div>' +
-      (r.me.isHost
-        ? '<button type="button" class="room-rules-button" data-action="toggleRoomSettings">房间设置</button>'
-        : "") +
-      '<button type="button" class="room-rules-button" data-action="copyInviteLink">邀请</button></div>';
-    if (r.phase !== "lobby" && r.me.seat === null)
-      html += '<div class="small muted" role="status">' + (["ended", "terminated"].includes(r.phase)
-        ? "本局已结束，你正在旁观；房主重开后可手动入座。"
-        : "本局进行中，你正在旁观；下一局可手动入座。") + '</div>';
-    if (state.showRoomRules) {
-      html +=
-        '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
-        '<div class="dialog-title">角色配置</div><div class="small muted">' +
-        esc(r.boardName) +
-        " · " +
-        r.capacity +
-        '人</div><div class="configuration-roles">' +
-        (r.roleConfiguration || [])
-          .map(function (x) {
-            return (
-              '<div class="role-line">' + esc(x.label) + "：" + esc(x.roles) + "</div>"
-            );
-          })
-          .join("") +
-        "</div>" +
-        '<div class="dialog-actions">' +
-        btn("secondary", "openBoardDetails", "板子详情") +
-        btn("primary", "closeRoomRules", "知道了") +
-        "</div></div></div>";
-    }
+    var html = viewRoomHeader(r);
     if (r.phase !== "lobby" && r.me.seat !== null) {
       if (state.revealed && state.secret) {
         var identity = state.secret;
@@ -4279,9 +4321,9 @@ function roomListItems(rooms) {
 
     var operationFirst = !["tools", "ended", "lobby"].includes(r.phase);
     var phaseHtml =
-      '<div class="phase-strip"><div class="phase-heading"><span class="phase-label">当前阶段</span><span class="phase-name">' +
+      '<div class="phase-strip"><div class="phase-heading"><span class="phase-symbol"><img src="/assets/table-cards.svg" alt="" /></span><span class="phase-heading-copy"><span class="phase-label">当前阶段</span><span class="phase-name">' +
       esc(r.phaseName) +
-      "</span></div>" +
+      "</span></span></div>" +
       (!r.flexible && (r.round || r.leader)
         ? '<div class="phase-detail">' +
           (r.round ? "<span>任务 " + r.round + "</span>" : "") +
@@ -4321,9 +4363,8 @@ function roomListItems(rooms) {
       } else resultHtml += '<div class="history-detail">' + esc(latest.latestDetail || latest.detail) + '</div>';
       resultHtml += '</div>';
     }
-    html += '<div class="table-dynamics ' + (r.phase === "lobby" ? 'is-lobby' : operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
+    if (r.phase !== "lobby") html += '<div class="table-dynamics ' + (operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
     if (r.recordNotice) html += '<div class="small muted">' + esc(r.recordNotice) + '</div>';
-    if (r.scoreSettings) html += '<div class="small muted">' + esc(r.scoreNotice || (r.scoreSettings.enabled ? '本局计分已开启' : '本局计分已关闭')) + '</div>';
     let lobbyActionHtml = "";
     if (r.phase === "lobby") {
       const blocked = state.busy || !!pending || !state.network, card = r.me.avoidance;
@@ -4385,10 +4426,12 @@ function roomListItems(rooms) {
       html += "</div>";
     }
     var quests = r.phase === "lobby" ? [] : state.history.filter(function (h) { return h.questResult; });
-    html += '<div class="task-progress"><div class="section-title history-heading"><span class="seat-section-title"><span>' + (quests.length ? '任务进度' : '玩家与座位') + '</span>' +
-      (r.phase === 'lobby' ? '<span class="seat-count" aria-label="已入座' + state.seatOccupiedCount + '人，共' + r.capacity + '个座位">' + state.seatOccupiedCount + '/' + r.capacity + '</span>' : '') + '</span>' +
-      (r.phase === "lobby" ? '' : '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
-    if (r.phase === 'lobby') html += '<div class="seat-section-caption"><span class="seat-ready-count">已准备 ' + state.seatReadyCount + '/' + state.seatOccupiedCount + '</span><span>点自己站起，点空位坐下</span></div>';
+    const waiting = r.phase === "lobby";
+    const occupied = state.seatOccupiedCount + '/' + r.capacity + ' 人';
+    html += '<div class="task-progress"><div class="section-title history-heading"><span class="seat-section-title"><span>' + (quests.length ? '任务进度' : '玩家') + '</span>' +
+      (waiting ? '' : '<span class="seat-count">' + occupied + '</span>') + '</span>' +
+      (waiting ? '<span class="seat-count">' + occupied + '入座 · ' + state.seatReadyCount + ' 人已准备</span>' :
+        '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
     if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
       return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
     }).join("") + '</div>';
@@ -4396,34 +4439,32 @@ function roomListItems(rooms) {
     if (r.phase === "lobby" || state.seatsExpanded) {
     html += '<div class="seats' + (r.capacity >= 10 ? ' seats-compact' : '') + '">';
     for (var i = 0; i < state.seats.length; i++) {
-      var s = state.seats[i];
+      const s = state.seats[i], fairy = !waiting && s.occupied && r.fairyHolder === s.seat;
+      const status = seatMeta(s);
       html +=
         '<button type="button" class="seat' +
         (s.occupied ? "" : " seat-empty") +
         (s.mine ? " mine" : "") +
         (s.inTeam ? " team" : "") +
         (s.selected ? " selected" : "") +
-        '" data-action="seat" data-seat="' +
-        s.seat +
-        '"' +
-        ' aria-label="' + esc(s.seat + '号，' + s.name + (s.mine ? '，你的座位' : '') + (s.host ? '，房主' : '') + (s.alive === false ? '，已出局' : '') + (s.selected ? '，已选入队' : s.inTeam ? '，任务队员' : '') + (r.fairyHolder === s.seat ? '，湖仙' : '') + (r.phase === 'lobby' ? '，' + seatMeta(s) : '')) + '"' +
-        ' aria-description="' + (r.phase === 'lobby' && s.mine ? '点击站起围观' : s.occupied ? '点击查看战绩' : r.phase === 'lobby' ? '点击入座' : '空位') + '"' +
+        (fairy ? " has-fairy" : "") +
+        '" data-action="seat" data-seat="' + s.seat + '"' +
+        ' aria-label="' + esc(s.seat + '号，' + s.name + (s.mine ? '，你的座位' : '') + (s.host ? '，房主' : '') + (s.alive === false ? '，已出局' : '') + (s.selected ? '，已选入队' : s.inTeam ? '，任务队员' : '') + (fairy ? '，湖中仙女持有者' : '') + (waiting ? '，' + status : '')) + '"' +
+        ' aria-description="' + (waiting && s.mine ? '点击站起围观' : s.occupied ? '点击查看战绩' : waiting ? '点击入座' : '空位') + '"' +
         (seatDisabled(s) ? " disabled" : "") +
-        '><span class="seat-head"><span class="seat-number">' +
-        s.seat +
-        '号</span>' + (s.mine ? '<span class="seat-self">你</span>' : '') + '</span>';
+        '><span class="seat-head"><span class="seat-number">' + s.seat + '号</span><span class="seat-head-tags">' +
+        (s.host ? '<span class="seat-flag">房主</span>' : '') + (s.mine ? '<span class="seat-self">你</span>' : '') + '</span></span>';
       if (s.occupied) {
         html += '<span class="seat-player"><span class="seat-avatar" aria-hidden="true"><span class="seat-avatar-fallback">' + esc(s.avatarInitial) + '</span>' +
-        (s.avatarUrl && !s.avatarFailed ? '<img class="seat-avatar-image" src="' + esc(s.avatarUrl) + '" alt="" data-seat="' + s.seat + '" data-seat-avatar-url="' + esc(s.avatarUrl) + '" />' : '') +
-        '</span><span class="seat-name">' + esc(s.name) + '</span></span><span class="seat-meta">' +
-        (seatMeta(s) ? '<span class="seat-status' + (r.phase === 'lobby' && s.ready ? ' seat-ready' : '') + '">' + esc(seatMeta(s)) + '</span>' : '') +
-        (s.host || s.alive === false || r.fairyHolder === s.seat ? '<span class="seat-tags">' +
-          (s.host ? '<span class="seat-flag">房主</span>' : '') +
-          (s.alive === false ? '<span class="seat-out">已出局</span>' : '') +
-          (r.fairyHolder === s.seat ? '<span class="seat-fairy">湖仙</span>' : '') + '</span>' : '') +
-        '</span>';
+          (s.avatarUrl && !s.avatarFailed ? '<img class="seat-avatar-image" src="' + esc(s.avatarUrl) + '" alt="" data-seat="' + s.seat + '" data-seat-avatar-url="' + esc(s.avatarUrl) + '" />' : '') +
+          '</span><span class="seat-name">' + esc(s.name) + '</span></span>';
+        if (waiting && s.ready) html += '<span class="seat-ready-badge" aria-hidden="true"><span class="seat-ready-check"></span></span>';
+        if (fairy) html += '<span class="seat-fairy" aria-hidden="true"><img src="/assets/lake-fairy.svg" alt="" /></span>';
+        if (!waiting && (status || s.alive === false)) html += '<span class="seat-meta">' +
+          (status ? '<span class="seat-status">' + esc(status) + '</span>' : '') +
+          (s.alive === false ? '<span class="seat-out">已出局</span>' : '') + '</span>';
       } else {
-        html += '<span class="seat-empty-body"><span class="seat-empty-mark" aria-hidden="true">+</span><span class="seat-empty-label">' + (r.phase === 'lobby' ? '点击入座' : '空位') + '</span></span>';
+        html += '<span class="seat-empty-body"><span class="seat-empty-mark" aria-hidden="true">+</span><span class="seat-empty-label">' + (waiting ? '入座' : '空位') + '</span></span>';
       }
       html += '</button>';
     }
@@ -4916,6 +4957,8 @@ function roomListItems(rooms) {
       state.room.canUseTools &&
       state.room.hasActiveOperation &&
       state.room.phase !== "offlineFinal";
+    const shell = ["lobby", "me", "table"].includes(state.page);
+    const roomSheet = state.entrySheet || state.showRoomRules || state.showBoardDetails;
     var next = document.createElement("div");
     next.innerHTML =
       viewFairyResult() +
@@ -4923,21 +4966,21 @@ function roomListItems(rooms) {
       viewDealtIdentity() +
       viewAvoidance() +
       viewIdentityHistory() +
-      (state.page === 'profile' ? viewProfileHeader() : '') + '<div class="page' +
+      (state.page === 'profile' ? viewProfileHeader() : shell ? viewShellHeader() : '') + '<div class="page' +
+      (state.page === 'lobby' ? ' home-lobby' : state.page === 'me' ? ' me-page' : state.page === 'table' ? ' table-page' : '') +
       (state.page === 'table' && state.room?.phase === 'lobby' ? ' has-lobby-actions' : '') + (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
-      (['profile', 'badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
+      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (roomSheet || state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (['table', 'me', 'profile', 'badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
-      viewErrorDialog() +
       viewActionDialog() +
       viewToolDialog() +
       viewResultDialog() +
       (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
       (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'data-management' ? viewRecordClearing() : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
-      "</div>" + viewRecordClearingConfirmation() +
+      "</div>" + viewEntrySheet() + viewRoomRules() + viewRecordClearingConfirmation() +
       (state.page === 'table' ? viewHistorySheet() + viewHonorBallot() : '') + viewPlayerCard() + viewSettingsDialog() +
-      viewBoardDetails() + (state.page === "me" && state.monthlyReset ? "" : viewNavigation()) + viewMonthlyReset();
+      viewBoardDetails() + viewErrorDialog() + (state.page === "me" && state.monthlyReset ? "" : viewNavigation()) + viewMonthlyReset();
     enhanceSelects(next);
     patchDOM(app, next);
     updateFunOptionsScrollHint();
@@ -5082,20 +5125,12 @@ function roomListItems(rooms) {
       pickToolThreshold(Number(el.dataset.value));
     },
     launchTool: launchTool,
-    switchEntry: function (el) {
-      if (state.busy || pending) return;
-      switchEntry(el.dataset.mode);
-      if (el.dataset.scroll) {
-        var field = app.querySelector(el.dataset.mode === "join" ? "#code" : "#nickname");
-        if (field) field.focus({ preventScroll: true });
-        app.querySelector(".entry-panel").scrollIntoView({ block: "start" });
-      }
-    },
-    toggleRules: function () {
-      setState({ showRules: !state.showRules });
-    },
-    create: create,
-    join: join,
+    switchEntry: el => switchEntry(el.dataset.mode),
+    closeEntry,
+    pasteRoomCode,
+    editEntryName: () => app.querySelector('#nickname')?.focus(),
+    entryCapacity: el => { if (!state.busy && !pending && !entryUnavailable()) selectCapacity(Number(el.dataset.value)); },
+    entryBoard: el => { if (!state.busy && !pending && !entryUnavailable()) pickBoard(el.dataset.value); },
     openRoom: function (el) {
       openRoom(el.dataset.code);
     },
@@ -5123,27 +5158,29 @@ function roomListItems(rooms) {
     },
     openRoomRules: function () {
       setState({ showRoomRules: true });
+      app.querySelector('.room-rules-close')?.focus();
     },
     closeRoomRules: function () {
       setState({ showRoomRules: false });
+      app.querySelector('[data-action="openRoomRules"]')?.focus({ preventScroll: true });
     },
     openBoardDetails: function () {
-      if (!state.room) return;
-      var board = state.boards.find(function (b) {
-        return b.id === state.room.board;
-      });
-      var detail = boardDetailPresentation.presentBoard(board
-        ? { ...board, roleConfiguration: state.room.roleConfiguration }
-        : { name: state.room.boardName, roleConfiguration: state.room.roleConfiguration }, state.room.capacity);
+      const room = state.room, fromEntry = state.page === 'lobby' && state.entrySheet && state.entryMode === 'create';
+      if (!room && !fromEntry) return;
+      const id = room ? room.board : state.boardId;
+      const board = state.boards.find(value => value.id === id);
+      if (!room && !board) return;
+      const detail = boardDetailPresentation.presentBoard({
+        ...(board || { name: room.boardName }),
+        roleConfiguration: room ? room.roleConfiguration : state.boardRoleConfiguration,
+      }, room ? room.capacity : state.capacity);
       setState({
         showBoardDetails: true,
         expandedBoardRoles: {},
-        showRoomRules: false,
         boardDetail: detail, boardDetailTab: detail.defaultTab, boardDetailQuery: "",
         boardDetailGroup: detail.groups[0]?.id || "", boardChapters: detail.chapters, boardDirectory: false,
       });
-      var close = app.querySelector('[data-action="closeBoardDetails"]');
-      if (close) close.focus();
+      app.querySelector('[data-action="closeBoardDetails"]')?.focus();
     },
     toggleBoardRole: function (el) {
       if (!state.boardDetail?.roles.some(role => role.id === el.dataset.value)) return;
@@ -5189,8 +5226,8 @@ function roomListItems(rooms) {
     },
     closeBoardDetails: function () {
       setState({ showBoardDetails: false, boardDetail: null, boardDirectory: false });
-      var trigger = app.querySelector('[data-action="openRoomRules"]');
-      if (trigger) trigger.focus();
+      const selector = state.entrySheet || state.showRoomRules ? '[data-action="openBoardDetails"]' : '[data-action="openRoomRules"]';
+      app.querySelector(selector)?.focus({ preventScroll: true });
     },
     toggleRoomSettings: toggleRoomSettings,
     seat: function (el) {
@@ -5362,13 +5399,6 @@ function roomListItems(rooms) {
     rankVisibility: el => changeRankVisibility(el.checked),
     settingsKick: function (el) { kickFromSettings(Number(el.value)); },
     settingsTransfer: function (el) { transferFromSettings(Number(el.value)); },
-    entryCapacity: function (el) {
-      if (state.busy) return;
-      selectCapacity(Number(el.value));
-    },
-    entryBoard: function (el) {
-      pickBoard(el.value);
-    },
     settingsCapacity: function (el) {
       if (settingsLocked() || !state.settings.room) return;
       if (state.settings.room.phase !== "lobby") return;
@@ -5421,11 +5451,13 @@ function roomListItems(rooms) {
     name: function (el) {
       state.nameEdited = true;
       state.name = el.value;
+      if (state.entryError) setState({ entryError: "" });
     },
     code: function (el) {
       var v = el.value.replace(/\D/g, "").slice(0, 6);
       state.code = v;
       if (el.value !== v) el.value = v;
+      if (state.entryError) setState({ entryError: "" });
     },
   };
 
@@ -5440,6 +5472,8 @@ function roomListItems(rooms) {
     } else render();
     }
 
+    if (e.target?.classList?.contains?.('home-wordmark') && !state.homeWordmarkFailed)
+      setState({ homeWordmarkFailed: true });
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
     if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
@@ -5454,6 +5488,8 @@ function roomListItems(rooms) {
       closeRoomSwipe();
       if (closeOnly) { e.preventDefault(); return; }
     }
+    if (e.target?.hasAttribute?.('data-entry-backdrop')) return closeEntry();
+    if (e.target?.hasAttribute?.('data-room-rules-backdrop')) return ACTIONS.closeRoomRules();
     if (e.target?.hasAttribute?.('data-public-history-backdrop')) return closeHistory();
     if (e.target?.hasAttribute?.('data-identity-history-backdrop')) return closeIdentityHistory();
     if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
@@ -5483,6 +5519,7 @@ function roomListItems(rooms) {
   app.addEventListener("submit", function (e) {
     e.preventDefault();
     if (e.target.dataset.form === "profile") saveProfile();
+    if (e.target.dataset.form === "entry") submitEntry();
   });
   app.addEventListener('focusout', function (e) {
     if (e.target?.dataset?.input === 'profileName' && e.relatedTarget?.dataset?.action !== 'finishProfileNickname') finishProfileNickname();
@@ -5595,6 +5632,23 @@ function roomListItems(rooms) {
     render();
   });
 
+  document.addEventListener("keydown", function (event) {
+    if ((!state.entrySheet && !state.showRoomRules) || state.showBoardDetails || state.error || !modal.hidden) return;
+    const dialog = app.querySelector(state.entrySheet ? '.entry-sheet' : '.room-rules-sheet');
+    if (!dialog) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (state.entrySheet) closeEntry();
+      else ACTIONS.closeRoomRules();
+    } else if (event.key === 'Tab') {
+      const controls = Array.from(dialog.querySelectorAll('button:not(:disabled), input:not(:disabled)'));
+      const index = controls.indexOf(document.activeElement);
+      if (!controls.length || index < 0 || (event.shiftKey ? index === 0 : index === controls.length - 1)) {
+        event.preventDefault();
+        (controls[event.shiftKey ? controls.length - 1 : 0] || dialog).focus();
+      }
+    }
+  });
   document.addEventListener("keydown", function (event) {
     if (!state.showBoardDetails || !modal.hidden) return;
     if (event.key === "Escape") {
