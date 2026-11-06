@@ -144,7 +144,7 @@ test("静态资源同源托管：HTML 与 CSP、Content-Type、未知路径落�
     (await a.raw("/icon.svg")).headers["content-type"],
     /image\/svg\+xml/,
   );
-  for (const path of ["/assets/table-lock.svg", "/assets/record-spark.svg", "/assets/roles/prophet.png"]) {
+  for (const path of ["/assets/table-lock.svg", "/assets/identity-hide-muted.svg", "/assets/record-spark.svg", "/assets/roles/prophet.png"]) {
     const asset = await a.raw(path);
     assert.equal(asset.status, 200);
     assert.match(asset.headers["content-type"], /image\//);

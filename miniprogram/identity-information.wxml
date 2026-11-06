@@ -2,13 +2,13 @@
   <view class="identity-information">
     <block wx:if="{{info}}">
       <view wx:if="{{info.showVision}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
-        <view class="identity-info-heading"><text>角色视野</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
+        <view class="identity-info-heading"><text>角色视野</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{compact && info.vision.label==='初始见面匪'}}" class="identity-info-meta identity-info-summary">初始见面匪{{info.vision.players.length?' · '+info.vision.players.length+'人':''}}</text><text wx:elif="{{info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
         <block wx:if="{{info.passive}}">
           <view class="identity-info-result"><text>存活 B 牌坏人</text><text class="identity-info-value">{{info.passive.result}}</text></view>
           <view class="identity-info-note">{{info.passive.note}}</view>
         </block>
         <block wx:else>
-          <view wx:if="{{info.vision.label}}" class="identity-info-caption">{{info.vision.label}}</view>
+          <view wx:if="{{info.vision.label && !(compact && info.vision.label==='初始见面匪')}}" class="identity-info-caption">{{info.vision.label}}</view>
           <view wx:if="{{info.vision.players.length}}" class="identity-info-players {{info.vision.wide?'is-wide':''}}">
             <view wx:for="{{info.vision.players}}" wx:key="seat" class="identity-info-player">
               <view wx:if="{{showAvatars}}" class="vision-player-avatar" aria-hidden="true"><text>{{item.avatarInitial}}</text><image wx:if="{{item.avatarUrl && !item.avatarFailed}}" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="true" /></view>

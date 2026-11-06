@@ -70,7 +70,7 @@ const assets = {
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "record-more", "share-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "record-more", "share-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const name of ["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];

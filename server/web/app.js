@@ -3796,19 +3796,21 @@ function roomListItems(rooms) {
         btn("primary", "revealDealtIdentity", state.busy ? "正在读取…" : "查看身份", null, state.busy || !state.network) +
         btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div>';
   }
-  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false) {
+  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false, compact = false) {
     var info = identityVision.presentIdentity(secret, profiles), vision = info.vision;
-    function heading(label, meta) {
-      return '<div class="identity-info-heading"><span>' + esc(label) + '</span>' + (meta ? '<span class="identity-info-meta">' + esc(meta) + '</span>' : '') + '</div>';
+    function heading(label, meta, summary = false) {
+      return '<div class="identity-info-heading"><span>' + esc(label) + '</span>' + (meta ? '<span class="identity-info-meta' + (summary ? ' identity-info-summary' : '') + '">' + esc(meta) + '</span>' : '') + '</div>';
     }
     function note(text) { return text ? '<div class="identity-info-note">' + esc(text) + '</div>' : ''; }
     function seat(number) { return '<span class="identity-info-seat">' + esc(number) + '<span class="identity-info-unit">号</span></span>'; }
     var html = '<div class="identity-information">';
     if (info.showVision) {
-      html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + heading('角色视野', info.passive?.round ? '第 ' + info.passive.round + ' 轮' : vision.label === '初始见面匪' ? '初始视野' : '');
+      var initialSummary = compact && vision.label === '初始见面匪';
+      var visionMeta = info.passive?.round ? '第 ' + info.passive.round + ' 轮' : initialSummary ? vision.label + (vision.players.length ? ' · ' + vision.players.length + '人' : '') : vision.label === '初始见面匪' ? '初始视野' : '';
+      html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + heading('角色视野', visionMeta, initialSummary);
       if (info.passive) html += '<div class="identity-info-result"><span>存活 B 牌坏人</span><span class="identity-info-value">' + esc(info.passive.result) + '</span></div>' + note(info.passive.note);
       else {
-        if (vision.label) html += '<div class="identity-info-caption">' + esc(vision.label) + '</div>';
+        if (vision.label && !initialSummary) html += '<div class="identity-info-caption">' + esc(vision.label) + '</div>';
         html += vision.players.length ? '<div class="identity-info-players' + (vision.wide ? ' is-wide' : '') + '">' + vision.players.map(player => '<div class="identity-info-player">' +
           (showAvatars ? '<div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
             (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') + '</div>' : '') + seat(player.seat) +
@@ -4311,11 +4313,11 @@ function roomListItems(rooms) {
         var identity = state.secret;
         var art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
         html += '<div class="identity open identity-compact">' +
-          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div>' + btn('text-button compact-hide', 'reveal', '立即遮盖') + '</div>' +
-          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div><span class="compact-faction faction-' + (identity.factionTone || '') + '">● ' + esc(identity.faction) + '</span></div>' +
+          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><img src="/assets/identity-hide-muted.svg" alt="" /><span>立即遮盖</span></button></div>' +
+          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title">' + esc(identity.role) + '</div><span class="compact-faction faction-' + (identity.factionTone || '') + '">' + esc(identity.faction) + '</span></div>' +
           (identity.identityHistory?.length > 1 ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
           (identity.outcome ? '<div class="compact-outcome ' + (identity.outcome === '本局你获胜' ? 'faction-good' : identity.outcome === '本局你失败' ? 'faction-evil' : '') + '">' + esc(identity.outcome) + '</div>' : '') +
-          viewIdentityInformation(identity) + viewSkillStatus(identity) + viewSkillHistory(identity, true) + '</div>';
+          viewIdentityInformation(identity, state.seats, false, true) + viewSkillStatus(identity) + viewSkillHistory(identity, true) + '</div>';
       }
     }
 

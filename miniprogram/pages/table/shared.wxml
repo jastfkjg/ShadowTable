@@ -443,14 +443,14 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open identity-compact">
-        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal">立即遮盖</button></view>
+        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>立即遮盖</text></button></view>
         <view class="compact-role-heading">
           <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
-          <view class="compact-role-copy"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><text class="compact-faction faction-{{secret.factionTone}}">● {{secret.faction}}</text></view>
+          <view class="compact-role-copy"><view class="compact-role-title">{{secret.role}}</view><text class="compact-faction faction-{{secret.factionTone}}">{{secret.faction}}</text></view>
           <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
         <view wx:if="{{secret.outcome}}" class="compact-outcome {{secret.outcome==='本局你获胜'?'faction-good':secret.outcome==='本局你失败'?'faction-evil':''}}">{{secret.outcome}}</view>
-        <template is="identityInformation" data="{{info:secret.info, fallback:secret.information}}" />
+        <template is="identityInformation" data="{{info:secret.info, fallback:secret.information, compact:true}}" />
         <template is="identitySkillStatus" data="{{status:secret.skillStatus}}" />
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>

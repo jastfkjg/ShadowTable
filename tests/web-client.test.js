@@ -1442,7 +1442,12 @@ test("网页断网或等待请求时仍可立即遮盖身份", async () => {
   c.state.secret = { role: "私密身份", information: "私密视野" };
   c.state.busy = true;
   c.state.network = false;
-  assert.match(c.viewRoom(), /data-action="reveal">立即遮盖/);
+  const hideButton = c.viewRoom().match(/<button\b[^>]*\bclass="[^"]*\bcompact-hide\b[^"]*"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(hideButton, "当前身份卡提供立即遮盖按钮");
+  const hideButtonTag = hideButton.match(/^<button\b[^>]*>/)[0];
+  assert.match(hideButtonTag, /\sdata-action="reveal"/);
+  assert.doesNotMatch(hideButtonTag, /\sdisabled(?:\s|=|>)/);
+  assert.equal(hideButton.replace(/<[^>]*>/g, "").trim(), "立即遮盖");
   await c.ACTIONS.reveal();
   assert.equal(c.state.revealed, false);
   assert.doesNotMatch(c.viewRoom(), /私密身份|私密视野/);

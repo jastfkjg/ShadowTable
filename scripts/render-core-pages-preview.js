@@ -468,6 +468,13 @@ for (const role of compactRoles) {
     secret: { ...secret, factionTone: tone, portrait: portrait(secret.role, tone).portrait } });
 }
 const compactLong = tableScenes['compact-identity-assassin'];
+// Screenshot reference for the refined inline card; intentionally fixed sample data.
+tableScenes['compact-identity-reference'] = { ...tableScenes['compact-identity-morgana'],
+  seats: tableScenes['compact-identity-morgana'].seats.map(player => ({ ...player,
+    name: player.seat === 7 ? '陪测6' : player.seat === 12 ? '陪测11' : player.name })),
+  secret: { role: '莫甘娜', faction: '坏人阵营', factionTone: 'evil', portrait: portrait('莫甘娜', 'evil').portrait,
+    information: '初始见面匪：7号（刺客）、12号（莫德雷德）。 6号查验结果：好人（第1轮）',
+    skillStatus: { title: '无主动技能' } } };
 tableScenes['compact-identity-long'] = { ...compactLong, seats: compactLong.seats.map(player => ({ ...player, name: '一个很长的完整玩家昵称测试' })),
   secret: { ...compactLong.secret, role: '觉醒蓝刀客·加赫雷斯', identityHistory: [{ current: true }, { id: 0 }] } };
 const processProjection=`<script>window.fitProcessSheet=()=>{const dealt=document.querySelector('.dealt-identity-dialog'),sheet=dealt||document.querySelector('.process-sheet');if(!sheet)return;const fit=${fitBody.toString()},selectors=dealt?['.dealt-identity-backdrop','.dealt-identity-top','.dealt-identity-fields','.dealt-identity-footer']:['.process-backdrop','.process-sheet-top','.process-sheet-fields','.process-sheet-footer'],rects=selectors.map(s=>document.querySelector(s)?.getBoundingClientRect());const height=fit(rects);if(height!==null){sheet.querySelector(dealt?'.dealt-identity-body':'.process-sheet-body').style.height=height+'px';sheet.classList.add('has-measured-body');}};addEventListener('load',window.fitProcessSheet);addEventListener('resize',window.fitProcessSheet);</script>`;
