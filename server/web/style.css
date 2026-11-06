@@ -570,8 +570,15 @@ button.identity-compact {
 
 /* Host tools */
 .host-panel {
-  border-style: dashed;
+  --host-panel-outline: rgba(229, 198, 139, .42);
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--host-panel-outline);
+  border-radius: 15px;
+  background: var(--control-bg);
 }
+.host-panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+.host-panel-heading .label { margin-bottom: 0; }
 .tool-actions,
 .tool-seat-grid {
   display: grid;
@@ -579,9 +586,12 @@ button.identity-compact {
   gap: 8px;
   margin: 12px 0;
 }
-.tool-actions button {
-  margin: 0;
-}
+.host-panel .tool-actions { margin-bottom: 0; }
+.tool-actions button { margin: 0; border-color: rgba(177,191,198,.13); border-radius: 12px; background: var(--surface); }
+.tool-actions button:nth-child(-n+2) { border-color: var(--host-panel-outline); }
+.tool-actions.has-three-extras { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.tool-actions.has-three-extras button:nth-child(-n+2) { grid-column: span 3; }
+.tool-actions.has-three-extras button:nth-child(n+3) { grid-column: span 2; min-width: 0; padding-left: 6px; padding-right: 6px; }
 button.tool-seat-option {
   width: 100%;
   min-width: 0;
@@ -1328,7 +1338,6 @@ button.history-toggle { width: auto; min-height: 44px; padding: 8px 4px; margin:
 .seat-summary { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 .task-progress .quest-summary { margin: 8px 0; flex-wrap: wrap; }
 .task-progress .quest-timeline { margin: 8px 0 0; }
-.host-panel { margin: 16px 0; padding: 16px; border-color: var(--border); }
 .history-heading { flex-wrap: wrap; }
 
 .result-summary-heading > .small { color: var(--accent); font-size: 12px; letter-spacing: 0.5px; }

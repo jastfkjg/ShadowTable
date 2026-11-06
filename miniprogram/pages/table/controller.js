@@ -1001,6 +1001,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.updateChangedData({
       ...privacyUpdate, ...identityProfileUpdate, honors, ...honorState,
       ...(stageChanged ? { resultDialog: false } : {}),
+      ...(room.phase === "quest" && this.data.toolType ? { toolType: "" } : {}),
       ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
       actionEntryLabel,
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
@@ -2001,7 +2002,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   openTool(e) {
     const room = this.data.room;
-    if (!room?.canUseTools || this.data.busy || this.pending) return;
+    if (!room?.canUseTools || room.phase === "quest" || this.data.busy || this.pending) return;
     const toolType = e.currentTarget.dataset.kind;
     const toolSeats = ["vote", "quest"].includes(toolType)
       ? [...room.team]

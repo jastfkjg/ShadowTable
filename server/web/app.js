@@ -3322,7 +3322,7 @@ function roomListItems(rooms) {
   // ===== host tools =====
   function openTool(kind) {
     var room = state.room;
-    if (!room || !room.canUseTools || state.busy) return;
+    if (!room || !room.canUseTools || room.phase === "quest" || state.busy) return;
     var toolSeats =
       ["vote", "quest"].indexOf(kind) !== -1 ? room.team.slice() : [];
     toolStage = room.stage;
@@ -4373,17 +4373,39 @@ function roomListItems(rooms) {
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
-    if (r.canUseTools) {
+    if (r.canUseTools && r.operationProgress) {
+      var progress = r.operationProgress;
+      var allCompleted = progress.total > 0 && progress.completed === progress.total;
       html +=
-        '<div class="panel host-panel"><div class="label">房主操作</div>' +
+        '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '"><button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '"><span class="progress-title">当前操作进度</span>' +
+        '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">已完成</span></span>' +
+        '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>' +
+        '<div class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="' + progress.total + '" aria-valuenow="' + progress.completed + '">';
+      for (var segment = 0; segment < progress.total; segment++) {
+        html += '<span class="progress-segment' + (segment < progress.completed ? ' completed' : '') + '"></span>';
+      }
+      html += '</div><div class="progress-note" role="status"><span class="progress-note-dot" aria-hidden="true"></span><span>' +
+        (allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
+      if (state.operationProgressExpanded) {
+        html += '<div class="progress-players" role="list">';
+        for (var q = 0; q < (progress.players || []).length; q++) {
+          var pp = progress.players[q];
+          if (!pp.required) continue;
+          html += '<div class="progress-player' + (pp.completed ? ' completed' : '') + '" role="listitem" aria-label="' + esc(pp.seat + '号，' + pp.name + '，' + (pp.completed ? '已完成' : '待完成')) + '">' +
+            '<span class="progress-seat" aria-hidden="true">' + esc(pp.seat) + '</span><span class="progress-player-name" aria-hidden="true">' + esc(pp.name) + '</span>' +
+            '<span class="progress-state ' + (pp.completed ? 'completed' : 'pending') + '" aria-hidden="true"></span></div>';
+        }
+        html += '</div><div class="progress-legend" aria-hidden="true"><span class="progress-legend-item"><span class="progress-state completed"></span><span>已完成</span></span><span class="progress-legend-item"><span class="progress-state pending"></span><span>待完成</span></span></div>';
+      }
+      html += "</div>";
+    }
+    if (r.canUseTools && r.phase !== "quest") {
+      html +=
+        '<div class="panel host-panel"><div class="host-panel-heading"><div class="label">房主操作</div>' +
         (r.knights
-          ? '<div class="small muted">第' +
-            r.knights.round +
-            "轮 · B牌剩余" +
-            r.knights.remainingCards +
-            '张</div>'
+          ? '<div class="small muted">B牌剩余' + esc(r.knights.remainingCards) + '张</div>'
           : "") +
-        '<div class="tool-actions">' +
+        '</div><div class="tool-actions' + (r.knights && r.fairyEnabled ? ' has-three-extras' : '') + '">' +
         btn("secondary", "openTool", "投票", { kind: "vote" }, state.busy) +
         btn("secondary", "openTool", "做任务", { kind: "quest" }, state.busy) +
         (r.knights
@@ -4397,32 +4419,6 @@ function roomListItems(rooms) {
           ? btn("secondary", "openTool", "刀逆仆", { kind: "reverseStrike" }, state.busy)
           : "") +
         "</div>";
-      if (r.operationProgress) {
-        var progress = r.operationProgress;
-        var allCompleted = progress.total > 0 && progress.completed === progress.total;
-        html +=
-          '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '"><button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '"><span class="progress-title">当前操作进度</span>' +
-          '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">已完成</span></span>' +
-          '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>' +
-          '<div class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="' + progress.total + '" aria-valuenow="' + progress.completed + '">';
-        for (var segment = 0; segment < progress.total; segment++) {
-          html += '<span class="progress-segment' + (segment < progress.completed ? ' completed' : '') + '"></span>';
-        }
-        html += '</div><div class="progress-note" role="status"><span class="progress-note-dot" aria-hidden="true"></span><span>' +
-          (allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
-        if (state.operationProgressExpanded) {
-          html += '<div class="progress-players" role="list">';
-          for (var q = 0; q < (progress.players || []).length; q++) {
-            var pp = progress.players[q];
-            if (!pp.required) continue;
-            html += '<div class="progress-player' + (pp.completed ? ' completed' : '') + '" role="listitem" aria-label="' + esc(pp.seat + '号，' + pp.name + '，' + (pp.completed ? '已完成' : '待完成')) + '">' +
-              '<span class="progress-seat" aria-hidden="true">' + esc(pp.seat) + '</span><span class="progress-player-name" aria-hidden="true">' + esc(pp.name) + '</span>' +
-              '<span class="progress-state ' + (pp.completed ? 'completed' : 'pending') + '" aria-hidden="true"></span></div>';
-          }
-          html += '</div><div class="progress-legend" aria-hidden="true"><span class="progress-legend-item"><span class="progress-state completed"></span><span>已完成</span></span><span class="progress-legend-item"><span class="progress-state pending"></span><span>待完成</span></span></div>';
-        }
-        html += "</div>";
-      }
       html += "</div>";
     }
     var quests = r.phase === "lobby" ? [] : state.history.filter(function (h) { return h.questResult; });

@@ -903,7 +903,7 @@ test("投票和私密操作只在弹窗显示，已提交后弹窗消失且入�
   assert.ok(JSON.stringify(done).includes("已提交，等待其他玩家"));
 });
 
-test("房主工具入口覆盖任意发牌后阶段，普通玩家不能看见管理入口", () => {
+test("房主工具入口在任务出牌时收起，普通玩家不能看见管理入口", () => {
   for (const phase of [
     "tools",
     "identity",
@@ -924,7 +924,7 @@ test("房主工具入口覆盖任意发牌后阶段，普通玩家不能看见�
     const host = render({ ...base, room });
     assert.equal(
       nodes(host).filter((n) => n.attr?.bindtap === "openTool").length,
-      3,
+      phase === "quest" ? 0 : 3,
     );
     assert.equal(byHandler(host, "advance"), undefined);
     assert.ok(byHandler(host, "finishTools"));
@@ -1061,18 +1061,20 @@ test("十二骑士不提供主动先知查验和刀梅林入口，新身份提�
   const room = {
     phase: "tools",
     canUseTools: true,
-    knights: { round: 2 },
+    knights: { round: 2, remainingCards: 12 },
+    fairyEnabled: true,
     team: [],
     me: { isHost: true },
   };
   const tree = render({ ...base, room });
+  const heading = nodes(tree).find(n => n.attr?.class === "host-panel-heading");
+  assert.deepEqual(Array.from(heading.children, n => n.children.join("")), ["房主操作", "B牌剩余12张"]);
+  assert.ok(nodes(tree).some(n => n.attr?.class === "tool-actions has-three-extras"));
+  assert.ok(nodes(render({ ...base, room: { ...room, fairyEnabled: false } })).some(n => n.attr?.class === "tool-actions"));
   const kinds = nodes(tree)
     .filter((n) => n.attr?.bindtap === "openTool")
     .map((n) => n.attr["data-kind"]);
-  assert.ok(!kinds.includes("assassination"));
-  assert.ok(!kinds.includes("offline"));
-  assert.ok(!kinds.includes("night"));
-  assert.ok(!kinds.includes("nextRound"));
+  assert.deepEqual(kinds, ["vote", "quest", "skills", "conversion", "fairy"]);
   const popupData = {
     ...base,
     room,
@@ -1261,20 +1263,32 @@ test("移交入口仅在管理员设置页显示，玩家列表按需弹出", ()
 test("自动结算牌桌展示个人状态和持久结果，房主可结束等待而不需点结算", () => {
   const room = {
     phase: "quest", flexible: true, canUseTools: true, hasActiveOperation: true,
-    closeWaiting: { mode: "cancel" },
+    closeWaiting: { mode: "questDefault", label: "跳过未提交玩家并结算" },
+    operationProgress: { total: 2, completed: 1 },
     operationStatus: { title: "本次你无需操作", detail: "参与者全部提交后自动结算" },
     needsSubmission: false, team: [2, 3], me: { isHost: true, submitted: false },
   };
   const data = { ...base, room, settleHint: "还差 1 人提交", latestResult: { text: "投票通过 · 提前截止", detail: "4票赞成\n2票弃权" } };
   const tree = render(data);
   assert.equal(byHandler(tree, "settleTool"), undefined);
-  assert.equal(byHandler(tree, "cancelTool"), undefined);
+  assert.equal(byHandler(tree, "openTool"), undefined);
   assert.equal(byHandler(tree, "openAction"), undefined);
-  assert.equal(byHandler(tree, "closeWaiting").attr.disabled, false);
+  const flat = nodes(tree);
+  const progressIndex = flat.indexOf(byHandler(tree, "toggleOperationProgress"));
+  assert.ok(progressIndex > flat.findIndex(n => n.attr?.class === "phase-strip"));
+  assert.ok(progressIndex < flat.findIndex(n => n.attr?.class === "task-progress"));
+  const dock = flat.find(n => n.attr?.class === "public-history-dock with-host-actions");
+  assert.equal(byHandler(dock, "closeWaiting").attr.disabled, false);
+  assert.ok(byHandler(dock, "cancelTool"));
+  const singleAction = render({ ...data, room: { ...room, closeWaiting: { mode: "cancel" } } });
+  assert.equal(byHandler(singleAction, "cancelTool"), undefined);
   assert.ok(JSON.stringify(tree).includes("本次你无需操作"));
   assert.ok(!JSON.stringify(tree).includes("2票弃权"));
-  const waiting = render({ ...data, room: { ...room, phase: "tools" } });
+  const waiting = render({ ...data, room: { ...room, phase: "tools", hasActiveOperation: false, operationProgress: null, closeWaiting: null } });
   assert.ok(JSON.stringify(waiting).includes("2票弃权"));
+  assert.ok(byHandler(waiting, "openTool"));
+  assert.equal(byHandler(waiting, "toggleOperationProgress"), undefined);
+  assert.equal(byHandler(waiting, "closeWaiting"), undefined);
   assert.equal(byHandler(render({ ...data, network: false }), "closeWaiting").attr.disabled, true);
   const submitted = render({ ...data, room: { ...room, canUseTools: false, closeWaiting: null, needsSubmission: true, me: { submitted: true }, operationStatus: { title: "已提交，等待其他玩家" } } });
   assert.equal(byHandler(submitted, "closeWaiting"), undefined);

@@ -224,6 +224,13 @@ test('网页红蓝兰斯提供独立转换入口，基础板隐藏转换，十�
       assert.equal(html.includes('data-kind="conversion"'), board !== "classic");
       assert.equal(html.includes('data-kind="skills"'), board === "knights");
       assert.equal(html.includes("B牌剩余"), board === "knights");
+      if (board === "knights") {
+        assert.match(html, /<div class="host-panel-heading"><div class="label">房主操作<\/div><div class="small muted">B牌剩余\d+张<\/div><\/div>/);
+        assert.match(html, /class="tool-actions has-three-extras"/);
+        assert.deepEqual(Array.from(html.matchAll(/data-action="openTool" data-kind="([^"]+)"/g), m => m[1]), ["vote", "quest", "skills", "conversion", "fairy"]);
+        c.state.room.fairyEnabled = false;
+        assert.match(c.viewRoom(), /class="tool-actions"/);
+      }
     }
   } finally { c.stop(); }
 });
@@ -1068,6 +1075,12 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   assert.match(c.state.latestResult.text, /提前截止/);
   const html = c.viewRoom();
   assert.doesNotMatch(html, /最近操作结果|上次结果/);
+  assert.doesNotMatch(html, /data-action="openTool"/);
+  const progressIndex = html.indexOf('data-action="toggleOperationProgress"');
+  assert.ok(progressIndex > html.indexOf('class="phase-strip"'));
+  assert.ok(progressIndex < html.indexOf('class="task-progress"'));
+  c.ACTIONS.openTool({ dataset: { kind: "vote" } });
+  assert.equal(c.state.toolType, "");
   c.state.dealtIdentityDialog = false;
   c.ACTIONS.openHistory();
   assert.match(c.viewHistorySheet(), /id="history-record-0"/);
@@ -1075,12 +1088,22 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   c.ACTIONS.toggleHistoryRow({ dataset: { key: '0' } });
   assert.match(c.viewHistorySheet(), /5票弃权/);
   assert.match(html, /本次你无需操作/);
-  assert.match(c.viewHostBar(), /跳过未交牌玩家并结算/);
+  assert.match(c.viewHostBar(), /跳过未提交玩家并结算/);
   assert.ok(!c.viewHostBar().includes('data-action="settleTool"'));
   assert.ok(c.viewHostBar().includes('data-action="cancelTool"'));
   run("p2", "submit", { value: "success" });
   await c.refresh();
   assert.equal(c.state.latestResult.text, "任务成功");
+  assert.match(c.viewRoom(), /data-action="openTool"/);
+  assert.doesNotMatch(c.viewRoom(), /data-action="toggleOperationProgress"/);
+  assert.equal(c.viewHostBar(), "");
+  run("p1", "beginActivity", { kind: "quest", team: [2], threshold: 1 });
+  await c.refresh();
+  assert.doesNotMatch(c.viewRoom(), /data-action="openTool"/);
+  run("p1", "cancelActivity");
+  await c.refresh();
+  assert.match(c.viewRoom(), /data-action="openTool"/);
+  assert.equal(c.viewHostBar(), "");
   run("p1", "finishTools");
   run("p1", "rematch");
   await c.refresh();

@@ -461,39 +461,41 @@
       <block wx:else><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
-      <view wx:if="{{room.canUseTools}}" class="panel host-panel">
-        <view class="label">房主操作</view>
-        <view wx:if="{{room.knights}}" class="small muted">第{{room.knights.round}}轮 · B牌剩余{{room.knights.remainingCards}}张</view>
-        <view class="tool-actions">
-          <button hover-class="none" class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
-          <button hover-class="none" class="secondary" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">做任务</button>
-          <button hover-class="none" wx:if="{{room.knights}}" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
-          <button hover-class="none" wx:if="{{room.knights || room.supportsConversion}}" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
-          <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
-          <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
-        </view>
-        <view wx:if="{{room.operationProgress}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
-          <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}" aria-label="{{'当前操作进度，'+room.operationProgress.completed+'人已完成，共'+room.operationProgress.total+'人，'+(operationProgressExpanded?'收起':'展开')}}">
-            <text class="progress-title">当前操作进度</text>
-            <view class="progress-count"><text class="progress-completed-count">{{room.operationProgress.completed}}</text><text class="progress-total">/ {{room.operationProgress.total}}</text><text class="progress-count-label">已完成</text></view>
-            <view class="progress-disclosure" aria-hidden="true"><text>{{operationProgressExpanded?'收起':'展开'}}</text><view class="progress-chevron {{operationProgressExpanded?'expanded':''}}" /></view>
-          </button>
-          <view class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="{{room.operationProgress.total}}" aria-valuenow="{{room.operationProgress.completed}}">
-            <view wx:for="{{operationProgressSegments}}" wx:key="index" class="progress-segment {{item.completed?'completed':''}}" />
-          </view>
-          <view class="progress-note" role="status"><view class="progress-note-dot" aria-hidden="true" /><text>{{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'全部玩家已完成操作':room.operationProgress.total > 0?'等待 '+(room.operationProgress.total-room.operationProgress.completed)+' 位玩家完成操作':'暂无待完成操作'}}</text></view>
-          <block wx:if="{{operationProgressExpanded}}">
-            <view class="progress-players" role="list">
-              <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{item.required}}" class="progress-player {{item.completed?'completed':''}}" role="listitem" aria-label="{{item.seat+'号，'+item.name+'，'+(item.completed?'已完成':'待完成')}}">
-                <text class="progress-seat" aria-hidden="true">{{item.seat}}</text>
-                <text class="progress-player-name" aria-hidden="true">{{item.name}}</text>
-                <view class="progress-state {{item.completed?'completed':'pending'}}" aria-hidden="true" />
-              </view>
-            </view>
-            <view class="progress-legend" aria-hidden="true"><view class="progress-legend-item"><view class="progress-state completed" /><text>已完成</text></view><view class="progress-legend-item"><view class="progress-state pending" /><text>待完成</text></view></view>
-          </block>
-        </view>
+    <view wx:if="{{room.canUseTools && room.operationProgress}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
+      <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}" aria-label="{{'当前操作进度，'+room.operationProgress.completed+'人已完成，共'+room.operationProgress.total+'人，'+(operationProgressExpanded?'收起':'展开')}}">
+        <text class="progress-title">当前操作进度</text>
+        <view class="progress-count"><text class="progress-completed-count">{{room.operationProgress.completed}}</text><text class="progress-total">/ {{room.operationProgress.total}}</text><text class="progress-count-label">已完成</text></view>
+        <view class="progress-disclosure" aria-hidden="true"><text>{{operationProgressExpanded?'收起':'展开'}}</text><view class="progress-chevron {{operationProgressExpanded?'expanded':''}}" /></view>
+      </button>
+      <view class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="{{room.operationProgress.total}}" aria-valuenow="{{room.operationProgress.completed}}">
+        <view wx:for="{{operationProgressSegments}}" wx:key="index" class="progress-segment {{item.completed?'completed':''}}" />
       </view>
+      <view class="progress-note" role="status"><view class="progress-note-dot" aria-hidden="true" /><text>{{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'全部玩家已完成操作':room.operationProgress.total > 0?'等待 '+(room.operationProgress.total-room.operationProgress.completed)+' 位玩家完成操作':'暂无待完成操作'}}</text></view>
+      <block wx:if="{{operationProgressExpanded}}">
+        <view class="progress-players" role="list">
+          <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{item.required}}" class="progress-player {{item.completed?'completed':''}}" role="listitem" aria-label="{{item.seat+'号，'+item.name+'，'+(item.completed?'已完成':'待完成')}}">
+            <text class="progress-seat" aria-hidden="true">{{item.seat}}</text>
+            <text class="progress-player-name" aria-hidden="true">{{item.name}}</text>
+            <view class="progress-state {{item.completed?'completed':'pending'}}" aria-hidden="true" />
+          </view>
+        </view>
+        <view class="progress-legend" aria-hidden="true"><view class="progress-legend-item"><view class="progress-state completed" /><text>已完成</text></view><view class="progress-legend-item"><view class="progress-state pending" /><text>待完成</text></view></view>
+      </block>
+    </view>
+    <view wx:if="{{room.canUseTools && room.phase!=='quest'}}" class="panel host-panel">
+      <view class="host-panel-heading">
+        <view class="label">房主操作</view>
+        <view wx:if="{{room.knights}}" class="small muted">B牌剩余{{room.knights.remainingCards}}张</view>
+      </view>
+      <view class="tool-actions{{room.knights && room.fairyEnabled?' has-three-extras':''}}">
+        <button hover-class="none" class="secondary" bindtap="openTool" data-kind="vote" disabled="{{hasPendingRequest || busy}}">投票</button>
+        <button hover-class="none" class="secondary" bindtap="openTool" data-kind="quest" disabled="{{hasPendingRequest || busy}}">做任务</button>
+        <button hover-class="none" wx:if="{{room.knights}}" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
+        <button hover-class="none" wx:if="{{room.knights || room.supportsConversion}}" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
+        <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
+        <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
+      </view>
+    </view>
     <view class="task-progress">
       <view class="section-title history-heading">
         <view class="seat-section-title"><text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家'}}</text><text wx:if="{{room.phase!=='lobby'}}" class="seat-count">{{seatOccupiedCount}}/{{room.capacity}} 人</text></view>

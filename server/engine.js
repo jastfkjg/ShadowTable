@@ -1116,7 +1116,7 @@ function closeWaitingPolicy(room) {
   if (room.phase === "quest")
     return {
       mode: "questDefault",
-      label: "跳过未交牌玩家并结算",
+      label: "跳过未提交玩家并结算",
       title: "跳过未交牌玩家？",
       description:
         "未交牌玩家按当前阵营补票：好人默认成功，坏人默认失败。已提交的牌不会更改；只公开汇总票数，不公开出牌人。",

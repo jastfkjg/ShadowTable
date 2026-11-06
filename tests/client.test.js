@@ -1162,6 +1162,9 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     await host.launchTool();
     await settle(host);
     await refresh();
+    assert.equal(host.data.room.phase, "quest");
+    host.openTool({ currentTarget: { dataset: { kind: "vote" } } });
+    assert.equal(host.data.toolType, "");
     for (const p of ps.slice(0, 2)) {
       await p.openAction();
       await p.submitChoice({ currentTarget: { dataset: { value: "success" } } });

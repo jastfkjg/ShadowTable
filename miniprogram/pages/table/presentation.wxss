@@ -97,11 +97,24 @@
 .table-room .result-team { font-size: 12px; }
 .table-room .latest-result .history-detail { margin-top: 12px; font-size: 13px; }
 .table-room .history-result-line { font-size: 13px; }
-.table-room .host-panel { margin: 16px 0; padding-bottom: 16px; }
+.table-room .host-panel {
+  --host-panel-outline: rgba(229, 198, 139, .42);
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--host-panel-outline);
+  border-radius: 15px;
+  background: var(--control-bg);
+}
+.host-panel-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+.host-panel-heading .label { margin-bottom: 0; }
 .table-room .host-panel .label, .table-room .host-panel button { font-size: 14px; }
 .table-room .host-panel button { min-height: 44px; }
-.table-room .host-panel .tool-actions { gap: 8px; margin-top: 12px; }
+.table-room .host-panel .tool-actions { gap: 8px; margin: 12px 0 0; }
 .table-room .host-panel .tool-actions button { margin: 0; padding: 10px 12px; border: 1px solid rgba(177,191,198,.13); border-radius: 12px; background: var(--surface); }
+.table-room .host-panel .tool-actions button:nth-child(-n+2) { border-color: var(--host-panel-outline); }
+.tool-actions.has-three-extras { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.tool-actions.has-three-extras button:nth-child(-n+2) { grid-column: span 3; }
+.table-room .host-panel .tool-actions.has-three-extras button:nth-child(n+3) { grid-column: span 2; min-width: 0; padding-left: 6px; padding-right: 6px; }
 
 /* Inline identity is rendered only by the existing explicit-reveal guard. */
 .table-room .identity.open { margin: 16px 0; padding: 4px 16px 14px; border: 0; border-radius: 21px; background: var(--surface); text-align: left; }
