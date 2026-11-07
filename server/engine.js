@@ -1118,9 +1118,9 @@ function closeWaitingPolicy(room) {
     return {
       mode: "questDefault",
       label: "跳过未提交玩家并结算",
-      title: "跳过未交牌玩家？",
+      title: "提前结算本次任务？",
       description:
-        "未交牌玩家按当前阵营补票：好人默认成功，坏人默认失败。已提交的牌不会更改；只公开汇总票数，不公开出牌人。",
+        "未交牌玩家将按当前阵营补票：\n好人默认成功，坏人默认失败。",
     };
   if (["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase))
     return {

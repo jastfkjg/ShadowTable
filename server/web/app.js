@@ -4299,7 +4299,7 @@ function roomListItems(rooms) {
       ${tool('openRoomRules', '查看本局角色配置与计分说明', 'room-config')}
       ${room.me.isHost ? tool('toggleRoomSettings', '打开房间设置', 'room-settings', blocked) : ''}
     </div>`;
-    const identityLabel = state.revealed ? '遮盖身份' : '查看身份';
+    const identityLabel = state.revealed ? '隐藏身份' : '查看身份';
     return `<div class="lobby-room-header"><div class="room-summary">
       <button type="button" class="copy-room lobby-room-code" data-action="copyRoomCode" aria-label="复制房间号${esc(room.code)}"><span>房间 ${esc(room.code)}</span><img src="/assets/sheet-copy.svg" alt="" /></button>
       ${lobby ? toolbar : spectator ? '' : `<div class="room-identity-anchor"><button type="button" class="room-identity${state.identityHintVisible ? ' identity-entry-highlight' : ''}" data-action="reveal" aria-label="${room.me.seat}号 · ${identityLabel}"${!state.revealed && (state.busy || !state.network) ? ' disabled' : ''}><span class="room-identity-icon" aria-hidden="true"></span>${identityLabel}</button>
@@ -4338,8 +4338,8 @@ function roomListItems(rooms) {
         var identity = state.secret;
         var art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
         html += '<div class="identity open identity-compact">' +
-          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><img src="/assets/identity-hide-muted.svg" alt="" /><span>立即遮盖</span></button></div>' +
-          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title">' + esc(identity.role) + '</div><span class="compact-faction faction-' + (identity.factionTone || '') + '">' + esc(identity.faction) + '</span></div>' +
+          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></button></div>' +
+          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div><div class="compact-faction faction-' + (identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span></div></div>' +
           (identity.identityHistory?.length > 1 ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
           viewIdentityInformation(identity, state.seats, false, true) + viewSkillHistory(identity, true) + '</div>';
       }

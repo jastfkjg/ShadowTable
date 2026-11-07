@@ -135,7 +135,7 @@ test('开局后图标工具栏沿用角色权限，身份入口及遮盖、加�
       for(const revealed of [false,true]) {
         const state={...data,revealed};
         const identity=byHandler(renderTable(state),'reveal');
-        assert.equal(identity.attr.ariaLabel,seat+'号 · '+(revealed?'遮盖我的身份':'查看我的身份'));
+        assert.equal(identity.attr.ariaLabel,seat+'号 · '+(revealed?'隐藏我的身份':'查看我的身份'));
         assert.equal(identity.attr.disabled,false);
         assert.equal(byHandler(renderTable({...state,network:false}),'reveal').attr.disabled,!revealed);
         assert.equal(byHandler(renderTable({...state,busy:true}),'reveal').attr.disabled,!revealed);
@@ -507,7 +507,8 @@ test('房主始终位于座位右上角，湖仙徽章独立于头像并保留�
   const seat = {seat:1,name:'甲',occupied:true,mine:true,host:true,alive:false,inTeam:true};
   for (const phase of ['lobby','tools','quest','ended']) {
     const room = {phase,capacity:6,team:[1],me:{seat:1},fairyHolder:1};
-    const button = byHandler(render({...base,room,seats:[seat]}), 'seat');
+    const tree = render({...base,room,seats:[seat],teamText:'1'});
+    const button = byHandler(tree, 'seat');
     const head = nodes(button).find(n => n.attr?.class === 'seat-head-tags');
     assert.deepEqual(Array.from(nodes(head).find(n => n.attr?.class === 'seat-flag').children), ['房主']);
     assert.equal(nodes(button).filter(n => n.attr?.class === 'seat-flag').length, 1);
@@ -517,9 +518,19 @@ test('房主始终位于座位右上角，湖仙徽章独立于头像并保留�
     assert.equal(!!fairy, phase !== 'lobby');
     if (phase !== 'lobby') {
       assert.match(button.attr.class, /has-fairy/);
-      assert.match(JSON.stringify(button), /任务队员|已出局/);
+      assert.match(button.attr.ariaLabel, /任务队员/);
+      assert.ok(!nodes(button).some(n => n.attr?.class === 'seat-status'));
+      assert.ok(nodes(button).some(n => n.attr?.class === 'seat-out'));
+      assert.ok(nodes(avatar).some(n => n.attr?.class === 'seat-self'));
+      const summary = nodes(tree).find(n => n.attr?.class === 'seat-team-summary');
+      assert.match(JSON.stringify(summary), /任务队伍/);
+      assert.deepEqual(Array.from(nodes(summary).find(n => n.attr?.class === 'seat-team-seats').children), ['1号']);
+    } else {
+      assert.ok(!nodes(tree).some(n => n.attr?.class === 'seat-team-summary'));
     }
   }
+  const noTeam = render({...base,room:{phase:'tools',team:[],me:{seat:1}},seats:[{...seat,inTeam:false}]});
+  assert.ok(!nodes(noTeam).some(n => n.attr?.class === 'seat-team-summary'));
 });
 test("座位头像固定占位且失败回退，保留座位按钮和全部公开状态", () => {
   const room = { phase: "proposal", flexible: false, leader: 1, fairyHolder: 1, capacity: 6, me: { seat: 1 } };

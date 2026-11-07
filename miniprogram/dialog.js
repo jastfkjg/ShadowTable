@@ -11,12 +11,15 @@ function show(options = {}) {
 
 function present(options = {}) {
   const emphasisAt = options.emphasis ? (options.content || "").indexOf(options.emphasis) : -1;
+  const questLines = options.variant === "quest-settlement" ? (options.content || "").split("\n") : [];
   return {
     ...(["room-confirm", "about"].includes(options.variant) ? { variant: options.variant, emphasis: emphasisAt >= 0 ? options.emphasis : "", contentBefore: emphasisAt >= 0 ? options.content.slice(0, emphasisAt) : "", contentAfter: emphasisAt >= 0 ? options.content.slice(emphasisAt + options.emphasis.length) : "" } : {}),
     ...(options.variant === "about" ? { subtitle: options.subtitle || "" } : {}),
     ...(options.variant === 'badge-awards' ? { variant: 'badge-awards', awards: options.awards } : {}),
     ...(options.variant === "fun-record" ? { variant: options.variant, info: options.info } : {}),
     ...(options.variant === "avoidance-grant" ? { variant: options.variant, lead: typeof options.lead === "string" ? options.lead : "" } : {}),
+    ...(options.variant === "quest-settlement" ? { variant: options.variant, lead: questLines[0],
+      ruleParts: questLines.slice(1).join("\n").split(/(成功|失败)/).map(text => ({ text, tone: text === "成功" ? "good" : text === "失败" ? "evil" : "" })) } : {}),
     title: options.title || "操作提示",
     content: options.content || "",
     contextLabel: options.contextLabel || "",
