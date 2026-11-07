@@ -36,6 +36,9 @@ test('互认只展示私密文本已披露的座位身份，能力和仙女不�
   assert.ok(ambiguous.vision.players.every(p=>p.role===''));
   assert.equal(ambiguous.vision.note,'你无法区分谁是梅林。');
   assert.deepEqual(ambiguous.fairy,{seat:8,faction:'好人',tone:'good'});
+  const converted=presentIdentity({information:'刺客位于：7号。你已被命中，现随坏人阵营结算。'});
+  assert.equal(converted.vision.note,'你已被命中，现随坏人阵营结算。');
+  assert.equal(converted.showRoleHelp,false);
 });
 
 test('石像鬼逐次展示并保留初始随机、旧版缺失及更新后标识，不把技能规则当作结果', () => {
@@ -94,13 +97,15 @@ test('全部可用板子与人数的实际私密数据均可展示，不修改�
   assert.ok(identities>100);
 });
 
-test('十二骑士全部技能角色的真实说明分区后保留全部规则文字', () => {
+test('十二骑士保留全部规则文字，只有 B 牌获得卡内说明入口', () => {
   const room=setup('knights',12);
-  const active=['blueGuard','gargoyle','witch','magician','paladin','blueKnight','redKnight','blueAwakened','redAwakened','blueHunter','redHunter','gareth','gaheris','blueLancelot','redLancelot','redSwordsman','assassin'];
-  for(const role of active) {
-    room.roles.p1=role;room.knights.players.p1.b=true;
+  const bCards=['blueGuard','gargoyle','witch','magician','paladin','blueKnight','redKnight','blueAwakened','redAwakened','blueHunter','redHunter','prophet'];
+  const aCards=['gareth','gaheris','blueLancelot','redLancelot','redSwordsman','assassin','morgana'];
+  for(const role of [...bCards,...aCards]) {
+    room.roles.p1=role;room.knights.players.p1.b=bCards.includes(role);
     const secret=privateView(room,'p1'),info=presentIdentity(secret);
     assert.ok(info.ability,roles[role]?.[0]||role);
+    assert.equal(info.showRoleHelp,bCards.includes(role),role);
     const help = require('../server/knight-role-help').roleHelp(role, 12);
     assert.equal(info.ability.brief, help.brief);
     assert.deepEqual(info.ability.lines, help.facts);

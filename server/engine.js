@@ -762,6 +762,7 @@ function privateView(room, uid) {
   if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
+  view.knightBCard = room.knights.players[uid].b === true;
   const history = previousKnightIdentities(room, uid);
   const records = [{
     id: history.length, role: view.role, faction: view.faction,

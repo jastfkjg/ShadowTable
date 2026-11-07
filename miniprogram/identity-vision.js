@@ -71,8 +71,7 @@
     }
     const noVisionAbility = text.match(/^(没有视野。)\s+([\s\S]+)$/);
     const knifeAbility = text.match(/^([\s\S]*?。)\s+(可刀刀客或B角色一次；[\s\S]+)$/);
-    const reverseAbility = text.match(/^(刺客位于：[1-9]\d*号。)(你只能投任务成功；[\s\S]+|你已被命中，现随坏人阵营结算。)$/);
-    const split = noVisionAbility || knifeAbility || reverseAbility;
+    const split = noVisionAbility || knifeAbility;
     if (split) { text = split[1]; abilityText = split[2]; }
     const vision = present(text, players);
     vision.wide = vision.players.some(player => Array.from(player.name || "").length > 8 || Array.from(player.role || "").length > 8);
@@ -94,7 +93,9 @@
         ability = { lines: [{ label: "", text: sentence ? sentence[1] : abilityText }], note: sentence ? sentence[2].trim() : "" };
       }
     }
-    return { vision, passive, fairy, inspections, ability: roleAbility || ability,
+    ability = roleAbility || ability;
+    return { vision, passive, fairy, inspections, ability,
+      showRoleHelp: secret.knightBCard === true && !!secret.skillStatus && !!ability,
       showVision: !!passive || (!!text && !(vision.empty && inspections.length)) };
   }
   return { present, presentIdentity };

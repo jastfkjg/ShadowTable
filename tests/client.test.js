@@ -2407,3 +2407,17 @@ test('回避角色先本地选择再确认，关闭和切后台清空私密草�
   const loading = delayed.openAvoidance(); delayed.onHide(); resolve(value); await loading;
   assert.equal(delayed.data.avoidanceOpen, false); assert.equal(delayed.data.avoidance, null);
 });
+
+test('身份说明仅在已揭示时展开，遮盖会重置且不改写身份数据', () => {
+  const p=page({});
+  const secret={role:'石像鬼',info:{ability:{brief:'角色规则'},showRoleHelp:true}};
+  p.data.secret={role:'莫甘娜',info:{ability:{brief:'角色规则'},showRoleHelp:false}};p.data.revealed=true;
+  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
+  p.data.secret=secret;p.data.revealed=true;
+  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,true);
+  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
+  p.toggleIdentityHelp();p.mask();
+  assert.equal(p.data.identityHelpExpanded,false);
+  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
+  assert.deepEqual(secret,{role:'石像鬼',info:{ability:{brief:'角色规则'},showRoleHelp:true}});
+});

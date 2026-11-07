@@ -2533,3 +2533,29 @@ test('网页所有身份展示使用分区结果，轮次括号仅在展示中�
   assert.equal(c.state.secret,null);
   assert.doesNotMatch(c.viewRoom(),/月下先知|存活 B 牌坏人|仙女查验/);
 });
+
+test('当前身份只在 B 牌技能状态旁显示说明入口，遮盖后清空展开状态', async () => {
+  const {identityHelp}=require('../server/knight-role-help');
+  const secret={role:'石像鬼',faction:'坏人阵营',knightBCard:true,information:'没有视野。 6号查验结果：好人'+identityHelp('gargoyle',12),skillStatus:{title:'技能可用'}};
+  const c=client();c.state.room=dealtWebRoom();c.state.revealed=true;c.state.secret=secret;
+  const before=JSON.stringify(secret);
+  assert.match(c.viewRoom(),/技能状态<\/span><span class="compact-skill-value">技能可用<\/span><button [^>]*aria-expanded="false"/);
+  assert.doesNotMatch(c.viewRoom(),/之后每轮/);
+  assert.match(c.viewRoom(),/仙女查验/);
+  c.ACTIONS.toggleIdentityHelp();
+  assert.match(c.viewRoom(),/data-action="toggleIdentityHelp" aria-expanded="true"/);
+  assert.match(c.viewRoom(),/之后每轮/);
+  c.ACTIONS.toggleIdentityHelp();
+  assert.doesNotMatch(c.viewRoom(),/之后每轮/);
+  c.ACTIONS.toggleIdentityHelp();
+  await c.ACTIONS.reveal();
+  assert.equal(c.state.identityHelpExpanded,false);
+  assert.doesNotMatch(c.viewRoom(),/角色说明|之后每轮/);
+  assert.equal(JSON.stringify(secret),before);
+  c.state.revealed=true;c.state.secret={...secret,information:'没有视野。'};
+  assert.doesNotMatch(c.viewRoom(),/角色说明/);
+  c.state.secret={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
+  c.ACTIONS.toggleIdentityHelp();
+  assert.equal(c.state.identityHelpExpanded,false);
+  assert.doesNotMatch(c.viewRoom(),/角色说明|首次复活/);
+});

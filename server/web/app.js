@@ -658,6 +658,7 @@
     selected: [],
     revealed: false,
     secret: null,
+    identityHelpExpanded: false,
     identityHistoryOpen: false,
     identityHistoryExpandedId: null,
     fairyResult: null,
@@ -1618,6 +1619,7 @@
       swapPlayers: [],
       revealed: false,
       secret: null,
+      identityHelpExpanded: false,
       identityHistoryOpen: false,
       identityHistoryExpandedId: null,
     });
@@ -1886,6 +1888,7 @@ function roomListItems(rooms) {
       patch.identityHintVisible = false;
       patch.revealed = false;
       patch.secret = null;
+      patch.identityHelpExpanded = false;
       patch.identityHistoryOpen = false;
       patch.identityHistoryExpandedId = null;
       patch.actionDialog = false;
@@ -2915,13 +2918,18 @@ function roomListItems(rooms) {
       ) {
         secret.factionTone = factionTone(secret.faction);
         rememberDealtIdentity();
-        setState({ revealed: true, secret: secret });
+        setState({ revealed: true, secret: secret, identityHelpExpanded: false });
       }
     } catch (e) {
       handleError(e);
     } finally {
       setState({ busy: false });
     }
+  }
+  function toggleIdentityHelp() {
+    if (!state.revealed || !state.secret || !identityVision.presentIdentity(state.secret).showRoleHelp) return;
+    setState({ identityHelpExpanded: !state.identityHelpExpanded });
+    app.querySelector('[data-action="toggleIdentityHelp"]')?.focus({ preventScroll: true });
   }
   function openIdentityHistory() {
     var history = state.secret?.identityHistory || [];
@@ -3257,6 +3265,7 @@ function roomListItems(rooms) {
           fairyResultRevealed: false,
           revealed: false,
           secret: null,
+          identityHelpExpanded: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -3301,6 +3310,7 @@ function roomListItems(rooms) {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHelpExpanded: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -3822,8 +3832,16 @@ function roomListItems(rooms) {
     if (info.inspections.length) html += '<div class="identity-info-section">' + heading('角色查验', info.inspections.length + ' 条记录') + info.inspections.map(record =>
       '<div class="identity-info-inspection"><div class="identity-info-record-label"><span>' + esc(record.label) + '</span><span>' + esc(record.source) + '</span></div><div class="identity-info-result">' + seat(record.seat) + '<span class="identity-info-inspection-result">' + esc(record.result) + '</span></div></div>').join('') + '</div>';
     if (info.fairy) html += '<div class="identity-info-section identity-info-fairy">' + heading('仙女查验') + '<div class="identity-info-fairy-result">' + seat(info.fairy.seat) + '<span class="identity-info-value faction-' + info.fairy.tone + '">' + esc(info.fairy.faction) + '</span></div></div>';
-    if (info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + (info.ability.brief ? '<div class="identity-info-brief">' + esc(info.ability.brief) + '</div>' : '') + info.ability.lines.map(line => '<div class="identity-info-ability' + (info.ability.structured ? ' structured' : '') + '">' + (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (info.ability.structured ? '：' : '') + '</span>' : '') + '<span>' + esc(line.text) + '</span></div>').join('') + note((info.ability.structured && info.ability.note ? '注意：' : '') + info.ability.note) + '</div>';
-    return html + '</div>';
+    if (!compact && info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + viewRoleAbility(info.ability) + '</div>';
+    return html + '</div>' + (compact ? viewSkillStatus(secret, info.showRoleHelp ? info.ability : null) : '');
+  }
+  function viewRoleAbility(ability) {
+    var html = ability.brief ? '<div class="identity-info-brief">' + esc(ability.brief) + '</div>' : '';
+    html += ability.lines.map(line => '<div class="identity-info-ability' + (ability.structured ? ' structured' : '') + '">' +
+      (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured ? '：' : '') + '</span>' : '') +
+      '<span>' + esc(line.text) + '</span></div>').join('');
+    if (ability.note) html += '<div class="identity-info-note">' + (ability.structured ? '注意：' : '') + esc(ability.note) + '</div>';
+    return html;
   }
   function viewIdentityChange() {
     if (!state.identityChange || state.error) return "";
@@ -3893,9 +3911,16 @@ function roomListItems(rooms) {
       "</div></div></div>"
     );
   }
-  function viewSkillStatus(secret) {
+  function viewSkillStatus(secret, ability = null) {
     if (!secret || !secret.skillStatus) return "";
-    return '<div class="compact-skill-status"><div class="compact-skill-heading"><img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(secret.skillStatus.title) + '</span></div>' + (secret.skillStatus.detail ? '<div class="identity-info-note">' + esc(secret.skillStatus.detail) + '</div>' : '') + '</div>';
+    var html = '<div class="compact-skill-status' + (ability ? ' has-role-help' : '') +
+      '"><div class="compact-skill-heading"><img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(secret.skillStatus.title) + '</span>';
+    if (ability) html += '<button type="button" class="identity-help-toggle" data-action="toggleIdentityHelp" aria-expanded="' + !!state.identityHelpExpanded +
+      '"><span>角色说明</span><span class="identity-help-chevron' + (state.identityHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
+    html += '</div>';
+    if (secret.skillStatus.detail) html += '<div class="identity-info-note">' + esc(secret.skillStatus.detail) + '</div>';
+    if (ability && state.identityHelpExpanded) html += '<div class="identity-help-body">' + viewRoleAbility(ability) + '</div>';
+    return html + '</div>';
   }
   function viewIdentityHistory() {
     var history = state.secret?.identityHistory || [];
@@ -4316,8 +4341,7 @@ function roomListItems(rooms) {
           '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><img src="/assets/identity-hide-muted.svg" alt="" /><span>立即遮盖</span></button></div>' +
           '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title">' + esc(identity.role) + '</div><span class="compact-faction faction-' + (identity.factionTone || '') + '">' + esc(identity.faction) + '</span></div>' +
           (identity.identityHistory?.length > 1 ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
-          (identity.outcome ? '<div class="compact-outcome ' + (identity.outcome === '本局你获胜' ? 'faction-good' : identity.outcome === '本局你失败' ? 'faction-evil' : '') + '">' + esc(identity.outcome) + '</div>' : '') +
-          viewIdentityInformation(identity, state.seats, false, true) + viewSkillStatus(identity) + viewSkillHistory(identity, true) + '</div>';
+          viewIdentityInformation(identity, state.seats, false, true) + viewSkillHistory(identity, true) + '</div>';
       }
     }
 
@@ -5001,7 +5025,7 @@ function roomListItems(rooms) {
     monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
     monthlyShare: shareMonthlyReport,
     monthlyDownload: downloadMonthlyImage,
-    openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
+    toggleIdentityHelp, openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,
     openBadgePicker: el => { if (!state.badgeManagerSaving && !state.badgeManagerLoading) setState({ badgePicker: 'add', badgePickerSlot: Number(el.dataset.slot) }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },

@@ -449,9 +449,8 @@
           <view class="compact-role-copy"><view class="compact-role-title">{{secret.role}}</view><text class="compact-faction faction-{{secret.factionTone}}">{{secret.faction}}</text></view>
           <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
-        <view wx:if="{{secret.outcome}}" class="compact-outcome {{secret.outcome==='本局你获胜'?'faction-good':secret.outcome==='本局你失败'?'faction-evil':''}}">{{secret.outcome}}</view>
         <template is="identityInformation" data="{{info:secret.info, fallback:secret.information, compact:true}}" />
-        <template is="identitySkillStatus" data="{{status:secret.skillStatus}}" />
+        <template is="identitySkillStatus" data="{{status:secret.skillStatus, ability:secret.info.showRoleHelp?secret.info.ability:null, helpExpanded:identityHelpExpanded}}" />
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>
     </block>

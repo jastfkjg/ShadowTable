@@ -2116,3 +2116,22 @@ test('紧凑身份信息在当前、发牌、新身份和旧身份中统一分�
   assert.match(JSON.stringify(renderTable(historical)),/存活 B 牌坏人/);
   assert.doesNotMatch(JSON.stringify(renderTable({...historical,identityHistoryExpandedId:null})),/存活 B 牌坏人/);
 });
+
+test('当前身份模板仅在 B 牌技能状态旁显示说明入口，默认收起', () => {
+  const {presentIdentity}=require('../miniprogram/identity-vision');
+  const {identityHelp}=require('../server/knight-role-help');
+  const secret={role:'石像鬼',knightBCard:true,information:'没有视野。 6号查验结果：好人'+identityHelp('gargoyle',12),skillStatus:{title:'技能可用'}};
+  secret.info=presentIdentity(secret);
+  const data={...base,room:{phase:'tools',players:[],team:[],history:[],me:{seat:1}},revealed:true,secret,identityHelpExpanded:false};
+  const collapsed=renderTable(data);
+  const statusRow=nodes(collapsed).find(node=>node.attr?.class==='compact-skill-heading');
+  assert.equal(byHandler(statusRow,'toggleIdentityHelp').attr.ariaExpanded,false);
+  assert.doesNotMatch(JSON.stringify(collapsed),/之后每轮/);
+  assert.match(JSON.stringify(collapsed),/仙女查验/);
+  assert.match(JSON.stringify(renderTable({...data,identityHelpExpanded:true})),/之后每轮/);
+  assert.doesNotMatch(JSON.stringify(renderTable({...data,revealed:false,identityHelpExpanded:true})),/之后每轮|角色说明/);
+  const aCard={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
+  aCard.info=presentIdentity(aCard);
+  assert.doesNotMatch(JSON.stringify(renderTable({...data,secret:aCard,identityHelpExpanded:true})),/首次复活|角色说明/);
+  assert.match(JSON.stringify(renderTable({...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard})),/首次复活/);
+});

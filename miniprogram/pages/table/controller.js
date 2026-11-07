@@ -342,6 +342,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     selected: [],
     revealed: false,
     secret: null,
+    identityHelpExpanded: false,
     identityHistoryOpen: false,
     identityHistoryExpandedId: null,
     choiceButtons: [],
@@ -494,6 +495,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       swapPlayers: [],
       revealed: false,
       secret: null,
+      identityHelpExpanded: false,
       identityHistoryOpen: false,
       identityHistoryExpandedId: null,
       choiceButtons: [],
@@ -890,6 +892,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHelpExpanded: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
           choiceButtons: [],
@@ -2575,6 +2578,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.rememberDealtIdentity();
         this.setData({
           revealed: true,
+          identityHelpExpanded: false,
           secret,
           choiceButtons: (secret.action?.choices || []).map((value) => ({
             value,
@@ -2591,6 +2595,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     } finally {
       this.setData({ busy: false, busyAction: "" });
     }
+  },
+  toggleIdentityHelp() {
+    if (!this.data.revealed || !this.data.secret?.info?.showRoleHelp) return;
+    this.setData({ identityHelpExpanded: !this.data.identityHelpExpanded });
   },
   openIdentityHistory() {
     const history = this.data.secret?.identityHistory || [];
@@ -2632,6 +2640,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           fairyResultRevealed: false,
           revealed: false,
           secret: null,
+          identityHelpExpanded: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -2687,6 +2696,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           identityChangeRevealed: false,
           revealed: false,
           secret: null,
+          identityHelpExpanded: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });

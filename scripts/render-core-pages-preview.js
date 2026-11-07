@@ -468,6 +468,7 @@ for (const role of compactRoles) {
     secret: { ...secret, factionTone: tone, portrait: portrait(secret.role, tone).portrait } });
 }
 const compactLong = tableScenes['compact-identity-assassin'];
+tableScenes['compact-identity-gargoyle-expanded'] = { ...tableScenes['compact-identity-gargoyle'], identityHelpExpanded: true };
 // Screenshot reference for the refined inline card; intentionally fixed sample data.
 tableScenes['compact-identity-reference'] = { ...tableScenes['compact-identity-morgana'],
   seats: tableScenes['compact-identity-morgana'].seats.map(player => ({ ...player,
