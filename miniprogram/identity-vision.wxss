@@ -104,7 +104,7 @@ button.identity-history-entry.compact-history-entry { flex-shrink: 0; width: aut
 .identity-help-chevron { box-sizing: border-box; width: 6px; height: 6px; margin: -3px 1px 0; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
 .identity-help-chevron.is-expanded { margin-top: 3px; transform: rotate(225deg); }
 .identity-help-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.identity-help-toggle:active, .identity-help-pressed { opacity: .65; }
+.identity-compact button.identity-help-toggle:not([disabled]):active { opacity: 1; color: var(--text); }
 .identity-help-body { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--identity-divider); }
 .compact-hide:not([disabled]):active, .compact-history-entry:not([disabled]):active { opacity: .65; }
 .compact-hide:focus-visible, .compact-history-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

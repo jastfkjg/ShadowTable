@@ -1069,6 +1069,7 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
     configure(r, { "wx:1": "gareth", "wx:2": "redSwordsman" });
     skills(r, { "wx:1": "target:2" });
     finish(r, { winner: "good" });
+    r.matchRecord.endedAt = boundary + 5000;
     store.transaction(() => store.save(r));
     assert.throws(
       () => read("metric=fun_merlin_evade&period=all&offset=20&version=" + first.version),

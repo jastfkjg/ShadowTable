@@ -3915,7 +3915,7 @@ function roomListItems(rooms) {
     if (!secret || !secret.skillStatus) return "";
     var html = '<div class="compact-skill-status' + (ability ? ' has-role-help' : '') +
       '"><div class="compact-skill-heading"><img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(secret.skillStatus.title) + '</span>';
-    if (ability) html += '<button type="button" class="identity-help-toggle" data-action="toggleIdentityHelp" aria-expanded="' + !!state.identityHelpExpanded +
+    if (ability) html += '<button type="button" class="disclosure-button identity-help-toggle" data-action="toggleIdentityHelp" aria-expanded="' + !!state.identityHelpExpanded +
       '"><span>角色说明</span><span class="identity-help-chevron' + (state.identityHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
     html += '</div>';
     if (secret.skillStatus.detail) html += '<div class="identity-info-note">' + esc(secret.skillStatus.detail) + '</div>';

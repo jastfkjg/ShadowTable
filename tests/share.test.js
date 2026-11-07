@@ -258,7 +258,8 @@ test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退",
   assert.equal(await mod.exports.renderImage({ alive: true }, card), "wxfile://native");
   assert.equal(canvas.width, 1080); assert.equal(canvas.height, cards.dimensions(card).height);
   assert.equal(exported.destWidth, 1080); assert.equal(exported.destHeight,cards.dimensions(card).height);
-  assert.equal(exported.height,canvas.height);assert.equal(exported.fileType, "png"); assert.ok(drawing.includes("小"));
+  assert.equal(exported.width,undefined);assert.equal(exported.height,undefined);
+  assert.equal(exported.fileType, "png"); assert.ok(drawing.includes("小"));
 });
 
 

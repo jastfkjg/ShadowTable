@@ -49,7 +49,7 @@
     <view class="compact-skill-heading">
       <image src="/assets/record-spark.svg" aria-hidden="true" />
       <text class="compact-skill-label">技能状态</text><text class="compact-skill-value">{{status.title}}</text>
-      <button wx:if="{{ability}}" class="identity-help-toggle" hover-class="identity-help-pressed" bindtap="toggleIdentityHelp" aria-expanded="{{helpExpanded}}">
+      <button wx:if="{{ability}}" class="disclosure-button identity-help-toggle" hover-class="none" bindtap="toggleIdentityHelp" aria-expanded="{{helpExpanded}}">
         <text>角色说明</text><view class="identity-help-chevron {{helpExpanded?'is-expanded':''}}" aria-hidden="true" />
       </button>
     </view>
