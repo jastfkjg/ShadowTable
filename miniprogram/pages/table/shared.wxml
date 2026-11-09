@@ -411,7 +411,7 @@
           <button wx:if="{{room.me.isHost}}" class="lobby-header-link" hover-class="room-invite-pressed" bindtap="toggleRoomSettings" disabled="{{hasPendingRequest}}" aria-label="打开房间设置"><image class="lobby-header-icon" src="/assets/room-settings.svg" aria-hidden="true" /></button>
         </view>
         <view wx:elif="{{room.me.seat!==null}}" class="room-identity-anchor">
-          <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{room.me.seat+'号 · '+(revealed?'遮盖我的身份':'查看我的身份')}}"><view wx:if="{{!(busy && busyAction==='identity')}}" class="room-identity-icon" aria-hidden="true" /><text>{{revealed?'遮盖身份':'查看身份'}}</text></button>
+          <button hover-class="none" class="room-identity {{identityHintVisible?'identity-entry-highlight':''}}" bindtap="reveal" loading="{{busy && busyAction==='identity'}}" disabled="{{!revealed && (busy || !network)}}" aria-label="{{room.me.seat+'号 · '+(revealed?'隐藏我的身份':'查看我的身份')}}"><view wx:if="{{!(busy && busyAction==='identity')}}" class="room-identity-icon" aria-hidden="true" /><text>{{revealed?'隐藏身份':'查看身份'}}</text></button>
           <view wx:if="{{identityHintVisible && !dealtIdentityDialog && !actionDialog && !identityChange && !fairyResult && !error && !toolType && !showRoomRules && !showRoomSettings}}" class="identity-entry-hint">
             <text role="status">随时点这里，查看身份与视野。</text>
             <button hover-class="none" class="identity-hint-close" bindtap="dismissIdentityHint" aria-label="关闭身份入口提示">×</button>
@@ -446,10 +446,10 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open identity-compact">
-        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>立即遮盖</text></button></view>
+        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>隐藏身份</text></button></view>
         <view class="compact-role-heading">
           <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
-          <view class="compact-role-copy"><view class="compact-role-title">{{secret.role}}</view><text class="compact-faction faction-{{secret.factionTone}}">{{secret.faction}}</text></view>
+          <view class="compact-role-copy"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><view class="compact-faction faction-{{secret.factionTone}}"><view class="compact-faction-dot" aria-hidden="true" /><text>{{secret.faction}}</text></view></view>
           <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
         <template is="identityInformation" data="{{info:secret.info, fallback:secret.information, compact:true}}" />
@@ -502,10 +502,13 @@
       <view class="section-title history-heading">
         <view class="seat-section-title"><text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家'}}</text><text wx:if="{{room.phase!=='lobby'}}" class="seat-count">{{seatOccupiedCount}}/{{room.capacity}} 人</text></view>
         <text wx:if="{{room.phase==='lobby'}}" class="seat-count" aria-label="{{'已入座'+seatOccupiedCount+'人，共'+room.capacity+'个座位，'+seatReadyCount+'人已准备'}}">{{seatOccupiedCount}}/{{room.capacity}} 人入座 · {{seatReadyCount}} 人已准备</text>
-        <button hover-class="none" wx:if="{{room.phase!=='lobby'}}" class="disclosure-button history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
+        <button hover-class="none" wx:if="{{room.phase!=='lobby'}}" class="disclosure-button history-toggle seat-disclosure" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}"><view class="seat-disclosure-face"><text>{{seatsExpanded?'收起座位':'展开座位'}}</text><image class="seat-disclosure-chevron {{seatsExpanded?'is-expanded':''}}" src="/assets/chevron-left.svg" mode="aspectFit" aria-hidden="true" /></view></button>
       </view>
-      <view wx:if="{{room.phase!=='lobby' && questTimeline.length}}" class="quest-timeline">
-        <button hover-class="none" wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
+      <view wx:if="{{room.phase!=='lobby' && (questTimeline.length || room.team.length)}}" class="seat-progress-details">
+        <view wx:if="{{questTimeline.length}}" class="quest-timeline">
+          <button hover-class="none" wx:for="{{questTimeline}}" wx:key="key" class="quest-step {{item.questResult}}" bindtap="showQuestRecord" data-key="{{item.key}}" aria-label="{{'第'+item.number+'次任务，'+item.text+'，查看详情'}}">第{{item.number}}次 · {{item.questResult==='success'?'✓ 成功':'× 失败'}}</button>
+        </view>
+        <view wx:if="{{room.team.length}}" class="seat-team-summary"><view class="seat-team-dot" aria-hidden="true" /><text class="seat-team-label">任务队伍 ·</text><text class="seat-team-seats">{{teamText}}号</text></view>
       </view>
     </view>
     <view wx:if="{{room.phase==='lobby' || seatsExpanded !== false}}" class="{{room.capacity>=10?'seats seats-compact':'seats'}}"
@@ -520,7 +523,7 @@
       >
         <view class="seat-head">
           <text class="seat-number">{{item.seat}}号</text>
-          <view class="seat-head-tags"><text wx:if="{{item.host}}" class="seat-flag">房主</text><text wx:if="{{item.mine}}" class="seat-self">你</text></view>
+          <view class="seat-head-tags"><text wx:if="{{item.host}}" class="seat-flag">房主</text><text wx:if="{{item.mine && room.phase==='lobby'}}" class="seat-self">你</text></view>
         </view>
         <view wx:if="{{item.occupied}}" class="seat-player">
           <view class="seat-avatar-wrap" aria-hidden="{{true}}">
@@ -528,6 +531,7 @@
               <text class="seat-avatar-fallback">{{item.avatarInitial}}</text>
               <image wx:if="{{item.avatarUrl && !item.avatarFailed}}" class="seat-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="{{true}}" />
             </view>
+            <text wx:if="{{item.mine && room.phase!=='lobby'}}" class="seat-self">你</text>
           </view>
           <view class="seat-name">{{item.name}}</view>
         </view>
@@ -537,8 +541,8 @@
         </view>
         <view wx:if="{{room.phase==='lobby' && item.occupied && item.ready}}" class="seat-ready-badge" aria-hidden="{{true}}"><view class="seat-ready-check" /></view>
         <view wx:if="{{room.phase!=='lobby' && item.occupied && room.fairyHolder===item.seat}}" class="seat-fairy" aria-hidden="{{true}}"><image class="seat-fairy-icon" src="/assets/lake-fairy.svg" mode="aspectFit" aria-hidden="{{true}}" /></view>
-        <view wx:if="{{item.occupied && room.phase!=='lobby' && (item.selected || item.inTeam || item.alive===false)}}" class="seat-meta">
-          <text wx:if="{{item.selected || item.inTeam}}" class="seat-status">{{item.selected?'已选入队':'任务队员'}}</text>
+        <view wx:if="{{item.occupied && room.phase!=='lobby' && (item.selected || item.alive===false)}}" class="seat-meta">
+          <text wx:if="{{item.selected}}" class="seat-status">已选入队</text>
           <view wx:if="{{item.alive===false}}" class="seat-tags">
             <text wx:if="{{item.alive===false}}" class="seat-out">已出局</text>
           </view>
@@ -587,10 +591,10 @@
       <template is="publicHistoryEntry" data="{{history, historyLatest, historyUnreadCount}}" />
       <block wx:if="{{room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal'}}">
       <view class="host-action-bar-inner {{room.closeWaiting?'has-waiting':''}} {{room.closeWaiting.mode==='cancel'?'has-single-action':''}}">
-        <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted">{{settleHint}}<view>收齐自动结算</view></view>
-        <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cutoff {{room.closeWaiting.mode==='cancel'?'is-destructive':''}}" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}">{{room.closeWaiting.label || '结束等待'}}</button>
+        <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted"><view class="host-waiting-status"><view class="host-waiting-dot" aria-hidden="{{true}}" /><text>{{settleHint}}</text></view><view class="host-waiting-auto">收齐自动结算</view></view>
+        <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cutoff {{room.closeWaiting.mode==='cancel'?'is-destructive':''}}" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}"><text>{{room.closeWaiting.mode==='cancel'?(room.closeWaiting.label || '作废本次操作'):room.closeWaiting.mode==='pass'?'结束等待':'提前结算'}}</text><view wx:if="{{room.closeWaiting.mode!=='cancel'}}" class="host-action-chevron" aria-hidden="{{true}}" /></button>
         <button hover-class="none" wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
-        <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
+        <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="text-button bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
       </view>
       </block>
     </view>

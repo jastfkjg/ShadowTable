@@ -1,7 +1,7 @@
-<view wx:if="{{dialog}}" class="app-dialog-backdrop {{dialog.variant==='room-confirm'?'is-room-confirm-backdrop':''}}" catchtouchmove="blockScroll" catchtap="blockScroll">
+<view wx:if="{{dialog}}" class="app-dialog-backdrop {{dialog.variant==='room-confirm'?'is-room-confirm-backdrop':dialog.variant==='quest-settlement'?'is-quest-settlement-backdrop':''}}" catchtouchmove="blockScroll" catchtap="blockScroll">
   <block wx:if="{{dialog.variant==='badge-awards'}}"><include src="./awards.wxml" /></block>
   <block wx:elif="{{dialog.variant==='fun-record'}}"><include src="./fun.wxml" /></block>
-  <view wx:else class="app-dialog {{dialog.variant==='about'?'is-about':dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+  <view wx:else class="app-dialog {{dialog.variant==='about'?'is-about':dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':dialog.variant==='quest-settlement'?'is-quest-settlement':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
     <view wx:if="{{dialog.variant==='about'}}" class="app-about-header">
       <view class="app-about-emblem" aria-hidden="true"><image src="{{dialog.contextIcon}}" mode="aspectFit" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>
@@ -23,6 +23,7 @@
         <view wx:if="{{dialog.lead}}" class="app-dialog-lead">{{dialog.lead}}</view>
         <view wx:if="{{dialog.content}}" class="app-dialog-hint {{dialog.lead?'has-lead':''}}">{{dialog.content}}</view>
       </view>
+      <view wx:elif="{{dialog.variant==='quest-settlement'}}" class="app-dialog-message"><view>{{dialog.lead}}</view><view class="app-dialog-quest-rule"><text wx:for="{{dialog.ruleParts}}" wx:key="text" class="app-dialog-rule-{{item.tone}}">{{item.text}}</text></view></view>
       <view wx:else class="app-dialog-message"><block wx:if="{{dialog.emphasis}}"><text>{{dialog.contentBefore}}</text><text class="app-dialog-emphasis">{{dialog.emphasis}}</text><text>{{dialog.contentAfter}}</text></block><block wx:else>{{dialog.content}}</block></view>
     </scroll-view>
     <view class="app-dialog-actions">

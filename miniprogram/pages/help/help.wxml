@@ -31,19 +31,63 @@
     <view wx:for="{{scoringRules.notes}}" wx:key="*this" class="help-copy help-note">{{item}}</view>
   </block>
 </template>
+<template name="help-reading-line">
+  <text wx:for="{{parts}}" wx:key="id" wx:for-item="part" class="{{part.strong ? 'help-reading-emphasis' : ''}}">{{part.text}}</text>
+</template>
+<template name="help-reading-copy">
+  <view wx:for="{{paragraphs}}" wx:key="text" wx:for-item="paragraph" class="help-reading-copy"><template is="help-reading-line" data="{{parts:paragraph.parts}}" /></view>
+</template>
+<template name="help-basics">
+  <view wx:for="{{items}}" wx:key="id" wx:for-item="answer" class="help-reading-topic">
+    <view class="help-reading-title"><text>{{answer.heading}}</text><text wx:if="{{answer.caption}}" class="help-reading-caption">{{answer.caption}}</text></view>
+    <view wx:if="{{answer.factions}}" class="help-factions">
+      <view wx:for="{{answer.factions}}" wx:key="tone" wx:for-item="faction" class="help-faction-row"><text class="help-faction-label {{faction.tone}}">{{faction.label}}</text><view class="help-reading-copy"><template is="help-reading-line" data="{{parts:faction.parts}}" /></view></view>
+    </view>
+    <view class="{{answer.factions ? 'help-basic-note' : ''}}"><template is="help-reading-copy" data="{{paragraphs:answer.paragraphs}}" /></view>
+  </view>
+</template>
+<template name="help-host">
+  <view class="help-host-timeline">
+    <block wx:for="{{items}}" wx:key="id" wx:for-item="answer">
+      <view wx:if="{{answer.number}}" class="help-host-step {{answer.lastStep ? 'is-last' : ''}}">
+        <text class="help-host-number">{{answer.number}}</text>
+        <view class="help-host-card">
+          <view class="help-reading-title">{{answer.heading}}</view>
+          <view wx:for="{{answer.paragraphs}}" wx:key="text" wx:for-item="paragraph" class="help-host-bullet"><view class="help-reading-dot" aria-hidden="true" /><view class="help-reading-copy"><template is="help-reading-line" data="{{parts:paragraph.parts}}" /></view></view>
+        </view>
+        <view wx:if="{{answer.notes.length}}" class="help-reading-callout"><template is="help-reading-copy" data="{{paragraphs:answer.notes}}" /></view>
+      </view>
+      <view wx:else class="help-host-followup"><view class="help-reading-title">{{answer.heading}}</view><template is="help-reading-copy" data="{{paragraphs:answer.paragraphs}}" /></view>
+    </block>
+  </view>
+</template>
+<template name="help-faq">
+  <view wx:for="{{items}}" wx:key="id" wx:for-item="answer" class="help-faq-item {{answer.expanded ? 'is-open' : ''}}">
+    <button hover-class="none" class="disclosure-button help-faq-toggle" bindtap="toggleFaq" data-id="{{answer.id}}" aria-expanded="{{answer.expanded}}" aria-controls="{{'help-faq-body-'+answer.id}}"><text>{{answer.title}}</text><view class="help-chevron {{answer.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
+    <view wx:if="{{answer.expanded}}" id="{{'help-faq-body-'+answer.id}}" class="help-faq-body">
+      <view wx:if="{{answer.lead}}" class="help-faq-lead {{answer.path ? 'is-path' : ''}}">{{answer.lead}}</view>
+      <template is="help-reading-copy" data="{{paragraphs:answer.paragraphs}}" />
+      <block wx:if="{{answer.topics.length}}"><view class="help-faq-subtitle">可以查看</view><view wx:for="{{answer.topics}}" wx:key="*this" wx:for-item="topic" class="help-host-bullet"><view class="help-reading-dot" aria-hidden="true" /><view class="help-reading-copy">{{topic}}</view></view></block>
+      <block wx:if="{{answer.details.length}}">
+        <button hover-class="none" class="disclosure-button help-faq-detail-toggle" bindtap="toggleFaqDetails" data-id="{{answer.id}}" aria-expanded="{{answer.detailsExpanded}}" aria-controls="{{'help-faq-details-'+answer.id}}"><text>统计说明</text><view class="help-chevron {{answer.detailsExpanded ? 'up' : ''}}" aria-hidden="true" /></button>
+        <view wx:if="{{answer.detailsExpanded}}" id="{{'help-faq-details-'+answer.id}}" class="help-faq-details"><template is="help-reading-copy" data="{{paragraphs:answer.details}}" /></view>
+      </block>
+    </view>
+  </view>
+</template>
 <app-nav title="{{scoringOnly ? '计分规则' : '使用帮助'}}" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page help-page {{scoringOnly ? 'help-scoring-page' : ''}}">
   <block wx:if="{{!scoringOnly}}">
     <view class="help-intro"><view class="help-intro-copy"><view class="help-eyebrow">新人上手</view><view class="help-title">{{guideMode === 'host' ? '四步组织一场对局' : '四步加入一场对局'}}</view><view class="help-intro-caption">{{guideMode === 'host' ? '从建桌到登记，按流程进行。' : '先看流程，边玩边熟悉。'}}</view></view><image class="help-intro-art" src="/assets/roles/merlin.png" mode="aspectFit" aria-hidden="true" /></view>
     <view class="help-modes" aria-label="引导身份"><button hover-class="none" bindtap="setGuideMode" data-mode="player" class="{{guideMode === 'player' ? 'selected' : ''}}" aria-pressed="{{guideMode === 'player'}}"><image src="/assets/record-users.svg" aria-hidden="true" />我是玩家</button><button hover-class="none" bindtap="setGuideMode" data-mode="host" class="{{guideMode === 'host' ? 'selected' : ''}}" aria-pressed="{{guideMode === 'host'}}"><image src="/assets/sheet-shield.svg" aria-hidden="true" />我是房主</button></view>
-    <view class="help-steps"><view wx:for="{{guideSteps}}" wx:key="number" class="help-step {{item.expanded ? 'expanded' : ''}}"><button hover-class="none" class="disclosure-button help-step-toggle" bindtap="toggleStep" data-index="{{index}}" aria-expanded="{{item.expanded}}" aria-controls="{{'help-step-'+index}}"><text class="help-number">{{item.number}}</text><text class="help-step-label">{{item.title}}</text><view class="help-chevron" aria-hidden="true" /></button><view wx:if="{{item.expanded}}" id="{{'help-step-'+index}}" class="help-step-body"><view class="help-copy">{{item.text}}</view><view class="help-flow"><image src="{{'/assets/'+item.icon+'.svg'}}" aria-hidden="true" /><text>{{item.flow}}</text><text class="help-flow-caption">示意</text></view><button wx:if="{{item.entryMode && !singlePage}}" hover-class="none" class="help-step-entry" bindtap="openEntry" data-mode="{{item.entryMode}}">{{item.entryLabel}} →</button></view></view></view>
+    <view class="help-steps"><view wx:for="{{guideSteps}}" wx:key="number" class="help-step {{item.expanded ? 'expanded' : ''}}"><button hover-class="none" class="disclosure-button help-step-toggle" bindtap="toggleStep" data-index="{{index}}" aria-expanded="{{item.expanded}}" aria-controls="{{'help-step-'+index}}"><text class="help-number">{{item.number}}</text><text class="help-step-label">{{item.title}}</text><view class="help-chevron" aria-hidden="true" /></button><view wx:if="{{item.expanded}}" id="{{'help-step-'+index}}" class="help-step-body"><view class="help-copy">{{item.text}}</view><view class="help-flow"><image src="{{'/assets/'+item.icon+'.svg'}}" aria-hidden="true" /><text>{{item.flow}}</text><text class="help-flow-caption">示意</text></view></view></view></view>
     <view class="help-reference-heading"><view class="help-heading">随用随查</view><text>规则与常见问题</text></view>
     <view class="help-search"><image src="/assets/board-search.svg" aria-hidden="true" /><input value="{{helpQuery}}" bindinput="searchHelp" placeholder="搜索问题或规则" placeholder-class="help-search-placeholder" aria-label="搜索帮助问题或规则" confirm-type="search" /><button wx:if="{{helpQuery}}" hover-class="none" bindtap="clearSearch" aria-label="清空帮助搜索">×</button></view>
     <view wx:if="{{helpQuery}}" class="help-search-status" role="status">{{references.length ? '已展开匹配内容' : '未找到匹配内容，试试“发牌”或“计分”。'}}</view>
     <view class="help-references">
       <view wx:for="{{references}}" wx:key="id" wx:for-item="reference" class="help-section">
         <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleReference" data-id="{{reference.id}}" data-index="{{reference.index}}" aria-expanded="{{reference.expanded}}" aria-controls="{{'help-reference-'+reference.id}}"><image class="help-reference-icon" src="{{'/assets/'+reference.icon+'.svg'}}" aria-hidden="true" /><view class="help-toggle-copy"><view class="help-heading">{{reference.title}}</view><view class="help-caption">{{reference.subtitle}}</view></view><view class="help-chevron {{reference.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
-        <view wx:if="{{reference.expanded}}" class="help-answers {{reference.id === 'scoring' ? 'help-score-answers' : ''}}" id="{{'help-reference-'+reference.id}}">
+        <view wx:if="{{reference.expanded}}" class="help-answers {{reference.id === 'scoring' ? 'help-score-answers' : reference.id === 'boards' ? '' : 'help-reading-answers'}}" id="{{'help-reference-'+reference.id}}">
           <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible}}" />
           <block wx:elif="{{reference.id === 'boards'}}">
             <view wx:if="{{loadingBoards && !connectionVisible}}" class="help-copy" role="status">正在加载板子介绍…</view>
@@ -51,7 +95,9 @@
             <view wx:elif="{{!reference.boards.length}}" class="help-copy">暂无匹配的可用板子。</view>
             <view wx:for="{{reference.boards}}" wx:key="id" wx:for-item="board" class="help-board"><view class="help-step-title">{{board.name}}</view><view class="help-copy">{{board.description}}</view><view class="help-caption">选择人数，查看规则</view><view class="help-board-links {{board.choices.length === 1 ? 'help-board-links-single' : ''}}"><button hover-class="none" wx:for="{{board.choices}}" wx:for-item="choice" wx:key="capacity" class="help-board-link" bindtap="openBoard" data-board="{{choice.board}}" data-capacity="{{choice.capacity}}" aria-label="{{board.name+'，'+choice.label+'，查看角色与规则'}}">{{choice.label}}</button></view></view>
           </block>
-          <block wx:else><view wx:for="{{reference.items}}" wx:key="title" wx:for-item="answer" class="help-answer"><view class="help-step-title">{{answer.title}}</view><view class="help-copy">{{answer.text}}</view></view></block>
+          <template wx:elif="{{reference.id === 'basics'}}" is="help-basics" data="{{items:reference.items}}" />
+          <template wx:elif="{{reference.id === 'host'}}" is="help-host" data="{{items:reference.items}}" />
+          <template wx:elif="{{reference.id === 'faq'}}" is="help-faq" data="{{items:reference.items}}" />
         </view>
       </view>
     </view>

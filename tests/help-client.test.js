@@ -10,7 +10,8 @@ function help(request) {
     Page: page => { definition = page; },
     require: name => name === "../../api" ? { publicRequest: request }
       : name === "../../rule-discovery" ? require("../miniprogram/rule-discovery")
-      : name === "../../records-share" ? { isSinglePage: () => false } : { switchHomeTab() {} },
+      : name === "../../records-share" ? { isSinglePage: () => false }
+      : name === "./presentation" ? require("../miniprogram/pages/help/presentation") : { switchHomeTab() {} },
     wx: { navigateTo: ({ url }) => links.push(url) },
   });
   const page = { ...definition, data: structuredClone(definition.data), setData(patch) {
@@ -94,4 +95,54 @@ test("异步帮助内容在页面卸载后不再写入，也不会覆盖现有�
   page.onLoad(); const snapshot = JSON.stringify(page.data); page.onUnload();
   pending[0]({ boards }); pending[1](scoring); await tick();
   assert.equal(JSON.stringify(page.data), snapshot);
+});
+
+test("常见问题逐题展开，统计说明独立折叠，收起整组后保留展开状态", async () => {
+  const { page } = help(async url => url === "/api/boards" ? { boards } : scoring);
+  page.onLoad(); await tick();
+  const faq = () => page.data.references.find(reference => reference.id === "faq");
+  page.toggleReference(tap({ id: "faq", index: 2 }));
+  const original = JSON.stringify(page.data.sections);
+  assert.equal(faq().items.filter(item => item.expanded).length, 1);
+  assert.equal(faq().items[0].detailsExpanded, false);
+  page.toggleFaq(tap({ id: faq().items[2].id }));
+  assert.equal(faq().items[2].expanded, true);
+  assert.equal(faq().items[1].expanded, false);
+  page.toggleFaqDetails(tap({ id: faq().items[0].id }));
+  assert.equal(faq().items[0].detailsExpanded, true);
+  assert.match(faq().items[0].details.map(p => p.text).join(""), /比例榜有有效机会即可参与/);
+  page.toggleReference(tap({ id: "faq", index: 2 }));
+  page.toggleReference(tap({ id: "faq", index: 2 }));
+  assert.equal(faq().items[2].expanded, true);
+  assert.equal(faq().items[0].detailsExpanded, true);
+  page.toggleFaq(tap({ id: "not-a-question" }));
+  assert.equal(JSON.stringify(page.data.sections), original);
+  page.onUnload();
+});
+
+test("搜索能直接读到折叠的答案及统计口径，清空后恢复逐题阅读状态", async () => {
+  const { page } = help(async url => url === "/api/boards" ? { boards } : scoring);
+  page.onLoad(); await tick();
+  const faq = () => page.data.references.find(reference => reference.id === "faq");
+  const firstId = faq().items[0].id;
+  page.toggleFaq(tap({ id: firstId }));
+  const original = JSON.stringify(page.data.faqExpanded);
+  page.searchHelp({ detail: { value: "最终非空刀" } });
+  assert.equal(faq().expanded, true);
+  assert.equal(faq().items.length, 1);
+  assert.equal(faq().items[0].expanded, true);
+  assert.equal(faq().items[0].detailsExpanded, true);
+  assert.match(faq().items[0].details.map(p => p.text).join(""), /最终非空刀/);
+  page.toggleFaqDetails(tap({ id: firstId }));
+  assert.equal(faq().items[0].detailsExpanded, false);
+  page.toggleFaq(tap({ id: firstId }));
+  assert.equal(faq().items[0].expanded, false);
+  page.clearSearch();
+  assert.equal(faq().items[0].expanded, false);
+  assert.equal(JSON.stringify(page.data.faqExpanded), original);
+  assert.equal(faq().items[0].detailsExpanded, false);
+  page.searchHelp({ detail: { value: "按现场进度发起操作" } });
+  const host = page.data.references.find(reference => reference.id === "host");
+  assert.equal(host.items[0].number, "3");
+  page.onUnload();
 });

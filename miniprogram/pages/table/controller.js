@@ -1986,9 +1986,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const value = roomConfirmation.present(kind, room);
     return this.confirm(value.title, value.content, value.confirmText, value);
   },
-  async confirmCommand(title, content, type, extra = {}) {
+  async confirmCommand(title, content, type, extra = {}, options = {}) {
     const stage = this.data.room?.stage;
-    if (!(await this.confirm(title, content, "确定", { danger: ["terminate", "cancelActivity"].includes(type) }))) return;
+    if (!(await this.confirm(title, content, options.confirmText || "确定", { danger: ["terminate", "cancelActivity"].includes(type), ...options }))) return;
     if (!this.foreground || this.data.room?.stage !== stage) {
       this.setData({ error: "阶段已变化，请查看当前阶段后重新操作" });
       return;
@@ -2102,7 +2102,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   async closeWaiting() {
     const policy = this.data.room?.closeWaiting;
     if (!policy) return;
-    return this.confirmCommand(policy.title, policy.description, "closeWaiting", { confirm: true });
+    return this.confirmCommand(policy.title, policy.description, "closeWaiting", { confirm: true },
+      policy.mode === "questDefault" ? { variant: "quest-settlement", confirmText: "提前结算" } : {});
   },
   settleTool() {
     this.cmd("settleTool");
