@@ -161,15 +161,17 @@ test('牌桌导航显示简称、配置保留完整板名，准备与开局后�
   assert.equal(nodes(loading).find(n=>n.tag==='wx-app-nav').attr.title,'牌桌');
 });
 test('身份历程入口只在已揭示且发生变化时出现，旧身份仅回看且遮盖不渲染', () => {
+  const information = '旧视野\n\n角色能力\n一句话：旧技能规则\n怎么用：选择一名玩家。';
   const history = [{ id: 1, current: true, role: '觉醒红刀客', faction: '坏人阵营', factionTone: 'evil', sinceLabel: '第1轮 · 换牌', skillHistory: [{ id: 0, round: 2, text: '刀8号' }] },
-    { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information: '旧视野', sinceLabel: '开局 · A牌', skillHistory: [{ id: 0, round: 1, text: '刀9号' }] }];
+    { id: 0, current: false, initial: true, role: '红兰斯洛特', faction: '坏人阵营', factionTone: 'evil', detailAvailable: true, information, info: require('../miniprogram/identity-vision').presentIdentity({ information }), sinceLabel: '开局 · A牌', skillHistory: [{ id: 0, round: 1, text: '刀9号' }] }];
   const data = { ...base, room: { code: '123456', phase: 'tools', capacity: 12, me: { seat: 1 }, players: [], team: [], history: [] }, revealed: true, identityHistoryOpen: true, identityHistoryExpandedId: 0,
     secret: { role: '觉醒红刀客', faction: '坏人阵营', identityHistory: history, skillHistory: history[0].skillHistory } };
   let tree = renderTable(data), text = JSON.stringify(tree);
   assert.ok(byHandler(tree, 'openIdentityHistory'));
   assert.ok(byHandler(tree, 'closeIdentityHistory'));
   assert.ok(byHandler(tree, 'hideIdentityHistory'));
-  assert.match(text, /旧视野|初始|当前/);
+  assert.match(text, /旧视野/);
+  assert.doesNotMatch(text, /角色能力|旧技能规则/);
   assert.match(text, /刀8号/); assert.match(text, /刀9号/);
   const card = nodes(tree).find(node => node.attr?.class?.split(' ').includes('identity-compact'));
   assert.match(JSON.stringify(card), /技能记录/); assert.match(JSON.stringify(card), /刀8号/);
@@ -1168,18 +1170,18 @@ test("独立设置页使用原生开关自动保存，仅失败时显示重试",
 
 test("仙女目标弹窗禁用不合法座位，未选目标不能确认，传递提示与选中目标一致", () => {
   const data = { ...base, room: { phase: "fairy", needsSubmission: true, me: { submitted: false }, team: [] },
-    actionDialog: true, stagedChoice: true, skillAction: true, skillTargetMode: "fairy", skillTitle: "仙女查验", skillHint: "查验并传递",
-    skillTargetMeta: "第 2 轮 · 2 号持有仙女", skillBodyHeight: 264, skillTargetCaption: "结果仅你可见", skillEligibility: "历任持有者不可选",
+    actionDialog: true, stagedChoice: true, skillAction: true, skillTargetMode: "fairy", skillTitle: "仙女查验",
+    skillTargetMeta: "第 2 轮 · 2 号持有仙女", skillBodyHeight: 264, skillTargetCaption: "结果仅你可见",
     skillTargets: [{ value: "target:3", label: "查验 3号", seat: 3, name: "玩家三" }, { value: "disabled:2", label: "2号", seat: 2, name: "玩家二", disabledReason: "你 · 当前持有者" }],
-    skillOtherChoices: [], swapOptions: [], swapPlayers: [], swapSeats: [], draftChoice: "", skillSummary: "尚未选择目标", skillConfirmLabel: "请先选择目标", skillConsequence: "确认提交后不可更改" };
+    skillOtherChoices: [], swapOptions: [], swapPlayers: [], swapSeats: [], draftChoice: "", skillConfirmLabel: "请先选择目标", skillConsequence: "查验后，仙女将传给所选玩家。" };
   let tree = render(data);
   assert.equal(byHandler(tree, "confirmChoice").attr.disabled, true);
   assert.ok(nodes(tree).find(n => n.attr?.class?.includes("skill-option-unavailable")).attr.disabled);
   assert.equal(nodes(tree).filter(n => n.attr?.class === "skill-other-choices").length, 0);
-  tree = render({ ...data, draftChoice: "target:3", skillSummary: "查验目标：3号（玩家三） · 湖仙将传给3号", skillConfirmLabel: "确认查验 3 号", skillConsequence: "" });
+  tree = render({ ...data, draftChoice: "target:3", skillConfirmLabel: "确认查验 3 号", skillConsequence: "查验后，仙女将传给 3 号。" });
   assert.equal(byHandler(tree, "confirmChoice").attr.disabled, false);
-  assert.match(JSON.stringify(tree), /查验目标：3号（玩家三） · 湖仙将传给3号/);
-  assert.doesNotMatch(JSON.stringify(tree), /skill-consequence|2 号持有仙女/);
+  assert.match(JSON.stringify(tree), /查验后，仙女将传给 3 号。/);
+  assert.doesNotMatch(JSON.stringify(tree), /skill-summary|skill-eligibility|2 号持有仙女/);
 });
 
 test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显示", () => {
@@ -1614,9 +1616,14 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
     }
     const selected = render({ ...data, draftChoice: value,
       ...(mode === "swap" ? { swapSeats: [2, 7], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: [2, 7].includes(p.seat) })) } : {}),
-      ...presentation.skillSelectionView(room, value, mode) });
+      ...presentation.skillSelectionView(value, mode) });
     assert.equal(byHandler(selected, "confirmChoice").attr.disabled, false, role);
     assert.ok(!byHandler(selected, "confirmSwap"));
+    const selectedText = JSON.stringify(selected);
+    assert.doesNotMatch(selectedText, /skill-summary|skill-eligibility|已选 \d \/ 2/, role);
+    if (mode === "duel") assert.match(selectedText, /决斗失败时，你将出局/);
+    if (mode === "detonate") assert.match(selectedText, /你将自爆出局/);
+    if (mode === "passive") assert.match(selectedText, /替女巫出局时不触发/);
   }
 });
 
@@ -2133,22 +2140,38 @@ test('紧凑身份信息在当前、发牌、新身份和旧身份中统一分�
   assert.doesNotMatch(JSON.stringify(renderTable({...historical,identityHistoryExpandedId:null})),/存活 B 牌坏人/);
 });
 
-test('当前身份模板仅在 B 牌技能状态旁显示说明入口，默认收起', () => {
+test('当前身份名旁显示角色说明图标，技能状态和身份历程各有位置', () => {
   const {presentIdentity}=require('../miniprogram/identity-vision');
   const {identityHelp}=require('../server/knight-role-help');
-  const secret={role:'石像鬼',knightBCard:true,information:'没有视野。 6号查验结果：好人'+identityHelp('gargoyle',12),skillStatus:{title:'技能可用'}};
+  const secret={role:'石像鬼',knightBCard:true,information:'没有视野。 6号查验结果：好人'+identityHelp('gargoyle',12),skillStatus:{title:'技能可用'},identityHistory:[{id:1,current:true},{id:0,current:false}]};
   secret.info=presentIdentity(secret);
   const data={...base,room:{phase:'tools',players:[],team:[],history:[],me:{seat:1}},revealed:true,secret,identityHelpExpanded:false};
   const collapsed=renderTable(data);
+  const nameRow=nodes(collapsed).find(node=>node.attr?.class==='compact-role-name');
+  const help=byHandler(nameRow,'openIdentityRoleHelp');
+  assert.equal(help.attr.ariaLabel,'角色说明');
+  assert.equal(help.attr.ariaHaspopup,'dialog');
+  assert.match(JSON.stringify(help),/sheet-book\.svg/);
+  assert.ok(byHandler(collapsed,'openIdentityHistory'));
+  assert.ok(nodes(collapsed).some(node=>node.attr?.class==='compact-role-heading has-history'));
+  assert.equal(byHandler(nameRow,'openIdentityHistory'),undefined);
   const statusRow=nodes(collapsed).find(node=>node.attr?.class==='compact-skill-heading');
-  assert.equal(byHandler(statusRow,'toggleIdentityHelp').attr.ariaExpanded,false);
+  assert.equal(byHandler(statusRow,'toggleIdentityHelp'),undefined);
   assert.doesNotMatch(JSON.stringify(collapsed),/之后每轮/);
   assert.match(JSON.stringify(collapsed),/仙女查验/);
-  assert.match(JSON.stringify(renderTable({...data,identityHelpExpanded:true})),/之后每轮/);
-  assert.doesNotMatch(JSON.stringify(renderTable({...data,revealed:false,identityHelpExpanded:true})),/之后每轮|角色说明/);
+  const shown=renderTable({...data,identityRoleHelpOpen:true});
+  assert.ok(byHandler(shown,'closeIdentityRoleHelp'));
+  assert.ok(nodes(shown).some(node=>node.attr?.class==='identity-role-help-summary'));
+  assert.equal(byHandler(shown,'toggleIdentityHelp').attr.ariaExpanded,false);
+  assert.doesNotMatch(JSON.stringify(shown),/之后每轮|注意事项/);
+  const expanded=renderTable({...data,identityRoleHelpOpen:true,identityHelpExpanded:true});
+  assert.equal(byHandler(expanded,'toggleIdentityHelp').attr.ariaExpanded,true);
+  assert.match(JSON.stringify(expanded),/之后每轮|注意事项/);
+  assert.doesNotMatch(JSON.stringify(renderTable({...data,revealed:false,identityRoleHelpOpen:true})),/之后每轮|角色说明/);
   const aCard={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
   aCard.info=presentIdentity(aCard);
-  assert.doesNotMatch(JSON.stringify(renderTable({...data,secret:aCard,identityHelpExpanded:true})),/首次复活|角色说明/);
+  assert.ok(byHandler(renderTable({...data,secret:aCard}),'openIdentityRoleHelp'));
+  assert.match(JSON.stringify(renderTable({...data,secret:aCard,identityRoleHelpOpen:true,identityHelpExpanded:true})),/首次复活/);
   const dealt = {...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard};
   assert.doesNotMatch(JSON.stringify(renderTable(dealt)),/首次复活/);
   assert.match(JSON.stringify(renderTable({...dealt,identityHelpExpanded:true})),/首次复活/);

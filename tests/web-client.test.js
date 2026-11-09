@@ -44,7 +44,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { grantNotifier, request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityChange, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance, viewScoreRules,
+      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityChange, viewIdentityHistory, viewIdentityRoleHelp, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance, viewScoreRules,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewRecordClearing, viewRecordClearingConfirmation, loadRecordClearing, viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
@@ -851,7 +851,7 @@ function dealtWebRoom(overrides = {}) {
 test("网页身份历程只读且转义旧视野，关闭返回当前身份，遮盖后台与阶段变化清空", async () => {
   const room = dealtWebRoom({ me: { seat: 1, identityRevision: 1 } });
   const history = [{ id: 1, current: true, role: "觉醒红刀客", faction: "坏人阵营", sinceLabel: "第1轮 · 换牌", skillHistory: [{ round: 2, text: "刀8号" }] },
-    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野<script>", detailAvailable: true, sinceLabel: "开局 · A牌", skillHistory: [{ round: 1, text: "刀9号<script>" }] }];
+    { id: 0, current: false, initial: true, role: "红兰斯洛特", faction: "坏人阵营", information: "旧视野<script>\n\n角色能力\n一句话：旧技能规则\n怎么用：选择一名玩家。", detailAvailable: true, sinceLabel: "开局 · A牌", skillHistory: [{ round: 1, text: "刀9号<script>" }] }];
   const storage = new Map([["session", "session"]]);
   const c = client(async url => response(structuredClone(url.endsWith('/private') ? { stage: room.stage, faction: "坏人阵营", identityHistory: history, skillHistory: history[0].skillHistory } : room)), storage);
   c.state.room = room;
@@ -860,9 +860,9 @@ test("网页身份历程只读且转义旧视野，关闭返回当前身份，�
   assert.match(c.viewRoom(), /技能记录/); assert.match(c.viewRoom(), /刀8号/);
   c.ACTIONS.openIdentityHistory();
   assert.equal(c.state.identityHistoryExpandedId, 0);
-  assert.match(c.viewIdentityHistory(), /旧视野&lt;script&gt;|初始|当前/);
+  assert.match(c.viewIdentityHistory(), /旧视野&lt;script&gt;/);
   assert.match(c.viewIdentityHistory(), /刀8号/); assert.match(c.viewIdentityHistory(), /刀9号&lt;script&gt;/);
-  assert.doesNotMatch(c.viewIdentityHistory(), /data-action="submit|<script>/);
+  assert.doesNotMatch(c.viewIdentityHistory(), /data-action="submit|<script>|角色能力|旧技能规则/);
   c.ACTIONS.toggleIdentityHistory({ dataset: { id: "0" } });
   assert.match(c.viewIdentityHistory(), /class="identity-history-detail" hidden/);
   c.ACTIONS.closeIdentityHistory(); assert.equal(c.state.revealed, true);
@@ -1488,7 +1488,7 @@ test("网页猎人技能三选一后只显示该模式号码，返回及阶段�
   assert.match(c.viewActionDialog(), /确认本轮不开枪/);
   c.ACTIONS.submitChoice({dataset: {value: "mode:detonate"}});
   assert.deepEqual(Array.from(c.state.actionChoices, o => o.value), ["detonate:1", "detonate:11", "mode:"]);
-  assert.match(c.viewActionDialog(), /第 2 步：选择相邻一人/);
+  assert.match(c.viewActionDialog(), /你将自爆出局/);
   assert.ok(!c.viewActionDialog().includes("本轮若出局，将不会触发被动开枪"));
   c.ACTIONS.submitChoice({dataset: {value: "mode:"}});
   c.ACTIONS.submitChoice({dataset: {value: "mode:passive"}});
@@ -1554,6 +1554,7 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
     if (secret.action.hunterModes) await choose("mode:" + mode);
     assert.equal(c.state.skillTargetMode, mode, role);
     assert.match(c.viewActionDialog(), /skill-target-dialog/);
+    assert.doesNotMatch(c.viewActionDialog(), /skill-summary|skill-eligibility|已选 \d \/ 2/, role);
     assert.match(c.viewActionDialog(), /已出局/);
     assert.match(c.viewActionDialog(), /&lt;小鱼&gt;/);
     if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
@@ -1582,10 +1583,20 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       assert.equal(c.state.swapPlayers.find(t => t.seat === 5).disabledReason, "已出局");
     } else {
       await choose(value);
+      assert.doesNotMatch(c.viewActionDialog(), /skill-summary|skill-eligibility/, role);
+      if (mode === "duel") assert.match(c.viewActionDialog(), /决斗失败时，你将出局/);
+      if (mode === "detonate") assert.match(c.viewActionDialog(), /你将自爆出局/);
+      if (mode === "passive") assert.match(c.viewActionDialog(), /替女巫出局时不触发/);
+      if (mode === "sword") {
+        const dialog = c.viewActionDialog();
+        assert.match(dialog, /确认对 7 号开刀/);
+        assert.match(dialog, /确认提交后不可更改/);
+        assert.doesNotMatch(dialog, /skill-summary|自己与已出局玩家不可选|开刀目标：/);
+      }
       if (mode === "final") {
         assert.match(c.viewActionDialog(), /确认本次空刀/);
         await choose("target:7");
-        assert.match(c.viewActionDialog(), /最终盘刀目标：7 号/);
+        assert.match(c.viewActionDialog(), /确认对 7 号最终盘刀/);
         await choose(value);
       } else if (!secret.action.hunterModes) {
         await choose("pass");
@@ -1625,12 +1636,14 @@ test("网页仙女只确认合法当前目标，提示传递关系并阻止过�
   assert.match(c.viewActionDialog(), /当前持有者/);
   assert.match(c.viewActionDialog(), /曾持有仙女/);
   assert.match(c.viewActionDialog(), /请先选择目标/);
+  assert.match(c.viewActionDialog(), /查验后，仙女将传给所选玩家。/);
   c.ACTIONS.submitChoice({ dataset: { value: "target:5" } });
   assert.equal(c.state.draftChoice, "");
   c.ACTIONS.submitChoice({ dataset: { value: "target:3" } });
   assert.equal(writes.length, 0);
-  assert.match(c.viewActionDialog(), /查验目标：3号（&lt;玩家三&gt;） · 湖仙将传给3号/);
-  assert.doesNotMatch(c.viewActionDialog(), /skill-meta|skill-consequence|持有仙女<\/div>/);
+  assert.match(c.viewActionDialog(), /确认查验 3 号/);
+  assert.match(c.viewActionDialog(), /查验后，仙女将传给 3 号。/);
+  assert.doesNotMatch(c.viewActionDialog(), /skill-meta|skill-summary|skill-eligibility|查验目标：/);
   c.state.room.stage = "f2";
   c.ACTIONS.confirmChoice();
   c.state.room.stage = "f1";
@@ -1645,7 +1658,7 @@ test("网页仙女只确认合法当前目标，提示传递关系并阻止过�
   assert.equal(writes[0].value, "target:3");
   c.ACTIONS.closeAction();
   assert.equal(c.state.skillTargetMode, "");
-  assert.equal(c.state.skillSummary, "");
+  assert.equal(c.state.skillConsequence, "");
   c.state.fairyResult = { revision: 1, information: "3号查验结果：好人" };
   c.state.fairyResultRevealed = true;
   c.ACTIONS.hideFairyResult();
@@ -2541,30 +2554,45 @@ test('网页所有身份展示使用分区结果，轮次括号仅在展示中�
   assert.doesNotMatch(c.viewRoom(),/月下先知|存活 B 牌坏人|仙女查验/);
 });
 
-test('当前身份只在 B 牌技能状态旁显示说明入口，遮盖后清空展开状态', async () => {
+test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在遮盖后清空', async () => {
   const {identityHelp}=require('../server/knight-role-help');
   const secret={role:'石像鬼',faction:'坏人阵营',knightBCard:true,information:'没有视野。 6号查验结果：好人'+identityHelp('gargoyle',12),skillStatus:{title:'技能可用'}};
   const c=client();c.state.room=dealtWebRoom();c.state.revealed=true;c.state.secret=secret;
   const before=JSON.stringify(secret);
-  assert.match(c.viewRoom(),/技能状态<\/span><span class="compact-skill-value">技能可用<\/span><button [^>]*aria-expanded="false"/);
+  assert.match(c.viewRoom(),/compact-role-title[^>]*>石像鬼<\/div><button [^>]*data-action="openIdentityRoleHelp"[^>]*aria-label="角色说明"/);
+  assert.match(c.viewRoom(),/技能状态<\/span><span class="compact-skill-value">技能可用<\/span><\/div>/);
   assert.doesNotMatch(c.viewRoom(),/之后每轮/);
   assert.match(c.viewRoom(),/仙女查验/);
-  c.ACTIONS.toggleIdentityHelp();
-  assert.match(c.viewRoom(),/data-action="toggleIdentityHelp" aria-expanded="true"/);
-  assert.match(c.viewRoom(),/之后每轮/);
-  c.ACTIONS.toggleIdentityHelp();
-  assert.doesNotMatch(c.viewRoom(),/之后每轮/);
-  c.ACTIONS.toggleIdentityHelp();
-  await c.ACTIONS.reveal();
+  c.ACTIONS.openIdentityRoleHelp();
+  const toggle={dataset:{surface:'role'}};
+  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*展开完整规则/);
+  assert.doesNotMatch(c.viewIdentityRoleHelp(),/之后每轮|注意事项/);
+  c.ACTIONS.toggleIdentityHelp(toggle);
+  assert.match(c.viewIdentityRoleHelp(),/角色说明.*石像鬼.*之后每轮/);
+  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*identity-role-help-rules.*identity-role-help-note-title">注意事项/);
+  assert.doesNotMatch(c.viewIdentityRoleHelp(),/6号|仙女查验/);
+  c.ACTIONS.closeIdentityRoleHelp();
+  assert.equal(c.viewIdentityRoleHelp(),'');
   assert.equal(c.state.identityHelpExpanded,false);
+  assert.equal(c.state.revealed,true);
+  c.ACTIONS.openIdentityRoleHelp();
+  await c.ACTIONS.reveal();
+  assert.equal(c.state.identityRoleHelpOpen,false);
+  assert.equal(c.viewIdentityRoleHelp(),'');
   assert.doesNotMatch(c.viewRoom(),/角色说明|之后每轮/);
   assert.equal(JSON.stringify(secret),before);
   c.state.revealed=true;c.state.secret={...secret,information:'没有视野。'};
   assert.doesNotMatch(c.viewRoom(),/角色说明/);
-  c.state.secret={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
-  c.ACTIONS.toggleIdentityHelp();
-  assert.equal(c.state.identityHelpExpanded,false);
-  assert.doesNotMatch(c.viewRoom(),/角色说明|首次复活/);
+  c.ACTIONS.openIdentityRoleHelp();
+  assert.equal(c.state.identityRoleHelpOpen,false);
+  c.state.secret={role:'红刀客·奥伯伦',knightBCard:false,information:'没有视野。'+identityHelp('redSwordsman',12),skillStatus:{title:'技能可用'}};
+  assert.match(c.viewRoom(),/角色说明/);
+  c.ACTIONS.openIdentityRoleHelp();
+  assert.match(c.viewIdentityRoleHelp(),/红刀客·奥伯伦.*必须投失败/);
+  assert.match(c.viewIdentityRoleHelp(),/开刀机会.*1 次.*初始视野.*展开完整规则/);
+  assert.doesNotMatch(c.viewIdentityRoleHelp(),/刺客只失去技能/);
+  c.ACTIONS.toggleIdentityHelp(toggle);
+  assert.match(c.viewIdentityRoleHelp(),/刺客只失去技能/);
 });
 
 test('网页首次发牌和换身份只在展开时展示角色规则明细', () => {

@@ -35,7 +35,33 @@
       </view>
     </view>
 </template>
-<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !historyOpen}}"><include src="../../player-card.wxml" /></block>
+<block wx:if="{{!error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !identityRoleHelpOpen && !historyOpen}}"><include src="../../player-card.wxml" /></block>
+<view wx:if="{{identityRoleHelpOpen && revealed && secret.info.showRoleHelp && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtap="closeIdentityRoleHelp" catchtouchmove="blockScroll">
+  <view class="error-dialog table-sheet process-sheet identity-role-help-sheet {{processBodyHeight?'has-measured-body':''}}" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="角色说明">
+    <view class="process-sheet-top">
+      <view class="table-sheet-handle" aria-hidden="true" />
+      <view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/sheet-book.svg" aria-hidden="true" /></view><text>角色说明</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeIdentityRoleHelp" aria-label="关闭角色说明">×</button></view>
+    </view>
+    <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
+      <view class="identity-role-help-intro">
+        <image wx:if="{{secret.portrait}}" class="identity-role-help-portrait" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
+        <view class="identity-role-help-copy"><view class="identity-role-help-role faction-{{secret.factionTone}}">{{secret.role}}</view>
+          <view class="identity-role-help-meta"><text class="faction-{{secret.factionTone}}">{{secret.faction}}</text><text wx:if="{{secret.info.roleOverview.deck}}">· {{secret.info.roleOverview.deck}}</text></view>
+        </view>
+      </view>
+      <view class="identity-role-help-overview">
+        <view class="identity-role-help-feature"><image src="/assets/{{secret.info.roleOverview.icon}}.svg" aria-hidden="true" /><view class="identity-role-help-copy">
+          <view class="identity-role-help-feature-title"><text>{{secret.info.roleOverview.title}}</text><text wx:if="{{secret.info.roleOverview.badge}}" class="identity-role-help-badge">{{secret.info.roleOverview.badge}}</text></view>
+          <view class="identity-role-help-summary">{{secret.info.roleOverview.brief}}</view>
+        </view></view>
+        <view wx:for="{{secret.info.roleOverview.rows}}" wx:key="label" class="identity-role-help-row {{item.label==='任务出牌'?'is-task':''}}"><text class="identity-role-help-row-label">{{item.label}}</text><text class="identity-role-help-row-value">{{item.text}}</text></view>
+      </view>
+      <button wx:if="{{secret.info.roleOverview.hasDetails}}" hover-class="none" class="disclosure-button identity-role-help-toggle" bindtap="toggleIdentityHelp" data-surface="role" aria-expanded="{{identityHelpExpanded}}"><image src="/assets/sheet-book.svg" aria-hidden="true" /><text>{{identityHelpExpanded?'收起完整规则':'展开完整规则'}}</text><view class="identity-help-chevron {{identityHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
+      <view wx:if="{{identityHelpExpanded}}" class="identity-role-help-rules"><template is="identityRoleAbility" data="{{ability:secret.info.ability, summarized:true, detailed:true}}" /></view>
+    </view></scroll-view>
+    <view class="process-sheet-footer table-sheet-footer"><button hover-class="none" class="primary" bindtap="reveal">立即遮盖</button></view>
+  </view>
+</view>
 <view wx:if="{{identityHistoryOpen && revealed && secret.identityHistory.length > 1 && !error}}" class="dialog-backdrop identity-history-backdrop table-sheet-backdrop process-backdrop" catchtap="closeIdentityHistory" catchtouchmove="blockScroll">
   <view class="identity-history-sheet table-sheet process-sheet process-history {{processBodyHeight?'has-measured-body':''}}" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局身份历程">
     <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="{{true}}" />
@@ -53,7 +79,7 @@
           <button wx:else hover-class="none" class="disclosure-button identity-history-toggle" bindtap="toggleIdentityHistory" data-id="{{item.id}}" aria-expanded="{{identityHistoryExpandedId===item.id}}" aria-label="{{(identityHistoryExpandedId===item.id?'收起':'展开')+item.role+'历史身份'}}"><image wx:if="{{item.portrait}}" class="process-history-art" src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="identity-history-role-copy"><text class="identity-history-role faction-{{item.factionTone}}">{{item.role}}</text><view class="identity-history-meta small muted">{{item.sinceLabel}}</view></view><text class="identity-history-badge">{{item.initial?'初始':'曾用'}}</text><view class="identity-history-chevron {{identityHistoryExpandedId===item.id?'is-expanded':''}}" aria-hidden="{{true}}" /></button>
           <view wx:if="{{item.current}}" class="identity-history-summary small muted">{{item.faction}}{{item.skillStatus?' · '+item.skillStatus.title:''}}</view>
           <view wx:if="{{item.skillHistory.length}}" class="identity-skill-history"><view wx:for="{{item.skillHistory}}" wx:for-item="skill" wx:for-index="skillIndex" wx:key="id" class="identity-skill-record"><text class="identity-skill-label small muted">{{skillIndex===0?'技能记录':''}}</text><view class="identity-skill-value"><text class="identity-skill-round small muted">第{{skill.round}}轮</text><text class="identity-skill-separator muted" aria-hidden="true">·</text><text class="identity-skill-text">{{skill.text}}</text></view></view></view>
-          <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="identity-history-faction small muted"><view class="identity-history-faction-dot faction-{{item.factionTone}}" aria-hidden="true" />{{item.faction}}</view><template wx:if="{{item.detailAvailable}}" is="identityInformation" data="{{info:item.info, fallback:item.information}}" /><view wx:else class="identity-history-information">旧对局未记录当时视野，仅保留初始身份。</view><view class="identity-history-readonly small muted"><image src="/assets/process-eye.svg" aria-hidden="true" /><text>曾用身份 · 仅供回看</text></view></view>
+          <view wx:if="{{!item.current && identityHistoryExpandedId===item.id}}" class="identity-history-detail"><view class="identity-history-faction small muted"><view class="identity-history-faction-dot faction-{{item.factionTone}}" aria-hidden="true" />{{item.faction}}</view><template wx:if="{{item.detailAvailable}}" is="identityInformation" data="{{info:item.info, fallback:item.information, compact:true}}" /><view wx:else class="identity-history-information">旧对局未记录当时视野，仅保留初始身份。</view><view class="identity-history-readonly small muted"><image src="/assets/process-eye.svg" aria-hidden="true" /><text>曾用身份 · 仅供回看</text></view></view>
         </view>
       </view>
     </view></scroll-view>
@@ -162,7 +188,7 @@
   </view>
 </view>
 <app-nav wx:if="{{!homeShell && isLobby}}" title="对局" />
-<app-nav wx:elif="{{!homeShell}}" title="{{room ? (roomNavTitle || '牌桌') : '牌桌'}}" constrainTitle="{{!!room}}" back="{{true}}" backText="对局" backLabel="返回对局，保留当前座位" bindback="returnHome" />
+<app-nav wx:elif="{{!homeShell}}" title="{{room ? (roomNavTitle || '牌桌') : '牌桌'}}" constrainTitle="{{!!room}}" back="{{true}}" backLabel="返回对局，保留当前座位" bindback="returnHome" />
 <view class="page {{isLobby ? 'tab-page home-lobby' : ''}} {{enteringCode ? 'is-entering-room' : ''}} {{room ? 'table-room' : ''}} {{room && room.phase!=='lobby' ? 'has-public-history' : ''}} {{room && room.phase==='lobby' ? 'table-lobby' : ''}} {{room && room.phase==='lobby' && busy && (busyAction==='seat' || busyAction==='stand' || busyAction==='ready') && network && !hasPendingRequest && !loading && !reconnecting ? 'lobby-request-pending' : ''}} {{room && room.canUseTools && room.hasActiveOperation && room.phase!=='offlineFinal' ? 'has-host-bar' : ''}}" bindtouchstart="startRoomSwipePageTouch" bindtap="tapRoomSwipePage">
   <view wx:if="{{!invitation && !room}}" class="brand">
     <view class="brand-identity">
@@ -198,24 +224,23 @@
       <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{skillTargetMode==='fairy' || skillTargetMode==='inspect'?'process-eye':skillTargetMode==='sword' || skillTargetMode==='attack'?'record-swords':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{skillTitle}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择技能">×</button></view></view>
       <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="skill-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
         <view wx:if="{{skillTargetMode!=='fairy'}}" class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
-        <view class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
+        <view wx:if="{{skillHint}}" class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
         <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
         <view wx:if="{{skillSwordHint}}" class="skill-context">{{skillSwordHint}}</view>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
         <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
           <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view>
-        <block wx:if="{{swapOptions.length}}"><view class="skill-context">已选 {{swapSeats.length}} / 2</view><view class="skill-target-grid">
+        <block wx:if="{{swapOptions.length}}"><view class="skill-target-grid">
           <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-pressed="{{item.selected}}" aria-label="{{item.seat+'号 '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(item.selected?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view></block>
-        <view wx:if="{{skillEligibility}}" class="skill-eligibility">{{skillEligibility}}</view>
         <view wx:if="{{skillOtherChoices.length}}" class="skill-other-choices">
           <button hover-class="none" wx:for="{{skillOtherChoices}}" wx:key="value" class="skill-other {{item.value==='mode:'?'skill-navigation':''}} {{draftChoice===item.value?'is-selected':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}"><view class="process-choice-symbol"><image src="/assets/{{item.value==='pass'?'process-skip':item.value==='mode:'?'record-list':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{item.label}}</text><view class="process-choice-radio" aria-hidden="true">{{draftChoice===item.value?'✓':''}}</view></button>
         </view>
       </view></scroll-view>
       <view class="skill-footer process-sheet-footer table-sheet-footer">
-        <view class="skill-summary" aria-live="polite">{{skillTargetMode?skillSummary:draftChoice?'已选择：'+draftLabel:swapSeats.length?'还需选择一个座位':'尚未选择'}}</view>
-        <view wx:if="{{skillTargetMode && skillConsequence}}" class="skill-consequence">{{skillConsequence}}</view>
+        <view wx:if="{{!skillTargetMode}}" class="skill-summary" aria-live="polite">{{draftChoice?'已选择：'+draftLabel:'尚未选择'}}</view>
+        <view wx:if="{{skillTargetMode && skillConsequence}}" class="skill-consequence" aria-live="polite">{{skillConsequence}}</view>
         <view wx:if="{{hunterModes && draftChoice==='pass'}}" class="small">本轮若出局，将不会触发被动开枪。是否确认？</view>
         <button hover-class="none" class="primary skill-confirm" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">{{busy && busyAction==='submit'?'正在提交…':skillTargetMode?skillConfirmLabel:draftChoice?(draftLabel==='本轮确认'?'确认本轮选择':'确认'+draftLabel):'请先选择'}}</button><button hover-class="none" class="text-button skill-later" bindtap="closeAction" disabled="{{busy}}">稍后选择</button>
       </view>
@@ -446,14 +471,14 @@
     </view>
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open identity-compact">
-        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>隐藏身份</text></button></view>
-        <view class="compact-role-heading">
+        <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><view class="compact-hide-face"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>隐藏身份</text></view></button></view>
+        <view class="compact-role-heading {{secret.identityHistory.length > 1?'has-history':''}}">
           <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
-          <view class="compact-role-copy"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><view class="compact-faction faction-{{secret.factionTone}}"><view class="compact-faction-dot" aria-hidden="true" /><text>{{secret.faction}}</text></view></view>
+          <view class="compact-role-copy"><view class="compact-role-name"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><button wx:if="{{secret.info.showRoleHelp}}" hover-class="none" class="compact-role-help" bindtap="openIdentityRoleHelp" aria-label="角色说明" aria-haspopup="dialog"><view class="compact-role-help-mark" aria-hidden="true"><image src="/assets/sheet-book.svg" /></view></button></view><view class="compact-faction faction-{{secret.factionTone}}"><view class="compact-faction-dot" aria-hidden="true" /><text>{{secret.faction}}</text></view></view>
           <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
         <template is="identityInformation" data="{{info:secret.info, fallback:secret.information, compact:true}}" />
-        <template is="identitySkillStatus" data="{{status:secret.skillStatus, ability:secret.info.showRoleHelp?secret.info.ability:null, helpExpanded:identityHelpExpanded}}" />
+        <template is="identitySkillStatus" data="{{status:secret.skillStatus}}" />
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>
     </block>

@@ -22,7 +22,7 @@
     <view class="public-history-chevron-slot" aria-hidden="{{true}}"><view wx:if="{{item.hasDetails}}" class="public-history-chevron {{item.expanded?'is-expanded':''}}" /></view>
   </view>
 </template>
-<view wx:if="{{historyOpen && room && room.phase!=='lobby' && !error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !toolType && !resultDialog && !showRoomRules && !showRoomSettings}}" class="dialog-backdrop public-history-backdrop" catchtap="closeHistory" catchtouchmove="blockScroll">
+<view wx:if="{{historyOpen && room && room.phase!=='lobby' && !error && !actionDialog && !dealtIdentityDialog && !identityChange && !fairyResult && !identityHistoryOpen && !identityRoleHelpOpen && !toolType && !resultDialog && !showRoomRules && !showRoomSettings}}" class="dialog-backdrop public-history-backdrop" catchtap="closeHistory" catchtouchmove="blockScroll">
   <view class="public-history-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="公开记录">
     <view class="public-history-handle" aria-hidden="{{true}}" />
     <view class="public-history-header">

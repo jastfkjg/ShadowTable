@@ -30,6 +30,32 @@
         avatarUrl: profile?.avatarUrl || "", avatarFailed: !!profile?.avatarFailed };
     }) };
   }
+  function roleOverview(secret, ability, vision) {
+    if (!ability) return null;
+    const facts = new Map(ability.lines.map(line => [line.label, line.text]));
+    const range = facts.get("攻击范围")?.split(/[，。；]/)
+      .find(part => /^可(?:击杀|攻击)/.test(part));
+    const uses = facts.get("使用次数") || "";
+    const sword = !!range && /限用(?:一次|\s*1\s*次)/.test(uses);
+    const first = ability.lines[0];
+    const labels = [...summaryLabels.keys()];
+    if (vision.empty) labels.push("初始视野");
+    const rows = labels.filter(label => facts.has(label)).map(label => ({
+      label,
+      text: facts.get(label).replace(/^上车执行任务时/, "上车")
+        .replace(/^没有初始视野，/, "无视野，").replace(/。$/, ""),
+    }));
+    return {
+      deck: typeof secret.knightBCard === "boolean" ? (secret.knightBCard ? "B 牌" : "A 牌") : "",
+      title: sword ? "开刀机会" : "能力速查",
+      icon: sword ? "record-swords" : "record-spark",
+      badge: sword ? "1 次" : "",
+      brief: sword ? range + "。" + (uses.includes("刀错") ? "刀错也消耗技能。" : "")
+        : ability.brief || (first?.label ? first.label + " · " + first.text : first?.text || ""),
+      rows,
+      hasDetails: !!ability.note || ability.lines.length > (ability.brief ? 0 : 1),
+    };
+  }
   // Presentation only: split the private text already returned by the server.
   // Unknown formats stay readable verbatim. Never consult roles on public seats,
   // and never replace an old identity snapshot with a current inspection.
@@ -103,7 +129,8 @@
     ] : [];
     return { vision, passive, fairy, inspections, ability, summary,
       summaryVision: openingVision?.replace(/^没有初始视野，/, "无初始视野，") || vision.text,
-      showRoleHelp: secret.knightBCard === true && !!secret.skillStatus && !!ability,
+      roleOverview: roleOverview(secret, ability, vision),
+      showRoleHelp: !!ability,
       showVision: !!passive || (!!text && !(vision.empty && inspections.length)) };
   }
   return { present, presentIdentity };

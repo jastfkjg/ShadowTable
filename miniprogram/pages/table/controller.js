@@ -85,66 +85,58 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const count = mode === "swap" ? swapSeats.size : targets.length;
   return {
     skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
-    skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择"),
+    skillHint: copy ? copy.hint || "" : hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择",
     skillTargets,
     ...(mode === "swap" ? { swapPlayers } : {}),
     skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
       (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
     skillSwordHint: swordHint,
-    skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
     skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
       label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
         ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
     })),
-    ...skillSelectionView(room, "", mode),
+    ...skillSelectionView("", mode),
   };
 }
 function skillTargetCopy(mode) {
   return {
-    fairy: { title: "仙女查验", hint: "查验一名玩家，并将仙女传给 TA。", verb: "查验", privateResult: true, eligibility: "当前持有者、曾持有仙女或已出局的玩家不可选。" },
-    sword: { title: "选择开刀目标", hint: "选择一名玩家，或本轮不开刀。", verb: "开刀", pass: "本轮不开刀", eligibility: "自己与已出局玩家不可选。" },
-    duel: { title: "骑士决斗", hint: "选择一名玩家决斗，或本轮不决斗。", verb: "决斗", pass: "本轮不决斗", eligibility: "自己与已出局玩家不可选。", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
-    inspect: { title: "石像鬼查验", hint: "查验一名玩家是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true, eligibility: "可查验自己；已出局玩家不可选。" },
-    guard: { title: "秘密守护", hint: "选择一名玩家守护，或本轮不守护。", verb: "守护", pass: "本轮不守护", eligibility: "可守护自己；已出局玩家不可选。" },
-    substitute: { title: "指定替死者", hint: "选择一名玩家作为替死者，或本轮不指定。", verb: "指定替死", pass: "本轮不指定替死者", eligibility: "可选择自己；已出局玩家不可选。" },
-    detonate: { title: "猎人主动自爆", hint: "第 2 步：选择相邻一人，自己将自爆出局", verb: "自爆开枪", eligibility: "仅可选择相邻且存活的玩家。", consequence: "你将自爆出局并向目标开枪 · 确认后不可更改" },
-    passive: { title: "猎人被动开枪", hint: "第 2 步：选择出局时开枪的目标；替女巫出局不触发", verb: "被动开枪", eligibility: "自己与已出局玩家不可选。", consequence: "仅在符合条件的出局时开枪 · 确认后不可更改" },
-    gun: { title: "选择开枪目标", hint: "选择一名玩家开枪，或本轮不开枪。", verb: "开枪", pass: "本轮不开枪", eligibility: "自己与已出局玩家不可选。" },
-    attack: { title: "选择技能目标", hint: "选择一名玩家使用刀或决斗，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能", eligibility: "自己与已出局玩家不可选。" },
-    revive: { title: "选择复活目标", hint: "选择一名可复活的玩家，或本轮不复活。", verb: "复活", pass: "本轮不复活", eligibility: "仅可选择本阶段允许复活的玩家。" },
-    swap: { title: "魔术师秘密换号", hint: "选择两个座位交换号码，再次点击可取消。", verb: "换号", pass: "本轮不换号", eligibility: "可选择自己；已出局玩家不可选。" },
-    final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标，或选择空刀。", verb: "最终盘刀", eligibility: "自己与已出局玩家不可选。" },
-    target: { title: "选择技能目标", hint: "选择一名玩家，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能" },
+    fairy: { title: "仙女查验", verb: "查验", privateResult: true },
+    sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+    duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
+    inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
+    guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
+    substitute: { title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
+    detonate: { title: "猎人主动自爆", verb: "自爆开枪", consequence: "你将自爆出局 · 确认后不可更改" },
+    passive: { title: "猎人被动开枪", verb: "被动开枪", consequence: "出局时向目标开枪，替女巫出局时不触发 · 确认后不可更改" },
+    gun: { title: "选择开枪目标", verb: "开枪", pass: "本轮不开枪" },
+    attack: { title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
+    revive: { title: "选择复活目标", verb: "复活", pass: "本轮不复活" },
+    swap: { title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
+    final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标。", verb: "最终盘刀" },
+    target: { title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
   }[mode];
 }
-function skillSelectionView(room, value, mode, swapSeats = []) {
-  if (!mode) return { skillSummary: "", skillConsequence: "", skillConfirmLabel: "" };
+function skillSelectionView(value, mode, swapSeats = []) {
+  if (!mode) return { skillConsequence: "", skillConfirmLabel: "" };
   const copy = skillTargetCopy(mode);
   const seat = /^(target|inspect|detonate|passive):\d+$/.test(value) ? Number(value.split(":")[1]) : null;
-  const player = (room.players || []).find(p => p.seat === seat);
-  let summary = "尚未选择目标", confirm = "请先选择目标";
+  let confirm = "请先选择目标";
+  let consequence = "确认提交后不可更改";
+  if (mode === "fairy") consequence = "查验后，仙女将传给" + (seat === null ? "所选玩家" : " " + seat + " 号") + "。";
+  else if (value !== "pass" && copy.consequence) consequence = copy.consequence;
   if (value === "pass") {
-    summary = "已选择：" + copy.pass;
     confirm = "确认" + copy.pass;
   } else if (mode === "final" && seat === 0) {
-    summary = "已选择：本次空刀";
     confirm = "确认本次空刀";
   } else if (seat !== null) {
-    summary = copy.verb + "目标：" + seat + " 号" + (player?.name ? " · " + player.name : "");
-    if (mode === "fairy") summary = "查验目标：" + seat + "号" + (player?.name ? "（" + player.name + "）" : "") + " · 湖仙将传给" + seat + "号";
     confirm = mode === "fairy" || mode === "inspect" ? "确认查验 " + seat + " 号" : "确认对 " + seat + " 号" + copy.verb;
   } else if (mode === "swap") {
     const seats = value.startsWith("swap:") ? value.split(":").slice(1).map(Number) : swapSeats;
-    summary = seats.length ? "已选 " + seats.length + " / 2：" + seats.join(" 号、") + " 号" : "尚未选择座位 · 需选 2 人";
     confirm = seats.length === 2 && value ? "确认交换 " + seats.join(" 号与 ") + " 号" : seats.length ? "请再选择一个座位" : "请选择两个座位";
   }
-  return {
-    skillSummary: summary,
-    skillConsequence: mode === "fairy" ? "" : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
-    skillConfirmLabel: confirm,
-  };
+  return { skillConsequence: consequence, skillConfirmLabel: confirm };
 }
 function skillDraftLabel(choice, hunterModes, mode) {
   const copy = skillTargetCopy(mode);
@@ -307,7 +299,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     draftLabel: "",
     stagedChoice: false,
     skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -345,6 +337,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     revealed: false,
     secret: null,
     identityHelpExpanded: false,
+    identityRoleHelpOpen: false,
     identityHistoryOpen: false,
     identityHistoryExpandedId: null,
     choiceButtons: [],
@@ -491,13 +484,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
       revealed: false,
       secret: null,
       identityHelpExpanded: false,
+      identityRoleHelpOpen: false,
       identityHistoryOpen: false,
       identityHistoryExpandedId: null,
       choiceButtons: [],
@@ -895,6 +889,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
+          identityRoleHelpOpen: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
           choiceButtons: [],
@@ -913,7 +908,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           draftLabel: "",
           stagedChoice: false,
           skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-          skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+          skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
           swapOptions: [],
           swapSeats: [],
           swapPlayers: [],
@@ -1538,6 +1533,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (d.error) return "";
     const stage = d.room?.code + ":" + d.room?.stage;
     if (d.dealtIdentityDialog) return stage + ":dealt:" + !!d.dealtIdentitySecret;
+    if (d.identityRoleHelpOpen && d.revealed) return stage + ":role-help:" + d.identityHelpExpanded;
     if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
     if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
     if (d.fairyResult) return stage + ":fairy:" + d.fairyResult.revision + ":" + d.fairyResultRevealed;
@@ -1922,7 +1918,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   ...playerCardMethods(api),
   async openPlayerCard(seat) {
     const room = this.data.room, player = room?.players.find(p => p.seat === seat);
-    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult || this.data.identityHistoryOpen || this.data.historyOpen) return;
+    if (!player || !this.foreground || this.data.actionDialog || this.data.dealtIdentityDialog || this.data.identityChange || this.data.fairyResult || this.data.identityHistoryOpen || this.data.identityRoleHelpOpen || this.data.historyOpen) return;
     const sourceAvatarUrl = player.avatarUrl;
     const card = { id: player.statsId, seat, name: player.name, isHost: player.isHost, sourceAvatarUrl,
       avatarUrl: sourceAvatarUrl ? api.assetUrl(sourceAvatarUrl) : "", initial: Array.from(player.name || "友")[0], avatarFailed: false };
@@ -2334,7 +2330,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -2487,7 +2483,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     return !this.alive || !this.foreground || !this.data.room || this.data.error ||
       this.grantNoticeOpen ||
       this.data.actionDialog || this.data.actionLoading || this.data.identityChange ||
-      this.data.fairyResult || this.data.identityHistoryOpen || this.data.historyOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
+      this.data.fairyResult || this.data.identityHistoryOpen || this.data.identityRoleHelpOpen || this.data.historyOpen || this.data.toolType || this.data.showRoomRules || this.data.showRoomSettings;
   },
   showDealtIdentity() {
     const key = this.identityDealKey();
@@ -2604,11 +2600,20 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     const surface = event?.currentTarget?.dataset?.surface;
     if (d.error) return;
-    if (surface === "dealt" ? d.dealtIdentityDialog && d.dealtIdentitySecret?.info?.ability
-      : surface === "change" ? d.identityChangeRevealed && d.identityChange?.info?.ability
-      : d.revealed && d.secret?.info?.showRoleHelp) {
-      this.setProcessData({ identityHelpExpanded: !d.identityHelpExpanded });
-    }
+    const info = surface === "dealt" ? d.dealtIdentityDialog && d.dealtIdentitySecret?.info
+      : surface === "change" ? d.identityChangeRevealed && d.identityChange?.info
+      : surface === "role" && d.identityRoleHelpOpen && d.revealed && d.secret?.info;
+    if (!info?.ability || (surface === "role" && !info.roleOverview?.hasDetails)) return;
+    this.setProcessData({ identityHelpExpanded: !d.identityHelpExpanded });
+  },
+  openIdentityRoleHelp() {
+    const d = this.data;
+    if (!d.revealed || !d.secret?.info?.showRoleHelp || d.dealtIdentityDialog || d.resultDialog || d.honorDialog || this.identityOverlayBlocked()) return;
+    this.closePlayerCard();
+    this.setProcessData({ identityRoleHelpOpen: true, identityHelpExpanded: false, processBodyHeight: 0 });
+  },
+  closeIdentityRoleHelp() {
+    this.setData({ identityRoleHelpOpen: false, identityHelpExpanded: false, processBodyHeight: 0 });
   },
   openIdentityHistory() {
     const history = this.data.secret?.identityHistory || [];
@@ -2651,6 +2656,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
+          identityRoleHelpOpen: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -2707,6 +2713,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
+          identityRoleHelpOpen: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -2750,7 +2757,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const draft = this.data.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
     this.setProcessData({
       ...(this.data.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
-      ...skillSelectionView(this.data.room, draft || "", this.data.skillTargetMode, selected),
+      ...skillSelectionView(draft || "", this.data.skillTargetMode, selected),
       swapSeats: selected,
       swapPlayers: this.data.swapPlayers.map((p) => ({
         ...p,
@@ -2830,7 +2837,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       if (choice)
         this.setProcessData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes, this.data.skillTargetMode) : choice.label,
           swapSeats: [], swapPlayers: this.data.swapPlayers.map(p => ({ ...p, selected: false })),
-          ...skillSelectionView(this.data.room, value, this.data.skillTargetMode) });
+          ...skillSelectionView(value, this.data.skillTargetMode) });
       return;
     }
     if (

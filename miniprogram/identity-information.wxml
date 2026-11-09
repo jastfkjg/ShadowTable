@@ -44,8 +44,8 @@
 </template>
 <template name="identityRoleAbility">
   <view wx:if="{{ability.brief && !summarized}}" class="identity-info-brief">{{ability.brief}}</view>
-  <view wx:for="{{ability.lines}}" wx:key="index" class="identity-info-ability {{ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{ability.structured?'：':''}}</text><text>{{item.text}}</text></view>
-  <view wx:if="{{ability.note}}" class="identity-info-note">{{ability.structured?'注意：':''}}{{ability.note}}</view>
+  <view wx:for="{{ability.lines}}" wx:key="index" class="identity-info-ability {{ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{ability.structured && !detailed?'：':''}}</text><text>{{item.text}}</text></view>
+  <view wx:if="{{ability.note}}" class="identity-info-note"><text wx:if="{{detailed}}" class="identity-role-help-note-title">注意事项</text>{{ability.structured && !detailed?'注意：':''}}{{ability.note}}</view>
 </template>
 <template name="identitySkillStatus">
   <view wx:if="{{status || ability}}" class="compact-skill-status {{ability?'has-role-help':''}}">

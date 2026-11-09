@@ -7,6 +7,8 @@
 .process-sheet-fields { padding: 0 18px 10px; overflow-wrap: anywhere; }
 .process-sheet-footer { flex-shrink: 0; margin: 0; border: 0; }
 .process-sheet .small { font-size: 12px; line-height: 1.7; }
+.table-sheet-backdrop .identity-role-help-sheet { background: var(--bg); }
+.identity-role-help-sheet .process-sheet-footer { border-top: 1px solid rgba(177,191,198,.14); }
 .process-sheet .identity-privacy-note { margin: 2px 0 14px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .process-sheet .table-symbol image { width: 19px; height: 19px; }
 .process-sheet button.table-sheet-close { align-self: flex-start; }
@@ -67,7 +69,7 @@
 .process-skill .skill-seat-unit, .process-team-number text { margin-left: 2px; font-size: 10px; color: var(--muted); font-weight: 400; }
 .process-skill .skill-name { margin: 0; width: 100%; color: inherit; font-size: 12px; font-weight: 400; line-height: 1.6; white-space: normal; overflow: visible; word-break: break-all; }
 .process-skill .skill-check, .process-tool .skill-check { position: absolute; top: 4px; right: 5px; width: 13px; height: 13px; font-size: 11px; line-height: 13px; border: 0; border-radius: 0; background: transparent; color: var(--accent); }
-.process-skill .skill-context, .process-skill .skill-eligibility { margin: 10px 0 12px; padding: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.process-skill .skill-context { margin: 10px 0 12px; padding: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .process-skill .skill-other-choices { display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 16px 0 0; }
 .process-skill button.skill-other, .process-skill button.skill-other[disabled]:not([type]) { display: flex; align-items: center; justify-content: flex-start; gap: 11px; width: 100%; min-height: 76px; margin: 0; padding: 14px; border: 1px solid rgba(177,191,198,.22); border-radius: 15px; background: var(--control-bg, #14232c); color: var(--text); text-align: left; font-size: 16px; line-height: 1.6; }
 .process-skill.has-targets button.skill-other { min-height: 60px; padding: 10px 12px; font-size: 14px; }

@@ -451,6 +451,10 @@ button.identity-history-entry { display: flex; align-items: center; gap: 6px; wi
 .identity-history-title { font-size: 23px; font-weight: 600; margin-bottom: 4px; }
 button.identity-history-close { flex-shrink: 0; width: 44px; min-height: 44px; margin: -4px -8px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 26px; font-weight: 400; }
 .identity-history-body { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.identity-role-help-sheet { background: var(--bg); }
+.identity-role-help-sheet .identity-history-heading { align-items: center; margin-bottom: 12px; }
+.identity-role-help-sheet .identity-history-title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 20px; }
+.identity-role-help-sheet .identity-history-body { text-align: left; }
 .identity-history-timeline { position: relative; padding: 0 0 0 22px; text-align: left; }
 .identity-history-timeline::before { content: ''; position: absolute; left: 5px; top: 13px; bottom: 24px; width: 1px; background: var(--border); }
 .identity-history-event { position: relative; padding-bottom: 26px; }
@@ -476,6 +480,8 @@ button.identity-history-toggle { width: 100%; min-height: 44px; margin: 0; paddi
 .identity-history-readonly { margin-top: 12px; }
 .identity-history-footer { flex-shrink: 0; padding-top: 22px; text-align: center; }
 .identity-history-footer button { margin-top: 12px; }
+.identity-role-help-sheet .identity-history-footer { margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(177,191,198,.14); }
+.identity-role-help-sheet .identity-history-footer button { margin: 0; }
 body:has(.identity-history-backdrop) { overflow: hidden; }
 .identity-history-sheet button:focus-visible, .identity-history-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @keyframes identity-history-enter { from { transform: translateY(18px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
@@ -1508,7 +1514,6 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .skill-target-dialog .is-selected .skill-name { color: var(--bg); }
 .skill-target-dialog button.skill-option-unavailable[disabled] { opacity: 1; background: var(--surface); color: var(--muted); border-color: var(--border); border-style: dashed; }
 .skill-target-dialog .skill-option-unavailable .skill-name { font-size: 11px; }
-.skill-eligibility { margin-top: 11px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .skill-target-dialog .skill-other-choices { padding: 0 20px 16px; }
 .skill-target-dialog button.skill-other { min-height: 48px; padding: 10px 13px; border: 1px solid var(--control-border); border-radius: 12px; justify-content: space-between; gap: 12px; font-size: 13px; background: var(--control-bg); border-color: var(--control-border); }
 .skill-target-dialog button.skill-other.is-selected { color: var(--accent); border-color: var(--accent); background: var(--surface); }
@@ -1518,7 +1523,6 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .is-selected .skill-pass-mark { border-color: var(--accent); }
 .is-selected .skill-pass-mark::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
 .skill-target-dialog .skill-footer { background: var(--skill-footer-bg); margin-top: 0; padding: 15px 20px calc(8px + env(safe-area-inset-bottom)); }
-.skill-target-dialog .skill-summary { font-size: 14px; font-weight: 550; line-height: 1.6; }
 .skill-consequence { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .skill-target-dialog button.skill-confirm { min-height: 48px; padding: 12px; margin-top: 12px; font-size: 15px; font-weight: 650; border-radius: 12px; }
 .skill-target-dialog button.skill-confirm[disabled] { opacity: 1; background: var(--skill-disabled-bg); color: var(--muted); }

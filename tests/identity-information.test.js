@@ -70,6 +70,8 @@ test('长规则及未知信息完整保留；猎人分开主动被动，特殊�
   const info=presentIdentity({information:'没有视野。 主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动枪。'});
   assert.equal(info.vision.empty,true);
   assert.deepEqual(info.ability.lines.map(l=>l.label),['主动自爆','被动开枪']);
+  assert.equal(info.roleOverview.brief,'主动自爆 · 带走相邻一人。');
+  assert.equal(info.roleOverview.hasDetails,true);
   assert.match(info.ability.note,/可不使用技能/);
   assert.match(info.ability.note,/共用一次技能，替女巫出局不触发被动枪/);
   for (const information of ['未来角色的完整规则\n未知查验：4号有特殊状态。','你不知道其他坏人是谁，其他坏人也看不见你。','没有视野。你与其他坏人不互认。']) {
@@ -97,7 +99,7 @@ test('全部可用板子与人数的实际私密数据均可展示，不修改�
   assert.ok(identities>100);
 });
 
-test('十二骑士保留全部规则文字，只有 B 牌获得卡内说明入口', () => {
+test('十二骑士的 A 牌和 B 牌都能查阅完整角色规则', () => {
   const room=setup('knights',12);
   const bCards=['blueGuard','gargoyle','witch','magician','paladin','blueKnight','redKnight','blueAwakened','redAwakened','blueHunter','redHunter','prophet'];
   const aCards=['gareth','gaheris','blueLancelot','redLancelot','redSwordsman','assassin','morgana'];
@@ -105,10 +107,20 @@ test('十二骑士保留全部规则文字，只有 B 牌获得卡内说明入�
     room.roles.p1=role;room.knights.players.p1.b=bCards.includes(role);
     const secret=privateView(room,'p1'),info=presentIdentity(secret);
     assert.ok(info.ability,roles[role]?.[0]||role);
-    assert.equal(info.showRoleHelp,bCards.includes(role),role);
+    assert.equal(info.showRoleHelp,true,role);
     const help = require('../server/knight-role-help').roleHelp(role, 12);
     assert.equal(info.ability.brief, help.brief);
     assert.deepEqual(info.ability.lines, help.facts);
     assert.equal(info.ability.note, help.exception);
+    assert.equal(info.roleOverview.deck, bCards.includes(role) ? 'B 牌' : 'A 牌');
+    assert.ok(info.roleOverview.brief);
+    if (role === 'redSwordsman') {
+      assert.equal(info.roleOverview.badge, '1 次');
+      assert.match(info.roleOverview.brief, /A 牌刀客或 B 牌角色.*刀错也消耗技能/);
+      assert.deepEqual(info.roleOverview.rows, [
+        { label: '任务出牌', text: '上车必须投失败' },
+        { label: '初始视野', text: '无视野，不参与坏人互认' },
+      ]);
+    }
   }
 });

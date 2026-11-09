@@ -357,7 +357,7 @@ for(const [role,mode,value] of [...skillFixtures.cases,['servant','none','pass']
   const choices=mode==='final'?secret.action.targets.map(t=>({value:'target:'+t.seat,label:'目标'+t.seat})):secret.action.hunterModes?secret.action.options.filter(c=>c.value.startsWith(mode+':')).concat([{value:'mode:',label:'返回选择技能方式'}]):secret.action.options.filter(c=>!c.value.startsWith('swap:'));
   const data={...tableScene(source,'p2'),room,actionDialog:true,stagedChoice:true,actionChoices:choices,swapOptions,swapSeats:[],swapPlayers:[],...skillPresentation.skillView(room,choices,!!secret.action.hunterModes,secret.action.hunterModes?mode:'',swapOptions,secret.action.unavailableHint)};
   tableScenes['skill-'+role]=data;
-  tableScenes['skill-'+role+'-selected']={...data,draftChoice:value,draftLabel:choices.find(c=>c.value===value)?.label||'',...skillPresentation.skillSelectionView(room,value,data.skillTargetMode),...(mode==='swap'?{swapSeats:[2,7],swapPlayers:data.swapPlayers.map(p=>({...p,selected:[2,7].includes(p.seat)}))}:{})};
+  tableScenes['skill-'+role+'-selected']={...data,draftChoice:value,draftLabel:choices.find(c=>c.value===value)?.label||'',...skillPresentation.skillSelectionView(value,data.skillTargetMode),...(mode==='swap'?{swapSeats:[2,7],swapPlayers:data.swapPlayers.map(p=>({...p,selected:[2,7].includes(p.seat)}))}:{})};
 }
 const newIdentity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动开枪。',skillStatus:{title:'新技能尚未启用',detail:'下次技能环节可用。'}},'evil');
 const identityHistory=[{...newIdentity,id:1,current:true,sinceLabel:'第2轮 · 换牌'},{...presentPrivateIdentity({role:'亚瑟的忠臣',information:'没有视野。',faction:'好人阵营'},'good'),id:0,initial:true,sinceLabel:'开局 · A牌',detailAvailable:true}];
@@ -437,7 +437,7 @@ tableFixtures.run(reviewSource,'beginActivity',{kind:'fairy'});
 const reviewRoom=publicView(reviewSource,'review-1'),reviewAction=privateView(reviewSource,'review-1').action;
 const reviewSkill=skillPresentation.skillView(reviewRoom,reviewAction.options,false,'',[]);
 tableScenes['ui-fairy-selection']={...tableScene(reviewSource,'review-1'),actionDialog:true,stagedChoice:true,actionChoices:reviewAction.options,...reviewSkill,
-  draftChoice:'target:3',...skillPresentation.skillSelectionView(reviewRoom,'target:3','fairy')};
+  draftChoice:'target:3',...skillPresentation.skillSelectionView('target:3','fairy')};
 tableScenes['ui-fairy-result']={...tableScene(reviewSource,'review-1'),fairyResult:presentFairyResult({summary:'3号 · 坏人'}),fairyResultRevealed:true};
 for(const [tone,label] of [['good','好人'],['third','盗贼阵营']]) {
   tableScenes['ui-fairy-result-'+tone]={...tableScenes['ui-fairy-result'],fairyResult:presentFairyResult({summary:'12号 · '+label})};

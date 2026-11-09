@@ -81,66 +81,58 @@
     const count = mode === "swap" ? swapSeats.size : targets.length;
     return {
       skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
-      skillHint: copy?.hint || (hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择"),
+      skillHint: copy ? copy.hint || "" : hunterModes ? "第 1 步：选择主动技能、被动技能，或本轮不开枪" : unavailableHint || "本阶段没有可选目标，请确认本轮选择",
       skillTargets,
       ...(mode === "swap" ? { swapPlayers } : {}),
       skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
         (finalAction ? "最终盘刀" : "技能准备") : "",
       skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
       skillSwordHint: swordHint,
-      skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
       skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
       skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
         label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
           ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
       })),
-      ...skillSelectionView(room, "", mode),
+      ...skillSelectionView("", mode),
     };
   }
   function skillTargetCopy(mode) {
     return {
-      fairy: { title: "仙女查验", hint: "查验一名玩家，并将仙女传给 TA。", verb: "查验", privateResult: true, eligibility: "当前持有者、曾持有仙女或已出局的玩家不可选。" },
-      sword: { title: "选择开刀目标", hint: "选择一名玩家，或本轮不开刀。", verb: "开刀", pass: "本轮不开刀", eligibility: "自己与已出局玩家不可选。" },
-      duel: { title: "骑士决斗", hint: "选择一名玩家决斗，或本轮不决斗。", verb: "决斗", pass: "本轮不决斗", eligibility: "自己与已出局玩家不可选。", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
-      inspect: { title: "石像鬼查验", hint: "查验一名玩家是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true, eligibility: "可查验自己；已出局玩家不可选。" },
-      guard: { title: "秘密守护", hint: "选择一名玩家守护，或本轮不守护。", verb: "守护", pass: "本轮不守护", eligibility: "可守护自己；已出局玩家不可选。" },
-      substitute: { title: "指定替死者", hint: "选择一名玩家作为替死者，或本轮不指定。", verb: "指定替死", pass: "本轮不指定替死者", eligibility: "可选择自己；已出局玩家不可选。" },
-      detonate: { title: "猎人主动自爆", hint: "第 2 步：选择相邻一人，自己将自爆出局", verb: "自爆开枪", eligibility: "仅可选择相邻且存活的玩家。", consequence: "你将自爆出局并向目标开枪 · 确认后不可更改" },
-      passive: { title: "猎人被动开枪", hint: "第 2 步：选择出局时开枪的目标；替女巫出局不触发", verb: "被动开枪", eligibility: "自己与已出局玩家不可选。", consequence: "仅在符合条件的出局时开枪 · 确认后不可更改" },
-      gun: { title: "选择开枪目标", hint: "选择一名玩家开枪，或本轮不开枪。", verb: "开枪", pass: "本轮不开枪", eligibility: "自己与已出局玩家不可选。" },
-      attack: { title: "选择技能目标", hint: "选择一名玩家使用刀或决斗，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能", eligibility: "自己与已出局玩家不可选。" },
-      revive: { title: "选择复活目标", hint: "选择一名可复活的玩家，或本轮不复活。", verb: "复活", pass: "本轮不复活", eligibility: "仅可选择本阶段允许复活的玩家。" },
-      swap: { title: "魔术师秘密换号", hint: "选择两个座位交换号码，再次点击可取消。", verb: "换号", pass: "本轮不换号", eligibility: "可选择自己；已出局玩家不可选。" },
-      final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标，或选择空刀。", verb: "最终盘刀", eligibility: "自己与已出局玩家不可选。" },
-      target: { title: "选择技能目标", hint: "选择一名玩家，或本轮不使用技能。", verb: "使用技能", pass: "本轮不使用技能" },
+      fairy: { title: "仙女查验", verb: "查验", privateResult: true },
+      sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+      duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
+      inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
+      guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
+      substitute: { title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
+      detonate: { title: "猎人主动自爆", verb: "自爆开枪", consequence: "你将自爆出局 · 确认后不可更改" },
+      passive: { title: "猎人被动开枪", verb: "被动开枪", consequence: "出局时向目标开枪，替女巫出局时不触发 · 确认后不可更改" },
+      gun: { title: "选择开枪目标", verb: "开枪", pass: "本轮不开枪" },
+      attack: { title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
+      revive: { title: "选择复活目标", verb: "复活", pass: "本轮不复活" },
+      swap: { title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
+      final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标。", verb: "最终盘刀" },
+      target: { title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
     }[mode];
   }
-  function skillSelectionView(room, value, mode, swapSeats = []) {
-    if (!mode) return { skillSummary: "", skillConsequence: "", skillConfirmLabel: "" };
+  function skillSelectionView(value, mode, swapSeats = []) {
+    if (!mode) return { skillConsequence: "", skillConfirmLabel: "" };
     const copy = skillTargetCopy(mode);
     const seat = /^(target|inspect|detonate|passive):\d+$/.test(value) ? Number(value.split(":")[1]) : null;
-    const player = (room.players || []).find(p => p.seat === seat);
-    let summary = "尚未选择目标", confirm = "请先选择目标";
+    let confirm = "请先选择目标";
+    let consequence = "确认提交后不可更改";
+    if (mode === "fairy") consequence = "查验后，仙女将传给" + (seat === null ? "所选玩家" : " " + seat + " 号") + "。";
+    else if (value !== "pass" && copy.consequence) consequence = copy.consequence;
     if (value === "pass") {
-      summary = "已选择：" + copy.pass;
       confirm = "确认" + copy.pass;
     } else if (mode === "final" && seat === 0) {
-      summary = "已选择：本次空刀";
       confirm = "确认本次空刀";
     } else if (seat !== null) {
-      summary = copy.verb + "目标：" + seat + " 号" + (player?.name ? " · " + player.name : "");
-      if (mode === "fairy") summary = "查验目标：" + seat + "号" + (player?.name ? "（" + player.name + "）" : "") + " · 湖仙将传给" + seat + "号";
       confirm = mode === "fairy" || mode === "inspect" ? "确认查验 " + seat + " 号" : "确认对 " + seat + " 号" + copy.verb;
     } else if (mode === "swap") {
       const seats = value.startsWith("swap:") ? value.split(":").slice(1).map(Number) : swapSeats;
-      summary = seats.length ? "已选 " + seats.length + " / 2：" + seats.join(" 号、") + " 号" : "尚未选择座位 · 需选 2 人";
       confirm = seats.length === 2 && value ? "确认交换 " + seats.join(" 号与 ") + " 号" : seats.length ? "请再选择一个座位" : "请选择两个座位";
     }
-    return {
-      skillSummary: summary,
-      skillConsequence: mode === "fairy" ? "" : value === "pass" ? "确认提交后不可更改" : copy.consequence || "确认提交后不可更改",
-      skillConfirmLabel: confirm,
-    };
+    return { skillConsequence: consequence, skillConfirmLabel: confirm };
   }
   function skillDraftLabel(choice, hunterModes, mode) {
     const copy = skillTargetCopy(mode);
@@ -622,7 +614,7 @@
     draftLabel: "",
     stagedChoice: false,
     skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -661,6 +653,7 @@
     revealed: false,
     secret: null,
     identityHelpExpanded: false,
+    identityRoleHelpOpen: false,
     identityHistoryOpen: false,
     identityHistoryExpandedId: null,
     fairyResult: null,
@@ -1616,13 +1609,14 @@
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
       revealed: false,
       secret: null,
       identityHelpExpanded: false,
+      identityRoleHelpOpen: false,
       identityHistoryOpen: false,
       identityHistoryExpandedId: null,
     });
@@ -1892,6 +1886,7 @@ function roomListItems(rooms) {
       patch.revealed = false;
       patch.secret = null;
       patch.identityHelpExpanded = false;
+      patch.identityRoleHelpOpen = false;
       patch.identityHistoryOpen = false;
       patch.identityHistoryExpandedId = null;
       patch.actionDialog = false;
@@ -1912,7 +1907,7 @@ function roomListItems(rooms) {
       patch.skillTargets = [];
       patch.skillBodyHeight = 0;
       patch.skillOtherChoices = [];
-      Object.assign(patch, { skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "" });
+      Object.assign(patch, { skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "" });
       patch.swapOptions = [];
       patch.swapSeats = [];
       patch.swapPlayers = [];
@@ -2839,7 +2834,7 @@ function roomListItems(rooms) {
   function identityOverlayBlocked() {
     return !alive || !foreground || !state.room || state.error || !modal.hidden ||
       state.actionDialog || state.actionLoading || state.identityChange || state.fairyResult ||
-      state.identityHistoryOpen || state.historyOpen || state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
+      state.identityHistoryOpen || state.identityRoleHelpOpen || state.historyOpen || state.toolType || state.showRoomRules || state.showRoomSettings || state.showBoardDetails;
   }
   function showDealtIdentity() {
     var key = identityDealKey();
@@ -2901,7 +2896,9 @@ function roomListItems(rooms) {
   async function reveal() {
     dismissIdentityHint();
     if (state.revealed) {
+      const fromRoleHelp = state.identityRoleHelpOpen;
       mask();
+      if (fromRoleHelp) app.querySelector('.room-identity')?.focus({ preventScroll: true });
       return;
     }
     if (state.busy || !state.network) return;
@@ -2933,12 +2930,23 @@ function roomListItems(rooms) {
     const surface = el?.dataset?.surface;
     const secret = surface === "dealt" ? state.dealtIdentityDialog && state.dealtIdentitySecret
       : surface === "change" ? state.identityChangeRevealed && state.identityChange
-      : state.revealed && state.secret;
+      : surface === "role" && state.identityRoleHelpOpen && state.revealed && state.secret;
     if (state.error || !secret) return;
     const info = identityVision.presentIdentity(secret);
-    if (surface ? !info.ability : !info.showRoleHelp) return;
+    if (!info.ability || (surface === "role" && !info.roleOverview.hasDetails)) return;
     setState({ identityHelpExpanded: !state.identityHelpExpanded });
-    app.querySelector(surface === "dealt" || surface === "change" ? `[data-action="toggleIdentityHelp"][data-surface="${surface}"]` : '[data-action="toggleIdentityHelp"]')?.focus({ preventScroll: true });
+    app.querySelector(`[data-action="toggleIdentityHelp"][data-surface="${surface}"]`)?.focus({ preventScroll: true });
+  }
+  function openIdentityRoleHelp() {
+    if (!state.revealed || !state.secret || state.dealtIdentityDialog || state.resultDialog || state.honorDialog ||
+      identityOverlayBlocked() || !identityVision.presentIdentity(state.secret).showRoleHelp) return;
+    closePlayerCard(false);
+    setState({ identityRoleHelpOpen: true, identityHelpExpanded: false });
+    app.querySelector('[data-action="closeIdentityRoleHelp"]')?.focus({ preventScroll: true });
+  }
+  function closeIdentityRoleHelp() {
+    setState({ identityRoleHelpOpen: false, identityHelpExpanded: false });
+    app.querySelector('[data-action="openIdentityRoleHelp"]')?.focus({ preventScroll: true });
   }
   function openIdentityHistory() {
     var history = state.secret?.identityHistory || [];
@@ -2976,7 +2984,7 @@ function roomListItems(rooms) {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillSwordHint: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -3138,7 +3146,7 @@ function roomListItems(rooms) {
       })[0];
       if (choice) setState({ draftChoice: value, draftLabel: state.skillAction ? skillDraftLabel(choice, state.hunterModes, state.skillTargetMode) : choice.label,
         swapSeats: [], swapPlayers: state.swapPlayers.map(p => ({ ...p, selected: false })),
-        ...skillSelectionView(state.room, value, state.skillTargetMode) });
+        ...skillSelectionView(value, state.skillTargetMode) });
       return;
     }
     if (
@@ -3211,7 +3219,7 @@ function roomListItems(rooms) {
     const draft = state.swapOptions.find(v => v.split(":").slice(1).map(Number).sort((a, b) => a - b).join(":") === pair);
     setState({
       ...(state.skillAction ? { draftChoice: draft || "", draftLabel: draft ? "交换 " + selected.slice().sort((a, b) => a - b).join(" 号与 ") + " 号" : "" } : {}),
-      ...skillSelectionView(state.room, draft || "", state.skillTargetMode, selected),
+      ...skillSelectionView(draft || "", state.skillTargetMode, selected),
       swapSeats: selected,
       swapPlayers: state.swapPlayers.map(function (p) {
         return { ...p, selected: selected.indexOf(p.seat) !== -1 };
@@ -3275,6 +3283,7 @@ function roomListItems(rooms) {
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
+          identityRoleHelpOpen: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -3320,6 +3329,7 @@ function roomListItems(rooms) {
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
+          identityRoleHelpOpen: false,
           identityHistoryOpen: false,
           identityHistoryExpandedId: null,
         });
@@ -3774,7 +3784,7 @@ function roomListItems(rooms) {
   }
   function viewPlayerCard() {
     const p = state.playerCard, stats = state.playerCardStats;
-    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen || state.historyOpen) return "";
+    if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen || state.identityRoleHelpOpen || state.historyOpen) return "";
     let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity' + (p.name.length > 8 ? ' is-long-name' : '') + '"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div>' + viewPlayerBadges(p.badges) + '</div>' + viewPlayerBadgeDetail();
     if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
@@ -3843,14 +3853,14 @@ function roomListItems(rooms) {
     if (surface && info.summary.length) html += '<div class="identity-info-section identity-info-preview">' + info.summary.map(line =>
       '<div class="identity-info-ability"><span class="identity-info-heading">' + esc(line.label) + '</span><span>' + esc(line.text) + '</span></div>').join('') + '</div>';
     if (!compact && !surface && info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + viewRoleAbility(info.ability) + '</div>';
-    return html + '</div>' + (compact || surface ? viewSkillStatus(secret, surface || info.showRoleHelp ? info.ability : null, surface) : '');
+    return html + '</div>' + (compact || surface ? viewSkillStatus(secret, surface ? info.ability : null, surface) : '');
   }
-  function viewRoleAbility(ability, summarized = false) {
+  function viewRoleAbility(ability, summarized = false, detailed = false) {
     var html = ability.brief && !summarized ? '<div class="identity-info-brief">' + esc(ability.brief) + '</div>' : '';
     html += ability.lines.map(line => '<div class="identity-info-ability' + (ability.structured ? ' structured' : '') + '">' +
-      (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured ? '：' : '') + '</span>' : '') +
+      (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured && !detailed ? '：' : '') + '</span>' : '') +
       '<span>' + esc(line.text) + '</span></div>').join('');
-    if (ability.note) html += '<div class="identity-info-note">' + (ability.structured ? '注意：' : '') + esc(ability.note) + '</div>';
+    if (ability.note) html += '<div class="identity-info-note">' + (detailed ? '<span class="identity-role-help-note-title">注意事项</span>' : ability.structured ? '注意：' : '') + esc(ability.note) + '</div>';
     return html;
   }
   function viewIdentityChange() {
@@ -3878,7 +3888,7 @@ function roomListItems(rooms) {
   function viewShellHeader() {
     const table = state.page === 'table';
     const title = table ? roomSheets.shortBoardName(state.room?.boardName) || '牌桌' : state.page === 'me' ? '我的' : '对局';
-    return `<header class="app-shell-header${table ? ' is-table' : ''}"${state.entrySheet || state.showRoomRules || state.showBoardDetails ? ' inert' : ''}><div class="app-shell-header-inner">
+    return `<header class="app-shell-header${table ? ' is-table' : ''}"${state.entrySheet || state.showRoomRules || state.showBoardDetails || state.identityRoleHelpOpen ? ' inert' : ''}><div class="app-shell-header-inner">
       ${table ? `<button type="button" class="app-shell-back" data-action="returnHome" aria-label="返回对局，保留当前座位"${state.busy ? ' disabled' : ''}><img src="/assets/chevron-left.svg" alt="" />对局</button><div class="app-shell-connection">${viewConnectionButton()}</div>` : ''}
       <h1 class="app-shell-title" tabindex="-1" data-page-heading title="${esc(title)}">${esc(title)}</h1>
     </div></header>`;
@@ -3932,6 +3942,29 @@ function roomListItems(rooms) {
     if (ability && state.identityHelpExpanded) html += '<div class="identity-help-body">' + viewRoleAbility(ability, !!surface) + '</div>';
     return html + '</div>';
   }
+  function viewIdentityRoleHelp() {
+    if (!state.identityRoleHelpOpen || !state.revealed || !state.secret || state.error) return '';
+    const secret = state.secret;
+    const { ability, roleOverview } = identityVision.presentIdentity(secret);
+    if (!roleOverview) return '';
+    const tone = factionTone(secret.faction);
+    const art = rolePortraits.portrait(secret.role, tone).portrait;
+    const expanded = state.identityHelpExpanded;
+    const rows = roleOverview.rows.map(row => '<div class="identity-role-help-row' + (row.label === '任务出牌' ? ' is-task' : '') + '"><span class="identity-role-help-row-label">' + esc(row.label) + '</span><span class="identity-role-help-row-value">' + esc(row.text) + '</span></div>').join('');
+    return '<div class="dialog-backdrop identity-history-backdrop" data-role-help-backdrop><section class="identity-history-sheet identity-role-help-sheet" role="dialog" aria-modal="true" aria-labelledby="role-help-title">' +
+      '<div class="identity-history-handle" aria-hidden="true"></div><div class="identity-history-heading"><div id="role-help-title" class="identity-history-title"><span class="compact-role-help-mark" aria-hidden="true"><img src="/assets/sheet-book.svg" alt="" /></span>角色说明</div>' +
+      '<button type="button" class="identity-history-close" data-action="closeIdentityRoleHelp" aria-label="关闭角色说明">×</button></div>' +
+      '<div class="identity-history-body"><div class="identity-role-help-intro"><img class="identity-role-help-portrait" src="' + esc(art) + '" alt="" /><div class="identity-role-help-copy">' +
+      '<div class="identity-role-help-role faction-' + tone + '">' + esc(secret.role) + '</div><div class="identity-role-help-meta"><span class="faction-' + tone + '">' + esc(secret.faction) + '</span>' +
+      (roleOverview.deck ? '<span>· ' + esc(roleOverview.deck) + '</span>' : '') + '</div></div></div>' +
+      '<div class="identity-role-help-overview"><div class="identity-role-help-feature"><img src="/assets/' + roleOverview.icon + '.svg" alt="" /><div class="identity-role-help-copy">' +
+      '<div class="identity-role-help-feature-title"><span>' + esc(roleOverview.title) + '</span>' + (roleOverview.badge ? '<span class="identity-role-help-badge">' + esc(roleOverview.badge) + '</span>' : '') + '</div>' +
+      '<div class="identity-role-help-summary">' + esc(roleOverview.brief) + '</div></div></div>' + rows + '</div>' +
+      (roleOverview.hasDetails ? '<button type="button" class="disclosure-button identity-role-help-toggle" data-action="toggleIdentityHelp" data-surface="role" aria-expanded="' + expanded + '">' +
+        '<img src="/assets/sheet-book.svg" alt="" /><span>' + (expanded ? '收起完整规则' : '展开完整规则') + '</span><span class="identity-help-chevron' + (expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>' : '') +
+      (expanded ? '<div class="identity-role-help-rules">' + viewRoleAbility(ability, true, true) + '</div>' : '') + '</div>' +
+      '<div class="identity-history-footer">' + btn('primary', 'reveal', '立即遮盖') + '</div></section></div>';
+  }
   function viewIdentityHistory() {
     var history = state.secret?.identityHistory || [];
     if (!state.identityHistoryOpen || !state.revealed || history.length < 2 || state.error) return "";
@@ -3944,7 +3977,7 @@ function roomListItems(rooms) {
         '<div class="identity-history-meta small muted">' + esc(record.sinceLabel) + '</div>';
       if (record.current) html += '<div class="identity-history-summary small muted">' + esc(record.faction) + (record.skillStatus ? ' · ' + esc(record.skillStatus.title) : '') + '</div>';
       html += viewSkillHistory(record);
-      if (!record.current) html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + (record.detailAvailable ? viewIdentityInformation(record, null) : esc('旧对局未记录当时视野，仅保留初始身份。')) + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
+      if (!record.current) html += '<div id="identity-history-detail-' + record.id + '" class="identity-history-detail"' + (expanded ? '' : ' hidden') + '><div class="small muted">' + esc(record.faction) + '</div><div class="identity-history-information">' + (record.detailAvailable ? viewIdentityInformation(record, null, false, true) : esc('旧对局未记录当时视野，仅保留初始身份。')) + '</div><div class="identity-history-readonly small muted">曾用身份 · 仅供回看</div></div>';
       html += '</div>';
     });
     return html + '</div></div><div class="identity-history-footer"><div class="small muted">本局记录 · 仅你可见</div>' + btn('secondary', 'hideIdentityHistory', '立即遮盖') + '</div></section></div>';
@@ -3957,9 +3990,11 @@ function roomListItems(rooms) {
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
     var targetMode = !!state.skillTargetMode;
-    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title" aria-describedby="skill-hint">' +
+    var description = [state.skillHint && 'skill-hint', targetMode && state.skillConsequence && 'skill-consequence'].filter(Boolean).join(' ');
+    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
+      (description ? ' aria-describedby="' + description + '"' : '') + '>' +
       '<div class="skill-header">' + (targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '') + '<div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
-      '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' +
+      (state.skillHint ? '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' : '') +
       '</div><div class="skill-body">';
     if (targetMode) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
     if (state.skillSwordHint) html += '<div class="skill-context">' + esc(state.skillSwordHint) + '</div>';
@@ -3973,8 +4008,7 @@ function roomListItems(rooms) {
         (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
     }
     if (state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
-    if (state.swapOptions.length) html += '<div class="skill-context">已选 ' + state.swapSeats.length + ' / 2</div><div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
-    if (state.skillEligibility) html += '<div class="skill-eligibility">' + esc(state.skillEligibility) + '</div>';
+    if (state.swapOptions.length) html += '<div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
     html += '</div>' + (state.skillOtherChoices.length ? '<div class="skill-other-choices">' : '');
     for (var c of state.skillOtherChoices) {
       var selected = state.draftChoice === c.value;
@@ -3983,9 +4017,9 @@ function roomListItems(rooms) {
         (!navigation ? ' aria-pressed="' + selected + '"' : '') + (locked ? ' disabled' : '') + '>' + (targetMode ? '<span>' + esc(c.label) + '</span>' + (navigation ? '' : '<span class="skill-pass-mark" aria-hidden="true"></span>') : '<span class="skill-other-mark" aria-hidden="true">' +
         (selected ? '✓' : c.value === 'pass' ? '○' : '›') + '</span>' + esc(c.label)) + '</button>';
     }
-    html += (state.skillOtherChoices.length ? '</div>' : '') + '<div class="skill-footer"><div class="skill-summary" aria-live="polite">' +
-      (targetMode ? esc(state.skillSummary) : state.draftChoice ? '已选择：' + esc(state.draftLabel) : state.swapSeats.length ? '还需选择一个座位' : '尚未选择') + '</div>' +
-      (targetMode && state.skillConsequence ? '<div class="skill-consequence">' + esc(state.skillConsequence) + '</div>' : '') +
+    html += (state.skillOtherChoices.length ? '</div>' : '') + '<div class="skill-footer">' +
+      (!targetMode ? '<div class="skill-summary" aria-live="polite">' + (state.draftChoice ? '已选择：' + esc(state.draftLabel) : '尚未选择') + '</div>' : '') +
+      (targetMode && state.skillConsequence ? '<div id="skill-consequence" class="skill-consequence" aria-live="polite">' + esc(state.skillConsequence) + '</div>' : '') +
       (state.hunterModes && state.draftChoice === 'pass' ? '<div class="small">本轮若出局，将不会触发被动开枪。是否确认？</div>' : '') +
       btn('primary skill-confirm', 'confirmChoice', state.busy && state.busyAction === 'submit' ? '正在提交…' : targetMode ? state.skillConfirmLabel : state.draftChoice ? (state.draftLabel === '本轮确认' ? '确认本轮选择' : '确认' + state.draftLabel) : '请先选择', null, locked || !state.draftChoice) +
       btn('text-button skill-later', 'closeAction', '稍后选择', null, state.busy) + '</div></div></div>';
@@ -4348,10 +4382,13 @@ function roomListItems(rooms) {
       if (state.revealed && state.secret) {
         var identity = state.secret;
         var art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
+        const hasIdentityHistory = identity.identityHistory?.length > 1;
         html += '<div class="identity open identity-compact">' +
-          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></button></div>' +
-          '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div><div class="compact-faction faction-' + (identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span></div></div>' +
-          (identity.identityHistory?.length > 1 ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
+          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><span class="compact-hide-face"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></span></button></div>' +
+          '<div class="compact-role-heading' + (hasIdentityHistory ? ' has-history' : '') + '"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-name"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div>' +
+          (identityVision.presentIdentity(identity).showRoleHelp ? '<button type="button" class="compact-role-help" data-action="openIdentityRoleHelp" aria-haspopup="dialog" aria-label="角色说明"><span class="compact-role-help-mark" aria-hidden="true"><img src="/assets/sheet-book.svg" alt="" /></span></button>' : '') +
+          '</div><div class="compact-faction faction-' + (identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span></div></div>' +
+          (hasIdentityHistory ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
           viewIdentityInformation(identity, state.seats, false, true) + viewSkillHistory(identity, true) + '</div>';
       }
     }
@@ -4615,7 +4652,7 @@ function roomListItems(rooms) {
   function hasPublicHistorySheet() {
     return state.historyOpen && state.room && state.room.phase !== 'lobby' &&
       !state.error && !state.actionDialog && !state.dealtIdentityDialog && !state.identityChange &&
-      !state.fairyResult && !state.identityHistoryOpen && !state.toolType && !state.resultDialog &&
+      !state.fairyResult && !state.identityHistoryOpen && !state.identityRoleHelpOpen && !state.toolType && !state.resultDialog &&
       !state.showRoomRules && !state.showRoomSettings;
   }
   function viewHistoryEntry() {
@@ -4998,11 +5035,12 @@ function roomListItems(rooms) {
       viewIdentityChange() +
       viewDealtIdentity() +
       viewAvoidance() +
+      viewIdentityRoleHelp() +
       viewIdentityHistory() +
       (state.page === 'profile' ? viewProfileHeader() : shell ? viewShellHeader() : '') + '<div class="page' +
       (state.page === 'lobby' ? ' home-lobby' : state.page === 'me' ? ' me-page' : state.page === 'table' ? ' table-page' : '') +
       (state.page === 'table' && state.room?.phase === 'lobby' ? ' has-lobby-actions' : '') + (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (roomSheet || state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (roomSheet || state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || state.identityRoleHelpOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
       (['table', 'me', 'profile', 'badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewActionDialog() +
@@ -5036,7 +5074,7 @@ function roomListItems(rooms) {
     monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
     monthlyShare: shareMonthlyReport,
     monthlyDownload: downloadMonthlyImage,
-    toggleIdentityHelp, openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
+    toggleIdentityHelp, openIdentityRoleHelp, closeIdentityRoleHelp, openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,
     openBadgePicker: el => { if (!state.badgeManagerSaving && !state.badgeManagerLoading) setState({ badgePicker: 'add', badgePickerSlot: Number(el.dataset.slot) }); app.querySelector('.badge-detail-close')?.focus({ preventScroll: true }); },
@@ -5526,6 +5564,7 @@ function roomListItems(rooms) {
     if (e.target?.hasAttribute?.('data-entry-backdrop')) return closeEntry();
     if (e.target?.hasAttribute?.('data-room-rules-backdrop')) return ACTIONS.closeRoomRules();
     if (e.target?.hasAttribute?.('data-public-history-backdrop')) return closeHistory();
+    if (e.target?.hasAttribute?.('data-role-help-backdrop')) return closeIdentityRoleHelp();
     if (e.target?.hasAttribute?.('data-identity-history-backdrop')) return closeIdentityHistory();
     if (e.target?.dataset?.rankDismiss) return ACTIONS[e.target.dataset.rankDismiss]?.();
     if (e.target?.hasAttribute?.('data-player-card-backdrop')) return closePlayerCard();
@@ -5595,8 +5634,8 @@ function roomListItems(rooms) {
   window.addEventListener("scroll", showIdentityHintWhenVisible, { passive: true });
   window.addEventListener("resize", showIdentityHintWhenVisible);
   document.addEventListener("keydown", function (event) {
-    if (state.identityHistoryOpen && !state.error) {
-      if (event.key === "Escape") { event.preventDefault(); closeIdentityHistory(); }
+    if ((state.identityHistoryOpen || state.identityRoleHelpOpen) && !state.error) {
+      if (event.key === "Escape") { event.preventDefault(); (state.identityRoleHelpOpen ? closeIdentityRoleHelp : closeIdentityHistory)(); }
       else if (event.key === "Tab") {
         var historyButtons = app.querySelectorAll('.identity-history-sheet button:not(:disabled)');
         if (historyButtons.length) {

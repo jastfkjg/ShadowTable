@@ -2118,9 +2118,11 @@ test("技能目标与放弃互斥，断网或未确认请求阻止提交，关�
   assert.equal(p.data.skillTitle, "选择开刀目标");
   p.confirmChoice();
   await choose("target:2");
+  assert.equal(p.data.skillConfirmLabel, "确认对 2 号开刀");
   await choose("pass");
   assert.equal(p.data.draftChoice, "pass");
   assert.equal(p.data.draftLabel, "本轮不开刀");
+  assert.equal(p.data.skillConfirmLabel, "确认本轮不开刀");
   for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }]) {
     Object.assign(p.data, patch);
     p.confirmChoice();
@@ -2160,7 +2162,7 @@ test("十二骑士各类选人技能复用确认弹窗，保留合法目标和�
       toggle(5);
       assert.equal(p.data.swapSeats.length, 0);
       toggle(2);
-      assert.match(p.data.skillSummary, /已选 1 \/ 2/);
+      assert.equal(p.data.skillConfirmLabel, "请再选择一个座位");
       p.confirmChoice();
       assert.equal(writes.length, 0);
       toggle(7);
@@ -2175,6 +2177,7 @@ test("十二骑士各类选人技能复用确认弹窗，保留合法目标和�
       await choose(value);
       if (mode === "duel") assert.match(p.data.skillConsequence, /决斗失败时，你将出局/);
       if (mode === "detonate") assert.match(p.data.skillConsequence, /你将自爆出局/);
+      if (mode === "passive") assert.match(p.data.skillConsequence, /替女巫出局时不触发/);
       if (mode === "inspect") assert.match(p.data.skillHint, /主动击杀能力/);
     }
     assert.equal(writes.length, 0);
@@ -2186,7 +2189,7 @@ test("十二骑士各类选人技能复用确认弹窗，保留合法目标和�
     assert.equal(writes[0][1].value, mode === "final" ? 0 : value, role);
     p.closeAction();
     assert.equal(p.data.skillTargetMode, "");
-    assert.equal(p.data.skillSummary, "");
+    assert.equal(p.data.skillConsequence, "");
   }
 });
 
@@ -2204,6 +2207,7 @@ test("仙女目标先选择再确认，不可选座位不生成草稿，过期�
   assert.equal(p.data.skillTargetMode, "fairy");
   assert.equal(p.data.draftChoice, "");
   assert.equal(p.data.skillConfirmLabel, "请先选择目标");
+  assert.equal(p.data.skillConsequence, "查验后，仙女将传给所选玩家。");
   assert.equal(p.data.skillTargets.find(t => t.seat === 2).disabledReason, "你 · 当前持有者");
   assert.equal(p.data.skillTargets.find(t => t.seat === 5).disabledReason, "曾持有仙女");
   assert.equal(p.data.skillTargets.find(t => t.seat === 6).disabledReason, "已出局");
@@ -2215,8 +2219,8 @@ test("仙女目标先选择再确认，不可选座位不生成草稿，过期�
   await choose("target:1");
   await choose("target:3");
   assert.equal(writes.length, 0);
-  assert.equal(p.data.skillSummary, "查验目标：3号（玩家3） · 湖仙将传给3号");
-  assert.equal(p.data.skillConsequence, "");
+  assert.equal(p.data.skillConfirmLabel, "确认查验 3 号");
+  assert.equal(p.data.skillConsequence, "查验后，仙女将传给 3 号。");
   assert.equal(p.data.skillTargetMeta, "");
   for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }, { room: { ...p.data.room, stage: "f2" } }]) {
     const original = { ...p.data };
@@ -2231,7 +2235,7 @@ test("仙女目标先选择再确认，不可选座位不生成草稿，过期�
   p.confirmChoice();
   assert.equal(writes.length, 1);
   assert.equal(p.data.skillTargetMode, "");
-  assert.equal(p.data.skillSummary, "");
+  assert.equal(p.data.skillConsequence, "");
 });
 
 test("技能换号与不使用互斥，仅完整合法的双人选择可以提交", async () => {
@@ -2408,18 +2412,31 @@ test('回避角色先本地选择再确认，关闭和切后台清空私密草�
   assert.equal(delayed.data.avoidanceOpen, false); assert.equal(delayed.data.avoidance, null);
 });
 
-test('身份说明仅在已揭示时展开，遮盖会重置且不改写身份数据', () => {
-  const p=page({});
-  const secret={role:'石像鬼',info:{ability:{brief:'角色规则'},showRoleHelp:true}};
-  p.data.secret={role:'莫甘娜',info:{ability:{brief:'角色规则'},showRoleHelp:false}};p.data.revealed=true;
-  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
-  p.data.secret=secret;p.data.revealed=true;
-  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,true);
-  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
-  p.toggleIdentityHelp();p.mask();
+test('对局角色说明仅在已揭示时打开，关闭保留身份卡，遮盖或身份变更清空弹层', async () => {
+  const room=dealtRoom({me:{seat:1,identityRevision:1}});
+  const p=page({request:async()=>structuredClone(room)});
+  p.roomCode=room.code;p.data.room=structuredClone(room);
+  const secret={role:'红刀客·奥伯伦',info:{ability:{brief:'角色规则'},showRoleHelp:true,roleOverview:{hasDetails:true}},identityHistory:[{id:1,current:true},{id:0}]};
+  const toggle={currentTarget:{dataset:{surface:'role'}}};
+  p.data.secret=secret;
+  p.openIdentityRoleHelp();assert.equal(p.data.identityRoleHelpOpen,false);
+  p.data.revealed=true;
+  p.openIdentityRoleHelp();assert.equal(p.data.identityRoleHelpOpen,true);
   assert.equal(p.data.identityHelpExpanded,false);
-  p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
-  assert.deepEqual(secret,{role:'石像鬼',info:{ability:{brief:'角色规则'},showRoleHelp:true}});
+  p.toggleIdentityHelp(toggle);assert.equal(p.data.identityHelpExpanded,true);
+  p.openIdentityHistory();assert.equal(p.data.identityHistoryOpen,false);
+  p.closeIdentityRoleHelp();assert.equal(p.data.identityRoleHelpOpen,false);
+  assert.equal(p.data.identityHelpExpanded,false);
+  assert.equal(p.data.revealed,true);assert.equal(p.data.secret,secret);
+  p.openIdentityRoleHelp();p.toggleIdentityHelp(toggle);await p.reveal();
+  assert.equal(p.data.identityRoleHelpOpen,false);assert.equal(p.data.secret,null);
+  assert.equal(p.data.identityHelpExpanded,false);
+  p.data.secret=secret;p.data.revealed=true;
+  p.openIdentityRoleHelp();p.onHide();
+  assert.equal(p.data.identityRoleHelpOpen,false);assert.equal(p.data.secret,null);
+  p.foreground=true;p.data.secret=secret;p.data.revealed=true;
+  p.openIdentityRoleHelp();room.me.identityRevision=2;await p.refresh();
+  assert.equal(p.data.identityRoleHelpOpen,false);assert.equal(p.data.secret,null);
 });
 
 test('换身份弹窗每次揭示时折叠角色说明，遮盖后展开按钮失效', () => {

@@ -401,9 +401,9 @@ for (const mode of ["fairy", "sword"]) {
     ...presentation };
   scenes[mode + "TargetPicker"] = data;
   scenes[mode + "TargetSelected"] = { ...data, draftChoice: "target:7", draftLabel: action.options.find(c => c.value === "target:7").label,
-    ...skillPresentation.skillSelectionView(room, "target:7", mode) };
+    ...skillPresentation.skillSelectionView("target:7", mode) };
   if (mode === "sword") scenes.swordTargetPass = { ...data, draftChoice: "pass", draftLabel: "本轮不开刀",
-    ...skillPresentation.skillSelectionView(room, "pass", mode) };
+    ...skillPresentation.skillSelectionView("pass", mode) };
 }
 for (const [role, mode, value] of require("../tests/helpers/skill-target-fixtures").cases) {
   const { source, room, secret } = require("../tests/helpers/skill-target-fixtures").fixture(role, mode);
@@ -418,9 +418,9 @@ for (const [role, mode, value] of require("../tests/helpers/skill-target-fixture
   scenes[mode + "TargetPicker"] = data;
   scenes[mode + "TargetSelected"] = { ...data, draftChoice: value,
     ...(mode === "swap" ? { swapSeats: [2, 7], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: [2, 7].includes(p.seat) })) } : {}),
-    ...skillPresentation.skillSelectionView(room, value, mode) };
+    ...skillPresentation.skillSelectionView(value, mode) };
   if (mode === "swap") scenes.swapTargetPartial = { ...data, swapSeats: [2], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: p.seat === 2 })),
-    ...skillPresentation.skillSelectionView(room, "", mode, [2]) };
+    ...skillPresentation.skillSelectionView("", mode, [2]) };
 }
 scenes.tablePlayingHost = {
   ...scenes.knightTools,
