@@ -241,6 +241,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   data: {
     isLobby: lobby,
     homeWordmarkFailed: false,
+    homeSubtitleFailed: false,
     loading: true,
     roomsRefreshing: false,
     roomsSyncLabel: "",
@@ -1634,6 +1635,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     dialog.show({ title: `第 ${entry.number} 次任务 · ${entry.text}`, content: [entry.detail, entry.thresholdLabel].filter(Boolean).join("\n"), showCancel: false });
   },
   homeBrandError() { this.setData({ homeWordmarkFailed: true }); },
+  homeSubtitleError() { this.setData({ homeSubtitleFailed: true }); },
   openHelp() {
     wx.navigateTo({ url: "/pages/help/help" });
   },

@@ -74,7 +74,7 @@ for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const name of ["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-wordmark", "tab-table", "tab-table-active", "tab-me", "tab-me-active"])
+for (const name of ["home-wordmark", "home-subtitle", "tab-table", "tab-table-active", "tab-me", "tab-me-active"])
   assets["/assets/" + name + ".png"] = ["../../miniprogram/assets/" + name + ".png", "image/png"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];

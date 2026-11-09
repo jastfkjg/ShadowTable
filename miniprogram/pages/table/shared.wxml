@@ -173,7 +173,10 @@
         <view class="connection-dot {{isLobby && connectionPhase==='connecting'?'pending':!network || needsLogin?'offline':reconnecting || loading || roomsRefreshing || busy || hasPendingRequest?'pending':serverConnected?'online':'offline'}}" />
         <text wx:if="{{isLobby ? reconnecting || loading || roomsRefreshing || busy || hasPendingRequest || !network || needsLogin : reconnecting || !network || needsLogin}}" class="connection-label">{{isLobby?(connectionPhase==='connecting'?'同步中':needsLogin?'待登录':!network?'未连接':connectionPhase==='waiting' || reconnecting?'等待重连':'同步中'):reconnecting?'重连中':!network || needsLogin?'连接断开':loading || roomsRefreshing || busy || hasPendingRequest?'同步中':serverConnected?'已连接':'连接中'}}</text>
       </button>
-      <text wx:if="{{isLobby}}" class="home-brand-subtitle">阿瓦隆线下助手</text>
+      <view wx:if="{{isLobby}}" class="home-brand-subtitle">
+        <image wx:if="{{!homeSubtitleFailed}}" class="home-subtitle-wordmark" src="/assets/home-subtitle.png" mode="aspectFit" binderror="homeSubtitleError" aria-label="阿瓦隆线下助手" />
+        <text wx:else>阿瓦隆线下助手</text>
+      </view>
     </view>
     <button hover-class="none" wx:if="{{!room}}" class="switch-table home-entry home-help" bindtap="openHelp" aria-label="打开使用帮助"><image class="home-help-icon" src="/assets/home-help.svg" aria-hidden="true" /></button>
   </view>
@@ -499,7 +502,7 @@
       <view class="section-title history-heading">
         <view class="seat-section-title"><text>{{room.phase!=='lobby' && questTimeline.length?'任务进度':'玩家'}}</text><text wx:if="{{room.phase!=='lobby'}}" class="seat-count">{{seatOccupiedCount}}/{{room.capacity}} 人</text></view>
         <text wx:if="{{room.phase==='lobby'}}" class="seat-count" aria-label="{{'已入座'+seatOccupiedCount+'人，共'+room.capacity+'个座位，'+seatReadyCount+'人已准备'}}">{{seatOccupiedCount}}/{{room.capacity}} 人入座 · {{seatReadyCount}} 人已准备</text>
-        <button hover-class="none" wx:if="{{room.phase!=='lobby'}}" class="disclosure-button history-toggle" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}">{{seatsExpanded?'收起座位':'座位（'+room.capacity+'）⌄'}}</button>
+        <button hover-class="none" wx:if="{{room.phase!=='lobby'}}" class="disclosure-button history-toggle seat-disclosure" bindtap="toggleSeats" aria-expanded="{{seatsExpanded}}"><view class="seat-disclosure-face"><text>{{seatsExpanded?'收起座位':'展开座位'}}</text><image class="seat-disclosure-chevron {{seatsExpanded?'is-expanded':''}}" src="/assets/chevron-left.svg" mode="aspectFit" aria-hidden="true" /></view></button>
       </view>
       <view wx:if="{{room.phase!=='lobby' && (questTimeline.length || room.team.length)}}" class="seat-progress-details">
         <view wx:if="{{questTimeline.length}}" class="quest-timeline">

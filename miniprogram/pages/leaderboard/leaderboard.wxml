@@ -5,7 +5,7 @@
     <view class="rank-period" aria-label="统计周期">
       <button wx:if="{{metric!=='points'}}" class="{{period==='all'?'selected':''}}" bindtap="choosePeriod" data-id="all" aria-pressed="{{period==='all'}}" hover-class="none">全部</button>
       <button class="{{period==='month'?'selected':''}}" bindtap="choosePeriod" data-id="month" aria-pressed="{{period==='month'}}" hover-class="none">本月</button>
-      <button wx:if="{{metric==='points'}}" class="{{period==='day'?'selected':''}}" bindtap="choosePeriod" data-id="day" aria-pressed="{{period==='day'}}" hover-class="none">今日</button>
+      <button wx:if="{{metric==='points'}}" class="{{period==='recent'?'selected':''}}" bindtap="choosePeriod" data-id="recent" aria-pressed="{{period==='recent'}}" hover-class="none">最近</button>
     </view>
     <view class="rank-tools">
       <button class="disclosure-button rank-tool rank-rules-tool" bindtap="toggleRules" disabled="{{!board}}" aria-expanded="{{rulesExpanded}}" aria-label="榜单规则" hover-class="none"><image class="rank-tool-icon" src="/assets/home-help.svg" aria-hidden="true" /></button>
@@ -35,6 +35,7 @@
     <view wx:if="{{loading || loadingMore || visibilitySaving || shareOpening}}" class="rank-share-status small muted" role="status">{{shareOpening?'正在打开分享页…':visibilitySaving?'正在保存公开设置…':'正在读取榜单…'}}</view>
     <view wx:if="{{shareNotice}}" class="rank-share-status small muted" role="alert">{{shareNotice}}</view>
     <view class="rank-panel">
+    <view wx:if="{{board.dateLabel}}" class="rank-date">{{board.dateLabel}} · 单日积分</view>
     <view wx:if="{{!board.fun}}" class="rank-list-heading"><text>排名 / 玩家</text><text>{{board.valueHeading || (board.metric==='games'?'有效局数':board.metricLabel)}}</text></view>
     <view wx:if="{{board.rows.length}}" class="rank-list">
       <button wx:for="{{board.rows}}" wx:key="publicId" class="rank-row {{item.isSelf?'is-self':''}} {{item.valueCompact?'rank-row-compact':''}}" bindtap="openRankPlayerCard" data-id="{{item.publicId}}" disabled="{{loading || loadingMore || visibilitySaving}}" hover-class="rank-row-pressed" aria-label="{{'查看'+item.nickname+'的玩家战绩'+(item.rank?'，'+(item.tied?'并列':'')+'第'+item.rank+'名':'')}}">
@@ -102,7 +103,7 @@
           <view wx:if="{{board.me.rank && board.me.tied}}" class="rank-summary-tied">并列</view>
         </view>
         <view class="rank-summary-column rank-summary-metric">
-          <view class="rank-summary-label">{{metric==='points'?'当前积分':(board.valueHeading || board.metricLabel)}}</view>
+          <view class="rank-summary-label">{{board.period==='recent'?'单日积分':board.metric==='points'?'当前积分':(board.valueHeading || board.metricLabel)}}</view>
           <view class="rank-summary-value {{board.me.valueCompact?'rank-summary-compact':''}}"><text class="rank-summary-number">{{board.me.value}}</text><text class="rank-summary-unit">{{board.me.unit}}</text></view>
         </view>
       </view>

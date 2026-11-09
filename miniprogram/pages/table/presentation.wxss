@@ -72,6 +72,13 @@
 .table-room .seat-section-title { gap: 8px; }
 .table-room .seat-count { font-size: 12px; font-weight: 400; }
 .table-room button.history-toggle { min-height: 44px; padding: 4px 0 4px 8px; font-size: 12px; }
+.table-room:not(.table-lobby) .task-progress .section-title { align-items: center; }
+.table-room button.history-toggle.seat-disclosure { width: auto; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: transparent; color: #d6e0e3; font-size: 12px; font-weight: 500; line-height: 1.5; }
+.table-room .seat-disclosure-face { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 32px; padding: 5px 11px; border: 1px solid #465c68; border-radius: 10px; background: #21323d; white-space: nowrap; }
+.table-room .seat-disclosure-chevron { display: block; flex-shrink: 0; width: 12px; height: 12px; opacity: .75; transform: rotate(-90deg); }
+.table-room .seat-disclosure-chevron.is-expanded { transform: rotate(90deg); }
+.table-room button.seat-disclosure:active .seat-disclosure-face { background: #2e404a; }
+.table-room button.seat-disclosure:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .table-room .seat-progress-details { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
 .table-room .quest-timeline { flex: 1 1 160px; min-width: 0; gap: 6px; margin: 0; }
 .table-room .seat-team-summary { display: flex; flex: 0 1 auto; align-items: baseline; gap: 5px; min-width: 0; max-width: 100%; margin-left: auto; font-size: 12px; line-height: 1.5; color: var(--muted); }

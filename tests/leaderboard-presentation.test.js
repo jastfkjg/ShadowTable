@@ -10,6 +10,18 @@ test('积分周期规则区分今日和本月，今日不显示月初清零说�
   const month = presentBoard({ metric: 'points', period: 'month', rows: [stats], me: stats });
   assert.equal(month.periodLabel, '本月'); assert.match(month.ruleLines.join(), /每月 1 日/);
 });
+test('最近积分展示北京时间的实际日期，并区分无计分局和无人公开上榜', () => {
+  const base = { metric: 'points', period: 'recent', rows: [] };
+  const recent = presentBoard({ ...base, periodStart: Date.parse('2026-11-09T16:00:00Z') });
+  assert.equal(recent.periodLabel, '最近');
+  assert.equal(recent.dateLabel, '2026 年 11 月 10 日');
+  assert.equal(recent.emptyTitle, '当天暂无公开排名');
+  assert.match(recent.ruleLines[0], /北京时间.*最近有有效计分对局/);
+  assert.doesNotMatch(recent.ruleLines.join(), /每月 1 日/);
+  const empty = presentBoard({ ...base, periodStart: null });
+  assert.equal(empty.dateLabel, '');
+  assert.equal(empty.emptyTitle, '暂无计分对局');
+});
 test('所有常规榜单展示独立主值、单位和有效样本，负积分不丢失', () => {
   for (const [metric,value,unit,secondary] of [['points','-12','分','3 场计分局'],['games','3','局','2 胜 · 胜率 66.7%'],['overall','66.7','%','2 胜 · 3 局'],['good','66.7','%','2 胜 · 3 局'],['evil','66.7','%','2 胜 · 3 局']]) {
     const board=presentBoard({metric,rows:[stats],me:stats});

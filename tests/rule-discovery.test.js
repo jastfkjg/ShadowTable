@@ -82,7 +82,6 @@ test("帮助与计分分享保留各自内容，朋友圈单页可读公开规�
     assert.equal(m.p.data.singlePage, true);
     assert.equal(m.p.onShareTimeline().query, section ? "section=scoring" : "");
     assert.equal(m.p.onShareAppMessage().path, "/pages/help/help" + (section ? "?section=scoring" : ""));
-    m.p.openEntry({ currentTarget: { dataset: { mode: "create" } } });
     assert.equal(m.navigation.length, 0);
   }
   const m = page("board-details", { singlePage: true });
@@ -115,6 +114,28 @@ test("板子首屏保留原有标题与角色速查，配置在规则章节内�
   const single = factory("pages/board-details/board-details.wxml")(m.p.data);
   assert.match(text(single), /A 牌.*梅林.*B 牌/);
   assert.ok(!nodes(single).some(node => node.attr?.bindtap === "createTable" || node.attr?.openType === "share"));
+});
+
+test("帮助展开后的规则、例外和统计口径在真实模板中完整可读", async () => {
+  const context = { window: {}, global: {} }; vm.createContext(context);
+  const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
+  const m = page("help", { request: async url => url === "/api/boards" ? { boards } : { scopeLabel: "当前计分范围" } });
+  m.p.onLoad(); await tick();
+  m.p.setData({ sections: m.p.data.sections.map(section => ({ ...section, expanded: true })) });
+  m.p.refreshReferences();
+  let faq = m.p.data.references.find(reference => reference.id === "faq");
+  for (const answer of faq.items) {
+    if (!answer.expanded) m.p.toggleFaq({ currentTarget: { dataset: { id: answer.id } } });
+    if (answer.details?.length) m.p.toggleFaqDetails({ currentTarget: { dataset: { id: answer.id } } });
+  }
+  const tree = factory("pages/help/help.wxml")(m.p.data), content = text(tree);
+  for (const phrase of ["连续五次组队被否决也会使坏人获胜", "可出的牌以身份和板子规则为准", "陪测完成并登记胜负的对局正常计入胜率", "任务或必选目标操作会作废", "反向指标的比例显示发生率", "挡刀率按终局面对最终非空刀的有效机会计算", "新牌身份仍仅本人可见"])
+    assert.ok(content.includes(phrase), phrase);
+  const toggles = nodes(tree).filter(node => node.attr?.bindtap === "toggleFaq");
+  assert.equal(toggles.length, m.p.data.sections[2].items.length);
+  assert.ok(toggles.every(node => node.tag === "wx-button" && node.attr.ariaExpanded === true && node.attr.ariaControls));
+  assert.doesNotMatch(content, /前往加入牌桌|前往创建牌桌/);
+  m.p.onUnload();
 });
 
 test("公开规则请求不访问登录存储、不发送 Authorization，也不因401清除用户会话", async () => {

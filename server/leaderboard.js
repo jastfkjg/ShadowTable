@@ -14,6 +14,7 @@ const eligibleRole = (def, role) => {
 };
 const METRICS = { points: 1, games: 1, overall: 1, good: 1, evil: 1 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
+const SCORED_MATCH_JOIN = "JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'";
 function markTies(rows) {
   rows.forEach((row, index) => { row.tied = rows[index - 1]?.rank === row.rank || rows[index + 1]?.rank === row.rank; });
 }
@@ -41,7 +42,7 @@ function parseQuery(params) {
   if (nearby && (params.get("nearby") !== "1" || offset !== "0")) throw new RuleError("排行榜参数无效", 400);
   const funMetric = metric.startsWith("fun_") ? fun.metrics[metric.slice(4)] : null;
   const mode = params.get("mode") || "all", role = params.get("role") || null, sort = params.get("sort") || "count";
-  if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !(metric === "points" ? ["all", "month", "day"] : ["all", "month"]).includes(requestedPeriod) || !/^(0|20|40|60|80)$/.test(offset)
+  if ((!Object.hasOwn(METRICS, metric) && !funMetric?.ranked) || !(metric === "points" ? ["all", "month", "day", "recent"] : ["all", "month"]).includes(requestedPeriod) || !/^(0|20|40|60|80)$/.test(offset)
     || (version !== null && !/^[a-f0-9-]{36}$/.test(version)) || (Number(offset) > 0 && !version))
     throw new RuleError("排行榜参数无效，请刷新后重试", 400);
   if (funMetric ? mode !== "all" && !Object.hasOwn(fun.modes, mode) || !["count", "rate"].includes(sort) || role && !eligibleRole(funMetric, role) || role && !roleName(role)
@@ -71,20 +72,25 @@ function neighbors(eligible, uid, present) {
 }
 class Leaderboard {
   constructor(store) { this.store = store; this.cache = new Map(); }
+  recentRange(now) {
+    const latest = this.store.db.prepare(`SELECT s.ended FROM visible_match_players p ${SCORED_MATCH_JOIN}
+      WHERE p.outcome IN ('win','loss') AND s.ended<=? ORDER BY s.ended DESC LIMIT 1`).get(now);
+    return latest ? periodRange("day", latest.ended) : { start: null, end: null };
+  }
   snapshot(metric, period, now) {
-    const range = periodRange(period, now), key = metric + ":" + period;
+    const range = period === "recent" ? this.recentRange(now) : periodRange(period, now), key = metric + ":" + period;
     const old = this.cache.get(key);
     if (old && old.revision === this.store.leaderboardRevision && old.start === range.start && now >= old.updatedAt && now - old.updatedAt < CACHE_MS) return old;
     const faction = ["good", "evil"].includes(metric) ? metric : null;
-    const aggregates = this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
+    const aggregates = range.start === null ? [] : this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
       ${metric === "points" ? "sum(s.points) AS points," : ""}
       f.nickname, f.avatar_hash, f.public_id, f.leaderboard_visible
       FROM visible_match_players p LEFT JOIN profiles f ON f.uid=p.uid
-      ${metric === "points" ? "JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'" : ""}
+      ${metric === "points" ? SCORED_MATCH_JOIN : ""}
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
       .all(range.start, ...(range.end === null ? [] : [range.end]), ...(faction ? [faction] : []));
-    if (metric === "points") {
+    if (metric === "points" && range.start !== null) {
       const adjustments=this.store.db.prepare(`SELECT a.uid,sum(a.delta) AS points,f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
         FROM visible_score_adjustments a LEFT JOIN profiles f ON f.uid=a.uid WHERE a.created>=? ${range.end===null?'':'AND a.created<?'} GROUP BY a.uid`)
         .all(range.start,...(range.end===null?[]:[range.end]));

@@ -2,15 +2,16 @@ const api = require("../../api");
 const { switchHomeTab } = require("../../tab-navigation");
 const discovery = require("../../rule-discovery");
 const { isSinglePage } = require("../../records-share");
+const { presentItem } = require("./presentation");
 const guideSteps = {
   player: [
-    { title: "加入牌桌", text: "打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。", flow: "打开邀请 / 输入房间码", icon: "home-join-gold", entryMode: "join", entryLabel: "前往加入牌桌" },
+    { title: "加入牌桌", text: "打开朋友的邀请，或在首页输入 6 位房间码和桌上昵称。", flow: "打开邀请 / 输入房间码", icon: "home-join-gold" },
     { title: "入座并准备", text: "选择座位后点击准备，等待房主发牌。满座时可以先围观。", flow: "选择座位 → 点击准备", icon: "record-users" },
     { title: "私下查看身份", text: "记住身份和初始视野，确认后遮盖，不要把屏幕展示给其他玩家。", flow: "查看身份 → 记住并遮盖", icon: "process-eye" },
     { title: "线下讨论，按提示操作", text: "需要你投票、出任务牌或使用技能时，页面会提示；确认提交后等待结算。", flow: "选择 → 确认提交 → 等待结算", icon: "process-vote" },
   ],
   host: [
-    { title: "建桌与邀请", text: "选择人数、板子和桌上昵称，创建房间后邀请朋友，或分享 6 位房间码。", flow: "选择人数与板子 → 邀请朋友", icon: "home-join-gold", entryMode: "create", entryLabel: "前往创建牌桌" },
+    { title: "建桌与邀请", text: "选择人数、板子和桌上昵称，创建房间后邀请朋友，或分享 6 位房间码。", flow: "选择人数与板子 → 邀请朋友", icon: "home-join-gold" },
     { title: "入座与发牌", text: "座位坐满、入座玩家全员准备后，房主才能发牌。每位玩家用自己的手机确认身份。", flow: "全员准备 → 发放身份", icon: "record-users" },
     { title: "按现场进度发起", text: "线下讨论后，由房主发起投票、任务或技能。任务需要选择队伍和失败票门槛；提交收齐后自动结算。", flow: "发起操作 → 全员提交 → 结算", icon: "process-vote" },
     { title: "登记结果与重开", text: "最终行刺在线下完成，由房主手动结束对局并登记胜方。结束后可在同一房间重新准备。", flow: "结束对局 → 登记胜方 → 再开一局", icon: "record-cup" },
@@ -30,6 +31,8 @@ Page({
     guideMode: "player",
     guideSteps: stepsFor("player"),
     helpQuery: "",
+    faqExpanded: { "faq-0": true },
+    faqDetailsExpanded: {},
     references: [],
     sections: [
       { id: "host", title: "我是房主", subtitle: "从建桌到再开一局", expanded: false, items: [
@@ -75,11 +78,6 @@ Page({
   },
   onShareTimeline() {
     return { title: discovery.helpMetadata(this.data.scoringOnly).title, query: discovery.helpMetadata(this.data.scoringOnly).query, imageUrl: "/assets/share-cover.jpg" };
-  },
-  openEntry(event) {
-    const mode = event.currentTarget.dataset.mode;
-    if (this.data.singlePage || !["create", "join"].includes(mode)) return;
-    switchHomeTab(0, { entry: { mode }, fail: () => wx.showToast({ title: "未能打开牌桌大厅，请重试", icon: "none" }) });
   },
   back() {
     if (getCurrentPages().length > 1) wx.navigateBack();
@@ -145,12 +143,14 @@ Page({
   refreshReferences() {
     const tokens = this.data.helpQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const matches = text => tokens.every(token => String(text).toLocaleLowerCase().includes(token));
+    const itemsFor = index => this.data.sections[index].items.map((item, itemIndex) =>
+      presentItem(this.data.sections[index].id, item, itemIndex, this.data, tokens.length > 0));
     const entries = [
-      { ...this.data.sections[1], icon: "sheet-book", index: 1 },
+      { ...this.data.sections[1], items: itemsFor(1), icon: "sheet-book", index: 1 },
       { id: "scoring", title: "计分规则", subtitle: "计分范围与加分项目", icon: "record-cup", expanded: this.data.scoringExpanded },
       { id: "boards", title: "板子与角色", subtitle: "按人数和玩法查阅", icon: "sheet-shield", expanded: this.data.boardsExpanded },
-      { ...this.data.sections[0], title: "房主操作详解", icon: "sheet-user", index: 0 },
-      { ...this.data.sections[2], icon: "record-info", index: 2 },
+      { ...this.data.sections[0], items: itemsFor(0), title: "房主操作详解", icon: "sheet-user", index: 0 },
+      { ...this.data.sections[2], items: itemsFor(2), icon: "record-info", index: 2 },
     ];
     const references = entries.flatMap(entry => {
       const headingMatches = matches(entry.title + " " + entry.subtitle);
@@ -177,6 +177,22 @@ Page({
     if (id === "scoring") this.toggleScoring();
     else if (id === "boards") this.toggleBoards();
     else this.toggleSection({ currentTarget: { dataset: { index } } });
+  },
+  toggleFaq(e) { this.toggleFaqContent(e, "expanded", "faqExpanded"); },
+  toggleFaqDetails(e) { this.toggleFaqContent(e, "detailsExpanded", "faqDetailsExpanded"); },
+  toggleFaqContent(e, property, stateKey) {
+    const id = e.currentTarget.dataset.id;
+    const faq = this.data.references.find(reference => reference.id === "faq");
+    const answer = faq?.items.find(item => item.id === id);
+    if (!answer || property === "detailsExpanded" && !answer.details?.length) return;
+    if (this.data.helpQuery.trim()) {
+      this.setData({ references: this.data.references.map(reference => reference.id === "faq"
+        ? { ...reference, items: reference.items.map(item => item.id === id ? { ...item, [property]: !item[property] } : item) }
+        : reference) });
+    } else {
+      this.setData({ [stateKey]: { ...this.data[stateKey], [id]: !answer[property] } });
+      this.refreshReferences();
+    }
   },
   toggleScoring() { this.setData({ scoringExpanded: !this.data.scoringExpanded }); this.refreshReferences(); },
   toggleBoards() {
