@@ -5,8 +5,8 @@
   else root.shadowtableLeaderboard = presentation;
 })(typeof window === "object" ? window : this, function (funCopy) {
   const categories = [{ id: "all", label: "全部" }, { id: "good", label: "好人" }, { id: "evil", label: "坏人" }, { id: "other", label: "其他" }];
-  const periodLabels = { all: "全部", month: "本月", day: "今日" };
-  const periodsFor = metric => metric === "points" ? ["month", "day"] : ["all", "month"];
+  const periodLabels = { all: "全部", month: "本月", day: "今日", recent: "最近" };
+  const periodsFor = metric => metric === "points" ? ["month", "recent"] : ["all", "month"];
   const normalizePeriod = (metric, period) => periodsFor(metric).includes(period) ? period : "month";
   function funOptions(definitions = [], { includeFinal = false } = {}) {
     const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_good_shield", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
@@ -26,13 +26,15 @@
   const percent = n => Number.isFinite(n) ? n.toFixed(1).replace(/\.0$/, "") : "—";
   function presentRules(board, selected, ruleLines) {
     const points = board.metric === "points", games = board.metric === "games";
-    const summary = points && board.period !== "day"
-      ? { title: "每月 1 日 00:00 起算并清零", lines: ["积分仅当月有效，上月积分不结转。", "历史对局仍保留在战绩和月报中。"] }
-      : board.period === "day"
-        ? { title: "每日 00:00 起算", lines: ["统计当日零点至次日零点前的有效记录。"] }
-        : board.period === "month"
-          ? { title: "每月 1 日 00:00 起算", lines: ["仅统计本月的有效记录。"] }
-          : { title: "统计全部历史有效记录", lines: [] };
+    const summary = board.period === "recent"
+      ? { title: "最近有计分对局的一天", lines: ["按对局结束时间确定日期，只统计当天的积分。", "新的一天有有效计分对局后，榜单才会切换日期。"] }
+      : points && board.period !== "day"
+        ? { title: "每月 1 日 00:00 起算并清零", lines: ["积分仅当月有效，上月积分不结转。", "历史对局仍保留在战绩和月报中。"] }
+        : board.period === "day"
+          ? { title: "每日 00:00 起算", lines: ["统计当日零点至次日零点前的有效记录。"] }
+          : board.period === "month"
+            ? { title: "每月 1 日 00:00 起算", lines: ["仅统计本月的有效记录。"] }
+            : { title: "统计全部历史有效记录", lines: [] };
     const display = { id: "display", title: "展示范围", main: [{ text: "榜单最多展示前 " }, { text: (board.maxRows || 100) + " 位", emphasis: true }, { text: "公开玩家" }], lines: ["我的排名仍按全部上榜玩家计算。"] };
     const sections = board.fun || board.countOnly || selected?.countOnly
       ? [{ id: "calculation", title: "统计方式", main: [], lines: ruleLines.slice(1, -1).filter(Boolean) },
@@ -49,6 +51,9 @@
     if (!board) return null;
     const options = funOptions(board.availableFunMetrics, { includeFinal: true }), selected = options.find(item => item.key === board.metric);
     const games = board.metric === "games", points = board.metric === "points";
+    const recent = board.period === "recent";
+    const date = recent && Number.isFinite(board.periodStart) ? new Date(board.periodStart + 8 * 3600000) : null;
+    const dateLabel = date ? `${date.getUTCFullYear()} 年 ${date.getUTCMonth() + 1} 月 ${date.getUTCDate()} 日` : "";
     const metricLabel = board.fun ? board.metricLabel : ({ points: "积分", games: "局数", overall: "总胜率", good: "好人胜率", evil: "坏人胜率" })[board.metric];
     const rateLabel = board.rateLabel || selected?.rateLabel || "成功率";
     const countUnit = selected?.unit || (board.unit === "%" ? "次" : board.unit) || "次";
@@ -69,7 +74,7 @@
     const statusLabel = me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : me.status === "unsupported" ? "暂不参与排名"
       : me.status === "not_enough" ? "还差 " + me.remaining + (board.fun && board.sort === "rate" ? " 次机会" : board.fun ? " " + countUnit : " 局") + "上榜"
       : me.status === "no_records" ? "尚无完整记录" : me.status === "no_games" ? "暂无有效对局" : "未上榜";
-    const ruleLines = [board.period === "day" ? "今日按北京时间统计，从当日零点起至次日零点前计算。" : board.period === "month" ? "本月按北京时间统计，从每月 1 日零点起计算。" : "全部榜统计历史有效记录。"];
+    const ruleLines = [recent ? "按北京时间选取最近有有效计分对局的一天，仅统计当天积分。" : board.period === "day" ? "今日按北京时间统计，从当日零点起至次日零点前计算。" : board.period === "month" ? "本月按北京时间统计，从每月 1 日零点起计算。" : "全部榜统计历史有效记录。"];
     if ((board.countOnly || selected?.countOnly) && !board.metric?.startsWith("fun_honor_")) {
       ruleLines.push(board.description || selected?.description || "", "按实际发生次数累计，同局可计多次；次数相同并列，不提供比例榜。", "缺失过程不按零次计算。");
     } else if (board.countOnly || selected?.countOnly) {
@@ -81,7 +86,7 @@
         "次数相同则并列；比例按未舍入值排序，相同比例时机会数多者优先，两者相同则并列。",
         board.metric?.startsWith("fun_defense_") ? "守卫按实际挡下伤害计数；魔术师换号使原攻击目标实际避开伤害时计一次，按该目标在技能发生时的阵营区分友方与对方。比例分母为实际保护总次数。" : board.metric?.startsWith("fun_kill_") ? "合并刀、枪、决斗造成的实际出局，按技能发生时实际承受者的阵营统计。缴械及未生效不计击杀，最终刺杀单独统计。" : board.metric === "fun_good_shield" ? "按终局时的身份、阵营和存活状态统计，非梅林好人包含派西维尔，一局最多一次。挡刀率 = 挡刀次数 / 面对最终非空刀的有效机会数。空刀不形成机会，缺失记录不按零次计算。" : "只统计已完整记录的对应机会；缺失记录不按零次计算。");
     } else {
-      if (points && board.period !== "day") ruleLines.push("积分仅当月有效，每月 1 日北京时间零点清零，上月积分不结转。历史对局仍保留在战绩和月报中。");
+      if (points && board.period === "month") ruleLines.push("积分仅当月有效，每月 1 日北京时间零点清零，上月积分不结转。历史对局仍保留在战绩和月报中。");
       ruleLines.push(points ? "积分包含有效计分局成绩和积分调整；至少有 1 场有效计分局才参与排名。积分相同则并列。"
         : games ? "只统计已登记胜负的有效对局；有效局数相同则并列。"
         : "至少有 1 场当前统计范围内的有效对局才参与排名。按未舍入胜率排序，胜率相同时局数多者优先，两者相同则并列。",
@@ -90,14 +95,15 @@
     ruleLines.push("仅展示已开启公开展示的玩家。榜单最多展示前 " + (board.maxRows || 100) + " 位玩家，我的排名仍按全部上榜玩家计算。");
     const rows = markTies(board.rows).map(describe), count = board.eligibleCount ?? rows.length;
     const endLabel = count > rows.length ? "已展示前 " + rows.length + " 位 · 共 " + count + " 位玩家上榜" : "已展示全部 " + count + " 位上榜玩家";
-    return { ...board, periodLabel: periodLabels[board.period], countOnly: !!(board.countOnly || selected?.countOnly), rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
+    return { ...board, periodLabel: periodLabels[board.period], dateLabel, countOnly: !!(board.countOnly || selected?.countOnly), rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
       currentFunOption: selected || null, rateThreshold, ruleLines, ...presentRules(board, selected, ruleLines), endLabel,
       participantLabel: "共 " + count + " 人上榜", compactEndLabel: count > rows.length ? "已展示前 " + rows.length + " 位" : "已显示全部",
-      emptyTitle: board.fun ? "暂无记录" : "暂无公开排名", emptyHint: board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
+      emptyTitle: recent ? dateLabel ? "当天暂无公开排名" : "暂无计分对局" : board.fun ? "暂无记录" : "暂无公开排名",
+      emptyHint: recent && !dateLabel ? "完成有效计分对局后，这里会显示当天的积分榜。" : board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
       me: { ...me, statusLabel, placeLabel: me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : "未上榜" } };
   }
   function filterFunOptions(options = [], category = "all") {
     return category === "all" ? options : options.filter(item => item.category === category);
   }
-  return { categories, periodsFor, normalizePeriod, funOptions, filterFunOptions, markTies, presentBoard };
+  return { categories, periodLabels, periodsFor, normalizePeriod, funOptions, filterFunOptions, markTies, presentBoard };
 });

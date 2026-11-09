@@ -288,6 +288,45 @@ test('今日积分按北京时间半开日区间累计计分局和调整，零�
       assert.throws(() => query(board, 'wx:me', 'metric=' + metric + '&period=day'), e => e.status === 400);
   } finally { store.close(); }
 });
+test('最近积分跨月保留最后一个计分日，由首场有效计分局切换日期和分页版本', () => {
+  const monthStart = Date.parse('2026-09-30T16:00:00Z'), day = 86400000;
+  let now = monthStart - 1;
+  const store = new Store(':memory:', { clock: () => now });
+  try {
+    const board = new Leaderboard(store);
+    const read = (uid = 'wx:me', extra = '') => board.read(uid, new URLSearchParams('metric=points&period=recent' + extra), now);
+    const score = (uid, endedAt, total, recordPurpose) => store.archiveMatch({
+      id: randomUUID(), board: 'classic', endedAt, recordPurpose,
+      players: [{ uid, name: '玩家', faction: 'good', outcome: 'win', score: { status: 'scored', total, breakdown: [] } }],
+    });
+    const adjust = points => store.transaction(() => store.adjustPlayerScore({ uid: 'wx:me', mode: 'delta', points, revision: store.scoreRevision('wx:me') }));
+    profile(store, 'wx:me');
+    adjust(2);
+    const empty = read();
+    assert.deepEqual([empty.periodStart, empty.periodEnd, empty.rows, empty.me.points], [null, null, [], 0]);
+    score('wx:me', monthStart - day, 5);
+    score('wx:me', monthStart - 1, 7);
+    score('wx:me', monthStart - day - 1, 100);
+    const last = read();
+    assert.deepEqual([last.periodStart, last.periodEnd, last.me.total, last.me.points], [monthStart - day, monthStart, 2, 14]);
+    now = monthStart;
+    assert.equal(read().version, last.version);
+    now += day;
+    games(store, 'wx:me', 1, 1, { endedAt: now });
+    score('wx:me', now, 100, 'test');
+    adjust(3);
+    assert.deepEqual([read().periodStart, read().me.points], [last.periodStart, 14]);
+    const beforeSwitch = read().version;
+    profile(store, 'wx:hidden', false);
+    score('wx:hidden', now, 0);
+    const next = read('wx:hidden');
+    assert.deepEqual([next.periodStart, next.periodEnd, next.rows, next.me.total, next.me.points], [now, now + day, [], 1, 0]);
+    assert.equal(read().periodStart, next.periodStart);
+    assert.throws(() => read('wx:me', '&offset=20&version=' + beforeSwitch), e => e.status === 409);
+    for (const metric of ['games', 'overall', 'good', 'evil', 'fun_good_shield'])
+      assert.throws(() => query(board, 'wx:me', 'metric=' + metric + '&period=recent'), e => e.status === 400);
+  } finally { store.close(); }
+});
 test('排名先覆盖所有合格玩家，前100位分页稳定，榜外本人有真实名次', () => {
   const store = new Store(':memory:');
   try {

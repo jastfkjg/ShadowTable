@@ -44,9 +44,10 @@ function scene(response,extra={}) {
     funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,funOptionsCanScroll:true,...extra};
 }
 const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric,period:metric==='points'?'month':base.period})]));
-scenes['points-day']=scene({...base,metric:'points',period:'day'});
+const recentPoints={...base,metric:'points',period:'recent',periodStart:Date.parse('2026-11-09T16:00:00Z')};
+scenes['points-recent']=scene(recentPoints);
 scenes['points-rules']=scene({...base,metric:'points',period:'month'},{rulesExpanded:true});
-scenes['points-day-rules']=scene({...base,metric:'points',period:'day'},{rulesExpanded:true});
+scenes['points-recent-rules']=scene(recentPoints,{rulesExpanded:true});
 scenes['games-rules']=scene({...base,metric:'games',period:'month'},{rulesExpanded:true});
 const previewPlayers=[['阿伟',1,19,6,3],['wyc',2,12,6],['元',3,11,6,10],['橙C',3,11,4],['玉虚宫',5,10,6],['大V',6,9,5,8],['子龙',6,9,6,7],['老高',6,9,6,4],['小明',9,7,3]]
   .map(([nickname,rank,points,total,avatar],i)=>({publicId:'preview-'+i,nickname,rank,points,total,wins:1,winRate:16.7,isSelf:nickname==='子龙',avatarUrl:avatar?'/pages/profile/assets/avatars/crayon-'+String(avatar).padStart(2,'0')+'.jpg':''}));

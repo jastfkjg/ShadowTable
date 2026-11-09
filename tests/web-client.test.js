@@ -1766,33 +1766,34 @@ function webRanks(metric='games',extra={}) {
     rows:[{publicId:'public-player',nickname:'<script>坏名字</script>',avatarUrl:null,rank:1,total:20,wins:10,winRate:50,isSelf:true}],
     me:{status:'ranked',rank:1,total:20,wins:10,winRate:50,remaining:0},...extra};
 }
-test('网页积分榜默认本月，可切今日与刷新，其他榜周期保持全部和本月', async () => {
-  const urls = []; let failDay = false, unavailable = false;
+test('网页积分榜默认本月，可切最近与刷新，其他榜周期保持全部和本月', async () => {
+  const urls = []; let failRecent = false, unavailable = false;
   const c = client(async url => {
     urls.push(url); const q = new URL('https://test.invalid' + url).searchParams;
-    if (q.get('period') === 'day' && failDay) throw Error('断线');
+    if (q.get('period') === 'recent' && failRecent) throw Error('断线');
     if (q.get('metric') === 'points' && unavailable) return { status: 400, json: async () => ({ error: '排行榜参数无效' }) };
-    return response(webRanks(q.get('metric'), { period: q.get('period'), hasMore: true, nextOffset: 20, version: 'day-version' }));
+    return response(webRanks(q.get('metric'), { period: q.get('period'), periodStart: Date.parse('2026-11-09T16:00:00Z'), hasMore: true, nextOffset: 20, version: 'recent-version' }));
   });
   await c.applyRoute('#/leaderboard'); assert.match(urls.at(-1), /metric=points&period=month/);
   let toolbar = () => c.viewLeaderboard().split('class="rank-metrics"')[0];
-  assert.match(toolbar(), /本月.*今日/); assert.doesNotMatch(toolbar(), /全部/);
+  assert.match(toolbar(), /本月.*最近/); assert.doesNotMatch(toolbar(), /全部|今日/);
   const reads = urls.length;
   await c.ACTIONS.rankPeriod({ dataset: { value: 'all' } }); assert.equal(urls.length, reads);
-  failDay = true; await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } });
+  failRecent = true; await c.ACTIONS.rankPeriod({ dataset: { value: 'recent' } });
   assert.equal(c.state.rankPeriod, 'month'); assert.equal(c.state.rankBoard.period, 'month');
-  failDay = false; await c.ACTIONS.rankRetry(); assert.equal(c.state.rankPeriod, 'day');
-  await c.ACTIONS.rankRefresh(); assert.match(urls.at(-1), /metric=points&period=day/);
-  await c.ACTIONS.rankMore(); assert.match(urls.at(-1), /period=day&offset=20&version=day-version/);
+  failRecent = false; await c.ACTIONS.rankRetry(); assert.equal(c.state.rankPeriod, 'recent');
+  assert.match(c.viewLeaderboard(), /2026 年 11 月 10 日 · 单日积分/);
+  await c.ACTIONS.rankRefresh(); assert.match(urls.at(-1), /metric=points&period=recent/);
+  await c.ACTIONS.rankMore(); assert.match(urls.at(-1), /period=recent&offset=20&version=recent-version/);
   for (const metric of ['games', 'overall', 'good', 'evil']) {
     await c.ACTIONS.rankMetric({ dataset: { value: metric } }); assert.equal(c.state.rankPeriod, 'month');
-    assert.match(toolbar(), /全部.*本月/); assert.doesNotMatch(toolbar(), /今日/);
+    assert.match(toolbar(), /全部.*本月/); assert.doesNotMatch(toolbar(), /最近/);
     const count = urls.length;
-    await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } }); assert.equal(urls.length, count);
+    await c.ACTIONS.rankPeriod({ dataset: { value: 'recent' } }); assert.equal(urls.length, count);
   }
   await c.ACTIONS.rankPeriod({ dataset: { value: 'all' } }); assert.equal(c.state.rankPeriod, 'all');
   await c.ACTIONS.rankMetric({ dataset: { value: 'points' } }); assert.equal(c.state.rankPeriod, 'month');
-  await c.ACTIONS.rankPeriod({ dataset: { value: 'day' } });
+  await c.ACTIONS.rankPeriod({ dataset: { value: 'recent' } });
   unavailable = true; await c.ACTIONS.rankRefresh();
   assert.match(urls.at(-1), /metric=games&period=month/);
 });
