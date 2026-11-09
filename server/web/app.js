@@ -602,6 +602,7 @@
     entrySheet: false,
     entryError: "",
     homeWordmarkFailed: false,
+    homeSubtitleFailed: false,
     showRoomRules: false,
     showBoardDetails: false,
     boardDetail: null,
@@ -3892,7 +3893,8 @@ function roomListItems(rooms) {
   function viewBrand() {
     if (state.page !== 'lobby') return '<div class="brand"><div class="brand-identity"><span class="brand-mark">桌边助手</span>' + viewConnectionButton(true) + '</div></div>';
     const mark = state.homeWordmarkFailed ? '<span class="brand-mark">桌边助手</span>' : '<img class="home-wordmark" src="/assets/home-wordmark.png" alt="桌边助手" />';
-    return `<div class="brand"><div class="brand-identity">${mark}${viewConnectionButton(true)}<span class="home-brand-subtitle">阿瓦隆线下助手</span></div><button type="button" class="switch-table home-help" data-action="navigate" data-page="help?from=lobby" aria-label="打开使用帮助"><img class="home-help-icon" src="/assets/home-help.svg" alt="" /></button></div>`;
+    const subtitle = state.homeSubtitleFailed ? '阿瓦隆线下助手' : '<img class="home-subtitle-wordmark" src="/assets/home-subtitle.png" alt="阿瓦隆线下助手" />';
+    return `<div class="brand"><div class="brand-identity">${mark}${viewConnectionButton(true)}<span class="home-brand-subtitle">${subtitle}</span></div><button type="button" class="switch-table home-help" data-action="navigate" data-page="help?from=lobby" aria-label="打开使用帮助"><img class="home-help-icon" src="/assets/home-help.svg" alt="" /></button></div>`;
   }
   function viewErrorDialog() {
     if (!state.error) return "";
@@ -5505,6 +5507,8 @@ function roomListItems(rooms) {
 
     if (e.target?.classList?.contains?.('home-wordmark') && !state.homeWordmarkFailed)
       setState({ homeWordmarkFailed: true });
+    if (e.target?.classList?.contains?.('home-subtitle-wordmark') && !state.homeSubtitleFailed)
+      setState({ homeSubtitleFailed: true });
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
     if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
