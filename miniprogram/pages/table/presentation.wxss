@@ -189,11 +189,11 @@
 .table-room .public-history-dock.with-host-actions { --host-action-bg: #2e404a; --host-action-border: #627680; padding-top: 0; }
 .table-room .public-history-dock.with-host-actions .public-history-entry { min-height: 64px; padding: 4px 0 12px; }
 .table-room .public-history-dock .host-action-bar-inner { max-width: 600px; padding-top: 12px; gap: 10px 8px; border-top-color: rgba(177,191,198,.18); }
-.table-room .public-history-dock .host-action-bar-inner.has-waiting:not(.has-single-action) { grid-template-columns: minmax(0, 1fr) 62px; }
+.table-room .public-history-dock .host-action-bar-inner.has-waiting:not(.has-single-action) { grid-template-columns: minmax(0, 1fr) auto; }
 .table-room .public-history-dock .host-action-bar-inner button { min-height: 44px; margin: 0; font-size: 13px; padding: 8px; }
 .table-room .public-history-dock .host-action-bar-inner button.bar-cutoff:not(.is-destructive),
 .table-room .public-history-dock .host-action-bar-inner button.bar-settle { flex: 1 1 0; border: 1px solid var(--host-action-border); border-radius: 12px; background: var(--host-action-bg); color: var(--text); font-size: 14px; font-weight: 500; }
-.table-room .public-history-dock .host-action-bar-inner button.bar-cancel { flex: 0 0 62px; width: 62px; padding: 8px 4px; border: 0; border-radius: 12px; background: transparent; color: var(--evil); font-size: 12px; font-weight: 400; }
+.table-room .public-history-dock .host-action-bar-inner button.bar-cancel { flex: none; width: 72px; border: 1px solid rgba(242,182,174,.52); border-radius: 12px; background: rgba(242,182,174,.06); color: var(--evil); font-weight: 500; }
 .table-room .public-history-dock .host-action-bar-inner .host-waiting-copy { gap: 4px 12px; padding: 0 0 2px; font-size: 13px; }
 .table-room .public-history-dock .host-waiting-copy .host-waiting-status { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); font-size: 13px; }
 .table-room .host-waiting-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }

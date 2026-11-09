@@ -26,7 +26,7 @@
         class="phase-team"
         ><text class="label">{{room.team.length?'任务队伍 '+teamText+' 号':'全员投票'}}</text
         ><text class="muted"
-          >{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text>
+          >{{room.phase==='quest'?'结算后公开任务结果和汇总票数，个人出牌保密':room.phase==='teamVote'?'全员表决，结算后公开票型':'已公开各座位的投票'}}</text>
         </view
       >
       <view wx:if="{{room.operationStatus || room.needsSubmission}}" class="action-entry" role="status">
@@ -248,7 +248,7 @@
     <view wx:elif="{{stagedChoice && (room.phase==='quest' || room.phase==='teamVote')}}" class="error-dialog table-sheet task-choice-sheet process-sheet process-vote {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{room.phase==='teamVote'?'队伍表决':'选择本轮任务牌'}}">
       <view class="table-sheet-top process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/{{room.phase==='teamVote'?'process-vote':'table-cards'}}.svg" /></view><text>{{room.phase==='teamVote'?'队伍表决':'选择本轮任务牌'}}</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择任务牌">×</button></view></view>
       <scroll-view class="table-sheet-body task-choice-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':'height:'+(62+actionChoices.length*108)+'px;'}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="table-sheet-fields process-sheet-fields">
-        <view class="task-choice-context muted">{{room.team.length?'任务队伍 '+teamText+' 号':room.phase==='teamVote'?'本次为全员表决（未指定任务队伍）':'本轮任务出牌'}}<text>{{room.phase==='teamVote'?'全员表决，结算后公开票型':'仅公开票数，不公开出牌人'}}</text></view>
+        <view class="task-choice-context muted">{{room.team.length?'任务队伍 '+teamText+' 号':room.phase==='teamVote'?'本次为全员表决（未指定任务队伍）':'本轮任务出牌'}}<text>{{room.phase==='teamVote'?'全员表决，结算后公开票型':'结算后公开任务结果和汇总票数，个人出牌保密'}}</text></view>
         <view class="action-choice-list"><button hover-class="none" wx:for="{{actionChoices}}" wx:key="value" class="quest-choice {{draftChoice===item.value?'is-selected':''}} {{item.value==='reject' || item.value==='fail' || item.value==='thiefFail'?'is-fail':item.value==='magic'?'is-magic':''}}" aria-label="{{item.label+(draftChoice===item.value?'，已选':'')}}" aria-pressed="{{draftChoice===item.value}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="quest-choice-symbol" aria-hidden="true"><image src="/assets/{{item.value==='approve'?'process-up':item.value==='reject'?'process-down':item.value==='fail' || item.value==='thiefFail'?'record-swords':item.value==='magic'?'record-spark':'record-shield-good'}}.svg" /></view><view class="quest-choice-copy"><view>{{item.label}}</view><text>{{room.phase==='teamVote'?(item.value==='approve'?'同意这支队伍出发':item.value==='reject'?'不同意这支队伍出发':'选择后再确认提交'):'本轮任务牌 · 点击选择'}}</text></view><view class="quest-choice-radio" aria-hidden="true">{{draftChoice===item.value?'✓':''}}</view></button></view>
       </view></scroll-view>
       <view class="table-sheet-footer process-sheet-footer"><view class="task-choice-hint muted" aria-live="polite">{{draftChoice?'已选：'+draftLabel+'，确认提交后不可更改':'请先选择，再确认提交'}}</view><button hover-class="none" class="primary" bindtap="confirmChoice" disabled="{{hasPendingRequest || busy || !network || !draftChoice}}" loading="{{busy && busyAction==='submit'}}">确认提交</button><button hover-class="none" class="text-button" bindtap="closeAction" disabled="{{busy}}">稍后</button></view>
@@ -302,7 +302,7 @@
         </block>
         <view wx:else class="dialog-message">{{toolDescription?toolDescription:toolType==='offline'?'线下刀人后，由房主记录完成。':toolType==='reverseStrike'?'刺客选择逆仆，结果私密。':'刺客选择梅林，结算后公开是否命中。'}}</view>
       </view></scroll-view>
-      <view class="process-sheet-footer table-sheet-footer"><view wx:if="{{toolType==='vote' || toolType==='quest' || (room.knights && toolType==='assassination')}}" class="process-selection-summary small muted">已选 {{toolSeats.length}} 人{{toolType==='vote' && !toolSeats.length?' · 全员投票':''}}</view><button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">{{toolType==='quest'?'发起任务':toolType==='vote'?(toolSeats.length?'发起投票':'发起全员投票'):'发起'}}</button><button hover-class="none" class="text-button" bindtap="closeTool" disabled="{{busy}}">取消</button></view>
+      <view class="process-sheet-footer table-sheet-footer"><view wx:if="{{room.knights && toolType==='assassination'}}" class="process-selection-summary small muted">已选 {{toolSeats.length}} 人</view><button hover-class="none" class="primary" bindtap="launchTool" disabled="{{hasPendingRequest || busy || (toolType==='quest' && toolSeats.length<toolThreshold)}}">{{toolType==='quest'?(toolSeats.length?'发起'+toolSeats.length+'人任务':'请选择任务队员'):toolType==='vote'?(toolSeats.length?'发起投票':'发起全员投票'):'发起'}}</button><button hover-class="none" class="text-button" bindtap="closeTool" disabled="{{busy}}">取消</button></view>
     </view>
   </view>
   <view wx:if="{{notice && !reconnecting}}" class="notice">{{notice}}</view>
@@ -464,7 +464,11 @@
         <scroll-view class="room-rules-body" style="{{roomRulesBodyHeight?'height:'+roomRulesBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="room-rules-sheet-fields">
           <view class="room-rules-summary"><view><image src="/assets/home-table-blue.svg" aria-hidden="true" /><text>{{room.boardName}}</text></view><text class="room-rules-capacity">{{room.capacity}} 人</text></view>
           <template is="roomRoleGroups" data="{{groups:roomRoleGroups.length?roomRoleGroups:room.roleConfiguration, compact:false}}" />
-          <view class="room-rules-options"><view wx:if="{{room.scoreSettings}}" class="room-rules-option {{room.scoreSettings.enabled?'is-enabled':''}}"><image src="/assets/record-coin.svg" aria-hidden="true" /><text>本局计分</text><text>{{room.scoreSettings.enabled?'已开启':'未开启'}}</text></view><view wx:if="{{room.scoreNotice}}" class="room-rules-notice">{{room.scoreNotice}}</view><view wx:if="{{room.testRoom}}" class="room-rules-option"><image src="/assets/sheet-flask.svg" aria-hidden="true" /><text>测试房间 · 陪测</text><text>已开启</text></view></view>
+          <view class="room-rules-options">
+            <view wx:if="{{room.scoreSettings}}" class="room-rules-option {{room.scoreSettings.enabled?'is-enabled':''}}"><image src="/assets/record-coin.svg" aria-hidden="true" /><text>本局计分</text><text>{{room.scoreSettings.enabled?'已开启':'未开启'}}</text></view>
+            <view wx:if="{{room.scoreNotice && !(room.scoreSettings.enabled===false && (room.scoreNotice==='本局不计积分' || room.scoreNotice==='本局未开启计分'))}}" class="room-rules-notice">{{room.scoreNotice}}</view>
+            <view wx:if="{{room.testRoom}}" class="room-rules-option"><image src="/assets/sheet-flask.svg" aria-hidden="true" /><text>测试房间 · 陪测</text><text>已开启</text></view>
+          </view>
         </view></scroll-view>
         <view class="room-rules-sheet-footer"><button hover-class="entry-option-pressed" class="secondary" bindtap="openBoardDetails"><image src="/assets/sheet-book.svg" aria-hidden="true" /><text>板子详情</text></button><button hover-class="entry-option-pressed" class="primary" bindtap="closeRoomRules">知道了</button></view>
       </view>
@@ -619,7 +623,7 @@
         <view wx:if="{{room.closeWaiting}}" class="host-waiting-copy small muted"><view class="host-waiting-status"><view class="host-waiting-dot" aria-hidden="{{true}}" /><text>{{settleHint}}</text></view><view class="host-waiting-auto">收齐自动结算</view></view>
         <button hover-class="none" wx:if="{{room.closeWaiting}}" class="secondary bar-cutoff {{room.closeWaiting.mode==='cancel'?'is-destructive':''}}" bindtap="closeWaiting" disabled="{{hasPendingRequest || busy || !network}}"><text>{{room.closeWaiting.mode==='cancel'?(room.closeWaiting.label || '作废本次操作'):room.closeWaiting.mode==='pass'?'结束等待':'提前结算'}}</text><view wx:if="{{room.closeWaiting.mode!=='cancel'}}" class="host-action-chevron" aria-hidden="{{true}}" /></button>
         <button hover-class="none" wx:else class="primary bar-settle" bindtap="settleTool" disabled="{{hasPendingRequest || busy || !network || !canSettle}}" loading="{{busy && busyAction==='settleTool'}}">{{canSettle?'结算当前操作':settleHint}}</button>
-        <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="text-button bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
+        <button hover-class="none" wx:if="{{!room.closeWaiting || room.closeWaiting.mode!=='cancel'}}" class="secondary bar-cancel" bindtap="cancelTool" disabled="{{hasPendingRequest || busy}}">作废</button>
       </view>
       </block>
     </view>

@@ -637,6 +637,7 @@ test('任务牌只展示当前允许选项，先选后确认且固定操作在�
   assert.equal(byHandler(tree,'confirmChoice').attr.disabled,true);
   const scroll = nodes(tree).find(n=>n.attr?.class?.split(' ').includes('task-choice-body'));
   assert.ok(scroll);
+  assert.match(JSON.stringify(scroll), /结算后公开任务结果和汇总票数，个人出牌保密/);
   assert.equal(byHandler(scroll,'confirmChoice'),undefined);
   const selected = render({...data,draftChoice:'success',draftLabel:'任务成功'});
   assert.equal(byHandler(selected,'confirmChoice').attr.disabled,false);
@@ -883,6 +884,13 @@ test("说明仅列阵营角色，房间内玩家可打开当前配置弹窗", ()
   const open = render({ ...base, room, showRoomRules: true });
   assert.ok(byHandler(open, "closeRoomRules"));
   assert.ok(JSON.stringify(open).includes("莫甘娜，刺客"));
+  for (const [scoreNotice, showNotice] of [["本局不计积分", false], ["本局未开启计分", false], ["本板子暂未参与计分", true]]) {
+    const tree = render({ ...base, showRoomRules: true,
+      room: { ...room, testRoom: true, scoreSettings: { enabled: false }, scoreNotice } });
+    const options = nodes(tree).find(n => n.attr?.class === "room-rules-options");
+    assert.match(JSON.stringify(options), /本局计分.*未开启.*测试房间 · 陪测/);
+    assert.equal(nodes(options).some(n => n.attr?.class === "room-rules-notice"), showNotice);
+  }
 });
 
 test("投票和私密操作只在弹窗显示，已提交后弹窗消失且入口显示完成", () => {
@@ -966,6 +974,15 @@ test("房主工具入口在任务出牌时收起，普通玩家不能看见管�
   });
   assert.ok(byHandler(dialog, "toggleToolSeat"));
   assert.equal(byHandler(dialog, "launchTool").attr.disabled, true);
+  assert.equal(byHandler(dialog, "launchTool").children.join(""), "请选择任务队员");
+  for (const toolType of ["quest", "vote"]) {
+    const selected = render({ ...base, room, toolType, toolSeats: [1], toolThreshold: 1,
+      toolPlayers: [{ seat: 1, name: "甲", selected: true }] });
+    const heading = nodes(selected).find(n => n.attr?.class === "process-target-title");
+    assert.match(JSON.stringify(heading), /已选 1 人/);
+    assert.doesNotMatch(JSON.stringify(selected), /process-selection-summary/);
+    assert.equal(byHandler(selected, "launchTool").children.join(""), toolType === "quest" ? "发起1人任务" : "发起投票");
+  }
 });
 
 test("身份默认只显示一行入口，进度仅房主可见，结束按钮位于记录之后", () => {
@@ -1293,7 +1310,7 @@ test("自动结算牌桌展示个人状态和持久结果，房主可结束等�
   assert.ok(progressIndex < flat.findIndex(n => n.attr?.class === "task-progress"));
   const dock = flat.find(n => n.attr?.class === "public-history-dock with-host-actions");
   assert.equal(byHandler(dock, "closeWaiting").attr.disabled, false);
-  assert.ok(byHandler(dock, "cancelTool"));
+  assert.match(byHandler(dock, "cancelTool").attr.class, /\bsecondary\b/);
   const singleAction = render({ ...data, room: { ...room, closeWaiting: { mode: "cancel" } } });
   assert.equal(byHandler(singleAction, "cancelTool"), undefined);
   assert.ok(JSON.stringify(tree).includes("本次你无需操作"));

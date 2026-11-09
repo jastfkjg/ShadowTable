@@ -4202,10 +4202,13 @@ function roomListItems(rooms) {
             : "刺客选择梅林，结算后公开是否命中。";
       html += '<div class="dialog-message">' + esc(desc) + "</div>";
     }
+    const launchLabel = kind === "quest"
+      ? (state.toolSeats.length ? "发起" + state.toolSeats.length + "人任务" : "请选择任务队员")
+      : "发起";
     html +=
       '<div class="dialog-actions">' +
       btn("secondary", "closeTool", "取消", null, state.busy) +
-      btn("primary", "launchTool", "发起", null, state.busy || (kind === "quest" && state.toolSeats.length < state.toolThreshold)) +
+      btn("primary", "launchTool", launchLabel, null, state.busy || (kind === "quest" && state.toolSeats.length < state.toolThreshold)) +
       "</div></div></div>";
     return html;
   }
@@ -4360,6 +4363,7 @@ function roomListItems(rooms) {
   function viewRoomRules() {
     const room = state.room;
     if (!room || !state.showRoomRules || state.error) return '';
+    const duplicateScoreNotice = room.scoreSettings?.enabled === false && ['本局不计积分', '本局未开启计分'].includes(room.scoreNotice);
     return `<div class="dialog-backdrop room-rules-backdrop" data-room-rules-backdrop${state.showBoardDetails ? ' inert' : ''}><section class="error-dialog room-rules-sheet" role="dialog" aria-modal="true" aria-labelledby="room-sheet-title" tabindex="-1">
       ${viewSheetHeading('角色配置', 'sheet-shield', 'closeRoomRules', true)}
       <div class="room-rules-body"><div class="room-rules-sheet-fields">
@@ -4367,7 +4371,7 @@ function roomListItems(rooms) {
         ${viewRoomRoleGroups(room.roleConfiguration)}
         <div class="room-rules-options">
           ${room.scoreSettings ? `<div class="room-rules-option${room.scoreSettings.enabled ? ' is-enabled' : ''}"><img src="/assets/record-coin.svg" alt="" /><span>本局计分</span><span>${room.scoreSettings.enabled ? '已开启' : '未开启'}</span></div>` : ''}
-          ${room.scoreNotice ? `<div class="room-rules-notice">${esc(room.scoreNotice)}</div>` : ''}
+          ${room.scoreNotice && !duplicateScoreNotice ? `<div class="room-rules-notice">${esc(room.scoreNotice)}</div>` : ''}
           ${room.testRoom ? '<div class="room-rules-option"><img src="/assets/sheet-flask.svg" alt="" /><span>测试房间 · 陪测</span><span>已开启</span></div>' : ''}
         </div>
         ${room.phase !== 'lobby' ? btn('text-button room-rules-invite', 'copyInviteLink', '复制邀请链接') : ''}
@@ -4415,7 +4419,8 @@ function roomListItems(rooms) {
           '<div class="phase-team"><span class="label">' +
           (r.team.length ? "任务队伍 " + esc(state.teamText) + " 号" : "全员投票") +
           '</span><span class="muted">' +
-          (r.phase === "teamVote" ? "全员表决，结算后公开票型" : "仅公开票数，不公开出牌人") +
+          (r.phase === "quest" ? "结算后公开任务结果和汇总票数，个人出牌保密"
+            : r.phase === "teamVote" ? "全员表决，结算后公开票型" : "已公开各座位的投票") +
           "</span></div>";
     if (r.operationStatus || r.needsSubmission)
       phaseHtml +=
