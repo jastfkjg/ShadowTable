@@ -1,12 +1,12 @@
 const api = require('./api');
 const { catalogue, presentCollection, MAX_EQUIPPED } = require('./badges');
-const initialBadgeManager = { badgeCollection: null, badgeTotalCount: catalogue.length, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '' };
+const initialBadgeManager = { badgeCollection: null, badgeTotalCount: catalogue.length, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '', badgePickerChoice: null, badgePlaced: null };
 function badgeManagerMethods() {
   return {
     async loadBadgeManager() {
       if (this.data.badgeManagerSaving) return;
       const sequence = this.badgeManagerSequence = (this.badgeManagerSequence || 0) + 1;
-      this.setData({ badgeManagerLoading: true, badgeManagerError: '' });
+      this.setData({ badgeManagerLoading: true, badgeManagerError: '', badgePlaced: null });
       try {
         const value = await api.request('/api/me/badges');
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl) });
@@ -20,20 +20,24 @@ function badgeManagerMethods() {
       if (this.data.badgeManagerSaving || this.data.badgeManagerLoading) return;
       const collection = this.data.badgeCollection, badge = collection?.badges.find(b => b.id === e.currentTarget.dataset.id);
       if (!badge) return;
-      const replaceId = e.currentTarget.dataset.replaceId;
+      const { replaceId, slotIndex } = e.currentTarget.dataset;
       if (!badge.equipped && collection.badges.filter(b => b.equipped).length >= MAX_EQUIPPED && !replaceId) {
         this.setData({ badgeManagerError: '最多佩戴3枚徽章，请先摘下一枚' });
         return;
       }
       const sequence = this.badgeManagerSequence;
-      this.setData({ badgeManagerSaving: true, badgeManagerError: '' });
+      this.setData({ badgeManagerSaving: true, badgeManagerError: '', badgePlaced: null });
       try {
-        const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart, ...(replaceId ? { replaceId } : {}), ...(this.data.badgePicker === 'add' && Number.isInteger(this.data.badgePickerSlot) ? { slotIndex: this.data.badgePickerSlot } : {}) }, api.requestId());
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl), selectedBadge: null, badgePicker: '' });
+        const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart, ...(replaceId ? { replaceId } : {}), ...(Number.isInteger(slotIndex) ? { slotIndex } : {}) }, api.requestId());
+        if (this.alive && sequence === this.badgeManagerSequence) {
+          const badgeCollection = presentCollection(value, this.data.badgeFilter, api.assetUrl);
+          const badgePlaced = replaceId || Number.isInteger(slotIndex) ? badgeCollection.slots.find(slot => slot.id === badge.id) || null : null;
+          this.setData({ badgeCollection, badgePlaced, selectedBadge: null, badgePicker: '', badgePickerChoice: null });
+        }
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) {
           // Reconcile an ambiguous network result before permitting another toggle.
-          this.setData({ badgeCollection: null, selectedBadge: null, badgePicker: '', badgeManagerError: e.message + '，请刷新徽章后重试。' });
+          this.setData({ badgeCollection: null, selectedBadge: null, badgePicker: '', badgePickerChoice: null, badgeManagerError: e.message + '，请刷新徽章后重试。' });
         }
       } finally {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerSaving: false });

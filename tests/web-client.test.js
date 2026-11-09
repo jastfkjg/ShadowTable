@@ -2310,7 +2310,8 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   await c.applyRoute('#/badges');
   assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,23);
-  assert.match(c.viewBadgeManager(),/<span> \/ 23<\/span>/);assert.match(c.viewBadgeManager(),/金牌替身/);
+  assert.match(c.viewBadgeManager(),/已拥有 1 \/ 23/);assert.match(c.viewBadgeManager(),/金牌替身/);
+  assert.match(c.viewBadgeManager(),/data-action="badgeRules" aria-label="荣誉徽章规则"><img[^>]+\/><\/button>/);
   c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
   c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
@@ -2358,9 +2359,87 @@ test('网页徽章管理按需显示摘下，详情精简说明且保留获取�
   c.ACTIONS.badgeManage();assert.match(c.viewBadgeManager(),/class="badge-remove"/);
   c.ACTIONS.badgeManage();c.ACTIONS.showBadgeDetail({dataset:{id:catalogue[1].id}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
-  assert.match(detail,/获取条件/);assert.match(detail,/持有规则/);
-  assert.doesNotMatch(detail,/按北京时间本月|摘下后仍保留/);
+  assert.match(detail,/获取条件/);assert.match(detail,/本月场次榜第一（含并列）/);
+  assert.match(detail,/榜首变动或跨月时重新计算/);
+  assert.doesNotMatch(detail,/>徽章详情<|常驻牌桌|按北京时间本月|摘下后仍保留/);
   assert.match(detail,/secondary badge-detail-action/);
+  c.ACTIONS.showBadgeDetail({dataset:{id:'overall'}});
+  assert.match(c.viewBadgeManager(),/按原始胜率排序，胜率相同时比较有效局数/);
+});
+
+test('网页满额替换先选择再确认，返回详情取消选择，保存后标出原名片位置', async () => {
+  const { catalogue } = require('../miniprogram/badges');
+  const [points, games, overall, incoming] = catalogue;
+  const periodStart = Date.UTC(2026, 10, 1), writes = [];
+  const collection = { periodStart, version: 1, badges: [
+    { id: overall.id, equipped: true, slotIndex: 2 },
+    { id: points.id, equipped: true, slotIndex: 0 },
+    { id: games.id, equipped: true, slotIndex: 1 },
+    { id: incoming.id, equipped: false },
+  ] };
+  const c = client(async (url, options) => {
+    assert.equal(url, '/api/me/badges');
+    writes.push(JSON.parse(options.body));
+    return response({ ...collection, version: 2, badges: [
+      collection.badges[0], collection.badges[1], { id: games.id, equipped: false },
+      { id: incoming.id, equipped: true, slotIndex: 1 },
+    ] });
+  });
+  Object.assign(c.state, { page: 'badges', badgeCollection: collection });
+  const event = id => ({ dataset: { id } });
+  c.ACTIONS.showBadgeDetail(event(incoming.id));
+  c.ACTIONS.openBadgeReplacement();
+  assert.match(c.viewBadgeManager(), /data-action="confirmBadgePicker" disabled>确认替换/);
+  assert.match(c.viewBadgeManager(), /换下<\/span><span class="badge-swap-name">待选择/);
+  await c.ACTIONS.confirmBadgePicker();
+  c.ACTIONS.chooseBadgePickerItem(event(games.id));
+  assert.match(c.viewBadgeManager(), /badge-picker-item is-selected[^>]+aria-pressed="true"/);
+  assert.match(c.viewBadgeManager(), /换下<\/span><span class="badge-swap-name">牌桌常青树/);
+  assert.match(c.viewBadgeManager(), /换上<\/span><span class="badge-swap-name">我在阿瓦隆玩重生/);
+  assert.match(c.viewBadgeManager(), /确认替换 · 位置 2/);
+  c.ACTIONS.closeBadgePicker();
+  assert.equal(c.state.selectedBadgeId, incoming.id);
+  assert.equal(c.state.badgePickerChoice, null);
+  assert.equal(writes.length, 0);
+  c.ACTIONS.openBadgeReplacement();
+  c.ACTIONS.chooseBadgePickerItem(event(games.id));
+  await c.ACTIONS.confirmBadgePicker();
+  assert.deepEqual(writes, [{ id: incoming.id, equipped: true, version: 1, periodStart, replaceId: games.id }]);
+  assert.match(c.viewBadgeManager(), /badge-slot is-updated/);
+  assert.match(c.viewBadgeManager(), /已佩戴到名片位置 2/);
+  assert.equal(c.state.badgePicker, '');
+});
+
+test('网页空位选择用徽章网格，确认前不提交并保留目标位置', async () => {
+  const collection = { periodStart: 1, version: 1, badges: [
+    { id: 'games', equipped: true, slotIndex: 0 },
+    { id: 'merlin_evade', equipped: false },
+  ] };
+  const writes = [];
+  const c = client(async (url, options) => {
+    assert.equal(url, '/api/me/badges');
+    const body = JSON.parse(options.body);
+    writes.push(body);
+    return response({ ...collection, version: 2, badges: [collection.badges[0], { id: body.id, equipped: true, slotIndex: body.slotIndex }] });
+  });
+  Object.assign(c.state, { page: 'badges', badgeCollection: collection });
+  const event = dataset => ({ dataset });
+  c.ACTIONS.openBadgePicker(event({ slot: '2' }));
+  assert.match(c.viewBadgeManager(), /名片位置 3/);
+  assert.match(c.viewBadgeManager(), /class="badge-picker-grid"/);
+  assert.match(c.viewBadgeManager(), /data-action="confirmBadgePicker" disabled>确认佩戴/);
+  c.ACTIONS.chooseBadgePickerItem(event({ id: 'merlin_evade' }));
+  assert.match(c.viewBadgeManager(), /佩戴闪身步大神/);
+  c.ACTIONS.closeBadgePicker();
+  assert.equal(writes.length, 0);
+  c.ACTIONS.openBadgePicker(event({ slot: '2' }));
+  await c.ACTIONS.confirmBadgePicker();
+  assert.equal(writes.length, 0);
+  c.ACTIONS.chooseBadgePickerItem(event({ id: 'merlin_evade' }));
+  await c.ACTIONS.confirmBadgePicker();
+  assert.deepEqual(writes, [{ id: 'merlin_evade', equipped: true, version: 1, periodStart: 1, slotIndex: 2 }]);
+  assert.match(c.viewBadgeManager(), /已佩戴到名片位置 3/);
+  assert.equal(c.state.badgePicker, '');
 });
 
 test('网页版回避卡单选、确认、只读和私密结果遮盖，与小程序规则一致', async () => {

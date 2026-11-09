@@ -2912,6 +2912,79 @@ test('徽章页忽略离开后的响应，保存失败清空旧资格并可刷�
   await p.loadBadgeManager(); assert.equal(p.data.badgeCollection.ownedCount,1);
 });
 
+test('小程序满额替换等待确认，提交后按服务端返回的位置更新名片', async () => {
+  const { catalogue } = require('../miniprogram/badges');
+  const [points, games, overall, incoming] = catalogue;
+  const periodStart = Date.UTC(2026, 10, 1), writes = [];
+  const collection = { periodStart, version: 1, badges: [
+    { id: points.id, equipped: true, slotIndex: 0 },
+    { id: overall.id, equipped: true, slotIndex: 2 },
+    { id: games.id, equipped: true, slotIndex: 1 },
+    { id: incoming.id, equipped: false },
+  ] };
+  const { p } = page('badges', { ...apiBase, request: async (url, method, body) => {
+    if (method !== 'POST') return collection;
+    writes.push({ ...body });
+    return { ...collection, version: 2, badges: [
+      collection.badges[0], collection.badges[1], { id: games.id, equipped: false },
+      { id: incoming.id, equipped: true, slotIndex: 1 },
+    ] };
+  } });
+  const event = id => ({ currentTarget: { dataset: { id } } });
+  p.onLoad();
+  await p.onShow();
+  p.showBadgeDetail(event(incoming.id));
+  p.openBadgeReplacement();
+  await p.confirmBadgePicker();
+  p.chooseBadgePickerItem(event(games.id));
+  assert.equal(p.data.badgePickerChoice.slotIndex, 1);
+  p.closeBadgePicker();
+  assert.equal(p.data.selectedBadge.id, incoming.id);
+  assert.equal(p.data.badgePickerChoice, null);
+  assert.equal(writes.length, 0);
+  p.openBadgeReplacement();
+  p.chooseBadgePickerItem(event(games.id));
+  await p.confirmBadgePicker();
+  assert.deepEqual(writes, [{ id: incoming.id, equipped: true, version: 1, periodStart, replaceId: games.id }]);
+  assert.equal(p.data.badgeCollection.slots[1].id, incoming.id);
+  assert.equal(p.data.badgePlaced.slotIndex, 1);
+  assert.equal(p.data.badgePicker, '');
+  assert.equal(p.data.selectedBadge, null);
+});
+
+test('小程序选择徽章先选中再佩戴，取消后清除选择，确认时写入指定空位', async () => {
+  const collection = { periodStart: 1, version: 1, badges: [
+    { id: 'games', equipped: true, slotIndex: 1 },
+    { id: 'merlin_evade', equipped: false },
+  ] };
+  const writes = [];
+  const { p } = page('badges', { ...apiBase, request: async (url, method, body) => {
+    if (method !== 'POST') return collection;
+    writes.push({ ...body });
+    return { ...collection, version: 2, badges: [collection.badges[0], { id: body.id, equipped: true, slotIndex: body.slotIndex }] };
+  } });
+  const event = dataset => ({ currentTarget: { dataset } });
+  p.onLoad();
+  await p.onShow();
+  p.openBadgePicker(event({ slot: 1 }));
+  assert.equal(p.data.badgePicker, '');
+  p.openBadgePicker(event({ slot: 2 }));
+  p.chooseBadgePickerItem(event({ id: 'games' }));
+  assert.equal(p.data.badgePickerChoice, null);
+  p.chooseBadgePickerItem(event({ id: 'merlin_evade' }));
+  assert.equal(p.data.badgePickerChoice.id, 'merlin_evade');
+  p.closeBadgePicker();
+  assert.equal(writes.length, 0);
+  p.openBadgePicker(event({ slot: 2 }));
+  await p.confirmBadgePicker();
+  assert.equal(writes.length, 0);
+  p.chooseBadgePickerItem(event({ id: 'merlin_evade' }));
+  await Promise.all([p.confirmBadgePicker(), p.confirmBadgePicker()]);
+  assert.deepEqual(writes, [{ id: 'merlin_evade', equipped: true, version: 1, periodStart: 1, slotIndex: 2 }]);
+  assert.equal(p.data.badgePlaced.slotIndex, 2);
+  assert.equal(p.data.badgePicker, '');
+});
+
 test('我的牌桌摘要不阻塞资料，优先已入座的进行中牌桌，忽略过期返回和失效房间', async () => {
   const oldRooms=deferred(); let roomReads=0;
   const room=(code,status,extra={})=>({code,status,available:true,isMember:true,capacity:12,boardName:'阿瓦隆 · 十二骑士',seat:null,lastEnteredAt:1,...extra});

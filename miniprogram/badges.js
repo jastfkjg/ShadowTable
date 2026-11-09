@@ -26,13 +26,24 @@
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
   const MAX_EQUIPPED = 3;
+  const detailNotes = {
+    overall: '按原始胜率排序，胜率相同时比较有效局数。',
+    survival_revive: '统计十二骑士中实际发生的复活。',
+    survival_knifed: '统计十二骑士中实际承受的轮内刀和最终刀，无论是否生效或复活。',
+    percival_bust: '仅统计派西维尔玩家。',
+    good_shield: '终局存活的非梅林好人被最终刀选中，含派西维尔。',
+    defense_ally: '统计守卫、魔术师的防御技能。',
+    defense_enemy: '统计守卫、魔术师的防御技能。',
+    kill_enemy: '仅统计有击杀技能的玩家。',
+    kill_ally: '仅统计有击杀技能的玩家。',
+  };
   function presentCollection(value, filter = 'all', assetUrl = path => path) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
     const items = catalogue.map(b => {
       const condition = (b.condition || (copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
       return { ...b, imageUrl: b.permanent ? assetUrl(b.imageUrl) : b.imageUrl, owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
-      condition, detailCondition: condition,
-      periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首持有，含并列第一',
+      condition, detailCondition: b.permanent ? condition : condition + '（含并列）', detailNote: detailNotes[b.id] || '', kindLabel: b.permanent ? '永久' : '月榜',
+      periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首变动或跨月时重新计算',
       status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }; });
     items.sort((a, b) => Number(b.owned) - Number(a.owned));
     const badges = (value.badges || []).map(b => items.find(item => item.id === b.id)).filter(Boolean), equipped = badges.filter(b => b.equipped);

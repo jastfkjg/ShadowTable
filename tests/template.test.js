@@ -2097,11 +2097,16 @@ test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情�
   assert.ok(byHandler(render({...data,badgeManaging:true}),'toggleOwnedBadge'));
   const detail=render({...data,selectedBadge:badgeCollection.items.find(b=>b.id==='games')});
   const text=JSON.stringify(detail);
-  assert.match(text,/获取条件|持有规则|常驻牌桌/);
-  assert.doesNotMatch(text,/按北京时间本月|摘下后仍保留/);
+  assert.match(text,/获取条件/);
+  assert.match(text,/本月场次榜第一（含并列）/);
+  assert.match(text,/榜首变动或跨月时重新计算/);
+  assert.doesNotMatch(text,/常驻牌桌|按北京时间本月|摘下后仍保留/);
   assert.match(byHandler(detail,'toggleOwnedBadge').attr.class,/secondary/);
   const locked=render({...data,selectedBadge:badgeCollection.items.find(b=>!b.owned)});
   assert.equal(byHandler(locked,'toggleOwnedBadge'),undefined);
+  const permanent=render({...data,selectedBadge:badgeCollection.items.find(b=>b.id==='october_2026_book')});
+  assert.match(JSON.stringify(permanent),/获得后永久保留/);
+  assert.doesNotMatch(JSON.stringify(permanent),/含并列|跨月时重新计算/);
 });
 
 test('趣味卡片只提供说明和独立回查箭头，不显示卡片分享入口', () => {

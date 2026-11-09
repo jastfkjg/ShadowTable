@@ -1965,6 +1965,8 @@ button.public-history-row-toggle:active { opacity: 1; background: rgba(177,191,1
 .player-card-badges { flex: 0 0 156px; width: 156px; max-width: 100%; white-space: nowrap; text-align: right; }
 button.player-badge-button { display: inline-flex; vertical-align: middle; width: 48px; height: 48px; min-height: 48px; padding: 2px; margin: 0 4px 0 0; border-radius: 8px; }
 .player-badge-button image { width: 44px; height: 44px; }
+/* Permanent badge art has more transparent padding than monthly badge art. */
+.badge-art-permanent { transform: scale(1.14); }
 .badge-pressed { opacity: .7; }
 .player-badge-detail { padding: 20rpx 0; border-top: 1rpx solid var(--border); }
 .player-badge-detail-heading { display: flex; align-items: center; gap: 16rpx; font-weight: 600; }
