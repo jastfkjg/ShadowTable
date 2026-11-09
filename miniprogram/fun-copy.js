@@ -58,6 +58,9 @@
     survival: "复活按实际回场计数；被刀包含轮内刀和最终刀，按换号、替死后的承受者统计，无论是否生效或复活。",
     assassin: "仅统计刺客的非空最终刺杀。",
   };
+  const modeLabels = { all: '全部玩法', classic: '经典', knights: '十二骑士', other: '扩展玩法' };
+  const combinedRecords = new Set(['merlin_evade', 'merlin_hit', 'percival_green', 'percival_bust']);
+  const isCombinedRecord = id => combinedRecords.has(id);
   function metric(row) {
     const id = row.id || row.key?.replace(/^fun_/, "");
     const title = row.key && honors[id] ? honors[id].title : titles[id?.split("_")[0]];
@@ -74,11 +77,38 @@
     if (["命中同伴", "命中友方"].includes(label)) return labels[type + "_ally"] || label;
     return label;
   }
-  // One entry per metric and mode; keep the server's order and record scope.
-  function records(value) {
+  function recordEntries(cards, splitModes) {
+    const entries = [];
+    const totals = new Map();
+    for (const card of cards) {
+      for (const row of card.metrics) {
+        if (row.id.endsWith('aim_enemy')) continue;
+        if (splitModes || !isCombinedRecord(row.id)) {
+          entries.push({ card, row });
+          continue;
+        }
+        let total = totals.get(row.id);
+        if (!total) {
+          total = { ...row, mode: 'all', byRole: [], count: 0, opportunities: 0, knownGames: 0, unknownGames: 0, value: null, rate: null };
+          totals.set(row.id, total);
+          entries.push({ card, row: total });
+        }
+        total.unknownGames += row.unknownGames || 0;
+        if (row.value == null) continue;
+        total.count += row.count;
+        total.opportunities += row.opportunities;
+        total.knownGames += row.knownGames || 0;
+        total.value = total.count;
+      }
+    }
+    for (const row of totals.values()) {
+      if (row.opportunities > 0) row.rate = Math.round(row.count / row.opportunities * 1000) / 10;
+    }
+    return entries;
+  }
+  function records(value, { splitModes = false } = {}) {
     const cards = summary(value)?.cards || [];
     const multipleModes = new Set(cards.filter(card => !card.id.endsWith(':honor')).map(card => card.id.split(':')[0])).size > 1;
-    const modes = { classic: '经典', knights: '十二骑士', other: '扩展玩法' };
     const visuals = {
       honor: ['record-medal.svg', 'gold'], survival: ['record-heart.svg', 'purple'],
       percival: ['roles/percival.png', 'portrait'], merlin: ['roles/merlin.png', 'portrait'],
@@ -86,7 +116,7 @@
       defense: ['record-shield.svg', 'gold'], kill: ['record-swords.svg', 'blue'],
       knife: ['roles/swordsman.png', 'portrait'], gun: ['roles/hunter.png', 'portrait'], duel: ['roles/lancelot.png', 'portrait'],
     };
-    const tiles = cards.flatMap(card => card.metrics.filter(row => !row.id.endsWith('aim_enemy')).map(row => {
+    const tiles = recordEntries(cards, splitModes).map(({ card, row }) => {
       const group = card.id.split(':').pop(), mode = row.mode || card.mode || card.id.split(':')[0];
       const [image, iconTone] = row.id === 'survival_knifed' ? ['record-swords.svg', 'blue'] : visuals[group] || ['record-spark.svg', 'purple'];
       const known = row.value != null, hasCount = known && row.count > 0;
@@ -100,7 +130,7 @@
       const roleLabel = ({ survival:'生存趣事', defense:'守卫 / 魔术师', kill:'击杀技能', knife:'刀客', gun:'猎人', duel:'骑士' })[group] || row.roleLabel || card.title || titles[group] || '趣味记录';
       return { ...row, key: mode + ':' + row.id, mode, url, hasCount, known,
         title: row.honorTitle || row.label, icon: '/assets/' + image, iconTone,
-        roleLabel: (multipleModes && group !== 'honor' ? (modes[mode] || mode) + ' · ' : '') + roleLabel,
+        roleLabel: (mode === 'all' || (multipleModes && group !== 'honor') ? (modeLabels[mode] || mode) + ' · ' : '') + roleLabel,
         valueLabel: known ? String(row.count) : '—', unit: known ? row.unit || '次' : '',
         color: !hasCount ? 'muted' : group === 'honor' ? row.id === 'honor_mvp' ? 'mvp' : 'svp' : group === 'survival' ? 'purple' : row.id.endsWith('failed') ? 'muted' : positive ? 'good' : 'evil',
         rateLabel, sampleLabel, stateLabel,
@@ -110,7 +140,7 @@
           url: url + '&role=' + encodeURIComponent(role.role),
         })),
       };
-    }));
+    });
     return { tiles, recordedTiles: tiles.filter(row => row.hasCount), totalCount: tiles.length, recordedCount: tiles.filter(row => row.hasCount).length };
   }
   function recordInfo(tile) {
@@ -121,8 +151,7 @@
     if (tile.id.startsWith('assassin_')) content += '空刀不计入刺客的次数和比例。';
     if (tile.id.startsWith('defense_')) content += '守卫需实际挡下伤害；魔术师需通过换号让原目标避开伤害。比例按实际保护总次数计算。';
     if (tile.id.startsWith('kill_')) content += '合并轮内刀、枪、决斗造成的实际出局，按技能发生时的阵营和实际承受者统计；最终刺杀单独记录。';
-    const modes={classic:'经典',knights:'十二骑士',other:'扩展玩法'};
-    const mode=modes[tile.mode],rules=[];
+    const mode=modeLabels[tile.mode],rules=[];
     let description=content;
     if(tile.id==='survival_knifed') {
       description='累计承受轮内刀和最终刀的次数。';
@@ -217,5 +246,5 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, metric, summary, records, recordInfo, story, groupEvents, leaderboard, response };
+  return { labels, titles, honors, metric, summary, records, isCombinedRecord, recordInfo, story, groupEvents, leaderboard, response };
 });

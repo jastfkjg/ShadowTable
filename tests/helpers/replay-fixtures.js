@@ -5,9 +5,8 @@ const ids = variants.decks.knights;
 const metadata = { ...variants.roles, merlin: [roleName("merlin"), "good"], percival: [roleName("percival"), "good"],
   servant: [roleName("servant"), "good"], assassin: [roleName("assassin"), "evil"], mordred: [roleName("mordred"), "evil"], morgana: [roleName("morgana"), "evil"] };
 function run(room, type, extra = {}, uid = room.host) { command(room, uid, { type, stage: room.stage, ...extra }); }
-function setup() {
-  const room = newRoom("123456", "wx:replay-1", "岚", "knights", 12);
-  const names = ["岚", "小鹿", "阿川", "白石", "子龙", "七月", "安", "可乐", "林", "海", "月北", "南风"];
+function setup({ code = "123456", names = ["岚", "小鹿", "阿川", "白石", "子龙", "七月", "安", "可乐", "林", "海", "月北", "南风"] } = {}) {
+  const room = newRoom(code, "wx:replay-1", names[0], "knights", 12);
   for (let i = 2; i <= 12; i++) enter(room, "wx:replay-" + i, names[i - 1]);
   enter(room, "spectator", "围观");
   room.players.forEach(p => p.ready = true);
@@ -46,8 +45,8 @@ function completed() {
   run(room, "finishTools", { scoreReason: "assassination", scoreTarget: 1 });
   return room;
 }
-function onlineCompleted() {
-  const room = setup();
+function onlineCompleted(options) {
+  const room = setup(options);
   run(room, "beginActivity", { kind: "vote", team: [1, 2, 7] });
   submit(room, { 10: "reject", 11: "reject", 12: "reject" });
   task(room, [1, 2, 7]);

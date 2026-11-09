@@ -45,16 +45,19 @@ function matchData(store, uid, id) {
     questTotal: events.filter(row => row.label === "任务成功" || row.label === "任务失败").length };
 }
 function funData(store, uid, input) {
-  check(Object.hasOwn(fun.metrics, input.metric || "") && Object.hasOwn(fun.modes, input.mode || ""), "请选择要分享的趣味指标");
-  const tile = funCopy.records(store.funFor(uid)).tiles.find(row => row.id === input.metric && row.mode === input.mode);
+  const modeLabel = fun.recordModeLabel(input.mode, input.metric);
+  check(Object.hasOwn(fun.metrics, input.metric || "") && modeLabel, "请选择要分享的趣味指标");
+  const splitModes = input.mode !== "all";
+  const tile = funCopy.records(store.funFor(uid), { splitModes }).tiles.find(row => row.id === input.metric && row.mode === input.mode);
   check(tile?.known && tile.knownGames > 0, "这项成绩还没有完整记录，暂时无法分享");
+  const matchCount = store.db.prepare(`SELECT coalesce(sum(count),0) AS n FROM match_fun_stats
+    WHERE uid=? AND match_id=? AND metric=? AND status='known' ${splitModes ? "AND mode=?" : ""}`);
   const records = store.matchesFor(uid, 0, 5, false, { metric: tile.id, mode: tile.mode }).records.map(row => {
-    const count = store.db.prepare("SELECT coalesce(sum(count),0) AS n FROM match_fun_stats WHERE uid=? AND match_id=? AND mode=? AND metric=? AND status='known'")
-      .get(uid, row.id, tile.mode, tile.id).n;
+    const count = matchCount.get(uid, row.id, tile.id, ...(splitModes ? [tile.mode] : [])).n;
     return { boardName: clean(row.boardName), role: clean(row.role), faction: row.faction, endedAt: row.endedAt, count };
   });
   const info = funCopy.recordInfo(tile);
-  return { metric: tile.id, mode: tile.mode, modeLabel: fun.modes[tile.mode], label: clean(tile.title), roleLabel: clean(tile.roleLabel),
+  return { metric: tile.id, mode: tile.mode, modeLabel, label: clean(tile.title), roleLabel: clean(tile.roleLabel),
     icon: tile.icon, iconTone: tile.iconTone, unit: tile.unit, count: tile.count, opportunities: tile.opportunities,
     knownGames: tile.knownGames, countOnly: !!tile.countOnly, rate: tile.countOnly ? null : tile.rate,
     rateName: tile.rateLabel ? tile.rateLabel.slice(0, tile.rateLabel.indexOf(" ")) : "发生率",
@@ -67,7 +70,7 @@ function matchesData(store, uid, input) {
   const filters = require("./match-filters").parseMatchFilters(new URLSearchParams(raw), store.clock());
   const f = input.fun;
   if (f !== undefined) check(f && typeof f === "object" && !Array.isArray(f) && Object.keys(f).every(key => ["metric", "mode", "role"].includes(key))
-    && typeof f.metric === "string" && typeof f.mode === "string" && Object.hasOwn(fun.metrics, f.metric) && Object.hasOwn(fun.modes, f.mode)
+    && typeof f.metric === "string" && typeof f.mode === "string" && Object.hasOwn(fun.metrics, f.metric) && fun.recordModeLabel(f.mode, f.metric)
     && (f.role === undefined || f.role === "" || typeof f.role === "string" && /^[A-Za-z]{1,32}$/.test(f.role)), "对局分享筛选无效");
   const result = store.matchesFor(uid, 0, 5, !!input.scored, f || null, filters, null, true);
   check(result.total > 0, "当前范围还没有可分享的对局");
@@ -80,7 +83,7 @@ function matchesData(store, uid, input) {
   if (filters.role) scopes.push(clean(filters.role));
   if (filters.outcome) scopes.push(({ win: "胜利", loss: "失利", excluded: "不计入战绩" })[filters.outcome]);
   if (input.scored) scopes.push("已计分");
-  if (f) scopes.push(fun.modes[f.mode], clean(funCopy.honors[f.metric]?.title || fun.metrics[f.metric].label), ...(f.role ? [f.role] : []));
+  if (f) scopes.push(fun.recordModeLabel(f.mode, f.metric), clean(funCopy.honors[f.metric]?.title || fun.metrics[f.metric].label), ...(f.role ? [f.role] : []));
   return { ...result.summary, scope: scopes.join(" · "), records: result.records.map(row => ({
     boardName: clean(row.boardName), role: clean(row.role), faction: row.faction, endedAt: row.endedAt, outcome: row.outcome,
     score: row.score?.status === "scored" ? row.score.total : null,

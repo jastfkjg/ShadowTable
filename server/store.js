@@ -587,8 +587,11 @@ class Store {
     if (filters.role) { filter += " AND json_extract(p.snapshot,'$.role')=?"; args.push(filters.role); }
     if (filters.outcome) { filter += " AND p.outcome=?"; args.push(filters.outcome); }
     if (funFilter) {
-      filter += " AND p.outcome IN ('win','loss') AND EXISTS (SELECT 1 FROM match_fun_stats f WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.mode=? AND f.status='known' AND f.count>0" + (funFilter.role ? " AND f.role=?" : "") + ")";
-      args.push(funFilter.metric, funFilter.mode, ...(funFilter.role ? [funFilter.role] : []));
+      const allModes = funFilter.mode === "all";
+      filter += ` AND p.outcome IN ('win','loss') AND EXISTS (SELECT 1 FROM match_fun_stats f
+        WHERE f.match_id=p.match_id AND f.uid=p.uid AND f.metric=? AND f.status='known' AND f.count>0
+        ${allModes ? "" : "AND f.mode=?"}${funFilter.role ? " AND f.role=?" : ""})`;
+      args.push(funFilter.metric, ...(allModes ? [] : [funFilter.mode]), ...(funFilter.role ? [funFilter.role] : []));
     }
     if (focusId) {
       const target = this.db.prepare("SELECT p.ended,p.match_id FROM visible_match_players p WHERE p.uid=?" + filter + " AND p.match_id=?").get(...args, focusId);

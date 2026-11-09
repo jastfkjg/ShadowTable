@@ -1,10 +1,12 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
 const VERSION = "fun-2026-10-v4";
-const { labels, titles, honors } = require("../miniprogram/fun-copy");
+const { labels, titles, honors, isCombinedRecord } = require("../miniprogram/fun-copy");
 const { roles: variantRoles } = require("./variants");
 const bRoles = new Set(Object.keys(variantRoles).slice(Object.keys(variantRoles).indexOf("blueAwakened")));
 const modes = { voted: "玩家票选", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
+const recordModeLabel = (mode, metric) =>
+  mode === "all" && isCombinedRecord(metric) ? "全部玩法" : Object.hasOwn(modes, mode) ? modes[mode] : null;
 const modeFor = (board) =>
   /^knights(?:-|$)/.test(board)
     ? "knights"
@@ -611,6 +613,7 @@ function publicMetrics() {
 module.exports = {
   VERSION,
   modes,
+  recordModeLabel,
   metrics,
   combatType,
   canHarm,

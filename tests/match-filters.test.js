@@ -105,6 +105,20 @@ test("HTTP筛选兼容计分与趣味角色回查，拒绝重复和越权参数"
     assert.equal(result.status, 200); assert.equal(result.body.total, 1);
     assert.equal(result.body.records[0].role, "魔术师"); assert.equal(result.body.filterOptions.roles[0].id, "魔术师");
     assert.equal(result.body.adjustments, undefined);
+    const write = app.store.db.prepare("INSERT INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)");
+    for (const [id, mode, count, status] of [
+      ["hit-classic", "classic", 1, "known"], ["hit-knights", "knights", 1, "known"],
+      ["unknown-knights", "knights", 1, "unknown"], ["evaded", "classic", 0, "known"],
+    ]) {
+      archive(app.store, id, { uid, board: mode, endedAt: now - 1 });
+      write.run(id, uid, mode, "merlin_hit", "merlin", "梅林", count, 1, status, now - 1);
+    }
+    const allHits = await get("fun=merlin_hit&mode=all");
+    assert.equal(allHits.status, 200);
+    assert.deepEqual(allHits.body.records.map(row => row.id), ["hit-knights", "hit-classic"]);
+    for (const suffix of ["mode=classic", "mode=all&board=classic"])
+      assert.deepEqual((await get("fun=merlin_hit&" + suffix)).body.records.map(row => row.id), ["hit-classic"]);
+    assert.equal((await get("fun=knife_enemy&mode=all")).status, 400);
     assert.equal((await get("offset=0")).status, 200);
     for (let i = 0; i < 30; i++) archive(app.store, "newer-" + i, { uid, endedAt: now + i + 1 });
     const focus = await get("offset=0&focus=fun");

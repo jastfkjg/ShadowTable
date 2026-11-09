@@ -22,6 +22,11 @@ const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/core-pages-implemented"));
+// Public README scenes use their own names and room codes from the start.
+const readmeRoom = {
+  code: "DEMO01",
+  names: Array.from({ length: 12 }, (_, index) => "演示玩家 " + String(index + 1).padStart(2, "0")),
+};
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
@@ -84,10 +89,13 @@ function write(name, file, data, styles, extra = "") {
 // Browser projection of the native selector-query measurement, not app behavior.
 const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');sheet.classList.remove('is-measuring');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
 const store = new Store(":memory:");
-let raw, online;
+let raw, online, readmeReplay;
 try {
   const room = completed(); store.save(room); raw = store.replayFor("wx:replay-5", room.matchRecord.id);
   const onlineRoom = onlineCompleted(); store.save(onlineRoom); online = store.replayFor("wx:replay-5", onlineRoom.matchRecord.id);
+  const demo = onlineCompleted(readmeRoom);
+  store.save(demo);
+  readmeReplay = store.replayFor("wx:replay-5", demo.matchRecord.id);
 } finally { store.close(); }
 const legacy = { ...raw, endedAt: Date.parse("2026-10-11T23:33:00+08:00"), status: "legacy", winner: null,
   message: "旧对局未保存完整复盘，仅展示已有记录；缺失过程不作推测。",
@@ -102,6 +110,7 @@ long.boardName = "阿瓦隆 · 十二骑士与扩展角色配置测试";
 long.self.name = "昵称较长的玩家名字测试";
 for (const p of [...long.initialPlayers, ...long.finalPlayers]) p.name = "昵称较长的玩家名字测试";
 const replayScenes = {
+  "readme-replay": presentReplay({ ...readmeReplay, endedAt: Date.parse("2026-11-03T20:30:00+08:00") }, "mine", ["round-1"]),
   replay: presentReplay(legacy), "replay-complete": presentReplay(raw), "replay-round": presentReplay(online, "global", ["round-1", "round-2", "round-3"]),
   "replay-mine": presentReplay(raw, "mine", ["round-1"]), "replay-player": { ...presentReplay(raw), playerDetail: trajectory(raw, 7) },
   "replay-final": { ...presentReplay(raw), playersExpanded: true }, "replay-unknown": presentReplay(unknown),
@@ -144,7 +153,12 @@ for (const [name, data] of Object.entries({
 const homeBase = { ...createTable({ lobby: true }).data, loading: false, serverConnected: true };
 const room = (code, status, people, relation, activity, extra = {}) => ({ code, status, statusLabel: status === "lobby" ? "待开局" : status === "playing" ? "进行中" : "已结束", boardName: "阿瓦隆 · 十二骑士", peopleLabel: people, compactRelation: relation, activityLabel: activity, entryLabel: status === "ended" ? "查看牌桌" : "返回牌桌", available: true, updatedAt: 1, canSwipeDissolve: true, isHost: true, isMember: true, canLeave: true, ...extra });
 const rooms = [room("201375", "lobby", "12/12 人已入座", "我是房主 · 1号", "今天 15:50"), room("534718", "lobby", "1/12 人已入座", "我是房主 · 1号", "10/13 14:53"), room("273843", "ended", "11 人", "房主：大V · 我在4号", "10/11 23:33", { boardName: "阿瓦隆 · 十二骑士（11人）", isHost: false, canSwipeDissolve: false })];
+const readmeRooms = [
+  room(readmeRoom.code, "playing", "12 人", "我在 5 号", "今天 20:30", { isHost: false, canSwipeDissolve: false }),
+  room("DEMO02", "lobby", "4/6 人已入座", "我是房主 · 1 号", "今天 19:15", { boardName: "阿瓦隆 · 经典基础" }),
+];
 const homeScenes = {
+  "readme-lobby": { memberRooms: readmeRooms, visibleMemberRooms: readmeRooms },
   "home-minimal": { memberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "22:10"), room("514047", "lobby", "1/6人已入座", "我是房主 · 1号", "22:11", { boardName:"阿瓦隆 · 经典基础" })], visibleMemberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "22:10"), room("514047", "lobby", "1/6人已入座", "我是房主 · 1号", "22:11", { boardName:"阿瓦隆 · 经典基础" })] },
   "home-brand-fallback": { homeWordmarkFailed:true },
   "home-crayon": { memberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "15:27"), room("993636", "lobby", "7/10人已入座", "房主：大V · 我在8号", "昨天23:03", { boardName:"阿瓦隆 · 十二骑士（10人）", isHost:false, canSwipeDissolve:false })], visibleMemberRooms: [room("858201", "playing", "12人", "我是房主 · 1号", "15:27"), room("993636", "lobby", "7/10人已入座", "房主：大V · 我在8号", "昨天23:03", { boardName:"阿瓦隆 · 十二骑士（10人）", isHost:false, canSwipeDissolve:false })] },
@@ -275,6 +289,12 @@ function tableScene(source, uid, extra = {}) {
 const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
+const readmeTable = tableFixtures.setup(readmeRoom);
+tableFixtures.task(readmeTable, [1, 2, 3]);
+const readmeTableScene = tableScene(readmeTable, 'wx:replay-5', { historyUnreadCount: 1 });
+for (const seat of readmeTableScene.seats) {
+  seat.avatarUrl = `/pages/profile/assets/avatars/geometric-${String(seat.seat).padStart(2, "0")}.jpg`;
+}
 const privateSource = privateView(tableSource,'wx:replay-5');
 const privateData = {...privateSource, factionTone:'good',portrait:portrait(privateSource.role,'good').portrait,vision:presentVision(privateSource.information,tablePlaying.seats)};
 const tableReadySource = newRoom('201375','host','子龙','knights',12);
@@ -308,6 +328,7 @@ const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,win
   {faction:'good',label:'好人阵营',total:6,wins:2,winRate:100/3,rateLabel:'33.3%',rateValue:'33.3'}]};
 const playerSample = {name:'阿伟',initial:'阿',seat:6,badges:badgeSamples};
 const tableScenes = {
+  'readme-table': readmeTableScene,
   'player-card-a': {...tablePlaying, playerCard: {...playerSample, name:'大V', initial:'大', seat:1, isHost:true, avatarUrl:'/pages/profile/assets/avatars/crayon-07.jpg'},
     playerCardStats: {scoreTotal:27,rateLabel:'55.6%',rateValue:'55.6',total:18,wins:10,byFaction:[
       {faction:'evil',label:'坏人阵营',total:5,wins:4,rateValue:'80.0'},

@@ -5,11 +5,12 @@
 <h1 align="center">桌边助手 · ShadowTable</h1>
 
 <p align="center"><strong>线下讨论，线上发牌。</strong></p>
-<p align="center">为面对面阿瓦隆准备：私密发牌、秘密投票、任务与技能结算，<br>以及散场之后的战绩、复盘、荣誉与月度战报。</p>
-<p align="center">微信小程序 + 网页版 · 5–13 人 · 6 类玩法 · 可自部署</p>
+<p align="center">面对面玩阿瓦隆时，用手机查看身份、提交投票和任务牌。<br>散场后可以回看对局、查战绩和分享月报。</p>
+<p align="center">微信小程序与网页版 · 5–13 人 · 6 类玩法 · 支持自部署</p>
 
 <p align="center">
   <a href="#快速上手">快速上手</a> ·
+  <a href="#界面预览">界面预览</a> ·
   <a href="#功能亮点">功能亮点</a> ·
   <a href="#支持的玩法">支持的玩法</a> ·
   <a href="#本地开发">本地开发</a> ·
@@ -17,9 +18,26 @@
   <a href="#项目文档">项目文档</a>
 </p>
 
+## 快速上手
+
+<p align="center">
+  <img src="docs/images/miniprogram-qrcode.jpg" alt="桌边助手微信小程序码，使用微信扫码打开" width="180" height="180">
+  <br>
+  <sub>微信扫码，创建或加入牌桌</sub>
+</p>
+
+1. **组一桌**：房主选择人数与板子，朋友通过邀请或 6 位房间码加入。
+2. **入座发牌**：选择座位并准备；满座且全员准备后，房主发牌，每人在自己的手机上查看身份与初始视野。
+3. **面对面玩**：线下讨论，房主按现场进度发起组队投票、任务出牌或技能。组队票结算后公开，任务牌只展示汇总。
+4. **结算再开**：线下完成最终盘刀，由房主登记结果或选择“不计战绩”。同桌重新准备即可再开，个人战绩与复盘在「我的」查看。
+
+准备阶段可换座或站起围观；满座、游戏进行中及本局结束后，新成员均可加入旁观，重开后再手动入座。切换牌桌或返回大厅会保留当前座位。
+
+> **按现场节奏使用。** 系统辅助发牌与操作结算，整局由房主手动结束。三次任务成功／失败、连续否决或单次技能结果不会自动结束整局；最终刀梅林在线下进行。
+
 ## 界面预览
 
-深蓝牌桌、蜡笔角色与暗金荣誉。点击图片可查看大图。
+下方六张图由当前小程序模板和专用演示数据生成。玩家昵称、房间码、对局和统计均为虚构，头像来自内置素材。点击图片可查看大图。
 
 <table>
   <tr>
@@ -38,41 +56,22 @@
     <th align="center">荣誉收藏</th>
   </tr>
   <tr>
-    <td width="33%" align="center"><a href="docs/images/preview-replay.webp"><img src="docs/images/preview-replay.webp" alt="对局复盘：全局与我的视角、分轮过程和身份轨迹" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-replay.webp"><img src="docs/images/preview-replay.webp" alt="对局复盘：结算结果、我的视角和每轮过程" width="260"></a></td>
     <td width="33%" align="center"><a href="docs/images/preview-monthly.webp"><img src="docs/images/preview-monthly.webp" alt="月度战报：月份选择、有效对局与参赛人数、综合榜单" width="260"></a></td>
-    <td width="33%" align="center"><a href="docs/images/preview-badges.webp"><img src="docs/images/preview-badges.webp" alt="荣誉收藏：已佩戴徽章、收藏筛选与徽章获取条件" width="260"></a></td>
+    <td width="33%" align="center"><a href="docs/images/preview-badges.webp"><img src="docs/images/preview-badges.webp" alt="荣誉收藏：名片佩戴、月榜与永久徽章" width="260"></a></td>
   </tr>
 </table>
-
-预览由当前小程序 WXML / WXSS 模板与示例数据生成；微信原生组件的实际表现以开发者工具和真机为准。
-
-## 快速上手
-
-<p align="center">
-  <img src="docs/images/miniprogram-qrcode.jpg" alt="桌边助手微信小程序码，使用微信扫码打开" width="180" height="180">
-  <br>
-  <sub>微信扫码，创建或加入牌桌</sub>
-</p>
-
-1. **组一桌**：房主选择人数与板子，朋友通过邀请或 6 位房间码加入。
-2. **入座发牌**：选择座位并准备；满座且全员准备后，房主发牌，每人在自己的手机上查看身份与初始视野。
-3. **面对面玩**：线下讨论，房主按现场进度发起投票、任务或技能；提交收齐后自动结算。
-4. **结算再开**：线下完成最终盘刀，由房主登记结果或选择“不计战绩”；同桌重新准备即可再开，个人战绩与复盘在“我的”查看。
-
-准备阶段可换座或站起围观；满座、游戏进行中及本局结束后，新成员均可加入旁观，重开后再手动入座。切换牌桌或返回大厅会保留当前座位。
-
-> **按现场节奏使用。** 系统辅助发牌与操作结算，整局由房主手动结束。三次任务成功／失败、连续否决或单次技能结果不会自动结束整局；最终刀梅林在线下进行。
 
 ## 功能亮点
 
 | 场景 | 可以做什么 |
 | --- | --- |
-| **私密身份与视野** | 本人主动揭示身份、初始互认与技能视野；小程序进入后台后遮盖私密内容，房主也不能查询全员身份或秘密提交。 |
+| **私密身份与视野** | 本人主动揭示身份、初始互认与技能视野，可展开角色说明。小程序进入后台后遮盖私密内容，房主只能看提交进度。 |
 | **投票、任务与技能** | 按现场节奏发起操作，查看提交进度，收齐后自动结算；选择任务队员与失败票门槛，十二骑士支持同时技能、换牌与复活。 |
 | **多人多桌** | 邀请好友、旁观、换座、房主转交与同房重开；最近牌桌、个人备注、左滑管理和历史牌桌方便聚会时切换。 |
 | **战绩与复盘** | 组合筛选时间、板子、角色、胜负、计分与趣味条件；按阵营和角色查看统计，回看分轮过程与身份变化轨迹。 |
-| **积分与排行榜** | 月度积分、明细流水、公开榜单、趣味记录与 MVP / SVP 票选；查看本人上榜进度，生成排行榜成绩分享图。 |
-| **荣誉与月报** | 18 枚月榜徽章与 5 枚永久内测纪念徽章，最多佩戴 3 枚；月报分综合榜单、趣味荣誉和娱乐榜，可导出完整分享长图。 |
+| **积分与排行榜** | 查看月度积分、明细流水、公开榜单、趣味记录与 MVP / SVP 票选。积分榜支持「本月」和「最近」，后者展示最近有有效计分对局的一天。 |
+| **荣誉与分享** | 收藏 18 枚月榜徽章与 5 枚永久纪念徽章，可在玩家名片上佩戴至多 3 枚。支持生成排行榜成绩图和完整月报长图。 |
 | **个人资料与回避卡** | 160 款内置头像，可选开启自定义上传；发牌前选择不想抽到的角色，实际避开才扣卡，支持管理员发放与累计胜负奖励。 |
 | **个人数据管理** | 按月预览并清除本人的战绩、积分与趣味统计贡献，榜单同步重算；已发永久徽章、回避卡及同桌玩家记录保留。 |
 
@@ -149,18 +148,19 @@ npm run check    # 主要服务端与客户端脚本语法检查
 CI 还会检查部署脚本与容器流程；自动化覆盖及需要真机验收的范围见 [验证记录](docs/verification.md)。
 
 <details>
-<summary>生成页面预览</summary>
+<summary>更新 README 预览图</summary>
 
-安装依赖后，使用现有脚本从小程序模板生成静态 HTML：
+安装依赖后，从小程序模板生成静态 HTML。
 
 ```sh
-node scripts/render-core-pages-preview.js  # 大厅、牌桌与复盘
-node scripts/render-stats-preview.js       # 个人战绩与趣味记录
-node scripts/render-monthly-preview.js     # 月报页面与分享长图
-node scripts/render-badges-preview.js      # 荣誉收藏与玩家战绩卡
+preview_dir=output/playwright/readme
+node scripts/render-core-pages-preview.js "$preview_dir/core"
+node scripts/render-stats-preview.js "$preview_dir/stats"
+node scripts/render-monthly-preview.js "$preview_dir/monthly"
+node scripts/render-badges-preview.js "$preview_dir/badges"
 ```
 
-产物位于 `output/playwright/`，仅用于布局检查。README 预览图统一使用 390 × 844 的视口，以 2 倍分辨率保存为 WebP，存放于 `docs/images/`。静态预览不连接真实牌桌，也不代替微信原生交互验收。
+公开截图取用 `core/readme-lobby.html`、`core/readme-table.html`、`core/readme-replay.html`，以及 `stats/`、`monthly/`、`badges/` 下各自的 `readme.html`。这些场景只用代码中的演示样本，复盘在内存 SQLite 中生成。截图使用 390 × 844 的视口，标注「演示数据」，以 780 × 1688 的 WebP 保存到 `docs/images/`。发布前检查可见昵称、头像、房间码和战绩。原生交互仍以微信开发者工具和真机为准。
 
 </details>
 

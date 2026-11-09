@@ -6,7 +6,7 @@ const { wxmlToJs } = require('miniprogram-compiler');
 const { presentStats, presentMatches, presentProfile, presentFun } = require('../miniprogram/profile');
 const createHistory = require('../miniprogram/pages/matches/controller');
 const root = path.resolve(__dirname, '../miniprogram');
-const output = path.resolve(__dirname, '../output/playwright/stats');
+const output = path.resolve(process.argv[2] || path.join(__dirname, '../output/playwright/stats'));
 const context = { window: {}, global: {}, console };
 vm.createContext(context);
 const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
@@ -97,7 +97,25 @@ const timelineEvents = [
   ...[1,2,3].map(round=>({id:'attack-'+round,round,kind:round===3?'duel':'knife',role:['蓝刀客·加雷斯','觉醒蓝刀客','红骑士'][round-1],label:round===3?'未生效':'刀中友方',detail:round===3?'5号同阵营 · 决斗失败':(round+1)+'号同阵营 · 目标出局'})),
 ];
 const timelineRecord = {...presentMatches([{...match,id:'timeline',role:'红骑士',faction:'evil',outcome:'loss',winner:'good',endedAt:new Date(2026,9,16,20,38).getTime(),score:{status:'scored',total:0,breakdown:[]},fun:{status:'recorded',initialRole:'蓝刀客·加雷斯',events:timelineEvents},members:Array.from({length:12},(_,i)=>({seat:i+1,name:i?'同桌玩家'+(i+1):'林间'}))}])[0],expanded:true};
+const readmeStats = presentStats({
+  total: 20, wins: 12, losses: 8, winRate: 60,
+  score: { total: 32, month: 32, games: 18, average: 32 / 18 },
+  byFaction: [
+    { faction: 'good', label: '好人阵营', total: 12, wins: 8, losses: 4, winRate: 66.7 },
+    { faction: 'evil', label: '坏人阵营', total: 8, wins: 4, losses: 4, winRate: 50 },
+  ],
+  byRole: [
+    { role: '梅林', faction: 'good', total: 4, wins: 3, winRate: 75 },
+    { role: '派西维尔', faction: 'good', total: 3, wins: 2, winRate: 66.7 },
+    { role: '亚瑟的忠臣', faction: 'good', total: 5, wins: 3, winRate: 60 },
+    { role: '莫甘娜', faction: 'evil', total: 3, wins: 2, winRate: 66.7 },
+    { role: '刺客', faction: 'evil', total: 3, wins: 1, winRate: 33.3 },
+    { role: '莫德雷德', faction: 'evil', total: 2, wins: 1, winRate: 50 },
+  ],
+  byBoard: [], recent: [],
+});
 const scenes = {
+  readme: { tab: 'records', statistics: { stats: readmeStats } },
   overview: {tab:'records',statistics:{stats}}, fun: {tab:'fun',statistics:{stats}},
   'fun-compact': {tab:'fun',statistics:{stats:compactStats}},
   'fun-compact-roles': {tab:'fun',statistics:{stats:compactStats,funRoles:{'knights:knife_enemy':true,'knights:kill_enemy':true}}},

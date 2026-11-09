@@ -119,6 +119,16 @@ test("趣味分享沿用真实次数和分母，保留零值、忽略未知样�
     assert.equal(shared.data.count, 2); assert.equal(shared.data.opportunities, 3); assert.equal(shared.data.rate, 66.7);
     assert.equal(shared.data.records[0].count, 2);
     assert.doesNotMatch(JSON.stringify(shared), /PRIVATE-|private-|uid|members|information|actor/);
+    const knights = seed(store, randomUUID(), { board: "knights", endedAt: NOW - 1 });
+    store.db.prepare("INSERT INTO match_fun_stats VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .run(knights, UID, "knights", "merlin_evade", "merlin", "梅林", 1, 1, "known", NOW - 1);
+    const combined = { metric: "merlin_evade", mode: "all" };
+    const combinedShare = shares.create(store, UID, { kind: "fun", ...combined }).data;
+    assert.deepEqual([combinedShare.count, combinedShare.opportunities, combinedShare.rate], [3, 4, 75]);
+    assert.deepEqual(combinedShare.records.map(record => record.count), [2, 1]);
+    const matchShare = shares.create(store, UID, { kind: "matches", fun: combined }).data;
+    assert.equal(matchShare.total, 2);
+    assert.match(matchShare.scope, /全部玩法 · 闪身步大神/);
     write(0, 0, "unknown");
     assert.throws(() => shares.create(store, UID, { kind: "fun", metric: "merlin_evade", mode: "classic" }), /没有完整记录/);
     assert.equal(shares.read(store, shared.id).data.count, 2);

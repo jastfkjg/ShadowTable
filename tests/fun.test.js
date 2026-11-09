@@ -250,7 +250,13 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
       assert.equal(read("&mode=classic&sort=rate").me.status, "ranked");
       assert.doesNotMatch(JSON.stringify(rates), /wx:|"uid"|target|events/);
       const stats = require("../miniprogram/profile").presentStats(store.statsFor(uid));
-      assert.equal(stats.fun.tiles.find(row => row.id === metric && row.hasCount).color, "evil");
+      const tiles = stats.fun.tiles.filter(row => row.id === metric);
+      assert.equal(tiles.find(row => row.hasCount).color, "evil");
+      if (metric !== "assassin_miss") {
+        assert.equal(tiles.length, 1);
+        const [tile] = tiles;
+        assert.deepEqual([tile.mode, tile.count, tile.opportunities, tile.rate], ["all", count, opportunities, rate]);
+      }
     }
     store.transaction(() => saveProfile(store, "wx:6", {
       nickname: "刺客", version: readProfile(store, "wx:6").version, leaderboardVisible: false,

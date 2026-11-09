@@ -5,7 +5,8 @@ const vm = require("node:vm");
 const { wxmlToJs } = require("miniprogram-compiler");
 const monthly = require("../miniprogram/monthly-report");
 const { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
-const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(__dirname, "../output/playwright/monthly");
+const root = path.resolve(__dirname, "../miniprogram");
+const output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/monthly"));
 const context = { window: {}, global: {}, console }; vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
 const safe = value => String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -33,6 +34,20 @@ for (const board of [...fixture.mainBoards, ...fixture.funBoards]) for (const ro
 }
 const report = monthly.presentReport(fixture);
 const data = { month: report.month, report, loading: false, error: "", category: "overall", navTop: 68, entertainment: false, detailBoards: monthly.detailBoards(report), shareOpening: false };
+// Only the authored test data feeds this public scene. Use seat-like aliases
+// and built-in illustrations instead of the review scenes' reference names.
+const readmeFixture = monthlyFixture();
+for (const board of [...readmeFixture.mainBoards, ...readmeFixture.funBoards]) {
+  for (const row of board.rows) {
+    const index = Number(row.publicId.slice(-2));
+    const avatar = avatars.find(item => item.id === "geometric-0" + index);
+    row.publicId = "demo-player-" + index;
+    row.nickname = "演示玩家 " + String(index).padStart(2, "0");
+    row.avatarSrc = avatar.path;
+  }
+}
+readmeFixture.highlights = [];
+const readmeReport = monthly.presentReport(readmeFixture);
 const approvedFixture = structuredClone(fixture);
 approvedFixture.month = "2026-10"; approvedFixture.status = "preview"; approvedFixture.overview = { games: 19, players: 24, activeDays: 6 }; approvedFixture.asOf = Date.parse("2026-10-29T09:30:00Z");
 const approvedAvatars = { "元":10, "子龙":7, "阿伟":3, "阿宁":16, "ViVi":1, "大V":15 };
@@ -54,6 +69,7 @@ sparseFixture.mainBoards.slice(1).forEach(board => { board.rows = []; });
 const sparseNames = { merlin_evade: [["月下江头",1],["阿伟",1]], assassin_hit: [["元",2]], defense_ally: [["子龙",1],["阿伟",1]] };
 sparseFixture.funBoards.forEach(board => { board.rows = board.sort === "count" && sparseNames[board.metric] ? sparseNames[board.metric].map(([nickname,count],i) => ({ ...board.rows[0], publicId: board.id+i, nickname, count, rank: 1, tied: sparseNames[board.metric].length>1, avatarUrl: null, avatarSrc: "" })) : []; });
 const scenes = {
+  readme: { ...data, report: readmeReport, detailBoards: monthly.detailBoards(readmeReport) },
   summary: data,
   approved: { ...data, month: approvedReport.month, report: approvedReport, detailBoards: monthly.detailBoards(approvedReport) },
   honors: { ...data, category: "honors" },

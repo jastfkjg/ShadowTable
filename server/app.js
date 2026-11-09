@@ -441,7 +441,7 @@ function createApp({
         const scored = requestUrl.searchParams.get("scored") || "0";
         check(["0", "1"].includes(scored), "对局记录筛选无效");
         const metric = requestUrl.searchParams.get("fun"), mode = requestUrl.searchParams.get("mode") || "classic", role = requestUrl.searchParams.get("role") || null;
-        check(!metric || Object.hasOwn(fun.metrics,metric) && Object.hasOwn(fun.modes,mode) && (!role || /^[A-Za-z]{1,32}$/.test(role)), "趣味记录筛选无效");
+        check(!metric || Object.hasOwn(fun.metrics,metric) && fun.recordModeLabel(mode,metric) && (!role || /^[A-Za-z]{1,32}$/.test(role)), "趣味记录筛选无效");
         check(metric || !requestUrl.searchParams.has("mode") && !role, "趣味记录筛选无效");
         const filters = require("./match-filters").parseMatchFilters(requestUrl.searchParams, store.clock());
         const result=store.matchesFor(uid, Number(rawOffset), 20, scored === "1", metric ? {metric,mode,role} : null, filters, focus);
