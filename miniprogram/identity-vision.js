@@ -2,6 +2,7 @@
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.shadowtableIdentityVision = factory();
 })(typeof window !== "undefined" ? window : this, function () {
+  const summaryLabels = new Map([["任务出牌", "任务"], ["阵营转换", "转换"]]);
   // Format only information already disclosed by the private endpoint. Never
   // join public seats with hidden roles or assign identities to ambiguous seats.
   function parse(information) {
@@ -94,7 +95,14 @@
       }
     }
     ability = roleAbility || ability;
-    return { vision, passive, fairy, inspections, ability,
+    const openingVision = vision.empty ? roleAbility?.lines.find(line => line.label === "初始视野")?.text : "";
+    const summary = roleAbility ? [
+      { label: "能力", text: roleAbility.brief },
+      ...roleAbility.lines.filter(line => summaryLabels.has(line.label))
+        .map(line => ({ label: summaryLabels.get(line.label), text: line.text })),
+    ] : [];
+    return { vision, passive, fairy, inspections, ability, summary,
+      summaryVision: openingVision?.replace(/^没有初始视野，/, "无初始视野，") || vision.text,
       showRoleHelp: secret.knightBCard === true && !!secret.skillStatus && !!ability,
       showVision: !!passive || (!!text && !(vision.empty && inspections.length)) };
   }

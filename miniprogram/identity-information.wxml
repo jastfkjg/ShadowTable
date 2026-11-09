@@ -16,7 +16,7 @@
               <view wx:if="{{item.name || item.role}}" class="identity-info-player-copy"><text wx:if="{{item.name}}" class="identity-info-name">{{item.name}}</text><text wx:if="{{item.role}}" class="identity-info-role">{{item.role}}</text></view>
             </view>
           </view>
-          <view wx:else class="identity-info-text">{{info.vision.text}}</view>
+          <view wx:else class="identity-info-text">{{summarize?info.summaryVision:info.vision.text}}</view>
           <view wx:if="{{info.vision.note}}" class="identity-info-note">{{info.vision.note}}</view>
         </block>
       </view>
@@ -31,7 +31,10 @@
         <view class="identity-info-heading">仙女查验</view>
         <view class="identity-info-fairy-result"><text class="identity-info-seat">{{info.fairy.seat}}<text class="identity-info-unit">号</text></text><text class="identity-info-value faction-{{info.fairy.tone}}">{{info.fairy.faction}}</text></view>
       </view>
-      <view wx:if="{{info.ability && !compact}}" class="identity-info-section">
+      <view wx:if="{{summarize && info.summary.length}}" class="identity-info-section identity-info-preview">
+        <view wx:for="{{info.summary}}" wx:key="label" class="identity-info-ability"><text class="identity-info-heading">{{item.label}}</text><text>{{item.text}}</text></view>
+      </view>
+      <view wx:if="{{info.ability && !compact && !summarize}}" class="identity-info-section">
         <view class="identity-info-heading">角色能力</view>
         <template is="identityRoleAbility" data="{{ability:info.ability}}" />
       </view>
@@ -40,20 +43,20 @@
   </view>
 </template>
 <template name="identityRoleAbility">
-  <view wx:if="{{ability.brief}}" class="identity-info-brief">{{ability.brief}}</view>
+  <view wx:if="{{ability.brief && !summarized}}" class="identity-info-brief">{{ability.brief}}</view>
   <view wx:for="{{ability.lines}}" wx:key="index" class="identity-info-ability {{ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{ability.structured?'：':''}}</text><text>{{item.text}}</text></view>
   <view wx:if="{{ability.note}}" class="identity-info-note">{{ability.structured?'注意：':''}}{{ability.note}}</view>
 </template>
 <template name="identitySkillStatus">
-  <view wx:if="{{status}}" class="compact-skill-status {{ability?'has-role-help':''}}">
+  <view wx:if="{{status || ability}}" class="compact-skill-status {{ability?'has-role-help':''}}">
     <view class="compact-skill-heading">
-      <image src="/assets/record-spark.svg" aria-hidden="true" />
-      <text class="compact-skill-label">技能状态</text><text class="compact-skill-value">{{status.title}}</text>
-      <button wx:if="{{ability}}" class="disclosure-button identity-help-toggle" hover-class="none" bindtap="toggleIdentityHelp" aria-expanded="{{helpExpanded}}">
+      <block wx:if="{{status}}"><image src="/assets/record-spark.svg" aria-hidden="true" />
+      <text class="compact-skill-label">技能状态</text><text class="compact-skill-value">{{status.title}}</text></block>
+      <button wx:if="{{ability}}" class="disclosure-button identity-help-toggle" hover-class="none" bindtap="toggleIdentityHelp" data-surface="{{surface}}" aria-expanded="{{helpExpanded}}">
         <text>角色说明</text><view class="identity-help-chevron {{helpExpanded?'is-expanded':''}}" aria-hidden="true" />
       </button>
     </view>
     <view wx:if="{{status.detail}}" class="identity-info-note">{{status.detail}}</view>
-    <view wx:if="{{ability && helpExpanded}}" class="identity-help-body"><template is="identityRoleAbility" data="{{ability}}" /></view>
+    <view wx:if="{{ability && helpExpanded}}" class="identity-help-body"><template is="identityRoleAbility" data="{{ability, summarized:surface==='dealt' || surface==='change'}}" /></view>
   </view>
 </template>

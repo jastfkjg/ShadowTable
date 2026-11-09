@@ -42,7 +42,7 @@
     pass: "不使用技能 / 确认",
   };
   // Derive private skill controls only from the server's allowed choices.
-  function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavailableHint = "") {
+  function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavailableHint = "", swordHint = "") {
     const fairyAction = room.phase === "fairy";
     const finalAction = !!room.knights && ["assassination", "reverseStrike"].includes(room.phase) && choices.some(c => /^target:\d+$/.test(c.value));
     const skillAction = fairyAction || finalAction || ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
@@ -87,6 +87,7 @@
       skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
         (finalAction ? "最终盘刀" : "技能准备") : "",
       skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
+      skillSwordHint: swordHint,
       skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
       skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
       skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
@@ -620,7 +621,7 @@
     draftLabel: "",
     stagedChoice: false,
     skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -1614,7 +1615,7 @@
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -1910,7 +1911,7 @@ function roomListItems(rooms) {
       patch.skillTargets = [];
       patch.skillBodyHeight = 0;
       patch.skillOtherChoices = [];
-      Object.assign(patch, { skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "" });
+      Object.assign(patch, { skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "" });
       patch.swapOptions = [];
       patch.swapSeats = [];
       patch.swapPlayers = [];
@@ -2927,10 +2928,16 @@ function roomListItems(rooms) {
       setState({ busy: false });
     }
   }
-  function toggleIdentityHelp() {
-    if (!state.revealed || !state.secret || !identityVision.presentIdentity(state.secret).showRoleHelp) return;
+  function toggleIdentityHelp(el) {
+    const surface = el?.dataset?.surface;
+    const secret = surface === "dealt" ? state.dealtIdentityDialog && state.dealtIdentitySecret
+      : surface === "change" ? state.identityChangeRevealed && state.identityChange
+      : state.revealed && state.secret;
+    if (state.error || !secret) return;
+    const info = identityVision.presentIdentity(secret);
+    if (surface ? !info.ability : !info.showRoleHelp) return;
     setState({ identityHelpExpanded: !state.identityHelpExpanded });
-    app.querySelector('[data-action="toggleIdentityHelp"]')?.focus({ preventScroll: true });
+    app.querySelector(surface === "dealt" || surface === "change" ? `[data-action="toggleIdentityHelp"][data-surface="${surface}"]` : '[data-action="toggleIdentityHelp"]')?.focus({ preventScroll: true });
   }
   function openIdentityHistory() {
     var history = state.secret?.identityHistory || [];
@@ -2968,7 +2975,7 @@ function roomListItems(rooms) {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -3046,7 +3053,7 @@ function roomListItems(rooms) {
             return { seat: p.seat, name: p.name, selected: false };
           }),
         actionChoices,
-        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions, response.action.unavailableHint),
+        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions, response.action.unavailableHint, response.action.swordHint),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {
@@ -3326,7 +3333,7 @@ function roomListItems(rooms) {
     if (state.busy || !state.identityChangeRevealed) return;
     var revision = state.identityChange && state.identityChange.identityRevision;
     if (revision === undefined) return;
-    setState({ identityChange: null, identityChangeRevealed: false });
+    setState({ identityChange: null, identityChangeRevealed: false, identityHelpExpanded: false });
     cmd("ackIdentity", { revision: revision });
   }
 
@@ -3796,18 +3803,17 @@ function roomListItems(rooms) {
   function viewDealtIdentity() {
     if (!state.dealtIdentityDialog || state.error) return "";
     var secret = state.dealtIdentitySecret;
-    return '<div class="dialog-backdrop"><div class="error-dialog dealt-identity-dialog' + (secret?.role === '莫甘娜' ? ' is-morgana' : '') + '" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
-      '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="small muted identity-privacy-note">仅供本人查看</div>' +
+    return '<div class="dialog-backdrop"><div class="error-dialog identity-reveal-dialog dealt-identity-dialog' + (secret?.role === '莫甘娜' ? ' is-morgana' : '') + '" role="dialog" aria-modal="true" aria-labelledby="dealt-identity-title">' +
+      '<div id="dealt-identity-title" class="dialog-title">身份已发放</div><div class="identity-reveal-body"><div class="small muted identity-privacy-note">仅供本人查看</div>' +
       (secret ? viewAvoidanceResult(secret.avoidance) + '<div class="dealt-web-role-heading"><div class="identity-title faction-' + secret.factionTone + '">' + esc(secret.role) + '</div><div class="muted">' + esc(secret.faction) +
-        '</div></div>' + viewIdentityInformation(secret, state.seats, true) +
-        viewSkillStatus(secret) +
-        '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' +
-        btn("primary", "closeDealtIdentity", "记住了，遮盖身份") :
-        '<div class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</div>' +
+        '</div></div>' + viewIdentityInformation(secret, state.seats, true, false, 'dealt') +
+        '<div class="small muted identity-return-note">之后可在房间号右侧的「我的身份」再次查看。</div>' :
+        '<div class="private-info muted">请确认屏幕仅自己可见，再查看身份与视野。</div>') +
+      '</div><div class="identity-reveal-footer">' + (secret ? btn("primary", "closeDealtIdentity", "记住了，遮盖身份") :
         btn("primary", "revealDealtIdentity", state.busy ? "正在读取…" : "查看身份", null, state.busy || !state.network) +
-        btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div>';
+        btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div></div>';
   }
-  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false, compact = false) {
+  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false, compact = false, surface = '') {
     var info = identityVision.presentIdentity(secret, profiles), vision = info.vision;
     function heading(label, meta, summary = false) {
       return '<div class="identity-info-heading"><span>' + esc(label) + '</span>' + (meta ? '<span class="identity-info-meta' + (summary ? ' identity-info-summary' : '') + '">' + esc(meta) + '</span>' : '') + '</div>';
@@ -3825,7 +3831,7 @@ function roomListItems(rooms) {
         html += vision.players.length ? '<div class="identity-info-players' + (vision.wide ? ' is-wide' : '') + '">' + vision.players.map(player => '<div class="identity-info-player">' +
           (showAvatars ? '<div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
             (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') + '</div>' : '') + seat(player.seat) +
-          ((player.name || player.role) ? '<div class="identity-info-player-copy">' + (player.name ? '<span class="identity-info-name">' + esc(player.name) + '</span>' : '') + (player.role ? '<span class="identity-info-role">' + esc(player.role) + '</span>' : '') + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="identity-info-text">' + esc(vision.text) + '</div>';
+          ((player.name || player.role) ? '<div class="identity-info-player-copy">' + (player.name ? '<span class="identity-info-name">' + esc(player.name) + '</span>' : '') + (player.role ? '<span class="identity-info-role">' + esc(player.role) + '</span>' : '') + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="identity-info-text">' + esc(surface ? info.summaryVision : vision.text) + '</div>';
         html += note(vision.note);
       }
       html += '</div>';
@@ -3833,11 +3839,13 @@ function roomListItems(rooms) {
     if (info.inspections.length) html += '<div class="identity-info-section">' + heading('角色查验', info.inspections.length + ' 条记录') + info.inspections.map(record =>
       '<div class="identity-info-inspection"><div class="identity-info-record-label"><span>' + esc(record.label) + '</span><span>' + esc(record.source) + '</span></div><div class="identity-info-result">' + seat(record.seat) + '<span class="identity-info-inspection-result">' + esc(record.result) + '</span></div></div>').join('') + '</div>';
     if (info.fairy) html += '<div class="identity-info-section identity-info-fairy">' + heading('仙女查验') + '<div class="identity-info-fairy-result">' + seat(info.fairy.seat) + '<span class="identity-info-value faction-' + info.fairy.tone + '">' + esc(info.fairy.faction) + '</span></div></div>';
-    if (!compact && info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + viewRoleAbility(info.ability) + '</div>';
-    return html + '</div>' + (compact ? viewSkillStatus(secret, info.showRoleHelp ? info.ability : null) : '');
+    if (surface && info.summary.length) html += '<div class="identity-info-section identity-info-preview">' + info.summary.map(line =>
+      '<div class="identity-info-ability"><span class="identity-info-heading">' + esc(line.label) + '</span><span>' + esc(line.text) + '</span></div>').join('') + '</div>';
+    if (!compact && !surface && info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + viewRoleAbility(info.ability) + '</div>';
+    return html + '</div>' + (compact || surface ? viewSkillStatus(secret, surface || info.showRoleHelp ? info.ability : null, surface) : '');
   }
-  function viewRoleAbility(ability) {
-    var html = ability.brief ? '<div class="identity-info-brief">' + esc(ability.brief) + '</div>' : '';
+  function viewRoleAbility(ability, summarized = false) {
+    var html = ability.brief && !summarized ? '<div class="identity-info-brief">' + esc(ability.brief) + '</div>' : '';
     html += ability.lines.map(line => '<div class="identity-info-ability' + (ability.structured ? ' structured' : '') + '">' +
       (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured ? '：' : '') + '</span>' : '') +
       '<span>' + esc(line.text) + '</span></div>').join('');
@@ -3848,11 +3856,9 @@ function roomListItems(rooms) {
     if (!state.identityChange || state.error) return "";
     var ic = state.identityChange;
     return (
-      '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
-      '<div class="dialog-title">你已获得新身份</div>' +
-      '<div class="small muted">仅供本人查看 · ' +
-      "使用时机见角色说明与技能状态" +
-      "</div>" +
+      '<div class="dialog-backdrop"><div class="error-dialog identity-reveal-dialog" role="dialog" aria-modal="true" aria-labelledby="new-identity-title">' +
+      '<div id="new-identity-title" class="dialog-title">你已获得新身份</div>' +
+      '<div class="identity-reveal-body"><div class="small muted identity-privacy-note">仅供本人查看</div>' +
       (state.identityChangeRevealed
         ? '<div class="identity-title faction-' +
           (ic.factionTone || "") +
@@ -3860,12 +3866,12 @@ function roomListItems(rooms) {
           esc(ic.role) +
           '</div><div class="muted">' +
           esc(ic.faction) +
-          '</div>' + viewIdentityInformation(ic) +
-          viewSkillStatus(ic) +
-          btn("primary", "acknowledgeIdentity", "记住了，遮盖身份", null, state.busy)
-        : '<div class="private-info muted">身份已遮盖，请确认周围无人查看。</div>' +
-          btn("primary", "revealChangedIdentity", "查看新身份", null, state.busy)) +
-      "</div></div>"
+          '</div>' + viewIdentityInformation(ic, state.seats, false, false, 'change')
+        : '<div class="private-info muted">身份已遮盖，请确认周围无人查看。</div>') +
+      '</div><div class="identity-reveal-footer">' + (state.identityChangeRevealed
+        ? btn("primary", "acknowledgeIdentity", "记住了，遮盖身份", null, state.busy)
+        : btn("primary", "revealChangedIdentity", "查看新身份", null, state.busy)) +
+      "</div></div></div>"
     );
   }
   function viewShellHeader() {
@@ -3912,15 +3918,16 @@ function roomListItems(rooms) {
       "</div></div></div>"
     );
   }
-  function viewSkillStatus(secret, ability = null) {
-    if (!secret || !secret.skillStatus) return "";
+  function viewSkillStatus(secret, ability = null, surface = '') {
+    const status = secret?.skillStatus;
+    if (!status && !ability) return "";
     var html = '<div class="compact-skill-status' + (ability ? ' has-role-help' : '') +
-      '"><div class="compact-skill-heading"><img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(secret.skillStatus.title) + '</span>';
-    if (ability) html += '<button type="button" class="disclosure-button identity-help-toggle" data-action="toggleIdentityHelp" aria-expanded="' + !!state.identityHelpExpanded +
+      '"><div class="compact-skill-heading">' + (status ? '<img src="/assets/record-spark.svg" alt="" /><span class="compact-skill-label">技能状态</span><span class="compact-skill-value">' + esc(status.title) + '</span>' : '');
+    if (ability) html += '<button type="button" class="disclosure-button identity-help-toggle" data-action="toggleIdentityHelp"' + (surface ? ' data-surface="' + surface + '"' : '') + ' aria-expanded="' + !!state.identityHelpExpanded +
       '"><span>角色说明</span><span class="identity-help-chevron' + (state.identityHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
     html += '</div>';
-    if (secret.skillStatus.detail) html += '<div class="identity-info-note">' + esc(secret.skillStatus.detail) + '</div>';
-    if (ability && state.identityHelpExpanded) html += '<div class="identity-help-body">' + viewRoleAbility(ability) + '</div>';
+    if (status?.detail) html += '<div class="identity-info-note">' + esc(status.detail) + '</div>';
+    if (ability && state.identityHelpExpanded) html += '<div class="identity-help-body">' + viewRoleAbility(ability, !!surface) + '</div>';
     return html + '</div>';
   }
   function viewIdentityHistory() {
@@ -3953,6 +3960,7 @@ function roomListItems(rooms) {
       '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' +
       '</div><div class="skill-body">';
     if (targetMode) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
+    if (state.skillSwordHint) html += '<div class="skill-context">' + esc(state.skillSwordHint) + '</div>';
     if (["hunterTurn", "paladinTurn"].includes(state.room.phase) && state.room.operationStatus)
       html += '<div class="skill-context">' + esc(state.room.operationStatus.detail) + '</div>';
     function seatButton(c, swap) {
@@ -5134,7 +5142,7 @@ function roomListItems(rooms) {
     acknowledgeFairyResult: acknowledgeFairyResult,
     revealChangedIdentity: function () {
       if (state.busy || !foreground || !state.identityChange) return;
-      setState({ identityChangeRevealed: true });
+      setState({ identityChangeRevealed: true, identityHelpExpanded: false });
     },
     acknowledgeIdentity: acknowledgeIdentity,
     openTool: function (el) {

@@ -116,8 +116,8 @@
         <block wx:if="{{dealtIdentitySecret}}">
           <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
           <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view></view>
-          <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true}}" />
-          <template is="identitySkillStatus" data="{{status:dealtIdentitySecret.skillStatus}}" />
+          <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true, summarize:true}}" />
+          <template is="identitySkillStatus" data="{{status:dealtIdentitySecret.skillStatus, ability:dealtIdentitySecret.info.ability, surface:'dealt', helpExpanded:identityHelpExpanded}}" />
           <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
         </block>
         <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
@@ -153,9 +153,8 @@
       <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
       <block wx:if="{{identityChangeRevealed}}">
         <view class="dealt-role-heading"><image wx:if="{{identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view></view>
-        <template is="identityInformation" data="{{info:identityChange.info, fallback:identityChange.information}}" />
-        <template is="identitySkillStatus" data="{{status:identityChange.skillStatus}}" />
-        <view wx:if="{{identityChange.timingNote}}" class="process-private-note small muted">{{identityChange.timingNote}}</view>
+        <template is="identityInformation" data="{{info:identityChange.info, fallback:identityChange.information, summarize:true}}" />
+        <template is="identitySkillStatus" data="{{status:identityChange.skillStatus, ability:identityChange.info.ability, surface:'change', helpExpanded:identityHelpExpanded}}" />
       </block>
       <view wx:else class="process-sealed"><view class="table-symbol blue"><image src="/assets/table-lock.svg" aria-hidden="true" /></view><view>新身份已遮盖</view><text class="small muted">请确认周围无人查看，再查看新身份。</text></view>
     </view></scroll-view>
@@ -198,6 +197,7 @@
         <view wx:if="{{skillTargetMode!=='fairy'}}" class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
         <view class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
         <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
+        <view wx:if="{{skillSwordHint}}" class="skill-context">{{skillSwordHint}}</view>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
         <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
           <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="true">✓</text></button>

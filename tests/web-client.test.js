@@ -44,7 +44,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
     render = function () {};
     roomCode = "123456";
     window.test = { grantNotifier, request, requestId, mutate, handleError, recoverConnection, retry, login, state, schedule, loadSettings, settingsSave, CHANGES, ACTIONS, viewActionDialog, refresh, viewRoom, viewHostBar, viewSettingsDialog, kickFromSettings, sendKick,
-      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance, viewScoreRules,
+      viewHonorBallot, viewHonors, viewHistorySheet, viewHistoryEntry, viewPlayerCard, openPlayerCard, closePlayerCard, viewDealtIdentity, viewIdentityChange, viewIdentityHistory, showIdentityHintWhenVisible, viewStats, viewResultDialog, seatAvatarError, loadMatches, viewMatches, viewAvoidance, viewScoreRules,
       navigate, applyRoute, loadProfile, saveProfile, viewNavigation, INPUTS, loadLeaderboard, viewLeaderboard, viewProfileEditor, viewMe, viewMonthlyReport, viewBadgeManager, viewBoardDetails,
       initializeWebAccount, startWebLogin, pollWebLogin, cancelWebLogin, continueAsGuest, viewWebLogin, bootstrap,
       viewRecordClearing, viewRecordClearingConfirmation, loadRecordClearing, viewEntry, loadRooms, startRoomSwipe, moveRoomSwipe, finishRoomSwipe, closeRoomSwipe,
@@ -1556,6 +1556,12 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
     assert.match(c.viewActionDialog(), /skill-target-dialog/);
     assert.match(c.viewActionDialog(), /已出局/);
     assert.match(c.viewActionDialog(), /&lt;小鱼&gt;/);
+    if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
+    else if (mode === 'sword') {
+      assert.match(c.viewActionDialog(), /可攻击其他任意身份/);
+      assert.doesNotMatch(c.viewActionDialog(), /刺客只失去技能/);
+    } else assert.doesNotMatch(c.viewActionDialog(), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+    assert.doesNotMatch(JSON.stringify(room), /swordHint|刺客只失去技能/);
     const grid = mode === "swap" ? c.state.swapPlayers : c.state.skillTargets;
     assert.equal(grid.length, 12, role);
     assert.equal(!grid.find(t => t.seat === 2).disabledReason, selfAllowed, role);
@@ -2559,4 +2565,33 @@ test('当前身份只在 B 牌技能状态旁显示说明入口，遮盖后清�
   c.ACTIONS.toggleIdentityHelp();
   assert.equal(c.state.identityHelpExpanded,false);
   assert.doesNotMatch(c.viewRoom(),/角色说明|首次复活/);
+});
+
+test('网页首次发牌和换身份只在展开时展示角色规则明细', () => {
+  const {identityHelp}=require('../server/knight-role-help');
+  const secret={role:'红刀客·奥伯伦',faction:'坏人阵营',factionTone:'evil',information:'没有视野。'+identityHelp('redSwordsman',12),skillStatus:{title:'技能可用'}};
+  const c=client();
+  c.state.room=dealtWebRoom();
+  c.state.dealtIdentityDialog=true;
+  c.state.dealtIdentitySecret=secret;
+  const details=/攻击范围|刺客只失去技能/;
+  function check(surface, view) {
+    const summary=view();
+    assert.match(summary,/无初始视野，不参与坏人互认/);
+    assert.match(summary,/有一次开刀机会.*上车执行任务时必须投失败/);
+    assert.doesNotMatch(summary,details);
+    assert.match(summary,/aria-expanded="false"/);
+    c.ACTIONS.toggleIdentityHelp({dataset:{surface}});
+    assert.match(view(),/aria-expanded="true"/);
+    assert.match(view(),details);
+    assert.match(view(),/identity-reveal-footer.*记住了，遮盖身份/);
+  }
+  check('dealt',c.viewDealtIdentity);
+  c.ACTIONS.closeDealtIdentity();
+  assert.equal(c.viewDealtIdentity(),'');
+  assert.equal(c.state.identityHelpExpanded,false);
+  c.state.identityChange=secret;
+  assert.doesNotMatch(c.viewIdentityChange(),/奥伯伦|投失败|角色说明/);
+  c.ACTIONS.revealChangedIdentity();
+  check('change',c.viewIdentityChange);
 });

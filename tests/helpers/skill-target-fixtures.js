@@ -9,6 +9,7 @@ const cases = [
   ["magician", "swap", "swap:2:7", true],
   ["blueHunter", "detonate", "detonate:1", false],
   ["redHunter", "passive", "passive:7", false],
+  ["redSwordsman", "sword", "target:7", false],
   ["blueAwakened", "sword", "target:7", false],
   ["redAwakened", "sword", "target:7", false],
   ["assassin", "final", "target:0", false],

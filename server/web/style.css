@@ -992,6 +992,10 @@ button.leave-button {
     transform: translateY(0) scale(1);
   }
 }
+.error-dialog.identity-reveal-dialog { display: flex; flex-direction: column; overflow: hidden; max-height: calc(100dvh - 32px); }
+.identity-reveal-dialog > .dialog-title, .identity-reveal-footer { flex-shrink: 0; }
+.identity-reveal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.identity-reveal-footer { padding-top: 8px; }
 .dialog-title {
   font-size: 18px;
   font-weight: 700;

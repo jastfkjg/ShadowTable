@@ -51,8 +51,7 @@ function presentPrivateIdentity(secret, factionTone, players) {
   // Split only the existing explicit no-vision prefix; never infer hidden roles
   // or skill rules. Other server descriptions stay intact in the vision block.
   const split = information.match(/^(没有视野。)\s*([\s\S]+)$/);
-  const timingNote = secret.passiveVision ? "视野随技能结算自动更新" : /下次技能环节可用|下一轮可用/.test(secret.skillStatus?.detail || "") ? "" : "使用时机见角色说明与技能状态";
-  return { ...secret, factionTone, portrait: portrait(secret.role, factionTone).portrait, timingNote,
+  return { ...secret, factionTone, portrait: portrait(secret.role, factionTone).portrait,
     visionText: split ? split[1] : information, abilityText: split ? split[2] : "",
     info: identityVision.presentIdentity(secret, players) };
 }

@@ -2421,3 +2421,18 @@ test('身份说明仅在已揭示时展开，遮盖会重置且不改写身份�
   p.toggleIdentityHelp();assert.equal(p.data.identityHelpExpanded,false);
   assert.deepEqual(secret,{role:'石像鬼',info:{ability:{brief:'角色规则'},showRoleHelp:true}});
 });
+
+test('换身份弹窗每次揭示时折叠角色说明，遮盖后展开按钮失效', () => {
+  const p=page({});
+  const event={currentTarget:{dataset:{surface:'change'}}};
+  p.data.identityChange={info:{ability:{brief:'角色规则'}}};
+  p.revealChangedIdentity();
+  p.toggleIdentityHelp(event);
+  assert.equal(p.data.identityHelpExpanded,true);
+  p.hidePrivatePreview();
+  p.toggleIdentityHelp(event);
+  assert.equal(p.data.identityHelpExpanded,false);
+  p.revealChangedIdentity();
+  assert.equal(p.data.identityChangeRevealed,true);
+  assert.equal(p.data.identityHelpExpanded,false);
+});

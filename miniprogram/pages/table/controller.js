@@ -46,7 +46,7 @@ const CHOICES = {
   pass: "不使用技能 / 确认",
 };
 // Derive private skill controls only from the server's allowed choices.
-function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavailableHint = "") {
+function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavailableHint = "", swordHint = "") {
   const fairyAction = room.phase === "fairy";
   const finalAction = !!room.knights && ["assassination", "reverseStrike"].includes(room.phase) && choices.some(c => /^target:\d+$/.test(c.value));
   const skillAction = fairyAction || finalAction || ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"].includes(room.phase);
@@ -91,6 +91,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
       (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
+    skillSwordHint: swordHint,
     skillEligibility: fairyAction && !room.knights ? "当前持有者与曾持有仙女的玩家不可选。" : copy?.eligibility || "",
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
     skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
@@ -305,7 +306,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     draftLabel: "",
     stagedChoice: false,
     skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+    skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
     swapOptions: [],
     swapSeats: [],
     swapPlayers: [],
@@ -489,7 +490,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -911,7 +912,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           draftLabel: "",
           stagedChoice: false,
           skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-          skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+          skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
           swapOptions: [],
           swapSeats: [],
           swapPlayers: [],
@@ -2330,7 +2331,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       draftLabel: "",
       stagedChoice: false,
       skillAction: false, skillTitle: "", skillHint: "", skillTargets: [], skillOtherChoices: [], skillBodyHeight: 0,
-      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
+      skillTargetMode: "", skillTargetMeta: "", skillTargetCaption: "", skillEligibility: "", skillSwordHint: "", skillSummary: "", skillConsequence: "", skillConfirmLabel: "",
       swapOptions: [],
       swapSeats: [],
       swapPlayers: [],
@@ -2399,7 +2400,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           .filter((p) => swapSeats.has(p.seat))
           .map((p) => ({ seat: p.seat, name: p.name, selected: false })),
         actionChoices,
-        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions, response.action.unavailableHint),
+        ...skillView(room, actionChoices, !!response.action.hunterModes, "", swapOptions, response.action.unavailableHint, response.action.swordHint),
         actionTargets: response.action.targets || [],
       });
     } catch (e) {
@@ -2596,9 +2597,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.setData({ busy: false, busyAction: "" });
     }
   },
-  toggleIdentityHelp() {
-    if (!this.data.revealed || !this.data.secret?.info?.showRoleHelp) return;
-    this.setData({ identityHelpExpanded: !this.data.identityHelpExpanded });
+  toggleIdentityHelp(event) {
+    const d = this.data;
+    const surface = event?.currentTarget?.dataset?.surface;
+    if (d.error) return;
+    if (surface === "dealt" ? d.dealtIdentityDialog && d.dealtIdentitySecret?.info?.ability
+      : surface === "change" ? d.identityChangeRevealed && d.identityChange?.info?.ability
+      : d.revealed && d.secret?.info?.showRoleHelp) {
+      this.setProcessData({ identityHelpExpanded: !d.identityHelpExpanded });
+    }
   },
   openIdentityHistory() {
     const history = this.data.secret?.identityHistory || [];
@@ -2652,7 +2659,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   hidePrivatePreview() {
-    this.setProcessData({ fairyResultRevealed: false, identityChangeRevealed: false });
+    this.setProcessData({ fairyResultRevealed: false, identityChangeRevealed: false, identityHelpExpanded: false });
   },
   revealFairyResult() {
     if (this.data.busy || !this.foreground || !this.data.fairyResult) return;
@@ -2709,13 +2716,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   revealChangedIdentity() {
     if (this.data.busy || !this.foreground || !this.data.identityChange) return;
-    this.setProcessData({ identityChangeRevealed: true });
+    this.setProcessData({ identityChangeRevealed: true, identityHelpExpanded: false });
   },
   acknowledgeIdentity() {
     if (this.data.busy || !this.data.identityChangeRevealed) return;
     const revision = this.data.identityChange?.identityRevision;
     if (revision === undefined) return;
-    this.setData({ identityChange: null, identityChangeRevealed: false });
+    this.setData({ identityChange: null, identityChangeRevealed: false, identityHelpExpanded: false });
     this.cmd("ackIdentity", { revision });
   },
   toggleSwapSeat(e) {

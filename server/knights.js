@@ -3,6 +3,7 @@ const { randomUUID, randomInt } = require("node:crypto");
 const { roles } = require("./variants");
 const fun = require("./fun");
 const replay = require("./replay");
+const { swordTargetHint } = require("./knight-role-help");
 const swords = [
   "gareth",
   "gaheris",
@@ -212,6 +213,9 @@ function action(room, uid) {
   const targets = living(room).map((p) => ({ seat: p.seat, name: p.name }));
   const ownSeat = room.players.find((p) => p.uid === uid).seat;
   const attackTargets = targets.filter((t) => t.seat !== ownSeat);
+  const aSword = swords.includes(role);
+  const awakenedSword = ["blueAwakened", "redAwakened"].includes(role);
+  const swordHint = aSword || awakenedSword ? { swordHint: swordTargetHint(aSword) } : {};
   const pass = {
     value: "pass",
     label: role === "paladin" ? "确认" : "不使用技能 / 确认",
@@ -236,10 +240,7 @@ function action(room, uid) {
     }
     if (
       eligible(room, uid) &&
-      (swords.includes(role) ||
-        ["blueAwakened", "redAwakened", "blueKnight", "redKnight"].includes(
-          role,
-        ))
+      (aSword || awakenedSword || ["blueKnight", "redKnight"].includes(role))
     )
       options.push(
         ...attackTargets.map((t) => ({
@@ -279,6 +280,7 @@ function action(room, uid) {
       label: "同时秘密提交技能；不使用技能请选择确认",
       choices: options.map((o) => o.value),
       options,
+      ...(options.length > 1 ? swordHint : {}),
       ...(eligible(room, uid) && hunters.includes(role)
         ? { hunterModes: true }
         : {}),
@@ -290,10 +292,7 @@ function action(room, uid) {
     if (uid === actor && (room.phase === "hunterTurn" || eligible(room, uid))) {
       if (
         room.phase === "hunterTurn" ||
-        swords.includes(role) ||
-        ["blueAwakened", "redAwakened", "blueKnight", "redKnight"].includes(
-          role,
-        )
+        aSword || awakenedSword || ["blueKnight", "redKnight"].includes(role)
       )
         options.push(
           ...attackTargets.map((t) => ({
@@ -311,6 +310,7 @@ function action(room, uid) {
           : `轮到 ${room.players.find((p) => p.uid === actor).seat}号使用技能；其他玩家确认`,
       choices: options.map((o) => o.value),
       options,
+      ...(room.phase === "skillTurn" && options.length > 1 ? swordHint : {}),
     };
   }
   return null;

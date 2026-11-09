@@ -4,6 +4,9 @@
 // eligibility, targeting and settlement remain in knights.js.
 const fact = (label, text) => ({ label, text });
 const attackNote = "实际出局仍按换号、守护、反伤和替死规则结算。";
+const aSwordRange = "可击杀 A 牌刀客或 B 牌角色，不要求对方与你阵营不同。";
+const aSwordException = "A 牌刀攻击刺客时，刺客只失去技能，不会被这一刀击杀。";
+const awakenedSwordRange = "可攻击其他任意身份，不要求对方与你阵营不同。";
 const nextRound = "通过抽 B 牌获得后，从下一轮技能环节开始使用。";
 const armor =
   "首次出局时，若 B 牌还有剩余，消耗一张 B 牌恢复原身份和初始视野；B 牌耗尽则不能复活。";
@@ -56,7 +59,7 @@ function roleHelp(role, capacity = 12) {
       "assassin",
     ].includes(role)
   ) {
-    brief = "有一次开刀机会，能攻击刀客和 B 牌角色；刀错也会用掉技能。";
+    brief = "技能环节有一次开刀机会，刀错也消耗。";
     facts = [
       fact(
         "怎么用",
@@ -64,15 +67,14 @@ function roleHelp(role, capacity = 12) {
       ),
       fact(
         "攻击范围",
-        "可击杀 A 牌刀客或 B 牌角色，不要求对方与你阵营不同；攻击其他 A 牌身份不能将其击杀。",
+        aSwordRange + "攻击其他 A 牌身份不能将其击杀。",
       ),
       fact(
         "使用次数",
         "每张身份牌限用一次；刀错不会因此让自己出局，但仍消耗技能。",
       ),
     ];
-    exception =
-      "A 牌刀攻击刺客时，刺客只失去技能，不会被这一刀击杀。" + attackNote;
+    exception = aSwordException + attackNote;
     if (["blueLancelot", "redLancelot"].includes(role)) {
       facts.push(
         fact(
@@ -181,7 +183,7 @@ function roleHelp(role, capacity = 12) {
       fact("怎么用", "技能环节选择场上其他 1 人开刀，不能选自己。"),
       fact(
         "攻击范围",
-        "不受 A 刀的目标身份限制，可攻击其他任意身份，也不要求对方与你阵营不同。",
+        "不受 A 刀的目标身份限制，" + awakenedSwordRange,
       ),
       fact("使用次数", "每张身份牌限用一次，出刀即消耗。"),
       fact("何时可用", nextRound),
@@ -314,4 +316,8 @@ function identityHelp(role, capacity) {
     ].join("\n")
   );
 }
-module.exports = { roleHelp, boardRoles, identityHelp };
+function swordTargetHint(aSword) {
+  return aSword ? aSwordRange + aSwordException : awakenedSwordRange;
+}
+
+module.exports = { roleHelp, boardRoles, identityHelp, swordTargetHint };

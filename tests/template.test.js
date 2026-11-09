@@ -1585,8 +1585,12 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
       : secret.action.hunterModes ? secret.action.options.filter(c => c.value.startsWith(mode + ":")).concat([{ value: "mode:", label: "返回选择技能方式" }])
       : secret.action.options.filter(c => !c.value.startsWith("swap:"));
     const data = { ...base, room, actionDialog: true, stagedChoice: true, draftChoice: "", swapOptions, swapSeats: [], swapPlayers: [],
-      ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions) };
+      ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions, secret.action.unavailableHint, secret.action.swordHint) };
     const initial = render(data);
+    const hint = nodes(initial).find(n => n.attr?.class === 'skill-context' && JSON.stringify(n).includes('任意身份'));
+    if (role === 'redSwordsman') assert.match(JSON.stringify(initial), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
+    else if (mode === 'sword') assert.ok(hint, role);
+    else assert.doesNotMatch(JSON.stringify(initial), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
     const seats = nodes(initial).filter(n => n.attr?.class?.split(" ").includes("skill-option"));
     assert.equal(seats.length, 12, role);
     assert.ok(seats.some(n => n.attr.disabled && n.attr.ariaLabel.includes("已出局")), role);
@@ -2134,5 +2138,32 @@ test('当前身份模板仅在 B 牌技能状态旁显示说明入口，默认�
   const aCard={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
   aCard.info=presentIdentity(aCard);
   assert.doesNotMatch(JSON.stringify(renderTable({...data,secret:aCard,identityHelpExpanded:true})),/首次复活|角色说明/);
-  assert.match(JSON.stringify(renderTable({...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard})),/首次复活/);
+  const dealt = {...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard};
+  assert.doesNotMatch(JSON.stringify(renderTable(dealt)),/首次复活/);
+  assert.match(JSON.stringify(renderTable({...dealt,identityHelpExpanded:true})),/首次复活/);
+});
+
+test('发牌和换牌默认只展示奥伯伦的关键规则，选读详情并可随时遮盖', () => {
+  const {presentIdentity}=require('../miniprogram/identity-vision');
+  const {identityHelp}=require('../server/knight-role-help');
+  const secret={role:'红刀客·奥伯伦',faction:'坏人阵营',information:'没有视野。'+identityHelp('redSwordsman',12),skillStatus:{title:'技能可用'}};
+  secret.info=presentIdentity(secret);
+  const data={...base,room:{phase:'tools',players:[],team:[],history:[],me:{seat:1}},identityHelpExpanded:false};
+  const details=/攻击范围|刺客只失去技能/;
+  for (const [surface, state, hide] of [
+    ['dealt',{dealtIdentityDialog:true,dealtIdentitySecret:secret},{dealtIdentitySecret:null}],
+    ['change',{identityChange:secret,identityChangeRevealed:true},{identityChangeRevealed:false}],
+  ]) {
+    const collapsed=renderTable({...data,...state});
+    const summary=JSON.stringify(collapsed);
+    assert.match(summary,/无初始视野，不参与坏人互认/);
+    assert.match(summary,/有一次开刀机会.*上车执行任务时必须投失败/);
+    assert.doesNotMatch(summary,details);
+    const toggle=byHandler(collapsed,'toggleIdentityHelp');
+    assert.equal(toggle.attr.ariaExpanded,false);
+    assert.equal(toggle.attr['data-surface'],surface);
+    assert.ok(byHandler(collapsed,surface==='dealt'?'closeDealtIdentity':'acknowledgeIdentity'));
+    assert.match(JSON.stringify(renderTable({...data,...state,identityHelpExpanded:true})),details);
+    assert.doesNotMatch(JSON.stringify(renderTable({...data,...state,...hide,identityHelpExpanded:true})),/奥伯伦|必须投失败|刺客只失去技能/);
+  }
 });

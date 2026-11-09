@@ -38,6 +38,8 @@
 .identity-info-inline { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .identity-info-inline .identity-info-heading, .identity-info-fairy .identity-info-heading { margin: 0; flex-shrink: 0; }
 .identity-info-inline .identity-info-text { font-size: 14px; }
+.identity-info-preview .identity-info-heading { flex-shrink: 0; margin: 0; }
+.identity-info-preview .identity-info-ability { gap: 12px; font-size: 14px; }
 .identity-info-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .identity-info-players.is-wide { grid-template-columns: minmax(0, 1fr); }
 .identity-info-player { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 9px; border-radius: 8px; background: var(--control-bg, #14232c); }
@@ -100,12 +102,13 @@ button.identity-history-entry.compact-history-entry { flex-shrink: 0; width: aut
 .identity-compact .compact-skill-heading { gap: 4px 6px; }
 .identity-compact .compact-skill-value { max-width: 100%; }
 .identity-compact .compact-skill-status.has-role-help { padding-top: 4px; }
-.identity-compact button.identity-help-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 6px; width: auto; min-height: 44px; margin: 0 0 0 6px; padding: 0 2px 0 6px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.compact-skill-heading button.identity-help-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 6px; width: auto; min-height: 44px; margin: 0 0 0 6px; padding: 0 2px 0 6px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.compact-skill-status.has-role-help { padding-top: 0; }
 .identity-help-chevron { box-sizing: border-box; width: 6px; height: 6px; margin: -3px 1px 0; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
 .identity-help-chevron.is-expanded { margin-top: 3px; transform: rotate(225deg); }
 .identity-help-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.identity-compact button.identity-help-toggle:not([disabled]):active { opacity: 1; color: var(--text); }
-.identity-help-body { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--identity-divider); }
+.compact-skill-heading button.identity-help-toggle:not([disabled]):active { opacity: 1; color: var(--text); }
+.identity-help-body { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--identity-divider, var(--border)); }
 .compact-hide:not([disabled]):active, .compact-history-entry:not([disabled]):active { opacity: .65; }
 .compact-hide:focus-visible, .compact-history-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 359px) { .compact-role-heading { gap: 8px; } .compact-role-title { font-size: 23px; } .identity-info-player { gap: 6px; padding: 8px; } .identity-compact .identity-info-player { gap: 6px; padding: 8px; } .identity-compact .identity-info-players { grid-template-columns: minmax(0, 1fr); } }
