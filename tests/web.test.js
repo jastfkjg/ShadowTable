@@ -149,6 +149,11 @@ test("静态资源同源托管：HTML 与 CSP、Content-Type、未知路径落�
     assert.equal(asset.status, 200);
     assert.match(asset.headers["content-type"], /image\//);
   }
+  for (const name of require("../miniprogram/role-portraits").assetNames) {
+    const asset = await a.raw("/assets/roles/" + name + ".png");
+    assert.equal(asset.status, 200, name);
+    assert.match(asset.headers["content-type"], /image\/png/, name);
+  }
   assert.equal((await a.raw("/nope.js")).status, 401);
   assert.equal((await a.raw("/style.css", {})).status, 401);
 });

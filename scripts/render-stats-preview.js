@@ -136,6 +136,18 @@ const scenes = {
   'history-empty': {tab:'matches',historyStarted:true,history:{...history,records:[],total:0,outcomeSummary:'',outcomeCounts:null}},
   'history-long': {tab:'matches',historyStarted:true,history:{...history,records:stressRecords,total:1,outcomeSummary:'0 胜 · 1 负',outcomeCounts:{wins:0,losses:1,excluded:0}}},
 };
+// All approved named variants, rendered through the production role grid.
+const roleArtNames = ["石像鬼", "奥伯伦", "蓝骑士", "红骑士", "蓝内奸", "红内奸",
+  "蓝兰斯洛特", "红兰斯洛特", "蓝刀客·加雷斯", "蓝刀客·加赫雷斯",
+  "蓝猎人", "红猎人", "蓝守卫", "红守卫", "蓝术士", "红术士",
+  "蓝盗贼", "红盗贼", "觉醒蓝刀客", "觉醒红刀客"];
+const roleArtStats = presentStats({ total: 40, wins: 20, winRate: 50, byFaction: [], byBoard: [], recent: [],
+  byRole: roleArtNames.map(role => ({ role,
+    faction: role.includes("盗贼") ? "third" : role.startsWith("红") || role === "觉醒红刀客" || ["石像鬼", "奥伯伦"].includes(role) ? "evil" : "good",
+    total: 2, wins: 1, winRate: 50,
+  })),
+});
+scenes['role-art-variants'] = {tab:'records', statistics:{stats:roleArtStats}};
 // Accepted title grid, using the counts from the design review as sample data.
 const gridCounts = { honor_mvp:1, honor_svp:0, survival_revive:0, survival_knifed:4,
   percival_green:0, percival_bust:1, merlin_evade:1, merlin_hit:0, good_shield:2, assassin_hit:0, assassin_miss:2 };
@@ -158,7 +170,7 @@ const projection = 'body{margin:0}button{position:relative;overflow:hidden;font:
 fs.mkdirSync(output, { recursive: true });
 for (const [name, data] of Object.entries(scenes)) fs.writeFileSync(path.join(output, name + '.html'), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>战绩 · ${name}</title><style>${projection}${styles}</style>${html(factory('pages/stats/stats.wxml')({statistics:{},history:{},historyStarted:false,scrollTops:{},...data}))}${data.info ? html(factory('components/app-dialog/app-dialog.wxml')({dialog:data.info,bodyHeight:0})) : ''}<div class="preview-homebar"></div></html>`);
 const meProfile=presentProfile({nickname:'子龙',identityType:'wx',avatarUrl:''});
-meProfile.avatarUrl='/pages/profile/assets/avatars/crayon-07.jpg';
+meProfile.avatarUrl='/pages/profile/assets/avatars/avatar-07.jpg';
 const meStyles=css('app.wxss')+css('components/app-nav/app-nav.wxss')+css('pages/me/me.wxss')+css('custom-tab-bar/index.wxss');
 for (const [name,personal] of Object.entries({
   me:{profile:meProfile,stats,currentRoom:{code:'620816',status:'lobby',statusLabel:'待开局',boardLabel:'十二骑士',capacity:12,relationLabel:'我在 3 号'}},

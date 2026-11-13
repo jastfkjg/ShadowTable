@@ -8,19 +8,52 @@ const rows = [0, 340, 633, 926, 1254];
 const columns = [[0, 307, 603, 922, 1254], [0, 320, 614, 919, 1254], [0, 315, 622, 940, 1254], [0, 309, 614, 941, 1254]];
 const names = ["merlin", "percival", "servant", "assassin", "morgana", "mordred", "oberon", "lancelot",
   "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"];
+// Reviewed crops for the approved November artwork. Null cells are superseded
+// knight/spy drafts; never import them over the separately approved revisions.
+const atlases = [
+  { input, width: 1254, height: 1254, rows, columns, names },
+  {
+    input: path.join(root, "docs/sources/role-portraits-factions.png"),
+    width: 1122, height: 1402,
+    rows: [0, 280, 554, 820, 1095, 1402],
+    columns: [[0, 290, 550, 840, 1122], [0, 280, 560, 825, 1122],
+      [0, 288, 560, 835, 1122], [0, 285, 565, 840, 1122], [0, 280, 560, 840, 1122]],
+    names: ["gargoyle", "oberon", null, null,
+      "lancelot-blue", "lancelot-red", "gareth", "gaheris",
+      "hunter-blue", "hunter-red", "guard-blue", "guard-red",
+      "magician-blue", "magician-red", "thief-blue", "thief-red",
+      "awakened-blue", "awakened-red", null, null],
+  },
+  {
+    input: path.join(root, "docs/sources/role-portraits-knights-spies.png"),
+    width: 1199, height: 1312,
+    rows: [0, 600, 1312], columns: [[0, 600, 1199], [0, 600, 1199]],
+    names: ["knight-blue", "knight-red", "spy-blue", "spy-red"],
+  },
+];
 async function main() {
-  const metadata = await sharp(input).metadata();
-  if (metadata.width !== 1254 || metadata.height !== 1254 || !metadata.hasAlpha) throw new Error("Expected the reviewed 1254×1254 transparent atlas");
+  for (const atlas of atlases) {
+    const metadata = await sharp(atlas.input).metadata();
+    if (metadata.width !== atlas.width || metadata.height !== atlas.height || !metadata.hasAlpha)
+      throw new Error("Expected the reviewed " + atlas.width + "×" + atlas.height + " transparent atlas: " + atlas.input);
+  }
   const output = path.join(root, "miniprogram/assets/roles");
   fs.mkdirSync(output, { recursive: true });
-  for (let i = 0; i < names.length; i++) {
-    const row = Math.floor(i / 4), col = i % 4;
-    const crop = await sharp(input).extract({ left: columns[row][col], top: rows[row], width: columns[row][col + 1] - columns[row][col], height: rows[row + 1] - rows[row] }).png().toBuffer();
-    const tile = await sharp(crop).trim().png().toBuffer();
-    await sharp(tile).resize(144, 144, { fit: "contain", background: "#00000000" })
-      .extend({ top: 8, bottom: 8, left: 8, right: 8, background: "#00000000" })
-      .png({ palette: true, colours: 128, compressionLevel: 9 }).toFile(path.join(output, names[i] + ".png"));
+  const imported = new Set();
+  for (const atlas of atlases) {
+    const { input, rows, columns, names } = atlas;
+    const columnCount = columns[0].length - 1;
+    for (let i = 0; i < names.length; i++) {
+      if (!names[i]) continue;
+      const row = Math.floor(i / columnCount), col = i % columnCount;
+      const crop = await sharp(input).extract({ left: columns[row][col], top: rows[row], width: columns[row][col + 1] - columns[row][col], height: rows[row + 1] - rows[row] }).png().toBuffer();
+      const tile = await sharp(crop).trim().png().toBuffer();
+      await sharp(tile).resize(144, 144, { fit: "contain", background: "#00000000" })
+        .extend({ top: 8, bottom: 8, left: 8, right: 8, background: "#00000000" })
+        .png({ palette: true, colours: 128, compressionLevel: 9 }).toFile(path.join(output, names[i] + ".png"));
+      imported.add(names[i]);
+    }
   }
-  console.log("Imported " + names.length + " transparent portraits into " + output);
+  console.log("Imported " + imported.size + " transparent portraits into " + output);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

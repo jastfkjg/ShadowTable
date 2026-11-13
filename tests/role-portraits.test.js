@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const sharp = require("sharp");
-const { portrait } = require("../miniprogram/role-portraits");
+const { portrait, assetNames } = require("../miniprogram/role-portraits");
 const { presentStats } = require("../miniprogram/profile");
 
 test("角色图鉴保留完整名称与最终阵营，同名跨阵营不合并，未知角色使用本地回退插画", () => {
@@ -22,10 +22,36 @@ test("角色图鉴保留完整名称与最终阵营，同名跨阵营不合并�
   assert.equal(stats.byRole[1].rateLabel, "0%");
 });
 
+test("独立角色与红蓝服饰使用不同素材，转换阵营不改变身份画像", () => {
+  for (const [blue, red] of [
+    ["蓝兰斯洛特", "红兰斯洛特"], ["蓝骑士", "红骑士"],
+    ["蓝猎人", "红猎人"], ["蓝守卫", "红守卫"],
+    ["蓝术士", "红术士"], ["蓝盗贼", "红盗贼"],
+    ["觉醒蓝刀客", "觉醒红刀客"], ["蓝内奸", "红内奸"],
+    ["蓝刀客·加雷斯", "蓝刀客·加赫雷斯"],
+    ["石像鬼", "莫德雷德"], ["蓝内奸", "刺客"], ["蓝骑士", "蓝兰斯洛特"],
+  ]) {
+    const left = portrait(blue, "good"), right = portrait(red, "evil");
+    assert.notEqual(left.portrait, right.portrait, blue + " / " + red);
+    assert.notDeepEqual(
+      fs.readFileSync(path.join(__dirname, "../miniprogram", left.portrait)),
+      fs.readFileSync(path.join(__dirname, "../miniprogram", right.portrait)),
+      blue + " / " + red + " must not be duplicate files",
+    );
+    assert.equal(portrait(blue, "evil").portrait, left.portrait);
+    assert.equal(portrait(blue, "evil").factionLabel, "坏人阵营");
+  }
+  assert.equal(portrait("红刀客 · 兰斯洛特", "evil").portrait, portrait("红兰斯洛特", "evil").portrait);
+  assert.equal(portrait("蓝刀客 · 加赫雷斯", "good").portrait, portrait("加赫雷斯", "good").portrait);
+  assert.equal(portrait("红刀客 · 奥伯伦", "evil").portrait, portrait("奥伯伦", "evil").portrait);
+  assert.equal(portrait("蓝刀客 · 加赫雷斯", "good").roleKey, "good:蓝刀客 · 加赫雷斯");
+  assert.equal(portrait("toString", "unknown").portrait, "/assets/roles/guard.png");
+});
+
 test("角色资源均为有透明留白的紧凑PNG，缩略图不携带浅色底板", async () => {
   const root = path.resolve(__dirname, "../miniprogram/assets/roles");
   const files = fs.readdirSync(root);
-  assert.equal(files.length, 16);
+  assert.deepEqual(files.sort(), assetNames.map(name => name + ".png").sort());
   let total = 0;
   for (const file of files) {
     const source = path.join(root, file);
@@ -39,7 +65,7 @@ test("角色资源均为有透明留白的紧凑PNG，缩略图不携带浅色�
     assert.equal(data[(info.width * info.height - 1) * 4 + 3], 0, file);
     assert.ok(data.some((value,index) => index % 4 === 3 && value > 0), file);
   }
-  assert.ok(total < 256 * 1024, "角色缩略图超过256KiB");
+  assert.ok(total < 512 * 1024, "角色缩略图超过512KiB");
 });
 
 test('网页与小程序共享角色插画映射，浏览器加载不依赖 CommonJS', () => {

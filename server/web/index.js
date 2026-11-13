@@ -78,7 +78,7 @@ for (const name of ["home-wordmark", "home-subtitle", "tab-table", "tab-table-ac
   assets["/assets/" + name + ".png"] = ["../../miniprogram/assets/" + name + ".png", "image/png"];
 for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
-for (const role of ["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"])
+for (const role of require("../../miniprogram/role-portraits").assetNames)
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
 for (const badge of require('../../miniprogram/badges').catalogue)
   assets[badge.imageUrl] = [badge.permanent ? 'assets/' + badge.imageUrl.split('/').pop() : '../../miniprogram' + badge.imageUrl, 'image/png'];
