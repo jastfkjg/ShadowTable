@@ -1219,9 +1219,9 @@ test('新身份的派生插画、能力说明及结构化查验结果均受主�
   const {presentPrivateIdentity,presentFairyResult}=require('../miniprogram/room-sheet-presentation');
   const identity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 私密角色能力说明。',skillStatus:{title:'尚未启用',detail:'下一轮可用。'}},'evil');
   const data={...base,room:{phase:'tools',code:'123456',team:[],me:{seat:1}},identityChange:identity};
-  assert.doesNotMatch(JSON.stringify(render(data)),/hunter\.png|红猎人|私密角色能力说明/);
+  assert.doesNotMatch(JSON.stringify(render(data)),/hunter-red\.png|红猎人|私密角色能力说明/);
   const shown=render({...data,identityChangeRevealed:true});
-  assert.match(JSON.stringify(shown),/hunter\.png|私密角色能力说明/);
+  assert.match(JSON.stringify(shown),/\/assets\/roles\/hunter-red\.png/);
   const body=nodes(shown).find(n=>n.attr?.class==='process-sheet-body');
   assert.equal(byHandler(body,'acknowledgeIdentity'),undefined);
   assert.ok(byHandler(shown,'acknowledgeIdentity'));assert.ok(byHandler(shown,'hidePrivatePreview'));

@@ -40,12 +40,13 @@ async function main() {
     const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
     if (!assets.size) throw new Error("Web entry has no assets");
     // These images are referenced by rendered views rather than the HTML shell.
+    const { assetNames: roleAssets } = require(require("node:path").join(process.cwd(), "miniprogram/role-portraits"));
     for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg", "/assets/about-merlin.svg",
       ...["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "share-dark", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
       ...["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"].map(name => "/assets/" + name + ".svg"),
       ...["home-wordmark", "home-subtitle", "tab-table", "tab-table-active", "tab-me", "tab-me-active"].map(name => "/assets/" + name + ".png"),
       ...["info", "heart", "sword", "swords", "shield", "shield-good", "spark", "medal", "users", "calendar", "list", "coin"].map(name => "/assets/record-" + name + ".svg"),
-      ...["merlin", "percival", "assassin", "servant", "morgana", "mordred", "oberon", "lancelot", "swordsman", "hunter", "guard", "paladin", "magician", "prophet", "witch", "thief"].map(name => "/assets/roles/" + name + ".png"),
+      ...roleAssets.map(name => "/assets/roles/" + name + ".png"),
       ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {
       const url = new URL(asset, origin);
