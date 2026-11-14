@@ -48,9 +48,12 @@ async function main() {
       const row = Math.floor(i / columnCount), col = i % columnCount;
       const crop = await sharp(input).extract({ left: columns[row][col], top: rows[row], width: columns[row][col + 1] - columns[row][col], height: rows[row + 1] - rows[row] }).png().toBuffer();
       const tile = await sharp(crop).trim().png().toBuffer();
-      await sharp(tile).resize(144, 144, { fit: "contain", background: "#00000000" })
-        .extend({ top: 8, bottom: 8, left: 8, right: 8, background: "#00000000" })
-        .png({ palette: true, colours: 128, compressionLevel: 9 }).toFile(path.join(output, names[i] + ".png"));
+      // The largest portrait slot is 80 CSS pixels. Keep the shared thumbnails
+      // compact enough for all role variants to fit in the mini program's main package.
+      await sharp(tile).resize(100, 100, { fit: "contain", background: "#00000000" })
+        .extend({ top: 6, bottom: 6, left: 6, right: 6, background: "#00000000" })
+        .png({ palette: true, quality: 50, dither: 0.15, compressionLevel: 9, effort: 10 })
+        .toFile(path.join(output, names[i] + ".png"));
       imported.add(names[i]);
     }
   }

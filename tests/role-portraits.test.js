@@ -57,15 +57,15 @@ test("角色资源均为有透明留白的紧凑PNG，缩略图不携带浅色�
     const source = path.join(root, file);
     total += fs.statSync(source).size;
     const meta = await sharp(source).metadata();
-    assert.equal(meta.width, 160, file);
-    assert.equal(meta.height, 160, file);
+    assert.equal(meta.width, 112, file);
+    assert.equal(meta.height, 112, file);
     assert.equal(meta.hasAlpha, true, file);
     const {data, info} = await sharp(source).ensureAlpha().raw().toBuffer({resolveWithObject:true});
     assert.equal(data[3], 0, file);
     assert.equal(data[(info.width * info.height - 1) * 4 + 3], 0, file);
     assert.ok(data.some((value,index) => index % 4 === 3 && value > 0), file);
   }
-  assert.ok(total < 512 * 1024, "角色缩略图超过512KiB");
+  assert.ok(total < 248 * 1024, "角色缩略图超过248KiB");
 });
 
 test('网页与小程序共享角色插画映射，浏览器加载不依赖 CommonJS', () => {
