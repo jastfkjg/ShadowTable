@@ -976,7 +976,7 @@ function beginActivity(room, input) {
     }[kind],
   );
 }
-function settleActivity(room) {
+function settleActivity(room, defaulted = []) {
   requireRule(
     hasActiveOperation(room) && room.phase !== "offlineFinal",
     "当前没有可结算的线上操作",
@@ -1062,7 +1062,7 @@ function settleActivity(room) {
         : {}),
     };
     room.history.push(result);
-    fun.recordQuest(room, result);
+    fun.recordQuest(room, result, faction, defaulted);
   } else {
     const assassin = room.players.find((p) =>
       room.knights
@@ -1149,7 +1149,7 @@ function closeWaitingPolicy(room) {
       "本次操作作废，不代选目标、不产生查验或命中结果。可重新发起或在线下处理。",
   };
 }
-function settleIfComplete(room) {
+function settleIfComplete(room, defaulted = []) {
   // Legacy sequential games retain their original transitions; current clients use tools.
   if (!room.flexible || !room.activity || room.phase === "offlineFinal") return;
   const participants = room.players.filter((p) => actionSpec(room, p.uid));
@@ -1157,7 +1157,7 @@ function settleIfComplete(room) {
     participants.length &&
     participants.every((p) => Object.hasOwn(room.submissions, p.uid))
   )
-    settleActivity(room);
+    settleActivity(room, defaulted);
 }
 function phaseName(room) {
   if (SPECIAL_PHASES.includes(room.phase))
@@ -1563,7 +1563,7 @@ function applyCommand(room, uid, input) {
           : policy.mode;
       }
       next.activity.earlyClosed = true;
-      settleIfComplete(next);
+      settleIfComplete(next, missing.map(player => player.uid));
     }
     Object.assign(room, next);
     return;
@@ -1987,7 +1987,7 @@ function applyCommand(room, uid, input) {
       };
       room.quests.push(result);
       room.history.push({ kind: "quest", ...result });
-      fun.recordQuest(room, result);
+      fun.recordQuest(room, result, faction);
       if (room.quests.filter((q) => !q.success).length === 3) {
         if (room.board === "shadow-assist") stage(room, "offlineFinal");
         else end(room, "evil", "三次任务失败，坏人获胜", "system", { reason: "quest_fail" });

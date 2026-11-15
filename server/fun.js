@@ -1,7 +1,8 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
-const VERSION = "fun-2026-10-v4";
-const { labels, titles, honors, isCombinedRecord } = require("../miniprogram/fun-copy");
+const VERSION = "fun-2026-11-v6";
+const { labels, titles, honors, roleRecords, isCombinedRecord } = require("../miniprogram/fun-copy");
+const { questMembers, questFacts, projectRoleRecords } = require("./role-fun");
 const { roles: variantRoles } = require("./variants");
 const bRoles = new Set(Object.keys(variantRoles).slice(Object.keys(variantRoles).indexOf("blueAwakened")));
 const modes = { voted: "玩家票选", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
@@ -38,6 +39,10 @@ const definitions = [
   ["defense_enemy", labels.defense_enemy, "defense", titles.defense, "次", false],
   ["kill_enemy", labels.kill_enemy, "kill", titles.kill, "次", true, 1],
   ["kill_ally", labels.kill_ally, "kill", titles.kill, "次", false],
+  ...Object.keys(roleRecords).map(id => {
+    const group = id.split("_")[0];
+    return [id, labels[id], group, titles[group], "局", true];
+  }),
   ["final_hit", "最终刺中梅林", "final", "最终带刀", "次", true, 1],
   ["final_miss", "最终歪刀", "final", "最终带刀", "次", false],
   ["final_empty_win", "空刀获胜", "final", "最终带刀", "次", false],
@@ -77,20 +82,23 @@ const definitions = [
       false,
     ],
   ]),
-].map(([id, label, group, title, unit, positive, rateThreshold]) => ({
-  id,
-  countOnly: !!honors[id]?.countOnly,
-  label,
-  group,
-  title,
-  unit,
-  positive,
-  ranked: positive || Object.hasOwn(extraRankings, id),
-  rankLabel: extraRankings[id]?.label || label,
-  rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
-  rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
-  ...(honors[id] ? { honorTitle: honors[id].title, description: honors[id].description } : {}),
-}));
+].map(([id, label, group, title, unit, positive, rateThreshold]) => {
+  const record = honors[id] || roleRecords[id];
+  return {
+    id,
+    countOnly: !!record?.countOnly,
+    label,
+    group,
+    title,
+    unit,
+    positive,
+    ranked: !Object.hasOwn(roleRecords, id) && (positive || Object.hasOwn(extraRankings, id)),
+    rankLabel: extraRankings[id]?.label || label,
+    rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
+    rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
+    ...(record ? { honorTitle: record.title, description: record.description } : {}),
+  };
+});
 const metrics = Object.fromEntries(definitions.map((item) => [item.id, item]));
 const combatType = (role) =>
   ["blueHunter", "redHunter"].includes(role)
@@ -231,7 +239,7 @@ function terminal(room, facts, roles, source) {
       : {}),
   };
 }
-function recordQuest(room, result) {
+function recordQuest(room, result, faction, defaulted = []) {
   if (!room.fun) return;
   room.fun.events.push({
     id: "quest:" + (result.number ?? result.round),
@@ -241,12 +249,14 @@ function recordQuest(room, result) {
     threshold: result.threshold,
     fails: result.fails,
     team: [...result.team],
+    members: questMembers(room, result.team, faction, defaulted),
   });
 }
 function project(record, players, roles) {
   const state = record.funFacts;
   const mode = modeFor(record.board),
     t = state?.terminal;
+  const quests = questFacts(record, record.players || players);
   const defenses = mode === "knights" ? defenseFacts(record, players) : null;
   const excluded = !!record.excludedReason;
   const labelRole = (id) =>
@@ -265,6 +275,13 @@ function project(record, players, roles) {
         opportunities,
         status: excluded ? "excluded" : known ? "known" : "unknown",
       });
+    projectRoleRecords(record, quests, player, initial, (id, role, achieved, known, detail, round) => {
+      add(id, role, Number(!!achieved), 0, !!(achieved || known));
+      if (achieved && !excluded) events.push({
+        id: (id.startsWith("reverse_") ? "final-" : "") + id,
+        role: labelRole(role), label: labels[id], detail, ...(round ? { round } : {}),
+      });
+    });
     if (record.honorResult?.status === "settled" && !player.uid.startsWith("test:") && ["win", "loss"].includes(player.outcome)) {
       for (const key of ["mvp", "svp"]) {
         const award = record.honorResult[key].find(p => p.seat === player.seat);
@@ -606,7 +623,7 @@ function aggregate(rows, legacyGames = 0) {
 }
 function publicMetrics() {
   return definitions
-    .filter((item) => honors[item.id])
+    .filter((item) => honors[item.id] && item.ranked)
     .sort((a,b) => Number(a.countOnly) - Number(b.countOnly))
     .map((item) => ({ ...item, title: item.honorTitle, label: labels[item.id] || item.rankLabel, key: "fun_" + item.id }));
 }

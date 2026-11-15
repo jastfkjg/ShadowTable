@@ -16,7 +16,18 @@
     knife_enemy: "刀中敌方", knife_ally: "刀中友方",
     duel_enemy: "决斗敌方", duel_ally: "决斗友方",
   };
-  const titles = { survival: "生存趣事", honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能" };
+  const titles = { survival: "生存趣事", honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能",
+    reverse: "逆仆", lancelot: "兰斯洛特", servant: "忠臣", morgana: "莫甘娜", mordred: "莫德雷德", oberon: "奥伯伦" };
+  const roleRecords = Object.fromEntries(Object.entries({
+    reverse_guard: ["首席护卫", "躲过逆仆刀，留在蓝方，随后梅林刀落到本人身上。"],
+    reverse_recruit: ["最佳新援", "被逆仆刀命中后转为红方，随后梅林被刺中，本人随红方获胜。"],
+    lancelot_both: ["双面骑士", "同一局以蓝方兰斯洛特身份参加过成功任务，又以红方兰斯洛特身份亲手提交过失败牌，顺序不限。"],
+    servant_all_green: ["圆桌劳模", "同一局以忠臣身份参加了三次成功任务。"],
+    servant_bench_win: ["躺赢大师", "在任务名单完整的对局中，忠臣一次正式任务都没上车，最终随蓝方获胜。"],
+    morgana_with_percival: ["梅林二号", "同一局以莫甘娜身份与真正的派西维尔一起参加了至少两次已结算的任务。"],
+    mordred_last_bust: ["深藏不露", "三次任务失败时，莫德雷德在第三次失败的任务中是车上唯一红方。"],
+    oberon_two_busts: ["最强独狼", "同一局以奥伯伦身份亲手在两次任务里提交失败牌，且两次任务均失败。"],
+  }).map(([id, [title, description]]) => [id, { title, description, countOnly: true }]));
   const honors = {
     survival_revive: { title: "我在阿瓦隆玩重生", description: "十二骑士中实际复活的次数，包含刀、决斗、猎人、魔术师换号、女巫替死及铠甲等导致的复活", countOnly: true },
     survival_knifed: { title: "全民公敌", description: "十二骑士中承受轮内刀和最终刀的次数，按换号及替死后的实际承受者统计；无论是否生效或复活都计入，不含枪和决斗", countOnly: true },
@@ -49,26 +60,30 @@
     kill_enemy: "成功击杀对方的次数", kill_ally: "成功击杀友方的次数",
   };
   const killIdentities = "蓝刀客·加雷斯、蓝刀客·加赫雷斯、红刀客·奥伯伦、蓝兰斯洛特、红兰斯洛特、刺客、觉醒蓝刀客、觉醒红刀客、蓝骑士、红骑士、蓝猎人、红猎人";
-  for (const [id, honor] of Object.entries(honors)) {
-    honor.roleLabel = identities[id.split("_")[0]];
+  for (const [id, record] of Object.entries(roleRecords)) labels[id] = record.title;
+  const recordDetails = { ...honors, ...roleRecords };
+  for (const [id, honor] of Object.entries(recordDetails)) {
+    const group = id.split("_")[0];
+    honor.roleLabel = identities[group] || titles[group];
     honor.roleDetail = id.startsWith("kill_") ? killIdentities : honor.roleLabel;
-    honor.conditionLabel = conditions[id];
+    honor.conditionLabel = conditions[id] || honor.description;
   }
   const descriptions = {
     survival: "复活按实际回场计数；被刀包含轮内刀和最终刀，按换号、替死后的承受者统计，无论是否生效或复活。",
     assassin: "仅统计刺客的非空最终刺杀。",
   };
   const modeLabels = { all: '全部玩法', classic: '经典', knights: '十二骑士', other: '扩展玩法' };
-  const combinedRecords = new Set(['merlin_evade', 'merlin_hit', 'percival_green', 'percival_bust']);
+  const combinedRecords = new Set(['merlin_evade', 'merlin_hit', 'percival_green', 'percival_bust', ...Object.keys(roleRecords)]);
   const isCombinedRecord = id => combinedRecords.has(id);
   function metric(row) {
     const id = row.id || row.key?.replace(/^fun_/, "");
-    const title = row.key && honors[id] ? honors[id].title : titles[id?.split("_")[0]];
+    const record = recordDetails[id];
+    const title = row.key && record ? record.title : titles[id?.split("_")[0]];
     return { ...row, ...(labels[id] ? { label: labels[id],
       ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}) } : {}),
       ...(row.title !== undefined && title ? { title } : {}),
-      ...(honors[id] ? { countOnly: !!honors[id].countOnly, honorTitle: honors[id].title, description: honors[id].description,
-        roleLabel: honors[id].roleLabel, roleDetail: honors[id].roleDetail, conditionLabel: honors[id].conditionLabel } : {}) };
+      ...(record ? { countOnly: !!record.countOnly, honorTitle: record.title, description: record.description,
+        roleLabel: record.roleLabel, roleDetail: record.roleDetail, conditionLabel: record.conditionLabel } : {}) };
   }
   function legacyLabel(label, type) {
     if (label === "三绿达成") return labels.percival_green;
@@ -115,6 +130,9 @@
       shield: ['record-shield-good.svg', 'green'], assassin: ['roles/assassin.png', 'portrait'],
       defense: ['record-shield.svg', 'gold'], kill: ['record-swords.svg', 'blue'],
       knife: ['roles/swordsman.png', 'portrait'], gun: ['roles/hunter.png', 'portrait'], duel: ['roles/lancelot.png', 'portrait'],
+      reverse: ['roles/reverse.png', 'portrait'], lancelot: ['roles/lancelot.png', 'portrait'],
+      servant: ['roles/servant.png', 'portrait'], morgana: ['roles/morgana.png', 'portrait'],
+      mordred: ['roles/mordred.png', 'portrait'], oberon: ['roles/oberon.png', 'portrait'],
     };
     const tiles = recordEntries(cards, splitModes).map(({ card, row }) => {
       const group = card.id.split(':').pop(), mode = row.mode || card.mode || card.id.split(':')[0];
@@ -273,5 +291,5 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response };
+  return { labels, titles, honors, roleRecords, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response };
 });
