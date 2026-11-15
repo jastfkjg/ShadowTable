@@ -37,6 +37,31 @@ test('小程序9、11人逆仆由房主在结束流程填写两刀，计分和�
   }
 });
 
+test('小程序通用结束表单直接支持11／12人红蓝兰斯计分，按转换后的阵营结算', async () => {
+  const { newRoom, enter, command, publicView } = require('../server/engine');
+  for (const capacity of [11, 12]) {
+    const room = newRoom('123456', 'wx:1', '房主', 'lancelot', capacity);
+    const run = (type, extra = {}) => command(room, room.host, { type, stage: room.stage, ...extra });
+    for (let i = 2; i <= capacity; i++) enter(room, `wx:${i}`, `玩家${i}`);
+    run('updateSettings', { board: room.board, capacity, visible: false, scoreEnabled: true });
+    room.players.forEach(player => player.ready = true);run('start', { flexible: true });
+    room.lancelot.conversions = [true];run('beginActivity', { kind: 'conversion' });
+    const red = room.players.find(player => room.roles[player.uid] === 'redLancelot');
+    const p = page({});p.data.room = publicView(room, room.host);
+    const submissions = [];
+    p.cmd = async (type, input) => { submissions.push({ type, ...input });run(type, input);p.data.room = publicView(room, room.host); };
+    p.finishTools();p.pickScoreReason({ currentTarget: { dataset: { id: 'assassination' } } });p.nextResult();
+    assert.equal(p.data.resultStep, 'target');
+    p.pickScoreTarget({ currentTarget: { dataset: { seat: red.seat } } });p.nextResult();
+    assert.equal(p.data.resultStep, 'review');
+    await p.saveResult();
+    assert.deepEqual(submissions, [{ type: 'finishTools', replace: true, scoreReason: 'assassination', scoreTarget: red.seat }]);
+    assert.equal(p.data.room.phase, 'ended');
+    const player = room.matchRecord.players.find(player => player.uid === red.uid);
+    assert.equal(player.faction, 'good');assert.equal(player.score.total, 15);
+  }
+});
+
 function page(api, storage = new Map(), layout, lobby = false) {
   let definition;
   const scrolls = [];
