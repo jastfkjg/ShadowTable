@@ -2,17 +2,19 @@
 .match-details { --match-story-line: rgba(177,191,198,.16); padding: 14px; font-size: 13px; line-height: 1.6; border-radius: 12px; background: var(--surface); overflow-wrap: anywhere; }
 .match-entry .match-details { margin: 0 12px 12px; background: var(--bg); }
 .match-entry.match-expanded { padding-bottom: 1px; }
-.match-details .match-result { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 12px; font-size: 12px; }
-.match-details .match-source { color: var(--muted); font-size: 12px; }
+.match-details .match-result { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 4px; font-size: 16px; font-weight: 600; }
+.match-details .match-source { color: var(--muted); font-size: 12px; font-weight: 400; }
 .match-details .match-source::before { display: none; }
 .match-details .match-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 4px 0; font-size: 12px; }
 .match-detail-row > text:first-child, .match-detail-row > span:first-child { flex: 1; min-width: 0; color: var(--muted); }
 .match-detail-row > text:last-child, .match-detail-row > span:last-child { max-width: 65%; text-align: right; }
-.match-details .score-breakdown { border-top: 1px solid var(--match-story-line); margin: 12px 0 0; padding: 8px 0 0; }
+.match-details .score-breakdown { border-top: 1px solid var(--match-story-line); margin: 10px 0 0; padding: 12px 0 0; }
 .match-details .score-total { align-items: center; margin: 0 0 4px; padding: 0; }
+.match-details .score-total > text:first-child, .match-details .score-total > span:first-child { color: var(--text); font-size: 14px; font-weight: 600; }
 .match-details .match-score-value { color: var(--accent); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .match-score-unit { font-size: 12px; margin-left: 3px; font-weight: 400; }
 .match-fun { --match-story-line: rgba(177,191,198,.16); border-top: 1px solid var(--match-story-line); padding: 16px 0 0; margin: 16px 0 0; }
+.match-details .match-fun { padding: 12px 0 0; margin: 12px 0 0; }
 .match-story-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .match-story-heading .match-section-label { font-size: 14px; font-weight: 600; }
 .match-story-count { color: var(--muted); font-size: 12px; flex-shrink: 0; }
@@ -31,7 +33,26 @@
 .match-event-label { font-size: 12px; line-height: 1.7; flex-shrink: 0; max-width: calc(100% - 20px); overflow-wrap: anywhere; }
 .match-event-role { display: block; font-size: 12px; color: var(--muted); }
 .match-event-detail { flex: 1; min-width: 110px; margin-left: auto; text-align: right; font-size: 12px; line-height: 1.7; color: var(--muted); overflow-wrap: anywhere; }
-.match-details .match-members-section { margin: 4px 0 -14px; border-top: 1px solid var(--match-story-line); }
+.match-details .match-timeline { padding-top: 8px; }
+.match-details .match-round { padding-bottom: 12px; }
+.match-details .match-round:last-child { padding-bottom: 0; }
+.match-round-compact::before { display: none; }
+.match-details .match-timeline .fun-event { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 8px; padding: 3px 0; }
+.match-details .match-round-compact .fun-event { grid-template-columns: 16px minmax(0, 1fr) auto; }
+.match-details .match-event-icon { width: 16px; height: 16px; margin-top: 3px; }
+.match-event-copy { min-width: 0; }
+.match-event-copy .match-event-label { max-width: none; font-size: 13px; font-weight: 600; }
+.match-event-copy .match-event-role { font-weight: 400; }
+.match-event-copy .match-event-detail { display: block; min-width: 0; margin: 0; padding: 0; text-align: left; }
+.match-event-stage { color: var(--muted); font-size: 12px; }
+.match-details .honor-result.is-settled { border-color: var(--match-story-line); margin: 12px 0 0; padding-top: 12px; }
+.match-details .honor-result-heading { margin-bottom: 8px; }
+.match-details .honor-award { padding: 8px; }
+.match-details .honor-award-heading { margin-bottom: 5px; }
+.match-details .honor-winner { gap: 6px; }
+.match-details .honor-winner .honor-avatar { width: 26px; height: 26px; }
+.match-details .honor-winner .honor-player-name { font-size: 13px; }
+.match-details .match-members-section { margin: 8px 0 -14px; border-top: 1px solid var(--match-story-line); }
 .match-details button.match-members-toggle { position: relative; justify-content: space-between; width: 100%; margin: 0; min-height: 48px; padding: 10px 0; border-radius: 0; text-align: left; font-size: 13px; font-weight: 400; gap: 8px; }
 .match-members-icon { width: 16px; height: 16px; flex-shrink: 0; }
 .match-members-label { flex: 1; min-width: 0; }

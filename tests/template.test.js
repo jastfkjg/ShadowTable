@@ -298,6 +298,8 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
 
   records[0].expanded = true;
   assert.match(text(render()), /坏人获胜/);
+  assert.doesNotMatch(text(render()), /分享这场对局/);
+  assert.equal(byHandler(render(), 'historyShareRecord'), undefined);
   assert.match(text(render()), /同桌成员/);
   assert.match(text(render()), /本局暂无过程记录/);
   assert.doesNotMatch(text(render()), /我的趣味记录|林间/);
@@ -2086,6 +2088,41 @@ test('对局趣味时间线按轮次归组，保留同轮多身份、长详情�
   const record={...require('../miniprogram/profile').presentMatches([{endedAt:1,members:[],fun:{events}}])[0],expanded:true};
   const text=JSON.stringify(renderHistoryShell({records:[record],loaded:true,total:1}));
   for(const value of ['第 1 轮','第 2 轮','蓝刀客·加雷斯','红骑士','实际承受者5号','最终目标：4号','保留旧记录的说明']) assert.ok(text.includes(value),value);
+});
+
+test('对局记录合并同一次终局刺杀，轮内受刀及累计指标分别保留', () => {
+  const { presentMatches } = require('../miniprogram/profile');
+  const { matchStory } = require('../miniprogram/fun-copy');
+  const fun = {
+    initialRole: '梅林',
+    events: [
+      {id:'final-received', label:'被刀', detail:'最终刀落到本人'},
+      {id:'final', role:'梅林', label:'被刺中', detail:'最终目标：2号 · 房主登记'},
+    ],
+    highlights: [{id:'merlin_hit', count:1}, {id:'survival_knifed', count:1}],
+  };
+  const [record] = presentMatches([{role:'梅林', endedAt:1, members:[], fun}]);
+  assert.deepEqual(record.funHighlights.map(row => row.label), ['终局被刺中']);
+  const tree = renderHistoryShell({records:[{...record, expanded:true}], loaded:true, total:1});
+  const rendered = JSON.stringify(tree);
+  assert.match(rendered, /最终目标为本人（2 号）/);
+  assert.match(rendered, /match-round-compact/);
+  assert.match(rendered, /1 条/);
+  assert.doesNotMatch(rendered, /最终刀落到本人|终局记录|2 条/);
+  assert.equal(record.fun.highlights.find(row => row.id === 'survival_knifed').count, 1);
+  assert.equal(fun.events.length, 2);
+
+  const legacy = require('../miniprogram/fun-copy').story(fun);
+  const legacyTree = renderHistoryShell({records:[{...record, fun:legacy, expanded:true}], loaded:true, total:1});
+  assert.equal(nodes(legacyTree).find(node => node.attr?.class === 'match-story-count').children.join(''), '2 条');
+  const received = {id:'r1:received', round:1, kind:'receivedKnife', label:'被刀', detail:'3号出刀 · 目标出局'};
+  const mixed = matchStory({events:[received, ...fun.events], highlights:[fun.highlights[0], {id:'survival_knifed', count:2}]});
+  assert.deepEqual(mixed.eventGroups.map(group => group.events.map(event => event.id)), [['r1:received'], ['final']]);
+  assert.equal(mixed.matchHighlights.find(row => row.id === 'survival_knifed').count, 1);
+  assert.deepEqual(matchStory(mixed), mixed);
+  const onlyReceived = matchStory({events:[fun.events[0]]});
+  assert.equal(onlyReceived.eventCount, 1);
+  assert.equal(onlyReceived.eventGroups[0].compact, true);
 });
 
 test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情不含冗余说明', () => {

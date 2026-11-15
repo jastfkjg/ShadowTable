@@ -48,13 +48,13 @@ function presentFun(value) {
 }
 function presentMatches(records) {
   return records.map(record => {
-    record = { ...record, fun: funCopy.story(record.fun) };
+    record = { ...record, fun: funCopy.matchStory(record.fun) };
     const date = new Date(record.endedAt);
     const validDate = !Number.isNaN(date.getTime());
     const pad = value => String(value).padStart(2, "0");
     const hasFunEvents = !!record.fun?.events?.length;
     const funNote = record.fun?.status === "legacy" && !hasFunEvents ? "本局暂无过程记录" : record.fun?.reason || "";
-    const funHighlights = (record.fun?.highlights || [])
+    const funHighlights = (record.fun?.matchHighlights || [])
       .filter(item => item.id !== "final_miss" && !String(item.id || "").endsWith("_failed")
         && !["最终歪刀", "未生效"].includes(item.label))
       .slice(0, 2).map(item => ({ ...item,

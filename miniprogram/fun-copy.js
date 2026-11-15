@@ -222,6 +222,33 @@
       ...(value.highlights ? { highlights: value.highlights.map(metric) } : {}),
       ...(value.events ? { events } : {}) };
   }
+  function matchStory(value) {
+    const result = story(value);
+    if (!result) return result;
+    const events = result.events || [];
+    const hit = events.find(event => event.id === "final" && event.label === labels.merlin_hit);
+    const duplicate = !!hit && events.some(event => event.id === "final-received");
+    const displayEvents = events.filter(event => !duplicate || event.id !== "final-received").map(event => {
+      if (event !== hit) return event;
+      const target = /^最终目标：\s*(\d+)\s*号(?:\s*·\s*(?:系统结算|房主登记))?$/.exec(event.detail || "");
+      return target ? { ...event, detail: `最终目标为本人（${target[1]} 号）` } : event;
+    });
+    const matchHighlights = (result.highlights || []).map(item => {
+      if (item.id === "merlin_hit") return { ...item, label: "终局被刺中" };
+      if (duplicate && item.id === "survival_knifed") return { ...item, count: item.count - 1, label: "轮内被刀" };
+      return item;
+    }).filter(item => item.count > 0);
+    return {
+      ...result,
+      matchHighlights,
+      eventCount: displayEvents.length,
+      eventGroups: groupEvents(displayEvents).map(group => ({
+        ...group,
+        label: group.id === "final" ? "终局" : group.label,
+        compact: group.id === "final" && group.events.length === 1,
+      })),
+    };
+  }
   function leaderboard(value) {
     const id = value.metric?.replace(/^fun_/, "");
     return { ...value,
@@ -246,5 +273,5 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, metric, summary, records, isCombinedRecord, recordInfo, story, groupEvents, leaderboard, response };
+  return { labels, titles, honors, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response };
 });

@@ -2350,17 +2350,30 @@ function roomListItems(rooms) {
     } catch (e) { if (sequence === matchSequence && route === routeSequence) setState({ matchesError: e.message }); }
     finally { if (sequence === matchSequence && route === routeSequence) setState({ matchesLoading: false }); }
   }
-  function viewFunStory(record) {
+  function viewFunStory(record, matchRole = null) {
     if (!record) return '';
-    record = funCopy.story(record);
+    const isMatch = matchRole !== null;
+    record = isMatch ? record : funCopy.story(record);
     const events = record.events || [];
-    let html = '<section class="match-fun"><div class="match-story-heading"><span class="match-section-label">我的趣味记录</span><span class="match-story-count">共 ' + events.length + ' 条</span></div>';
-    if (record.initialRole) html += '<div class="match-note muted">初始身份：' + esc(record.initialRole) + '</div>';
-    if (record.reason) html += '<div class="match-note muted">' + esc(record.reason) + '</div>';
+    let notes = '';
+    if (record.initialRole && record.initialRole !== matchRole) notes += '<div class="match-note muted">初始身份：' + esc(record.initialRole) + '</div>';
+    if (record.reason) notes += '<div class="match-note muted">' + esc(record.reason) + '</div>';
+    if (isMatch && !record.eventCount) return notes;
+    let html = '<section class="match-fun"><div class="match-story-heading"><span class="match-section-label">我的趣味记录</span><span class="match-story-count">' + (isMatch ? record.eventCount : events.length) + ' 条</span></div>' + notes;
     html += '<div class="match-timeline">';
     for (const group of record.eventGroups) {
-      html += '<div class="match-round"><div class="match-round-marker">' + esc(group.marker) + '</div><div class="match-round-body"><div class="match-round-heading"><span>' + esc(group.label) + '</span>' + (group.role ? '<span class="match-round-role">' + esc(group.role) + '</span>' : '') + '</div>';
-      for (const event of group.events) html += '<div class="fun-event"><img class="match-event-icon" src="' + esc(event.icon) + '" alt="" /><div class="match-event-label"><span>' + esc(event.label) + '</span>' + (group.showEventRoles && event.role ? '<span class="match-event-role">' + esc(event.role) + '</span>' : '') + '</div>' + (event.detail ? '<span class="match-event-detail">' + esc(event.detail) + '</span>' : '') + '</div>';
+      html += '<div class="match-round' + (group.compact ? ' match-round-compact' : '') + '">';
+      if (!group.compact) html += '<div class="match-round-marker">' + esc(group.marker) + '</div>';
+      html += '<div class="match-round-body">';
+      if (!group.compact) html += '<div class="match-round-heading"><span>' + esc(group.label) + '</span>' + (group.role ? '<span class="match-round-role">' + esc(group.role) + '</span>' : '') + '</div>';
+      for (const event of group.events) {
+        const showRole = event.role && (group.showEventRoles || (group.compact && event.role !== matchRole));
+        const label = '<div class="match-event-label"><span>' + esc(event.label) + '</span>' + (showRole ? '<span class="match-event-role">' + esc(event.role) + '</span>' : '') + '</div>';
+        const detail = event.detail ? '<span class="match-event-detail">' + esc(event.detail) + '</span>' : '';
+        html += '<div class="fun-event"><img class="match-event-icon" src="' + esc(event.icon) + '" alt="" />'
+          + (isMatch ? '<div class="match-event-copy">' + label + detail + '</div>' : label + detail)
+          + (group.compact ? '<span class="match-event-stage">终局</span>' : '') + '</div>';
+      }
       html += '</div></div>';
     }
     if (!events.length && !record.reason) html += '<div class="small muted">本局没有适用的趣味事件。</div>';
@@ -2370,7 +2383,7 @@ function roomListItems(rooms) {
     const winner = ({good:'好人',evil:'坏人',third:'盗贼'})[record.winner];
     let html = '<div class="match-details"><div class="match-result"><span>' + (winner ? winner + '获胜' : '胜方未登记') + '</span><span class="match-source muted">' + ({manual:'房主登记',system:'系统判定'}[record.source] || '未判定') + '</span></div>';
     for (const [label, value] of [['不计入原因',record.excludedReason],['结束原因',record.scoreEndReason]]) if (value) html += '<div class="match-detail-row"><span>' + label + '</span><span>' + esc(value) + '</span></div>';
-    html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun) + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures));
+    html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun, record.role || '') + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures), true);
     if (record.members?.length) html += '<details class="match-members-section"><summary class="match-members-toggle"><img class="match-members-icon" src="/assets/record-users.svg" alt="" /><span>同桌成员 <span class="match-member-count">' + record.members.length + '人</span></span></summary><div class="match-members">' + record.members.map(member => '<div class="match-member"><span class="match-seat">' + member.seat + '号</span><span class="match-member-name">' + esc(member.name) + (member.seat === record.seat ? '（我）' : '') + '</span></div>').join('') + '</div></details>';
     return html + '</div>';
   }
@@ -2378,14 +2391,14 @@ function roomListItems(rooms) {
     return player.avatarUrl ? '<img class="honor-avatar" src="' + esc(player.avatarUrl) + '" alt="" data-honor-avatar />'
       : '<span class="honor-avatar honor-initial" aria-hidden="true">' + esc(player.initial) + '</span>';
   }
-  function viewHonors(h) {
+  function viewHonors(h, compactTitles = false) {
     if (!h) return '';
     let html = '<section class="honor-result' + (h.status === 'settled' ? ' is-settled' : '') + '" aria-label="本场最佳票选">';
     if (h.status === 'not_started') html += '<div class="honor-heading">谁是本场最佳？</div>' + (h.canStart ? btn('primary honor-primary','startHonors','发起 MVP / SVP 投票',null,state.busy || !!pending) : '<div class="honor-help">等待房主发起票选</div>');
     else if (h.status === 'open') html += '<div class="honor-heading">本场最佳 · 投票中</div><div class="honor-progress"><span>' + h.completed + ' / ' + h.total + ' 人已投票</span></div>' + (h.canClose && h.pendingLabel ? '<div class="honor-help honor-pending">未投票：' + esc(h.pendingLabel) + '</div>' : '') + (h.canVote ? btn('primary honor-primary','openHonors',h.ballot ? '已提交 · 修改投票' : '投出我的 MVP / SVP',null,state.busy || !!pending) : '') + '<div class="honor-footnote">至少 ' + h.required + ' 人完成投票才颁奖 · 匿名票选</div>' + (h.canClose ? btn('text-button honor-close-poll','closeHonors','结束投票并结算',null,state.busy || !!pending) : '');
     else if (h.status === 'settled') {
       html += '<div class="honor-result-heading"><div class="honor-heading">本场最佳</div><div class="honor-help">' + h.completed + ' / ' + h.total + ' 人票选</div></div><div class="honor-awards">';
-      for (const award of h.awards) html += '<div class="honor-award ' + award.key + '"><div class="honor-award-heading"><span>' + award.title + '</span>' + (award.tied ? '<span class="honor-tied" aria-label="并列获奖">并列</span>' : '') + '</div><div class="honor-winners">' + award.players.map(player => '<div class="honor-winner">' + honorAvatar(player) + '<div class="honor-player-copy"><div class="honor-player-name">' + esc(player.name) + '</div><div class="honor-player-meta">' + player.seat + ' 号 · <span class="honor-votes">' + player.votes + ' 票</span></div></div></div>').join('') + '</div>' + (award.players.length ? '' : '<div class="honor-help">暂无有效选票</div>') + '</div>';
+      for (const award of h.awards) html += '<div class="honor-award ' + award.key + '"><div class="honor-award-heading"><span>' + (compactTitles ? award.key.toUpperCase() : award.title) + '</span>' + (award.tied ? '<span class="honor-tied" aria-label="并列获奖">并列</span>' : '') + '</div><div class="honor-winners">' + award.players.map(player => '<div class="honor-winner">' + honorAvatar(player) + '<div class="honor-player-copy"><div class="honor-player-name">' + esc(player.name) + '</div><div class="honor-player-meta">' + player.seat + ' 号 · <span class="honor-votes">' + player.votes + ' 票</span></div></div></div>').join('') + '</div>' + (award.players.length ? '' : '<div class="honor-help">暂无有效选票</div>') + '</div>';
       html += '</div>';
     } else html += '<div class="honor-help">' + esc(h.resultNote) + '</div>';
     return html + '</section>';
@@ -2439,8 +2452,10 @@ function roomListItems(rooms) {
     if (state.matchesError) html += '<div class="inline-error" role="alert">' + esc(state.matchesError) + btn('secondary','loadMatches','重试') + '</div>';
     if (!state.matches.length) html += '<div class="muted" role="status">' + (state.matchesLoading ? '正在读取对局…' : '暂无对局记录') + '</div>';
     else html += '<div class="small muted">共 ' + state.matchesTotal + ' 场对局</div>';
-    state.matches.forEach(record => {
-      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (record.fun?.highlights?.length ? '<div class="match-fun-label">' + record.fun.highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewMatchDetails(record) + '</details>';
+    state.matches.forEach(match => {
+      const record = { ...match, fun: funCopy.matchStory(match.fun) };
+      const highlights = record.fun?.matchHighlights || [];
+      html += '<details class="stats-match"><summary><div class="stats-row"><span>' + esc(record.boardName) + ' · ' + record.capacity + '人</span><span class="stats-outcome ' + esc(record.outcome) + '">' + ({win:'胜利',loss:'失利',excluded:'不计入战绩'})[record.outcome] + '</span></div><div class="small muted">' + esc(new Date(record.endedAt).toLocaleString('zh-CN',{hour12:false})) + ' · 我的身份：' + esc(record.role) + '</div><div class="' + (record.score?.status === 'scored' ? 'accent' : 'muted') + '">' + (record.score?.status === 'scored' ? (record.score.total >= 0 ? '+' : '') + record.score.total + ' 分' : record.score?.status === 'excluded' ? '不计积分' : '积分未启用') + '</div>' + (highlights.length ? '<div class="match-fun-label">' + highlights.slice(0,2).map(item=>esc(item.label)+(item.count>1 ? ' ×'+item.count : '')).join(' · ') + '</div>' : '') + '</summary>' + viewMatchDetails(record) + '</details>';
     });
     if (state.matchesMore) html += btn('secondary','moreMatches',state.matchesLoading ? '正在加载…' : '加载更多',null,state.matchesLoading);
     if(scoreAdjustmentRecords.length && !state.matchFun) {

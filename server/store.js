@@ -343,7 +343,7 @@ class Store {
     const recent = this.db.prepare("SELECT p.match_id,m.snapshot AS game, p.snapshot AS player FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? ORDER BY p.ended DESC,p.match_id DESC LIMIT 20").all(uid)
       .map(row => {
         const shown = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
-        const { scorePolicy, scoringFacts, scoreEligibilityReason, scoreExcludedReason, funFacts, companions, replay: replayFacts, ...game } = shown.game;
+        const { scorePolicy, scoringFacts, reverseStrike, scoreEligibilityReason, scoreExcludedReason, funFacts, companions, replay: replayFacts, ...game } = shown.game;
         const { roleId, ...player } = shown.player;
         return { ...game, ...player, fun: funCopy.story(player.fun) };
       });
@@ -371,9 +371,19 @@ class Store {
     const players = this.matchParticipants(match);
     if (!players.length || players.some(player => !player.roleId || player.faction === "unknown")) throw new RuleError("身份信息不完整，不能更正计分");
     if (option.requiresTarget && !scoring.validTarget(input.scoreTarget, players, match.board, match.scorePolicy)) throw new RuleError("请选择实际在场刺杀目标或空刀");
+    const reverseError = scoring.reverseSettlementError(match, option.id, true);
+    if (reverseError) throw new RuleError(reverseError);
     const before = {winner:match.winner, facts:match.scoringFacts, revision:match.scoreRevision || 0};
     match.winner = scoring.resolveWinner(option, input.scoreTarget, players, match.board, match.scorePolicy);
     match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
+    let factionChanged = false;
+    for (const player of players) {
+      const faction = scoring.settlementFaction(player, match);
+      if (faction !== player.faction) factionChanged = true;
+      player.faction = faction;
+      player.outcome = faction === match.winner ? "win" : "loss";
+    }
+    match.companions = players.filter(companion).map(companionContext);
     match.source = "manual"; match.excludedReason = null; match.scoreExcludedReason = null;
     if (match.funFacts) {
       const knight = fun.modeFor(match.board) === "knights";
@@ -388,11 +398,11 @@ class Store {
     for (const {uid,...player} of players) {
       if (uid.startsWith("test:")) continue;
       player.outcome = player.faction === match.winner ? "win" : "loss";
-      this.db.prepare("UPDATE match_players SET outcome=?,snapshot=? WHERE match_id=? AND uid=?").run(player.outcome,JSON.stringify(player),id,uid);
+      this.db.prepare("UPDATE match_players SET faction=?,outcome=?,snapshot=? WHERE match_id=? AND uid=?").run(player.faction,player.outcome,JSON.stringify(player),id,uid);
       this.db.prepare("UPDATE match_scores SET status='scored' WHERE match_id=? AND uid=?").run(id,uid);
       this.rebuildScores(uid, id);
     }
-    if (before.winner !== match.winner) {
+    if (before.winner !== match.winner || factionChanged) {
       require("./honors").invalidate(this, id);
       match.honorResult = { status: "invalidated", mvp: [], svp: [] };
     }
@@ -442,7 +452,12 @@ class Store {
       const saved = JSON.parse(archived.snapshot);
       room.recordManagement = management.control(this,saved.id);
       room.matchRecord = {...saved,players:this.matchParticipants(saved)};
-      if (saved.id === resultId) {room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;}
+      if (saved.id === resultId) {
+        room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;
+        if (scoring.usesReverseRules(saved)) {
+          room.convertedReverse = room.matchRecord.players.find(player => player.roleId === "reverse" && player.faction === "evil")?.uid || null;
+        }
+      }
       this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room),room.code);
     }
   }

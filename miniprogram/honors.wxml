@@ -17,7 +17,7 @@
       <view class="honor-result-heading"><view class="honor-heading">本场最佳</view><view class="honor-help">{{honors.completed}} / {{honors.total}} 人票选</view></view>
       <view class="honor-awards">
         <view wx:for="{{honors.awards}}" wx:for-item="award" wx:key="key" class="honor-award {{award.key}}">
-          <view class="honor-award-heading"><text>{{award.title}}</text><text wx:if="{{award.tied}}" class="honor-tied" aria-label="并列获奖">并列</text></view>
+          <view class="honor-award-heading"><text>{{compactTitles?(award.key==='mvp'?'MVP':'SVP'):award.title}}</text><text wx:if="{{award.tied}}" class="honor-tied" aria-label="并列获奖">并列</text></view>
           <view class="honor-winners">
             <view wx:for="{{award.players}}" wx:for-item="player" wx:key="seat" class="honor-winner">
               <image wx:if="{{player.avatarUrl}}" class="honor-avatar" src="{{player.avatarUrl}}" mode="aspectFill" binderror="honorAvatarError" data-url="{{player.avatarUrl}}" aria-hidden="true" />

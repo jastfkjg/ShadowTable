@@ -254,6 +254,10 @@ function stage(room, phase) {
   room.submissions = {};
 }
 function end(room, winner, reason, source = "system", facts = null) {
+  if (facts && !scoring.exclusion(room)) {
+    const error = scoring.reverseSettlementError(room, facts.reason);
+    requireRule(!error, error);
+  }
   room.result = { winner, reason, source };
   room.scoringFacts = facts;
   if (room.fun) room.fun.terminal = fun.terminal(room, facts || room.fun.pendingTerminal, ROLES, source);
@@ -280,6 +284,7 @@ function archiveResult(room) {
     recordPurpose: room.recordPurpose || "normal",
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
+    ...(scoring.usesReverseRules(room) ? { reverseStrike: room.reverseStrike || null } : {}),
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
     funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
@@ -454,6 +459,7 @@ function start(room, flexible = false) {
   room.result = null;
   room.proposalSubmitted = false;
   room.convertedReverse = null;
+  room.reverseStrike = null;
   room.flexible = flexible;
   room.activity = null;
   room.toolSequence = 0;
@@ -906,6 +912,10 @@ function beginActivity(room, input) {
     }
   }
   if (["assassination", "reverseStrike"].includes(kind)) {
+    if (scoring.usesReverseRules(room) && !scoring.exclusion(room)) {
+      requireRule(kind !== "reverseStrike" || !room.reverseStrike, "本局已结算刀逆仆，不能重复发起");
+      requireRule(kind !== "assassination" || !!room.reverseStrike, "请先完成刀逆仆并结算，再刺梅林");
+    }
     requireRule(!assisted(room), "本板子请在线下完成最终盘刀");
     requireRule(
       !!room.knights || Object.values(room.roles).includes("assassin"),
@@ -1075,6 +1085,7 @@ function settleActivity(room) {
       (p) => p.seat === room.submissions[assassin.uid],
     );
     if (room.phase === "reverseStrike") {
+      room.reverseStrike = { target: target.seat, hit: room.roles[target.uid] === "reverse" };
       if (room.roles[target.uid] === "reverse")
         room.convertedReverse = target.uid;
       room.history.push({ kind: "toolReverse", number });
@@ -1779,6 +1790,7 @@ function applyCommand(room, uid, input) {
       "rejects",
       "teamApproved",
       "convertedReverse",
+      "reverseStrike",
       "flexible",
       "activity",
       "toolSequence",
@@ -1987,6 +1999,7 @@ function applyCommand(room, uid, input) {
       const target = room.players.find(
         (p) => p.seat === room.submissions[assassin.uid],
       );
+      room.reverseStrike = { target: target.seat, hit: room.roles[target.uid] === "reverse" };
       if (room.roles[target.uid] === "reverse")
         room.convertedReverse = target.uid;
       // Do not publish target, hit, role or faction changes to the host/public view.

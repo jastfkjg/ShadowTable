@@ -10,6 +10,9 @@ function validateRules(rules) {
     || Object.entries(rules.defaultEnabledBoards).some(([board, counts]) => !Array.isArray(counts) || !counts.length
       || counts.some(count => !Number.isSafeInteger(count) || !rules.boards[board]?.includes(count)))) throw Error("积分默认板子配置无效");
   if (rules.targetModes && Object.values(rules.targetModes).some(mode => mode !== "living_merlin")) throw Error("积分刺杀判定配置无效");
+  if (rules.reverseBoards && (typeof rules.reverseBoards !== "object" || Array.isArray(rules.reverseBoards)
+    || Object.entries(rules.reverseBoards).some(([board, counts]) => !Array.isArray(counts) || !counts.length
+      || counts.some(count => !rules.boards[board]?.includes(count))))) throw Error("逆仆计分配置无效");
   if (rules.notes && (!Array.isArray(rules.notes) || rules.notes.some(note => typeof note !== "string"))) throw Error("积分说明配置无效");
   const ids = new Set();
   for (const award of rules.awards) {
@@ -57,6 +60,24 @@ function settings(room) {
 }
 function settlementOptions(room) {
   return exclusion(room) ? [] : optionsFor(room.board, room.scorePolicy);
+}
+// Frozen with the policy, so existing and non-scoring games keep their workflow.
+function usesReverseRules(game) {
+  return game.scorePolicy?.reverseBoards?.[game.board]?.includes(game.capacity) === true;
+}
+function reverseSettlementError(game, reason, correction = false) {
+  if (!usesReverseRules(game)) return null;
+  if (reason === "assassination") {
+    if (!game.reverseStrike || !Number.isInteger(game.reverseStrike.target) || typeof game.reverseStrike.hit !== "boolean")
+      return "请先完成刀逆仆并结算，再登记三绿刺杀；缺少逆仆刀记录不能补算刺杀积分";
+  } else if (!correction && game.reverseStrike) {
+    return "已完成刀逆仆，请登记三绿刺杀；三次任务失败或五次否决不能包含逆仆刀";
+  }
+  return null;
+}
+function settlementFaction(player, game) {
+  if (!usesReverseRules(game) || player.roleId !== "reverse") return player.faction;
+  return game.scoringFacts?.reason === "assassination" && game.reverseStrike?.hit ? "evil" : "good";
 }
 function optionsFor(board, rules) {
   return clone(rules.endReasons.filter(reason => !reason.boards || reason.boards.includes(board)));
@@ -124,4 +145,4 @@ function publicRules(rules = policy()) {
     notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", "房主可在准备阶段开启或关闭计分；更换板子或人数时应用默认值，同房重开保留选择。发牌后固定。", "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
       "测试房间及有陪测参与的对局中，真实玩家和开发账号正常计分；陪测账号不保存个人战绩、积分及趣味记录。终止及缺少计分依据的对局不计积分。", ...(rules.notes || [])] };
 }
-module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };
+module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, usesReverseRules, reverseSettlementError, settlementFaction, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };

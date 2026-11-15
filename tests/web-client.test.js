@@ -422,6 +422,25 @@ test('网页读取旧趣味响应时同步转换统计、比例、历史摘要�
   assert.doesNotMatch(matches, /命中同伴|非梅林好人/);
   assert.equal(JSON.stringify(legacy), before);
 });
+test('网页对局摘要与详情合并同一次终局刺杀', async () => {
+  const record = {
+    boardName:'十二骑士', capacity:12, endedAt:1, role:'梅林', winner:'evil', outcome:'loss', source:'manual',
+    fun:{
+      events:[
+        {id:'final-received', label:'被刀', detail:'最终刀落到本人'},
+        {id:'final', role:'梅林', label:'被刺中', detail:'最终目标：2号 · 房主登记'},
+      ],
+      highlights:[{id:'merlin_hit', count:1}, {id:'survival_knifed', count:1}],
+    },
+  };
+  const c = client(async () => response({records:[record], total:1, hasMore:false}));
+  await c.applyRoute('#/matches');
+  const html = c.viewMatches();
+  assert.match(html, /class="match-fun-label">终局被刺中</);
+  assert.match(html, /class="match-story-count">1 条</);
+  assert.match(html, /最终目标为本人（2 号）/);
+  assert.doesNotMatch(html, /最终刀落到本人|终局记录/);
+});
 test('网页恢复 Cookie 身份并保留原游客；正式会话过期不会自动新建游客', async () => {
   const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'guest-command'], ['roomCode', '123456']]), calls = [];
   let expired = false;

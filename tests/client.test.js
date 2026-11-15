@@ -4,6 +4,49 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const { createApp } = require("../server/app");
+test('现有小程序无需新增字段即可登记9、11人逆仆计分，服务端缺少逆仆刀时拒绝结算', async () => {
+  const { newRoom, enter, command, publicView } = require('../server/engine');
+  for (const [board, capacity] of [['classic', 9], ['classic-11', 11]]) {
+    const room = newRoom('123456', 'wx:1', '房主', board, capacity);
+    const run = (type, extra = {}, uid = room.host) => command(room, uid, { type, stage: room.stage, ...extra });
+    for (let i = 2; i <= capacity; i++) enter(room, `wx:${i}`, `玩家${i}`);
+    run('updateSettings', { board, capacity, visible: false, scoreEnabled: true });
+    room.players.forEach(player => player.ready = true);run('start', { flexible: true });
+    const p = page({});
+    p.data.room = publicView(room, room.host);
+    const submissions = [];
+    p.cmd = async (type, input) => {
+      submissions.push({ type, ...input });
+      run(type, input);
+      p.data.room = publicView(room, room.host);
+    };
+    const merlin = room.players.find(player => room.roles[player.uid] === 'merlin');
+    const register = async () => {
+      p.finishTools();
+      p.pickScoreReason({ currentTarget: { dataset: { id: 'assassination' } } });
+      p.nextResult();
+      assert.equal(p.data.resultStep, 'target');
+      p.pickScoreTarget({ currentTarget: { dataset: { seat: merlin.seat } } });
+      p.nextResult();
+      assert.equal(p.data.resultStep, 'review');
+      assert.match(p.data.resultNotice, /积分/);
+      await p.saveResult();
+    };
+    await assert.rejects(register(), /请先完成刀逆仆/);
+    assert.equal(room.phase, 'tools');
+    run('beginActivity', { kind: 'reverseStrike' });
+    const reverse = room.players.find(player => room.roles[player.uid] === 'reverse');
+    for (const player of room.players) run('submit', {
+      value: room.roles[player.uid] === 'assassin' ? reverse.seat : 'confirm',
+    }, player.uid);
+    p.data.room = publicView(room, room.host);
+    await register();
+    assert.deepEqual(submissions.at(-1), { type: 'finishTools', replace: true, scoreReason: 'assassination', scoreTarget: merlin.seat });
+    assert.equal(p.data.room.phase, 'ended');
+    assert.equal(p.data.room.myScore.status, 'scored');
+    assert.equal(room.matchRecord.players.find(player => player.uid === reverse.uid).score.total, 9);
+  }
+});
 function page(api, storage = new Map(), layout, lobby = false) {
   let definition;
   const scrolls = [];

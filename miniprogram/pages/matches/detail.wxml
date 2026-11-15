@@ -2,7 +2,6 @@
 <template name="matchDetails">
         <view class="match-details">
           <view class="match-result"><text>{{item.winner==='good' || item.winner==='evil' || item.winner==='third'?item.winnerLabel+'获胜':'胜方未登记'}}</text><text class="match-source">{{item.sourceLabel}}</text></view>
-          <button class="shared-data-entry" bindtap="historyShareRecord" data-id="{{item.id}}" hover-class="stats-pressed"><image src="/assets/share.svg" aria-hidden="true" /><text>分享这场对局</text></button>
           <view wx:if="{{item.excludedReason}}" class="match-detail-row"><text>不计入原因</text><text>{{item.excludedReason}}</text></view>
           <view wx:if="{{item.scoreEndReason}}" class="match-detail-row"><text>结束原因</text><text>{{item.scoreEndReason}}</text></view>
           <view wx:if="{{item.score.status==='scored'}}" class="score-breakdown">
@@ -12,14 +11,22 @@
           </view>
           <view wx:elif="{{item.score.reason && item.score.reason!==item.excludedReason}}" class="match-note">{{item.score.reason}}</view>
           <view wx:if="{{item.hasFunEvents}}" class="match-fun">
-            <view class="match-story-heading"><text class="match-section-label">我的趣味记录</text><text class="match-story-count">共 {{item.fun.events.length}} 条</text></view>
+            <view class="match-story-heading"><text class="match-section-label">我的趣味记录</text><text class="match-story-count">{{item.fun.eventCount || item.fun.events.length}} 条</text></view>
             <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
             <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
             <view class="match-timeline">
-              <view wx:for="{{item.fun.eventGroups}}" wx:for-item="group" wx:key="id" class="match-round">
-                <view class="match-round-marker">{{group.marker}}</view>
-                <view class="match-round-body"><view class="match-round-heading"><text>{{group.label}}</text><text wx:if="{{group.role}}" class="match-round-role">{{group.role}}</text></view>
-                  <view wx:for="{{group.events}}" wx:for-item="event" wx:key="id" class="fun-event"><image class="match-event-icon" src="{{event.icon}}" mode="aspectFit" aria-hidden="true" /><view class="match-event-label"><text>{{event.label}}</text><text wx:if="{{group.showEventRoles && event.role}}" class="match-event-role">{{event.role}}</text></view><text wx:if="{{event.detail}}" class="match-event-detail">{{event.detail}}</text></view>
+              <view wx:for="{{item.fun.eventGroups}}" wx:for-item="group" wx:key="id" class="match-round {{group.compact?'match-round-compact':''}}">
+                <view wx:if="{{!group.compact}}" class="match-round-marker">{{group.marker}}</view>
+                <view class="match-round-body">
+                  <view wx:if="{{!group.compact}}" class="match-round-heading"><text>{{group.label}}</text><text wx:if="{{group.role}}" class="match-round-role">{{group.role}}</text></view>
+                  <view wx:for="{{group.events}}" wx:for-item="event" wx:key="id" class="fun-event">
+                    <image class="match-event-icon" src="{{event.icon}}" mode="aspectFit" aria-hidden="true" />
+                    <view class="match-event-copy">
+                      <view class="match-event-label"><text>{{event.label}}</text><text wx:if="{{event.role && (group.showEventRoles || (group.compact && event.role!==item.role))}}" class="match-event-role">{{event.role}}</text></view>
+                      <text wx:if="{{event.detail}}" class="match-event-detail">{{event.detail}}</text>
+                    </view>
+                    <text wx:if="{{group.compact}}" class="match-event-stage">终局</text>
+                  </view>
                 </view>
               </view>
             </view>
@@ -28,7 +35,7 @@
             <view wx:if="{{item.showInitialRole}}" class="match-note">初始身份：{{item.fun.initialRole}}</view>
             <view wx:if="{{item.funNote}}" class="match-note">{{item.funNote}}</view>
           </block>
-          <template is="honorResults" data="{{honors:item.honors}}" />
+          <template is="honorResults" data="{{honors:item.honors,compactTitles:true}}" />
           <view wx:if="{{item.members.length}}" class="match-members-section">
             <button hover-class="none" class="disclosure-button match-members-toggle" bindtap="historyToggleMembers" data-id="{{item.id}}" aria-expanded="{{item.membersExpanded}}" aria-label="{{item.membersExpanded?'收起':'展开'}}同桌成员，共{{item.members.length}}人"><image class="match-members-icon" src="/assets/record-users.svg" mode="aspectFit" aria-hidden="true" /><text class="match-members-label">同桌成员<text class="match-member-count"> {{item.members.length}}人</text></text><view class="match-arrow {{item.membersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
             <view wx:if="{{item.membersExpanded}}" class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text class="match-seat">{{member.seat}}号</text><text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text></view></view>

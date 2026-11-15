@@ -309,7 +309,7 @@ test('v13 新分值不改写 v11/v12 开局与历史快照，管理员更正仍�
       assert.equal(store.matchFor('wx:4',old.matchId).score.total,3+shield);
       assert.equal(store.matchFor('wx:4',old.matchId).score.ruleVersion,'avalon-2026-10-'+version);
     }
-    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-10-v13');
+    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-11-v14');
     assert.deepEqual(finish(fresh),[12,12,15,9,0,0]);
     assert.deepEqual(fresh.matchRecord.players[2].score.breakdown,[
       {id:'good_win',label:'好人获胜',points:9},
@@ -375,7 +375,7 @@ test("结算无身份预览，非法目标不泄露身份，只有房主能提�
   assert.equal(publicView(room,"wx:observer").myScore,null);
   assert.doesNotMatch(JSON.stringify(publicView(room,"wx:3")),/wx:1|wx:2|scorePolicy|scoringFacts|"uid"/);
 });
-test("9人经典基础可手动开启经典计分，原9人逆仆仍不计分", () => {
+test("9人经典基础和逆仆均支持计分且默认关闭", () => {
   const lobby = newRoom("123456", "wx:1", "房主", "classic-court", 9);
   assert.equal(lobby.scoreEnabled, false);
   assert.equal(publicView(lobby, lobby.host).scoreSettings.unavailableReason, null);
@@ -388,10 +388,11 @@ test("9人经典基础可手动开启经典计分，原9人逆仆仍不计分", 
     assert.equal(player.score.total, player.faction === "evil" ? 0 : player.seat === target ? 15 : ["merlin", "percival"].includes(player.roleId) ? 12 : 9);
   }
   const reverse = newRoom("654321", "wx:1", "房主", "classic", 9);
-  assert.equal(publicView(reverse, reverse.host).scoreSettings.unavailableReason, "本板子暂未参与计分");
+  assert.equal(publicView(reverse, reverse.host).scoreSettings.unavailableReason, null);
+  assert.equal(reverse.scoreEnabled, false);
 });
 
-test("积分资格独立于战绩；旧开局、逆仆板和缺少依据不会计分",()=>{
+test("积分资格独立于战绩；旧开局及缺少依据不会计分",()=>{
   for(const variant of ["legacy","unknown","reverse","terminated"]) {
     const room=variant==="reverse"?deal({capacity:9}):deal();
     if(variant==="legacy") delete room.scorePolicy;
