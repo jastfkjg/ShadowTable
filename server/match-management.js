@@ -89,6 +89,7 @@ function detail(store, id) {
     correctionKind:
       game.scorePolicy && !game.scoreEligibilityReason ? "score" : "fun",
     needsActor: fun.modeFor(game.board) === "knights" && !!game.funFacts,
+    needsReverseTarget: scoring.isReverseBoard(game),
     options:
       c.state !== "active"
         ? []

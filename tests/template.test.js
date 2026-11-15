@@ -2260,3 +2260,23 @@ test('发牌和换牌默认只展示奥伯伦的关键规则，选读详情并�
     assert.doesNotMatch(JSON.stringify(renderTable({...data,...state,...hide,identityHelpExpanded:true})),/奥伯伦|必须投失败|刺客只失去技能/);
   }
 });
+
+test('逆仆结束模板显示两刀步骤与核对目标，房主工具移除独立刀逆仆', () => {
+  const registration=require('../miniprogram/result-registration');
+  for(const capacity of [9,11]) {
+    const room={code:'123456',phase:'tools',capacity,players:Array.from({length:capacity},(_,i)=>({seat:i+1,name:`玩家${i+1}`})),
+      team:[],history:[],me:{seat:1},canUseTools:true,hasReverse:true,reverseSettlement:true,settlementRequiresActor:false,
+      scoreSettlement:[{id:'assassination',label:'三绿，已完成最终刺杀',requiresTarget:true,requiresReverseTarget:true},{id:'quest_fail',label:'三次任务失败'}]};
+    const data={...base,room,resultDialog:true,resultReason:'assassination',resultStep:'reverse',resultReverseTarget:2,resultTarget:3};
+    let tree=renderTable({...data,...registration.flow(data)});
+    assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='pickReverseTarget').length,capacity);
+    assert.ok(!nodes(tree).some(node=>node.attr?.['data-kind']==='reverseStrike'));
+    assert.match(JSON.stringify(tree),/选择逆仆刀目标/);
+    assert.equal(byHandler(tree,'pickScoreTarget'),undefined);
+    const target={...data,resultStep:'target'};tree=renderTable({...target,...registration.flow(target)});
+    assert.match(JSON.stringify(tree),/选择梅林刀目标/);
+    const review={...data,resultStep:'review'};tree=renderTable({...review,...registration.flow(review)});
+    assert.match(JSON.stringify(tree),/逆仆刀目标/);assert.match(JSON.stringify(tree),/梅林刀目标/);
+    assert.equal(byHandler(tree,'saveResult').attr.disabled,false);
+  }
+});

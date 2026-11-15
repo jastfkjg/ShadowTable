@@ -728,6 +728,7 @@ function correctionMatch() { return correctionMatches.find(match=>match.id===$('
 function updateCorrectionTarget() {
   const match=correctionMatch(), selected=match?.options.find(option=>option.id===$('correction-result').value);
   $('correction-target-row').hidden=!selected?.requiresTarget;
+  $('correction-reverse-row').hidden=!(selected?.requiresTarget && match?.needsReverseTarget);
   $('correction-target').required=!!selected?.requiresTarget;
   $('correction-actor-row').hidden=!(selected?.requiresTarget && match?.needsActor);
 }
@@ -738,6 +739,7 @@ function updateCorrectionMatch() {
   $('correction-editor').open=false;
   selectOptions('correction-result',[{value:'',label:'请选择实际结束方式'},...(match?.options || []).map(option=>({value:option.id,label:option.label}))]);
   selectOptions('correction-target',[{value:'',label:'请选择实际目标'},...(match?.players || []).filter(player=>player.alive !== false).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name})),{value:'0',label:'空刀'}]);
+  selectOptions('correction-reverse',[{value:'',label:'保留原逆仆刀记录'},...(match?.players || []).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name}))]);
   selectOptions('correction-actor',[{value:'',label:'保留原带刀记录（未登记则未知）'},...(match?.players || []).filter(player=>player.alive!==false).map(player=>({value:String(player.seat),label:player.seat+'号 · '+player.name}))]);
   $('correction-result').disabled=!match?.options.length;
   $('correction-submit').disabled=!match?.options.length;
@@ -781,7 +783,7 @@ $('correction-form').addEventListener('submit',async event=>{
     if(!await (window.AdminUI ? window.AdminUI.confirm({title:'更正对局结果',description,danger:true}) : window.confirm(description))) return;
     if(correctionBusy || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading || correctionMatch()!==match) return;
     correctionPending={id:match.id,data:{requestId:crypto.randomUUID(),revision:match.revision,[match.correctionKind === "fun" ? "funReason" : "scoreReason"]:option.id,
-      ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {})}};
+      ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsReverseTarget && $('correction-reverse').value ? {reverseTarget:Number($('correction-reverse').value)} : {}), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {})}};
   }
   correctionBusy=true;lockScoreControls();$('correction-status').textContent='正在更正对局结果…';
   try {
@@ -802,7 +804,7 @@ $('correction-form').addEventListener('submit',async event=>{
 let scorePlayers=[], scorePlayerQuery='', scorePlayerOffset=0, scorePlayerHasMore=false;
 let selectedScorePlayer=null, scorePlayerHistoryOffset=0, scorePlayerHistoryMore=false, matchScoreDetail=null;
 let scoreBusy=false, scoreWritePending=null, matchScoreSequence=0, matchScoreLoading=false;
-const scoreControls=['score-player-query','score-player-find','score-player','score-player-prev','score-player-next','player-score-mode','player-score-points','player-score-history-more','correction-load','correction-code','correction-match','correction-result','correction-target','correction-actor','score-tab-player','score-tab-match'];
+const scoreControls=['score-player-query','score-player-find','score-player','score-player-prev','score-player-next','player-score-mode','player-score-points','player-score-history-more','correction-load','correction-code','correction-match','correction-result','correction-target','correction-reverse','correction-actor','score-tab-player','score-tab-match'];
 function lockScoreControls() {
   const locked=scoreBusy || !!scoreWritePending || correctionBusy || !!correctionPending || correctionLoading || matchScoreLoading;
   for(const id of scoreControls) $(id).disabled=locked;

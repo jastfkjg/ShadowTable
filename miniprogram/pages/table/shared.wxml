@@ -346,10 +346,11 @@
             <button wx:if="{{!resultReasonOptions.length}}" class="secondary score-choice score-excluded {{resultChoice==='none'?'is-selected':''}}" data-value="none" bindtap="pickResult" aria-pressed="{{resultChoice==='none'}}" hover-class="none"><view class="score-choice-mark" aria-hidden="true"></view><view class="score-choice-title">不计战绩</view></button>
           </block>
         </block>
-        <block wx:if="{{resultStep==='actor' || resultStep==='target'}}">
-          <view class="score-section-title">{{resultStep==='actor'?'选择带刀人':'选择刺杀目标'}}</view><view wx:if="{{resultStep==='target'}}" class="score-helper">未指定目标可选空刀。</view>
+        <block wx:if="{{resultStep==='actor' || resultStep==='reverse' || resultStep==='target'}}">
+          <view class="score-section-title">{{resultStep==='actor'?'选择带刀人':resultStep==='reverse'?'选择逆仆刀目标':resultNeedsReverse?'选择梅林刀目标':'选择刺杀目标'}}</view><view wx:if="{{resultStep==='reverse'}}" class="score-helper">录入线下决定的第一刀目标。两刀确认后统一结算，其他玩家无需确认。</view><view wx:if="{{resultStep==='target'}}" class="score-helper">未指定目标可选空刀。</view>
           <view class="score-targets capacity-grid">
             <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='actor'}}" class="secondary {{resultActor===item.seat?'is-selected':''}}" bindtap="pickFunActor" data-seat="{{item.seat}}" aria-pressed="{{resultActor===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
+            <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='reverse'}}" class="secondary {{resultReverseTarget===item.seat?'is-selected':''}}" bindtap="pickReverseTarget" data-seat="{{item.seat}}" aria-pressed="{{resultReverseTarget===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
             <button wx:for="{{resultPlayers}}" wx:key="seat" wx:if="{{resultStep==='target'}}" class="secondary {{resultTarget===item.seat?'is-selected':''}}" bindtap="pickScoreTarget" disabled="{{resultNeedsActor && resultActor===item.seat}}" data-seat="{{item.seat}}" aria-pressed="{{resultTarget===item.seat}}" hover-class="none"><text>{{item.seat}}号</text><text class="score-player-name">{{item.name}}</text></button>
             <button wx:if="{{resultStep==='target'}}" class="secondary score-empty-target {{resultTarget===0?'is-selected':''}}" bindtap="pickScoreTarget" data-seat="0" aria-pressed="{{resultTarget===0}}" hover-class="none">空刀</button>
           </view>
@@ -524,7 +525,7 @@
         <button hover-class="none" wx:if="{{room.knights}}" class="secondary" bindtap="openTool" data-kind="skills" disabled="{{hasPendingRequest || busy}}">使用技能</button>
         <button hover-class="none" wx:if="{{room.knights || room.supportsConversion}}" class="secondary" bindtap="openTool" data-kind="conversion" disabled="{{hasPendingRequest || busy}}">身份转换</button>
         <button hover-class="none" wx:if="{{room.fairyEnabled}}" class="secondary" bindtap="openTool" data-kind="fairy" disabled="{{hasPendingRequest || busy}}">仙女查验</button>
-        <button hover-class="none" wx:if="{{room.hasReverse && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
+        <button hover-class="none" wx:if="{{room.hasReverse && !room.reverseSettlement && !room.knifeOffline}}" class="secondary" bindtap="openTool" data-kind="reverseStrike" disabled="{{hasPendingRequest || busy}}">刀逆仆</button>
       </view>
     </view>
     <view class="task-progress">

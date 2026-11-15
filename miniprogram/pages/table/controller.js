@@ -2114,7 +2114,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   finishTools() {
     if (!this.data.room?.canUseTools || this.data.busy || this.pending) return;
     this.resultStage = this.data.room.stage;
-    this.setResultDraft({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "", resultScrollTop: 0 });
+    this.setResultDraft({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "", resultScrollTop: 0 });
   },
   closeResult() { if (!this.data.busy) this.setData({ resultDialog: false }); },
   setResultDraft(patch = {}) {
@@ -2141,12 +2141,17 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   pickResult(e) {
     const value = e.currentTarget.dataset.value;
     if (value !== "none" && !this.data.room?.winnerOptions?.some(item => item.value === value)) return;
-    this.setResultDraft({ resultOther: value !== "none", resultChoice: value, resultReason: "", resultRequiresTarget: false, resultTarget: null, resultActor: null });
+    this.setResultDraft({ resultOther: value !== "none", resultChoice: value, resultReason: "", resultRequiresTarget: false, resultTarget: null, resultReverseTarget: null, resultActor: null });
   },
   pickScoreReason(e) {
     const room = this.data.room;
     const reason = resultRegistration.reasons(room).find(item => item.id === e.currentTarget.dataset.id);
-    if (reason && reason.id !== this.data.resultReason) this.setResultDraft({ resultOther: false, resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultActor: null });
+    if (reason && reason.id !== this.data.resultReason) this.setResultDraft({ resultOther: false, resultReason: reason.id, resultChoice: "", resultRequiresTarget: !!reason.requiresTarget, resultTarget: null, resultReverseTarget: null, resultActor: null });
+  },
+  pickReverseTarget(e) {
+    const seat = Number(e.currentTarget.dataset.seat);
+    if (!this.data.room?.players?.some(player => player.seat === seat && player.alive !== false)) return;
+    this.setResultDraft({ resultReverseTarget: seat });
   },
   pickScoreTarget(e) {
     const seat = Number(e.currentTarget.dataset.seat), room = this.data.room;
@@ -2184,7 +2189,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = this.data.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? { funActor: this.data.resultActor } : {}) } : {}) }
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? { reverseTarget: this.data.resultReverseTarget } : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? { funActor: this.data.resultActor } : {}) } : {}) }
       : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(this.data), stage = room.stage;
     this.resultConfirming = true;

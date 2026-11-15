@@ -284,7 +284,7 @@ function archiveResult(room) {
     recordPurpose: room.recordPurpose || "normal",
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
-    ...(scoring.usesReverseRules(room) ? { reverseStrike: room.reverseStrike || null } : {}),
+    ...(scoring.isReverseBoard(room) ? { reverseStrike: room.reverseStrike || null } : {}),
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
     funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
@@ -1257,7 +1257,8 @@ function publicView(room, uid) {
   const settlementPlayers = settlementSnapshot?.players || room.knights?.players;
   const requiresActor = fun.settlementOptions(room.board).length > 0 && !room.players.some(player =>
     settlementRoles?.[player.uid] === "assassin" && settlementPlayers?.[player.uid].alive !== false);
-  const registrationOptions = options => options.filter(option => !["early_assassination", "five_rejections"].includes(option.id));
+  const registrationOptions = options => options.filter(option => !["early_assassination", "five_rejections"].includes(option.id))
+    .map(option => scoring.isReverseBoard(room) && option.requiresTarget ? { ...option, requiresReverseTarget: true } : option);
   const managedState = room.recordManagement?.state;
   const excludedRecord = managedState && managedState !== "active";
   const recordNotice = managedState === "deleted" ? "管理员已删除本局记录，不计战绩"
@@ -1308,6 +1309,7 @@ function publicView(room, uid) {
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
     scoreSettlement: registrationOptions(scoring.settlementOptions(room)),
+    reverseSettlement: scoring.isReverseBoard(room),
     funSettlement: registrationOptions(fun.settlementOptions(room.board)),
     settlementRequiresActor: room.host === uid && canUseTools(room) ? requiresActor : null,
     recordSettings: {purpose:room.recordPurpose || "normal",editable:room.phase === "lobby"},
@@ -1637,6 +1639,24 @@ function applyCommand(room, uid, input) {
         const terminal = fun.terminal(next, next.fun.lastFinal, ROLES, "system");
         if ((terminal.hit || terminal.emptyWin ? "evil" : "good") === winner) next.fun.pendingTerminal = next.fun.lastFinal;
       }
+    }
+    const registeredReason = input.scoreReason ?? input.funReason;
+    if (input.reverseTarget !== undefined) {
+      requireRule(scoring.isReverseBoard(next) && registeredReason === "assassination", "仅逆仆局的三绿刺杀可填写逆仆刀目标");
+      requireRule(Number.isInteger(input.reverseTarget) && next.players.some(player => player.seat === input.reverseTarget), "请选择逆仆刀的实际玩家目标");
+    }
+    if (scoring.isReverseBoard(next) && registeredReason === "assassination") {
+      // Both targets are committed together. Never reveal a hit during form entry.
+      if (input.reverseTarget !== undefined) {
+        const target = next.players.find(player => player.seat === input.reverseTarget);
+        next.reverseStrike = { target: target.seat, hit: next.roles[target.uid] === "reverse" };
+        next.convertedReverse = next.reverseStrike.hit ? target.uid : null;
+      }
+      // Existing clients may still complete the legacy private action first.
+      requireRule(!!next.reverseStrike, "请在结束本局时填写逆仆刀目标");
+    } else if (scoring.isReverseBoard(next) && registeredReason === "quest_fail") {
+      next.reverseStrike = null;
+      next.convertedReverse = null;
     }
     const finalFacts = facts || next.fun?.pendingTerminal;
     const assassin = next.players.find(player => next.roles[player.uid] === "assassin" && next.knights?.players[player.uid].alive !== false);

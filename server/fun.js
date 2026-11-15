@@ -173,7 +173,7 @@ function init(room) {
   };
 }
 function settlementOptions(board) {
-  if (modeFor(board) === "other") return [];
+  if (modeFor(board) === "other" && board !== "classic-11") return [];
   return [
     {
       id: "assassination",

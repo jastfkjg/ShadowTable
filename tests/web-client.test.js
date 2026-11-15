@@ -2721,3 +2721,38 @@ test('网页首次发牌和换身份只在展开时展示角色规则明细', ()
   c.ACTIONS.revealChangedIdentity();
   check('change',c.viewIdentityChange);
 });
+
+test('网页逆仆两刀结束流程按计分开关提交，保留草稿且常规工具隐藏逆仆刀', async () => {
+  const { newRoom, enter, command, publicView } = require('../server/engine');
+  for (const [board, capacity] of [['classic', 9], ['classic-11', 11]]) for (const enabled of [false, true]) {
+    const room = newRoom('123456', 'wx:1', '房主', board, capacity);
+    for(let i=2;i<=capacity;i++) enter(room, `wx:${i}`, `玩家${i}`);
+    const run = (type, input = {}) => command(room, room.host, { type, stage: room.stage, ...input });
+    run('updateSettings', { board, capacity, visible: false, scoreEnabled: enabled });
+    room.players.forEach(p=>p.ready=true);run('start', { flexible: true });
+    const writes=[];
+    const c=client(async (url, options)=>{if(options.method==='POST') writes.push(JSON.parse(options.body));return response({});});
+    c.setRefresh(async()=>{});c.state.room=publicView(room,room.host);
+    assert.doesNotMatch(c.viewRoom(), /data-kind="reverseStrike"/);
+    c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'assassination'}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'reverse');assert.match(c.viewResultDialog(),/选择逆仆刀目标|其他玩家无需确认/);
+    assert.doesNotMatch(c.viewResultDialog(),/>空刀</);
+    c.ACTIONS.pickReverseTarget({dataset:{seat:0}});assert.equal(c.state.resultReverseTarget,null);
+    c.ACTIONS.pickReverseTarget({dataset:{seat:2}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'target');assert.match(c.viewResultDialog(),/选择梅林刀目标/);
+    c.ACTIONS.pickScoreTarget({dataset:{seat:3}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'review');assert.match(c.viewResultDialog(),/逆仆刀目标/);assert.match(c.viewResultDialog(),/梅林刀目标/);
+    c.ACTIONS.backResult();c.ACTIONS.backResult();c.ACTIONS.backResult();
+    c.ACTIONS.toggleResultOther();c.ACTIONS.toggleResultOther();
+    assert.equal(c.state.resultReverseTarget,2);assert.equal(c.state.resultTarget,3);
+    c.ACTIONS.nextResult();c.ACTIONS.nextResult();c.ACTIONS.nextResult();
+    c.setConfirm(async()=>false);await c.ACTIONS.saveResult();assert.equal(writes.length,0);
+    c.setConfirm(async()=>true);await c.ACTIONS.saveResult();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(writes.length,1);assert.equal(writes[0].reverseTarget,2);
+    assert.equal(writes[0][enabled?'scoreTarget':'funTarget'],3);
+    assert.equal(writes[0][enabled?'scoreReason':'funReason'],'assassination');
+    c.ACTIONS.finishTools();c.ACTIONS.pickScoreReason({dataset:{id:'quest_fail'}});c.ACTIONS.nextResult();
+    assert.equal(c.state.resultStep,'review');assert.equal(c.state.resultReverseTarget,null);
+    assert.doesNotMatch(c.viewResultDialog(),/逆仆刀目标|五次否决/);
+  }
+});

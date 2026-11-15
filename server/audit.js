@@ -102,6 +102,7 @@ function actionDetails(room, uid, type, input) {
     "scoreEnabled",
     "recordPurpose",
     "scoreTarget",
+    "reverseTarget",
     "funReason",
     "funTarget",
     "funActor",

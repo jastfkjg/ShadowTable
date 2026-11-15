@@ -630,7 +630,7 @@
     monthlyReset: null, resetSaving: false, resetError: '',
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
-    resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false,
+    resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
     monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyCategory: 'overall', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
@@ -2275,7 +2275,7 @@ function roomListItems(rooms) {
     var option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = state.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? {reverseTarget:state.resultReverseTarget} : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(state), stage = room.stage;
     resultConfirming = true;
     try {
@@ -2322,8 +2322,12 @@ function roomListItems(rooms) {
       } else {
         html += '<div class="score-option-heading"><strong>仅登记胜方</strong><span>不计积分</span></div><div class="score-winners" role="group" aria-label="仅登记胜方">'+(room.winnerOptions || []).map(option => '<button type="button" class="secondary score-choice '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>').join('')+'</div>'+(reasons.length?'':excluded);
       }
-    } else if (step === 'actor' || step === 'target') {
-      html += '<h3 class="score-section-title">'+(step==='actor'?'选择带刀人':'选择刺杀目标')+'</h3>'+(step==='target'?'<p class="score-helper">未指定目标可选空刀。</p>':'')+'<div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat ? 'is-selected' : '') + '" data-action="' + (step === 'actor' ? 'pickFunActor' : 'pickScoreTarget') + '"' + (step === 'target' && flow.resultNeedsActor && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + ((step === 'actor' ? state.resultActor : state.resultTarget) === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary score-empty-target '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
+    } else if (step === 'actor' || step === 'reverse' || step === 'target') {
+      const reverse = step === 'reverse', actor = step === 'actor';
+      const selected = actor ? state.resultActor : reverse ? state.resultReverseTarget : state.resultTarget;
+      const action = actor ? 'pickFunActor' : reverse ? 'pickReverseTarget' : 'pickScoreTarget';
+      const title = actor ? '选择带刀人' : reverse ? '选择逆仆刀目标' : flow.resultNeedsReverse ? '选择梅林刀目标' : '选择刺杀目标';
+      html += '<h3 class="score-section-title">'+title+'</h3>'+(reverse ? '<p class="score-helper">录入线下决定的第一刀目标。两刀确认后统一结算，其他玩家无需确认。</p>' : step==='target'?'<p class="score-helper">未指定目标可选空刀。</p>':'')+'<div class="score-targets">' + flow.resultPlayers.map(player => '<button class="secondary ' + (selected === player.seat ? 'is-selected' : '') + '" data-action="' + action + '"' + (step === 'target' && flow.resultNeedsActor && state.resultActor === player.seat ? ' disabled' : '') + ' data-seat="' + player.seat + '" aria-pressed="' + (selected === player.seat) + '"><span>' + player.seat + '号</span><span class="score-player-name">' + esc(player.name) + '</span></button>').join('') + (step === 'target' ? '<button class="secondary score-empty-target '+(state.resultTarget===0?'is-selected':'')+'" data-action="pickScoreTarget" data-seat="0" aria-pressed="'+(state.resultTarget===0)+'">空刀</button>' : '') + '</div>';
     } else {
       html += '<div class="result-review">' + flow.resultSummary.map(row => '<div class="result-review-row"><span class="small muted">'+esc(row.label)+'</span><span>'+esc(row.value)+'</span></div>').join('') + '</div><p class="result-review-note">'+esc(flow.resultNotice)+'</p>' + (room.hasActiveOperation ? '<p class="result-warning">当前未结算的操作将作废。</p>' : '');
     }
@@ -4580,7 +4584,7 @@ function roomListItems(rooms) {
           ? btn("secondary", "openTool", "身份转换", { kind: "conversion" }, state.busy)
           : "") +
         (r.fairyEnabled ? btn("secondary", "openTool", "仙女查验", { kind: "fairy" }, state.busy) : "") +
-        (r.hasReverse && !r.knifeOffline
+        (r.hasReverse && !r.reverseSettlement && !r.knifeOffline
           ? btn("secondary", "openTool", "刀逆仆", { kind: "reverseStrike" }, state.busy)
           : "") +
         "</div>";
@@ -5500,7 +5504,7 @@ function roomListItems(rooms) {
     finishTools: function () {
       if (!state.room?.canUseTools || state.busy || pending) return;
       resultStage = state.room.stage;
-      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
+      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
       var first = app.querySelector('.result-dialog button');
       if (first) first.focus();
     },
@@ -5522,16 +5526,21 @@ function roomListItems(rooms) {
     },
     pickResult: el => {
       if (el.dataset.value !== 'none' && !state.room?.winnerOptions?.some(item=>item.value===el.dataset.value)) return;
-      updateResult({resultOther:el.dataset.value!=='none',resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultActor:null});
+      updateResult({resultOther:el.dataset.value!=='none',resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
     pickScoreReason: el => {
       const reason=resultRegistration.reasons(state.room).find(item=>item.id===el.dataset.id);
-      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultActor:null});
+      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
     pickFunActor: el => {
       const seat=Number(el.dataset.seat);
       if (!state.room?.players?.some(player=>player.seat===seat && player.alive!==false)) return;
       updateResult({resultActor:seat,...(state.resultTarget===seat?{resultTarget:null}:{})});
+    },
+    pickReverseTarget: el => {
+      const seat=Number(el.dataset.seat);
+      if (!state.room?.players?.some(player=>player.seat===seat && player.alive!==false)) return;
+      updateResult({resultReverseTarget:seat});
     },
     pickScoreTarget: el => {
       const seat=Number(el.dataset.seat);

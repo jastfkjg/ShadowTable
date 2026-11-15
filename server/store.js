@@ -16,6 +16,16 @@ const companion = player => player.uid.startsWith("test:");
 // Keep only the table context needed to correct real players' results.
 const companionContext = ({ uid, name, seat, role, roleId, alive, faction }) =>
   ({ uid, name, seat, role, roleId, alive, faction });
+function correctReverseTarget(match, reason, target, players) {
+  if (target !== undefined) {
+    if (!scoring.isReverseBoard(match) || reason !== "assassination") throw new RuleError("仅逆仆局的三绿刺杀可填写逆仆刀目标");
+    const player = players.find(player => player.seat === target);
+    if (!Number.isInteger(target) || !player) throw new RuleError("请选择逆仆刀的实际玩家目标");
+    match.reverseStrike = { target, hit: player.roleId === "reverse" };
+  }
+  const error = scoring.reverseSettlementError(match, reason, true);
+  if (error) throw new RuleError(error);
+}
 const adjustmentReason = (reason = "") => {
   if (typeof reason!=="string" || reason.length>200) throw new RuleError("操作备注最多200字");
   return reason.trim();
@@ -371,9 +381,10 @@ class Store {
     const players = this.matchParticipants(match);
     if (!players.length || players.some(player => !player.roleId || player.faction === "unknown")) throw new RuleError("身份信息不完整，不能更正计分");
     if (option.requiresTarget && !scoring.validTarget(input.scoreTarget, players, match.board, match.scorePolicy)) throw new RuleError("请选择实际在场刺杀目标或空刀");
-    const reverseError = scoring.reverseSettlementError(match, option.id, true);
-    if (reverseError) throw new RuleError(reverseError);
+    const beforeReverse = match.reverseStrike;
+    correctReverseTarget(match, option.id, input.reverseTarget, players);
     const before = {winner:match.winner, facts:match.scoringFacts, revision:match.scoreRevision || 0};
+    if (scoring.isReverseBoard(match)) before.reverseStrike = beforeReverse || null;
     match.winner = scoring.resolveWinner(option, input.scoreTarget, players, match.board, match.scorePolicy);
     match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
     let factionChanged = false;
@@ -410,7 +421,8 @@ class Store {
     this.syncScoreRooms(id);
     this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
-    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision}};
+    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision,
+      ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }
   correctFunMatch(id, input) {
     if (!this.inTransaction) throw Error("对局更正必须在事务中执行");
@@ -430,19 +442,31 @@ class Store {
     const actor = input.funActor ?? (knight && option.requiresTarget ? players.find(p=>p.uid===match.funFacts.terminal?.actor?.uid)?.seat : undefined);
     if (actor!==undefined && (!knight || !option.requiresTarget || !players.some(p=>p.seat===actor && p.alive!==false) || actor===input.funTarget)) throw new RuleError("请选择实际在场带刀人且不能自刀");
     const before = {winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision || 0};
+    if (scoring.isReverseBoard(match)) before.reverseStrike = match.reverseStrike || null;
+    correctReverseTarget(match, option.id, input.reverseTarget, players);
     const room = {players,roles:Object.fromEntries(players.map(p=>[p.uid,p.roleId])),...(knight ? {knights:{players:Object.fromEntries(players.map(p=>[p.uid,{alive:p.alive!==false,faction:p.faction}]))}} : {})};
     match.funFacts.terminal = fun.terminal(room,{reason:option.id,...(option.requiresTarget ? {target:input.funTarget,...(actor!==undefined ? {actor} : {})} : {})},null,"manual");
     match.winner = scoring.resolveWinner(option,input.funTarget,players,match.board,rules);
+    let factionChanged = false;
+    for (const player of players) {
+      const faction = scoring.settlementFaction(player, match);
+      if (faction !== player.faction) factionChanged = true;
+      player.faction = faction;
+      player.outcome = faction === match.winner ? "win" : "loss";
+      if (!companion(player)) this.db.prepare("UPDATE match_players SET faction=? WHERE match_id=? AND uid=?").run(faction,id,player.uid);
+    }
+    match.companions = players.filter(companion).map(companionContext);
     match.source="manual";match.excludedReason=null;match.scoreRevision=(match.scoreRevision || 0)+1;
     this.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(match),id);
     players.forEach(p=>p.outcome=p.faction===match.winner ? "win" : "loss");
-    if (before.winner !== match.winner) {
+    if (before.winner !== match.winner || factionChanged) {
       require("./honors").invalidate(this, id);
       match.honorResult = { status: "invalidated", mvp: [], svp: [] };
     }
     this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
-    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision}};
+    return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision,
+      ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }
   syncScoreRooms(resultId = null) {
     // Synchronize still-visible completed tables with their saved result and score.
@@ -454,7 +478,7 @@ class Store {
       room.matchRecord = {...saved,players:this.matchParticipants(saved)};
       if (saved.id === resultId) {
         room.result={winner:saved.winner,source:"manual",reason:"管理员已更正本局结果。"};room.scoringFacts=saved.scoringFacts;
-        if (scoring.usesReverseRules(saved)) {
+        if (scoring.isReverseBoard(saved)) {
           room.convertedReverse = room.matchRecord.players.find(player => player.roleId === "reverse" && player.faction === "evil")?.uid || null;
         }
       }

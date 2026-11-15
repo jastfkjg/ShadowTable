@@ -30,6 +30,102 @@ function strike(room, hit) {
 const finish = (room, reason = 'assassination', target = role(room, 'merlin').seat) =>
   run(room, 'finishTools', { scoreReason: reason, scoreTarget: target, replace: true });
 
+test('房主一次登记两刀覆盖9／11人、计分开关及四种命中组合，无需任何玩家确认', () => {
+  for (const [board, capacity] of boards) for (const enabled of [false, true])
+    for (const hit of [false, true]) for (const merlinHit of [false, true]) {
+      const room = deal(board, capacity, { enabled });
+      const reverse = role(room, 'reverse');
+      const options = publicView(room, room.host)[enabled ? 'scoreSettlement' : 'funSettlement'];
+      assert.equal(options.find(option => option.id === 'assassination').requiresReverseTarget, true);
+      assert.ok(!options.some(option => option.id === 'five_rejections'));
+      assert.equal(publicView(room, room.host).reverseSettlement, true);
+      run(room, 'finishTools', {
+        [enabled ? 'scoreReason' : 'funReason']: 'assassination',
+        [enabled ? 'scoreTarget' : 'funTarget']: role(room, merlinHit ? 'merlin' : 'servant').seat,
+        reverseTarget: role(room, hit ? 'reverse' : 'servant').seat,
+      });
+      assert.equal(room.phase, 'ended');assert.deepEqual(room.submissions, {});
+      const player = room.matchRecord.players.find(player => player.uid === reverse.uid);
+      assert.equal(player.faction, hit ? 'evil' : 'good');
+      assert.equal(player.outcome, hit === merlinHit ? 'win' : 'loss');
+      assert.equal(player.score.status, enabled ? 'scored' : 'excluded');
+      assert.equal(player.score.total, !enabled ? 0 : hit ? merlinHit ? 9 : 0 : merlinHit ? 3 : 9);
+      assert.equal(room.history.some(entry => entry.kind === 'toolReverse'), false);
+    }
+});
+
+test('两刀登记只允许房主，缺少或非法目标和作废中的请求均不提前改变状态', () => {
+  for (const [board, capacity] of boards) for (const enabled of [false, true]) {
+    const room = deal(board, capacity, { enabled });
+    const fields = { [enabled ? 'scoreReason' : 'funReason']: 'assassination',
+      [enabled ? 'scoreTarget' : 'funTarget']: role(room, 'merlin').seat, reverseTarget: role(room, 'reverse').seat };
+    const before = structuredClone(room);
+    assert.throws(() => run(room, 'finishTools', fields, 'wx:2'), /只有房主/);
+    for (const reverseTarget of [undefined, null, 0, -1, capacity + 1, '2']) {
+      assert.throws(() => run(room, 'finishTools', { ...fields, reverseTarget }), /逆仆刀/);
+      assert.deepEqual(room, before);
+    }
+    assert.throws(() => run(room, 'finishTools', { ...fields, [enabled ? 'scoreTarget' : 'funTarget']: capacity + 1 }), /目标/);
+    assert.deepEqual(room, before);
+    run(room, 'beginActivity', { kind: 'vote' });
+    const active = structuredClone(room);
+    assert.throws(() => run(room, 'finishTools', fields), /作废/);
+    assert.deepEqual(room, active);
+    run(room, 'finishTools', { ...fields, replace: true });
+    assert.equal(room.phase, 'ended');assert.equal(room.convertedReverse, role(room, 'reverse').uid);
+  }
+});
+
+test('非刺杀不接受逆仆刀字段，三红车清除旧流程的转阵营，其他板子不接受两刀', () => {
+  for (const [board, capacity] of boards) for (const enabled of [false, true]) {
+    const room = deal(board, capacity, { enabled });
+    strike(room, true);
+    const reason = enabled ? 'scoreReason' : 'funReason';
+    const before = structuredClone(room);
+    assert.throws(() => run(room, 'finishTools', { [reason]: 'quest_fail', reverseTarget: role(room, 'reverse').seat }), /仅逆仆局/);
+    assert.deepEqual(room, before);
+    run(room, 'finishTools', { [reason]: 'quest_fail' });
+    const reverse = room.matchRecord.players.find(player => player.roleId === 'reverse');
+    assert.equal(reverse.faction, 'good');assert.equal(reverse.outcome, 'loss');assert.equal(reverse.score.total, 0);
+    assert.equal(room.reverseStrike, null);
+  }
+  const room = deal('classic', 6);
+  assert.throws(() => run(room, 'finishTools', { scoreReason: 'assassination', scoreTarget: 1, reverseTarget: 2 }), /仅逆仆局/);
+});
+
+test('两刀归档可更正第一刀，计分与不计分的阵营、胜负及结束牌桌同步且事实不公开', () => {
+  for (const [board, capacity] of boards) for (const enabled of [false, true]) {
+    const room = deal(board, capacity, { enabled });
+    const reverse = role(room, 'reverse'), merlin = role(room, 'merlin'), servant = role(room, 'servant');
+    run(room, 'finishTools', { [enabled ? 'scoreReason' : 'funReason']: 'assassination',
+      [enabled ? 'scoreTarget' : 'funTarget']: merlin.seat, reverseTarget: reverse.seat });
+    const store = new Store(':memory:');
+    try {
+      store.save(room);
+      const correct = (revision, reason, reverseTarget) => store.transaction(() => store[enabled ? 'correctMatch' : 'correctFunMatch'](room.matchId,
+        { revision, [enabled ? 'scoreReason' : 'funReason']: reason, [enabled ? 'scoreTarget' : 'funTarget']: merlin.seat,
+          ...(reverseTarget === undefined ? {} : { reverseTarget }) }));
+      correct(0, 'assassination', servant.seat);
+      let record = store.matchFor(reverse.uid, room.matchId);
+      assert.equal(record.faction, 'good');assert.equal(record.outcome, 'loss');assert.equal(record.score.total, enabled ? 3 : 0);
+      assert.equal(privateView(store.get(room.code), reverse.uid).faction, '好人阵营');
+      correct(1, 'assassination', reverse.seat);
+      record = store.matchFor(reverse.uid, room.matchId);
+      assert.equal(record.faction, 'evil');assert.equal(record.outcome, 'win');assert.equal(record.score.total, enabled ? 9 : 0);
+      correct(2, 'quest_fail');
+      assert.equal(store.matchFor(reverse.uid, room.matchId).faction, 'good');
+      correct(3, 'assassination');
+      assert.equal(store.matchFor(reverse.uid, room.matchId).faction, 'evil');
+      assert.equal(store.statsFor(reverse.uid).score.total, enabled ? 9 : 0);
+      for (const player of room.players) {
+        assert.doesNotMatch(JSON.stringify(store.statsFor(player.uid)), /"reverseStrike"|"reverseTarget"/);
+        assert.doesNotMatch(JSON.stringify(store.matchesFor(player.uid)), /"reverseStrike"|"reverseTarget"/);
+        assert.doesNotMatch(JSON.stringify(publicView(store.get(room.code), player.uid)), /"reverseStrike"|"reverseTarget"/);
+      }
+    } finally { store.close(); }
+  }
+});
+
 test('9、11人逆仆默认关闭，只新增这两种计分资格且不提供提前盘刀', () => {
   for (const [board, capacity] of boards) {
     const lobby = newRoom('123456', 'wx:1', '房主', board, capacity);
@@ -82,14 +178,14 @@ test('计分局必须结算一次逆仆刀，拒绝跳过、重复和矛盾终�
   for (const [board, capacity] of boards) {
     const room = deal(board, capacity);
     let before = structuredClone(room);
-    assert.throws(() => finish(room), /请先完成刀逆仆/);
+    assert.throws(() => finish(room), /填写逆仆刀目标/);
     assert.throws(() => run(room, 'beginActivity', { kind: 'assassination' }), /请先完成刀逆仆/);
     assert.deepEqual(room, before);
     run(room, 'beginActivity', { kind: 'reverseStrike' });
     const assassin = role(room, 'assassin');
     run(room, 'submit', { value: role(room, 'reverse').seat }, assassin.uid);
     before = structuredClone(room);
-    assert.throws(() => finish(room), /请先完成刀逆仆/);
+    assert.throws(() => finish(room), /填写逆仆刀目标/);
     assert.deepEqual(room, before);
     run(room, 'cancelActivity');
     assert.equal(room.reverseStrike, null);
@@ -97,7 +193,7 @@ test('计分局必须结算一次逆仆刀，拒绝跳过、重复和矛盾终�
     strike(room, false);
     before = structuredClone(room);
     assert.throws(() => run(room, 'beginActivity', { kind: 'reverseStrike' }), /不能重复/);
-    for (const reason of ['quest_fail', 'five_rejections']) assert.throws(() => finish(room, reason), /不能包含逆仆刀/);
+    for (const reason of ['five_rejections']) assert.throws(() => finish(room, reason), /不能包含逆仆刀/);
     assert.deepEqual(room, before);
     finish(room);
     run(room, 'rematch');
