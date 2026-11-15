@@ -3,12 +3,12 @@
 「我的战绩」角色图鉴、趣味记录的职业图标、对局记录与积分流水的角色缩略图，复盘身份图鉴，以及创建房间和房间配置的公开角色列表复用透明 PNG，直接展示在现有 `#1b2b35` 分组底色上。2026-10-16 使用内置 ImageGen 工具生成，参考了项目已有彩色蜡笔头像的笔触与比例，没有沿用参考小程序的图片。
 
 - 原始图集：`docs/sources/role-portraits-atlas.png`，1254×1254，保留透明通道。
-- 小程序资源：`miniprogram/assets/roles/*.png`，现有 35 张 112×112 的透明缩略图，合计约 229 KiB（预算 248 KiB）。
+- 小程序资源：`miniprogram/assets/roles/*.png`，36 张 112×112 的透明缩略图（预算 248 KiB）。
 - 名称映射：`miniprogram/role-portraits.js`；具名角色和红蓝变体使用独立插画，其余按职业复用，完整角色名与结算阵营独立展示。同名角色跨阵营时保留独立战绩。
 - 对局列表的阵营色点与文字取结算记录；插画仅标识角色职业，不据其服装颜色判断阵营。趣味记录的机会数、成功率、未知值和相关对局链接沿用现有数据。
 - 公开角色配置由 `miniprogram/room-sheet-presentation.js` 添加插画与重复角色标记；保留服务端的人数、阵营和角色原文，包含盗贼阵营，不据插画推断或调整配比。
 - 复盘分别按初始和最终身份选图；身份未记录时显示未知占位，不根据其他时刻的身份补图或推断阵营。积分调整使用独立图标，不显示角色，也不增加详情点击入口。
-- 处理脚本：`node scripts/import-role-portraits.js`。依次导入原始图集、阵营图集和最终骑士／内奸图集。先按已核对的行列间隙切片，再裁去透明边缘、等比缩放并补透明留白，最后以索引色 PNG 压缩；替换图集后应重新核对坐标。原始职业图标保留供趣味记录使用。
+- 处理脚本：`node scripts/import-role-portraits.js`。依次导入原始图集、阵营图集、最终骑士／内奸图集和逆仆单图。先按已核对的行列间隙切片，再裁去透明边缘、等比缩放并补透明留白，最后以索引色 PNG 压缩；替换图集后应重新核对坐标。原始职业图标保留供趣味记录使用。
 - 输入风格参考：`crayon-01.jpg`、`crayon-07.jpg`、`crayon-06.jpg`、`crayon-03.jpg`，位于 `miniprogram/pages/profile/assets/avatars/`。
 
 图集从左到右、从上到下分别为：梅林、派西维尔、忠臣、刺客；莫甘娜、莫德雷德、奥伯伦、兰斯洛特；刀客、猎人、守卫、圣骑士；魔术师、先知、女巫、盗贼。
@@ -32,6 +32,14 @@ Use case: background-extraction. Edit this exact supplied approved portrait boar
 
 ```text
 Use case: background-extraction. Edit this exact supplied approved portrait board into a production TRANSPARENT sprite atlas. Remove ONLY the dark navy background and ALL Chinese caption text, making those pixels fully transparent. Preserve all FOUR portraits exactly: same crayon texture, faces, equipment, colors, silhouettes, poses and details. Do NOT redesign or redraw. Top row blue knight / red knight, bottom row blue court spy / red court spy. Keep exactly TWO columns and TWO rows, each portrait centered in its own equally sized cell with generous transparent margins. Retain entire feathers, pennants, helmets and shoulders. True alpha transparency, no simulated checkerboard, no background, no text, no labels, no shadows behind the portraits. Preserve natural textured edges, no dark navy boxes or halos. This is extraction of the approved artwork, not a new creative concept.
+```
+
+## 逆仆立绘
+
+采用用户选定的折旗侍从。使用内置 ImageGen 为确认稿移除深色背景，透明原图为 `docs/sources/role-portrait-reverse.png`。9 人和 11 人局的逆仆共用这张独立立绘，结算阵营改变时仍按角色名称取图。
+
+```text
+Use case: background-extraction. The attached approved image is the exact edit target. Isolate its existing crayon character for a production role icon with a genuinely transparent alpha background. Remove ONLY the dark slate blue background, including the gaps around the left flagpole, the hat, scarf tails and shoulders. Keep the illustration itself unchanged as closely as possible: same red-brown curls, same tiny freckles and dark oval eyes, same oat-colored cloth headscarf, same two gold buttons and blue jacket, same cream knotted neckscarf, same original asymmetric red-over-blue folded pennant and diagonal wooden pole, same expression, proportions, pose, silhouette, position and visible textures. Preserve the natural irregular wax-crayon alpha along the character edges. Do not simplify, redesign, redraw, recolor or retouch character, just extract. Keep the entire original character and flag. Square canvas with padding, no shadow, halo, labels, lettering, colored backdrop, checkerboard pattern or overpainted edge.
 ```
 
 ## 生成提示词

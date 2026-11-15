@@ -30,6 +30,12 @@ const atlases = [
     rows: [0, 600, 1312], columns: [[0, 600, 1199], [0, 600, 1199]],
     names: ["knight-blue", "knight-red", "spy-blue", "spy-red"],
   },
+  {
+    input: path.join(root, "docs/sources/role-portrait-reverse.png"),
+    width: 1254, height: 1254,
+    rows: [0, 1254], columns: [[0, 1254]],
+    names: ["reverse"],
+  },
 ];
 async function main() {
   for (const atlas of atlases) {
