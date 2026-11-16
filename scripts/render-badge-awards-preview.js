@@ -1,7 +1,7 @@
 // Layout-only projection of the production shared dialog, not another client.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const {wxmlToJs}=require('miniprogram-compiler');
+const {wxmlToJs}=require('./miniprogram-compiler');
 const {catalogue}=require('../miniprogram/badges');
 const {present,markup}=require('../miniprogram/badge-awards');
 const root=path.resolve(__dirname,'../miniprogram'),out=path.resolve(__dirname,'../output/playwright/october-awards-implemented');

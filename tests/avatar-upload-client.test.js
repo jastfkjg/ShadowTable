@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("../scripts/miniprogram-compiler");
 const root = path.resolve(__dirname, "../miniprogram");
 const profile = { nickname: "林间", avatarUrl: "/api/avatars/old", version: 3, identityType: "wx" };
 const flush = () => new Promise(resolve => setImmediate(resolve));

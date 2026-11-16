@@ -2,7 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./miniprogram-compiler");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures");
 const { presentReplay, trajectory } = require("../miniprogram/replay");

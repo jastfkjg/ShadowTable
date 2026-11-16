@@ -768,7 +768,7 @@
       } else if (route.page === 'lobby') {
         await Promise.all([loadRooms(), loadProfile()]);
         if (!state.nameEdited) setState({ name: (!needsNicknameSetup() ? state.profile?.nickname : '') || storage.get('nickname') || '' });
-      } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats(), loadRooms().catch(() => {})]);
+      } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats(), loadRooms().catch(() => {}), loadPersonalitySummary()]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
       else if (route.page === 'leaderboard') await loadLeaderboard();
@@ -938,6 +938,8 @@
       html += `<button type="button" class="me-current-room" data-action="openRoom" data-code="${esc(current.code)}" aria-label="${esc('返回牌桌，房间' + current.code + '，' + current.statusLabel + '，' + current.relationLabel)}"${state.busy || pending ? ' disabled' : ''}><span class="me-room-icon" aria-hidden="true"></span><span class="me-room-copy"><span class="me-room-title">当前牌桌<span class="me-room-state ${esc(current.status)}">${esc(current.statusLabel)}</span></span><span class="me-room-caption">${esc(current.boardLabel + ' · ' + current.capacity + '人 · ' + current.relationLabel)}</span></span><span class="me-room-return">返回${chevron}</span></button>`;
     }
     const group = (title, links) => `<section class="personal-links me-links${title ? '' : ' me-links-secondary'}">${title ? `<h2 class="me-section-label">${title}</h2>` : ''}<div class="me-link-group">${links.map(([page, label, note, icon, tone]) => `<button class="personal-link" type="button" ${page ? `data-action="navigate" data-page="${page}"` : 'data-action="about"'}><span class="me-icon-well me-well-${tone}"><span class="me-icon me-icon-${icon}" aria-hidden="true"></span></span><span class="me-link-copy"><span class="me-link-title">${label}</span>${note ? `<span class="me-link-caption">${note}</span>` : ''}</span>${chevron}</button>`).join('')}</div></section>`;
+    const persona = personalityCache()?.summary(webSessionTag || storage.get('session')) || {title:'我的阿瓦隆人格',caption:'28 个情境，探索你的牌桌风格',portrait:'/assets/roles/merlin.png'};
+    html += '<a class="me-personality" href="/personality"><img class="me-personality-art" src="'+esc(persona.portrait)+'" alt=""><span class="me-personality-copy"><span class="me-personality-label">AVALON · 16 PERSONALITIES</span><span class="me-personality-title">'+esc(persona.title)+'</span><span class="me-personality-caption">'+esc(persona.caption)+'</span></span>'+chevron+'</a>';
     html += group('我的记录', [
       ['matches', '对局记录', '回看身份、胜负与对局过程', 'history', 'blue'],
       ['stats?tab=fun', '趣味记录', '刀法、挡刀，还有那些名场面', 'spark', 'purple'],
@@ -953,6 +955,17 @@
     html += '<div class="web-account-row"><span class="small muted">' + (profile.identityType === 'wx' ? '小程序账号 · 资料与战绩共用' : '游客账号') + '</span>' + (webSessionTag ? btn('text-button', 'continueAsGuest', storage.get('guestSession') ? '退出并返回原游客' : '退出网页登录', null, state.webLoginBusy) : webAuthEnabled ? btn('text-button', 'navigate', '使用小程序账号登录', { page: 'login' }) : '') + '</div>';
     if (state.webLoginError) html += '<div class="inline-error" role="alert">' + esc(state.webLoginError) + '</div>';
     return html;
+  }
+  function personalityCache() {
+    return window.shadowtablePersonalityStorage?.create({get:key=>safeParse(storage.get(key)),set:(key,value)=>localStorage.setItem(key,JSON.stringify(value)),remove:key=>localStorage.removeItem(key)});
+  }
+  async function loadPersonalitySummary() {
+    const route=routeSequence,account=webSessionTag || storage.get('session');
+    try {
+      const value=await request('/api/me/personality');
+      if(route!==routeSequence || account!==(webSessionTag || storage.get('session')))return;
+      personalityCache()?.bind(account,value);render();
+    }catch(_) { /* The cached draft entry remains available offline. */ }
   }
   let clearingSequence = 0, clearingPending = null, clearingConfirmationRoute = -1, clearingConfirmationAccount = null;
   const clearingAccount = () => webSessionTag || storage.get('session');

@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./miniprogram-compiler");
 const cards = require("../miniprogram/share-card");
 const { now, profile, stats, board, fullFunStats } = require("../tests/helpers/share-fixtures");
 const root = path.resolve(__dirname, "../miniprogram");

@@ -1,6 +1,6 @@
 // Render the public WXML and WXSS, with sample snapshots rather than live player data.
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./miniprogram-compiler");
 const { present } = require("../miniprogram/shared-record-view");
 const fixtures = require("../tests/helpers/record-share-fixtures");
 const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/record-shares-implemented"));

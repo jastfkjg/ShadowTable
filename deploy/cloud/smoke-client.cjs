@@ -37,8 +37,11 @@ async function main() {
     const html = await request("/");
     if (!html.includes("<html")) throw new Error("Web entry did not return HTML");
     // Fetch the dependencies from the actual image, not the source checkout.
-    const assets = new Set(Array.from(html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]));
+    const htmlAssets = content => Array.from(content.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi), match => match[1]);
+    const assets = new Set(htmlAssets(html));
     if (!assets.size) throw new Error("Web entry has no assets");
+    assets.add("/personality");
+    assets.add("/pages/personality/assets/miniprogram-qrcode.jpg");
     // These images are referenced by rendered views rather than the HTML shell.
     const { assetNames: roleAssets } = require(require("node:path").join(process.cwd(), "miniprogram/role-portraits"));
     for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg", "/assets/about-merlin.svg",
@@ -53,6 +56,10 @@ async function main() {
       if (url.origin !== origin) throw new Error(`Unexpected external web asset: ${asset}`);
       const content = await request(url.pathname + url.search);
       if (!content.trim()) throw new Error(`Empty web asset: ${asset}`);
+      if (url.pathname === "/personality") {
+        if (!content.includes('id="personality"')) throw new Error("Personality page is unavailable in the image");
+        for (const dependency of htmlAssets(content)) assets.add(dependency);
+      }
       if (url.pathname.endsWith(".js")) new (require("node:vm").Script)(content, { filename: asset });
       // Follow shared stylesheet imports too; reading only the HTML shell would
       // miss a stylesheet left out of the image's explicit packaging list.
@@ -67,6 +74,10 @@ async function main() {
     }));
     if (!/^[a-f0-9]{64}$/.test(data.token)) throw new Error("Guest login returned an invalid token");
     const auth = { Authorization: "Bearer " + data.token };
+    const personality = JSON.parse(await request("/api/me/personality", { headers: auth }));
+    if (!/^[a-f0-9]{64}$/.test(personality.accountKey) || personality.latest !== null || !Array.isArray(personality.history)) {
+      throw new Error("Personality account API is unavailable in the image");
+    }
     const wallet = JSON.parse(await request("/api/me/avoidance", { headers: auth }));
     if (wallet.balance !== 0 || wallet.history.length !== 0) throw new Error("New accounts must start without avoidance cards or automatic grants");
     const room = JSON.parse(await request("/api/rooms", { method: "POST", headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": require("node:crypto").randomUUID() }, body: JSON.stringify({ name: "容器验收", board: "classic", capacity: 6 }) }));

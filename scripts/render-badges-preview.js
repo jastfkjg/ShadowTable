@@ -1,6 +1,6 @@
 // Static visual fixtures rendered from the real mini-program templates.
 const fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
-const {wxmlToJs}=require('miniprogram-compiler');
+const {wxmlToJs}=require('./miniprogram-compiler');
 const {catalogue,presentCollection}=require('../miniprogram/badges');
 const root = path.resolve(__dirname, '../miniprogram');
 const output = path.resolve(process.argv[2] || path.join(__dirname, '../output/playwright/badges'));

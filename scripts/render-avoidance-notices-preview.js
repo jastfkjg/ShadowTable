@@ -1,7 +1,7 @@
 // Project the production receipt notifier and WXML/WXSS for browser visual QA.
 // This does not replace verification in the native WeChat runtime.
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./miniprogram-compiler");
 const { present } = require("../miniprogram/dialog");
 const avoidance = require("../miniprogram/avoidance");
 const root = path.resolve(__dirname, "../miniprogram");

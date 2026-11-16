@@ -1,0 +1,216 @@
+.persona-page { max-width:600px; margin:0 auto; padding:24px 22px calc(40px + env(safe-area-inset-bottom)); color:var(--text,#f2eee5); font-size:16px; line-height:1.7; }
+.persona-page, .persona-page view, .persona-page text, .persona-page button { box-sizing:border-box; }
+.persona-page button { margin:0; width:auto; min-height:48px; font-size:15px; line-height:1.55; font-weight:500; border-radius:14px; }
+.persona-page button::after { border:0; }
+.persona-page button:focus-visible { outline:2px solid var(--accent,#e5c68b); outline-offset:4px; }
+.persona-page .persona-primary { background:var(--accent,#e5c68b); color:#17232a; padding:14px 18px; font-weight:600; }
+.persona-page .persona-secondary { background:#21343f; border:1px solid #50606b; color:var(--text,#f2eee5); padding:13px 16px; }
+.persona-small { display:block; font-size:13px; color:var(--muted,#b1bfc6); line-height:1.7; }
+.persona-center { text-align:center; }
+.persona-eyebrow { display:block; color:var(--accent,#e5c68b); font-size:12px; letter-spacing:2px; }
+.persona-intro { text-align:center; padding:12px 0 24px; }
+.persona-intro-title { margin:18px 0 0; font-size:34px; font-weight:650; line-height:1.4; letter-spacing:1px; }
+.persona-intro-title text, .persona-intro-copy text { display:block; }
+.persona-intro-art { position:relative; height:228px; max-width:380px; margin:8px auto; }
+.persona-intro-main { position:absolute; width:220px; height:220px; left:50%; bottom:0; transform:translateX(-50%); z-index:2; }
+.persona-intro-side { position:absolute; width:142px; height:142px; bottom:10px; opacity:.65; }
+.persona-intro-left { left:0; transform:rotate(-9deg); }
+.persona-intro-right { right:0; transform:rotate(9deg); }
+.persona-intro-copy { color:var(--muted,#b1bfc6); margin:12px auto 24px; }
+.persona-facts { display:flex; justify-content:center; margin:0 0 28px; }
+.persona-facts>view { flex:1; font-size:12px; color:var(--muted,#b1bfc6); }
+.persona-facts>view+view { border-left:1px solid #30434e; }
+.persona-facts text { display:block; font-size:22px; color:var(--text,#f2eee5); line-height:1.6; }
+.persona-intro .persona-small { margin-top:12px; }
+.persona-intro .persona-primary, .persona-shared-action .persona-primary { width:100%; }
+.persona-account-note { margin:8px 0 20px; }
+.persona-page .persona-disclosure { width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; text-align:left; padding:15px 0; color:var(--text,#f2eee5); background:transparent; border-radius:0; }
+.persona-disclosure>text:last-child { color:var(--accent,#e5c68b); font-size:13px; flex-shrink:0; }
+.persona-page .persona-text-button { color:var(--accent,#e5c68b); padding:12px 8px; background:transparent; }
+.persona-message { margin:12px 0 20px; padding:14px 16px; background:var(--surface,#1b2b35); border-radius:12px; color:var(--muted,#b1bfc6); font-size:14px; }
+.persona-message button { color:var(--accent,#e5c68b); padding:8px 0; }
+.persona-error { color:#f2b6ae; }
+.persona-status { text-align:center; padding:80px 0; color:var(--muted,#b1bfc6); }
+.persona-answering { padding-top:20px; padding-bottom:calc(118px + env(safe-area-inset-bottom)); }
+.persona-progress-meta { display:flex; justify-content:space-between; gap:12px; color:var(--muted,#b1bfc6); font-size:12px; }
+.persona-progress-meta>text:first-child { color:var(--accent,#e5c68b); }
+.persona-progress { height:3px; background:#30434e; border-radius:4px; overflow:hidden; margin:12px 0 26px; }
+.persona-progress-fill { height:100%; background:var(--accent,#e5c68b); transition:width .24s ease; }
+.persona-context { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:var(--accent,#e5c68b); margin-bottom:14px; }
+.persona-context>text:first-child { color:var(--muted,#b1bfc6); }
+.persona-situation { font-size:16px; line-height:1.85; }
+.persona-history { margin-top:18px; padding:7px 12px; background:#1b2b35; border-radius:10px; }
+.persona-history-row { display:flex; gap:10px; justify-content:space-between; font-size:12px; padding:5px 0; color:var(--muted,#b1bfc6); }
+.persona-prompt { margin:26px 0 18px; font-size:21px; line-height:1.6; font-weight:600; }
+.persona-options { display:flex; flex-direction:column; gap:12px; }
+.persona-page .persona-option { display:flex; align-items:flex-start; gap:12px; width:100%; text-align:left; padding:17px 16px; background:var(--surface,#1b2b35); border:1px solid #4b606b; color:var(--text,#f2eee5); font-size:15px; line-height:1.8; transition:background .15s,border-color .15s; }
+.persona-page .persona-option.is-selected { background:#30372f; border-color:var(--accent,#e5c68b); }
+.persona-option-mark { display:flex; width:25px; height:25px; margin-top:1px; align-items:center; justify-content:center; border:1px solid #83949b; border-radius:50%; flex-shrink:0; font-size:12px; color:var(--muted,#b1bfc6); }
+.is-selected .persona-option-mark { background:var(--accent,#e5c68b); border-color:var(--accent,#e5c68b); color:#17232a; }
+.persona-option-copy { flex:1; min-width:0; }
+.persona-rule-note { color:var(--muted,#b1bfc6); font-size:12px; margin:20px 0 0; }
+.persona-answer-actions { position:fixed; z-index:50; bottom:0; left:0; right:0; width:100%; max-width:600px; margin:auto; display:flex; gap:12px; padding:14px 22px calc(14px + env(safe-area-inset-bottom)); background:#101c24; border-top:1px solid #30434e; }
+.persona-answer-actions .persona-secondary { width:104px; flex-shrink:0; }
+.persona-answer-actions .persona-primary { flex:1; }
+.persona-rules { padding:0 0 20px; }
+.persona-rule { margin:20px 0; font-size:14px; color:var(--muted,#b1bfc6); }
+.persona-rule .persona-section-title { margin-bottom:8px; }
+.persona-shared-by { text-align:center; font-size:13px; color:var(--muted,#b1bfc6); margin-bottom:18px; }
+.persona-result-hero { position:relative; padding:14px 8px 24px; text-align:center; }
+.persona-role-name { font-size:38px; font-weight:650; line-height:1.35; margin:14px 0 3px; letter-spacing:2px; }
+.persona-role-english { font-size:13px; letter-spacing:3px; color:var(--accent,#e5c68b); }
+.persona-portrait-stage { position:relative; height:250px; margin:4px auto 0; max-width:330px; display:flex; align-items:center; justify-content:center; }
+.persona-orbit { position:absolute; width:220px; height:220px; border:1px solid rgba(229,198,139,.2); border-radius:50%; }
+.persona-orbit::after { content:""; position:absolute; inset:13px; border:1px solid rgba(229,198,139,.07); border-radius:50%; }
+.persona-portrait { position:relative; z-index:1; width:250px; height:250px; animation:persona-arrive .45s ease both; }
+.persona-subtype { font-size:28px; line-height:1.45; color:var(--accent,#e5c68b); font-weight:600; letter-spacing:2px; }
+.persona-result-summary { font-size:15px; line-height:1.85; color:var(--muted,#b1bfc6); max-width:410px; margin:16px auto; }
+.persona-type-line { display:flex; align-items:center; justify-content:center; gap:16px; font-size:11px; letter-spacing:1px; color:var(--muted,#b1bfc6); }
+.persona-type-line>text+text { border-left:1px solid #536570; padding-left:16px; }
+.persona-save-state { text-align:center; color:var(--muted,#b1bfc6); font-size:12px; margin:0 0 16px; }
+.persona-result-actions { display:flex; gap:10px; margin:0 0 22px; }
+.persona-result-actions>.persona-primary { flex:1; min-width:0; }
+.persona-result-actions>.persona-secondary { flex-shrink:0; font-size:14px; }
+.persona-share-panel { padding:20px; border:1px solid #536570; border-radius:16px; margin-bottom:24px; }
+.persona-share-panel .persona-primary { margin-top:16px; width:100%; }
+.persona-section { padding:28px 0; border-top:1px solid #30434e; }
+.persona-section-heading { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.persona-section-number { font-size:12px; font-variant-numeric:tabular-nums; color:var(--accent,#e5c68b); }
+.persona-section-title { color:var(--text,#f2eee5); font-size:18px; font-weight:600; line-height:1.6; }
+.persona-prose { color:var(--muted,#b1bfc6); line-height:1.85; }
+.persona-insight { margin:20px 0; color:var(--muted,#b1bfc6); }
+.persona-insight-label { display:block; color:var(--text,#f2eee5); font-size:13px; margin-bottom:6px; }
+.persona-tip { padding:18px 20px; border-left:2px solid var(--accent,#e5c68b); background:#1b2b35; border-radius:0 12px 12px 0; }
+.persona-tip>text { display:block; font-size:12px; color:var(--accent,#e5c68b); margin-bottom:8px; }
+.persona-evidence { margin:24px 0; }
+.persona-evidence-source { display:block; font-size:12px; color:var(--accent,#e5c68b); margin-bottom:8px; }
+.persona-quote { margin-bottom:10px; line-height:1.85; }
+.persona-dimension-note { margin:8px 0 28px; }
+.persona-dimension { margin:24px 0 34px; }
+.persona-dimension-name { font-size:15px; font-weight:600; margin-bottom:10px; }
+.persona-axis-labels { display:flex; justify-content:space-between; gap:24px; color:var(--muted,#b1bfc6); font-size:12px; line-height:1.6; }
+.persona-axis-labels>text { flex:1; max-width:47%; }
+.persona-axis-labels>text:last-child { text-align:right; }
+.persona-axis { position:relative; height:5px; background:#435760; margin:15px 7px; border-radius:8px; }
+.persona-axis-center { position:absolute; left:50%; top:-3px; height:11px; width:1px; background:#b1bfc6; }
+.persona-axis-dot { position:absolute; top:-4px; width:13px; height:13px; margin-left:-6.5px; border:2px solid #101c24; border-radius:50%; background:var(--accent,#e5c68b); box-shadow:0 0 0 1px var(--accent,#e5c68b); }
+.persona-style { padding-top:26px; border-top:1px dashed #536570; margin-bottom:0; }
+.persona-secondary-roles { display:flex; gap:24px; padding-top:16px; }
+.persona-secondary-roles>view { flex:1; display:flex; flex-direction:column; align-items:center; font-size:14px; }
+.persona-secondary-roles image { width:90px; height:90px; }
+.persona-footnote { padding:20px 0; font-size:12px; line-height:1.8; color:var(--muted,#b1bfc6); }
+.persona-bottom-links { display:flex; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.persona-shared-action { margin:10px 0 22px; }
+.persona-shared-action .persona-small { margin-top:12px; }
+.persona-history-result { display:flex; gap:12px; width:100%; text-align:left; color:var(--text,#f2eee5); background:transparent; padding:14px 0; }
+.persona-history-result image { width:48px; height:48px; flex-shrink:0; }
+.persona-history-result>view { flex:1; min-width:0; }
+.persona-history-result>view>text { display:block; }
+.persona-catalogue-item { display:flex; align-items:center; gap:14px; padding:20px 0; border-top:1px solid #30434e; }
+.persona-catalogue-item image { width:82px; height:82px; flex-shrink:0; }
+.persona-export-canvas { position:fixed; width:360px; height:520px; left:-10000px; top:0; pointer-events:none; }
+.persona-pressed { opacity:.8; }
+@keyframes persona-arrive { from { opacity:0; transform:translateY(10px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+@media (prefers-reduced-motion:reduce) { .persona-portrait { animation:none; } .persona-progress-fill, .persona-option { transition:none; } }
+@media (max-width:360px) { .persona-page { padding-left:18px; padding-right:18px; } .persona-role-name { font-size:32px; } .persona-intro-title { font-size:30px; } .persona-intro-side { width:120px; height:120px; } .persona-result-actions { flex-direction:column; } }
+.persona-progress.p0 .persona-progress-fill { width:0%; } .persona-axis.p0 .persona-axis-dot { left:0%; }
+.persona-progress.p1 .persona-progress-fill { width:1%; } .persona-axis.p1 .persona-axis-dot { left:1%; }
+.persona-progress.p2 .persona-progress-fill { width:2%; } .persona-axis.p2 .persona-axis-dot { left:2%; }
+.persona-progress.p3 .persona-progress-fill { width:3%; } .persona-axis.p3 .persona-axis-dot { left:3%; }
+.persona-progress.p4 .persona-progress-fill { width:4%; } .persona-axis.p4 .persona-axis-dot { left:4%; }
+.persona-progress.p5 .persona-progress-fill { width:5%; } .persona-axis.p5 .persona-axis-dot { left:5%; }
+.persona-progress.p6 .persona-progress-fill { width:6%; } .persona-axis.p6 .persona-axis-dot { left:6%; }
+.persona-progress.p7 .persona-progress-fill { width:7%; } .persona-axis.p7 .persona-axis-dot { left:7%; }
+.persona-progress.p8 .persona-progress-fill { width:8%; } .persona-axis.p8 .persona-axis-dot { left:8%; }
+.persona-progress.p9 .persona-progress-fill { width:9%; } .persona-axis.p9 .persona-axis-dot { left:9%; }
+.persona-progress.p10 .persona-progress-fill { width:10%; } .persona-axis.p10 .persona-axis-dot { left:10%; }
+.persona-progress.p11 .persona-progress-fill { width:11%; } .persona-axis.p11 .persona-axis-dot { left:11%; }
+.persona-progress.p12 .persona-progress-fill { width:12%; } .persona-axis.p12 .persona-axis-dot { left:12%; }
+.persona-progress.p13 .persona-progress-fill { width:13%; } .persona-axis.p13 .persona-axis-dot { left:13%; }
+.persona-progress.p14 .persona-progress-fill { width:14%; } .persona-axis.p14 .persona-axis-dot { left:14%; }
+.persona-progress.p15 .persona-progress-fill { width:15%; } .persona-axis.p15 .persona-axis-dot { left:15%; }
+.persona-progress.p16 .persona-progress-fill { width:16%; } .persona-axis.p16 .persona-axis-dot { left:16%; }
+.persona-progress.p17 .persona-progress-fill { width:17%; } .persona-axis.p17 .persona-axis-dot { left:17%; }
+.persona-progress.p18 .persona-progress-fill { width:18%; } .persona-axis.p18 .persona-axis-dot { left:18%; }
+.persona-progress.p19 .persona-progress-fill { width:19%; } .persona-axis.p19 .persona-axis-dot { left:19%; }
+.persona-progress.p20 .persona-progress-fill { width:20%; } .persona-axis.p20 .persona-axis-dot { left:20%; }
+.persona-progress.p21 .persona-progress-fill { width:21%; } .persona-axis.p21 .persona-axis-dot { left:21%; }
+.persona-progress.p22 .persona-progress-fill { width:22%; } .persona-axis.p22 .persona-axis-dot { left:22%; }
+.persona-progress.p23 .persona-progress-fill { width:23%; } .persona-axis.p23 .persona-axis-dot { left:23%; }
+.persona-progress.p24 .persona-progress-fill { width:24%; } .persona-axis.p24 .persona-axis-dot { left:24%; }
+.persona-progress.p25 .persona-progress-fill { width:25%; } .persona-axis.p25 .persona-axis-dot { left:25%; }
+.persona-progress.p26 .persona-progress-fill { width:26%; } .persona-axis.p26 .persona-axis-dot { left:26%; }
+.persona-progress.p27 .persona-progress-fill { width:27%; } .persona-axis.p27 .persona-axis-dot { left:27%; }
+.persona-progress.p28 .persona-progress-fill { width:28%; } .persona-axis.p28 .persona-axis-dot { left:28%; }
+.persona-progress.p29 .persona-progress-fill { width:29%; } .persona-axis.p29 .persona-axis-dot { left:29%; }
+.persona-progress.p30 .persona-progress-fill { width:30%; } .persona-axis.p30 .persona-axis-dot { left:30%; }
+.persona-progress.p31 .persona-progress-fill { width:31%; } .persona-axis.p31 .persona-axis-dot { left:31%; }
+.persona-progress.p32 .persona-progress-fill { width:32%; } .persona-axis.p32 .persona-axis-dot { left:32%; }
+.persona-progress.p33 .persona-progress-fill { width:33%; } .persona-axis.p33 .persona-axis-dot { left:33%; }
+.persona-progress.p34 .persona-progress-fill { width:34%; } .persona-axis.p34 .persona-axis-dot { left:34%; }
+.persona-progress.p35 .persona-progress-fill { width:35%; } .persona-axis.p35 .persona-axis-dot { left:35%; }
+.persona-progress.p36 .persona-progress-fill { width:36%; } .persona-axis.p36 .persona-axis-dot { left:36%; }
+.persona-progress.p37 .persona-progress-fill { width:37%; } .persona-axis.p37 .persona-axis-dot { left:37%; }
+.persona-progress.p38 .persona-progress-fill { width:38%; } .persona-axis.p38 .persona-axis-dot { left:38%; }
+.persona-progress.p39 .persona-progress-fill { width:39%; } .persona-axis.p39 .persona-axis-dot { left:39%; }
+.persona-progress.p40 .persona-progress-fill { width:40%; } .persona-axis.p40 .persona-axis-dot { left:40%; }
+.persona-progress.p41 .persona-progress-fill { width:41%; } .persona-axis.p41 .persona-axis-dot { left:41%; }
+.persona-progress.p42 .persona-progress-fill { width:42%; } .persona-axis.p42 .persona-axis-dot { left:42%; }
+.persona-progress.p43 .persona-progress-fill { width:43%; } .persona-axis.p43 .persona-axis-dot { left:43%; }
+.persona-progress.p44 .persona-progress-fill { width:44%; } .persona-axis.p44 .persona-axis-dot { left:44%; }
+.persona-progress.p45 .persona-progress-fill { width:45%; } .persona-axis.p45 .persona-axis-dot { left:45%; }
+.persona-progress.p46 .persona-progress-fill { width:46%; } .persona-axis.p46 .persona-axis-dot { left:46%; }
+.persona-progress.p47 .persona-progress-fill { width:47%; } .persona-axis.p47 .persona-axis-dot { left:47%; }
+.persona-progress.p48 .persona-progress-fill { width:48%; } .persona-axis.p48 .persona-axis-dot { left:48%; }
+.persona-progress.p49 .persona-progress-fill { width:49%; } .persona-axis.p49 .persona-axis-dot { left:49%; }
+.persona-progress.p50 .persona-progress-fill { width:50%; } .persona-axis.p50 .persona-axis-dot { left:50%; }
+.persona-progress.p51 .persona-progress-fill { width:51%; } .persona-axis.p51 .persona-axis-dot { left:51%; }
+.persona-progress.p52 .persona-progress-fill { width:52%; } .persona-axis.p52 .persona-axis-dot { left:52%; }
+.persona-progress.p53 .persona-progress-fill { width:53%; } .persona-axis.p53 .persona-axis-dot { left:53%; }
+.persona-progress.p54 .persona-progress-fill { width:54%; } .persona-axis.p54 .persona-axis-dot { left:54%; }
+.persona-progress.p55 .persona-progress-fill { width:55%; } .persona-axis.p55 .persona-axis-dot { left:55%; }
+.persona-progress.p56 .persona-progress-fill { width:56%; } .persona-axis.p56 .persona-axis-dot { left:56%; }
+.persona-progress.p57 .persona-progress-fill { width:57%; } .persona-axis.p57 .persona-axis-dot { left:57%; }
+.persona-progress.p58 .persona-progress-fill { width:58%; } .persona-axis.p58 .persona-axis-dot { left:58%; }
+.persona-progress.p59 .persona-progress-fill { width:59%; } .persona-axis.p59 .persona-axis-dot { left:59%; }
+.persona-progress.p60 .persona-progress-fill { width:60%; } .persona-axis.p60 .persona-axis-dot { left:60%; }
+.persona-progress.p61 .persona-progress-fill { width:61%; } .persona-axis.p61 .persona-axis-dot { left:61%; }
+.persona-progress.p62 .persona-progress-fill { width:62%; } .persona-axis.p62 .persona-axis-dot { left:62%; }
+.persona-progress.p63 .persona-progress-fill { width:63%; } .persona-axis.p63 .persona-axis-dot { left:63%; }
+.persona-progress.p64 .persona-progress-fill { width:64%; } .persona-axis.p64 .persona-axis-dot { left:64%; }
+.persona-progress.p65 .persona-progress-fill { width:65%; } .persona-axis.p65 .persona-axis-dot { left:65%; }
+.persona-progress.p66 .persona-progress-fill { width:66%; } .persona-axis.p66 .persona-axis-dot { left:66%; }
+.persona-progress.p67 .persona-progress-fill { width:67%; } .persona-axis.p67 .persona-axis-dot { left:67%; }
+.persona-progress.p68 .persona-progress-fill { width:68%; } .persona-axis.p68 .persona-axis-dot { left:68%; }
+.persona-progress.p69 .persona-progress-fill { width:69%; } .persona-axis.p69 .persona-axis-dot { left:69%; }
+.persona-progress.p70 .persona-progress-fill { width:70%; } .persona-axis.p70 .persona-axis-dot { left:70%; }
+.persona-progress.p71 .persona-progress-fill { width:71%; } .persona-axis.p71 .persona-axis-dot { left:71%; }
+.persona-progress.p72 .persona-progress-fill { width:72%; } .persona-axis.p72 .persona-axis-dot { left:72%; }
+.persona-progress.p73 .persona-progress-fill { width:73%; } .persona-axis.p73 .persona-axis-dot { left:73%; }
+.persona-progress.p74 .persona-progress-fill { width:74%; } .persona-axis.p74 .persona-axis-dot { left:74%; }
+.persona-progress.p75 .persona-progress-fill { width:75%; } .persona-axis.p75 .persona-axis-dot { left:75%; }
+.persona-progress.p76 .persona-progress-fill { width:76%; } .persona-axis.p76 .persona-axis-dot { left:76%; }
+.persona-progress.p77 .persona-progress-fill { width:77%; } .persona-axis.p77 .persona-axis-dot { left:77%; }
+.persona-progress.p78 .persona-progress-fill { width:78%; } .persona-axis.p78 .persona-axis-dot { left:78%; }
+.persona-progress.p79 .persona-progress-fill { width:79%; } .persona-axis.p79 .persona-axis-dot { left:79%; }
+.persona-progress.p80 .persona-progress-fill { width:80%; } .persona-axis.p80 .persona-axis-dot { left:80%; }
+.persona-progress.p81 .persona-progress-fill { width:81%; } .persona-axis.p81 .persona-axis-dot { left:81%; }
+.persona-progress.p82 .persona-progress-fill { width:82%; } .persona-axis.p82 .persona-axis-dot { left:82%; }
+.persona-progress.p83 .persona-progress-fill { width:83%; } .persona-axis.p83 .persona-axis-dot { left:83%; }
+.persona-progress.p84 .persona-progress-fill { width:84%; } .persona-axis.p84 .persona-axis-dot { left:84%; }
+.persona-progress.p85 .persona-progress-fill { width:85%; } .persona-axis.p85 .persona-axis-dot { left:85%; }
+.persona-progress.p86 .persona-progress-fill { width:86%; } .persona-axis.p86 .persona-axis-dot { left:86%; }
+.persona-progress.p87 .persona-progress-fill { width:87%; } .persona-axis.p87 .persona-axis-dot { left:87%; }
+.persona-progress.p88 .persona-progress-fill { width:88%; } .persona-axis.p88 .persona-axis-dot { left:88%; }
+.persona-progress.p89 .persona-progress-fill { width:89%; } .persona-axis.p89 .persona-axis-dot { left:89%; }
+.persona-progress.p90 .persona-progress-fill { width:90%; } .persona-axis.p90 .persona-axis-dot { left:90%; }
+.persona-progress.p91 .persona-progress-fill { width:91%; } .persona-axis.p91 .persona-axis-dot { left:91%; }
+.persona-progress.p92 .persona-progress-fill { width:92%; } .persona-axis.p92 .persona-axis-dot { left:92%; }
+.persona-progress.p93 .persona-progress-fill { width:93%; } .persona-axis.p93 .persona-axis-dot { left:93%; }
+.persona-progress.p94 .persona-progress-fill { width:94%; } .persona-axis.p94 .persona-axis-dot { left:94%; }
+.persona-progress.p95 .persona-progress-fill { width:95%; } .persona-axis.p95 .persona-axis-dot { left:95%; }
+.persona-progress.p96 .persona-progress-fill { width:96%; } .persona-axis.p96 .persona-axis-dot { left:96%; }
+.persona-progress.p97 .persona-progress-fill { width:97%; } .persona-axis.p97 .persona-axis-dot { left:97%; }
+.persona-progress.p98 .persona-progress-fill { width:98%; } .persona-axis.p98 .persona-axis-dot { left:98%; }
+.persona-progress.p99 .persona-progress-fill { width:99%; } .persona-axis.p99 .persona-axis-dot { left:99%; }
+.persona-progress.p100 .persona-progress-fill { width:100%; } .persona-axis.p100 .persona-axis-dot { left:100%; }

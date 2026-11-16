@@ -1,4 +1,10 @@
 @import "../shared/content.wxss";
+.me-personality { display:flex; align-items:center; gap:10px; margin:18px 0 6px; padding:16px 14px 16px 8px; border:1px solid rgba(229,198,139,.3); border-radius:20px; background:#1b2b35; color:var(--text); text-decoration:none; }
+.me-personality-art { width:78px; height:88px; flex-shrink:0; }
+.me-personality-copy { min-width:0; flex:1; }
+.me-personality-label { display:block; font-size:9px; line-height:1.5; letter-spacing:1px; color:var(--accent); }
+.me-personality-title { display:block; margin:6px 0; font-size:16px; line-height:1.5; font-weight:600; }
+.me-personality-caption { display:block; font-size:12px; color:var(--muted); line-height:1.6; }
 .me-page { --me-divider: rgba(177,191,198,.13); max-width:600px; padding:20px 16px calc(32px + 50px + env(safe-area-inset-bottom)); }
 .me-page, .me-page view, .me-page text, .me-page navigator { box-sizing:border-box; }
 .me-page .me-pressed { opacity:.72; }

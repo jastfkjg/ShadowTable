@@ -2,7 +2,7 @@
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./miniprogram-compiler");
 const {
   BOARDS,
   newRoom,

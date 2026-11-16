@@ -20,7 +20,7 @@ function avatarFor(canvas, path) {
     const timer = setTimeout(() => done(null), 3000);
     image.onload = () => done(image.width && image.height ? image : null);
     image.onerror = () => done(null);
-    try { image.src = path.startsWith("/assets/") || /^https?:\/\//.test(path) ? path : api.assetUrl(path); } catch { done(null); }
+    try { image.src = /^\/(assets|pages\/personality\/assets)\//.test(path) || /^https?:\/\//.test(path) ? path : api.assetUrl(path); } catch { done(null); }
   });
 }
 async function renderImage(page, card, options = {}) {

@@ -1,4 +1,7 @@
 <import src="../../loading-placeholder.wxml" />
+<template name="personalityEntry">
+  <navigator class="me-personality" hover-start-time="{{0}}" hover-stay-time="{{70}}" url="/pages/personality/personality" open-type="navigate" hover-class="me-pressed" aria-label="{{personality.title}}"><image class="me-personality-art" src="{{personality.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="me-personality-copy"><text class="me-personality-label">AVALON · 16 PERSONALITIES</text><view class="me-personality-title">{{personality.title}}</view><view class="me-personality-caption">{{personality.caption}}</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+</template>
 <template name="personalPanel">
 <view class="page personal-page me-page tab-page">
   <template wx:if="{{loading && !profile}}" is="loadingPlaceholder" data="{{kind:'personal'}}" />
@@ -37,6 +40,7 @@
       <view class="me-room-copy"><view class="me-room-title"><text>当前牌桌</text><text class="me-room-state {{currentRoom.status==='playing'?'playing':''}}">{{currentRoom.statusLabel}}</text></view><view class="me-room-caption">{{currentRoom.boardLabel}} · {{currentRoom.capacity}}人 · {{currentRoom.relationLabel}}</view></view>
       <view class="me-room-return"><text>返回</text><view class="me-chevron" aria-hidden="true"></view></view>
     </navigator>
+    <template is="personalityEntry" data="{{personality}}" />
     <view class="personal-links me-links me-links-primary">
       <view class="me-section-label">我的记录</view>
       <view class="me-link-group">
@@ -58,6 +62,7 @@
       <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-info" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">关于桌边助手</view></view><view class="me-chevron" aria-hidden="true"></view></button>
     </view></view>
   </block>
+  <template wx:if="{{!profile && !loading}}" is="personalityEntry" data="{{personality}}" />
 </view>
 <view wx:if="{{monthlyReset}}" class="monthly-reset-backdrop" catchtouchmove="blockMonthlyResetScroll">
   <view class="monthly-reset-dialog" role="dialog" aria-modal="true" aria-label="新月积分提醒">

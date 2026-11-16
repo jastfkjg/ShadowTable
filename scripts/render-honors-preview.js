@@ -1,6 +1,6 @@
 // Render real WXML/WXSS with example election data for visual verification.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-const { wxmlToJs } = require('miniprogram-compiler');
+const { wxmlToJs } = require('./miniprogram-compiler');
 const hp = require('../miniprogram/honors');
 const { presentStats } = require('../miniprogram/profile');
 const { presentBoard } = require('../miniprogram/leaderboard-presentation');

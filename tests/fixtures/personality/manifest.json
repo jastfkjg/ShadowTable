@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "files": {
+    "AVALON_16_IMPLEMENTATION_SPEC.md": "95f6d9fa1340b31284765bc4dfc423ecc5eb80d5f5cd1a68410fe563d7139690",
+    "README.md": "27510ca49e89ff65d95c73b3770f3f08d14d60e6b59b1e62d8185b6826d7a034",
+    "quiz.json": "cf3e7a372c059dee48d5a91181aefe3bb96ae8d9b7fb7ca43eca0e987fec7c9d",
+    "scoring.mjs": "7c13691ca70d0fd595f46848065271d999cba352a8da60c2b5009483ad860524",
+    "validate.mjs": "1e00c920ed067ec923a275f539fdf39088fc2e7d2cfc77868a2df301b8c8efee",
+    "reachability-fixtures.json": "8e999f7b8328a165a5d7038548b95616886b3ece89508b9b539ef447964c539a",
+    "analysis_report.json": "dee9797a5e2188e30abb694e51081736ecf458156a082032d6758c4992c6d068",
+    "validation-report.json": "3b272fc20d3ab8961652801f91d150b41df04f17c44f7dc0ef1929e6fc7c5fd2",
+    "package.json": "08da145d3e8847bc247838643bd2602074b3c4cdf357f8b9e790d43bcddb4cf5"
+  }
+}

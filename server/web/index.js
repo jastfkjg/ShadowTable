@@ -66,6 +66,17 @@ const assets = {
   "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
   "/poster-canvas.js": ["../../miniprogram/poster-canvas.js", "text/javascript; charset=utf-8"],
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
+  "/personality": ["personality.html", "text/html; charset=utf-8"],
+  "/personality/web.js": ["personality.js", "text/javascript; charset=utf-8"],
+  "/personality/web.css": ["personality.css", "text/css; charset=utf-8"],
+  "/personality/layout.css": ["../../miniprogram/pages/personality/personality.wxss", "text/css; charset=utf-8"],
+  "/personality/quiz.js": ["../../miniprogram/pages/personality/quiz.json", "text/javascript; charset=utf-8"],
+  "/personality/scoring.js": ["../../miniprogram/pages/personality/scoring.js", "text/javascript; charset=utf-8"],
+  "/personality/presentation.js": ["../../miniprogram/pages/personality/presentation.js", "text/javascript; charset=utf-8"],
+  "/personality/flow.js": ["../../miniprogram/pages/personality/flow.js", "text/javascript; charset=utf-8"],
+  "/personality/storage.js": ["../../miniprogram/personality-storage.js", "text/javascript; charset=utf-8"],
+  "/personality/poster.js": ["../../miniprogram/pages/personality/poster.js", "text/javascript; charset=utf-8"],
+  "/pages/personality/assets/miniprogram-qrcode.jpg": ["../../miniprogram/pages/personality/assets/miniprogram-qrcode.jpg", "image/jpeg"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
@@ -99,7 +110,8 @@ function serve(req, res, path) {
   let content = asset[0] === null
     ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0]));
-  if (["/home.css", "/room-sheets.css", "/me.css"].includes(path)) content = webStyles(content);
+  if (["/home.css", "/room-sheets.css", "/me.css", "/personality/layout.css"].includes(path)) content = webStyles(content);
+  if (path === "/personality/quiz.js") content = "window.shadowtablePersonalityQuiz = " + content.toString() + ";";
   if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + webTags[tag]);
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);

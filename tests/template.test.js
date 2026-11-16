@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs, wxssToJs } = require("miniprogram-compiler");
+const { wxmlToJs, wxssToJs } = require("../scripts/miniprogram-compiler");
 const root = path.resolve(__dirname, "../miniprogram");
 const context = { window: {}, global: {}, console };
 vm.createContext(context);

@@ -5,8 +5,10 @@ const { presentProfile, presentStats } = require("../../profile");
 const { selectTab } = require("../../tab-navigation");
 const { presentMonthlyReset } = require("../../monthly-reset");
 const { currentRoom } = require("../../room-list");
+const personalityCache = require("../../personality-storage");
+const personalityStorage = () => personalityCache.create({ get:key=>wx.getStorageSync(key), set:(key,value)=>wx.setStorageSync(key,value), remove:key=>wx.removeStorageSync(key) });
 module.exports = function createMePage() { return {
-  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "" },
+  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "", personality:{title:"我的阿瓦隆人格",caption:"28 个情境，探索你的牌桌风格",portrait:"/assets/roles/merlin.png"} },
   onLoad() { this.alive = true; },
   onShow() { this.foreground = true; selectTab(this, 1); return this.load(); },
   onHide() { this.foreground = false; this.updateChangedData({ monthlyReset: null }); },
@@ -21,6 +23,7 @@ module.exports = function createMePage() { return {
   async load() {
     const sequence = this.sequence = (this.sequence || 0) + 1, resetEpoch = this.resetEpoch;
     this.matchesPreview = null;
+    this.updateChangedData({ personality:personalityStorage().summary(wx.getStorageSync("session") || "") });
     this.updateChangedData({ loading: true, error: "" });
     try {
       await api.login();
@@ -29,6 +32,7 @@ module.exports = function createMePage() { return {
       // speculative request errors. The destination still refreshes on entry.
       this.prefetchMatches(sequence);
       this.loadCurrentRoom(sequence);
+      this.loadPersonality(sequence);
       const errors = {};
       const read = async (key, present) => {
         try {
@@ -46,6 +50,15 @@ module.exports = function createMePage() { return {
       await Promise.all([read("profile", presentProfile), read("stats", presentStats)]);
     } catch (e) { if (this.alive && sequence === this.sequence) this.updateChangedData({ error: e.message }); }
     finally { if (this.alive && sequence === this.sequence) this.updateChangedData({ loading: false }); }
+  },
+  async loadPersonality(sequence) {
+    const credential=wx.getStorageSync("session") || "";
+    try {
+      const value=await api.request("/api/me/personality");
+      if(!this.alive || sequence!==this.sequence || credential!==(wx.getStorageSync("session") || ""))return;
+      const cache=personalityStorage();cache.bind(credential,value);
+      this.updateChangedData({personality:cache.summary(credential)});
+    } catch (_) { /* Local progress stays usable while account sync is unavailable. */ }
   },
   async prefetchMatches(sequence) {
     try {

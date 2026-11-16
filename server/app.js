@@ -15,6 +15,7 @@ const avoidance = require("./avoidance");
 const avoidanceRewards = require("./avoidance-rewards");
 const BOARD_INFO = require("./board-info");
 const recordShares = require("./record-shares");
+const personality = require("./personality");
 const {
   BOARDS,
   RuleError,
@@ -102,6 +103,7 @@ function createApp({
   const leaderboard = new Leaderboard(store);
   const monthlyReport = new MonthlyReport(store);
   recordShares.initialize(store);
+  personality.initialize(store);
   function limit(key, max) {
     const now = clock(),
       old = limits.get(key);
@@ -224,6 +226,12 @@ function createApp({
         res.setHeader("X-Robots-Tag", "noindex");
         return send(200, recordShares.read(store, path.slice("/api/shares/".length)));
       }
+      if (path.startsWith("/api/personality/shares/")) {
+        check(req.method === "GET" && !requestUrl.search, "分享不存在或已失效", 404);
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("X-Robots-Tag", "noindex");
+        return send(200, personality.readShare(store, path.slice("/api/personality/shares/".length)));
+      }
       const avatar = path.match(/^\/api\/avatars\/([a-f0-9]{64})$/);
       if (req.method === "GET" && avatar) {
         const stored = store.db.prepare("SELECT mime,data FROM avatars WHERE hash=?").get(avatar[1]);
@@ -303,6 +311,19 @@ function createApp({
       }
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
       avoidance.ensureAccount(store, uid);
+      if (path === "/api/me/personality" || path.startsWith("/api/me/personality/")) {
+        check(!requestUrl.search, "人格测试参数无效");
+        res.setHeader("Cache-Control", "no-store");
+        if (req.method === "GET" && path === "/api/me/personality") return send(200, personality.account(store, uid));
+        if (req.method === "POST" && path === "/api/me/personality/results") return send(200, personality.save(store, uid, await body(req)));
+        if (req.method === "POST" && path === "/api/me/personality/shares") {
+          limit(`personality-share:${uid}`, 20);
+          return send(200, personality.share(store, uid, await body(req)));
+        }
+        const resultId = path.match(/^\/api\/me\/personality\/results\/([a-f0-9]{48})$/);
+        if (req.method === "GET" && resultId) return send(200, personality.read(store, uid, resultId[1]));
+        throw new RuleError("人格测试接口不存在", 404);
+      }
       if (req.method === "POST" && path === "/api/me/shares") {
         check(!requestUrl.search, "分享参数无效");
         limit(`share:${uid}`, 20);

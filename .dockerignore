@@ -39,6 +39,7 @@
 !miniprogram/monthly-report.js
 !miniprogram/monthly-report-card.js
 !miniprogram/poster-canvas.js
+!miniprogram/personality-storage.js
 !miniprogram/assets/
 !miniprogram/assets/about-merlin.svg
 !miniprogram/assets/roles/
@@ -96,6 +97,15 @@
 !miniprogram/pages/home/room-sheets.wxss
 !miniprogram/pages/me/
 !miniprogram/pages/me/me.wxss
+!miniprogram/pages/personality/
+!miniprogram/pages/personality/quiz.json
+!miniprogram/pages/personality/scoring.js
+!miniprogram/pages/personality/presentation.js
+!miniprogram/pages/personality/flow.js
+!miniprogram/pages/personality/poster.js
+!miniprogram/pages/personality/personality.wxss
+!miniprogram/pages/personality/assets/
+!miniprogram/pages/personality/assets/miniprogram-qrcode.jpg
 !miniprogram/pages/data-management/
 !miniprogram/pages/data-management/presentation.js
 !miniprogram/pages/data-management/layout.wxss
