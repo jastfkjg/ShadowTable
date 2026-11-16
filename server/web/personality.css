@@ -7,7 +7,6 @@
 .persona-web-nav img { width:22px; height:22px; }
 .persona-web-brand { position:absolute; right:24px; color:#b1bfc6; font-size:12px; font-weight:400; }
 .persona-page h1,.persona-page h2,.persona-page p { margin-block-start:0; margin-block-end:0; }
-.persona-page .persona-role-name { margin-top:14px; margin-bottom:3px; }
 .persona-page .persona-intro-title { margin-top:18px; }
 .persona-page .persona-prompt { margin:26px 0 18px; }
 .persona-page img { object-fit:contain; }
@@ -23,7 +22,6 @@
 .persona-page .persona-facts span { display:block; font-size:22px; color:var(--text); }
 .persona-page .persona-axis-labels>span { flex:1; max-width:47%; }
 .persona-page .persona-axis-labels>span:last-child { text-align:right; }
-.persona-page .persona-type-line>span+span { border-left:1px solid #536570; padding-left:16px; }
 .persona-page .persona-secondary-roles>div { flex:1; display:flex; flex-direction:column; align-items:center; font-size:14px; }
 .persona-page .persona-secondary-roles img { width:90px; height:90px; }
 .persona-page .persona-tip>span { display:block; font-size:12px; color:var(--accent); margin-bottom:8px; }

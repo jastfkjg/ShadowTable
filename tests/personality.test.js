@@ -5,23 +5,35 @@ const { readFileSync }=require("node:fs");
 const { pathToFileURL }=require("node:url");
 const { join }=require("node:path");
 const quiz=require("../miniprogram/pages/personality/quiz.json");
+const legacyQuiz=require("../server/personality-quiz-v2.json");
 const scoring=require("../miniprogram/pages/personality/scoring");
 const presentation=require("../miniprogram/pages/personality/presentation");
-const fixtures=require("./fixtures/personality/reachability-fixtures.json").fixtures;
+const legacyFixtures=require("./fixtures/personality/reachability-fixtures.json").fixtures;
+const fixtures=require("./fixtures/personality/reachability-v3.json").fixtures;
 const { Store }=require("../server/store");
 const personality=require("../server/personality");
 const payload=(i=0,attemptId="personality_attempt_0001")=>({version:quiz.version,attemptId,answers:fixtures[i].answers,tieAnswers:{}});
 
-test("附件题库逐字保留，16种结果与原始计分器完全一致",async()=>{
+test("归档题库逐字保留，旧版 16 种结果与原始计分器一致",async()=>{
   const manifest=require("./fixtures/personality/manifest.json");
-  const bytes=readFileSync(join(__dirname,"../miniprogram/pages/personality/quiz.json"));
+  const bytes=readFileSync(join(__dirname,"../server/personality-quiz-v2.json"));
   assert.equal(createHash("sha256").update(bytes).digest("hex"),manifest.files["quiz.json"]);
   assert.equal(createHash("sha256").update(readFileSync(join(__dirname,"fixtures/personality/scoring.mjs"))).digest("hex"),manifest.files["scoring.mjs"]);
   const original=await import(pathToFileURL(join(__dirname,"fixtures/personality/scoring.mjs")));
+  assert.equal(scoring.validateConfig(legacyQuiz),true);
+  for(const fixture of legacyFixtures){
+    const result=scoring.scoreQuiz(legacyQuiz,fixture.answers);
+    assert.deepEqual(result,original.scoreQuiz(legacyQuiz,fixture.answers));
+    assert.equal(result.typeId,fixture.expectedTypeId);
+  }
+});
+test("新版 15 题覆盖全部 16 种结果，解释来自真实选项",()=>{
   assert.equal(scoring.validateConfig(quiz),true);
+  assert.equal(quiz.questions.length,15);
+  assert.deepEqual(quiz.questions.map(q=>q.kind),[...Array(10).fill("short"),...Array(5).fill("scenario")]);
   for(const fixture of fixtures){
     const result=scoring.scoreQuiz(quiz,fixture.answers);
-    assert.deepEqual(result,original.scoreQuiz(quiz,fixture.answers));
+    assert.equal(result.status,"complete");
     assert.equal(result.typeId,fixture.expectedTypeId);
     const reordered=structuredClone(quiz);reordered.questions.reverse();reordered.questions.forEach(q=>q.options.reverse());
     assert.equal(scoring.scoreQuiz(reordered,fixture.answers).typeId,result.typeId);
@@ -30,6 +42,26 @@ test("附件题库逐字保留，16种结果与原始计分器完全一致",asyn
     for(const e of view.explanations){assert.equal(fixture.answers[e.questionId],e.optionId);assert.equal(quiz.questions.find(q=>q.id===e.questionId).options.find(o=>o.id===e.optionId).text,e.text);}
   }
   assert.equal(new Set(fixtures.map(f=>f.expectedTypeId)).size,16);
+});
+test("新版情景符合任务人数，奥伯伦必失败，刺杀阶段只能落刀",()=>{
+  const scenarios=quiz.questions.filter(q=>q.kind==="scenario");
+  assert.deepEqual(scenarios.map(q=>quiz.rulesets[q.rulesetId].players),[10,10,10,10,11]);
+  for(const q of scenarios){
+    const rules=quiz.rulesets[q.rulesetId];
+    const teams=Object.values(q.optionTeams || {}).map(team=>({team,quest:q.questNumber,failCards:0}));
+    if(q.proposedTeam)teams.push({team:q.proposedTeam,quest:q.questNumber,failCards:0});
+    for(const {team,quest,failCards} of [...teams,...(q.history || [])]){
+      assert.equal(team.length,rules.teamSizes[quest-1],q.id);
+      assert.equal(team.length,new Set(team).size,q.id);
+      assert.ok(team.every(seat=>Number.isInteger(seat)&&seat>=1&&seat<=rules.players),q.id);
+      assert.ok(failCards>=0 && failCards<=team.length,q.id);
+    }
+  }
+  const [,oberon,,assassin]=scenarios;
+  assert.match(oberon.situation,/只能出失败/);
+  assert.equal(assassin.phase,"assassination");
+  assert.match(assassin.situation,/全桌禁言/);
+  assert.ok(assassin.options.every(option=>/^刀 [345]。/.test(option.text)));
 });
 test("缺答和非法答案不能定型，E独立于角色，精确同分按各自补题处理",()=>{
   assert.equal(scoring.scoreQuiz(quiz,{}).status,"incomplete");
@@ -50,9 +82,11 @@ test("缺答和非法答案不能定型，E独立于角色，精确同分按各�
 test("账号结果复算、重试幂等、历史隔离，公开分享固定且不泄露答案",()=>{
   let now=1700000000000;const store=new Store(":memory:",{clock:()=>now});personality.initialize(store);
   try{
-    const first=personality.save(store,"wx:one",payload());
-    assert.equal(first.view.typeId,fixtures[0].expectedTypeId);
-    assert.deepEqual(personality.save(store,"wx:one",payload()),first);
+    const old={...payload(),version:legacyQuiz.version,answers:legacyFixtures[0].answers};
+    const first=personality.save(store,"wx:one",old);
+    assert.equal(first.view.typeId,legacyFixtures[0].expectedTypeId);
+    assert.equal(first.view.version,legacyQuiz.version);
+    assert.deepEqual(personality.save(store,"wx:one",old),first);
     assert.throws(()=>personality.save(store,"wx:one",payload(1)),e=>e.status===409);
     assert.throws(()=>personality.read(store,"wx:two",first.id),e=>e.status===404);
     assert.equal(personality.account(store,"wx:two").latest,null);
@@ -61,6 +95,7 @@ test("账号结果复算、重试幂等、历史隔离，公开分享固定且�
     assert.throws(()=>personality.share(store,"wx:two",{resultId:first.id}),e=>e.status===404);
     assert.doesNotMatch(JSON.stringify(snapshot),/answers|explanations|questionId|optionId|dimensions|profile|accountKey|attemptId|wx:one|uid/);
     now++;const second=personality.save(store,"wx:one",payload(1,"personality_attempt_0002"));
+    assert.equal(second.view.version,quiz.version);
     assert.equal(personality.account(store,"wx:one").latest.id,second.id);
     assert.equal(personality.account(store,"wx:one").history.length,2);
     assert.deepEqual(personality.readShare(store,snapshot.id),snapshot);

@@ -4,15 +4,17 @@
 function validateConfig(config) {
   const ids = new Set();
   const dims = [...config.coreDimensions, config.styleDimension];
-  if (config.questions.length !== 28 || config.roles.length !== 8 || dims.length !== 8) throw new Error('Invalid v2.0.0 cardinality');
+  const measured = new Set();
+  if (!config.questions.length || config.roles.length !== 8 || dims.length !== 8 || new Set(dims).size !== dims.length) throw new Error('Invalid quiz cardinality');
   for (const q of config.questions) {
     if (ids.has(q.id)) throw new Error(`Duplicate question ${q.id}`);
     ids.add(q.id);
-    if (q.options.length !== 3 || q.measuredDims.length < 2 || q.measuredDims.length > 3) throw new Error(`Invalid question ${q.id}`);
+    if (q.options.length !== 3 || q.measuredDims.length < 1 || q.measuredDims.length > 3) throw new Error(`Invalid question ${q.id}`);
     if (new Set(q.options.map(o => o.id)).size !== 3) throw new Error(`Duplicate option ${q.id}`);
     if (new Set(q.measuredDims).size !== q.measuredDims.length) throw new Error(`Duplicate dimension ${q.id}`);
     for (const d of q.measuredDims) {
       if (!dims.includes(d)) throw new Error(`Unknown dimension ${d}`);
+      measured.add(d);
       const values = q.options.map(o => o.scores[d]);
       if (values.some(v => !Number.isInteger(v) || v < -2 || v > 2)) throw new Error(`Invalid score ${q.id}.${d}`);
       if (Math.max(...values) === Math.min(...values)) throw new Error(`Constant measured dimension ${q.id}.${d}`);
@@ -21,6 +23,7 @@ function validateConfig(config) {
       if (Object.keys(o.scores).sort().join() !== [...q.measuredDims].sort().join()) throw new Error(`Score key mismatch ${q.id}.${o.id}`);
     }
   }
+  if (measured.size !== dims.length) throw new Error('The quiz must measure every dimension');
   if (new Set(config.roles.map(r => r.id)).size !== 8) throw new Error('Duplicate role');
   for (const r of config.roles) {
     if (r.prototype.length !== 7 || !r.prototype.every(Number.isFinite) || Math.hypot(...r.prototype) === 0) throw new Error(`Invalid prototype ${r.id}`);

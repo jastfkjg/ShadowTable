@@ -2,13 +2,15 @@
 const { createHash, randomBytes } = require("node:crypto");
 const { RuleError } = require("./engine");
 const quiz = require("../miniprogram/pages/personality/quiz.json");
+const legacyQuiz = require("./personality-quiz-v2.json");
 const scoring = require("../miniprogram/pages/personality/scoring");
 const presentation = require("../miniprogram/pages/personality/presentation");
+const quizzes = new Map([[quiz.version, quiz], [legacyQuiz.version, legacyQuiz]]);
 const check = (condition, message, status=400) => { if (!condition) throw new RuleError(message,status); };
 const hash = text => createHash("sha256").update(text).digest("hex");
 const validId = id => typeof id === "string" && /^[a-f0-9]{48}$/.test(id);
 function initialize(store) {
-  scoring.validateConfig(quiz);
+  for (const config of quizzes.values()) scoring.validateConfig(config);
   store.db.exec(`CREATE TABLE IF NOT EXISTS personality_results(
     id TEXT PRIMARY KEY,uid TEXT NOT NULL,attempt_id TEXT NOT NULL,fingerprint TEXT NOT NULL,
     version TEXT NOT NULL,answers TEXT NOT NULL,tie_answers TEXT NOT NULL,result TEXT NOT NULL,view TEXT NOT NULL,created INTEGER NOT NULL,
@@ -33,19 +35,20 @@ function account(store,uid) {
 }
 function save(store,uid,input) {
   check(input && Object.keys(input).every(key => ["version","attemptId","answers","tieAnswers"].includes(key)),"测试提交参数无效");
-  check(input.version === quiz.version,"题库版本已更新，请保留本地结果并更新小程序后重新测试",409);
+  const config = quizzes.get(input.version);
+  check(config,"此题库版本暂不支持，请更新后重试。",409);
   check(typeof input.attemptId === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(input.attemptId),"测试记录编号无效");
   check(input.tieAnswers && typeof input.tieAnswers === "object" && !Array.isArray(input.tieAnswers),"补充答案格式无效");
   let computed;
-  try { computed=scoring.scoreQuiz(quiz,input.answers,input.tieAnswers); }
+  try { computed=scoring.scoreQuiz(config,input.answers,input.tieAnswers); }
   catch { throw new RuleError("测试答案无效，请检查后重试"); }
   check(computed.status === "complete",computed.status === "needs_tiebreak" ? "请先完成补充问题" : "请先完成全部题目");
-  const fingerprint=hash(JSON.stringify([input.version,quiz.questions.map(q=>input.answers[q.id]),Object.keys(input.tieAnswers).sort().map(key=>[key,input.tieAnswers[key]])]));
+  const fingerprint=hash(JSON.stringify([input.version,config.questions.map(q=>input.answers[q.id]),Object.keys(input.tieAnswers).sort().map(key=>[key,input.tieAnswers[key]])]));
   return store.transaction(() => {
     const previous=store.db.prepare("SELECT * FROM personality_results WHERE uid=? AND attempt_id=?").get(uid,input.attemptId);
     if(previous) { check(previous.fingerprint === fingerprint,"这次测试已经保存，请重新开始一次测试",409);return serialize(previous); }
     const id=randomBytes(24).toString("hex"), now=store.clock();
-    store.db.prepare("INSERT INTO personality_results VALUES(?,?,?,?,?,?,?,?,?,?)").run(id,uid,input.attemptId,fingerprint,quiz.version,JSON.stringify(input.answers),JSON.stringify(input.tieAnswers),JSON.stringify(computed),JSON.stringify(presentation.result(computed)),now);
+    store.db.prepare("INSERT INTO personality_results VALUES(?,?,?,?,?,?,?,?,?,?)").run(id,uid,input.attemptId,fingerprint,config.version,JSON.stringify(input.answers),JSON.stringify(input.tieAnswers),JSON.stringify(computed),JSON.stringify(presentation.result(computed,config)),now);
     return read(store,uid,id);
   });
 }

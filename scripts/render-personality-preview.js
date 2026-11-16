@@ -2,7 +2,7 @@
 const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const {wxmlToJs}=require("./miniprogram-compiler");
 const quiz=require("../miniprogram/pages/personality/quiz.json"),scoring=require("../miniprogram/pages/personality/scoring"),present=require("../miniprogram/pages/personality/presentation");
-const fixtures=require("../tests/fixtures/personality/reachability-fixtures.json").fixtures;
+const fixtures=require("../tests/fixtures/personality/reachability-v3.json").fixtures;
 const root=path.resolve(__dirname,"../miniprogram"),out=path.resolve(process.argv[2]||"output/playwright/personality/native");
 const context={window:{},global:{},console};vm.createContext(context);
 const factory=vm.runInContext("(function(global){"+wxmlToJs(root)+"})(global)",context);
@@ -21,9 +21,14 @@ function html(node){
   }).join(" ");
   return `<${tag} ${attrs}>${(node.children||[]).map(html).join("")}${tag==="img"?"":`</${tag}>`}`;
 }
-const base={mode:"intro",loading:false,error:"",storageError:"",saveError:"",shareError:"",notice:"",hasDraft:false,history:[],rulesOpen:false,detailsOpen:false,catalogueOpen:false,terms:present.terms,catalogue:present.catalogue(),version:quiz.version};
-const scenes={intro:base,resume:{...base,hasDraft:true,completedCount:12},q01:{...base,mode:"quiz",question:present.question("Q01","B")},q08:{...base,mode:"quiz",question:present.question("Q08")},q25:{...base,mode:"quiz",question:present.question("Q25")},tiebreak:{...base,mode:"quiz",question:present.question("T_STYLE")},rules:{...base,rulesOpen:true}};
-for(const f of fixtures){const view=present.result(scoring.scoreQuiz(quiz,f.answers));scenes[f.expectedTypeId]={...base,mode:"result",result:view,record:{id:"fixture"},detailsOpen:f.expectedTypeId==="ASS-B"};}
+const base={...require("../miniprogram/pages/personality/flow").create({storage:{}}).state(),loading:false};
+const scenes={intro:base,resume:{...base,hasDraft:true,completedCount:12},q01:{...base,mode:"quiz",question:present.question("Q01","B")},q08:{...base,mode:"quiz",question:present.question("Q08")},q15:{...base,mode:"quiz",question:present.question("Q15")},tiebreak:{...base,mode:"quiz",question:present.question("T_STYLE")},rules:{...base,rulesOpen:true}};
+for(const f of fixtures){
+  const view=present.result(scoring.scoreQuiz(quiz,f.answers));
+  scenes[f.expectedTypeId]={...base,mode:"result",result:view,record:{id:"fixture"},preferences:present.preferences(view),activeStyle:view.typeId.slice(-1)};
+}
+scenes.preferences={...scenes["OBE-B"],resultTab:"preferences"};
+scenes.evidence={...scenes["OBE-B"],resultTab:"evidence"};
 scenes.shared={...scenes["OBE-B"],mode:"shared",shared:{name:"演示玩家"},record:null};
 const styles=css("app.wxss")+css("components/app-nav/app-nav.wxss")+css("pages/personality/personality.wxss");
 fs.mkdirSync(out,{recursive:true});

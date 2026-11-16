@@ -8,7 +8,7 @@ const { currentRoom } = require("../../room-list");
 const personalityCache = require("../../personality-storage");
 const personalityStorage = () => personalityCache.create({ get:key=>wx.getStorageSync(key), set:(key,value)=>wx.setStorageSync(key,value), remove:key=>wx.removeStorageSync(key) });
 module.exports = function createMePage() { return {
-  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "", personality:{title:"我的阿瓦隆人格",caption:"28 个情境，探索你的牌桌风格",portrait:"/assets/roles/merlin.png"} },
+  data: { loading: true, error: "", profile: null, stats: null, currentRoom: null, monthlyReset: null, resetSaving: false, resetError: "", personality:{title:"我的阿瓦隆人格",caption:"探索你的牌桌决策风格",portrait:"/assets/roles/merlin.png"} },
   onLoad() { this.alive = true; },
   onShow() { this.foreground = true; selectTab(this, 1); return this.load(); },
   onHide() { this.foreground = false; this.updateChangedData({ monthlyReset: null }); },
