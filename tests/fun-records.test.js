@@ -49,6 +49,29 @@ test('轮内技能的角色回查保留所选指标和玩法，未知角色不�
   assert.deepEqual(copy.records(null).tiles, []);
 });
 
+test('个人全部目录固定显示八项角色称号，区分无身份样本、旧局未知和零次', () => {
+  const input = { cards: [
+    { id: 'classic:reverse', metrics: [row('reverse_guard', 'classic', 0, 0)] },
+    { id: 'other:reverse', metrics: [row('reverse_recruit', 'other', 0, 0, { value: null, knownGames: 0, unknownGames: 1 })] },
+    { id: 'other:lancelot', metrics: [row('lancelot_both', 'other', 1, 0)] },
+    { id: 'knights:lancelot', metrics: [row('lancelot_both', 'knights', 1, 0)] },
+  ] };
+  const result = copy.records(input, { includeRoleCatalogue: true });
+  assert.deepEqual(result.tiles.map(tile => tile.id), Object.keys(copy.roleRecords));
+  const tile = id => result.tiles.find(item => item.id === id);
+  assert.equal(tile('oberon_two_busts').stateLabel, '暂无该身份记录');
+  assert.equal(tile('oberon_two_busts').valueLabel, '—');
+  assert.equal(tile('oberon_two_busts').url, '');
+  assert.match(copy.recordInfo(tile('oberon_two_busts')).content, /亲手在两次任务/);
+  assert.equal(tile('reverse_recruit').stateLabel, '尚无完整记录');
+  assert.equal(tile('reverse_guard').stateLabel, '暂无次数');
+  assert.equal(tile('reverse_guard').valueLabel, '0');
+  assert.equal(tile('lancelot_both').valueLabel, '2');
+  assert.deepEqual(result.recordedTiles.map(item => item.id), ['lancelot_both']);
+  assert.equal(copy.records(input).totalCount, 3);
+  assert.equal(copy.records(null, { includeRoleCatalogue: true }).totalCount, 0);
+});
+
 test('趣味说明呈现称号真实含义、适用身份和个人次数，零与未知不混淆', () => {
   const tiles = copy.records({ cards: [{ id:'knights:survival', metrics:[
     row('survival_knifed','knights',4,0), row('survival_revive','knights',0,0,{value:null}),

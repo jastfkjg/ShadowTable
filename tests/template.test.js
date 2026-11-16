@@ -1759,7 +1759,8 @@ test('趣味称号网格保持全部指标、玩法范围与回查入口', () =>
     {id:'classic:assassin',title:'刺客',metrics:[metric('assassin_hit','classic')]},
     {id:'knights:knife',title:'刀客刀法',metrics:[metric('knife_enemy','knights')]},
   ]});
-  assert.deepEqual(fun.tiles.map(tile=>tile.roleLabel),['经典 · 非梅林好人','经典 · 刺客','十二骑士 · 刀客']);
+  assert.deepEqual(fun.recordedTiles.map(tile=>tile.roleLabel),['经典 · 非梅林好人','经典 · 刺客','十二骑士 · 刀客']);
+  assert.equal(fun.totalCount,11);
   assert.equal(fun.tiles[0].icon,'/assets/record-shield-good.svg');
   const tree=renderStatsShell({tab:'fun',stats:{fun}});
   assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);
@@ -2161,7 +2162,8 @@ test('趣味卡片只提供说明和独立回查箭头，不显示卡片分享�
     assert.equal(byHandler(entry,'openFunMatches'),undefined);
   }
   const arrows=nodes(tree).filter(n=>n.attr?.class==='fun-record-link');
-  assert.equal(arrows.length,entries.length);
+  assert.equal(arrows.length,stats.fun.tiles.filter(tile=>tile.url).length);
+  assert.match(JSON.stringify(entries.find(entry=>entry.attr['data-key']==='all:oberon_two_busts')), /最强独狼.*暂无该身份记录/);
   for(const arrow of arrows){assert.equal(arrow.attr.bindtap,'openFunMatches'); assert.ok(arrow.attr['data-url']);}
 });
 

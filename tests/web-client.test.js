@@ -2587,7 +2587,8 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   let reads = 0;
   const c = client(async () => { reads++; return response(fixture); });
   await c.applyRoute('#/stats?tab=fun');
-  assert.match(c.viewStats(), /全部 3/);
+  assert.match(c.viewStats(), /全部 11/);
+  assert.match(c.viewStats(), /首席护卫.*最强独狼/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   let html = c.viewStats();
   assert.match(html, /data-metric="knife_ally"/);
@@ -2595,7 +2596,11 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   c.ACTIONS.filterFun({ dataset: { filter: 'invalid' } }); assert.equal(c.state.funFilter, 'counted');
   assert.equal(reads, 1);
   c.state.stats = { ...c.state.stats, fun: { cards: [] } };
-  assert.match(c.viewStats(), /暂无趣味记录/);
+  assert.match(c.viewStats(), /还没有累计次数的记录/);
+  c.ACTIONS.filterFun({ dataset: { filter: 'all' } });
+  assert.match(c.viewStats(), /全部 8.*暂无该身份记录/);
+  assert.doesNotMatch(c.viewStats(), /data-action="funRecords"/);
+  c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   c.state.stats = { ...c.state.stats, fun: { cards: [{ id: 'knights:survival', metrics: [{ id: 'survival_revive', mode: 'knights', count: 0, value: null, byRole: [] }] }] } };
   html = c.viewStats(); assert.match(html, /还没有累计次数的记录/); assert.match(html, /查看全部记录/);
   c.ACTIONS.filterFun({ dataset: { filter: 'all' } });

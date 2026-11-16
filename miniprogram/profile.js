@@ -44,7 +44,7 @@ function presentStats(stats) {
 function presentFun(value) {
   if (!value) return { available: false, cards: [], legacyGames: 0, teaser: "", ...funCopy.records(null) };
   value = funCopy.summary(value);
-  return { ...value, available: true, ...funCopy.records(value), shareable: canShareFun(value) };
+  return { ...value, available: true, ...funCopy.records(value, { includeRoleCatalogue: true }), shareable: canShareFun(value) };
 }
 function presentMatches(records) {
   return records.map(record => {

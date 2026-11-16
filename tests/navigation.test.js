@@ -3203,7 +3203,8 @@ test('趣味次数筛选覆盖反向称号，切换标签和刷新后保留筛�
   await p.switchPanel('records'); await p.switchPanel('fun'); await p.load();
   assert.equal(p.data.statistics.funFilter, 'counted');
   select('invalid'); assert.equal(p.data.statistics.funFilter, 'counted');
-  select('all'); assert.equal(p.data.statistics.stats.fun.tiles.length, 3);
+  select('all'); assert.equal(p.data.statistics.stats.fun.tiles.length, 11);
+  assert.equal(p.data.statistics.stats.fun.tiles.find(tile => tile.id === 'reverse_guard').stateLabel, '暂无该身份记录');
   assert.equal(p.data.statistics.funFilter, 'all');
   p.onUnload();
 });

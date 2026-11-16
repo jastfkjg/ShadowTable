@@ -2426,7 +2426,7 @@ function roomListItems(rooms) {
 
   function viewFunStats(data) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
-    const records = funCopy.records(data);
+    const records = funCopy.records(data, { includeRoleCatalogue: true });
     if (!records.totalCount) return '<p class="fun-empty muted">暂无趣味记录</p>';
     const tiles = state.funFilter === 'counted' ? records.recordedTiles : records.tiles;
     let html = '<div class="fun-content">';
@@ -2434,7 +2434,8 @@ function roomListItems(rooms) {
     if (!tiles.length) html += '<div class="fun-records-empty">还没有累计次数的记录<button type="button" data-action="filterFun" data-filter="all">查看全部记录 ›</button></div>';
     html += '<div class="fun-records-grid">';
     for (const tile of tiles) {
-      html += '<article class="fun-record' + (tile.hasCount ? '' : ' is-quiet') + '"><div class="fun-record-main' + (tile.rateLabel ? ' has-rate' : '') + '"><button type="button" class="fun-record-entry" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog" aria-label="' + esc(tile.accessibilityLabel) + '"><span class="fun-record-identity"><img class="fun-record-icon' + (tile.iconTone === 'portrait' ? ' is-portrait' : '') + '" src="' + esc(tile.icon) + '" alt="" /><span>' + esc(tile.roleLabel) + '</span></span><span class="fun-record-title">' + esc(tile.title) + '</span><span class="fun-record-bottom"><span class="fun-record-value ' + tile.color + '"><span>' + esc(tile.valueLabel) + '</span>' + (tile.unit ? '<span class="fun-record-unit">' + esc(tile.unit) + '</span>' : '') + '</span></span><span class="fun-record-caption">' + esc(tile.rateLabel || tile.stateLabel) + (tile.sampleLabel ? '<span class="fun-record-sample">' + esc(tile.sampleLabel) + '</span>' : '') + '</span></button><button type="button" class="fun-record-link" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" aria-label="查看' + esc(tile.title) + '相关对局">›</button></div>';
+      const matchLink = tile.url ? '<button type="button" class="fun-record-link" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" aria-label="查看' + esc(tile.title) + '相关对局">›</button>' : '';
+      html += '<article class="fun-record' + (tile.hasCount ? '' : ' is-quiet') + '"><div class="fun-record-main' + (tile.rateLabel ? ' has-rate' : '') + '"><button type="button" class="fun-record-entry" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog" aria-label="' + esc(tile.accessibilityLabel) + '"><span class="fun-record-identity"><img class="fun-record-icon' + (tile.iconTone === 'portrait' ? ' is-portrait' : '') + '" src="' + esc(tile.icon) + '" alt="" /><span>' + esc(tile.roleLabel) + '</span></span><span class="fun-record-title">' + esc(tile.title) + '</span><span class="fun-record-bottom"><span class="fun-record-value ' + tile.color + '"><span>' + esc(tile.valueLabel) + '</span>' + (tile.unit ? '<span class="fun-record-unit">' + esc(tile.unit) + '</span>' : '') + '</span></span><span class="fun-record-caption">' + esc(tile.rateLabel || tile.stateLabel) + (tile.sampleLabel ? '<span class="fun-record-sample">' + esc(tile.sampleLabel) + '</span>' : '') + '</span></button>' + matchLink + '</div>';
       if (tile.roles.length) html += '<details><summary class="fun-record-role-toggle">按角色查看</summary><div class="fun-record-roles">' + tile.roles.map(role => '<div class="fun-record-role-wrap"><button type="button" class="fun-record-role" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog"><span>' + esc(role.label) + '</span><span class="fun-record-role-count">' + esc(role.countLabel) + (role.value == null ? '' : ' ' + esc(tile.unit)) + '</span></button><button type="button" class="fun-record-link is-role" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" data-role="' + esc(role.role) + '" aria-label="查看' + esc(role.label) + '的' + esc(tile.title) + '相关对局">›</button></div>').join('') + '</div></details>';
       html += '</article>';
     }
@@ -5220,7 +5221,7 @@ function roomListItems(rooms) {
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
     funDetails: el => {
       if (state.page !== 'stats' || state.statsTab !== 'fun') return;
-      const tile = funCopy.records(state.stats?.fun).tiles.find(row => row.key === el.dataset.key);
+      const tile = funCopy.records(state.stats?.fun, { includeRoleCatalogue: true }).tiles.find(row => row.key === el.dataset.key);
       if (!tile) return;
       const info = funCopy.recordInfo(tile);
       return confirm(info.title, info.content, false, info.confirmText, null, null, false, info);
