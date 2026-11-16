@@ -8,7 +8,8 @@ const { join } = require('node:path');
 const { Store } = require('../server/store');
 const { saveProfile, readProfile } = require('../server/profile');
 const { readBadges, saveBadge, equippedBadges } = require('../server/badges');
-const { catalogue } = require('../miniprogram/badges');
+const { catalogue, presentCollection } = require('../miniprogram/badges');
+const { honors, roleRecords } = require('../miniprogram/fun-copy');
 const { createApp } = require('../server/app');
 const NOW = Date.parse('2026-10-13T08:00:00Z');
 const NEXT = Date.parse('2026-10-31T16:00:00Z');
@@ -29,14 +30,53 @@ function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
 }
-test('23 枚徽章涵盖月榜及五枚永久活动荣誉，零数据不颁发', () => {
+test('31 枚徽章涵盖 26 枚月榜及五枚永久活动荣誉，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,23);assert.equal(new Set(catalogue.map(b=>b.id)).size,23);
+    assert.equal(catalogue.length,31);assert.equal(new Set(catalogue.map(b=>b.id)).size,31);
     assert.equal(catalogue.filter(b=>b.permanent).length,5);
-    for (const id of Object.keys(require('../miniprogram/fun-copy').honors)) assert.ok(catalogue.some(b=>b.id===id));
+    for (const id of Object.keys({ ...honors, ...roleRecords })) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
   } finally {store.close();}
+});
+test('八枚角色徽章只取本月公开达成次数榜，并列、佩戴和跨月使用现有规则', () => {
+  let now = Date.parse('2026-09-30T15:59:59Z');
+  const store = new Store(':memory:', { clock: () => now });
+  const roleIds = Object.keys(roleRecords);
+  try {
+    for (const id of roleIds) for (let i = 0; i < 3; i++) metric(store, 'wx:previous', id, 1, 0);
+    now = NOW;
+    for (const id of roleIds) {
+      for (const uid of ['wx:tie-a', 'dev:tie-b', 'wx:hidden']) {
+        metric(store, uid, id, 1, 0);
+        metric(store, uid, id, 1, 0);
+      }
+      metric(store, 'wx:hidden', id, 1, 0);
+      metric(store, 'wx:runner-up', id, 1, 0);
+      metric(store, 'wx:zero', id, 0, 0);
+    }
+    const profile = readProfile(store, 'wx:hidden');
+    saveProfile(store, 'wx:hidden', { nickname: '隐藏玩家', version: profile.version, leaderboardVisible: false });
+    for (const uid of ['wx:tie-a', 'dev:tie-b']) {
+      const value = readBadges(store, uid);
+      const collection = presentCollection(value, 'owned', path => 'https://test.invalid' + path);
+      for (const id of roleIds) {
+        const badge = collection.visibleBadges.find(item => item.id === id);
+        assert.equal(badge.title, roleRecords[id].title);
+        assert.equal(badge.kindLabel, '月榜');
+        assert.equal(badge.imageUrl, 'https://test.invalid/assets/badges/' + id + '.png');
+        assert.match(badge.detailCondition, /达成次数榜第一（含并列）/);
+        assert.equal(badge.detailNote, roleRecords[id].description);
+      }
+    }
+    for (const uid of ['wx:previous', 'wx:runner-up', 'wx:zero', 'wx:hidden'])
+      assert.ok(ids(store, uid).every(id => !roleIds.includes(id)));
+    for (const badge of equippedBadges(store, 'wx:tie-a')) wear(store, 'wx:tie-a', badge.id, false);
+    wear(store, 'wx:tie-a', 'reverse_guard', true);
+    assert.deepEqual(equippedBadges(store, 'wx:tie-a').map(badge => badge.id), ['reverse_guard']);
+    now = NEXT;
+    assert.ok(ids(store, 'wx:tie-a').every(id => !roleIds.includes(id)));
+  } finally { store.close(); }
 });
 test('金牌替身按本月公开挡刀次数颁发，并列持有、摘戴及跨月重算沿用现有体系', () => {
   let now=NOW;const store=new Store(':memory:',{clock:()=>now});
@@ -141,16 +181,27 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
     const card=await req('/api/leaderboard/players/'+publicId+'/stats');
     assert.equal(card.status,200);assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','overall']);
     assert.doesNotMatch(JSON.stringify(card.data),/wx:a|badge_preferences|period_start/);
+    const homepage = await fetch(origin);
+    assert.match(homepage.headers.get('content-type'), /^application\/json/);
+    await homepage.arrayBuffer();
+    await Promise.all(Object.keys(roleRecords).map(async id => {
+      const image = await fetch(origin + '/assets/badges/' + id + '.png');
+      assert.equal(image.status, 200, id);
+      assert.equal(image.headers.get('content-type'), 'image/png', id);
+      assert.equal(Buffer.from(await image.arrayBuffer()).subarray(0, 8).toString('hex'), '89504e470d0a1a0a', id);
+    }));
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });
 
 test('小程序战绩卡适配徽章图片，说明按需打开，关闭后不残留其他玩家徽章', async () => {
   const {initialPlayerCardData,playerCardMethods}=require('../miniprogram/player-card');
   const badge=catalogue.find(b=>b.id==='merlin_hit');
+  const serverBadge=catalogue.find(b=>b.id==='reverse_guard');
   const p={alive:true,data:{...initialPlayerCardData},setData(value){Object.assign(this.data,value);},
-    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
+    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge,{...serverBadge,imageUrl:'/ignored.png'}]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
   await p.loadPlayerCard({id:'one',scope:'leaderboard'},'/card');
   assert.equal(p.data.playerCard.badges[0].imageUrl,badge.imageUrl);
+  assert.equal(p.data.playerCard.badges[1].imageUrl,'https://test.invalid'+serverBadge.imageUrl);
   assert.equal(p.data.playerCardBadge,null);
   p.showPlayerCardBadge({currentTarget:{dataset:{id:badge.id}}});assert.equal(p.data.playerCardBadge.title,'舍我其谁');
   p.closePlayerCard();assert.equal(p.data.playerCardBadge,null);assert.equal(p.data.playerCard,null);

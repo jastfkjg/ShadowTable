@@ -2879,13 +2879,15 @@ test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作�
   } });
   p.onLoad(); await p.onShow();
   assert.equal(p.data.badgeCollection.monthLabel,'2026年10月');
-  assert.equal(p.data.badgeCollection.items.length,23);
-  assert.equal(p.data.badgeTotalCount,23);
+  assert.equal(p.data.badgeCollection.items.length,31);
+  assert.equal(p.data.badgeTotalCount,31);
   assert.equal(p.data.badgeCollection.items.find(b=>b.id==='good_shield').title,'金牌替身');
   assert.equal(p.data.badgeCollection.ownedCount,2);
   assert.equal(p.data.badgeCollection.slots.filter(b => b.empty).length,1);
   const event = id => ({currentTarget:{dataset:{id}}});
-  p.chooseBadgeFilter(event('unowned')); assert.equal(p.data.badgeCollection.visibleBadges.length,21);
+  p.chooseBadgeFilter(event('unowned')); assert.equal(p.data.badgeCollection.visibleBadges.length,29);
+  p.showBadgeDetail(event('reverse_guard'));
+  assert.equal(p.data.selectedBadge.imageUrl,'https://test.invalid/assets/badges/reverse_guard.png');
   p.showBadgeDetail(event('points')); assert.equal(p.data.selectedBadge.owned,false);
   await p.toggleOwnedBadge(event('points')); assert.equal(writes.length,0);
   p.chooseBadgeFilter(event('owned')); p.showBadgeDetail(event('games'));

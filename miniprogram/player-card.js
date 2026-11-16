@@ -54,10 +54,12 @@ function playerCardMethods(api, platform = typeof wx === "undefined" ? null : wx
           byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate), rateValue: rateValue(row.winRate) })) } : null;
         let playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
-        // Monthly artwork is bundled; campaign artwork is shared with the web client.
-        const { catalogue, MAX_EQUIPPED } = require('./badges');
-        playerCard = { ...playerCard, badges: (result.player.badges || []).filter(badge => catalogue.some(b => b.id === badge.id)).slice(0, MAX_EQUIPPED)
-          .map(badge => ({ ...badge, imageUrl: badge.permanent ? api.assetUrl(catalogue.find(b => b.id === badge.id).imageUrl) : catalogue.find(b => b.id === badge.id).imageUrl })) };
+        const { catalogue, MAX_EQUIPPED, badgeImageUrl } = require('./badges');
+        const badges = (result.player.badges || []).flatMap(badge => {
+          const definition = catalogue.find(item => item.id === badge.id);
+          return definition ? [{ ...badge, imageUrl: badgeImageUrl(definition, api.assetUrl) }] : [];
+        });
+        playerCard = { ...playerCard, badges: badges.slice(0, MAX_EQUIPPED) };
         this.setPlayerCardData({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
       } catch (e) {
         if (active()) this.setPlayerCardData({ playerCardError: e.message || "战绩读取失败，请重试" });

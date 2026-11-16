@@ -4,7 +4,6 @@ const { RuleError, roleName } = require("./engine");
 const { roles: variantRoles } = require("./variants");
 const { readProfile } = require("./profile");
 const fun = require("./fun");
-const { honors } = require("../miniprogram/fun-copy");
 const eligibleRole = (def, role) => {
   if (def.countOnly) return false;
   if (def.group === "final") return true;
@@ -191,7 +190,7 @@ class Leaderboard {
     const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : own?.rank ? "ranked" : !stats.knownGames ? "no_records" : remaining ? "not_enough" : "no_games";
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
     const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,tied:row.tied,isSelf:row.uid===uid,...present(row)});
-    return { metric, period, mode, role, sort, countOnly: !!def.countOnly, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: honors[def.id]?.title || def.title, description: def.description, rateLabel: def.rateLabel,
+    return { metric, period, mode, role, sort, countOnly: !!def.countOnly, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.honorTitle || def.title, description: def.description, rateLabel: def.rateLabel,
       unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && eligibleRole(def, role)).map(role=>({id:role,label:roleName(role)})),
       periodStart: range.start,periodEnd:range.end,timezone:"Asia/Shanghai",eligibleCount:snapshot.eligible.length,maxRows:MAX_ROWS,updatedAt:snapshot.updatedAt,version:snapshot.version,

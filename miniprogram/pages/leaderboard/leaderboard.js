@@ -47,7 +47,7 @@ Page({
     let { metric } = { ...this.data, ...selection };
     const { board } = this.data;
     let period = rankPresentation.normalizePeriod(metric, selection.period || this.data.period);
-    const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
+    const countOnly = rankPresentation.isCountOnly(metric, this.data.funOptions);
     const selected = { ...this.data, ...selection };
     const funMode = countOnly ? "all" : selected.funMode, funSort = countOnly ? "count" : selected.funSort;
     let append = more, pointsUnavailable = false, funUnavailable = false;

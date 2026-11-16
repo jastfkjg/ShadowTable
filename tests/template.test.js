@@ -460,13 +460,15 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
     assert.ok(choices.every(n=>n.tag==='wx-button'));
     if(category.id!=='all')keys.push(...choices.map(n=>n.attr['data-id']));
     assert.ok(byHandler(tree,'confirmFunMetric'));
-    assert.doesNotMatch(JSON.stringify(tree), /查看不同角色的高光|至少|次数榜/);
+    assert.doesNotMatch(JSON.stringify(tree), /查看不同角色的高光|至少[^\"]*次机会|次数榜/);
   }
   assert.deepEqual(keys.sort(),options.map(item=>item.key).sort());
   const adverse=renderRank({...data,metric:'fun_kill_ally',funSort:'rate',board:{...data.board,rateLabel:'发生率',threshold:10}});
   assert.match(JSON.stringify(byHandler(adverse,'toggleMetrics')),/击杀友方/);
   assert.match(JSON.stringify(nodes(adverse).find(n=>n.attr?.['data-id']==='rate')),/发生率/);
   assert.doesNotMatch(JSON.stringify(adverse),/至少.*次机会/);
+  const role=renderRank({...data,metric:'fun_reverse_guard',board:{...data.board,countOnly:true}});
+  assert.deepEqual(nodes(role).filter(n=>n.attr?.bindtap==='chooseFunSort').map(n=>n.attr['data-id']),['count']);
 });
 
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{

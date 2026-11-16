@@ -80,10 +80,15 @@ for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const role of require("../../miniprogram/role-portraits").assetNames)
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
-for (const badge of require('../../miniprogram/badges').catalogue)
-  assets[badge.imageUrl] = [badge.permanent ? 'assets/' + badge.imageUrl.split('/').pop() : '../../miniprogram' + badge.imageUrl, 'image/png'];
-for (const badge of require('../../miniprogram/badges').catalogue.filter(b => b.largeImageUrl))
-  assets[badge.largeImageUrl] = ['assets/october_2026_book-large.png', 'image/png'];
+const { catalogue, usesServerArt } = require('../../miniprogram/badges');
+const serverBadgeArt = new Set();
+for (const badge of catalogue) {
+  if (usesServerArt(badge)) serverBadgeArt.add(badge.imageUrl);
+  else assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
+  if (badge.largeImageUrl) serverBadgeArt.add(badge.largeImageUrl);
+}
+for (const url of serverBadgeArt)
+  assets[url] = ['assets/' + url.split('/').pop(), 'image/png'];
 for (const name of ['info','heart','sword','swords','shield','shield-good','spark','medal','users','calendar','list','coin'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
@@ -104,4 +109,6 @@ function serve(req, res, path) {
   res.end(content);
   return true;
 }
-module.exports = { serve };
+// Mini-program-only deployments also need catalogue artwork hosted by the server.
+const serveBadgeArt = (req, res, path) => serverBadgeArt.has(path) && serve(req, res, path);
+module.exports = { serve, serveBadgeArt };

@@ -10,10 +10,11 @@
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
     { id: 'overall', title: '常胜将军', description: '本月总胜率榜第一。以原始胜率排名，胜率相同时按有效局数排序，两者相同则并列。', metric: 'overall' },
   ];
-  const monthly = standard.concat(Object.entries(copy.honors).map(([id, honor]) => ({
+  const funMonthly = Object.entries({ ...copy.honors, ...copy.roleRecords }).map(([id, honor]) => ({
     id, title: honor.title, metric: 'fun_' + id,
-    description: '本月「' + honor.title + '」次数榜第一。' + honor.description + '。',
-  }))).map(badge => ({ ...badge, imageUrl: '/assets/badges/' + badge.id + '.png', rules,
+    description: '本月「' + honor.title + '」' + (copy.roleRecords[id] ? '达成' : '') + '次数榜第一。' + honor.description.replace(/。+$/, '') + '。',
+  }));
+  const monthly = standard.concat(funMonthly).map(badge => ({ ...badge, imageUrl: '/assets/badges/' + badge.id + '.png', rules,
     category: ({ points: '积分荣誉', games: '场次荣誉', overall: '胜率荣誉' })[badge.id] || '趣味荣誉',
     flavor: badge.description.split('。').slice(1).join('。') }));
   const october = [
@@ -26,6 +27,8 @@
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
   const MAX_EQUIPPED = 3;
+  const usesServerArt = badge => !!(badge.permanent || Object.hasOwn(copy.roleRecords, badge.id));
+  const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',
     survival_revive: '统计十二骑士中实际发生的复活。',
@@ -40,9 +43,10 @@
   function presentCollection(value, filter = 'all', assetUrl = path => path) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
     const items = catalogue.map(b => {
-      const condition = (b.condition || (copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
-      return { ...b, imageUrl: b.permanent ? assetUrl(b.imageUrl) : b.imageUrl, owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
-      condition, detailCondition: b.permanent ? condition : condition + '（含并列）', detailNote: detailNotes[b.id] || '', kindLabel: b.permanent ? '永久' : '月榜',
+      const roleRecord = copy.roleRecords[b.id];
+      const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
+      return { ...b, imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
+      condition, detailCondition: b.permanent ? condition : condition + '（含并列）', detailNote: roleRecord?.description || detailNotes[b.id] || '', kindLabel: b.permanent ? '永久' : '月榜',
       periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首变动或跨月时重新计算',
       status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }; });
     items.sort((a, b) => Number(b.owned) - Number(a.owned));
@@ -56,5 +60,5 @@
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { catalogue, rules, MAX_EQUIPPED, presentCollection };
+  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentCollection };
 });

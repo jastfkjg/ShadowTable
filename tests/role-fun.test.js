@@ -48,7 +48,20 @@ test("逆仆个人记录区分两刀、拒绝互相串计，管理更正同步�
     assert.equal(guard.rateLabel, "");
     assert.match(guard.url, /fun=reverse_guard&mode=all/);
     assert.equal(store.matchesFor(reverse.uid, 0, 20, false, filter).total, 1);
-    assert.throws(() => new Leaderboard(store).read(reverse.uid, new URLSearchParams("metric=fun_reverse_guard")), /排行榜参数无效/);
+    const leaderboard = new Leaderboard(store);
+    const rank = (id, extra = {}) => leaderboard.read(reverse.uid, new URLSearchParams({ metric: "fun_" + id, ...extra }));
+    for (const id of Object.keys(funCopy.roleRecords)) {
+      assert.equal(rank(id).countOnly, true);
+      assert.equal(rank(id).metricLabel, "达成次数");
+      assert.deepEqual(rank(id).roleOptions, []);
+      assert.throws(() => rank(id, { sort: "rate" }), /仅支持总次数榜/);
+      assert.throws(() => rank(id, { mode: "classic" }), /仅支持总次数榜/);
+    }
+    const board = rank(filter.metric, { period: "all" });
+    assert.equal(board.title, "首席护卫");
+    assert.equal(board.me.rank, 1);
+    assert.equal(board.rows[0].count, 1);
+    assert.doesNotMatch(JSON.stringify(board.rows), /reverseTarget|reverseStrike|wx:/);
 
     store.transaction(() => store.correctFunMatch(room.matchId, {
       revision: 0, funReason: "assassination", funTarget: merlin.seat, reverseTarget: reverse.seat,
@@ -57,6 +70,8 @@ test("逆仆个人记录区分两刀、拒绝互相串计，管理更正同步�
     assert.equal(metric(updated, reverse, "reverse_guard").count, 0);
     assert.equal(metric(updated, reverse, "reverse_recruit").count, 1);
     assert.equal(store.matchesFor(reverse.uid, 0, 20, false, filter).total, 0);
+    assert.equal(rank(filter.metric, { period: "all" }).me.rank, null);
+    assert.equal(rank("reverse_recruit", { period: "all" }).rows[0].count, 1);
   } finally { store.close(); }
 });
 

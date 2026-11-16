@@ -1248,7 +1248,7 @@
     let metric = selection.rankMetric || state.rankMetric;
     const board = state.rankBoard;
     let period = rankPresentation.normalizePeriod(metric, selection.rankPeriod || state.rankPeriod);
-    const countOnly = /^fun_(honor_(mvp|svp)|survival_(revive|knifed))$/.test(metric);
+    const countOnly = rankPresentation.isCountOnly(metric, state.rankFunMetrics);
     const funMode = countOnly ? "all" : selection.rankFunMode || state.rankFunMode, funSort = countOnly ? "count" : selection.rankFunSort || state.rankFunSort, funRole = countOnly ? "" : selection.rankFunRole ?? state.rankFunRole;
     let append = more, pointsUnavailable = false, funUnavailable = false;
     rankFailedSelection = null;

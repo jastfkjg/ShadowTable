@@ -73,7 +73,8 @@ function createApp({
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
   const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
-  const web = webOrigin ? require("./web").serve : null;
+  const { serve: serveWeb, serveBadgeArt } = require("./web");
+  const servePublicAsset = webOrigin ? serveWeb : serveBadgeArt;
   let webHost = "";
   if (webOrigin) {
     let url;
@@ -196,7 +197,7 @@ function createApp({
           return send(404, { error: "接口不存在" });
         return;
       }
-      if (web && web(req, res, path)) return;
+      if (servePublicAsset(req, res, path)) return;
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account read/write and login/create limits below apply independently.
       limit(`ip:${clientAddress(req)}`, 6000);
@@ -248,7 +249,7 @@ function createApp({
           check(devAuth, "开发登录未开启", 404);
           uid = `dev:${randomBytes(24).toString("hex")}`;
         } else if (path === "/api/guest-login") {
-          check(web, "网页登录未开启", 404);
+          check(webOrigin, "网页登录未开启", 404);
           check(
             req.headers.host === webHost &&
               req.headers.origin === webOrigin &&

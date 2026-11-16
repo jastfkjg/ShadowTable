@@ -19,15 +19,15 @@
   const titles = { survival: "生存趣事", honor: "本场最佳", percival: "派西维尔", knife: "刀客刀法", duel: "骑士", defense: "防御技能", kill: "击杀技能",
     reverse: "逆仆", lancelot: "兰斯洛特", servant: "忠臣", morgana: "莫甘娜", mordred: "莫德雷德", oberon: "奥伯伦" };
   const roleRecords = Object.fromEntries(Object.entries({
-    reverse_guard: ["首席护卫", "躲过逆仆刀，留在蓝方，随后梅林刀落到本人身上。"],
-    reverse_recruit: ["最佳新援", "被逆仆刀命中后转为红方，随后梅林被刺中，本人随红方获胜。"],
-    lancelot_both: ["双面骑士", "同一局以蓝方兰斯洛特身份参加过成功任务，又以红方兰斯洛特身份亲手提交过失败牌，顺序不限。"],
-    servant_all_green: ["圆桌劳模", "同一局以忠臣身份参加了三次成功任务。"],
-    servant_bench_win: ["躺赢大师", "在任务名单完整的对局中，忠臣一次正式任务都没上车，最终随蓝方获胜。"],
-    morgana_with_percival: ["梅林二号", "同一局以莫甘娜身份与真正的派西维尔一起参加了至少两次已结算的任务。"],
-    mordred_last_bust: ["深藏不露", "三次任务失败时，莫德雷德在第三次失败的任务中是车上唯一红方。"],
-    oberon_two_busts: ["最强独狼", "同一局以奥伯伦身份亲手在两次任务里提交失败牌，且两次任务均失败。"],
-  }).map(([id, [title, description]]) => [id, { title, description, countOnly: true }]));
+    reverse_guard: ["首席护卫", "good", "躲过逆仆刀，留在蓝方，随后梅林刀落到本人身上。"],
+    reverse_recruit: ["最佳新援", "evil", "被逆仆刀命中后转为红方，随后梅林被刺中，本人随红方获胜。"],
+    lancelot_both: ["双面骑士", "other", "同一局以蓝方兰斯洛特身份参加过成功任务，又以红方兰斯洛特身份亲手提交过失败牌，顺序不限。"],
+    servant_all_green: ["圆桌劳模", "good", "同一局以忠臣身份参加了三次成功任务。"],
+    servant_bench_win: ["躺赢大师", "good", "在任务名单完整的对局中，忠臣一次正式任务都没上车，最终随蓝方获胜。"],
+    morgana_with_percival: ["梅林二号", "evil", "同一局以莫甘娜身份与真正的派西维尔一起参加了至少两次已结算的任务。"],
+    mordred_last_bust: ["深藏不露", "evil", "三次任务失败时，莫德雷德在第三次失败的任务中是车上唯一红方。"],
+    oberon_two_busts: ["最强独狼", "evil", "同一局以奥伯伦身份亲手在两次任务里提交失败牌，且两次任务均失败。"],
+  }).map(([id, [title, category, description]]) => [id, { title, category, description, countOnly: true }]));
   const honors = {
     survival_revive: { title: "我在阿瓦隆玩重生", description: "十二骑士中实际复活的次数，包含刀、决斗、猎人、魔术师换号、女巫替死及铠甲等导致的复活", countOnly: true },
     survival_knifed: { title: "全民公敌", description: "十二骑士中承受轮内刀和最终刀的次数，按换号及替死后的实际承受者统计；无论是否生效或复活都计入，不含枪和决斗", countOnly: true },
@@ -83,6 +83,7 @@
       ...(row.rankLabel !== undefined ? { rankLabel: labels[id] } : {}) } : {}),
       ...(row.title !== undefined && title ? { title } : {}),
       ...(record ? { countOnly: !!record.countOnly, honorTitle: record.title, description: record.description,
+        ...(record.category ? { category: record.category } : {}),
         roleLabel: record.roleLabel, roleDetail: record.roleDetail, conditionLabel: record.conditionLabel } : {}) };
   }
   function legacyLabel(label, type) {
@@ -269,13 +270,14 @@
   }
   function leaderboard(value) {
     const id = value.metric?.replace(/^fun_/, "");
+    const record = recordDetails[id];
     return { ...value,
       ...(value.availableFunMetrics ? { availableFunMetrics: value.availableFunMetrics.map(metric) } : {}),
-      ...(value.fun && honors[id] ? {
-        title: honors[id].title, description: honors[id].description,
-        roleLabel: honors[id].roleLabel, roleDetail: honors[id].roleDetail, conditionLabel: honors[id].conditionLabel,
-        countOnly: !!honors[id].countOnly,
-        metricLabel: id.startsWith("honor_") ? "获奖次数" : (labels[id] || value.metricLabel?.replace(/次数$|率$/, "")) + (value.sort === "rate" ? "率" : "次数"),
+      ...(value.fun && record ? {
+        title: record.title, description: record.description,
+        roleLabel: record.roleLabel, roleDetail: record.roleDetail, conditionLabel: record.conditionLabel,
+        countOnly: !!record.countOnly,
+        metricLabel: roleRecords[id] ? "达成次数" : id.startsWith("honor_") ? "获奖次数" : (labels[id] || value.metricLabel?.replace(/次数$|率$/, "")) + (value.sort === "rate" ? "率" : "次数"),
       } : value.fun && labels[id] ? {
         title: titles[id.split("_")[0]] || value.title,
         metricLabel: labels[id] + (value.sort === "rate" ? "率" : "次数"),

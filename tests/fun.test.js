@@ -95,11 +95,12 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
-test("十五项称号统一公开，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
+test("趣味称号公开目录包含八项角色次数榜，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
   const fun = require("../server/fun");
   assert.deepEqual(fun.publicMetrics().map(m => m.honorTitle), [
     "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "金牌替身", "职业刺客", "背锅侠",
     "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "我在阿瓦隆玩重生", "全民公敌", "最强 MVP", "最强 SVP",
+    "首席护卫", "最佳新援", "双面骑士", "圆桌劳模", "躺赢大师", "梅林二号", "深藏不露", "最强独狼",
   ]);
   for (const [reason, target, green, bust] of [
     ["assassination", 3, 1, 0], ["assassination", 1, 0, 1],

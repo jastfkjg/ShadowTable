@@ -49,7 +49,7 @@ test('所有可选趣味指标仅出现一次，反向记录均可访问', () =>
   assert.equal(new Set(options.map(item=>item.key)).size,options.length);
   for(const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_defense_enemy','fun_kill_ally'])assert.ok(options.some(item=>item.key===key));
   assert.ok(options.every(item=>['good','evil','other'].includes(item.category)));
-  assert.equal(options.length,15);
+  assert.equal(options.length,23);
   const standin=options.find(item=>item.key==='fun_good_shield');
   assert.equal(standin.title,'金牌替身');assert.equal(standin.category,'good');
   assert.equal(standin.roleLabel,'非梅林好人');assert.match(standin.conditionLabel,/最终刀落到本人/);
@@ -59,6 +59,21 @@ test('所有可选趣味指标仅出现一次，反向记录均可访问', () =>
   assert.equal(options.find(item=>item.key==='fun_defense_ally').roleLabel,'蓝守卫／魔术师');
   assert.match(options.find(item=>item.key==='fun_kill_enemy').roleDetail,/刺客.*蓝骑士.*红猎人/);
   assert.equal(presentBoard({fun:true,metric:'fun_defense_ally',availableFunMetrics,rows:[],me:{}}).emptyTitle,'暂无记录');
+});
+
+test('角色称号按达成次数显示角色分组与局数样本', () => {
+  const row = { publicId: 'a', count: 2, opportunities: 0, knownGames: 5, rank: 1 };
+  const board = presentBoard({ fun: true, metric: 'fun_reverse_guard', metricLabel: '达成次数', period: 'month',
+    sort: 'count', availableFunMetrics, rows: [row], me: row });
+  assert.equal(board.countOnly, true);
+  assert.equal(board.currentFunOption.category, 'good');
+  const options = funOptions(availableFunMetrics);
+  assert.equal(options.find(item => item.key === 'fun_reverse_recruit').category, 'evil');
+  assert.equal(options.find(item => item.key === 'fun_lancelot_both').category, 'other');
+  assert.equal(board.rows[0].unit, '局');
+  assert.equal(board.rows[0].secondaryLabel, '5 局有记录');
+  assert.match(board.ruleLines.join(), /每局最多计一次.*次数相同则并列/);
+  assert.doesNotMatch(board.ruleLines.join(), /同局可计多次/);
 });
 
 test('趣味次数榜精简重复次数，比例榜与个人详情保留完整样本，榜尾不误报截断', () => {

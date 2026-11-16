@@ -8,12 +8,16 @@
   const periodLabels = { all: "全部", month: "本月", day: "今日", recent: "最近" };
   const periodsFor = metric => metric === "points" ? ["month", "recent"] : ["all", "month"];
   const normalizePeriod = (metric, period) => periodsFor(metric).includes(period) ? period : "month";
+  function isCountOnly(key, definitions = []) {
+    const id = key?.replace(/^fun_/, "");
+    return !!((funCopy.roleRecords[id] || funCopy.honors[id])?.countOnly || definitions.some(item => item.key === key && item.countOnly));
+  }
   function funOptions(definitions = [], { includeFinal = false } = {}) {
     const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_good_shield", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(funCopy.metric).map(item => {
       const title = item.honorTitle || item.title;
-      const category = /^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
-        : /^fun_assassin_/.test(item.key) ? "evil" : "other";
+      const category = item.category || (/^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
+        : /^fun_assassin_/.test(item.key) ? "evil" : "other");
       return { ...item, title, category, tabLabel: title + " · " + item.label,
         accessibilityLabel: [title, item.roleLabel, item.conditionLabel || item.label].filter(Boolean).join("，") };
     }).sort((a, b) => (first.includes(a.key) ? first.indexOf(a.key) : first.length) - (first.includes(b.key) ? first.indexOf(b.key) : first.length));
@@ -50,6 +54,9 @@
   function presentBoard(board) {
     if (!board) return null;
     const options = funOptions(board.availableFunMetrics, { includeFinal: true }), selected = options.find(item => item.key === board.metric);
+    const countOnly = !!(board.countOnly || selected?.countOnly);
+    const roleRecord = funCopy.roleRecords[board.metric?.slice(4)];
+    const voted = board.metric?.startsWith("fun_honor_");
     const games = board.metric === "games", points = board.metric === "points";
     const recent = board.period === "recent";
     const date = recent && Number.isFinite(board.periodStart) ? new Date(board.periodStart + 8 * 3600000) : null;
@@ -62,10 +69,13 @@
       const value = board.fun ? !row.knownGames ? "—" : board.sort === "count" ? String(row.count) : Number.isFinite(row.rate) ? row.rate.toFixed(1) : "—"
         : points ? String(row.points || 0) : games ? String(row.total || 0) : Number.isFinite(row.winRate) ? row.winRate.toFixed(1) : "—";
       const unit = value === "—" ? "" : board.fun ? board.sort === "count" ? countUnit : "%" : points ? "分" : games ? "局" : "%";
-      const sampleLabel = (board.countOnly || selected?.countOnly) && !board.metric?.startsWith("fun_honor_") ? (!row.knownGames ? "暂无完整样本" : "十二骑士 · " + row.knownGames + " 局有记录") : board.countOnly || selected?.countOnly ? "玩家票选 · 获奖 " + row.count + " 次" : board.fun ? !row.knownGames ? "暂无完整样本" : (rateLabel === "发生率" ? "发生 " : "成功 ") + row.count + " " + countUnit + " · 共 " + row.opportunities + " 次机会" : "";
+      let sampleLabel = "";
+      if (countOnly && voted) sampleLabel = "玩家票选 · 获奖 " + row.count + " 次";
+      else if (board.fun && !row.knownGames) sampleLabel = "暂无完整样本";
+      else if (countOnly) sampleLabel = (roleRecord ? "" : "十二骑士 · ") + row.knownGames + " 局有记录";
+      else if (board.fun) sampleLabel = (rateLabel === "发生率" ? "发生 " : "成功 ") + row.count + " " + countUnit + " · 共 " + row.opportunities + " 次机会";
       const listSampleLabel = board.fun && board.sort === "count" && row.knownGames
-        ? board.metric?.startsWith("fun_honor_") ? "玩家票选"
-          : board.countOnly || selected?.countOnly ? sampleLabel : "共 " + row.opportunities + " 次机会"
+        ? voted ? "玩家票选" : countOnly ? sampleLabel : "共 " + row.opportunities + " 次机会"
         : sampleLabel;
       return { ...row, value, unit, sampleLabel, valueCompact: value.length > 6, secondaryLabel: board.fun ? listSampleLabel : points ? (row.total || 0) + " 场计分局"
         : games ? (row.wins || 0) + " 胜 · 胜率 " + percent(row.winRate) + (Number.isFinite(row.winRate) ? "%" : "") : (row.wins || 0) + " 胜 · " + (row.total || 0) + " 局" };
@@ -75,9 +85,11 @@
       : me.status === "not_enough" ? "还差 " + me.remaining + (board.fun && board.sort === "rate" ? " 次机会" : board.fun ? " " + countUnit : " 局") + "上榜"
       : me.status === "no_records" ? "尚无完整记录" : me.status === "no_games" ? "暂无有效对局" : "未上榜";
     const ruleLines = [recent ? "按北京时间选取最近有有效计分对局的一天，仅统计当天积分。" : board.period === "day" ? "今日按北京时间统计，从当日零点起至次日零点前计算。" : board.period === "month" ? "本月按北京时间统计，从每月 1 日零点起计算。" : "全部榜统计历史有效记录。"];
-    if ((board.countOnly || selected?.countOnly) && !board.metric?.startsWith("fun_honor_")) {
+    if (roleRecord) {
+      ruleLines.push(roleRecord.description, "每局最多计一次，跨玩法累计。", "按达成次数从高到低排名，次数相同则并列。缺失过程不计入。", "至少达成一次且公开展示即可上榜。");
+    } else if (countOnly && !voted) {
       ruleLines.push(board.description || selected?.description || "", "按实际发生次数累计，同局可计多次；次数相同并列，不提供比例榜。", "缺失过程不按零次计算。");
-    } else if (board.countOnly || selected?.countOnly) {
+    } else if (countOnly) {
       ruleLines.push("按获奖局数统计，每局每项荣誉最多增加一次；票数不累加到排行榜。", "最高票同票并列获奖；累计获奖次数相同则并列排名。", "仅计入至少半数玩家完成投票的有效对局，不提供成功率榜。");
     } else if (board.fun) {
       if (board.description || selected?.description) ruleLines.push(board.description || selected.description);
@@ -95,7 +107,7 @@
     ruleLines.push("仅展示已开启公开展示的玩家。榜单最多展示前 " + (board.maxRows || 100) + " 位玩家，我的排名仍按全部上榜玩家计算。");
     const rows = markTies(board.rows).map(describe), count = board.eligibleCount ?? rows.length;
     const endLabel = count > rows.length ? "已展示前 " + rows.length + " 位 · 共 " + count + " 位玩家上榜" : "已展示全部 " + count + " 位上榜玩家";
-    return { ...board, periodLabel: periodLabels[board.period], dateLabel, countOnly: !!(board.countOnly || selected?.countOnly), rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
+    return { ...board, periodLabel: periodLabels[board.period], dateLabel, countOnly, rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
       currentFunOption: selected || null, rateThreshold, ruleLines, ...presentRules(board, selected, ruleLines), endLabel,
       participantLabel: "共 " + count + " 人上榜", compactEndLabel: count > rows.length ? "已展示前 " + rows.length + " 位" : "已显示全部",
       emptyTitle: recent ? dateLabel ? "当天暂无公开排名" : "暂无计分对局" : board.fun ? "暂无记录" : "暂无公开排名",
@@ -105,5 +117,5 @@
   function filterFunOptions(options = [], category = "all") {
     return category === "all" ? options : options.filter(item => item.category === category);
   }
-  return { categories, periodLabels, periodsFor, normalizePeriod, funOptions, filterFunOptions, markTies, presentBoard };
+  return { categories, periodLabels, periodsFor, normalizePeriod, isCountOnly, funOptions, filterFunOptions, markTies, presentBoard };
 });

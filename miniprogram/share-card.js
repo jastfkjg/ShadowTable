@@ -181,6 +181,7 @@ function leaderboardCard(profile, board) {
   const error = leaderboardShareError(board);
   if (error) throw new Error(error);
   const me = board.me, points = board.metric === "points", games = board.metric === "games";
+  const roleRecord = board.fun && Object.hasOwn(funCopy.roleRecords, board.metric.slice(4));
   const period = ["day", "recent"].includes(board.period) ? shanghaiTime(board.periodStart).split(" ")[0].replace(".", " 年 ").replace(".", " 月 ") + " 日"
     : board.period === "month" ? shanghaiTime(board.periodStart, true).replace(".", " 年 ") + " 月" : "";
   const title = board.fun ? clean(board.metricLabel) + "榜" : metricNames[board.metric];
@@ -200,7 +201,8 @@ function leaderboardCard(profile, board) {
     label: board.fun ? clean(board.metricLabel) : points ? "我的积分" : games ? "有效局数" : title.replace(/榜$/, ""),
     rank, rankLabel, ...nearbyProjection(profile, board, rank),
     nearbyLabel: board.fun ? board.sort === "rate" ? "成功率" : "次数" : points ? "积分" : games ? "局数" : "胜率",
-    metrics: board.fun ? [board.sort === "rate" ? stat(me.count, "成功次数") : { value: percent(me.rate), label: "成功率" }, stat(me.opportunities, "有效机会"), stat(me.knownGames, "有记录局数")]
+    metrics: roleRecord ? [stat(me.knownGames, "有记录局数"), stat(me.knownGames - me.count, "未达成局数"), stat(me.unknownGames || 0, "资料不足局数")]
+      : board.fun ? [board.sort === "rate" ? stat(me.count, "成功次数") : { value: percent(me.rate), label: "成功率" }, stat(me.opportunities, "有效机会"), stat(me.knownGames, "有记录局数")]
       : points ? [stat(me.total, "计分局数"), stat(me.wins, "计分局胜场"), { value: percent(me.winRate), label: "计分局胜率" }]
       : games ? [stat(me.wins, "胜场"), stat(me.losses ?? me.total - me.wins, "负场"), { value: percent(me.winRate), label: "总胜率" }]
       : [stat(me.total, "有效局数"), stat(me.wins, "胜场"), stat(me.losses ?? me.total - me.wins, "负场")],

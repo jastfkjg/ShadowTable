@@ -92,8 +92,8 @@ const definitions = [
     title,
     unit,
     positive,
-    ranked: !Object.hasOwn(roleRecords, id) && (positive || Object.hasOwn(extraRankings, id)),
-    rankLabel: extraRankings[id]?.label || label,
+    ranked: positive || Object.hasOwn(extraRankings, id),
+    rankLabel: Object.hasOwn(roleRecords, id) ? "达成" : extraRankings[id]?.label || label,
     rateLabel: Object.hasOwn(extraRankings, id) ? "发生率" : "成功率",
     rateThreshold: rateThreshold || extraRankings[id]?.rateThreshold || 0,
     ...(record ? { honorTitle: record.title, description: record.description } : {}),
@@ -623,7 +623,7 @@ function aggregate(rows, legacyGames = 0) {
 }
 function publicMetrics() {
   return definitions
-    .filter((item) => honors[item.id] && item.ranked)
+    .filter((item) => item.honorTitle && item.ranked)
     .sort((a,b) => Number(a.countOnly) - Number(b.countOnly))
     .map((item) => ({ ...item, title: item.honorTitle, label: labels[item.id] || item.rankLabel, key: "fun_" + item.id }));
 }
