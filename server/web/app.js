@@ -2426,7 +2426,7 @@ function roomListItems(rooms) {
 
   function viewFunStats(data) {
     if (!data) return '<p class="muted">趣味记录将在服务更新后开放。</p>';
-    const records = funCopy.records(data, { includeRoleCatalogue: true });
+    const records = funCopy.records(data, { includeCatalogue: true });
     if (!records.totalCount) return '<p class="fun-empty muted">暂无趣味记录</p>';
     const tiles = state.funFilter === 'counted' ? records.recordedTiles : records.tiles;
     let html = '<div class="fun-content">';
@@ -5221,7 +5221,7 @@ function roomListItems(rooms) {
     statsTab: el => { if(['records','fun'].includes(el.dataset.value)) setState({statsTab:el.dataset.value}); },
     funDetails: el => {
       if (state.page !== 'stats' || state.statsTab !== 'fun') return;
-      const tile = funCopy.records(state.stats?.fun, { includeRoleCatalogue: true }).tiles.find(row => row.key === el.dataset.key);
+      const tile = funCopy.records(state.stats?.fun, { includeCatalogue: true }).tiles.find(row => row.key === el.dataset.key);
       if (!tile) return;
       const info = funCopy.recordInfo(tile);
       return confirm(info.title, info.content, false, info.confirmText, null, null, false, info);

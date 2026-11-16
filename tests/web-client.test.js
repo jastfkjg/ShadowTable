@@ -2587,7 +2587,7 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   let reads = 0;
   const c = client(async () => { reads++; return response(fixture); });
   await c.applyRoute('#/stats?tab=fun');
-  assert.match(c.viewStats(), /全部 11/);
+  assert.match(c.viewStats(), /全部 26/);
   assert.match(c.viewStats(), /首席护卫.*最强独狼/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   let html = c.viewStats();
@@ -2598,7 +2598,7 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   c.state.stats = { ...c.state.stats, fun: { cards: [] } };
   assert.match(c.viewStats(), /还没有累计次数的记录/);
   c.ACTIONS.filterFun({ dataset: { filter: 'all' } });
-  assert.match(c.viewStats(), /全部 8.*暂无该身份记录/);
+  assert.match(c.viewStats(), /全部 23.*最强派西.*暂无相关记录.*暂无该身份记录/);
   assert.doesNotMatch(c.viewStats(), /data-action="funRecords"/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   c.state.stats = { ...c.state.stats, fun: { cards: [{ id: 'knights:survival', metrics: [{ id: 'survival_revive', mode: 'knights', count: 0, value: null, byRole: [] }] }] } };

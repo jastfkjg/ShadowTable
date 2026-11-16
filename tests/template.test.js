@@ -1760,7 +1760,7 @@ test('趣味称号网格保持全部指标、玩法范围与回查入口', () =>
     {id:'knights:knife',title:'刀客刀法',metrics:[metric('knife_enemy','knights')]},
   ]});
   assert.deepEqual(fun.recordedTiles.map(tile=>tile.roleLabel),['经典 · 非梅林好人','经典 · 刺客','十二骑士 · 刀客']);
-  assert.equal(fun.totalCount,11);
+  assert.equal(fun.totalCount,24);
   assert.equal(fun.tiles[0].icon,'/assets/record-shield-good.svg');
   const tree=renderStatsShell({tab:'fun',stats:{fun}});
   assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);

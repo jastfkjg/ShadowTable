@@ -93,7 +93,7 @@
     if (["命中同伴", "命中友方"].includes(label)) return labels[type + "_ally"] || label;
     return label;
   }
-  function recordEntries(cards, splitModes, includeRoleCatalogue) {
+  function recordEntries(cards, splitModes, includeCatalogue) {
     const entries = [];
     const totals = new Map();
     for (const card of cards) {
@@ -120,16 +120,19 @@
     for (const row of totals.values()) {
       if (row.opportunities > 0) row.rate = Math.round(row.count / row.opportunities * 1000) / 10;
     }
-    if (splitModes || !includeRoleCatalogue) return entries;
-    const roleEntries = Object.keys(roleRecords).map(id => {
-      const group = id.split('_')[0];
-      const row = totals.get(id) || metric({ id, mode: 'all', value: null, count: 0, unit: '局',
+    if (splitModes || !includeCatalogue) return entries;
+    const displayed = new Set(entries.map(({ row }) => row.id));
+    const catalogue = Object.keys(recordDetails).flatMap(id => {
+      if (!Object.hasOwn(roleRecords, id) && displayed.has(id)) return [];
+      const group = id === 'good_shield' ? 'shield' : id.split('_')[0];
+      const mode = group === 'honor' ? 'voted' : ['survival', 'defense', 'kill'].includes(group) ? 'knights' : 'all';
+      const row = totals.get(id) || metric({ id, mode, noSamples: true, value: null, count: 0,
         knownGames: 0, unknownGames: 0, opportunities: 0, rate: null });
-      return { card: { id: 'all:' + group, title: titles[group] }, row };
+      return [{ card: { id: mode + ':' + group }, row }];
     });
-    return entries.filter(({ row }) => !Object.hasOwn(roleRecords, row.id)).concat(roleEntries);
+    return entries.filter(({ row }) => !Object.hasOwn(roleRecords, row.id)).concat(catalogue);
   }
-  function records(value, { splitModes = false, includeRoleCatalogue = false } = {}) {
+  function records(value, { splitModes = false, includeCatalogue = false } = {}) {
     const cards = summary(value)?.cards || [];
     const multipleModes = new Set(cards.filter(card => !card.id.endsWith(':honor')).map(card => card.id.split(':')[0])).size > 1;
     const visuals = {
@@ -142,7 +145,7 @@
       servant: ['roles/servant.png', 'portrait'], morgana: ['roles/morgana.png', 'portrait'],
       mordred: ['roles/mordred.png', 'portrait'], oberon: ['roles/oberon.png', 'portrait'],
     };
-    const tiles = recordEntries(cards, splitModes, value && includeRoleCatalogue).map(({ card, row }) => {
+    const tiles = recordEntries(cards, splitModes, value && includeCatalogue).map(({ card, row }) => {
       const group = card.id.split(':').pop(), mode = row.mode || card.mode || card.id.split(':')[0];
       const [image, iconTone] = row.id === 'survival_knifed' ? ['record-swords.svg', 'blue'] : visuals[group] || ['record-spark.svg', 'purple'];
       const known = row.value != null, hasCount = known && row.count > 0;
@@ -151,13 +154,13 @@
       const rateName = !row.honorTitle ? row.label + '率' : row.rateLabel === '发生率' || !positive ? '发生率' : '成功率';
       const rateLabel = hasRate ? rateName + ' ' + Number(row.rate.toFixed(1)) + '%' : '';
       const sampleLabel = hasRate ? row.count + ' / ' + row.opportunities + ' ' + (row.unit || '次') : '';
-      const noRoleSamples = !known && Object.hasOwn(roleRecords, row.id) && !row.knownGames && !row.unknownGames;
-      const stateLabel = noRoleSamples ? '暂无该身份记录' : !known ? '尚无完整记录' : !row.countOnly && !row.opportunities ? '暂无有效机会' : !hasCount ? '暂无次数' : '查看说明';
-      const url = noRoleSamples ? '' : '/pages/matches/matches?fun=' + encodeURIComponent(row.id) + '&mode=' + encodeURIComponent(mode);
+      const stateLabel = row.noSamples ? (Object.hasOwn(roleRecords, row.id) ? '暂无该身份记录' : '暂无相关记录')
+        : !known ? '尚无完整记录' : !row.countOnly && !row.opportunities ? '暂无有效机会' : !hasCount ? '暂无次数' : '查看说明';
+      const url = row.noSamples ? '' : '/pages/matches/matches?fun=' + encodeURIComponent(row.id) + '&mode=' + encodeURIComponent(mode);
       const roleLabel = ({ survival:'生存趣事', defense:'守卫 / 魔术师', kill:'击杀技能', knife:'刀客', gun:'猎人', duel:'骑士' })[group] || row.roleLabel || card.title || titles[group] || '趣味记录';
       return { ...row, key: mode + ':' + row.id, mode, url, hasCount, known,
         title: row.honorTitle || row.label, icon: '/assets/' + image, iconTone,
-        roleLabel: (mode === 'all' || (multipleModes && group !== 'honor') ? (modeLabels[mode] || mode) + ' · ' : '') + roleLabel,
+        roleLabel: (mode === 'all' || ((multipleModes || row.noSamples) && group !== 'honor') ? (modeLabels[mode] || mode) + ' · ' : '') + roleLabel,
         valueLabel: known ? String(row.count) : '—', unit: known ? row.unit || '次' : '',
         color: !hasCount ? 'muted' : group === 'honor' ? row.id === 'honor_mvp' ? 'mvp' : 'svp' : group === 'survival' ? 'purple' : row.id.endsWith('failed') ? 'muted' : positive ? 'good' : 'evil',
         rateLabel, sampleLabel, stateLabel,
