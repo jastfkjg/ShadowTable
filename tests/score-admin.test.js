@@ -47,11 +47,11 @@ test('单局多人改分、负分、恢复自动计分和结果重算保留手�
   assert.equal(store.statsFor('wx:3').score.total,15);
   assert.equal(store.matchesFor('wx:3').records[0].score.manualOverride.reason,'现场奖励修正');
   store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:2,reason:'恢复自动规则',scores:[{uid:'wx:3',points:null},{uid:'wx:5',points:null}]}));
-  assert.equal(store.statsFor('wx:3').score.total,5);assert.equal(store.statsFor('wx:5').score.total,9);
+  assert.equal(store.statsFor('wx:3').score.total,6);assert.equal(store.statsFor('wx:5').score.total,9);
   assert.equal(store.matchesFor('wx:3').records[0].score.manualOverride,undefined);
   const revision=store.scoreRevision('wx:3');
   assert.throws(()=>store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:3,reason:'非法批量',scores:[{uid:'wx:3',points:50},{uid:'other',points:20}]})));
-  assert.equal(store.statsFor('wx:3').score.total,5);assert.equal(store.scoreRevision('wx:3'),revision);
+  assert.equal(store.statsFor('wx:3').score.total,6);assert.equal(store.scoreRevision('wx:3'),revision);
   for(const scores of [[null],[{uid:'wx:3',points:1.2}],[{uid:'wx:3',points:2},{uid:'wx:3',points:3}]])assert.throws(()=>store.transaction(()=>store.adjustMatchScores(room.matchId,{revision:3,reason:'非法参数',scores})),e=>e.status===400);
  }finally{store.close();}
 });
@@ -77,7 +77,7 @@ test('更正早期胜负时其他对局保持原分，手动单局积分及独�
   const records=store.matchesFor('wx:3').records;
   assert.equal(records.find(row=>row.id===second.matchId).score.total,12);
   assert.equal(records.find(row=>row.id===third.matchId).score.total,15);
-  assert.equal(store.playerScore('wx:3').points,33);
+  assert.equal(store.playerScore('wx:3').points,34);
  }finally{store.close();}
 });
 async function launch(t) {

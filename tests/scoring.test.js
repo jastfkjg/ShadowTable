@@ -27,8 +27,14 @@ function knightDeal(options={}) {
   room.roles=Object.fromEntries(room.players.map((player,index)=>[player.uid,roles[index]]));
   return room;
 }
-function legacyDeal(version) {
+function beforeLossPoints() {
   const room = deal();
+  room.scorePolicy.version = 'avalon-2026-11-v16';
+  room.scorePolicy.awards = room.scorePolicy.awards.filter(award => !['good_loss', 'evil_loss'].includes(award.id));
+  return room;
+}
+function legacyDeal(version) {
+  const room = beforeLossPoints();
   room.scorePolicy.version = 'avalon-2026-10-' + version;
   const points = { good_win: 3, good_stage: 2, good_stage_role: 1, evil_win: 3, role: 1, shield: 2 };
   for (const award of room.scorePolicy.awards) if (Object.hasOwn(points, award.id)) award.points = points[award.id];
@@ -42,14 +48,14 @@ test('十二骑士10到13人默认计分，三绿和提前盘刀按新分值计�
       const good=deal({board,capacity}),target=good.players.find(player=>good.roles[player.uid]==='percival').seat;
       assert.deepEqual(publicView(good,good.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
       finish(good,{scoreReason:reason,scoreTarget:target});
-      for(const player of good.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?0:['merlin','percival'].includes(player.roleId)?12:9);
+      for(const player of good.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?1:['merlin','percival'].includes(player.roleId)?12:9);
       assert.ok(!good.matchRecord.players.find(player=>player.seat===target).score.breakdown.some(award=>award.id==='shield'));
     }
     for(const reason of ['assassination','quest_fail','five_rejections','early_assassination']) {
       const bad=deal({board,capacity}),merlin=bad.players.find(player=>bad.roles[player.uid]==='merlin').seat;
       finish(bad,{scoreReason:reason,scoreTarget:merlin});
       assert.equal(bad.result.winner,'evil');
-      for(const player of bad.matchRecord.players) assert.equal(player.score.total,['assassination','early_assassination'].includes(reason) ? player.faction==='evil'?9:['merlin','percival'].includes(player.roleId)?2:3 : player.faction==='evil'?9:0);
+      for(const player of bad.matchRecord.players) assert.equal(player.score.total,player.faction==='evil'?9:!['assassination','early_assassination'].includes(reason)?1:['merlin','percival'].includes(player.roleId)?2:3);
     }
   }
   const classic=deal();assert.ok(!publicView(classic,classic.host).scoreSettlement.some(option=>option.id==='early_assassination'));
@@ -61,12 +67,12 @@ test('十二骑士按换牌后角色与转换后阵营得分，出局保留最�
   room.roles['wx:6']='redHunter';room.knights.players['wx:6'].alive=false;
   room.roles['wx:7']='blueHunter';
   finish(room,{scoreReason:'early_assassination',scoreTarget:5});
-  assert.deepEqual(room.matchRecord.players.slice(0,7).map(player=>player.score.total),[12,12,9,0,15,0,9]);
+  assert.deepEqual(room.matchRecord.players.slice(0,7).map(player=>player.score.total),[12,12,9,1,15,1,9]);
   assert.equal(room.matchRecord.players[3].faction,'evil');assert.equal(room.matchRecord.players[4].faction,'good');
   assert.equal(room.matchRecord.players[5].alive,false);assert.equal(room.matchRecord.players[5].roleId,'redHunter');
   const lostRole=knightDeal();lostRole.roles['wx:1']='redKnight';lostRole.roles['wx:2']='blueGuard';
   finish(lostRole,{scoreReason:'quest_fail'});
-  assert.equal(lostRole.matchRecord.players[0].score.total,9);assert.equal(lostRole.matchRecord.players[1].score.total,0);
+  assert.equal(lostRole.matchRecord.players[0].score.total,9);assert.equal(lostRole.matchRecord.players[1].score.total,1);
 });
 test('十二骑士空刀依据存活梅林判胜，出局目标无效；管理员更正用同一快照判定',()=>{
   const living=knightDeal();finish(living,{scoreReason:'assassination',scoreTarget:0});assert.equal(living.result.winner,'good');
@@ -196,10 +202,10 @@ test("三蓝车刺中、未中、派西被刺、普通好人挡刀、刺到坏�
   assert.deepEqual(finish(hit,{scoreReason:"assassination",scoreTarget:1}),[2,2,3,3,9,9]);
   for(const player of hit.matchRecord.players.slice(0,2)) assert.deepEqual(player.score.breakdown,[{id:'good_stage_role',label:'梅林／派西三绿阶段奖励',points:2}]);
   for(const player of hit.matchRecord.players.slice(4)) assert.deepEqual(player.score.breakdown,[{id:'evil_win',label:'坏人获胜',points:9}]);
-  assert.deepEqual(finish(deal()),[12,12,15,9,0,0]);
-  assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[12,12,9,9,0,0]);
-  for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[12,12,9,9,0,0]);
-  for(const reason of ["quest_fail","five_rejections"]) assert.deepEqual(finish(deal(),{scoreReason:reason}),[0,0,0,0,9,9]);
+  assert.deepEqual(finish(deal()),[12,12,15,9,1,1]);
+  assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:2}),[12,12,9,9,1,1]);
+  for(const target of [0,5]) assert.deepEqual(finish(deal(),{scoreReason:"assassination",scoreTarget:target}),[12,12,9,9,1,1]);
+  for(const reason of ["quest_fail","five_rejections"]) assert.deepEqual(finish(deal(),{scoreReason:reason}),[1,1,1,1,9,9]);
 });
 test('测试房间和开发账号可归档及更正积分，纯陪测对局不归档',()=>{
   for(const prefix of ['wx:','dev:','test:']) {
@@ -217,7 +223,7 @@ test('测试房间和开发账号可归档及更正积分，纯陪测对局不�
         room.scorePolicy.excludedIdentityPrefixes=['dev:','test:'];
         assert.equal(publicView(room,room.host).scoreNotice,null);
         assert.ok(publicView(room,room.host).scoreSettlement.length>0);
-        assert.deepEqual(finish(room),[12,12,15,9,0,0]);
+        assert.deepEqual(finish(room),[12,12,15,9,1,1]);
         store.transaction(()=>store.save(room));store.transaction(()=>store.save(room));
         const uid=prefix+'3';
         if(prefix==='test:') {
@@ -234,7 +240,7 @@ test('测试房间和开发账号可归档及更正积分，纯陪测对局不�
         assert.equal(publicView(room,uid).myScore.total,15);
         assert.ok(store.matchScoreData(room.matchId).players.every(player=>player.editable));
         store.transaction(()=>store.correctMatch(room.matchId,{revision:0,scoreReason:'quest_fail'}));
-        assert.equal(store.statsFor(uid).score.total,0);
+        assert.equal(store.statsFor(uid).score.total,1);
 
         assert.equal(store.statsFor(prefix+'5').score.total,9);
       } finally {store.close();}
@@ -283,7 +289,7 @@ test('角色排除条件由服务端下发说明，拒绝无效配置',()=>{
 });
 test('规则对照表展示每人基础总分，额外奖励独立下发且随配置变化',()=>{
   const rules=publicRules();
-  assert.deepEqual(rules.table.rows.map(row=>row.scores),[[12,2,0],[12,2,0],[9,3,0],[0,9,9]]);
+  assert.deepEqual(rules.table.rows.map(row=>row.scores),[[12,2,1],[12,2,1],[9,3,1],[1,9,9]]);
   assert.deepEqual(rules.bonuses.map(({id,points})=>({id,points})),[
     {id:'shield',points:6},{id:'honor_mvp',points:1},{id:'honor_svp',points:1},
   ]);
@@ -293,7 +299,7 @@ test('规则对照表展示每人基础总分，额外奖励独立下发且随�
   custom.awards.find(award=>award.id==='good_win').points=10;
   custom.awards.find(award=>award.id==='shield').points=8;
   const changed=publicRules(custom);
-  assert.deepEqual(changed.table.rows.map(row=>row.scores),[[13,2,0],[13,2,0],[10,3,0],[0,9,9]]);
+  assert.deepEqual(changed.table.rows.map(row=>row.scores),[[13,2,1],[13,2,1],[10,3,1],[1,9,9]]);
   assert.equal(changed.bonuses[0].points,8);
   assert.match(changed.items.find(item=>item.id==='shield').text,/：\+8 分$/);
 });
@@ -309,8 +315,8 @@ test('v13 新分值不改写 v11/v12 开局与历史快照，管理员更正仍�
       assert.equal(store.matchFor('wx:4',old.matchId).score.total,3+shield);
       assert.equal(store.matchFor('wx:4',old.matchId).score.ruleVersion,'avalon-2026-10-'+version);
     }
-    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-11-v16');
-    assert.deepEqual(finish(fresh),[12,12,15,9,0,0]);
+    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-11-v17');
+    assert.deepEqual(finish(fresh),[12,12,15,9,1,1]);
     assert.deepEqual(fresh.matchRecord.players[2].score.breakdown,[
       {id:'good_win',label:'好人获胜',points:9},
       {id:'shield',label:'挡刀奖励',points:6},
@@ -339,7 +345,7 @@ test('v10 已开局三绿刺中坏人仍为零分，新局坏人每人九分，�
     store.transaction(()=>store.save(fresh));
     for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,9);
     store.transaction(()=>store.correctMatch(fresh.matchId,{revision:0,scoreReason:'assassination',scoreTarget:2}));
-    for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,0);
+    for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,1);
     store.transaction(()=>store.correctMatch(fresh.matchId,{revision:1,scoreReason:'assassination',scoreTarget:1}));
     for(const uid of ['wx:5','wx:6']) assert.equal(store.statsFor(uid).score.total,9);
   } finally {store.close();}
@@ -361,7 +367,7 @@ test('调整前开局的规则仍发梅派阶段分和派西挡刀分，归档�
     const score=store.matchesFor('wx:2').records[0].score;
     assert.equal(score.total,5);assert.equal(score.ruleVersion,'avalon-2026-10-v6');
     assert.ok(score.breakdown.some(award=>award.id==='shield'));
-    assert.deepEqual(finish(deal(),{scoreReason:'assassination',scoreTarget:2}),[12,12,9,9,0,0]);
+    assert.deepEqual(finish(deal(),{scoreReason:'assassination',scoreTarget:2}),[12,12,9,9,1,1]);
   } finally {store.close();}
 });
 test("结算无身份预览，非法目标不泄露身份，只有房主能提交，结束后只返回本人积分",()=>{
@@ -385,7 +391,7 @@ test("9人经典基础和逆仆均支持计分且默认关闭", () => {
   assert.equal(room.result.winner, "good");
   for (const player of room.matchRecord.players) {
     assert.equal(player.score.status, "scored");
-    assert.equal(player.score.total, player.faction === "evil" ? 0 : player.seat === target ? 15 : ["merlin", "percival"].includes(player.roleId) ? 12 : 9);
+    assert.equal(player.score.total, player.faction === "evil" ? 1 : player.seat === target ? 15 : ["merlin", "percival"].includes(player.roleId) ? 12 : 9);
   }
   const reverse = newRoom("654321", "wx:1", "房主", "classic", 9);
   assert.equal(publicView(reverse, reverse.host).scoreSettings.unavailableReason, null);
@@ -404,7 +410,7 @@ test("积分资格独立于战绩；旧开局及缺少依据不会计分",()=>{
 });
 test("记账幂等、事务回滚、零分分母和计分局筛选正确，删除房间不删除积分",()=>{
   const store=new Store(":memory:");try{
-    const room=deal();finish(room);store.transaction(()=>store.save(room));
+    const room=beforeLossPoints();finish(room);store.transaction(()=>store.save(room));
     const score=store.statsFor("wx:5").score;assert.equal(score.games,1);assert.equal(score.average,0);
     store.transaction(()=>store.save(room));assert.equal(store.statsFor("wx:3").score.total,15);
     const second=deal();finish(second,{scoreReason:"quest_fail"});
@@ -454,7 +460,7 @@ test("移除连胜后历史得分保留，更正和删除其他对局不改写�
 test("积分榜同分并列，零分可上榜，公开设置与北京时间月界沿用现有行为",()=>{
   const store=new Store(":memory:");try{
     for(let i=1;i<=6;i++) store.transaction(()=>saveProfile(store,"wx:"+i,{nickname:"玩家"+i,version:0}));
-    const room=deal();finish(room);const now=Date.now(),range=periodRange("month",now);room.matchRecord.endedAt=range.start;
+    const room=beforeLossPoints();finish(room);const now=Date.now(),range=periodRange("month",now);room.matchRecord.endedAt=range.start;
     store.transaction(()=>store.save(room));const board=new Leaderboard(store);
     const result=board.read("wx:5",new URLSearchParams("metric=points&period=month"),now);
     assert.deepEqual(result.rows.map(row=>row.rank),[1,2,2,4,5,5]);assert.equal(result.me.points,0);assert.equal(result.me.rank,5);
@@ -487,7 +493,7 @@ test("更正整局同步本局积分与胜负，其他对局积分不变；版�
     assert.throws(()=>store.transaction(()=>{store.correctMatch(rooms[0].matchId,input);throw Error("rollback");}));
     assert.equal(store.statsFor("wx:3").score.total,45);
     store.transaction(()=>store.correctMatch(rooms[0].matchId,input));
-    assert.equal(store.statsFor("wx:3").score.total,30);assert.equal(store.statsFor("wx:3").wins,2);
+    assert.equal(store.statsFor("wx:3").score.total,31);assert.equal(store.statsFor("wx:3").wins,2);
 
     assert.equal(publicView(store.get("123456"),"wx:3").myScore.total,15);
     assert.throws(()=>store.transaction(()=>store.correctMatch(rooms[0].matchId,input)),error=>error.status===409);
@@ -495,7 +501,7 @@ test("更正整局同步本局积分与胜负，其他对局积分不变；版�
     assert.equal(store.statsFor("wx:3").score.total,45);
   }finally{store.close();}
 });
-test("HTTP积分结算同事务、幂等、本人可见，规则公开且筛选包含零分局",async()=>{
+test("HTTP积分结算同事务、幂等、本人可见，公开积分表与结算一致",async()=>{
   const app=createApp({database:":memory:",exchangeCode:async code=>code});
   await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));
   const base="http://127.0.0.1:"+app.server.address().port;
@@ -511,7 +517,9 @@ test("HTTP积分结算同事务、幂等、本人可见，规则公开且筛选�
     room.players.forEach(p=>p.ready=true);run(room,"start",{flexible:true});
     room.roles=Object.fromEntries(uids.map((uid,i)=>[uid,["merlin","percival","servant","servant","morgana","assassin"][i]]));
     app.store.transaction(()=>app.store.save(room));
-    assert.equal((await req("/api/scoring/rules")).status,200);
+    const rules=await req("/api/scoring/rules");
+    assert.equal(rules.status,200);
+    assert.deepEqual(rules.data.table.rows.map(row=>row.scores),[[12,2,1],[12,2,1],[9,3,1],[1,9,9]]);
     const body={type:"finishTools",stage:room.stage,replace:true,scoreReason:"assassination",scoreTarget:3},id=randomUUID(),path="/api/rooms/123456";
     assert.equal((await req(path+"/commands",tokens[1],body)).status,403);
     const original=app.store.addReceipt;app.store.addReceipt=()=>{throw Error("storage failure");};
@@ -522,7 +530,7 @@ test("HTTP积分结算同事务、幂等、本人可见，规则公开且筛选�
     assert.equal((await req(path+"/commands",tokens[0],body,id)).status,200);
     assert.equal((await req(path,tokens[2])).data.myScore.total,15);
     assert.equal((await req("/api/me/matches?scored=1",tokens[4])).data.total,1);
-    assert.equal((await req("/api/me/stats",tokens[4])).data.score.average,0);
+    assert.equal((await req("/api/me/stats",tokens[4])).data.score.average,1);
     assert.equal((await req("/api/me/matches?scored=bad",tokens[4])).status,400);
     assert.equal((await req("/api/me/stats",tokens[2])).data.score.total,15);
     assert.doesNotMatch(JSON.stringify((await req(path,tokens[2])).data),/"uid"|scorePolicy|scoringFacts/);

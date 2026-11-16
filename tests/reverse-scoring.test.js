@@ -49,7 +49,7 @@ test('房主一次登记两刀覆盖9／11人、计分开关及四种命中组�
       assert.equal(player.faction, hit ? 'evil' : 'good');
       assert.equal(player.outcome, hit === merlinHit ? 'win' : 'loss');
       assert.equal(player.score.status, enabled ? 'scored' : 'excluded');
-      assert.equal(player.score.total, !enabled ? 0 : hit ? merlinHit ? 9 : 0 : merlinHit ? 3 : 9);
+      assert.equal(player.score.total, !enabled ? 0 : hit ? merlinHit ? 9 : 1 : merlinHit ? 3 : 9);
       assert.equal(room.history.some(entry => entry.kind === 'toolReverse'), false);
     }
 });
@@ -86,7 +86,7 @@ test('非刺杀不接受逆仆刀字段，三红车清除旧流程的转阵营�
     assert.deepEqual(room, before);
     run(room, 'finishTools', { [reason]: 'quest_fail' });
     const reverse = room.matchRecord.players.find(player => player.roleId === 'reverse');
-    assert.equal(reverse.faction, 'good');assert.equal(reverse.outcome, 'loss');assert.equal(reverse.score.total, 0);
+    assert.equal(reverse.faction, 'good');assert.equal(reverse.outcome, 'loss');assert.equal(reverse.score.total, enabled ? 1 : 0);
     assert.equal(room.reverseStrike, null);
   }
   const room = deal('classic', 6);
@@ -148,10 +148,10 @@ test('逆仆刀命中/未中 × 梅林刀命中/未中按最终阵营计分；�
     finish(room, 'assassination', target);
     const player = room.matchRecord.players.find(player => player.uid === reverse.uid);
     assert.equal(player.faction, hit ? 'evil' : 'good');
-    assert.equal(player.score.total, hit ? merlinHit ? 9 : 0 : merlinHit ? 3 : 9);
+    assert.equal(player.score.total, hit ? merlinHit ? 9 : 1 : merlinHit ? 3 : 9);
     assert.equal(player.outcome, hit === merlinHit ? 'win' : 'loss');
     for (const p of room.matchRecord.players) {
-      const expected = p.faction === 'evil' ? merlinHit ? 9 : 0
+      const expected = p.faction === 'evil' ? merlinHit ? 9 : 1
         : ['merlin', 'percival'].includes(p.roleId) ? merlinHit ? 2 : 12 : merlinHit ? 3 : 9;
       assert.equal(p.score.total, expected);
       assert.ok(!p.score.breakdown.some(award => award.id === 'shield'));
@@ -169,7 +169,7 @@ test('仅最终刺梅林可给蓝方逆仆挡刀奖励，已转红逆仆不获�
     strike(room, hit);
     finish(room, 'assassination', role(room, 'reverse').seat);
     const reverse = room.matchRecord.players.find(p => p.roleId === 'reverse');
-    assert.equal(reverse.score.total, hit ? 0 : 15);
+    assert.equal(reverse.score.total, hit ? 1 : 15);
     assert.equal(reverse.score.breakdown.some(a => a.id === 'shield'), !hit);
   }
 });
@@ -203,13 +203,13 @@ test('计分局必须结算一次逆仆刀，拒绝跳过、重复和矛盾终�
   }
 });
 
-test('三红车和五次否决逆仆失败为0分；未开启、终止、旧快照和仅登记胜方不补算', () => {
+test('三红车和五次否决逆仆失败为1分；未开启、终止、旧快照和仅登记胜方不补算', () => {
   for (const [board, capacity] of boards) {
     for (const reason of ['quest_fail', 'five_rejections']) {
       const room = deal(board, capacity);
       finish(room, reason);
       const reverse = room.matchRecord.players.find(p => p.roleId === 'reverse');
-      assert.equal(reverse.faction, 'good');assert.equal(reverse.outcome, 'loss');assert.equal(reverse.score.total, 0);
+      assert.equal(reverse.faction, 'good');assert.equal(reverse.outcome, 'loss');assert.equal(reverse.score.total, 1);
     }
     for (const mode of ['disabled', 'legacy', 'manual', 'terminated']) {
       const room = deal(board, capacity, { enabled: mode !== 'disabled' });
@@ -262,7 +262,7 @@ test('重启保留逆仆刀与规则快照，更正同步阵营/榜单/本人视
         { revision, scoreReason: reason, scoreTarget: target }));
       correct(0, 'quest_fail'); // Winner remains evil, but the reverse servant returns to good.
       let record = store.matchFor(reverse.uid, room.matchId);
-      assert.equal(record.faction, 'good');assert.equal(record.outcome, 'loss');assert.equal(record.score.total, 0);
+      assert.equal(record.faction, 'good');assert.equal(record.outcome, 'loss');assert.equal(record.score.total, 1);
       assert.equal(record.honorResult.status, 'invalidated');
       assert.equal(privateView(store.get(room.code), reverse.uid).faction, '好人阵营');
       assert.equal(store.db.prepare('SELECT faction FROM match_players WHERE match_id=? AND uid=?').get(room.matchId, reverse.uid).faction, 'good');

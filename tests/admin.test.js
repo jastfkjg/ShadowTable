@@ -878,7 +878,7 @@ test('管理员更正计分结果鉴权、幂等和版本校验，并保留整�
   const path='/api/admin/matches/'+room.matchId+'/correct',body={requestId:randomUUID(),revision:0,scoreReason:'quest_fail'};
   const first=await a.api(path,body);assert.equal(first.winner,'evil');
   assert.deepEqual(await a.api(path,body),first);
-  assert.equal(a.app.store.statsFor('wx:score-3').score.total,0);assert.equal(a.app.store.statsFor('wx:score-3').wins,0);
+  assert.equal(a.app.store.statsFor('wx:score-3').score.total,1);assert.equal(a.app.store.statsFor('wx:score-3').wins,0);
   assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='correct-result'").get().n,1);
   assert.equal((await a.raw(path,{...body,requestId:randomUUID()})).status,409);
   assert.equal((await a.raw(path,{...body,requestId:randomUUID(),revision:1,reason:{}})).status,400);

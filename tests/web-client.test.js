@@ -2627,7 +2627,9 @@ test('网页规则按角色和结局展示基础积分及额外奖励，兼容�
   assert.match(html, /<table>/); assert.match(html, /scope="col"/); assert.match(html, /scope="row"/);
   assert.match(html, /未刺中梅林/); assert.match(html, /刺中梅林/); assert.match(html, /3红车/);
   assert.match(html, /\+12/); assert.match(html, /\+9/); assert.match(html, /\+6 分/);
-  assert.match(html, /梅林、派西除外/); assert.match(html, /is-zero">0<\/td>/);
+  assert.match(html, /梅林、派西除外/); assert.equal((html.match(/>\+1<\/td>/g) || []).length, 4);
+  c.state.scoringRules.table.rows[0].scores[2] = 0;
+  assert.match(c.viewScoreRules(), /is-zero">0<\/td>/);
   c.state.scoringRules.table.rows[0].label = '<梅林>';
   assert.match(c.viewScoreRules(), /&lt;梅林&gt;/);
   delete c.state.scoringRules.table;

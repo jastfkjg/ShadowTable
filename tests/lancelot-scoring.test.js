@@ -54,10 +54,10 @@ test('未转换、转换一次及转换回原阵营的兰斯按终局阵营计�
           const expected = (player.roleId === 'blueLancelot') !== swapped ? 'good' : 'evil';
           assert.equal(player.faction, expected);
           assert.equal(player.outcome, expected === winner ? 'win' : 'loss');
-          assert.equal(player.score.total, expected === winner ? 9 : expected === 'good' && ending === 'hit' ? 3 : 0);
+          assert.equal(player.score.total, expected === winner ? 9 : expected === 'good' && ending === 'hit' ? 3 : 1);
           assert.ok(!player.score.breakdown.some(a => a.id === 'role'));
         } else if (['merlin', 'percival'].includes(player.roleId)) {
-          assert.equal(player.score.total, ending === 'miss' ? 12 : ending === 'hit' ? 2 : 0);
+          assert.equal(player.score.total, ending === 'miss' ? 12 : ending === 'hit' ? 2 : 1);
         }
       }
     }
@@ -73,7 +73,7 @@ test('蓝方兰斯可挡刀，转红后不拿挡刀奖励，作废未完成任�
     const player = room.matchRecord.players.find(p => p.uid === target.uid);
     const good = (roleId === 'blueLancelot') !== converted;
     assert.equal(player.faction, good ? 'good' : 'evil');
-    assert.equal(player.score.total, good ? 15 : 0);
+    assert.equal(player.score.total, good ? 15 : 1);
     assert.equal(player.score.breakdown.some(a => a.id === 'shield'), good);
   }
 });
@@ -96,7 +96,7 @@ test('转换状态重启后结算进明细和榜单，管理员更正保持归�
       assert.equal(store.matchFor(red.uid, room.matchId).score.total, 3);
       assert.equal(store.matchFor(blue.uid, room.matchId).score.total, 9);
       store.transaction(() => store.correctMatch(room.matchId, { revision: 1, scoreReason: 'quest_fail' }));
-      assert.equal(store.matchFor(red.uid, room.matchId).score.total, 0);
+      assert.equal(store.matchFor(red.uid, room.matchId).score.total, 1);
       assert.equal(store.matchFor(blue.uid, room.matchId).score.total, 9);
       assert.equal(store.statsFor(blue.uid).byFaction.find(f => f.faction === 'evil').score.total, 9);
       assert.equal(privateView(store.get(room.code), red.uid).faction, '好人阵营');

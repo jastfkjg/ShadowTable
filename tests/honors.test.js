@@ -11,7 +11,7 @@ function fixture(store, uids = Array.from({length:6}, (_,i) => 'wx:'+(i+1)), { s
   for (let i=2;i<=6;i++) enter(r,uids[i-1],'玩家'+i);
   r.players.forEach(p=>p.ready=true);
   command(r,r.host,{type:'start',stage:r.stage,flexible:true});
-  if (legacy) r.scorePolicy.awards = r.scorePolicy.awards.filter(award => !award.when.honor);
+  if (legacy) r.scorePolicy.awards = r.scorePolicy.awards.filter(award => !award.when.honor && !['good_loss', 'evil_loss'].includes(award.id));
   r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
   r.fun.initialRoles={...r.roles};
   command(r,r.host,{type:'finishTools',stage:r.stage,replace:true,
@@ -30,7 +30,7 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
     const revision=s.scoreRevision('wx:2');
     act(s,r,r.host,'honorStart');
     vote(s,r,1,3,6);vote(s,r,2,3,5);vote(s,r,3,2,6);vote(s,r,4,2,6);vote(s,r,5,3,6);vote(s,r,6,2,5);
-    for(const [uid,total,award] of [['wx:2',13,'honor_mvp'],['wx:3',16,'honor_mvp'],['wx:6',1,'honor_svp']]) {
+    for(const [uid,total,award] of [['wx:2',13,'honor_mvp'],['wx:3',16,'honor_mvp'],['wx:6',2,'honor_svp']]) {
       const score=s.matchFor(uid,r.matchId).score;
       assert.equal(score.total,total);
       assert.deepEqual(score.breakdown.filter(row=>row.id===award).map(row=>row.points),[1]);
@@ -44,7 +44,7 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
     s.transaction(()=>s.save(s.get(r.code)));
     assert.equal(s.playerScore('wx:2').points,13);
     assert.equal(s.playerScore('wx:1').points,12);
-    assert.equal(s.playerScore('wx:5').points,0);
+    assert.equal(s.playerScore('wx:5').points,1);
     s.transaction(()=>s.manageMatches({action:'exclude',matches:[{id:r.matchId,revision:0}]}));
     assert.equal(s.playerScore('wx:2').points,0);
     s.transaction(()=>s.manageMatches({action:'include',matches:[{id:r.matchId,revision:s.matchScoreData(r.matchId).revision}]}));
@@ -84,7 +84,7 @@ test('更正刀口保留票选奖励，改变胜方撤回奖励；手动总分�
     assert.equal(s.playerScore('wx:2').points,13);
     s.transaction(()=>s.correctMatch(r.matchId,{revision:2,scoreReason:'assassination',scoreTarget:2}));
     assert.equal(s.playerScore('wx:2').points,13);
-    assert.equal(s.playerScore('wx:5').points,1);
+    assert.equal(s.playerScore('wx:5').points,2);
     s.transaction(()=>s.correctMatch(r.matchId,{revision:3,scoreReason:'assassination',scoreTarget:1}));
     assert.equal(honors.view(s,s.get(r.code),r.host).status,'invalidated');
     assert.equal(s.playerScore('wx:2').points,2);
@@ -270,9 +270,9 @@ test('微信玩家与陪测同桌获得 SVP，新规则加一分，旧规则不�
       for(let i=0;i<uids.length;i++) act(s,r,uids[i],'honorVote',{mvp:i===0?2:1,svp:i===4?6:5});
       assert.equal(honors.view(s,s.get(r.code),'wx:svp').svp[0].seat,5);
       const score=s.matchFor('wx:svp',r.matchRecord.id).score;
-      assert.equal(score.total,legacy?0:1);
+      assert.equal(score.total,legacy?0:2);
       assert.equal(score.breakdown.some(row=>row.id==='honor_svp'),!legacy);
-      assert.equal(s.playerScore('wx:svp').points,legacy?0:1);
+      assert.equal(s.playerScore('wx:svp').points,legacy?0:2);
     } finally { s.close(); }
   }
 });
