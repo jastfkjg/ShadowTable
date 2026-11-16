@@ -15,6 +15,48 @@ const renderHistoryShell = data => factory('pages/matches/matches.wxml')({tab:'m
 const renderTable = factory("pages/table/table.wxml");
 const renderLobby = data => factory("pages/lobby/lobby.wxml")({ activeTab: 0, lobby: data, personal: {} });
 const render = data => (data.room ? renderTable : renderLobby)({ ...data, isLobby: !data.room });
+test("我的资料行独立导航到资料和人格页，并按进度显示简短入口", () => {
+  const storage = new Map();
+  const cache = require("../miniprogram/personality-storage").create({
+    get: key => storage.get(key),
+    set: (key, value) => storage.set(key, value),
+    remove: key => storage.delete(key),
+  });
+  const credential = "test-session";
+  const accountKey = "a".repeat(64);
+  const renderMe = profile => factory("pages/me/me.wxml")({
+    activeTab: 1,
+    personal: { loading: false, profile, personality: cache.summary(credential) },
+  });
+  const route = "/pages/personality/personality";
+  const profile = { displayName: "一位使用完整长昵称的阿瓦隆玩家", initial: "一" };
+  cache.bind(credential, { accountKey });
+
+  function checkEntry(label, portrait) {
+    const tree = nodes(renderMe(profile));
+    const row = tree.find(node => node.attr?.class === "me-profile-row");
+    const [edit, personality] = row.children;
+    assert.equal(edit.attr.url, "/pages/profile/profile");
+    assert.ok(edit.attr.ariaLabel.includes(profile.displayName));
+    assert.equal(personality.attr.url, route);
+    assert.equal(personality.attr.ariaLabel, "阿瓦隆人格，" + label);
+    assert.equal(nodes(personality).find(node => node.attr?.class === "me-personality-title").children[0], label);
+    assert.equal(nodes(personality).find(node => node.tag === "wx-image").attr.src, portrait);
+    assert.equal(tree.filter(node => node.attr?.url === route).length, 1);
+  }
+
+  checkEntry("开始测试", "/assets/roles/merlin.png");
+  cache.saveDraft(accountKey, { version: "3.0.0", total: 15, answers: { Q01: "A" } });
+  checkEntry("继续测试", "/assets/roles/merlin.png");
+  cache.removeDraft(accountKey, "3.0.0");
+  const view = { roleName: "奥伯伦", title: "孤影观察者", portrait: "/assets/roles/oberon.png" };
+  cache.bind(credential, { accountKey, latest: { view } });
+  checkEntry(view.title, view.portrait);
+
+  const fallback = nodes(renderMe(null)).find(node => node.attr?.url === route);
+  assert.equal(fallback.attr.ariaLabel, "奥伯伦 · 孤影观察者");
+  assert.doesNotMatch(fallback.attr.class, /me-personality-compact/);
+});
 test('已准备仍能选择回避，无卡提示优先；发牌后隐藏入口', () => {
   const room = { code: '123456', phase: 'lobby', capacity: 6, players: [], team: [], history: [], me: { seat: 1, ready: true, avoidance: { balance: 1 } } };
   const data = { ...base, room, avoidanceOpen: true, avoidanceLoading: false,

@@ -14,11 +14,26 @@
     function saveDraft(key,value) {if(!validAccount(key))throw new Error("账号尚未确认");write("draft:"+key+":"+value.version,value);write("draft-version:"+key,value.version);}
     function removeDraft(key,version) {storage.remove(prefix+"draft:"+key+":"+version);if(read("draft-version:"+key)===version)storage.remove(prefix+"draft-version:"+key);}
     function summary(credential) {
-      const value=account(credential);if(!value)return {title:"我的阿瓦隆人格",caption:"探索你的牌桌决策风格",portrait:"/assets/roles/merlin.png"};
-      const version=read("draft-version:"+value.accountKey), saved=draft(value.accountKey,version);
-      if(saved?.total && !saved.completed && Object.keys(saved.answers||{}).length) return {title:"继续探索你的牌桌风格",caption:"已完成 "+Object.keys(saved.answers).length+" / "+saved.total+" 题 · 进度已保存",portrait:"/assets/roles/merlin.png"};
-      const result=saved?.completed && saved.localView || value.latest?.view;
-      return result ? {title:result.roleName+" · "+result.title,caption:saved?.completed ? "查看结果 · 待同步到账号" : "我的阿瓦隆人格 · 查看结果",portrait:result.portrait} : {title:"我的阿瓦隆人格",caption:"探索你的牌桌决策风格",portrait:"/assets/roles/merlin.png"};
+      const empty = { title:"我的阿瓦隆人格", entryLabel:"开始测试", caption:"探索你的牌桌决策风格", portrait:"/assets/roles/merlin.png" };
+      const value = account(credential);
+      if (!value) return empty;
+      const version = read("draft-version:" + value.accountKey);
+      const saved = draft(value.accountKey, version);
+      const answered = Object.keys(saved?.answers || {}).length;
+      if (saved?.total && !saved.completed && answered) return {
+        title:"继续探索你的牌桌风格",
+        entryLabel:"继续测试",
+        caption:"已完成 " + answered + " / " + saved.total + " 题 · 进度已保存",
+        portrait:empty.portrait,
+      };
+      const result = saved?.completed && saved.localView || value.latest?.view;
+      if (!result) return empty;
+      return {
+        title:result.roleName + " · " + result.title,
+        entryLabel:result.title,
+        caption:saved?.completed ? "查看结果 · 待同步到账号" : "我的阿瓦隆人格 · 查看结果",
+        portrait:result.portrait,
+      };
     }
     return {account,bind,draft,saveDraft,removeDraft,summary,previousVersion:key=>read("draft-version:"+key)};
   }

@@ -9,13 +9,34 @@
 .me-page, .me-page view, .me-page text, .me-page navigator { box-sizing:border-box; }
 .me-page .me-pressed { opacity:.72; }
 .me-page .inline-error button { min-height:44px; }
-.me-profile { display:block; padding:0 8px; color:var(--text); }
-.me-profile-main { display:flex; align-items:center; gap:14px; min-width:0; min-height:60px; }
+.me-profile-row { display:flex; align-items:center; gap:10px; padding-left:8px; }
+.me-profile { display:flex; flex:1; align-items:center; gap:12px; min-width:0; min-height:60px; color:var(--text); }
 .me-profile .profile-avatar { width:52px; height:52px; border:0; border-radius:17px; flex-shrink:0; }
 .me-profile .avatar-fallback { font-size:28px; font-weight:500; }
 .me-profile .profile-identity { min-width:0; flex:1; }
-.me-profile .profile-name { font-size:22px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.me-profile .profile-name { font-size:22px; font-weight:600; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .me-profile-caption { display:flex; align-items:center; gap:8px; margin-top:6px; color:var(--muted); font-size:12px; }
+.me-personality-compact {
+  flex:0 1 142px;
+  max-width:50%;
+  min-height:52px;
+  margin:0;
+  padding:4px 9px 4px 5px;
+  gap:6px;
+  border-radius:13px;
+  background:var(--surface);
+}
+.me-personality-compact .me-personality-art { width:36px; height:36px; }
+.me-personality-compact .me-personality-label { font-size:11px; letter-spacing:0; }
+.me-personality-compact .me-personality-title {
+  margin:2px 0 0;
+  font-size:13px;
+  line-height:1.35;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.me-personality-compact .me-chevron { border-color:var(--accent); }
 .me-page .account-note { margin:18px 8px 0; }
 .me-overview { margin:20px 0 14px; padding:12px 16px 0; border-radius:22px; background:var(--surface); }
 .me-overview-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 8px; min-height:44px; }
