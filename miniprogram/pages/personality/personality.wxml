@@ -1,5 +1,5 @@
-<app-nav wx:if="{{!singlePage}}" title="{{mode==='quiz'?'人格测试':mode==='result'||mode==='shared'?'我的阿瓦隆人格':'阿瓦隆十六人格'}}" back="{{true}}" bind:back="back" />
-<view class="persona-page {{mode==='quiz'?'persona-answering':''}}">
+<app-nav wx:if="{{!singlePage}}" id="persona-nav" title="{{mode==='quiz'?'人格测试':mode==='result'||mode==='shared'?'我的阿瓦隆人格':'阿瓦隆十六人格'}}" back="{{true}}" bind:back="back" />
+<view class="persona-page {{mode==='quiz'?'persona-answering':''}} {{!loading && result && mode==='result' && !singlePage?'persona-has-result-dock':''}}">
   <view wx:if="{{loading}}" class="persona-status" role="status">正在读取你的牌桌故事…</view>
   <view wx:if="{{error}}" class="persona-message persona-error" role="alert"><text>{{error}}</text><button hover-class="none" bindtap="retry">重新载入</button></view>
   <view wx:if="{{notice}}" class="persona-message" role="status">{{notice}}</view>
@@ -54,19 +54,13 @@
     <block wx:if="{{mode==='result'}}">
       <view class="persona-result-actions">
         <button hover-class="none" class="persona-primary" bindtap="saveImage" disabled="{{rendering}}">{{rendering?'正在准备图片…':'保存图片'}}</button>
-        <button hover-class="none" class="persona-secondary" bindtap="prepareShare" disabled="{{sharing}}" loading="{{sharing}}">{{sharing?'正在准备…':'分享结果'}}</button>
+        <button hover-class="none" class="persona-secondary" open-type="share" disabled="{{sharing}}" loading="{{sharing}}">{{sharing?'正在准备…':'分享结果'}}</button>
       </view>
-      <view class="persona-save-state {{record?'confirmed':''}}" role="status">
-        <text>{{record?'✓ 已保存到账号':saving?'正在同步到账号…':storageError?'当前结果尚未同步':'结果已保存在本机'}}</text>
-        <button hover-class="none" wx:if="{{saveError && !saving}}" class="persona-text-button" bindtap="retrySave">重试同步</button>
+      <view wx:if="{{saveError && !saving}}" class="persona-message persona-error persona-sync-error" role="alert">
+        <text>{{saveError}}</text>
+        <button hover-class="none" class="persona-text-button" bindtap="retrySave">重试同步</button>
       </view>
-      <view wx:if="{{saveError && !saving}}" class="persona-small persona-action-note" role="alert">{{saveError}}</view>
       <view wx:if="{{shareError}}" class="persona-message persona-error" role="alert">{{shareError}}</view>
-      <view wx:if="{{sharePanel && shared}}" class="persona-share-panel">
-        <view class="persona-section-title">结果链接已准备好</view>
-        <view class="persona-small">好友可以看到角色卡和风格解读。</view>
-        <button hover-class="none" class="persona-primary" open-type="share">发送给好友</button>
-      </view>
       <view wx:if="{{imageError}}" class="persona-message persona-error" role="alert">
         <text>{{imageError}}</text>
         <view class="persona-image-actions">
@@ -80,57 +74,67 @@
       </view>
     </block>
 
-    <view wx:if="{{mode==='shared'||resultTab==='overview'}}" class="persona-result-panel" id="persona-panel-overview" role="{{mode==='result'?'tabpanel':'region'}}" aria-label="风格解读">
-      <view class="persona-section-title">你的牌桌风格</view>
-      <view class="persona-prose">{{result.summary}}</view>
-      <view class="persona-insight"><text class="persona-insight-label">你的长处</text><view>{{result.strength}}</view></view>
-      <view class="persona-insight"><text class="persona-insight-label">容易错过</text><view>{{result.blindspot}}</view></view>
-      <view class="persona-tip"><text>下次试试</text><view>{{result.tip}}</view></view>
-      <view wx:if="{{mode==='result' && result.secondary.length}}" class="persona-related">
-        <view class="persona-section-title">也接近这些风格</view>
-        <view class="persona-small">{{result.tendencyLabel==='混合倾向'?'你的选择呈现混合倾向，主角色是本次最接近的方向。':'部分选择也与这些角色的策略取向接近。'}}</view>
-        <view class="persona-secondary-roles"><view wx:for="{{result.secondary}}" wx:key="id"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><text>{{item.name}}</text></view></view>
-      </view>
-    </view>
-
-    <view wx:if="{{mode==='result' && resultTab==='preferences'}}" class="persona-result-panel" id="persona-panel-preferences" role="tabpanel" aria-label="本次偏好">
-      <view class="persona-section-title">你在两种做法之间的位置</view>
-      <view class="persona-small">来自本次作答，两端各有用途。</view>
-      <block wx:for="{{preferences}}" wx:key="id">
-        <view wx:if="{{index<3 || detailsOpen}}" class="persona-dimension">
-          <view class="persona-dimension-heading"><text>{{item.label}}</text><text>{{item.tendency}}</text></view>
-          <view class="persona-axis-labels"><text>{{item.negative}}</text><text>{{item.positive}}</text></view>
-          <view class="persona-axis {{item.positionClass}}" aria-label="{{item.tendency}}"><view class="persona-axis-center"></view><view class="persona-axis-dot"></view></view>
+    <view class="persona-result-panel" id="{{'persona-panel-'+(mode==='shared'?'overview':resultTab)}}" role="{{mode==='result'?'tabpanel':'region'}}" aria-label="{{mode==='shared' || resultTab==='overview'?'风格解读':resultTab==='preferences'?'本次偏好':'作答依据'}}">
+      <block wx:if="{{mode==='shared' || resultTab==='overview'}}">
+        <view class="persona-report-title">你的牌桌风格</view>
+        <view class="persona-prose">{{result.summary}}</view>
+        <view class="persona-insights">
+          <view class="persona-insight"><text class="persona-insight-label">你的长处</text><view>{{result.strength}}</view></view>
+          <view class="persona-insight"><text class="persona-insight-label">容易错过</text><view>{{result.blindspot}}</view></view>
+        </view>
+        <view class="persona-tip"><text class="persona-tip-label">下次试试</text><view>{{result.tip}}</view></view>
+        <view wx:if="{{mode==='result' && result.secondary.length}}" class="persona-related">
+          <view class="persona-section-title">也接近这些风格</view>
+          <view class="persona-small">{{result.tendencyLabel==='混合倾向'?'你的选择呈现混合倾向，主角色是本次最接近的方向。':'部分选择也与这些角色的策略取向接近。'}}</view>
+          <view class="persona-secondary-roles"><view wx:for="{{result.secondary}}" wx:key="id"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><text>{{item.name}}</text></view></view>
         </view>
       </block>
-      <button wx:if="{{preferences.length>3}}" hover-class="none" class="disclosure-button persona-text-button persona-more" bindtap="details" aria-expanded="{{detailsOpen}}">{{detailsOpen?'收起其他维度':'查看其余 '+(preferences.length-3)+' 项'}}</button>
-      <view class="persona-style">
-        <view class="persona-dimension-heading"><text>介入风格</text><text>{{activeStyle==='A'?'主动介入':'择机介入'}}</text></view>
-        <view class="persona-small">{{result.description}}</view>
-        <view wx:if="{{result.style}}" class="persona-axis-labels"><text>择机介入</text><text>主动介入</text></view>
-        <view wx:if="{{result.style}}" class="persona-axis {{result.style.positionClass}}" aria-label="{{result.style.tendency}}"><view class="persona-axis-center"></view><view class="persona-axis-dot"></view></view>
-      </view>
+      <block wx:elif="{{resultTab==='preferences'}}">
+        <view class="persona-report-title">你在两种做法之间的位置</view>
+        <view class="persona-small">来自本次作答，两端各有用途。</view>
+        <block wx:for="{{preferences}}" wx:key="id">
+          <view wx:if="{{index<3 || detailsOpen}}" class="persona-dimension">
+            <view class="persona-dimension-heading"><text>{{item.label}}</text><text>{{item.tendency}}</text></view>
+            <view class="persona-axis-labels"><text>{{item.negative}}</text><text>{{item.positive}}</text></view>
+            <view class="persona-axis {{item.positionClass}}" aria-label="{{item.tendency}}"><view class="persona-axis-center"></view><view class="persona-axis-dot"></view></view>
+          </view>
+        </block>
+        <button wx:if="{{preferences.length>3}}" hover-class="none" class="disclosure-button persona-text-button persona-more" bindtap="details" aria-expanded="{{detailsOpen}}">{{detailsOpen?'收起其他维度':'查看其余 '+(preferences.length-3)+' 项'}}</button>
+        <view class="persona-style">
+          <view class="persona-dimension-heading"><text>介入风格</text><text>{{activeStyle==='A'?'主动介入':'择机介入'}}</text></view>
+          <view class="persona-small">{{result.description}}</view>
+          <view wx:if="{{result.style}}" class="persona-axis-labels"><text>择机介入</text><text>主动介入</text></view>
+          <view wx:if="{{result.style}}" class="persona-axis {{result.style.positionClass}}" aria-label="{{result.style.tendency}}"><view class="persona-axis-center"></view><view class="persona-axis-dot"></view></view>
+        </view>
+      </block>
+      <block wx:elif="{{resultTab==='evidence'}}">
+        <view class="persona-report-title">哪些选择影响了结果</view>
+        <view wx:if="{{!result.explanations.length}}" class="persona-small">你的选择比较均衡，这次没有特别突出的单题依据。</view>
+        <view wx:else class="persona-evidence-list">
+          <view class="persona-evidence" wx:for="{{result.explanations}}" wx:key="questionId">
+            <text class="persona-evidence-source">{{item.title}}</text>
+            <view class="persona-quote">“{{item.text}}”</view>
+            <view class="persona-small">{{item.interpretation}}</view>
+          </view>
+        </view>
+      </block>
+      <view class="persona-footnote">{{result.note}}</view>
     </view>
-
-    <view wx:if="{{mode==='result' && resultTab==='evidence'}}" class="persona-result-panel" id="persona-panel-evidence" role="tabpanel" aria-label="作答依据">
-      <view class="persona-section-title">哪些选择影响了结果</view>
-      <view wx:if="{{!result.explanations.length}}" class="persona-small">你的选择比较均衡，这次没有特别突出的单题依据。</view>
-      <view class="persona-evidence" wx:for="{{result.explanations}}" wx:key="questionId">
-        <text class="persona-evidence-source">{{item.title}}</text>
-        <view class="persona-quote">“{{item.text}}”</view>
-        <view class="persona-small">{{item.interpretation}}</view>
-      </view>
-    </view>
-    <view class="persona-footnote">{{result.note}}</view>
     <view wx:if="{{mode==='shared' && !singlePage}}" class="persona-shared-action"><button hover-class="none" class="persona-primary" bindtap="testMine">测测我的人格</button><view class="persona-small persona-center">{{questionTotal}} 道题 · 支持暂停续答</view></view>
     <view wx:if="{{singlePage}}" class="persona-message">打开小程序，探索你的阿瓦隆人格。</view>
-    <view wx:if="{{mode==='result' && !singlePage}}" class="persona-bottom-links">
-      <button hover-class="none" class="disclosure-button persona-text-button" bindtap="catalogue" aria-expanded="{{catalogueOpen}}">{{catalogueOpen?'收起十六人格':'看看全部十六人格'}}</button>
-      <button hover-class="none" class="persona-text-button" bindtap="retest" disabled="{{saving||sharing}}">重新测试</button>
+    <view wx:if="{{mode==='result' && !singlePage}}" class="persona-result-dock">
+      <button hover-class="none" class="disclosure-button persona-dock-catalogue" bindtap="catalogue" aria-expanded="{{catalogueOpen}}" aria-controls="persona-catalogue">
+        <text>{{catalogueOpen?'收起十六人格':'看看全部十六人格'}}</text>
+        <image class="persona-dock-chevron {{catalogueOpen?'is-expanded':''}}" src="/assets/chevron-left.svg" aria-hidden="true" />
+      </button>
+      <button hover-class="none" class="persona-dock-retest" bindtap="retest" disabled="{{saving||sharing}}">
+        <image class="persona-dock-refresh" src="/assets/home-refresh.svg" aria-hidden="true" />
+        <text>重新测试</text>
+      </button>
     </view>
   </block>
-  <view wx:if="{{catalogueOpen}}" class="persona-catalogue"><view wx:for="{{catalogue}}" wx:key="typeId" class="persona-catalogue-item"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text class="persona-small">{{item.roleName}}</text><view class="persona-section-title">{{item.title}}</view><view class="persona-small">{{item.description}}</view></view></view></view>
-  <view wx:if="{{!loading && mode!=='quiz' && mode!=='shared' && history.length}}" class="persona-section"><view class="persona-section-title">最近的测试</view><button hover-class="none" wx:for="{{history}}" wx:key="id" class="persona-history-result" data-id="{{item.id}}" bindtap="openHistory" disabled="{{saving||sharing}}"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text>{{item.roleName}} · {{item.title}}</text><text class="persona-small">{{item.dateLabel || item.version}}</text></view><text>›</text></button></view>
+  <view wx:if="{{catalogueOpen}}" id="persona-catalogue" class="persona-catalogue" role="region" aria-label="全部十六人格"><view wx:for="{{catalogue}}" wx:key="typeId" class="persona-catalogue-item"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text class="persona-small">{{item.roleName}}</text><view class="persona-section-title">{{item.title}}</view><view class="persona-small">{{item.description}}</view></view></view></view>
+  <view wx:if="{{!loading && mode!=='quiz' && mode!=='shared' && history.length}}" class="persona-section {{mode==='result'?'persona-result-history':''}}"><view class="persona-section-title">最近的测试</view><button hover-class="none" wx:for="{{history}}" wx:key="id" class="persona-history-result" data-id="{{item.id}}" bindtap="openHistory" disabled="{{saving||sharing}}"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text>{{item.roleName}} · {{item.title}}</text><text class="persona-small">{{item.dateLabel || item.version}}</text></view><text aria-hidden="true">›</text></button></view>
 </view>
 <canvas wx:if="{{!singlePage}}" type="2d" id="personality-canvas" class="persona-export-canvas" aria-hidden="true"></canvas>
 <app-dialog id="app-dialog" />

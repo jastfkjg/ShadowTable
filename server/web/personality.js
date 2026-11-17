@@ -7,6 +7,7 @@
   const safeGet=key=>{try{return localStorage.getItem(key)||"";}catch{return "";}};
   const storage={get:key=>{try{return JSON.parse(localStorage.getItem(key));}catch{return null;}},set:(key,value)=>localStorage.setItem(key,JSON.stringify(value)),remove:key=>localStorage.removeItem(key)};
   let webTag="",initializing=null,retryAt=0,ui=null,previous=null,options=Object.fromEntries(new URLSearchParams(location.search)),imageBusy=false,imageError="",pageAlive=true,announcementTimer;
+  let manualShareId="";
   const revision=safeGet("accountRevision");
   try{const saved=JSON.parse(sessionStorage.getItem("avalon16-web"));if(saved?.revision===revision&&safeGet("webAccount")==="wechat")webTag=saved.tag;}catch{}
   const credential=()=>safeGet("accountRevision")!==revision?"account-changed":webTag||safeGet("session");
@@ -66,7 +67,7 @@
         state.detailsOpen?"收起其他维度":"查看其余 "+(state.preferences.length-3)+" 项",
         "details","persona-text-button persona-more",false,` aria-expanded="${state.detailsOpen}"`
       ):"";
-      return `<h2 class="persona-section-title">你在两种做法之间的位置</h2>
+      return `<h2 class="persona-report-title">你在两种做法之间的位置</h2>
         <div class="persona-small">来自本次作答，两端各有用途。</div>${dimensions}${more}
         <div class="persona-style">
           <div class="persona-dimension-heading"><span>介入风格</span><span>${state.activeStyle==="A"?"主动介入":"择机介入"}</span></div>
@@ -77,24 +78,25 @@
     if(state.resultTab==="evidence"){
       const evidence=v.explanations?.map(e=>`<div class="persona-evidence">
         <span class="persona-evidence-source">${esc(e.title)}</span>
-        <div class="persona-quote">“${esc(e.text)}”</div><div class="persona-small">${esc(e.interpretation)}</div>
+        <blockquote class="persona-quote">“${esc(e.text)}”</blockquote><div class="persona-small">${esc(e.interpretation)}</div>
       </div>`).join("");
-      return `<h2 class="persona-section-title">哪些选择影响了结果</h2>
-        ${evidence||'<div class="persona-small">你的选择比较均衡，这次没有特别突出的单题依据。</div>'}`;
+      return `<h2 class="persona-report-title">哪些选择影响了结果</h2>
+        ${evidence?`<div class="persona-evidence-list">${evidence}</div>`:'<div class="persona-small">你的选择比较均衡，这次没有特别突出的单题依据。</div>'}`;
     }
     const related=state.mode==="result" && v.secondary?.length?`<div class="persona-related">
       <h2 class="persona-section-title">也接近这些风格</h2>
       <div class="persona-small">${v.tendencyLabel==="混合倾向"?"你的选择呈现混合倾向，主角色是本次最接近的方向。":"部分选择也与这些角色的策略取向接近。"}</div>
       <div class="persona-secondary-roles">${v.secondary.map(r=>`<div>${img(r.portrait)}<span>${esc(r.name)}</span></div>`).join("")}</div>
     </div>`:"";
-    return `<h2 class="persona-section-title">你的牌桌风格</h2><div class="persona-prose">${esc(v.summary)}</div>
-      ${insight("你的长处",v.strength)}${insight("容易错过",v.blindspot)}
-      <div class="persona-tip"><span>下次试试</span><div>${esc(v.tip)}</div></div>${related}`;
+    return `<h2 class="persona-report-title">你的牌桌风格</h2><div class="persona-prose">${esc(v.summary)}</div>
+      <div class="persona-insights">${insight("你的长处",v.strength)}${insight("容易错过",v.blindspot)}</div>
+      <div class="persona-tip"><span class="persona-tip-label">下次试试</span><div>${esc(v.tip)}</div></div>${related}`;
   }
 
   function resultPage(state) {
     const v=state.result;
     const shared=state.mode==="shared";
+    const report=`${resultPanel(state)}<div class="persona-footnote">${esc(v.note)}</div>`;
     const hero=`<section class="persona-result-hero">
       <span class="persona-eyebrow">阿瓦隆十六人格</span>
       <div class="persona-portrait-stage"><div class="persona-orbit" aria-hidden="true"></div>${img(v.portrait,"persona-portrait",v.roleName+"角色形象")}</div>
@@ -104,34 +106,32 @@
     </section>`;
     if(shared){
       return `<div class="persona-shared-by">${esc(state.shared.name)} 的牌桌风格</div>${hero}
-        <section class="persona-result-panel">${resultPanel(state)}</section>
-        <div class="persona-footnote">${esc(v.note)}</div>
+        <section class="persona-result-panel">${report}</section>
         <div class="persona-shared-action">${button("测测我的人格","mine","persona-primary")}<div class="persona-small persona-center">${state.questionTotal} 道题 · 支持暂停续答</div></div>`;
     }
-    const stateText=state.record?"✓ 已保存到账号":state.saving?"正在同步到账号…":state.storageError?"当前结果尚未同步":"结果已保存在本机";
     const retry=state.saveError&&!state.saving;
     const tabs=state.tabs.map(tab=>{
       const active=tab.id===state.resultTab;
       return button(tab.label,"resultTab","persona-result-tab"+(active?" is-active":""),false,
         ` data-id="${tab.id}" id="persona-tab-${tab.id}" role="tab" aria-selected="${active}" aria-controls="persona-panel-${tab.id}" tabindex="${active?0:-1}"`);
     }).join("");
-    const sharePanel=state.shared?`<div class="persona-share-panel">
-      <h2 class="persona-section-title">结果链接已准备好</h2><div class="persona-small">好友可以看到角色卡和风格解读。</div>
-      <input aria-label="人格分享链接" readonly value="${esc(shareLink(state.shared))}">${button("复制分享链接","copy","persona-primary")}
-    </div>`:"";
+    const manualShare=state.shared?.id===manualShareId;
     return `${hero}<div class="persona-result-actions">
       ${button(imageBusy?"正在准备图片…":"保存图片","image","persona-primary",imageBusy)}
-      ${button(state.sharing?"正在准备…":"分享结果","share","persona-secondary",state.sharing)}
+      ${button(state.sharing?"正在准备…":manualShare?"复制分享链接":"分享结果","share","persona-secondary",state.sharing)}
     </div>
-    <div class="persona-save-state ${state.record?"confirmed":""}" role="status"><span>${stateText}</span>${retry?button("重试同步","save"):""}</div>
-    ${retry?`<div class="persona-small persona-action-note" role="alert">${esc(state.saveError)}</div>`:""}
-    ${message(imageError)}${message(state.shareError)}${sharePanel}
+    ${retry?`<div class="persona-message persona-error persona-sync-error" role="alert"><span>${esc(state.saveError)}</span>${button("重试同步","save")}</div>`:""}
+    ${message(imageError)}${message(state.shareError)}
+    ${manualShare?`<input class="persona-share-link" aria-label="人格分享链接" readonly value="${esc(shareLink(state.shared))}">`:""}
     <div class="persona-result-tabs" role="tablist" aria-label="人格报告">${tabs}</div>
-    <section class="persona-result-panel" id="persona-panel-${state.resultTab}" role="tabpanel" aria-labelledby="persona-tab-${state.resultTab}" tabindex="0">${resultPanel(state)}</section>
-    <div class="persona-footnote">${esc(v.note)}</div>
-    <div class="persona-bottom-links">
-      ${button(state.catalogueOpen?"收起十六人格":"看看全部十六人格","catalogue","persona-text-button",false,` aria-expanded="${state.catalogueOpen}"`)}
-      ${button("重新测试","retest","persona-text-button",state.saving||state.sharing)}
+    <section class="persona-result-panel" id="persona-panel-${state.resultTab}" role="tabpanel" aria-labelledby="persona-tab-${state.resultTab}" tabindex="0">${report}</section>
+    <div class="persona-result-dock">
+      <button type="button" class="persona-dock-catalogue" data-action="catalogue" aria-controls="persona-catalogue" aria-expanded="${state.catalogueOpen}">
+        <span>${state.catalogueOpen?"收起十六人格":"看看全部十六人格"}</span>${img("/assets/chevron-left.svg","persona-dock-chevron"+(state.catalogueOpen?" is-expanded":""))}
+      </button>
+      <button type="button" class="persona-dock-retest" data-action="retest"${state.saving||state.sharing?" disabled":""}>
+        ${img("/assets/home-refresh.svg","persona-dock-refresh")}<span>重新测试</span>
+      </button>
     </div>`;
   }
   const shareLink=shared=>location.origin+"/personality?share="+shared.id;
@@ -140,7 +140,7 @@
     const scrollToTop=previous&&(state.mode!==previous.mode||state.question?.id!==previous.question?.id);
     if(poster.imageKey(state.result)!==poster.imageKey(previous?.result))imageError="";
     const focused=document.activeElement?.dataset,focusAction=focused?.action,focusId=focused?.id;
-    root.className="persona-page"+(state.mode==="quiz"?" persona-answering":"");
+    root.className="persona-page"+(state.mode==="quiz"?" persona-answering":!state.loading&&state.result&&state.mode==="result"?" persona-has-result-dock":"");
     let html=state.loading?'<p class="persona-status" role="status">正在读取你的牌桌故事…</p>':"";
     html+=message(state.error,"retry","重新载入")+(state.notice?`<div class="persona-message" role="status">${esc(state.notice)}</div>`:"")+message(state.storageError,state.mode==="quiz"?"persist":null,"重试保存进度");
     if(!state.loading&&state.mode==="intro"){
@@ -156,8 +156,8 @@
     }
     if(state.rulesOpen)html+=`<div class="persona-rules">${state.terms.map(t=>`<section class="persona-rule"><h2 class="persona-section-title">${esc(t.title)}</h2><div>${esc(t.text)}</div></section>`).join("")}</div>`;
     if(!state.loading&&state.result&&["result","shared"].includes(state.mode))html+=resultPage(state);
-    if(state.catalogueOpen)html+=`<div class="persona-catalogue">${state.catalogue.map(t=>`<div class="persona-catalogue-item">${img(t.portrait)}<div><span class="persona-small">${esc(t.roleName)}</span><div class="persona-section-title">${esc(t.title)}</div><div class="persona-small">${esc(t.description)}</div></div></div>`).join("")}</div>`;
-    if(!state.loading&&!["quiz","shared"].includes(state.mode)&&state.history.length)html+=`<section class="persona-section"><h2 class="persona-section-title">最近的测试</h2>${state.history.map(h=>`<button class="persona-history-result" type="button" data-action="history" data-id="${h.id}"${state.saving||state.sharing?" disabled":""}>${img(h.portrait)}<span>${esc(h.roleName+" · "+h.title)}<span class="persona-small">${esc(h.dateLabel)}</span></span>›</button>`).join("")}</section>`;
+    if(state.catalogueOpen)html+=`<div class="persona-catalogue" id="persona-catalogue" tabindex="-1" role="region" aria-label="全部十六人格">${state.catalogue.map(t=>`<div class="persona-catalogue-item">${img(t.portrait)}<div><span class="persona-small">${esc(t.roleName)}</span><div class="persona-section-title">${esc(t.title)}</div><div class="persona-small">${esc(t.description)}</div></div></div>`).join("")}</div>`;
+    if(!state.loading&&!["quiz","shared"].includes(state.mode)&&state.history.length)html+=`<section class="persona-section${state.mode==="result"?" persona-result-history":""}"><h2 class="persona-section-title">最近的测试</h2>${state.history.map(h=>`<button class="persona-history-result" type="button" data-action="history" data-id="${h.id}"${state.saving||state.sharing?" disabled":""}>${img(h.portrait)}<span>${esc(h.roleName+" · "+h.title)}<span class="persona-small">${esc(h.dateLabel)}</span></span><span aria-hidden="true">›</span></button>`).join("")}</section>`;
     root.innerHTML=html;
     if(scrollToTop){window.scrollTo(0,0);root.querySelector("h1")?.focus({preventScroll:true});}
     else if(focusAction){[...root.querySelectorAll("[data-action]")].find(e=>e.dataset.action===focusAction&&e.dataset.id===focusId)?.focus({preventScroll:true});}
@@ -165,6 +165,43 @@
   }
   const session=window.shadowtablePersonalityFlow.create({storage,credential,login,request:fetchJSON,publicRequest:path=>fetchJSON(path,"GET",undefined,true),requestId:()=>"personality_"+crypto.randomUUID(),onChange:render});
   function announce(text){clearTimeout(announcementTimer);announcement.textContent=text;announcementTimer=setTimeout(()=>{announcement.textContent="";},4000);}
+  async function copyShareLink(pendingShare,currentLink){
+    const clipboard=navigator.clipboard;
+    if(!clipboard)return false;
+    if(clipboard.write&&typeof ClipboardItem==="function"){
+      // Start the write in the click handler, then resolve the clipboard item with the URL.
+      const content=pendingShare.then(shared=>{
+        const link=currentLink(shared);
+        if(!link)throw new Error("分享链接尚未生成");
+        return new Blob([link],{type:"text/plain"});
+      });
+      content.catch(()=>{});
+      try{
+        await clipboard.write([new ClipboardItem({"text/plain":content})]);
+        return true;
+      }catch{}
+    }
+    const link=currentLink(await pendingShare);
+    if(!link||!clipboard.writeText)return false;
+    try{await clipboard.writeText(link);return true;}
+    catch{return false;}
+  }
+  async function shareResult(){
+    const pendingShare=session.share();
+    const currentLink=shared=>shared&&pageAlive&&ui.mode==="result"&&ui.shared?.id===shared.id?shareLink(shared):"";
+    const copied=await copyShareLink(pendingShare,currentLink);
+    const shared=await pendingShare;
+    if(!currentLink(shared))return;
+    const fallback=copied?"":shared.id;
+    if(fallback!==manualShareId){manualShareId=fallback;render(ui);}
+    if(copied)announce("分享链接已复制");
+    else{
+      const input=root.querySelector(".persona-share-link");
+      input.focus();
+      input.select();
+      announce("请复制已选中的分享链接");
+    }
+  }
   async function imageDownload(){
     if(imageBusy||!ui.result)return;
     const view=ui.result, imageKey=poster.imageKey(view);
@@ -190,12 +227,23 @@
     }catch(error){if(currentImage())imageError=error.message;}
     finally{imageBusy=false;if(pageAlive)render(ui);}
   }
-  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.toggle("rulesOpen"),details:()=>session.toggle("detailsOpen"),catalogue:()=>session.toggle("catalogueOpen"),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
-    retest:()=>document.getElementById("persona-retest").showModal(),
+  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.toggle("rulesOpen"),details:()=>session.toggle("detailsOpen"),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
+    catalogue:()=>{
+      session.toggle("catalogueOpen");
+      const catalogue=root.querySelector("#persona-catalogue");
+      if(catalogue){
+        catalogue.focus({preventScroll:true});
+        catalogue.scrollIntoView();
+      }
+    },
+    retest:()=>{
+      const dialog=document.getElementById("persona-retest");
+      dialog.returnValue="";
+      dialog.showModal();
+    },
     mine:async()=>{options={};history.replaceState(null,"","/personality");await session.load();if(!ui.error)session.start();},
     resultTab:el=>session.selectTab(el.dataset.id),
-    share:async()=>{if(await session.share())root.querySelector(".persona-share-panel input")?.focus({preventScroll:true});},
-    copy:async()=>{if(!ui.shared)return;try{await navigator.clipboard.writeText(shareLink(ui.shared));announce("分享链接已复制");}catch{root.querySelector(".persona-share-panel input")?.select();announce("请复制已选中的分享链接");}},
+    share:shareResult,
     image:imageDownload,
   };
   root.addEventListener("click",event=>{const el=event.target.closest("[data-action]");if(el&&!el.disabled)Promise.resolve(actions[el.dataset.action]?.(el)).catch(error=>announce(error.message));});

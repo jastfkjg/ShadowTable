@@ -1,7 +1,9 @@
 .personality-web { margin:0; background:#101c24; color:#f2eee5; --bg:#101c24; --surface:#1b2b35; --text:#f2eee5; --muted:#b1bfc6; --accent:#e5c68b; --border:#536570; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
 .personality-web button { font-family:inherit; cursor:pointer; }
+html:has(.persona-has-result-dock) { scroll-padding:76px 0 calc(85px + env(safe-area-inset-bottom)); }
 .persona-page a { color:var(--accent); }
 .persona-page button:disabled { cursor:default; opacity:.5; }
+.persona-result-tabs button:active,.persona-dock-retest:not(:disabled):active { opacity:.8; }
 .persona-web-nav { position:sticky; top:0; z-index:100; height:64px; display:flex; align-items:center; justify-content:center; border-bottom:1px solid #30404a; background:#101c24; font-size:17px; font-weight:600; }
 .persona-web-nav>a { position:absolute; left:16px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; }
 .persona-web-nav img { width:22px; height:22px; }
@@ -14,7 +16,7 @@
 .persona-page .persona-options button { white-space:normal; }
 .persona-page .persona-option-copy { display:block; }
 .persona-page .persona-history-result { justify-content:flex-start; }
-.persona-page .persona-history-result>span { flex:1; }
+.persona-page .persona-history-result>span:first-of-type { flex:1; min-width:0; }
 .persona-page .persona-history-result .persona-small { margin-top:4px; }
 .persona-page .persona-intro-title span,.persona-page .persona-intro-copy span { display:block; }
 .persona-page .persona-facts>div { flex:1; font-size:12px; color:var(--muted); }
@@ -24,13 +26,13 @@
 .persona-page .persona-axis-labels>span:last-child { text-align:right; }
 .persona-page .persona-secondary-roles>div { flex:1; display:flex; flex-direction:column; align-items:center; font-size:14px; }
 .persona-page .persona-secondary-roles img { width:90px; height:90px; }
-.persona-page .persona-tip>span { display:block; font-size:12px; color:var(--accent); margin-bottom:8px; }
 .persona-page .persona-catalogue-item img { width:82px; height:82px; flex-shrink:0; }
 .persona-page .persona-history-result img { width:48px; height:48px; flex-shrink:0; }
 .persona-page .persona-disclosure>span:last-child { color:var(--accent); font-size:13px; flex-shrink:0; }
-.persona-page .persona-share-panel input { box-sizing:border-box; width:100%; color:var(--text); background:#101c24; border:1px solid #536570; border-radius:8px; padding:12px; margin:12px 0; font:inherit; }
+.persona-share-link { width:100%; color:var(--text); background:#101c24; border:1px solid #536570; border-radius:8px; padding:12px; margin-top:12px; font:inherit; }
 #persona-announcement { position:fixed; left:20px; right:20px; bottom:20px; pointer-events:none; text-align:center; z-index:200; }
 #persona-announcement:not(:empty) { max-width:480px; margin:auto; padding:12px; border-radius:12px; background:#e5c68b; color:#17232a; }
+.persona-has-result-dock~#persona-announcement { bottom:calc(86px + env(safe-area-inset-bottom)); }
 #persona-retest { max-width:360px; width:calc(100% - 64px); padding:24px; background:#1b2b35; color:#f2eee5; border:1px solid #536570; border-radius:20px; }
 #persona-retest::backdrop { background:rgba(0,0,0,.65); }
 #persona-retest h2 { font-size:20px; margin:0 0 16px; }

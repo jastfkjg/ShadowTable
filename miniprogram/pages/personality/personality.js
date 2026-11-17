@@ -5,8 +5,14 @@ const poster = require("./poster");
 const dialog = require("../../dialog");
 const { backToMe } = require("../../profile");
 const { isSinglePage } = require("../../records-share");
+const pagePath="/pages/personality/personality";
+function shareContent(shared) {
+  return shared
+    ? {title:"我是"+shared.view.title+"，你是哪种阿瓦隆人格？",path:pagePath+"?share="+shared.id,imageUrl:shared.view.portrait||"/assets/roles/merlin.png"}
+    : {title:"探索你的阿瓦隆人格",path:pagePath,imageUrl:"/assets/roles/merlin.png"};
+}
 Page({
-  data:{mode:"intro",loading:true,result:null,error:"",singlePage:false,imagePath:"",rendering:false,imageError:"",albumDenied:false,sharePanel:false},
+  data:{mode:"intro",loading:true,result:null,error:"",singlePage:false,imagePath:"",rendering:false,imageError:"",albumDenied:false},
   onLoad(options={}) {
     this.alive=true;this.options=options;const singlePage=isSinglePage();
     this.lastCredential=singlePage?"":wx.getStorageSync("session")||"";
@@ -20,12 +26,12 @@ Page({
       onChange:state=>{
         if(!this.alive)return;
         const changedQuestion=state.question?.id!==this.data.question?.id,changedMode=state.mode!==this.data.mode;
+        const catalogueOpened=state.catalogueOpen&&!this.data.catalogueOpen;
         const posterChanged=poster.imageKey(state.result)!==poster.imageKey(this.data.result);
         if(posterChanged)this.imageEpoch=(this.imageEpoch||0)+1;
         this.setData({...state,
           ...(posterChanged?{imagePath:"",imageError:"",albumDenied:false}:{}),
-          ...(!state.shared||changedMode?{sharePanel:false}:{}),
-        });
+        },catalogueOpened?()=>this.revealCatalogue():undefined);
         if(changedQuestion||changedMode)wx.pageScrollTo?.({scrollTop:0,duration:0});
         const shareMenu=!this.data.singlePage && state.mode!=="quiz" && (state.mode!=="result" || !!state.shared);
         if(shareMenu!==this.shareMenu && !this.data.singlePage){
@@ -55,6 +61,17 @@ Page({
   selectResultTab(event){this.flow.selectTab(event.currentTarget.dataset.tab);},
   details(){this.flow.toggle("detailsOpen");},
   catalogue(){this.flow.toggle("catalogueOpen");},
+  revealCatalogue(){
+    if(!this.alive||!this.data.catalogueOpen)return;
+    const query=wx.createSelectorQuery();
+    query.select("#persona-nav").boundingClientRect();
+    query.select("#persona-catalogue").boundingClientRect();
+    query.selectViewport().scrollOffset();
+    query.exec(([nav,catalogue,viewport])=>{
+      if(this.alive&&this.data.catalogueOpen&&catalogue&&viewport)
+        wx.pageScrollTo({scrollTop:Math.max(0,viewport.scrollTop+catalogue.top-(nav?.height||0)-12),duration:0});
+    });
+  },
   retrySave(){return this.flow.save();},
   retryLocalSave(){this.flow.persist();},
   openHistory(event){return this.flow.openResult(event.currentTarget.dataset.id);},
@@ -71,10 +88,6 @@ Page({
   back(){
     if(this.data.mode==="quiz"){this.flow.persist();this.flow.intro();return;}
     return backToMe();
-  },
-  async prepareShare(){
-    const shared=await this.flow.share();
-    if(shared&&this.alive)this.setData({sharePanel:true});
   },
   async saveImage(){
     if(!this.alive||!this.data.result||this.data.singlePage||this.data.rendering)return;
@@ -103,9 +116,21 @@ Page({
     }});
   },
   albumSettings(){wx.openSetting({success:r=>{if(this.alive&&r.authSetting?.["scope.writePhotosAlbum"])this.setData({albumDenied:false,imageError:"权限已开启，请再次保存图片。"});}});},
-  onShareAppMessage(){
-    const shared=this.data.shared;
-    return {title:shared?"我是"+shared.view.title+"，你是哪种阿瓦隆人格？":"探索你的阿瓦隆人格",path:"/pages/personality/personality"+(shared?"?share="+shared.id:""),imageUrl:shared?.view.portrait||"/assets/roles/merlin.png"};
+  onShareAppMessage(event){
+    const {shared,mode,singlePage}=this.data;
+    const content=shareContent(shared);
+    if(shared||mode!=="result"||singlePage||event?.from!=="button")return content;
+    const started=Date.now();
+    return {...content,promise:this.flow.share().then(result=>{
+      if(!result||!this.alive)return content;
+      // The native share sheet may have used its default card on a slow connection.
+      if(Date.now()-started>=3000)wx.showToast?.({title:"结果已就绪，请再点一次分享",icon:"none"});
+      return shareContent(result);
+    })};
   },
-  onShareTimeline(){const content=this.onShareAppMessage();return {title:content.title,query:this.data.shared?"share="+this.data.shared.id:"",imageUrl:content.imageUrl};},
+  onShareTimeline(){
+    const shared=this.data.shared;
+    const {title,imageUrl}=shareContent(shared);
+    return {title,query:shared?"share="+shared.id:"",imageUrl};
+  },
 });
