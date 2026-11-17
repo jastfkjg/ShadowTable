@@ -1981,7 +1981,7 @@ test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应�
     const group=c.viewLeaderboard();html+=group;
     assert.equal((group.match(/data-action="funRankPreview"/g)||[]).length,category==='all'?options.length:options.filter(item=>item.category===category).length);
   }
-  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 23 项/);
+  assert.match(html,/绝对防御，蓝守卫／魔术师，成功保护友方的次数/);assert.match(html,/职业杀手，刀客／骑士／猎人等，成功击杀对方的次数/);assert.match(html,/共 46 项/);
   assert.match(html,/金牌替身，非梅林好人，作为非梅林好人，最终刀落到本人身上的次数/);
   assert.doesNotMatch(html,/查看不同角色的高光|次数榜至少|次机会参与排名|fun-option-description/);
   c.ACTIONS.rankToggleMetrics();
@@ -2330,17 +2330,17 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.match(c.viewMe(),/data-page="badges"/); assert.doesNotMatch(c.viewMe(),/toggleBadgeManager/);
   await c.applyRoute('#/badges');
   assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,31);
-  assert.match(c.viewBadgeManager(),/已拥有 1 \/ 31/);assert.match(c.viewBadgeManager(),/金牌替身/);
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length);
+  assert.ok(c.viewBadgeManager().includes('已拥有 1 / ' + catalogue.length));assert.match(c.viewBadgeManager(),/金牌替身/);
   assert.match(c.viewBadgeManager(),/data-action="badgeRules" aria-label="荣誉徽章规则"><img[^>]+\/><\/button>/);
   c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
   c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
-  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,30);
-  c.ACTIONS.showBadgeDetail({dataset:{id:'reverse_guard'}});
+  assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length - 1);
+  c.ACTIONS.showBadgeDetail({dataset:{id:'merlin_bust_exit'}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
-  assert.match(detail,/首席护卫/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
-  assert.match(detail,/\/assets\/badges\/reverse_guard\.png/);
+  assert.match(detail,/炸飞梅林/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
+  assert.match(detail,/\/assets\/badges\/merlin_bust_exit\.png/);
   c.ACTIONS.closeBadgeDetail(); assert.equal(c.state.selectedBadgeId,'');
 });
 
@@ -2587,8 +2587,8 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   let reads = 0;
   const c = client(async () => { reads++; return response(fixture); });
   await c.applyRoute('#/stats?tab=fun');
-  assert.match(c.viewStats(), /全部 26/);
-  assert.match(c.viewStats(), /首席护卫.*最强独狼/);
+  assert.match(c.viewStats(), /全部 49/);
+  assert.match(c.viewStats(), /首席护卫.*最强独狼.*灯下黑梅林.*阵营摇摆王/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   let html = c.viewStats();
   assert.match(html, /data-metric="knife_ally"/);
@@ -2598,7 +2598,7 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   c.state.stats = { ...c.state.stats, fun: { cards: [] } };
   assert.match(c.viewStats(), /还没有累计次数的记录/);
   c.ACTIONS.filterFun({ dataset: { filter: 'all' } });
-  assert.match(c.viewStats(), /全部 23.*最强派西.*暂无相关记录.*暂无该身份记录/);
+  assert.match(c.viewStats(), /全部 46.*最强派西.*暂无相关记录.*暂无该身份记录/);
   assert.doesNotMatch(c.viewStats(), /data-action="funRecords"/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   c.state.stats = { ...c.state.stats, fun: { cards: [{ id: 'knights:survival', metrics: [{ id: 'survival_revive', mode: 'knights', count: 0, value: null, byRole: [] }] }] } };

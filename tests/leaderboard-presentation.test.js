@@ -49,7 +49,8 @@ test('所有可选趣味指标仅出现一次，反向记录均可访问', () =>
   assert.equal(new Set(options.map(item=>item.key)).size,options.length);
   for(const key of ['fun_percival_bust','fun_merlin_hit','fun_assassin_miss','fun_defense_enemy','fun_kill_ally'])assert.ok(options.some(item=>item.key===key));
   assert.ok(options.every(item=>['good','evil','other'].includes(item.category)));
-  assert.equal(options.length,23);
+  assert.equal(options.length,46);
+  assert.equal(options.find(item => item.key === 'fun_lancelot_double_agent').roleLabel, '红／蓝兰斯洛特');
   const standin=options.find(item=>item.key==='fun_good_shield');
   assert.equal(standin.title,'金牌替身');assert.equal(standin.category,'good');
   assert.equal(standin.roleLabel,'非梅林好人');assert.match(standin.conditionLabel,/最终刀落到本人/);
