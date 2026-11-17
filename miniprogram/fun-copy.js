@@ -27,7 +27,30 @@
     morgana_with_percival: ["梅林二号", "evil", "同一局以莫甘娜身份与真正的派西维尔一起参加了至少两次已结算的任务。"],
     mordred_last_bust: ["深藏不露", "evil", "三次任务失败时，莫德雷德在第三次失败的任务中是车上唯一红方。"],
     oberon_two_busts: ["最强独狼", "evil", "同一局以奥伯伦身份亲手在两次任务里提交失败牌，且两次任务均失败。"],
-  }).map(([id, [title, category, description]]) => [id, { title, category, description, countOnly: true }]));
+    merlin_all_rides: ["灯下黑梅林", "good", "蓝方完成三次成功任务并获胜，梅林每趟任务都上车且未被刺中。"],
+    merlin_skip_decider: ["影帝梅林", "good", "梅林未参加决定第三次任务成功或失败的任务，蓝方最终获胜。"],
+    merlin_bust_exit: ["炸飞梅林", "good", "梅林参加过失败任务，之后至少还有一趟任务且本人再未上车，蓝方最终获胜。"],
+    percival_merlin_streak: ["孤注一掷", "good", "派西维尔在场，连续三趟已结算任务均有梅林上车，蓝方最终获胜。"],
+    percival_morgana_streak: ["压错宝", "good", "派西维尔在场，连续三趟已结算任务均有莫甘娜上车，刺杀结果不影响计数。"],
+    percival_assassinated: ["化身梅派", "good", "最终刺杀的目标是派西维尔，蓝方最终获胜。"],
+    servant_green_only: ["金牌乘客", "good", "忠臣至少上过一趟成功任务，没上过失败任务，且蓝方完成三次成功任务；刺杀结果不影响计数。"],
+    servant_all_with_bust: ["定蓝机", "good", "忠臣参加每趟任务且至少经历一次任务失败，蓝方完成三次成功任务；刺杀结果不影响计数。"],
+    servant_bench_three_green: ["与世无争", "good", "忠臣全局未参加任务，蓝方完成三次成功任务；刺杀结果不影响计数。"],
+    reverse_wrong_side: ["占错队", "evil", "被逆仆刀命中转红后，红方最终选错刺杀目标，蓝方获胜。"],
+    mordred_three_rides: ["影帝大莫", "evil", "莫德雷德参加至少三趟任务，任务及刺杀结果不影响计数。"],
+    mordred_bench_win: ["车底大莫", "evil", "莫德雷德全局未参加任务，红方最终获胜。"],
+    mordred_decider_only: ["最后王牌", "evil", "莫德雷德只在决胜任务上车，该任务失败并为红方带来三次任务失败的胜利。"],
+    morgana_three_rides: ["倒钩王者", "evil", "莫甘娜参加至少三趟任务，任务及刺杀结果不影响计数。"],
+    morgana_no_rides: ["新手演员", "evil", "莫甘娜全局未参加任务，刺杀结果不影响计数。"],
+    assassin_oberon_double: ["勇敢炮灰", "evil", "刺客与奥伯伦同车，且该任务收到至少两张失败牌；刺杀结果不影响计数。"],
+    oberon_solo_bust: ["孤儿狼", "evil", "奥伯伦是车上唯一红方，亲手提交失败牌并使任务失败；刺杀结果不影响计数。"],
+    oberon_bench_win: ["队友勿cue", "evil", "奥伯伦全局未参加任务，红方最终获胜。"],
+    oberon_double_bust: ["双炸艺术家", "evil", "奥伯伦与另一名红方同车，且该任务收到至少两张失败牌；刺杀结果不影响计数。"],
+    lancelot_red_redemption: ["浪子回头", "evil", "红兰斯洛特转蓝后上车并亲手提交成功牌，最终随蓝方获胜。", "红兰斯洛特"],
+    lancelot_blue_betrayal: ["反水大师", "good", "蓝兰斯洛特转红后在决胜任务上车并亲手提交失败牌，最终随红方获胜。", "蓝兰斯洛特"],
+    lancelot_double_agent: ["双面间谍", "other", "同一局至少两次阵营转换，最终随当前阵营获胜。红蓝兰斯洛特合并统计。", "红／蓝兰斯洛特"],
+    lancelot_switch_win: ["阵营摇摆王", "other", "同一局至少一次阵营转换，最终随当前阵营获胜。红蓝兰斯洛特合并统计。", "红／蓝兰斯洛特"],
+  }).map(([id, [title, category, description, roleLabel]]) => [id, { title, category, description, roleLabel, countOnly: true }]));
   const honors = {
     survival_revive: { title: "我在阿瓦隆玩重生", description: "十二骑士中实际复活的次数，包含刀、决斗、猎人、魔术师换号、女巫替死及铠甲等导致的复活", countOnly: true },
     survival_knifed: { title: "全民公敌", description: "十二骑士中承受轮内刀和最终刀的次数，按换号及替死后的实际承受者统计；无论是否生效或复活都计入，不含枪和决斗", countOnly: true },
@@ -64,7 +87,7 @@
   const recordDetails = { ...honors, ...roleRecords };
   for (const [id, honor] of Object.entries(recordDetails)) {
     const group = id.split("_")[0];
-    honor.roleLabel = identities[group] || titles[group];
+    honor.roleLabel ||= identities[group] || titles[group];
     honor.roleDetail = id.startsWith("kill_") ? killIdentities : honor.roleLabel;
     honor.conditionLabel = conditions[id] || honor.description;
   }
@@ -178,7 +201,7 @@
     if (!tile.honorTitle) content += '的次数，按完整技能环节的实际记录累计；缺失过程不按零次计算。';
     if (tile.id === 'percival_green') content = '初始身份为派西维尔，三蓝后仍有梅林在场，且最终刀未刺中梅林的局数。';
     if (tile.id === 'percival_bust') content = '初始身份为派西维尔，三红或最终刀刺中梅林的局数。提前盘刀刺中也计入，一局最多一次。';
-    if (tile.id.startsWith('assassin_')) content += '空刀不计入刺客的次数和比例。';
+    if (['assassin_hit', 'assassin_miss'].includes(tile.id)) content += '空刀不计入刺客的次数和比例。';
     if (tile.id.startsWith('defense_')) content += '守卫需实际挡下伤害；魔术师需通过换号让原目标避开伤害。比例按实际保护总次数计算。';
     if (tile.id.startsWith('kill_')) content += '合并轮内刀、枪、决斗造成的实际出局，按技能发生时的阵营和实际承受者统计；最终刺杀单独记录。';
     const mode=modeLabels[tile.mode],rules=[];
@@ -243,7 +266,8 @@
     const types = [...new Set((value.metrics || []).map(row => row.id.split("_")[0])
       .filter(type => ["knife", "gun", "duel"].includes(type)))];
     const events = (value.events || []).map(event => ({ ...event,
-      label: legacyLabel(event.label, event.kind || event.type || (types.length === 1 ? types[0] : "")),
+      label: roleRecords[String(event.id ?? "").replace(/^final-/, "")]?.title ||
+        legacyLabel(event.label, event.kind || event.type || (types.length === 1 ? types[0] : "")),
       ...(typeof event.detail === "string" ? { detail: event.detail.replace(/(\d+号)非梅林好人/g, "$1") } : {}) }));
     return { ...value, eventGroups: groupEvents(events),
       hasEffectiveHighlights: (value.highlights || []).some(row =>

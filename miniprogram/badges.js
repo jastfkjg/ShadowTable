@@ -27,7 +27,7 @@
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
   const MAX_EQUIPPED = 3;
-  const usesServerArt = badge => !!(badge.permanent || Object.hasOwn(copy.roleRecords, badge.id));
+  const usesServerArt = badge => !!(badge.permanent || badge.id === 'good_shield' || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',

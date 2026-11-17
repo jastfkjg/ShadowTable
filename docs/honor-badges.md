@@ -2,7 +2,7 @@
 
 ## 2026年10月内测纪念
 
-五枚永久徽章与 26 枚月榜徽章一起展示在「荣誉收藏」中：
+五枚永久徽章与 49 枚月榜徽章一起展示在「荣誉收藏」中：
 
 | 徽章 | 资格 |
 | --- | --- |
@@ -26,9 +26,9 @@
 
 ## 月榜徽章
 
-小程序和网页版共用 26 枚暗金纹章。`miniprogram/badges.js` 收录 23 个趣味称号，以及积分榜「积分王者」、场次榜「牌桌常青树」、总胜率榜「常胜将军」。图案均使用内置 ImageGen 制作的 192px 透明 PNG，沿用古金浮雕、月桂边框和素金扣。两端徽章页和预览画廊的总数从目录读取。
+小程序和网页版共用 49 枚暗金纹章。`miniprogram/badges.js` 收录 46 个趣味称号，以及积分榜「积分王者」、场次榜「牌桌常青树」、总胜率榜「常胜将军」。图案均使用内置 ImageGen 制作的 192px 透明 PNG，沿用古金浮雕、月桂边框和素金扣。两端徽章页和预览画廊的总数从目录读取。
 
-八枚角色月榜徽章使用确认的候选图。小程序和网页版从服务端同源路径读取这些图案，正式资源位于 `server/web/assets/`。
+31 枚角色月榜徽章使用确认的候选图。小程序和网页版从服务端同源路径读取这些图案，正式资源位于 `server/web/assets/`。
 
 | 称号 | 选稿 | 资源 |
 | --- | --- | --- |
@@ -40,8 +40,31 @@
 | 梅林二号 | B · 双帽对照 | `morgana_with_percival.png` |
 | 深藏不露 | B · 斗篷藏牌 | `mordred_last_bust.png` |
 | 最强独狼 | A · 狼首双星 | `oberon_two_busts.png` |
+| 灯下黑梅林 | B | `merlin_all_rides.png` |
+| 影帝梅林 | B | `merlin_skip_decider.png` |
+| 炸飞梅林 | C | `merlin_bust_exit.png` |
+| 孤注一掷 | A | `percival_merlin_streak.png` |
+| 压错宝 | A | `percival_morgana_streak.png` |
+| 化身梅派 | E | `percival_assassinated.png` |
+| 金牌乘客 | B | `servant_green_only.png` |
+| 定蓝机 | E | `servant_all_with_bust.png` |
+| 与世无争 | B | `servant_bench_three_green.png` |
+| 占错队 | A | `reverse_wrong_side.png` |
+| 影帝大莫 | A | `mordred_three_rides.png` |
+| 车底大莫 | B | `mordred_bench_win.png` |
+| 最后王牌 | B | `mordred_decider_only.png` |
+| 倒钩王者 | B | `morgana_three_rides.png` |
+| 新手演员 | E | `morgana_no_rides.png` |
+| 勇敢炮灰 | D | `assassin_oberon_double.png` |
+| 孤儿狼 | B | `oberon_solo_bust.png` |
+| 队友勿cue | A | `oberon_bench_win.png` |
+| 双炸艺术家 | E | `oberon_double_bust.png` |
+| 浪子回头 | A | `lancelot_red_redemption.png` |
+| 反水大师 | B | `lancelot_blue_betrayal.png` |
+| 双面间谍 | A | `lancelot_double_agent.png` |
+| 阵营摇摆王 | A | `lancelot_switch_win.png` |
 
-「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。使用现有历史投影，无需数据迁移。徽章同样由本月公开次数榜榜首持有，成功率榜不授予。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底；不使用防御称号的盾牌。客户端资源为 `miniprogram/assets/badges/good_shield.png`，原图保存在 `output/imagegen/badges/good_shield.png`；制作记录见 [金牌替身图案](good-shield-artwork.md)。
+「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。徽章由本月公开次数榜榜首持有。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底。小程序和网页版从同源服务端读取 `server/web/assets/good_shield.png`。[金牌替身图案](good-shield-artwork.md)
 
 ## 资格
 

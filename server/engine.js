@@ -287,7 +287,14 @@ function archiveResult(room) {
     ...(scoring.isReverseBoard(room) ? { reverseStrike: room.reverseStrike || null } : {}),
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
-    funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
+    funFacts: room.fun ? {
+      ...room.fun, attacksComplete: true,
+      questsComplete: !room.flexible && room.fun.events.filter(event => event.kind === "quest").length === room.quests.length,
+      ...(room.lancelot ? {
+        lancelotConversions: Object.fromEntries(Object.entries(room.lancelot.players)
+          .map(([uid, state]) => [uid, state.identityRevision])),
+      } : {}),
+    } : null,
     ...(replay.supported(room.board) ? { replay: replay.snapshot(room) } : {}),
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
