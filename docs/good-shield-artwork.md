@@ -1,6 +1,6 @@
 # 金牌替身徽章图案
 
-使用内置 `imagegen` 制作，透明背景。以已有 `output/imagegen/badges/defense_ally.png` 为风格和边框参考，中心改为金色替身面具迎住刺客匕首。原图为 `output/imagegen/badges/good_shield.png`；生产资源为 `miniprogram/assets/badges/good_shield.png`，192 × 192 透明 PNG，沿用现有徽章的压缩规格。
+使用内置 `imagegen` 制作，透明背景。以已有 `output/imagegen/badges/defense_ally.png` 为风格和边框参考，中心改为金色替身面具迎住刺客匕首。原图为 `output/imagegen/badges/good_shield.png`。192 × 192 透明 PNG 生产资源位于 `server/web/assets/good_shield.png`，由服务端提供。
 
 最终生成提示词：
 

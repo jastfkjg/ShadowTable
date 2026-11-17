@@ -186,7 +186,7 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
     const homepage = await fetch(origin);
     assert.match(homepage.headers.get('content-type'), /^application\/json/);
     await homepage.arrayBuffer();
-    await Promise.all(roleIds.map(async id => {
+    await Promise.all([...roleIds, 'good_shield'].map(async id => {
       const image = await fetch(origin + '/assets/badges/' + id + '.png');
       assert.equal(image.status, 200, id);
       assert.equal(image.headers.get('content-type'), 'image/png', id);

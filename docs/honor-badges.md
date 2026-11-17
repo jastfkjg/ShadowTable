@@ -64,7 +64,7 @@
 | 双面间谍 | A | `lancelot_double_agent.png` |
 | 阵营摇摆王 | A | `lancelot_switch_win.png` |
 
-「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。使用现有历史投影，无需数据迁移。徽章同样由本月公开次数榜榜首持有，成功率榜不授予。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底；不使用防御称号的盾牌。客户端资源为 `miniprogram/assets/badges/good_shield.png`，原图保存在 `output/imagegen/badges/good_shield.png`；制作记录见 [金牌替身图案](good-shield-artwork.md)。
+「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。徽章由本月公开次数榜榜首持有。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底。小程序和网页版从同源服务端读取 `server/web/assets/good_shield.png`。[金牌替身图案](good-shield-artwork.md)
 
 ## 资格
 
