@@ -44,6 +44,7 @@
       asOfLabel: displayTime(report.asOf), versionLabel: "V" + report.version,
       canShare: report.overview.games > 0,
       rules: ["按北京时间自然月和对局结束时间统计。概览包含所有有效参赛记录，榜单仅展示已公开的微信、开发账号。",
+        ...(report.minPlayers ? ["月报榜单只统计 " + report.minPlayers + " 人及以上的有效对局。"] : []),
         "活跃天数按有有效对局结算的自然日去重；同一对局和同一玩家分别去重统计。",
         "积分含本月有效计分局及本月积分调整，至少一场计分局才参与。总胜率和阵营胜率荣誉均至少 10 局；现有排行榜门槛保持原规则。",
         "趣味次数榜至少一条对应记录，比例榜至少 5 次有效机会；缺失记录不当作零次。",

@@ -150,16 +150,17 @@ test('陪测只保留同桌上下文，真实玩家可更正陪测目标，重�
 test('终止、不计战绩及身份不完整仍排除，陪测房间保留真实玩家统计，陪测身份不归档', () => {
   const store = new Store(':memory:');
   try {
-    let r = deal(); finish(store, r, null);
-    r = deal(); run(r, 'terminate'); store.save(r);
+    const rankedGame = () => deal("classic-court", 10);
+    let r = rankedGame(); finish(store, r, null);
+    r = rankedGame(); run(r, 'terminate'); store.save(r);
     assert.equal(store.statsFor('wx:1').winRate, null);
-    r = deal(); r.testRoom = true; r.roles['wx:1']='merlin'; finish(store, r);
+    r = rankedGame(); r.testRoom = true; r.roles['wx:1']='merlin'; finish(store, r);
     for (const prefix of ['dev:', 'test:']) {
-      r = deal(); r.players[1].uid = prefix+'tester'; r.roles[prefix+'tester'] = 'assassin';
+      r = rankedGame(); r.players[1].uid = prefix+'tester'; r.roles[prefix+'tester'] = 'assassin';
       r.roles['wx:1']='merlin'; finish(store, r, 'evil');
       assert.equal(store.statsFor(prefix+'tester').wins,prefix==='test:' ? 0 : 1);
     }
-    r = deal(); r.testRoom=true; delete r.roles['wx:2']; finish(store,r);
+    r = rankedGame(); r.testRoom=true; delete r.roles['wx:2']; finish(store,r);
     const stats = store.statsFor('wx:1');
     assert.equal(stats.total, 3);
     assert.equal(stats.winRate, 33.3);
@@ -181,7 +182,7 @@ test('旧陪测归档启动时补算，保留未判胜负和身份不完整局�
   try {
     const legacy=[];
     for (const kind of ['win','loss','none','unknown']) {
-      const r=deal();r.testRoom=true;r.roles['wx:1']='merlin';
+      const r=deal('classic-court',10);r.testRoom=true;r.roles['wx:1']='merlin';
       if(kind==='unknown')delete r.roles['wx:2'];
       run(r,'finishTools',{winner:kind==='none'?null:kind==='loss'?'evil':'good',replace:true});
       r.matchRecord.excludedReason='测试局';
@@ -212,8 +213,8 @@ test('旧测试局恢复战绩时同步恢复趣味记录，已恢复胜负的�
   try {
     const rooms=[];
     for(const alreadyRestored of [false,true]) {
-      const r=deal('classic',6,'dev:');r.testRoom=true;
-      r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
+      const r=deal('classic-court',10,'dev:');r.testRoom=true;
+      r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin','servant','servant','mordred','oberon'][i]]));
       r.fun.initialRoles={...r.roles};
       run(r,'finishTools',{funReason:'assassination',funTarget:3});
       r.matchRecord.excludedReason='测试局';r.matchRecord.players.forEach(p=>p.outcome='excluded');

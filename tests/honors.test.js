@@ -5,14 +5,14 @@ const { newRoom, enter, command } = require('../server/engine');
 const honors = require('../server/honors');
 const { Leaderboard } = require('../server/leaderboard');
 function fixture(store, uids = Array.from({length:6}, (_,i) => 'wx:'+(i+1)), { scoreEnabled = false, legacy = false, endedAt } = {}) {
-  const r = newRoom('123456', uids[0], '玩家1', 'classic', 6);
+  const r = newRoom('123456', uids[0], '玩家1', uids.length >= 9 ? 'classic-court' : 'classic', uids.length);
   r.scoreEnabled = scoreEnabled;
   r.testRoom = uids.some(uid => uid.startsWith('test:'));
-  for (let i=2;i<=6;i++) enter(r,uids[i-1],'玩家'+i);
+  for (let i=2;i<=uids.length;i++) enter(r,uids[i-1],'玩家'+i);
   r.players.forEach(p=>p.ready=true);
   command(r,r.host,{type:'start',stage:r.stage,flexible:true});
   if (legacy) r.scorePolicy.awards = r.scorePolicy.awards.filter(award => !award.when.honor && !['good_loss', 'evil_loss'].includes(award.id));
-  r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
+  r.roles=Object.fromEntries(r.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin','servant','servant','mordred','oberon'][i]]));
   r.fun.initialRoles={...r.roles};
   command(r,r.host,{type:'finishTools',stage:r.stage,replace:true,
     ...(scoreEnabled ? {scoreReason:'assassination',scoreTarget:3} : {funReason:'assassination',funTarget:3})});
@@ -22,11 +22,11 @@ function fixture(store, uids = Array.from({length:6}, (_,i) => 'wx:'+(i+1)), { s
 }
 function act(s,r,uid,type,extra={}) { s.transaction(()=>honors.handle(s,s.get(r.code),uid,{type,stage:r.stage,matchId:r.matchRecord.id,...extra})); }
 function vote(s,r,i,mvp=i===2?1:2,svp=i===5?6:5) { act(s,r,'wx:'+i,'honorVote',{mvp,svp}); }
-test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结束页同步且不重复发放',()=>{
+test('六人局并列 MVP 与 SVP 各加一分，个人明细、流水和结束页同步，积分榜排除',()=>{
   const s=new Store(':memory:');
   try {
     const r=fixture(s,undefined,{scoreEnabled:true}),rank=new Leaderboard(s);
-    assert.equal(rank.read('wx:2',new URLSearchParams('metric=points')).me.points,12);
+    assert.equal(rank.read('wx:2',new URLSearchParams('metric=points')).me.points,0);
     const revision=s.scoreRevision('wx:2');
     act(s,r,r.host,'honorStart');
     vote(s,r,1,3,6);vote(s,r,2,3,5);vote(s,r,3,2,6);vote(s,r,4,2,6);vote(s,r,5,3,6);vote(s,r,6,2,5);
@@ -37,7 +37,7 @@ test('计分局并列 MVP 与 SVP 各加一分，明细、榜单、流水和结�
       assert.equal(s.get(r.code).matchRecord.players.find(p=>p.uid===uid).score.total,total);
       assert.equal(s.statsFor(uid).score.total,total);
       assert.equal(s.scoreLedger(uid).summary.total,total);
-      assert.equal(rank.read(uid,new URLSearchParams('metric=points')).me.points,total);
+      assert.equal(rank.read(uid,new URLSearchParams('metric=points')).me.status,'no_games');
     }
     assert.throws(()=>s.scoreLedger('wx:2',0,20,revision),e=>e.status===409);
     s.transaction(()=>honors.closeForRoom(s,s.get(r.code)));
@@ -150,7 +150,7 @@ test('anonymous ballots validate both outcomes and self; all submitted settles t
     assert.equal(count(),1);
     assert.equal(s.matchesFor('wx:2',0,20,false,{metric:'honor_mvp',mode:'voted'}).total,1);
     const rank=new Leaderboard(s).read('wx:2',new URLSearchParams('metric=fun_honor_mvp'));
-    assert.equal(rank.rows.length,2); assert(rank.rows.every(p=>p.rank===1 && p.tied && p.count===1));
+    assert.deepEqual(rank.rows,[]); assert.equal(rank.me.count,0);
     assert.throws(()=>new Leaderboard(s).read('wx:2',new URLSearchParams('metric=fun_honor_mvp&sort=rate')),/次数榜/);
     assert.throws(()=>vote(s,r,1),/结束/);
   } finally {s.close();}
@@ -280,9 +280,9 @@ test('微信玩家与陪测同桌获得 SVP，新规则加一分，旧规则不�
 test('companion ballots can award a human and only that human receives an honor count',()=>{
   const s=new Store(':memory:');
   try {
-    const uids=['wx:1',...Array.from({length:5},(_,i)=>'test:123456:owner:'+(i+2))];
+    const uids=['wx:1',...Array.from({length:9},(_,i)=>'test:123456:owner:'+(i+2))];
     const r=fixture(s,uids);act(s,r,r.host,'honorStart');
-    for(let i=0;i<6;i++)act(s,r,uids[i],'honorVote',{mvp:i===0?2:1,svp:i===4?6:5});
+    for(let i=0;i<uids.length;i++)act(s,r,uids[i],'honorVote',{mvp:i===0?2:1,svp:i===4?6:5});
     assert.equal(s.funFor('wx:1').metrics.find(p=>p.id==='honor_mvp').count,1);
     const board=new Leaderboard(s).read('wx:1',new URLSearchParams('metric=fun_honor_mvp'));
     assert.equal(board.rows.length,1);assert.equal(board.rows[0].isSelf,true);assert.equal(board.rows[0].count,1);

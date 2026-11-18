@@ -39,6 +39,7 @@
           : board.period === "month"
             ? { title: "每月 1 日 00:00 起算", lines: ["仅统计本月的有效记录。"] }
             : { title: "统计全部历史有效记录", lines: [] };
+    if (board.minPlayers) summary.lines.push("只统计 " + board.minPlayers + " 人及以上的有效对局。");
     const display = { id: "display", title: "展示范围", main: [{ text: "榜单最多展示前 " }, { text: (board.maxRows || 100) + " 位", emphasis: true }, { text: "公开玩家" }], lines: ["我的排名仍按全部上榜玩家计算。"] };
     const sections = board.fun || board.countOnly || selected?.countOnly
       ? [{ id: "calculation", title: "统计方式", main: [], lines: ruleLines.slice(1, -1).filter(Boolean) },

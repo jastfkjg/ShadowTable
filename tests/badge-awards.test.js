@@ -13,9 +13,9 @@ const { readProfile, saveProfile } = require('../server/profile');
 const presentation = require('../miniprogram/badge-awards');
 const NOW = Date.parse('2026-10-25T08:00:00Z');
 const ids = (s, uid) => readBadges(s, uid).badges.filter(b=>b.permanent).map(b=>b.id);
-function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good' } = {}) {
+function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good', capacity = 9 } = {}) {
   const id = randomUUID();
-  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt, winner, source:'manual',
+  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity, endedAt, winner, source:'manual',
     ...(testGame ? {recordPurpose:'test'} : {}), players:[{ uid,name:uid,seat:1,role:'梅林',faction:'good',outcome:winner?'win':'excluded',
       ...(scored ? {score:{status:'scored',total:points,breakdown:[]}} : {}) }] });
   return id;
@@ -25,7 +25,7 @@ test('发布冻结公开积分前三，含并列；后续得分、隐藏及重�
   const dir=mkdtempSync(join(tmpdir(),'october-awards-'));let now=NOW;let s=new Store(join(dir,'db'),{clock:()=>now});
   try {
     game(s,'wx:first',{points:9});game(s,'wx:second',{points:6});game(s,'wx:second-tie',{points:6});
-    game(s,'wx:fourth',{points:1});game(s,'wx:hidden',{points:99});hidden(s,'wx:hidden');
+    game(s,'wx:fourth',{points:1});game(s,'wx:fourth',{points:100,capacity:8});game(s,'wx:hidden',{points:99});hidden(s,'wx:hidden');
     assert.deepEqual(ids(s,'wx:first'),[]);
     awards.activate(s);
     assert.ok(ids(s,'wx:first').includes('october_2026_crown'));

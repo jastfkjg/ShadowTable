@@ -581,7 +581,7 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
       const board=await a.api("/api/leaderboard?metric="+metric+"&nearby=1",undefined,auth);
       assert.equal(board.me.status,"unsupported");assert.equal(board.me.rank,null);
       assert.equal(board.me.total,stats.total);assert.ok(board.rows.every(row=>!row.isSelf));
-      assert.equal(board.eligibleCount,1);assert.deepEqual(board.nearby,[]);
+      assert.equal(board.eligibleCount,0);assert.deepEqual(board.nearby,[]);
     }
     const funBoard=await a.api("/api/leaderboard?metric=fun_merlin_evade&nearby=1",undefined,auth);
     assert.equal(funBoard.me.status,"unsupported");assert.equal(funBoard.me.count,0);
@@ -612,7 +612,7 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
   assert.equal(a.app.store.statsFor(room.host).total,1);
   await assert.rejects(a.api("/api/me/matches",undefined,auth),e=>e.status===401);
 });
-test("测试房间的管理陪测可投 MVP/SVP，仅真人获奖进入趣味记录和排行榜", async (t) => {
+test("六人测试房间的管理陪测可投 MVP/SVP，真人获奖留在个人趣味记录", async (t) => {
   const a = await setup(t); await a.login();
   const { code, token } = await a.room(); await a.action(code, "test-on");
   const panel = new Companion({ request: (path, actorToken, data, id) =>
@@ -661,8 +661,7 @@ test("测试房间的管理陪测可投 MVP/SVP，仅真人获奖进入趣味记
   const stats = await a.api("/api/me/stats", undefined, a.auth(token));
   assert.equal(stats.fun.metrics.find(p => p.id === "honor_svp").count, 1);
   const ranking = await a.api("/api/leaderboard?metric=fun_honor_svp", undefined, a.auth(token));
-  assert.equal(ranking.rows.length, 1); assert.equal(ranking.rows[0].isSelf, true);
-  assert.equal(ranking.rows[0].count, 1);
+  assert.deepEqual(ranking.rows, []); assert.equal(ranking.me.count, 0);
   assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM match_fun_stats WHERE uid LIKE 'test:%'").get().n, 0);
   assert.doesNotMatch(JSON.stringify(result), /test:|wx:|"uid"/);
 });

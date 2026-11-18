@@ -6,12 +6,14 @@ const fail = (ok, message, status = 400) => {
   if (!ok) throw new RuleError(message, status);
 };
 const states = { active: "正常", excluded: "不计战绩", deleted: "已删除" };
+const RANK_MIN_PLAYERS = 9;
 
 function initialize(store) {
   require("./record-clearing").initialize(store);
   store.transaction(() => store.db.exec(`CREATE TABLE IF NOT EXISTS match_controls(
     match_id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('active','excluded','deleted')),
     previous_state TEXT NOT NULL DEFAULT 'active', previous_reason TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '', updated INTEGER NOT NULL);
+    DROP VIEW IF EXISTS leaderboard_match_players;
     DROP VIEW IF EXISTS visible_match_players;
     DROP VIEW IF EXISTS active_match_scores;
     DROP VIEW IF EXISTS visible_score_adjustments;
@@ -21,6 +23,9 @@ function initialize(store) {
       FROM match_players p LEFT JOIN match_controls c ON c.match_id=p.match_id
       WHERE (c.state IS NULL OR c.state<>'deleted') AND NOT EXISTS(
         SELECT 1 FROM player_record_clears x WHERE x.uid=p.uid AND x.kind='match' AND x.record_id=p.match_id);
+    CREATE VIEW leaderboard_match_players AS
+      SELECT p.* FROM visible_match_players p JOIN matches m ON m.id=p.match_id
+      WHERE CAST(json_extract(m.snapshot,'$.capacity') AS INTEGER)>=${RANK_MIN_PLAYERS};
     CREATE VIEW active_match_scores AS
       SELECT s.rowid AS rowid,s.* FROM match_scores s LEFT JOIN match_controls c ON c.match_id=s.match_id
       WHERE (c.state IS NULL OR c.state='active') AND NOT EXISTS(
@@ -334,6 +339,7 @@ function preview(store, input) {
   }
 }
 module.exports = {
+  RANK_MIN_PLAYERS,
   initialize,
   control,
   present,

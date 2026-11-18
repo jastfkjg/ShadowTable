@@ -17,7 +17,7 @@ const NOW = Date.parse('2026-10-13T08:00:00Z');
 const NEXT = Date.parse('2026-10-31T16:00:00Z');
 function game(store, uid, { endedAt = store.clock(), win = true, points = 2 } = {}) {
   const id = randomUUID();
-  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt,
+  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:9, endedAt,
     winner:'good', source:'manual', excludedReason:null,
     players:[{uid,name:'玩家',seat:1,role:'梅林',faction:'good',outcome:win?'win':'loss',score:{status:'scored',total:points,breakdown:[]}}] }));
   return id;

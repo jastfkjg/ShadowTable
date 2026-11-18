@@ -8,6 +8,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { Store } = require('../server/store');
 const { readProfile, saveProfile } = require('../server/profile');
 const { Leaderboard, periodRange } = require('../server/leaderboard');
+const { readBadges } = require('../server/badges');
 const { createApp } = require('../server/app');
 const NOW = Date.parse('2026-09-28T08:00:00Z');
 function profile(store, uid, visible = true, nickname = uid.split(':')[1]) {
@@ -15,12 +16,64 @@ function profile(store, uid, visible = true, nickname = uid.split(':')[1]) {
 }
 function games(store, uid, total, wins, { faction = 'good', endedAt = NOW - 1000, excluded = false } = {}) {
   store.transaction(() => {
-    for (let i = 0; i < total; i++) store.archiveMatch({id:randomUUID(),board:'classic',boardName:'经典',capacity:6,endedAt,
+    for (let i = 0; i < total; i++) store.archiveMatch({id:randomUUID(),board:'classic',boardName:'经典',capacity:9,endedAt,
       source:i % 2 ? 'manual' : 'system',winner:excluded ? null : 'good',excludedReason:excluded ? '未登记胜负' : null,
       players:[{uid,name:'历史昵称',role:'本人角色',faction,outcome:excluded ? 'excluded' : i < wins ? 'win' : 'loss'}]});
   });
 }
 const query = (board, uid, text = '') => board.read(uid, new URLSearchParams(text), NOW);
+test('8 人及以下历史对局不计入榜单或徽章，9 人局计入并保留个人记录', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'shadow-rank-min-players-')), path = join(dir, 'db.sqlite');
+  const uid = 'wx:me', smallOnly = 'wx:small-only';
+  let store = new Store(path, { clock: () => NOW });
+  const earlier = NOW - 86400000;
+  const archive = (uid, capacity, endedAt, points, hit) => store.archiveMatch({
+    id: randomUUID(), board: capacity === 9 ? 'classic-court' : 'classic', capacity, endedAt, winner: hit ? 'evil' : 'good',
+    honorResult: { status: 'settled', mvp: hit ? [] : [{ seat: 1, votes: 3 }], svp: hit ? [{ seat: 1, votes: 3 }] : [] },
+    funFacts: { terminal: { reason: 'assassination', target: hit ? 1 : 2, hit, merlins: [uid] }, events: [] },
+    players: [{ uid, seat: 1, roleId: 'merlin', role: '梅林', faction: 'good', outcome: hit ? 'loss' : 'win',
+      score: { status: 'scored', total: points, breakdown: [] } },
+    ...Array.from({ length: capacity - 1 }, (_, index) => ({ uid: 'test:' + index, seat: index + 2 }))],
+  });
+  try {
+    archive(uid, 9, earlier, 4, false);
+    archive(uid, 8, NOW - 1000, 100, true);
+    archive(smallOnly, 5, NOW - 1000, 150, false);
+    store.close();
+    store = new Store(path, { clock: () => NOW });
+    const board = new Leaderboard(store);
+    for (const period of ['month', 'all']) for (const metric of ['games', 'overall', 'good']) {
+      const result = query(board, uid, `metric=${metric}&period=${period}&nearby=1`);
+      assert.equal(result.minPlayers, 9);
+      assert.deepEqual(result.rows.map(row => [row.isSelf, row.total, row.wins]), [[true, 1, 1]]);
+      assert.deepEqual(result.nearby, result.rows);
+    }
+    const points = query(board, uid, 'metric=points');
+    assert.deepEqual(points.rows.map(row => [row.isSelf, row.points]), [[true, 4]]);
+    assert.equal(query(board, smallOnly, 'metric=points').me.status, 'no_games');
+    const recent = query(board, uid, 'metric=points&period=recent');
+    assert.equal(recent.periodStart, periodRange('day', earlier).start);
+    assert.equal(recent.me.points, 4);
+    for (const sort of ['count', 'rate']) {
+      const result = query(board, uid, 'metric=fun_merlin_evade&mode=classic&sort=' + sort);
+      assert.deepEqual(result.rows.map(row => [row.isSelf, row.count, row.opportunities, row.rate]), [[true, 1, 1, 100]]);
+    }
+    assert.equal(query(board, uid, 'metric=fun_honor_mvp').me.count, 1);
+    assert.equal(query(board, uid, 'metric=fun_honor_svp').me.count, 0);
+    const badges = readBadges(store, uid).badges.map(badge => badge.id);
+    for (const badge of ['points', 'games', 'overall', 'merlin_evade']) assert.ok(badges.includes(badge));
+    assert.ok(!badges.includes('merlin_hit'));
+    assert.deepEqual(readBadges(store, smallOnly).badges, []);
+    assert.equal(store.playerScore(uid).points, 104);
+    assert.equal(store.matchesFor(uid).total, 2);
+    const personal = store.funFor(uid).metrics;
+    assert.equal(personal.find(row => row.id === 'honor_svp').count, 1);
+    assert.equal(personal.find(row => row.id === 'merlin_evade').opportunities, 2);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可查看战绩', async () => {
   const app=createApp({database:':memory:',clock:()=>NOW});
   await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
@@ -74,7 +127,7 @@ test('微信、开发账号首局自动上榜，陪测和游客不参与五榜�
     const empty=query(board,'guest:viewer');
     assert.equal(empty.rows.length,0);
     for(const faction of ['good','evil']) store.transaction(()=>store.archiveMatch({
-      id:randomUUID(),board:'classic',endedAt:NOW-1000,players:uids.map(uid=>({
+      id:randomUUID(),board:'classic',capacity:9,endedAt:NOW-1000,players:uids.map(uid=>({
         uid,name:'不应公开的牌桌昵称',faction,outcome:'win',score:{status:'scored',total:3,breakdown:[]},
       })),
     }));
@@ -113,7 +166,7 @@ test('默认公开资料与战绩同事务回滚，重复归档不改变公开ID
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store), first=query(board,'wx:new');
-    const record={id:randomUUID(),board:'classic',endedAt:NOW,players:[{uid:'wx:new',faction:'good',outcome:'win'}]};
+    const record={id:randomUUID(),board:'classic',capacity:9,endedAt:NOW,players:[{uid:'wx:new',faction:'good',outcome:'win'}]};
     assert.throws(()=>store.transaction(()=>{store.archiveMatch(record);throw Error('rollback');}));
     assert.equal(store.db.prepare('SELECT count(*) AS n FROM profiles').get().n,0);
     assert.deepEqual(query(board,'wx:new'),first);
@@ -254,7 +307,7 @@ test('今日积分按北京时间半开日区间累计计分局和调整，零�
     assert.equal(new Date(start).toISOString(), '2026-09-27T16:00:00.000Z');
     assert.equal(new Date(end).toISOString(), '2026-09-28T16:00:00.000Z');
     const score = (uid, endedAt, points, outcome = 'win') => store.transaction(() => store.archiveMatch({
-      id: randomUUID(), board: 'classic', endedAt,
+      id: randomUUID(), board: 'classic', capacity: 9, endedAt,
       players: [{ uid, name: '私密昵称', faction: 'good', outcome, score: { status: 'scored', total: points, breakdown: [] } }],
     }));
     for (const [time, points, delta] of [[start - 1, 100, 30], [start, 5, 2], [end - 1, -5, -2], [end, 9, 7]]) {
@@ -296,7 +349,7 @@ test('最近积分跨月保留最后一个计分日，由首场有效计分局�
     const board = new Leaderboard(store);
     const read = (uid = 'wx:me', extra = '') => board.read(uid, new URLSearchParams('metric=points&period=recent' + extra), now);
     const score = (uid, endedAt, total, recordPurpose) => store.archiveMatch({
-      id: randomUUID(), board: 'classic', endedAt, recordPurpose,
+      id: randomUUID(), board: 'classic', capacity: 9, endedAt, recordPurpose,
       players: [{ uid, name: '玩家', faction: 'good', outcome: 'win', score: { status: 'scored', total, breakdown: [] } }],
     });
     const adjust = points => store.transaction(() => store.adjustPlayerScore({ uid: 'wx:me', mode: 'delta', points, revision: store.scoreRevision('wx:me') }));
@@ -353,7 +406,7 @@ test('附近排名基于完整同周期快照，覆盖百名之后、首尾、�
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store);
-    store.transaction(() => store.archiveMatch({id:randomUUID(),board:'classic',endedAt:NOW-1000,
+    store.transaction(() => store.archiveMatch({id:randomUUID(),board:'classic',capacity:9,endedAt:NOW-1000,
       players:Array.from({length:121},(_,i)=>({uid:'wx:near-'+i,name:'私人牌桌昵称',role:'私人角色',faction:'good',outcome:'win',
         score:{status:'scored',total:i===51?950:1000-i,breakdown:[]}}))}));
     profile(store,'wx:near-105',true,'附近本人');
@@ -406,7 +459,7 @@ test('缓存仅在提交后失效：回滚、重复归档、昵称头像及公�
     assert.equal(query(board,'wx:me').version,first.version);
     assert.throws(()=>store.transaction(()=>{saveProfile(store,'wx:me',{nickname:'不应发布',version:1,leaderboardVisible:false});throw Error('rollback');}));
     assert.equal(query(board,'wx:me').version,first.version); assert.equal(readProfile(store,'wx:me').leaderboardVisible,true);
-    const record={id:randomUUID(),board:'classic',endedAt:NOW,players:[{uid:'wx:me',faction:'evil',outcome:'win'}]};
+    const record={id:randomUUID(),board:'classic',capacity:9,endedAt:NOW,players:[{uid:'wx:me',faction:'evil',outcome:'win'}]};
     store.transaction(()=>store.archiveMatch(record)); const second=query(board,'wx:me'); assert.notEqual(second.version,first.version);
     store.transaction(()=>store.archiveMatch(record)); assert.equal(query(board,'wx:me').version,second.version);
     profile(store,'wx:me',true,'新昵称'); const renamed=query(board,'wx:me');

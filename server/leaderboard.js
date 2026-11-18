@@ -3,6 +3,7 @@ const { randomUUID } = require("node:crypto");
 const { RuleError, roleName } = require("./engine");
 const { roles: variantRoles } = require("./variants");
 const { readProfile } = require("./profile");
+const { RANK_MIN_PLAYERS } = require("./match-management");
 const fun = require("./fun");
 const eligibleRole = (def, role) => {
   if (def.countOnly) return false;
@@ -72,7 +73,7 @@ function neighbors(eligible, uid, present) {
 class Leaderboard {
   constructor(store) { this.store = store; this.cache = new Map(); }
   recentRange(now) {
-    const latest = this.store.db.prepare(`SELECT s.ended FROM visible_match_players p ${SCORED_MATCH_JOIN}
+    const latest = this.store.db.prepare(`SELECT s.ended FROM leaderboard_match_players p ${SCORED_MATCH_JOIN}
       WHERE p.outcome IN ('win','loss') AND s.ended<=? ORDER BY s.ended DESC LIMIT 1`).get(now);
     return latest ? periodRange("day", latest.ended) : { start: null, end: null };
   }
@@ -84,7 +85,7 @@ class Leaderboard {
     const aggregates = range.start === null ? [] : this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
       ${metric === "points" ? "sum(s.points) AS points," : ""}
       f.nickname, f.avatar_hash, f.public_id, f.leaderboard_visible
-      FROM visible_match_players p LEFT JOIN profiles f ON f.uid=p.uid
+      FROM leaderboard_match_players p LEFT JOIN profiles f ON f.uid=p.uid
       ${metric === "points" ? SCORED_MATCH_JOIN : ""}
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
@@ -135,7 +136,7 @@ class Leaderboard {
     return {
       metric, period, availableMetrics: Object.keys(METRICS), periodStart: snapshot.start, periodEnd: snapshot.end, timezone: "Asia/Shanghai",
       availableFunMetrics: fun.publicMetrics(),
-      threshold: METRICS[metric], eligibleCount: snapshot.eligible.length, maxRows: MAX_ROWS,
+      minPlayers: RANK_MIN_PLAYERS, threshold: METRICS[metric], eligibleCount: snapshot.eligible.length, maxRows: MAX_ROWS,
       updatedAt: snapshot.updatedAt, version: snapshot.version,
       rows: snapshot.eligible.slice(offset, Math.min(nextOffset, end)).map(present),
       ...(nearby ? { nearby: neighbors(snapshot.eligible, uid, present) } : {}),
@@ -160,7 +161,7 @@ class Leaderboard {
         count(DISTINCT CASE WHEN s.status='known' THEN s.match_id END) AS knownGames,
         count(DISTINCT CASE WHEN s.status='unknown' THEN s.match_id END) AS unknownGames,
         f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
-        FROM match_fun_stats s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
+        FROM match_fun_stats s JOIN leaderboard_match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
         WHERE p.outcome IN ('win','loss') AND s.metric=? ${mode === "all" ? "" : "AND s.mode=?"} AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
         GROUP BY s.uid`).all(def.id, ...(mode === "all" ? [] : [mode]), range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
       const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);
@@ -191,7 +192,7 @@ class Leaderboard {
     const end = Math.min(MAX_ROWS,snapshot.eligible.length), nextOffset = offset+PAGE_SIZE;
     const publicRow = row => ({publicId:row.public_id,nickname:row.nickname || "新朋友",avatarUrl:row.avatar_hash ? "/api/avatars/"+row.avatar_hash : null,rank:row.rank,tied:row.tied,isSelf:row.uid===uid,...present(row)});
     return { metric, period, mode, role, sort, countOnly: !!def.countOnly, fun: true, metricLabel: def.rankLabel + (sort === "rate" ? "率" : "次数"), title: def.honorTitle || def.title, description: def.description, rateLabel: def.rateLabel,
-      unit: sort === "rate" ? "%" : def.unit, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
+      unit: sort === "rate" ? "%" : def.unit, minPlayers: RANK_MIN_PLAYERS, threshold, availableMetrics: Object.keys(METRICS), availableFunMetrics: fun.publicMetrics(),
       roleOptions: ["merlin","percival","assassin","mordred","morgana","servant",...Object.keys(variantRoles)].filter((role,i,all)=>all.indexOf(role)===i && eligibleRole(def, role)).map(role=>({id:role,label:roleName(role)})),
       periodStart: range.start,periodEnd:range.end,timezone:"Asia/Shanghai",eligibleCount:snapshot.eligible.length,maxRows:MAX_ROWS,updatedAt:snapshot.updatedAt,version:snapshot.version,
       rows:snapshot.eligible.slice(offset,Math.min(nextOffset,end)).map(publicRow),

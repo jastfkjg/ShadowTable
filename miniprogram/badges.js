@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '月榜徽章按北京时间本月公开榜计算，当前第一名（含并列）持有；排名变化或跨月后自动重新计算。活动纪念徽章由服务端授予，获得后永久保留，跨月不收回。';
+  const rules = '月榜徽章按北京时间本月公开榜计算，当前第一名（含并列）持有；排名变化或跨月后自动重新计算。榜单徽章沿用对应榜单的对局人数门槛。活动纪念徽章由服务端授予，获得后永久保留，跨月不收回。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
