@@ -26,6 +26,9 @@
   ].map(b => ({ ...b, permanent: true, metric: 'campaign', periodLabel: '2026年10月', category: b.rank ? '积分榜限定荣誉' : '内测参与纪念',
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
+  // The server also uses catalogue order to choose default equipped badges.
+  const funByRole = monthly.slice(standard.length).sort((a, b) => copy.compareDisplayIds(a.id, b.id));
+  const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, october);
   const placementTitles = ['交剑王冠', '持枪骑士', '铜铸城钥'];
   function monthlyAward(id) {
     const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3])$/.exec(id);
@@ -56,7 +59,7 @@
   function presentCollection(value, filter = 'all', assetUrl = path => path) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
     const placements = Array.from(owned.keys(), monthlyAward).filter(Boolean);
-    const items = placements.concat(catalogue).map(b => {
+    const items = placements.concat(collectionCatalogue).map(b => {
       const roleRecord = copy.roleRecords[b.id];
       const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
       return { ...b, imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
@@ -68,7 +71,7 @@
     equipped.forEach((b, i) => { if (!Number.isInteger(b.slotIndex)) b.slotIndex = i; });
     const month = new Date((value.periodStart || Date.now()) + 8 * 3600000);
     return { ...value, badges, items, visibleBadges: items.filter(b => filter === 'owned' ? b.owned : filter === 'unowned' ? !b.owned : true),
-      availableBadges: badges.filter(b => !b.equipped), equippedBadges: equipped,
+      availableBadges: items.filter(b => b.owned && !b.equipped), equippedBadges: equipped,
       slots: Array.from({ length: MAX_EQUIPPED }, (_, i) => equipped.find(b => b.slotIndex === i) || { id: 'empty-' + i, empty: true, slotIndex: i }),
       ownedCount: badges.length, totalCount: items.length, unownedCount: items.length - badges.length,
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,

@@ -394,9 +394,10 @@ test('旧接口的趣味统计、历史摘要和详情统一文案，保留计�
     : { records: [legacy.match], total: 1, hasMore: false } };
   const { p: stats } = page('stats', api);
   await stats.onLoad({ tab: 'fun' });
-  assert.equal(stats.data.stats.fun.tiles[0].label, '刀中敌方');
-  assert.equal(stats.data.stats.fun.tiles[1].label, '刀中友方');
-  assert.equal(stats.data.stats.fun.tiles[1].count, 1);
+  const knives = stats.data.stats.fun.tiles.filter(tile => tile.key.startsWith('knights:knife_'));
+  assert.equal(knives[0].label, '刀中敌方');
+  assert.equal(knives[1].label, '刀中友方');
+  assert.equal(knives[1].count, 1);
   const { p: matches } = page('matches', api);
   await matches.onLoad({});
   assert.equal(matches.data.records[0].funLabel, '成功挡刀 · 刀中友方');
@@ -2078,7 +2079,8 @@ test('小程序趣味战绩保留未知而非零，指标回查与分页持续�
   const aggregate=require('../server/fun').aggregate;
   const fun=aggregate([{match_id:'old',mode:'knights',metric:'knife_enemy',role:'gareth',role_label:'加雷斯',status:'unknown',count:0,opportunities:0}]);
   const stats=page('stats',{...apiBase,request:async()=>({...emptyStats,fun})}).p;await stats.onLoad({tab:'fun'});
-  assert.equal(stats.data.tab,'fun');assert.equal(stats.data.stats.fun.tiles[0].valueLabel,'—');assert.equal(stats.data.stats.fun.tiles[0].roles[0].countLabel,'—');
+  const knife = stats.data.stats.fun.tiles.find(tile => tile.id === 'knife_enemy');
+  assert.equal(stats.data.tab,'fun');assert.equal(knife.valueLabel,'—');assert.equal(knife.roles[0].countLabel,'—');
   const urls=[];const {p}=page('matches',{...apiBase,request:async url=>{urls.push(url);return {records:[{id:String(urls.length),endedAt:1,members:[]}],total:2,hasMore:urls.length===1};}},{pages:[{route:'pages/me/me',matchesPreview:{records:[{id:'unfiltered',members:[]}],total:1}},{}]});
   await p.onLoad({fun:'knife_enemy',mode:'knights',role:'gareth'});await p.loadMore();
   assert.deepEqual(urls,['/api/me/matches?offset=0&fun=knife_enemy&mode=knights&role=gareth','/api/me/matches?offset=1&fun=knife_enemy&mode=knights&role=gareth']);
@@ -3215,7 +3217,7 @@ test('趣味卡片打开说明不切换标签或请求对局，防止重复弹�
   const requests=[],dialogs=[]; let dismiss;
   const {p}=page('stats',{...apiBase,request:async url=>{requests.push(url);return url.includes('/stats')?{...emptyStats,fun:require('../server/fun').aggregate(rows)}:{records:[],total:0};}}, {home:true,wx:{showModal:options=>{dialogs.push(options);return new Promise(resolve=>dismiss=resolve)}}});
   await p.onLoad({tab:'fun'});
-  const tile=p.data.statistics.stats.fun.tiles[0];
+  const tile=p.data.statistics.stats.fun.tiles.find(tile => tile.id === 'survival_knifed');
   const pending=p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
   await p.openFunDetails({currentTarget:{dataset:{key:tile.key}}});
   assert.equal(dialogs.length,1); assert.equal(dialogs[0].title,'全民公敌'); assert.match(dialogs[0].content,/不含枪和决斗/);

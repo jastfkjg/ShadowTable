@@ -2439,9 +2439,7 @@ function roomListItems(rooms) {
       if (tile.roles.length) html += '<details><summary class="fun-record-role-toggle">按角色查看</summary><div class="fun-record-roles">' + tile.roles.map(role => '<div class="fun-record-role-wrap"><button type="button" class="fun-record-role" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog"><span>' + esc(role.label) + '</span><span class="fun-record-role-count">' + esc(role.countLabel) + (role.value == null ? '' : ' ' + esc(tile.unit)) + '</span></button><button type="button" class="fun-record-link is-role" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" data-role="' + esc(role.role) + '" aria-label="查看' + esc(role.label) + '的' + esc(tile.title) + '相关对局">›</button></div>').join('') + '</div></details>';
       html += '</article>';
     }
-    html += '</div>';
-    if (data.legacyGames) html += '<p class="fun-records-note">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>';
-    return html + '</div>';
+    return html + '</div></div>';
   }
   function viewFunRankFilters(board) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);

@@ -81,7 +81,7 @@ test("逆仆个人记录区分两刀、拒绝互相串计，管理更正同步�
     assert.equal(metric(store.get(room.code), reverse, "reverse_wrong_side").count, 1);
     assert.equal(rank("reverse_wrong_side", { period: "all" }).me.rank, 1);
     const badge = readBadges(store, reverse.uid).badges.find(item => item.id === "reverse_wrong_side");
-    assert.equal(badge.title, "占错队");
+    assert.equal(badge.title, "站错队");
     assert.equal(badge.imageUrl, "/assets/badges/reverse_wrong_side.png");
   } finally { store.close(); }
 });

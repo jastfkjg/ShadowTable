@@ -1759,9 +1759,9 @@ test('趣味称号网格保持全部指标、玩法范围与回查入口', () =>
     {id:'classic:assassin',title:'刺客',metrics:[metric('assassin_hit','classic')]},
     {id:'knights:knife',title:'刀客刀法',metrics:[metric('knife_enemy','knights')]},
   ]});
-  assert.deepEqual(fun.recordedTiles.map(tile=>tile.roleLabel),['经典 · 非梅林好人','经典 · 刺客','十二骑士 · 刀客']);
+  assert.deepEqual(fun.recordedTiles.map(tile=>tile.roleLabel),['经典 · 刺客','经典 · 非梅林好人','十二骑士 · 刀客']);
   assert.equal(fun.totalCount,47);
-  assert.equal(fun.tiles[0].icon,'/assets/record-shield-good.svg');
+  assert.equal(fun.tiles.find(tile => tile.id === 'good_shield').icon,'/assets/record-shield-good.svg');
   const tree=renderStatsShell({tab:'fun',stats:{fun}});
   assert.equal(nodes(tree).filter(node=>node.attr?.bindtap==='openFunMatches').length,3);
   assert.equal(nodes(tree).filter(node=>node.attr?.class==='fun-record ').length,3);
@@ -1773,12 +1773,13 @@ test('趣味精简卡片保留称号、未知次数和回查，移除释义说�
   const fun = presentFun({ legacyGames:1, cards:[{ id:'knights:survival', metrics:[
     { ...metric, id:'survival_revive', value:null }, { ...metric, id:'survival_knifed', value:0 },
   ] }] });
-  assert.equal(fun.tiles[0].title, '我在阿瓦隆玩重生');
-  assert.equal(fun.tiles[0].rateLabel, '');
+  const revive = fun.tiles.find(tile => tile.id === 'survival_revive');
+  assert.equal(revive.title, '我在阿瓦隆玩重生');
+  assert.equal(revive.rateLabel, '');
   const textOf = tree => nodes(tree).flatMap(n => (n.children || []).filter(c => typeof c === 'string')).join('');
   const compact = renderStatsShell({ tab:'fun', stats:{fun} });
   assert.match(textOf(compact), /我在阿瓦隆玩重生—.*全民公敌0次/);
-  assert.doesNotMatch(textOf(compact), /复活按实际回场|按实际发生次数/);
+  assert.doesNotMatch(textOf(compact), /复活按实际回场|按实际发生次数|旧对局未记录完整过程/);
   assert.ok(!byHandler(compact, 'toggleFunRules'));
   assert.equal(nodes(compact).filter(n => n.attr?.bindtap === 'openFunMatches').length, 2);
 });

@@ -48,16 +48,16 @@
 | 梅林二号 | B · 双帽对照 | `morgana_with_percival.png` |
 | 深藏不露 | B · 斗篷藏牌 | `mordred_last_bust.png` |
 | 最强独狼 | A · 狼首双星 | `oberon_two_busts.png` |
-| 灯下黑梅林 | B | `merlin_all_rides.png` |
-| 影帝梅林 | B | `merlin_skip_decider.png` |
-| 炸飞梅林 | C | `merlin_bust_exit.png` |
+| 隐身乘客 | B | `merlin_all_rides.png` |
+| 幕后军师 | B | `merlin_skip_decider.png` |
+| 弹射下车 | C | `merlin_bust_exit.png` |
 | 孤注一掷 | A | `percival_merlin_streak.png` |
 | 压错宝 | A | `percival_morgana_streak.png` |
 | 化身梅派 | E | `percival_assassinated.png` |
 | 金牌乘客 | B | `servant_green_only.png` |
 | 定蓝机 | E | `servant_all_with_bust.png` |
 | 与世无争 | B | `servant_bench_three_green.png` |
-| 占错队 | A | `reverse_wrong_side.png` |
+| 站错队 | A | `reverse_wrong_side.png` |
 | 影帝大莫 | A | `mordred_three_rides.png` |
 | 车底大莫 | B | `mordred_bench_win.png` |
 | 最后王牌 | B | `mordred_decider_only.png` |

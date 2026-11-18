@@ -1956,7 +1956,7 @@ test('网页趣味卡片正文显示说明，箭头回查，比例带分母且�
   const c=client(async()=>response({total:2,wins:1,winRate:50,byFaction:[],byRole:[],byBoard:[],recent:[],fun:aggregate([...rows,...unknown],1)}));
   await c.applyRoute('#/stats?tab=fun');assert.equal(c.state.statsTab,'fun');const html=c.viewStats();
   assert.match(html,/data-action="funDetails" data-key="knights:knife_enemy".*?fun-record-title">刀中敌方<.*?fun-record-value good"><span>2<\/span>/);assert.doesNotMatch(html,/&lt;span|style="width:|fun-bar|次数最多/);assert.match(html,/刀中敌方率 66\.7%.*?2 \/ 3 次/);
-  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/加荷里斯<\/span><span class="fun-record-role-count">—<\/span>.*?data-role="gaheris"/);assert.match(html,/&lt;坏标签&gt;/);
+  assert.doesNotMatch(html,/旧对局未记录完整过程/);assert.match(html,/加荷里斯<\/span><span class="fun-record-role-count">—<\/span>.*?data-role="gaheris"/);assert.match(html,/&lt;坏标签&gt;/);
 });
 test('网页趣味回查深链与分页保留过滤，清除回到全部，不混入管理员积分调整',async()=>{
   const urls=[];const c=client(async url=>{urls.push(url);return response({records:[{id:String(urls.length),endedAt:1,members:[],role:'梅林',outcome:'win',fun:{events:[],highlights:[],reason:'旧数据'}}],total:2,hasMore:urls.length===1,adjustments:{records:[{id:'a',delta:2,reason:'积分调整'}],total:1,hasMore:false}});});
@@ -2339,7 +2339,7 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length - 1);
   c.ACTIONS.showBadgeDetail({dataset:{id:'merlin_bust_exit'}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
-  assert.match(detail,/炸飞梅林/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
+  assert.match(detail,/弹射下车/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
   assert.match(detail,/\/assets\/badges\/merlin_bust_exit\.png/);
   c.ACTIONS.closeBadgeDetail(); assert.equal(c.state.selectedBadgeId,'');
 });
@@ -2588,7 +2588,7 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   const c = client(async () => { reads++; return response(fixture); });
   await c.applyRoute('#/stats?tab=fun');
   assert.match(c.viewStats(), /全部 49/);
-  assert.match(c.viewStats(), /首席护卫.*最强独狼.*灯下黑梅林.*阵营摇摆王/);
+  assert.match(c.viewStats(), /隐身乘客.*圆桌劳模.*躺赢大师.*金牌乘客.*定蓝机.*与世无争.*首席护卫.*最强独狼.*阵营摇摆王/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   let html = c.viewStats();
   assert.match(html, /data-metric="knife_ally"/);
