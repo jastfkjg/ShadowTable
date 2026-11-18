@@ -2,14 +2,17 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {wxmlToJs}=require('miniprogram-compiler');
-const {catalogue}=require('../miniprogram/badges');
+const {catalogue,monthlyAward}=require('../miniprogram/badges');
 const {present,markup}=require('../miniprogram/badge-awards');
-const root=path.resolve(__dirname,'../miniprogram'),out=path.resolve(__dirname,'../output/playwright/october-awards-implemented');
+const {render:renderMonthlyArt}=require('../server/monthly-badge-art');
+const root=path.resolve(__dirname,'../miniprogram'),out=path.resolve(process.argv[2] || path.join(__dirname,'../output/playwright/october-awards-implemented'));
 fs.mkdirSync(out,{recursive:true});
 const context={window:{},global:{},console};vm.createContext(context);
 const factory=vm.runInContext('(function(global){'+wxmlToJs(root)+'})(global)',context);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const monthlyAssets=new Map();
 function asset(src) {
+  if (monthlyAssets.has(src)) return monthlyAssets.get(src);
   const local=path.join(root,src),file=fs.existsSync(local)?local:path.resolve(__dirname,'../server/web/assets',path.basename(src));
   return 'data:image/png;base64,'+fs.readFileSync(file).toString('base64');
 }
@@ -31,14 +34,23 @@ function html(n) {
 }
 const defs=catalogue.filter(b=>b.permanent),find=s=>defs.find(b=>b.id==='october_2026_'+s);
 const scenes={champion:[find('crown'),find('table'),find('book')],runner:[find('silver'),find('table'),find('book')],third:[find('stag'),find('table'),find('book')],scored:[find('table'),find('book')],participant:[find('table')]};
+const placements=[1,2,3].map(rank=>monthlyAward('monthly_points_2026-11_'+rank));
 const base=css('app.wxss')+css('components/app-dialog/app-dialog.wxss')+'body{margin:0}button{font-family:inherit}img{object-fit:contain}.award-scroll{overflow-y:auto}';
 const fit=`<script>function fit(){const box=document.querySelector('.award-scroll'),body=document.querySelector('.award-scroll-content'),actions=document.querySelector('.award-actions');if(box&&body)box.style.height=Math.min(body.getBoundingClientRect().height,innerHeight-50-actions.getBoundingClientRect().height)+'px';}addEventListener('load',fit);addEventListener('resize',fit);</script>`;
-for(const[name,badges]of Object.entries(scenes)) {
-  const value=present({badges});
-  const native=html(factory('components/app-dialog/app-dialog.wxml')({dialog:{variant:'badge-awards',title:value.title,awards:value,id:1},bodyHeight:0,awardDetail:null}));
-  const wrap=(body,extra='')=>'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>十月徽章 · '+name+'</title><style>'+base+'</style><body>'+body+extra+'</body></html>';
-  fs.writeFileSync(path.join(out,name+'.html'),wrap(native,fit));
-  const inline=JSON.parse(JSON.stringify(value));for(const b of [...inline.badges,...inline.secondary,...(inline.hero?[inline.hero]:[])])b.imageUrl=asset(b.imageUrl);
-  fs.writeFileSync(path.join(out,'web-'+name+'.html'),wrap('<div class="app-dialog-backdrop">'+markup(inline,esc)+'</div>'));
+async function render() {
+  await Promise.all(placements.map(async badge => {
+    const art=await renderMonthlyArt(badge.month,badge.rank);
+    monthlyAssets.set(badge.imageUrl,'data:image/png;base64,'+art.toString('base64'));
+    scenes['monthly-'+badge.rank]=[badge];
+  }));
+  for(const[name,badges]of Object.entries(scenes)) {
+    const value=present({badges});
+    const native=html(factory('components/app-dialog/app-dialog.wxml')({dialog:{variant:'badge-awards',title:value.title,awards:value,id:1},bodyHeight:0,awardDetail:null}));
+    const wrap=(body,extra='')=>'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>'+esc(value.title)+'</title><style>'+base+'</style><body>'+body+extra+'</body></html>';
+    fs.writeFileSync(path.join(out,name+'.html'),wrap(native,fit));
+    const inline=JSON.parse(JSON.stringify(value));for(const b of [...inline.badges,...inline.secondary,...(inline.hero?[inline.hero]:[])])b.imageUrl=asset(b.imageUrl);
+    fs.writeFileSync(path.join(out,'web-'+name+'.html'),wrap('<div class="app-dialog-backdrop">'+markup(inline,esc)+'</div>'));
+  }
+  console.log(out);
 }
-console.log(out);
+render().catch(error=>{console.error(error);process.exitCode=1;});

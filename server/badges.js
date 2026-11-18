@@ -2,13 +2,15 @@
 const { Leaderboard, periodRange } = require('./leaderboard');
 const { RuleError } = require('./engine');
 const fun = require('./fun');
-const { catalogue, MAX_EQUIPPED } = require('../miniprogram/badges');
+const { catalogue, MAX_EQUIPPED, monthlyAward } = require('../miniprogram/badges');
+const { settleMonthly } = require('./badge-awards');
 const boards = new WeakMap();
 function boardFor(store) {
   if (!boards.has(store)) boards.set(store, new Leaderboard(store));
   return boards.get(store);
 }
 function readBadges(store, uid, now = store.clock()) {
+  settleMonthly(store, now);
   const range = periodRange('month', now);
   const version = store.db.prepare('SELECT version FROM badge_versions WHERE uid=?').get(uid)?.version || 0;
   const preferences = new Map(store.db.prepare('SELECT badge_id,equipped FROM badge_preferences WHERE uid=? AND period_start IN (?,0)').all(uid, range.start).map(row => [row.badge_id, !!row.equipped]));
@@ -22,8 +24,12 @@ function readBadges(store, uid, now = store.clock()) {
     const row = snapshot.aggregates.get(uid);
     if (row?.rank === 1) badges.push({ ...definition, equipped: false });
   }
-  const awarded = new Set(store.db.prepare('SELECT badge_id FROM badge_awards WHERE uid=?').all(uid).map(row => row.badge_id));
+  const awarded = new Set(store.db.prepare('SELECT badge_id FROM badge_awards WHERE uid=? ORDER BY granted_at DESC, id').all(uid).map(row => row.badge_id));
   for (const definition of catalogue) if (definition.permanent && awarded.has(definition.id)) badges.push({ ...definition, equipped: false });
+  for (const id of awarded) {
+    const definition = monthlyAward(id);
+    if (definition) badges.push({ ...definition, equipped: false });
+  }
   // Explicit choices take priority over newly awarded defaults, including legacy preferences.
   const selected = badges.filter(b => preferences.get(b.id) === true)
     .concat(badges.filter(b => !preferences.has(b.id))).slice(0, MAX_EQUIPPED);
@@ -45,7 +51,7 @@ function equippedBadges(store, uid) {
 }
 function saveBadge(store, uid, input) {
   if (!input || Object.keys(input).some(key => !['id','equipped','version','periodStart','replaceId','slotIndex'].includes(key)) ||
-    typeof input.id !== 'string' || !catalogue.some(b => b.id === input.id) || typeof input.equipped !== 'boolean' ||
+    typeof input.id !== 'string' || !(catalogue.some(b => b.id === input.id) || monthlyAward(input.id)) || typeof input.equipped !== 'boolean' ||
     !Number.isSafeInteger(input.version) || input.version < 0 || !Number.isSafeInteger(input.periodStart))
     throw new RuleError('徽章佩戴参数无效', 400);
   const current = readBadges(store, uid);

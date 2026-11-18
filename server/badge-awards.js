@@ -1,11 +1,17 @@
 'use strict';
 const { Leaderboard } = require('./leaderboard');
 const { RuleError } = require('./engine');
+const { monthAt, monthRange } = require('../miniprogram/monthly-report');
+const { awardDefinition } = require('../miniprogram/badges');
 const CAMPAIGN = '2026-10-beta';
+const FIRST_MONTH = '2026-11';
+const monthlyCampaign = month => 'monthly-points-' + month;
 const START = Date.parse('2026-09-30T16:00:00Z');
 const END = Date.parse('2026-10-31T16:00:00Z');
 const rankedIds = ['october_2026_crown', 'october_2026_silver', 'october_2026_stag'];
 const transaction = (store, fn) => store.inTransaction ? fn() : store.transaction(fn);
+const pointsPodium = (board, now) => board.snapshot('points', 'month', now).eligible
+  .filter(row => row.rank <= 3).map(({ uid, rank, points }) => ({ uid, rank, points }));
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS badge_campaigns(
@@ -17,10 +23,10 @@ function initialize(store) {
       UNIQUE(uid,badge_id));
     CREATE INDEX IF NOT EXISTS badge_awards_notice ON badge_awards(uid,seen,id);`);
 }
-function grant(store, uid, id, rank = null, points = null) {
+function grant(store, uid, id, { rank = null, points = null, campaign = CAMPAIGN, grantedAt = store.clock() } = {}) {
   const result = store.db.prepare(`INSERT OR IGNORE INTO badge_awards
     (uid,badge_id,campaign,granted_at,rank_at_grant,points_at_grant) VALUES(?,?,?,?,?,?)`)
-    .run(uid, id, CAMPAIGN, store.clock(), rank, points);
+    .run(uid, id, campaign, grantedAt, rank, points);
   if (result.changes) store.db.prepare(`INSERT INTO badge_versions(uid,version) VALUES(?,1)
     ON CONFLICT(uid) DO UPDATE SET version=version+1`).run(uid);
 }
@@ -54,10 +60,9 @@ function activate(store) {
   if (store.clock() < START) return null;
   return transaction(store, () => {
     if (!store.db.prepare('SELECT 1 FROM badge_campaigns WHERE id=?').get(CAMPAIGN)) {
-      const rows = new Leaderboard(store).snapshot('points', 'month', Math.min(store.clock(), END - 1)).eligible
-        .filter(row => row.rank <= 3).map(({ uid, rank, points }) => ({ uid, rank, points }));
+      const rows = pointsPodium(new Leaderboard(store), Math.min(store.clock(), END - 1));
       store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)').run(CAMPAIGN, store.clock(), JSON.stringify(rows));
-      for (const row of rows) grant(store, row.uid, rankedIds[row.rank - 1], row.rank, row.points);
+      for (const { uid, rank, points } of rows) grant(store, uid, rankedIds[rank - 1], { rank, points });
     }
     reconcileParticipants(store);
     return summary(store);
@@ -68,13 +73,53 @@ function summary(store) {
   return campaign ? { campaign: CAMPAIGN, activatedAt: campaign.activated_at,
     counts: store.db.prepare('SELECT badge_id AS id,count(*) AS count FROM badge_awards WHERE campaign=? GROUP BY badge_id').all(CAMPAIGN) } : null;
 }
+function settleMonthly(store, now = store.clock()) {
+  const currentMonth = monthAt(now);
+  if (currentMonth <= FIRST_MONTH) return;
+  const lastClosedMonth = monthAt(monthRange(currentMonth).start - 1);
+  const first = monthlyCampaign(FIRST_MONTH), latest = monthlyCampaign(lastClosedMonth);
+  const lastSettled = store.db.prepare('SELECT id FROM badge_campaigns WHERE id BETWEEN ? AND ? ORDER BY id DESC LIMIT 1');
+  if (lastSettled.get(first, latest)?.id === latest) return;
+
+  // The write lock covers the snapshot and every grant, including an empty month.
+  transaction(store, () => {
+    const last = lastSettled.get(first, latest)?.id;
+    let month = last ? monthAt(monthRange(last.slice(-7)).end) : FIRST_MONTH;
+    const board = new Leaderboard(store);
+    const freeze = store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)');
+    while (month <= lastClosedMonth) {
+      const { end } = monthRange(month), campaign = monthlyCampaign(month);
+      const rows = pointsPodium(board, end - 1);
+      freeze.run(campaign, now, JSON.stringify(rows));
+      for (const { uid, rank, points } of rows)
+        grant(store, uid, `monthly_points_${month}_${rank}`, { rank, points, campaign, grantedAt: end });
+      month = monthAt(end);
+    }
+  });
+}
+function startMonthlyAwards(store, logger = console) {
+  let timer;
+  function run() {
+    const now = store.clock();
+    let delay = Math.min(monthRange(monthAt(now)).end - now, 2147483647);
+    try { settleMonthly(store, now); }
+    catch (error) {
+      logger.error('Monthly badge settlement failed:', error.message);
+      delay = Math.min(delay, 60000);
+    }
+    timer = setTimeout(run, delay);
+    timer.unref();
+  }
+  run();
+  return () => clearTimeout(timer);
+}
 function notice(store, uid) {
+  settleMonthly(store);
   reconcileParticipants(store, uid);
-  const rows = store.db.prepare('SELECT id,badge_id,granted_at FROM badge_awards WHERE uid=? AND seen=0 ORDER BY id').all(uid);
-  const definitions = require('../miniprogram/badges').catalogue;
-  const badges = rows.map(row => ({ ...definitions.find(b => b.id === row.badge_id), grantedAt: row.granted_at }));
-  badges.sort((a,b) => (a.rank || 4) - (b.rank || 4));
-  return { notice: badges.length ? { through: rows.at(-1).id, badges, campaign: CAMPAIGN } : null };
+  const rows = store.db.prepare('SELECT id,badge_id,granted_at,campaign FROM badge_awards WHERE uid=? AND seen=0 ORDER BY id').all(uid);
+  const badges = rows.map(row => ({ ...awardDefinition(row.badge_id), grantedAt: row.granted_at }));
+  badges.sort((a,b) => (b.month || '').localeCompare(a.month || '') || (a.rank || 4) - (b.rank || 4));
+  return { notice: badges.length ? { through: rows.at(-1).id, badges, campaign: rows.at(-1).campaign } : null };
 }
 function acknowledge(store, uid, input) {
   if (!input || Object.keys(input).length !== 1 || !Number.isSafeInteger(input.through) || input.through < 1 ||
@@ -83,4 +128,4 @@ function acknowledge(store, uid, input) {
   store.db.prepare('UPDATE badge_awards SET seen=1 WHERE uid=? AND id<=?').run(uid, input.through);
   return { acknowledged: input.through };
 }
-module.exports = { initialize, activate, reconcileParticipants, notice, acknowledge, summary, CAMPAIGN, START, END };
+module.exports = { initialize, activate, settleMonthly, startMonthlyAwards, reconcileParticipants, notice, acknowledge, summary, CAMPAIGN, START, END, FIRST_MONTH };
