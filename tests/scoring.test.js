@@ -27,8 +27,8 @@ function knightDeal(options={}) {
   room.roles=Object.fromEntries(room.players.map((player,index)=>[player.uid,roles[index]]));
   return room;
 }
-function beforeLossPoints() {
-  const room = deal();
+function beforeLossPoints(options) {
+  const room = deal(options);
   room.scorePolicy.version = 'avalon-2026-11-v16';
   room.scorePolicy.awards = room.scorePolicy.awards.filter(award => !['good_loss', 'evil_loss'].includes(award.id));
   return room;
@@ -109,7 +109,7 @@ test('十二骑士积分进入明细榜单和跨板汇总，关闭仍排除，�
     assert.equal(store.statsFor('wx:3').score.total,30);
     assert.equal(store.matchesFor('wx:3',0,20,true).total,2);
     const ranking=new Leaderboard(store).read('wx:3',new URLSearchParams('metric=points'));
-    assert.equal(ranking.me.points,30);assert.equal(ranking.me.total,2);assert.equal(ranking.me.status,'ranked');
+    assert.equal(ranking.me.points,15);assert.equal(ranking.me.total,1);assert.equal(ranking.me.status,'ranked');
     const loss=knightDeal();finish(loss,{scoreReason:'early_assassination',scoreTarget:1});store.transaction(()=>store.save(loss));
     assert.equal(store.statsFor('wx:3').score.games,3);assert.equal(store.statsFor('wx:3').score.total,33);
     const off=knightDeal({scoreEnabled:false});run(off,'finishTools',{winner:'good'});
@@ -460,10 +460,13 @@ test("移除连胜后历史得分保留，更正和删除其他对局不改写�
 test("积分榜同分并列，零分可上榜，公开设置与北京时间月界沿用现有行为",()=>{
   const store=new Store(":memory:");try{
     for(let i=1;i<=6;i++) store.transaction(()=>saveProfile(store,"wx:"+i,{nickname:"玩家"+i,version:0}));
-    const room=beforeLossPoints();finish(room);const now=Date.now(),range=periodRange("month",now);room.matchRecord.endedAt=range.start;
+    const room=beforeLossPoints({board:"classic-court",capacity:10});
+    const roles=["merlin","percival","servant","servant","morgana","assassin","servant","servant","mordred","oberon"];
+    room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,roles[i]]));
+    finish(room);const now=Date.now(),range=periodRange("month",now);room.matchRecord.endedAt=range.start;
     store.transaction(()=>store.save(room));const board=new Leaderboard(store);
     const result=board.read("wx:5",new URLSearchParams("metric=points&period=month"),now);
-    assert.deepEqual(result.rows.map(row=>row.rank),[1,2,2,4,5,5]);assert.equal(result.me.points,0);assert.equal(result.me.rank,5);
+    assert.deepEqual(result.rows.map(row=>row.rank),[1,2,2,4,4,4,7,7,7,7]);assert.equal(result.me.points,0);assert.equal(result.me.rank,7);
     assert.doesNotMatch(JSON.stringify(result),/wx:|"uid"|breakdown|roleId/);
     const previous=board.read("wx:5",new URLSearchParams("metric=points"),range.start-1);
     assert.equal(previous.me.total,0); // Points never include another month, even without a period parameter.

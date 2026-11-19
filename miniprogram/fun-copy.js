@@ -84,6 +84,14 @@
   };
   const killIdentities = "蓝刀客·加雷斯、蓝刀客·加赫雷斯、红刀客·奥伯伦、蓝兰斯洛特、红兰斯洛特、刺客、觉醒蓝刀客、觉醒红刀客、蓝骑士、红骑士、蓝猎人、红猎人";
   for (const [id, record] of Object.entries(roleRecords)) labels[id] = record.title;
+  const legacyTitleIds = {
+    灯下黑梅林: "merlin_all_rides",
+    影帝梅林: "merlin_skip_decider",
+    炸飞梅林: "merlin_bust_exit",
+    占错队: "reverse_wrong_side",
+  };
+  const currentTitle = title => Object.hasOwn(legacyTitleIds, title) ? roleRecords[legacyTitleIds[title]].title : title;
+  const currentTitleScope = scope => scope?.split(" · ").map(currentTitle).join(" · ");
   const recordDetails = { ...honors, ...roleRecords };
   const displayGroups = [
     'percival', 'merlin', 'servant', 'reverse', 'assassin', 'morgana', 'mordred', 'oberon', 'lancelot',
@@ -125,7 +133,7 @@
     if (label === "三炸收场") return labels.percival_bust;
     if (label === "命中敌方") return labels[type + "_enemy"] || label;
     if (["命中同伴", "命中友方"].includes(label)) return labels[type + "_ally"] || label;
-    return label;
+    return currentTitle(label);
   }
   function recordEntries(cards, splitModes, includeCatalogue) {
     const entries = [];
@@ -340,5 +348,18 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, roleRecords, compareDisplayIds, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response };
+  function shareSnapshot(snapshot) {
+    if (snapshot?.version !== 1 || !snapshot.player || !snapshot.data) return snapshot;
+    const { kind, data, player } = snapshot;
+    if (kind === "fun" && Object.hasOwn(roleRecords, data.metric)) {
+      const record = roleRecords[data.metric];
+      return { ...snapshot, title: `${player.name}的${record.title} · ${data.count}${data.unit}`,
+        data: { ...data, label: record.title, description: record.description } };
+    }
+    if (kind === "funSummary") return { ...snapshot, data: { ...data,
+      items: data.items.map(item => ({ ...item, label: currentTitle(item.label) })) } };
+    if (kind === "matches") return { ...snapshot, data: { ...data, scope: currentTitleScope(data.scope) } };
+    return snapshot;
+  }
+  return { labels, titles, honors, roleRecords, compareDisplayIds, currentTitleScope, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response, shareSnapshot };
 });

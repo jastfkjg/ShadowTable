@@ -11,7 +11,7 @@ const { readMonthlyReset, acknowledgeMonthlyReset } = require("../server/monthly
 const { createApp } = require("../server/app");
 const at = value => Date.parse(value + "+08:00");
 const archive = (store, endedAt, points, outcome = "win", uid = "wx:monthly") => store.transaction(() => store.archiveMatch({
-  id: randomUUID(), board: "classic", boardName: "经典", capacity: 6, endedAt, winner: "good",
+  id: randomUUID(), board: "classic", boardName: "经典", capacity: 9, endedAt, winner: "good",
   players: [{ uid, name: "月度玩家", role: "忠臣", faction: "good", outcome,
     score: { status: "scored", total: points, breakdown: [] } }],
 }));

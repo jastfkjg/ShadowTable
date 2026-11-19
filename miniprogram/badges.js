@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '本月榜首徽章随北京时间本月公开榜实时更新。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。';
+  const rules = '本月榜首徽章随北京时间本月公开榜实时更新。榜单徽章沿用对应榜单的对局人数门槛。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
@@ -45,6 +45,11 @@
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.permanent || badge.id === 'good_shield' || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
+  function presentPlayerBadge(badge, assetUrl = path => path) {
+    const definition = catalogue.find(item => item.id === badge.id) || monthlyAward(badge.id);
+    if (!definition) return null;
+    return { ...badge, ...definition, imageUrl: badgeImageUrl(definition, assetUrl) };
+  }
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',
     survival_revive: '统计十二骑士中实际发生的复活。',
@@ -77,5 +82,5 @@
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentCollection, awardDefinition, monthlyAward };
+  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
 });

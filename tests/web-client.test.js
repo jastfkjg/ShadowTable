@@ -441,6 +441,21 @@ test('网页对局摘要与详情合并同一次终局刺杀', async () => {
   assert.match(html, /最终目标为本人（2 号）/);
   assert.doesNotMatch(html, /最终刀落到本人|终局记录/);
 });
+test('网页历史对局的称号摘要和事件均显示新版称号', async () => {
+  const record = { boardName:'经典', capacity:6, endedAt:1, role:'梅林', winner:'good', outcome:'win',
+    fun:{
+      events:[{id:'merlin_all_rides', label:'灯下黑梅林'}, {id:'final-reverse_wrong_side', label:'占错队'},
+        {id:'legacy-event-1', label:'影帝梅林'}, {id:'legacy-event-2', label:'炸飞梅林'}],
+      highlights:[{id:'merlin_all_rides', label:'灯下黑梅林', count:1}],
+    },
+  };
+  const c = client(async () => response({records:[record], total:1, hasMore:false}));
+  await c.applyRoute('#/matches');
+  const html = c.viewMatches();
+  assert.match(html, /class="match-fun-label">隐身乘客</);
+  assert.match(html, /隐身乘客.*幕后军师.*弹射下车.*站错队/);
+  assert.doesNotMatch(html, /灯下黑梅林|影帝梅林|炸飞梅林|占错队/);
+});
 test('网页恢复 Cookie 身份并保留原游客；正式会话过期不会自动新建游客', async () => {
   const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'guest-command'], ['roomCode', '123456']]), calls = [];
   let expired = false;
@@ -2285,22 +2300,27 @@ test('网页最佳玩家票选不限时，支持房主未投名单、选择修�
 });
 
 test('战绩卡仅显示徽章图案，点击显示称号介绍，关闭还原；佩戴管理提交明确状态', async () => {
-  const badge=require('../miniprogram/badges').catalogue.find(b=>b.id==='assassin_hit');
+  const badge=require('../miniprogram/badges').catalogue.find(b=>b.id==='merlin_all_rides');
   const collection={badges:[{...badge,equipped:true}],version:0,periodStart:1};
   const calls=[];
   const c=client(async(path,options)=>{
     calls.push({path,data:options.body?JSON.parse(options.body):null});
+    if(path.endsWith('/stats')) return response({
+      player:{id:'p',seat:1,name:'玩家',badges:[{...badge,title:'灯下黑梅林',description:'本月「灯下黑梅林」达成次数榜第一。'}]},
+      status:'available',stats:{total:0,wins:0,byFaction:[]},
+    });
     if(options.method==='POST')return response({...collection,version:1,badges:[{...badge,equipped:false}]});
     return response(collection);
   });
-  c.state.playerCard={id:'p',scope:'leaderboard',name:'玩家',initial:'玩',badges:[badge]};
-  c.state.playerCardStats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
+  c.state.room=dealtWebRoom({players:[{seat:1,statsId:'p',name:'玩家'}]});
+  await c.openPlayerCard(1);
   const html=c.viewPlayerCard();
-  assert.match(html,/aria-label="查看职业刺客徽章"/);
-  assert.doesNotMatch(html,/>职业刺客</);
+  assert.match(html,/aria-label="查看隐身乘客徽章"/);
+  assert.doesNotMatch(html,/>隐身乘客</);
   c.ACTIONS.showPlayerCardBadge({dataset:{id:badge.id}});
-  assert.match(c.viewPlayerCard(),/>职业刺客</);assert.match(c.viewPlayerCard(),/本月/);
-  c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>职业刺客</);
+  assert.match(c.viewPlayerCard(),/>隐身乘客</);assert.ok(c.viewPlayerCard().includes(badge.description));
+  assert.doesNotMatch(c.viewPlayerCard(),/灯下黑梅林/);
+  c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>隐身乘客</);
   await c.applyRoute('#/badges');
   assert.equal(c.state.badgeCollection.badges[0].equipped,true);
   await c.ACTIONS.toggleOwnedBadge({dataset:{id:badge.id}});

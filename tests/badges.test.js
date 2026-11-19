@@ -17,7 +17,7 @@ const NOW = Date.parse('2026-10-13T08:00:00Z');
 const NEXT = Date.parse('2026-10-31T16:00:00Z');
 function game(store, uid, { endedAt = store.clock(), win = true, points = 2 } = {}) {
   const id = randomUUID();
-  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt,
+  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:9, endedAt,
     winner:'good', source:'manual', excludedReason:null,
     players:[{uid,name:'玩家',seat:1,role:'梅林',faction:'good',outcome:win?'win':'loss',score:{status:'scored',total:points,breakdown:[]}}] }));
   return id;
@@ -199,14 +199,18 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
 test('小程序战绩卡适配徽章图片，说明按需打开，关闭后不残留其他玩家徽章', async () => {
   const {initialPlayerCardData,playerCardMethods}=require('../miniprogram/player-card');
   const badge=catalogue.find(b=>b.id==='merlin_hit');
-  const serverBadge=catalogue.find(b=>b.id==='merlin_bust_exit');
+  const serverBadge=catalogue.find(b=>b.id==='merlin_all_rides');
+  const oldBadge={...serverBadge,title:'灯下黑梅林',description:'本月「灯下黑梅林」达成次数榜第一。',imageUrl:'/ignored.png'};
   const p={alive:true,data:{...initialPlayerCardData},setData(value){Object.assign(this.data,value);},
-    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge,{...serverBadge,imageUrl:'/ignored.png'}]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
+    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge,oldBadge]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
   await p.loadPlayerCard({id:'one',scope:'leaderboard'},'/card');
   assert.equal(p.data.playerCard.badges[0].imageUrl,badge.imageUrl);
   assert.equal(p.data.playerCard.badges[1].imageUrl,'https://test.invalid'+serverBadge.imageUrl);
   assert.equal(p.data.playerCardBadge,null);
   p.showPlayerCardBadge({currentTarget:{dataset:{id:badge.id}}});assert.equal(p.data.playerCardBadge.title,'舍我其谁');
+  p.showPlayerCardBadge({currentTarget:{dataset:{id:oldBadge.id}}});
+  assert.equal(p.data.playerCardBadge.title,'隐身乘客');
+  assert.equal(p.data.playerCardBadge.description,serverBadge.description);
   p.closePlayerCard();assert.equal(p.data.playerCardBadge,null);assert.equal(p.data.playerCard,null);
 });
 

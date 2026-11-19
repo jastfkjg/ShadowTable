@@ -2813,7 +2813,8 @@ function roomListItems(rooms) {
       const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
         byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
       let playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
-      playerCard = { ...playerCard, badges: result.player.badges || [] };
+      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || badge);
+      playerCard = { ...playerCard, badges };
       setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
     } catch (e) {
       if (active()) setState({ playerCardError: e.message || "战绩读取失败，请重试" });

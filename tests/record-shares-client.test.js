@@ -46,6 +46,20 @@ test("朋友圈和好友分享链接匿名读取同一快照，不登录、不�
     } finally { c.p.onUnload(); }
   }
 });
+test("打开旧趣味链接后，详情、再分享标题和新生成封面使用新版称号", async () => {
+  const { coverContent } = require("../miniprogram/record-share-cover");
+  const snapshot = { ...fixtures.fun, title: "子龙的灯下黑梅林 · 3局",
+    data: { ...fixtures.fun.data, metric: "merlin_all_rides", label: "灯下黑梅林", unit: "局", countOnly: true, description: "灯下黑梅林的旧说明" } };
+  const c = client({ publicRead: options => options.success({ statusCode: 200, data: snapshot }) });
+  try {
+    await c.p.onLoad({ share: snapshot.id });
+    assert.equal(c.p.data.sharedRecord.heroLabel, "隐身乘客");
+    assert.match(c.p.data.sharedRecord.description, /每趟任务都上车/);
+    assert.equal(c.p.onShareAppMessage().title, "子龙的隐身乘客 · 3局");
+    assert.equal(c.p.onShareTimeline().title, "子龙的隐身乘客 · 3局");
+    assert.equal(coverContent("fun", c.p.snapshot).subtitle, "隐身乘客");
+  } finally { c.p.onUnload(); }
+});
 test("品牌兜底在普通与单页模式均无需登录或接口即可展示和再次分享", async () => {
   for(const single of [true,false]) for(const tab of ['records','matches','fun']) {
     const c=client({single});

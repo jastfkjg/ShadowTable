@@ -16,9 +16,9 @@ const read = (reports, month = "2026-09", now = NOW) => reports.read(new URLSear
 function profile(store, uid, visible = true) {
   store.transaction(() => saveProfile(store, uid, { nickname: uid.split(":")[1], version: readProfile(store, uid).version, leaderboardVisible: visible }));
 }
-function match(store, entries, endedAt = SEPTEMBER) {
+function match(store, entries, endedAt = SEPTEMBER, capacity = 9) {
   const id = randomUUID();
-  store.transaction(() => store.archiveMatch({ id, board: "classic", boardName: "经典", capacity: 6, winner: "good", endedAt,
+  store.transaction(() => store.archiveMatch({ id, board: "classic", boardName: "经典", capacity, winner: "good", endedAt,
     players: entries.map(entry => ({ name: "私密牌桌昵称", role: "忠臣", faction: "good", outcome: "win", ...entry,
       ...(entry.points === undefined ? {} : { score: { status: "scored", total: entry.points, breakdown: [] } }) })) }));
   return id;
@@ -39,14 +39,16 @@ test("月报按北京时间半开区间统计，概览对对局、玩家及结�
     profile(store, "wx:a"); profile(store, "wx:b"); profile(store, "wx:hidden", false);
     match(store, [{ uid: "wx:a" }, { uid: "wx:b" }, { uid: "wx:hidden" }, { uid: "guest:c" }], start);
     match(store, [{ uid: "wx:a" }], end - 1);
+    match(store, [{ uid: "wx:unranked" }, { uid: "wx:a", points: 100 }], start, 8);
     match(store, [{ uid: "wx:a" }], start - 1);
     match(store, [{ uid: "wx:a" }], end);
     match(store, [{ uid: "wx:a", outcome: "excluded" }], start + 1000);
     match(store, [{ uid: "test:companion" }], start + 1000);
     const report = read(reports);
-    assert.deepEqual(report.overview, { games: 2, players: 4, activeDays: 2 });
+    assert.deepEqual(report.overview, { games: 3, players: 5, activeDays: 2 });
     assert.equal(report.firstMonth, "2026-08"); assert.equal(report.status, "complete");
     assert.deepEqual(report.mainBoards.find(board => board.id === "games").rows.map(row => [row.nickname, row.total]), [["a", 2], ["b", 1]]);
+    assert.deepEqual(report.mainBoards.find(board => board.id === "points").rows, []);
     assert.doesNotMatch(JSON.stringify(report), /wx:|guest:|test:|私密牌桌昵称|hidden|roleId|snapshot/);
     assert.equal(read(reports, "2026-10").status, "preview");
     assert.equal(read(reports, "2026-08").overview.games, 1);
@@ -87,6 +89,8 @@ test("趣味榜仅使用已知机会，次数和比例分开，完整分享同�
     const a = match(store, [{ uid: "wx:a" }]), b = match(store, [{ uid: "wx:b" }]), c = match(store, [{ uid: "wx:c" }]);
     funRecord(store, a, "wx:a", "merlin_evade", 3, 5); funRecord(store, b, "wx:b", "merlin_evade", 3, 6);
     funRecord(store, c, "wx:c", "merlin_evade", 1, 1);
+    const small = match(store, [{ uid: "wx:c" }], SEPTEMBER, 8);
+    funRecord(store, small, "wx:c", "merlin_evade", 10, 10);
     funRecord(store, a, "wx:a", "assassin_hit", 2, 5); funRecord(store, b, "wx:b", "defense_ally", 1, 5);
     funRecord(store, b, "wx:b", "assassin_miss", 4, 5);
     funRecord(store, a, "wx:a", "good_shield", 2, 5);

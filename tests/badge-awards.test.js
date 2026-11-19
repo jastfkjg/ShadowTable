@@ -14,9 +14,9 @@ const presentation = require('../miniprogram/badge-awards');
 const NOW = Date.parse('2026-10-25T08:00:00Z');
 const DECEMBER = Date.parse('2026-12-01T00:00:00+08:00');
 const ids = (s, uid) => readBadges(s, uid).badges.filter(b=>b.permanent).map(b=>b.id);
-function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good' } = {}) {
+function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good', capacity = 9 } = {}) {
   const id = randomUUID();
-  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt, winner, source:'manual',
+  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity, endedAt, winner, source:'manual',
     ...(testGame ? {recordPurpose:'test'} : {}), players:[{ uid,name:uid,seat:1,role:'梅林',faction:'good',outcome:winner?'win':'excluded',
       ...(scored ? {score:{status:'scored',total:points,breakdown:[]}} : {}) }] });
   return id;
@@ -28,6 +28,8 @@ test('北京时间月初冻结上月公开积分前三，含并列，每月单�
   try {
     const players = ['wx:gold', 'wx:silver', 'wx:bronze', 'wx:tied', 'wx:fourth', 'wx:hidden'];
     players.forEach((uid, index) => game(store, uid, { points: [12, 9, 6, 6, 3, 99][index] }));
+    game(store, 'wx:small-only', { points: 100, capacity: 8 });
+    game(store, 'wx:fourth', { points: 100, capacity: 8 });
     hidden(store, 'wx:hidden');
     assert.equal(awards.notice(store, 'wx:gold').notice, null);
     now++;
@@ -39,6 +41,7 @@ test('北京时间月初冻结上月公开积分前三，含并列，每月单�
 
     const notice = awards.notice(store, 'wx:gold').notice;
     const badge = notice.badges[0];
+    assert.deepEqual(ids(store, 'wx:small-only'), []);
     assert.deepEqual([badge.id, badge.rank, badge.title, badge.grantedAt],
       ['monthly_points_2026-11_1', 1, '交剑王冠', DECEMBER]);
     assert.deepEqual(awards.notice(store, 'wx:gold').notice, notice);

@@ -18,17 +18,20 @@
     return date.getUTCFullYear() + "." + pad(date.getUTCMonth() + 1) + "." + pad(date.getUTCDate()) + " " + pad(date.getUTCHours()) + ":" + pad(date.getUTCMinutes());
   }
   function presentBoard(board) {
-    const honor = funCopy.honors[board.metric], rankingSubtitle = board.rankingSubtitle || board.subtitle;
+    const roleRecord = funCopy.roleRecords[board.metric], honor = roleRecord || funCopy.honors[board.metric];
+    const label = roleRecord?.title || board.label;
+    const rankingSubtitle = funCopy.currentTitleScope(board.rankingSubtitle || board.subtitle);
     const countUnit = board.sort === "rate" ? (/^percival_/.test(board.metric) ? "局" : "次") : board.unit;
     const rows = board.rows.map(row => {
       const value = board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
       return { ...row, rankLabel: pad(row.rank), initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
-        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : board.label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
+        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
           : board.id === "points" ? row.scoredGames + " 场计分局" + (row.adjustmentPoints ? " · 调整 " + (row.adjustmentPoints > 0 ? "+" : "") + row.adjustmentPoints + " 分" : "")
           : row.wins + " 胜 / " + row.total + " 局" };
     });
     const icon = board.id === "points" ? "crown" : board.metric?.includes("shield") || board.metric?.startsWith("defense_") || board.id === "good" ? "shield" : board.metric?.includes("assassin") ? "moon" : "sword";
-    return { ...board, ...(honor ? { title: honor.title, roleLabel: honor.roleLabel, roleDetail: honor.roleDetail, conditionLabel: honor.conditionLabel } : {}),
+    return { ...board, ...(roleRecord ? { label, description: roleRecord.description } : {}),
+      ...(honor ? { title: honor.title, roleLabel: honor.roleLabel, roleDetail: honor.roleDetail, conditionLabel: honor.conditionLabel } : {}),
       iconPath: "/assets/monthly-" + icon + ".svg", rankingSubtitle,
       subtitle: board.id === "points" ? "本月积分" : honor ? honor.roleLabel + " · " + rankingSubtitle : board.subtitle, rows };
   }
@@ -44,6 +47,7 @@
       asOfLabel: displayTime(report.asOf), versionLabel: "V" + report.version,
       canShare: report.overview.games > 0,
       rules: ["按北京时间自然月和对局结束时间统计。概览包含所有有效参赛记录，榜单仅展示已公开的微信、开发账号。",
+        ...(report.minPlayers ? ["月报榜单只统计 " + report.minPlayers + " 人及以上的有效对局。"] : []),
         "活跃天数按有有效对局结算的自然日去重；同一对局和同一玩家分别去重统计。",
         "积分含本月有效计分局及本月积分调整，至少一场计分局才参与。总胜率和阵营胜率荣誉均至少 10 局；现有排行榜门槛保持原规则。",
         "趣味次数榜至少一条对应记录，比例榜至少 5 次有效机会；缺失记录不当作零次。",
