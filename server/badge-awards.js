@@ -29,6 +29,10 @@ function grant(store, uid, id, { rank = null, points = null, campaign = CAMPAIGN
     .run(uid, id, campaign, grantedAt, rank, points);
   if (result.changes) store.db.prepare(`INSERT INTO badge_versions(uid,version) VALUES(?,1)
     ON CONFLICT(uid) DO UPDATE SET version=version+1`).run(uid);
+  return result.changes > 0;
+}
+function grantContributor(store, uid) {
+  return grant(store, uid, 'feedback_contributor', { campaign: 'feedback' });
 }
 // Participation is independent of public leaderboard visibility and winning.
 // Spectators have no match_players row. Companion/test/deleted/excluded records
@@ -128,4 +132,4 @@ function acknowledge(store, uid, input) {
   store.db.prepare('UPDATE badge_awards SET seen=1 WHERE uid=? AND id<=?').run(uid, input.through);
   return { acknowledged: input.through };
 }
-module.exports = { initialize, activate, settleMonthly, startMonthlyAwards, reconcileParticipants, notice, acknowledge, summary, CAMPAIGN, START, END, FIRST_MONTH };
+module.exports = { initialize, activate, settleMonthly, startMonthlyAwards, reconcileParticipants, grantContributor, notice, acknowledge, summary, CAMPAIGN, START, END, FIRST_MONTH };

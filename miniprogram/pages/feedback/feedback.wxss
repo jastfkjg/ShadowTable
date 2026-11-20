@@ -1,1 +1,25 @@
 @import "./layout.wxss";
+@import "./records.wxss";
+
+.fb-center { max-width: 590px; margin: 0 auto; padding-top: 16px; }
+.fb-tabs {
+  display: flex; align-items: center; gap: 3px; padding: 4px;
+  border: 1px solid #344651; background: #15232c; border-radius: 14px;
+}
+.fb-tabs button.fb-tab[size="mini"] {
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; width: 0; min-width: 0; min-height: 44px; padding: 5px 8px; margin: 0;
+  border: 1px solid transparent; border-radius: 10px; background: transparent;
+  color: var(--muted); font-size: 15px; line-height: 1.4; font-weight: 500;
+}
+.fb-tabs button.fb-tab.selected { background: #354044; border-color: #4d5550; color: var(--accent); font-weight: 600; }
+.fb-title { margin: 25px 0 13px; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.fb-choices { background: var(--surface); border: 1px solid rgba(177,191,198,.18); border-radius: 16px; overflow: hidden; }
+.fb-choice { display: flex; align-items: center; gap: 13px; margin: 0 16px; padding: 17px 0; }
+.fb-choice + .fb-choice { border-top: 1px solid rgba(177,191,198,.13); }
+.fb-choice .fb-well { flex: none; width: 40px; height: 40px; border-radius: 12px; }
+.fb-choice .fb-well image { width: 23px; height: 23px; }
+.fb-choice .fb-choice-title { font-size: 17px; line-height: 1.45; }
+.fb-choice .fb-muted { font-size: 13px; line-height: 1.5; }
+.fb-chevron { flex: none; }
+.fb-history { margin-top: 20px; }

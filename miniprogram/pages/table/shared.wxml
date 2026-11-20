@@ -173,10 +173,7 @@
       </view>
       <view class="deal-controls">
         <button wx:if="{{dealtIdentitySecret}}" class="primary deal-stow {{dealtIdentitySecret.cardArt?'brass':''}}" hover-class="none" bindtap="closeDealtIdentity">收起身份</button>
-        <block wx:if="{{!dealtIdentitySecret && !dealClosing}}">
-          <view class="deal-prompt" role="status">{{busyAction==='dealtIdentity'?'正在查看身份…':network?(identityChange?'你已获得新身份，轻点翻牌':'轻点牌面，查看身份'):'联网后可查看身份'}}</view>
-          <button wx:if="{{!identityChange}}" class="deal-later" hover-class="none" bindtap="closeDealtIdentity">稍后查看</button>
-        </block>
+        <view wx:if="{{!dealtIdentitySecret && !dealClosing}}" class="deal-prompt" role="status">{{busyAction==='dealtIdentity'?'正在查看身份…':network?(identityChange?'你已获得新身份，轻点翻牌':'轻点牌面，查看身份'):'联网后可查看身份'}}</view>
       </view>
     </view>
   </scroll-view>
@@ -499,7 +496,7 @@
           <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
           <view class="compact-role-copy">
             <view class="compact-role-name">
-              <view class="compact-role-title">{{secret.role}}</view>
+              <view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view>
               <button wx:if="{{secret.info.showRoleHelp}}" hover-class="none" class="compact-role-help" bindtap="openIdentityRoleHelp" aria-label="角色说明" aria-haspopup="dialog"><view class="compact-role-help-mark" aria-hidden="true"><image src="/assets/sheet-book.svg" /></view></button>
             </view>
             <view class="compact-faction faction-{{secret.factionTone}}">
@@ -509,9 +506,9 @@
             </view>
           </view>
         </view>
-        <view wx:if="{{!secret.info.review.skillByFaction && (secret.info.review.emptyVision || secret.skillStatus.title || secret.identityHistory.length > 1)}}" class="compact-review-row">
+        <view wx:if="{{!secret.info.review.skillByFaction && ((secret.info.showVision && secret.info.vision.empty) || secret.skillStatus.title || secret.identityHistory.length > 1)}}" class="compact-review-row">
           <view class="compact-review-values">
-            <text wx:if="{{secret.info.review.emptyVision}}">{{secret.info.vision.text}}</text>
+            <text wx:if="{{secret.info.showVision && secret.info.vision.empty}}">{{secret.info.vision.text}}</text>
             <text wx:if="{{secret.skillStatus.title}}" class="compact-review-skill {{secret.skillStatus.title==='技能可用'?'is-ready':''}}">{{secret.skillStatus.title}}</text>
           </view>
           <template wx:if="{{secret.identityHistory.length > 1}}" is="compactHistoryEntry" />

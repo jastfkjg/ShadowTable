@@ -14,8 +14,10 @@
     card.className = "feedback-ticket";
     const summary = document.createElement("summary");
     const meta = el("span", "", "ticket-meta");
-    meta.append(el("span", item.reply ? "已回复" : "待处理", item.reply ? "ticket-done" : "ticket-pending"),
+    meta.append(el("span", item.reply ? "已回复" : "待回复", item.reply ? "ticket-done" : "ticket-pending"),
       el("span", [item.category, item.area].filter(Boolean).join(" · ")));
+    const adoption = el("span", "已采纳", "ticket-done");
+    if (item.acceptedAt != null) meta.append(adoption);
     summary.append(meta, el("strong", item.content, "ticket-excerpt"),
       el("span", (item.nickname || "玩家") + " · " + timestamp(item.created), "ticket-byline"));
     card.append(summary);
@@ -35,6 +37,34 @@
       }
       body.append(photos);
     }
+    const decision = el("div", "", "ticket-decision");
+    const acceptedText = time => "已采纳 · " + timestamp(time);
+    const decisionStatus = el("span", item.acceptedAt == null ? "尚未采纳" : acceptedText(item.acceptedAt));
+    decisionStatus.setAttribute("role", "status");
+    decision.append(decisionStatus);
+    if (item.acceptedAt == null) {
+      const accept = el("button", "采纳反馈");
+      accept.type = "button";
+      decision.append(accept);
+      accept.addEventListener("click", async () => {
+        if (accept.disabled) return;
+        accept.disabled = true;
+        accept.textContent = "正在采纳";
+        try {
+          const result = await api("feedback/" + item.id + "/accept", {});
+          if (!list.contains(card)) return;
+          meta.append(adoption);
+          decisionStatus.textContent = acceptedText(result.acceptedAt)
+            + (result.awarded ? " · 已发放「共建者」徽章" : " · 玩家已拥有「共建者」徽章");
+          accept.remove();
+        } catch (error) {
+          decisionStatus.textContent = error.message;
+          accept.disabled = false;
+          accept.textContent = "重试采纳";
+        }
+      });
+    }
+    body.append(decision);
     const renderReply = (text, date) => {
       const result = el("div", "", "ticket-reply");
       result.append(el("strong", "开发者回复"), el("p", text, "ticket-text"), el("small", timestamp(date)));
@@ -62,19 +92,18 @@
       form.addEventListener("submit", async event => {
         event.preventDefault();
         if (send.disabled || !input.value.trim()) return;
-        const version = revision;
         const reply = input.value.trim();
         send.disabled = true; input.disabled = true; send.textContent = "正在发送";
         try {
           await api("feedback/" + item.id + "/reply", { reply });
           drafts.delete(item.id);
-          if (version !== revision) return;
+          if (!list.contains(card)) return;
           form.remove();
           renderReply(reply, Date.now());
           const badge = meta.firstElementChild;
           badge.textContent = "已回复"; badge.className = "ticket-done";
           if (filter === "pending") card.remove();
-          status.textContent = list.childElementCount || next ? "回复已发送。" : "回复已发送，当前没有待处理反馈。";
+          status.textContent = list.childElementCount || next ? "回复已发送。" : "回复已发送，当前没有待回复的反馈。";
         } catch (e) {
           message.textContent = e.message;
           send.disabled = false; input.disabled = false; send.textContent = "重试发送";
@@ -98,7 +127,7 @@
       if (version !== revision) return;
       for (const item of page.items) list.append(record(item));
       next = page.next;
-      status.textContent = list.childElementCount ? "" : ({ pending: "当前没有待处理的反馈。", replied: "还没有已回复的反馈。", all: "还没有玩家提交反馈。" })[filter];
+      status.textContent = list.childElementCount ? "" : ({ pending: "当前没有待回复的反馈。", replied: "还没有已回复的反馈。", all: "还没有玩家提交反馈。" })[filter];
     } catch (e) {
       if (revision === version) status.textContent = e.message + "，可点击「" + (append ? "加载更多" : "刷新列表") + "」重试。";
     } finally {

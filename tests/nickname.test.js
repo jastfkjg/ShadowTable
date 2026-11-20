@@ -233,6 +233,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   context.window.shadowtableRoomSheets = require('../miniprogram/room-sheet-presentation');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
+  context.window.shadowtableBadgeAwardMarkup = require('../server/web/badge-award-markup');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
     window.test = { state, applyRoute, ACTIONS, viewEntrySheet, submitEntry };

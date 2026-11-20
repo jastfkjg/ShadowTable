@@ -7,7 +7,7 @@
 .deal-stage {
   --deal-top: max(64px, calc(env(safe-area-inset-top) + 44px));
   --deal-bottom: max(12px, env(safe-area-inset-bottom));
-  --deal-controls: 84px;
+  --deal-controls: 60px;
   --deal-height: min(135vw, 535px, calc(100vh - var(--deal-top) - var(--deal-bottom) - var(--deal-controls)));
   width: 86vw;
   max-width: 340px;
@@ -123,7 +123,6 @@
 .deal-controls { min-height: var(--deal-controls); position: sticky; bottom: env(safe-area-inset-bottom); padding: 10px 0 4px; box-sizing: border-box; }
 .deal-controls button.deal-stow { width: 88%; min-height: 46px; margin: 0 auto; border-radius: 14px; font-weight: 600; }
 .deal-prompt { color: #f5efe3; font-size: 16px; font-weight: 600; }
-.deal-controls button.deal-later { min-height: 44px; width: auto; margin: 0 auto; padding: 4px 15px; background: transparent; color: #c1cbd0; font-size: 13px; }
 .deal-controls button:active { opacity: .8; }
 @keyframes deal-land {
   from { opacity: 0; transform: translateY(-34px) rotate(-4deg); }

@@ -121,7 +121,7 @@
     if (split) { text = split[1]; abilityText = split[2]; }
     const vision = present(text, players);
     vision.wide = vision.players.some(player => Array.from(player.name || "").length > 8 || Array.from(player.role || "").length > 8);
-    vision.empty = text === "没有视野。";
+    vision.empty = /^(?:没有视野|无角色视野)。?$/.test(text);
     vision.text = vision.empty ? "无角色视野" : vision.text;
     // Empty results are different from unknown/not-yet-resolved results.
     const emptySeats = text.match(/^(初始见面匪|你的坏人同伴|你的盗贼同伴|你看见的坏人座位|你看见的举手座位|梅林与莫甘娜位于|蓝术士与红术士位于|刺客位于)：(?:无可见同伴|无号|号)?(?:。|（|$)([\s\S]*)$/);
@@ -148,7 +148,6 @@
     ] : [];
     const showVision = !!passive || (!!text && !(vision.empty && inspections.length));
     const review = {
-      emptyVision: showVision && vision.empty,
       skillByFaction: vision.players.length > 0 && secret.skillStatus?.title === "无主动技能" && !secret.skillStatus.detail,
       visionHeading: passive ? "存活 B 牌坏人" : vision.label || "角色视野",
       visionMeta: passive?.round ? "第 " + passive.round + " 轮" : vision.players.length ? vision.players.length + " 人" : "",

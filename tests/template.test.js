@@ -598,12 +598,12 @@ test("座位区保留人数和准备统计，长昵称保留在原卡片且不�
   assert.match(button.attr.ariaLabel, /这是一个很长的完整玩家昵称/);
   assert.deepEqual(Array.from(nodes(button).find(n => n.attr?.class === "seat-name").children), ["这是一个很长的完整玩家昵称"]);
 });
-test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份入口气泡，不渲染旧秘密", () => {
+test("初次发牌提醒只提示翻牌，揭示后可收起身份，关闭后隐藏秘密并提示身份入口", () => {
   const data = { ...base, room: { phase: "tools", code: "123456", capacity: 6, team: [], me: { seat: 1 } }, dealtIdentityDialog: true };
   const hidden = render(data);
   assert.ok(byHandler(hidden, "revealDealtIdentity"));
-  assert.ok(byHandler(hidden, "closeDealtIdentity"));
-  assert.match(JSON.stringify(hidden), /稍后查看/);
+  assert.equal(byHandler(hidden, "closeDealtIdentity"), undefined);
+  assert.doesNotMatch(JSON.stringify(hidden), /稍后查看/);
   const secret = { role: "梅林", faction: "好人阵营", information: "秘密视野" };
   const shown = render({ ...data, dealtIdentitySecret: secret });
   assert.match(JSON.stringify(shown), /秘密视野/);
@@ -2234,6 +2234,20 @@ test('紧凑身份信息在当前、发牌、新身份和旧身份中统一分�
   assert.doesNotMatch(JSON.stringify(renderTable({...historical,identityHistoryExpandedId:null})),/存活 B 牌坏人/);
 });
 
+test('蓝兰斯洛特回看将空视野与技能状态放在同一行，旧展示数据也只渲染一次', () => {
+  const { presentIdentity } = require('../miniprogram/identity-vision');
+  const room = { phase:'tools', players:[], team:[], history:[], me:{seat:1} };
+  for (const information of ['没有视野。', '无角色视野']) {
+    const secret = { role:'蓝兰斯洛特', factionTone:'good', information, skillStatus:{title:'技能可用'} };
+    secret.info = presentIdentity(secret);
+    delete secret.info.review;
+    const tree = renderTable({...base, room, revealed:true, secret});
+    const summary = nodes(tree).find(node => node.attr?.class === 'compact-review-values');
+    assert.match(JSON.stringify(summary), /无角色视野.*is-ready.*技能可用/);
+    assert.equal(nodes(tree).some(node => node.attr?.class === 'identity-information'), false);
+    assert.ok(nodes(tree).some(node => node.attr?.class === 'compact-role-title faction-good'));
+  }
+});
 test('当前身份名旁显示角色说明图标，技能状态和身份历程各有位置', () => {
   const {presentIdentity}=require('../miniprogram/identity-vision');
   const {identityHelp}=require('../server/knight-role-help');

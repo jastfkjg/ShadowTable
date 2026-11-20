@@ -3,7 +3,8 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {wxmlToJs}=require('./miniprogram-compiler');
 const {catalogue,monthlyAward}=require('../miniprogram/badges');
-const {present,markup}=require('../miniprogram/badge-awards');
+const {present}=require('../miniprogram/badge-awards');
+const markup=require('../server/web/badge-award-markup');
 const {render:renderMonthlyArt}=require('../server/monthly-badge-art');
 const root=path.resolve(__dirname,'../miniprogram'),out=path.resolve(process.argv[2] || path.join(__dirname,'../output/playwright/october-awards-implemented'));
 fs.mkdirSync(out,{recursive:true});

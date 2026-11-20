@@ -23,7 +23,7 @@ async function preparePhoto(file) {
 
 Page({
   data: { type: types[0], areas: ["牌桌", "对局记录", "我的", "其他"], area: "", content: "",
-    photos: [], choosing: false, saving: false, ready: false, guardPaused: false, error: "" },
+    photos: [], choosing: false, saving: false, ready: false, guardPaused: false, receiptId: 0, error: "" },
   onLoad(options) {
     this.alive = true;
     this.setData({ type: types.find(type => type.id === options.type) || types[0] });
@@ -48,11 +48,13 @@ Page({
   },
   onGuardClosed() {
     if (!this.alive) return;
+    if (this.data.receiptId) return this.openReceipt();
     if (this.leaving) return backToMe();
     if (this.data.guardPaused || !(this.data.ready || this.data.photos.length)) return;
     // A native back closes the page-container first. Rearm it for the next back,
     // including another back gesture while the confirmation is on screen.
     this.setData({ guardPaused: true }, () => {
+      if (this.data.receiptId) return this.openReceipt();
       if (this.alive && !this.leaving) this.setData({ guardPaused: false });
     });
     return this.back();
@@ -90,6 +92,19 @@ Page({
   },
   remove(e) { if (!this.data.choosing) this.edit({ photos: this.data.photos.filter(path => path !== e.currentTarget.dataset.path) }); },
   preview(e) { wx.previewImage({ current: e.currentTarget.dataset.path, urls: this.data.photos }); },
+  openReceipt() {
+    const id = this.data.receiptId;
+    if (!this.alive || !id) return;
+    this.setData({ receiptId: 0 });
+    const pages = getCurrentPages();
+    const previous = pages[pages.length - 2];
+    const redirect = () => wx.redirectTo({ url: "feedback?tab=history&id=" + id,
+      fail: () => this.setData({ guardPaused: false, error: "谢谢你的反馈！首次被采纳时，你会获得永久「共建者」徽章。可返回「我的反馈」查看。" }) });
+    if (previous?.showReceipt) {
+      previous.showReceipt(id);
+      wx.navigateBack({ fail: redirect });
+    } else redirect();
+  },
   async submit() {
     if (!this.data.ready || this.data.saving || this.data.choosing) return;
     this.setData({ saving: true, error: "" });
@@ -101,10 +116,9 @@ Page({
       if (!this.alive) return;
       const result = await api.request("/api/me/feedback", "POST", { category: type.label, area, content, images }, this.key);
       if (!this.alive) return;
-      this.setData({ ready: false, content: "", area: "", photos: [] });
       this.key = null;
-      wx.showToast({ title: "反馈已提交", icon: "success" });
-      wx.redirectTo({ url: "history?id=" + result.id, fail: () => this.setData({ error: "反馈已提交，可返回「我的反馈」查看。" }) });
+      // Keep the guard mounted until afterleave so WeChat allows navigateBack.
+      this.setData({ receiptId: result.id, guardPaused: true, ready: false, content: "", area: "", photos: [] });
     } catch (e) {
       if (this.alive) this.setData({ error: e.message || "提交失败，内容已保留，请重试" });
     } finally { if (this.alive) this.setData({ saving: false }); }

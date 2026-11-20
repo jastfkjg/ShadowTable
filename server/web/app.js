@@ -1598,7 +1598,7 @@
         let detail = null, closed = false;
         const previousFocus = document.activeElement;
         const renderNotice = () => {
-          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwards.markup(value, esc, detail);
+          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwardMarkup(value, esc, detail);
           badgeNoticeHost.querySelector(detail ? '[data-award-back]' : '[data-award-confirm]')?.focus({preventScroll:true});
         };
         const done = confirmed => {
@@ -3941,7 +3941,7 @@ function roomListItems(rooms) {
     function note(text) { return text ? '<div class="identity-info-note">' + esc(text) + '</div>' : ''; }
     function seat(number) { return '<span class="identity-info-seat">' + esc(number) + '<span class="identity-info-unit">号</span></span>'; }
     var html = '<div class="identity-information">';
-    if (info.showVision && !(review && info.review.emptyVision)) {
+    if (info.showVision && !(review && vision.empty)) {
       var initialSummary = compact && vision.label === '初始见面匪';
       var visionMeta = info.passive?.round ? '第 ' + info.passive.round + ' 轮' : initialSummary ? vision.label + (vision.players.length ? ' · ' + vision.players.length + '人' : '') : vision.label === '初始见面匪' ? '初始视野' : '';
       html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + (review ? heading(info.review.visionHeading, info.review.visionMeta) : heading('角色视野', visionMeta, initialSummary));
@@ -4511,16 +4511,17 @@ function roomListItems(rooms) {
     const art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
     const info = identityVision.presentIdentity(identity, state.seats);
     const review = info.review, status = identity.skillStatus;
+    const emptyVision = info.showVision && info.vision.empty;
     const history = identity.identityHistory?.length > 1
       ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog">身份历程 <span aria-hidden="true">›</span></button>' : '';
-    const summary = !review.skillByFaction && (review.emptyVision || status?.title || history)
+    const summary = !review.skillByFaction && (emptyVision || status?.title || history)
       ? '<div class="compact-review-row"><div class="compact-review-values">' +
-        (review.emptyVision ? '<span>' + esc(info.vision.text) + '</span>' : '') +
+        (emptyVision ? '<span>' + esc(info.vision.text) + '</span>' : '') +
         (status?.title ? '<span class="compact-review-skill' + (status.title === '技能可用' ? ' is-ready' : '') + '">' + esc(status.title) + '</span>' : '') +
         '</div>' + history + '</div>' : '';
     return '<div class="identity open identity-compact">' +
       '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><span class="compact-hide-face"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></span></button></div>' +
-      '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-name"><div class="compact-role-title">' + esc(identity.role) + '</div>' +
+      '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-name"><div class="compact-role-title faction-' + esc(identity.factionTone || '') + '">' + esc(identity.role) + '</div>' +
       (info.showRoleHelp ? '<button type="button" class="compact-role-help" data-action="openIdentityRoleHelp" aria-haspopup="dialog" aria-label="角色说明"><span class="compact-role-help-mark" aria-hidden="true"><img src="/assets/sheet-book.svg" alt="" /></span></button>' : '') +
       '</div><div class="compact-faction faction-' + esc(identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span>' +
       (review.skillByFaction ? '<span class="compact-faction-skill">' + esc(status.title) + '</span>' + history : '') + '</div></div></div>' + summary +
