@@ -39,6 +39,9 @@ async function api(path, data) {
   return result;
 }
 function showSession(on) {
+  if (on && $("dashboard").hidden && window.FeedbackInbox && !$("feedback-management").hidden) {
+    window.FeedbackInbox.load();
+  }
   if(on) window.MatchRecords?.resume();
   $("login").hidden = on;
   $("dashboard").hidden = !on;
@@ -46,6 +49,7 @@ function showSession(on) {
   if (!on) {
     $("rooms").replaceChildren();
     $("audit").replaceChildren();
+    window.FeedbackInbox?.clear();
     window.MatchRecords?.clear();
     window.AvoidanceAdmin?.clear();
   }
@@ -704,7 +708,10 @@ $("confirm-dialog").addEventListener("close", () => {
 $("cancel").addEventListener("click", () => {
   if (!actionBusy) $("confirm-dialog").close();
 });
-$("refresh").addEventListener("click", refresh);
+$("refresh").addEventListener("click", () => {
+  if (window.FeedbackInbox && !$("feedback-management").hidden) return window.FeedbackInbox.load();
+  return refresh();
+});
 $("prev").addEventListener("click", () => {
   offset = Math.max(0, offset - 50);
   refresh();

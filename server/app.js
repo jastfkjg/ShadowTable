@@ -1,5 +1,6 @@
 "use strict";
 const http = require("node:http");
+const playerFeedback = require("./feedback");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails, completeActionDetails } = require("./audit");
@@ -312,6 +313,18 @@ function createApp({
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
       if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
       if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));
+      if (path === "/api/me/feedback") {
+        if (req.method === "GET") return send(200, playerFeedback.list(store, uid, requestUrl.searchParams));
+        check(req.method === "POST", "接口不存在", 404);
+        limit(`feedback:${uid}`, 10);
+        return send(200, await playerFeedback.submit(store, uid, req.headers["idempotency-key"], await body(req, playerFeedback.maxBody)));
+      }
+      const feedbackImage = path.match(/^\/api\/me\/feedback\/(\d+)\/images\/([0-3])$/);
+      if (feedbackImage && req.method === "GET") {
+        const bytes = playerFeedback.image(store, uid, feedbackImage[1], feedbackImage[2]);
+        res.setHeader("Content-Type", "image/jpeg");
+        return send(200, bytes, true);
+      }
       if (path === "/api/me/avatar-uploads") {
         if (req.method === "GET") return send(200, { enabled: uploads.enabled && (uid.startsWith("wx:") || devAuth && uid.startsWith("dev:")) });
         check(req.method === "POST", "接口不存在", 404);
