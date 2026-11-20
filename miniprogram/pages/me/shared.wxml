@@ -10,6 +10,13 @@
     <view class="me-chevron" aria-hidden="true"></view>
   </navigator>
 </template>
+<template name="meMenuLink">
+  <navigator class="personal-link" url="{{url}}" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}">
+    <view class="me-icon-well {{well}}"><view class="me-icon {{icon}}" aria-hidden="true"></view></view>
+    <view class="me-link-copy"><view class="me-link-title">{{title}}</view><view class="me-link-caption">{{caption}}</view></view>
+    <view class="me-chevron" aria-hidden="true"></view>
+  </navigator>
+</template>
 <template name="personalPanel">
 <view class="page personal-page me-page tab-page">
   <template wx:if="{{loading && !profile}}" is="loadingPlaceholder" data="{{kind:'personal'}}" />
@@ -60,13 +67,14 @@
     <view class="personal-links me-links me-links-community">
       <view class="me-section-label">一起看看</view>
       <view class="me-link-group">
-        <navigator class="personal-link" url="/pages/leaderboard/leaderboard" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-green"><view class="me-icon me-icon-rank" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">排行榜</view><view class="me-link-caption">看看同桌朋友的表现</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
-        <navigator class="personal-link" url="/pages/monthly/monthly" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-orange"><view class="me-icon me-icon-calendar" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">月度战报</view><view class="me-link-caption">回顾这个月一起打过的局</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+        <template is="meMenuLink" data="{{url:'/pages/leaderboard/leaderboard',well:'me-well-green',icon:'me-icon-rank',title:'排行榜',caption:'看看同桌朋友的表现'}}" />
+        <template is="meMenuLink" data="{{url:'/pages/monthly/monthly',well:'me-well-orange',icon:'me-icon-calendar',title:'月度战报',caption:'回顾这个月一起打过的局'}}" />
       </view>
     </view>
     <view class="personal-links me-links me-links-secondary"><view class="me-link-group">
-      <navigator class="personal-link" url="/pages/data-management/data-management" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-rose"><view class="me-icon me-icon-database" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">数据管理</view><view class="me-link-caption">按月清除个人战绩</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
-      <navigator class="personal-link" url="/pages/help/help" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-book" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">帮助与规则</view><view class="me-link-caption">流程、角色与板子说明</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+      <template is="meMenuLink" data="{{url:'/pages/data-management/data-management',well:'me-well-rose',icon:'me-icon-database',title:'数据管理',caption:'按月清除个人战绩'}}" />
+      <template is="meMenuLink" data="{{url:'/pages/help/help',well:'me-well-slate',icon:'me-icon-book',title:'帮助与规则',caption:'流程、角色与板子说明'}}" />
+      <template is="meMenuLink" data="{{url:'/pages/feedback/feedback',well:'me-well-gold',icon:'me-icon-feedback',title:'建议与意见',caption:'遇到问题或有新想法，告诉我们'}}" />
       <button class="personal-link" bindtap="about" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="关于桌边助手"><view class="me-icon-well me-well-slate"><view class="me-icon me-icon-info" aria-hidden="true"></view></view><view class="me-link-copy"><view class="me-link-title">关于桌边助手</view></view><view class="me-chevron" aria-hidden="true"></view></button>
     </view></view>
   </block>

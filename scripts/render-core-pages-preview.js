@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const { wxmlToJs } = require("./miniprogram-compiler");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures");
-const { presentReplay, trajectory } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
 const roomSwipe = require("../miniprogram/room-swipe");
@@ -16,7 +16,7 @@ const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision, presentIdentityInformation } = require("../miniprogram/room-sheet-presentation");
+const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision, presentIdentityInformation, playerProgressCard } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -48,8 +48,8 @@ function html(node) {
     if (key === "hidden" || key === "disabled") return value ? [key] : [];
     if (key.startsWith("aria")) key = key.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
     if (key === "src" && value.startsWith("/")) {
-      const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml" })[path.extname(value)];
-      value = "data:" + mime + ";base64," + fs.readFileSync(path.join(root, value)).toString("base64");
+      const mime = ({ ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml" })[path.extname(value)];
+      value = "data:" + mime + ";base64," + fs.readFileSync(value.startsWith("/assets/role-cards/") ? path.join(__dirname, "../server/web", value) : path.join(root, value)).toString("base64");
     }
     if (key === "style") value = String(value).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
     return ["id", "class", "src", "style", "role", "aria-label", "aria-live", "aria-busy", "aria-selected", "aria-pressed", "aria-expanded", "aria-hidden", "aria-haspopup", "aria-modal", "value", "placeholder", "maxlength"].includes(key) ? [`${key}="${safe(value)}"`] : [];
@@ -74,7 +74,7 @@ function write(name, file, data, styles, extra = "") {
     ? owner.connectionPreviewState.connectionVisible ? owner.connectionPreviewState : null
     : runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
   if (previewConnection) owner.connectionVisible = true;
-  for (const key of ['secret', 'dealtIdentitySecret', 'identityChange', 'actionSecret']) {
+  for (const key of ['secret', 'dealtIdentitySecret', 'actionSecret']) {
     if (!data[key]) continue;
     data[key] = { ...data[key], info: presentIdentityInformation(data[key], data.seats) };
     if (data[key].identityHistory) data[key].identityHistory = data[key].identityHistory.map(record => ({ ...record,
@@ -290,8 +290,18 @@ const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
 const readmeTable = tableFixtures.setup(readmeRoom);
+// A fixed demo deal keeps the README card illustration stable across renders.
+readmeTable.matchId = 'readme-demo';
+const merlin = readmeTable.players.find(player => readmeTable.roles[player.uid] === 'merlin');
+const readmeIdentity = tableScene(readmeTable, merlin.uid, { dealtIdentityDialog: true });
+readmeIdentity.dealtIdentitySecret = presentPrivateIdentity(privateView(readmeTable, merlin.uid), 'good', readmeIdentity.seats);
 tableFixtures.task(readmeTable, [1, 2, 3]);
+tableFixtures.run(readmeTable, 'beginActivity', { kind: 'vote', team: [1, 3, 5, 7] });
+for (const player of readmeTable.players.slice(0, 5)) {
+  tableFixtures.run(readmeTable, 'submit', { value: 'approve' }, player.uid);
+}
 const readmeTableScene = tableScene(readmeTable, 'wx:replay-5', { historyUnreadCount: 1 });
+readmeTableScene.playerProgressCard = playerProgressCard(readmeTableScene.room);
 for (const seat of readmeTableScene.seats) {
   seat.avatarUrl = `/pages/profile/assets/avatars/geometric-${String(seat.seat).padStart(2, "0")}.jpg`;
 }
@@ -328,6 +338,7 @@ const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,win
   {faction:'good',label:'好人阵营',total:6,wins:2,winRate:100/3,rateLabel:'33.3%',rateValue:'33.3'}]};
 const playerSample = {name:'阿伟',initial:'阿',seat:6,badges:badgeSamples};
 const tableScenes = {
+  'readme-identity': readmeIdentity,
   'readme-table': readmeTableScene,
   'player-card-a': {...tablePlaying, playerCard: {...playerSample, name:'大V', initial:'大', seat:1, isHost:true, avatarUrl:'/pages/profile/assets/avatars/crayon-07.jpg'},
     playerCardStats: {scoreTotal:27,rateLabel:'55.6%',rateValue:'55.6',total:18,wins:10,byFaction:[
@@ -380,12 +391,14 @@ for(const [role,mode,value] of [...skillFixtures.cases,['servant','none','pass']
   tableScenes['skill-'+role]=data;
   tableScenes['skill-'+role+'-selected']={...data,draftChoice:value,draftLabel:choices.find(c=>c.value===value)?.label||'',...skillPresentation.skillSelectionView(value,data.skillTargetMode),...(mode==='swap'?{swapSeats:[2,7],swapPlayers:data.swapPlayers.map(p=>({...p,selected:[2,7].includes(p.seat)}))}:{})};
 }
-const newIdentity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动开枪。',skillStatus:{title:'新技能尚未启用',detail:'下次技能环节可用。'}},'evil');
+const redrawSample = skillFixtures.fixture('redHunter', 'skills');
+Object.assign(redrawSample.source.knights.players.p2, { b: true, availableRound: redrawSample.source.knights.round + 1 });
+const newIdentity = presentPrivateIdentity(privateView(redrawSample.source, 'p2'), 'evil', tablePlaying.seats);
 const identityHistory=[{...newIdentity,id:1,current:true,sinceLabel:'第2轮 · 换牌'},{...presentPrivateIdentity({role:'亚瑟的忠臣',information:'没有视野。',faction:'好人阵营'},'good'),id:0,initial:true,sinceLabel:'开局 · A牌',detailAvailable:true}];
 Object.assign(tableScenes,{
-  'new-identity':{...tablePlaying,identityChange:newIdentity,identityChangeRevealed:true},
-  'new-identity-covered':{...tablePlaying,identityChange:newIdentity},
-  'new-identity-long':{...tablePlaying,identityChange:{...newIdentity,information:newIdentity.information.repeat(8)},identityChangeRevealed:true},
+  'new-identity':{...tablePlaying,identityChange:{identityRevision:1},dealtIdentitySecret:newIdentity},
+  'new-identity-covered':{...tablePlaying,identityChange:{identityRevision:1}},
+  'new-identity-long':{...tablePlaying,identityChange:{identityRevision:1},dealtIdentitySecret:{...newIdentity,information:newIdentity.information.repeat(8)}},
   'identity-history':{...tablePlaying,revealed:true,secret:{...newIdentity,identityHistory},identityHistoryOpen:true,identityHistoryExpandedId:0},
   'fairy-result':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人',information:'7号查验结果：坏人（第2轮）'}),fairyResultRevealed:true},
   'fairy-covered':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人'})},
@@ -428,15 +441,15 @@ merlinSource.knights.initialRoles={...merlinSource.roles};
 const identityNames=['小橙','子龙','林间','初夏','北川','舟舟','阿木','七月','阿辰','小鱼','向晚','晚风'];
 const identityAvatars=['19','04','13','18','14','21','20','16','15','22','27','28'];
 merlinSource.players.forEach((player,index)=>Object.assign(player,{name:identityNames[index],avatarUrl:'/pages/profile/assets/avatars/crayon-'+identityAvatars[index]+'.jpg'}));
-for(const [role,tone] of [['merlin','good'],['morgana','evil']]) {
+for(const [role,tone] of [['merlin','good'],['percival','good'],['morgana','evil'],['assassin','evil']]) {
   const player=merlinSource.players.find(player=>merlinSource.roles[player.uid]===role),secret=privateView(merlinSource,player.uid);
   tableScenes['ui-identity-'+role]=tableScene(merlinSource,player.uid,{dealtIdentityDialog:true,dealtIdentitySecret:{...secret,
     factionTone:tone,portrait:portrait(secret.role,tone).portrait,vision:presentVision(secret.information,merlinSource.players)}});
 }
 for(const [name,profiles] of [['long-name',merlinSource.players.map(player=>player.seat===3?{...player,name:'这是一个很长的完整玩家昵称'}:player)],
   ['avatar-failed',merlinSource.players.map(player=>({...player,avatarFailed:true}))]]) {
-  const scene=tableScenes['ui-identity-morgana'],secret=scene.dealtIdentitySecret;
-  tableScenes['ui-identity-'+name]={...scene,dealtIdentitySecret:{...secret,vision:presentVision(secret.information,profiles)}};
+  const scene=tableScenes['ui-identity-morgana'];
+  tableScenes['ui-identity-'+name]={...scene,seats:scene.seats.map(seat=>({...seat,...profiles.find(p=>p.seat===seat.seat)}))};
 }
 // Focused review scenes use the shipped templates and actual private endpoint
 // projection; the forced role allocation makes the requested example stable.
@@ -449,6 +462,17 @@ Object.assign(reviewSource.roles,{'review-1':'morgana','review-3':'mordred','rev
 reviewSource.knights.initialRoles={...reviewSource.roles};
 const reviewSecret=privateView(reviewSource,'review-1');
 const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information,reviewSource.players)};
+for (const role of ['mordred', 'minion', 'assassin']) {
+  const sample = structuredClone(reviewSource), uid = 'review-1';
+  Object.assign(sample.roles, { [uid]: role, 'review-3': 'morgana', 'review-7': role === 'assassin' ? 'mordred' : 'assassin' });
+  sample.knights.initialRoles = { ...sample.roles };
+  const secret = privateView(sample, uid);
+  for (const variant of ['a', 'b']) {
+    tableScenes['woodcut-' + role + '-' + variant] = tableScene(sample, uid, { dealtIdentityDialog: true,
+      dealtIdentitySecret: { ...secret, factionTone: 'evil', portrait: portrait(secret.role, 'evil').portrait,
+        cardArt: '/assets/role-cards/' + role + '-' + variant + '.jpg' } });
+  }
+}
 tableScenes['ui-identity-morgana-no-avatars']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
 for(const [name,information] of [['anonymous','梅林与莫甘娜位于：3、7号。你无法区分谁是梅林。'],['long','完整的私密视野说明。'.repeat(35)]]) {
   tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information,reviewSource.players)}});

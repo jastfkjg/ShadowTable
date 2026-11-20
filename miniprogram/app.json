@@ -14,6 +14,7 @@
     "pages/web-login/web-login"
   ],
   "subPackages": [
+    { "root": "pages/feedback", "pages": ["feedback", "compose", "history"] },
     {
       "root": "pages/personality",
       "pages": ["personality"]

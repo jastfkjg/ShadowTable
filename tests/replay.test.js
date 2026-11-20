@@ -7,7 +7,7 @@ const { createHash, randomBytes } = require("node:crypto");
 const { Store } = require("../server/store");
 const { createApp } = require("../server/app");
 const { publicView, privateView } = require("../server/engine");
-const { presentReplay, trajectory } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const { setup, completed, onlineCompleted, run, task, skills, submit } = require("./helpers/replay-fixtures");
 
 test("完整复盘保留初始身份、当时阵营、同时互刀、抽牌顺序和最终计分，主流程结果不变", () => {

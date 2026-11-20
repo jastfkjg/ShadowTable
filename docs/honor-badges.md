@@ -1,8 +1,16 @@
 # 荣誉徽章与永久活动纪念
 
+## 积分月榜前三名永久徽章
+
+从 2026 年 11 月榜开始，每月 1 日北京时间 00:00 结算上月公开积分月榜。交剑王冠、持枪骑士、铜铸城钥依次对应第 1、2、3 名。沿用月榜参榜资格和并列名次，例如 1、1、3 时颁发两枚冠军和一枚季军徽章。十月仍按原内测活动发放。
+
+服务端在事务中冻结月份排名并授予徽章，跨月重启时补结尚未冻结的月份。每个月的榜单徽章单独收藏，获得后永久保留，可在「荣誉徽章」中佩戴。同一名次复用一张透明底图，服务端在飘带上合成对应榜单的年月。底图采用已选定的 C 款拱形边框和 B 款图案，年月字形为 Noto Serif。
+
+获奖玩家登录后，在首页或「我的」等能展示弹窗的页面收到未读徽章提醒。弹窗复用原有领取组件，确认后同一枚徽章不再提示。多个积压月份或其他纪念徽章可以合并提示。用 `node scripts/render-badge-awards-preview.js` 生成 `monthly-1.html` 到 `monthly-3.html` 预览。
+
 ## 2026年10月内测纪念
 
-五枚永久徽章与 26 枚月榜徽章一起展示在「荣誉收藏」中：
+五枚永久徽章与 49 枚月榜徽章一起展示在「荣誉收藏」中：
 
 | 徽章 | 资格 |
 | --- | --- |
@@ -26,9 +34,9 @@
 
 ## 月榜徽章
 
-小程序和网页版共用 26 枚暗金纹章。`miniprogram/badges.js` 收录 23 个趣味称号，以及积分榜「积分王者」、场次榜「牌桌常青树」、总胜率榜「常胜将军」。图案均使用内置 ImageGen 制作的 192px 透明 PNG，沿用古金浮雕、月桂边框和素金扣。两端徽章页和预览画廊的总数从目录读取。
+小程序和网页版共用 49 枚暗金纹章。`miniprogram/badges.js` 收录 46 个趣味称号，以及积分榜「积分王者」、场次榜「牌桌常青树」、总胜率榜「常胜将军」。图案均使用内置 ImageGen 制作的 192px 透明 PNG，沿用古金浮雕、月桂边框和素金扣。两端徽章页和预览画廊的总数从目录读取。
 
-八枚角色月榜徽章使用确认的候选图。小程序和网页版从服务端同源路径读取这些图案，正式资源位于 `server/web/assets/`。
+31 枚角色月榜徽章使用确认的候选图。小程序和网页版从服务端同源路径读取这些图案，正式资源位于 `server/web/assets/`。
 
 | 称号 | 选稿 | 资源 |
 | --- | --- | --- |
@@ -40,14 +48,39 @@
 | 梅林二号 | B · 双帽对照 | `morgana_with_percival.png` |
 | 深藏不露 | B · 斗篷藏牌 | `mordred_last_bust.png` |
 | 最强独狼 | A · 狼首双星 | `oberon_two_busts.png` |
+| 隐身乘客 | B | `merlin_all_rides.png` |
+| 幕后军师 | B | `merlin_skip_decider.png` |
+| 弹射下车 | C | `merlin_bust_exit.png` |
+| 孤注一掷 | A | `percival_merlin_streak.png` |
+| 压错宝 | A | `percival_morgana_streak.png` |
+| 化身梅派 | E | `percival_assassinated.png` |
+| 金牌乘客 | B | `servant_green_only.png` |
+| 定蓝机 | E | `servant_all_with_bust.png` |
+| 与世无争 | B | `servant_bench_three_green.png` |
+| 站错队 | A | `reverse_wrong_side.png` |
+| 影帝大莫 | A | `mordred_three_rides.png` |
+| 车底大莫 | B | `mordred_bench_win.png` |
+| 最后王牌 | B | `mordred_decider_only.png` |
+| 倒钩王者 | B | `morgana_three_rides.png` |
+| 新手演员 | E | `morgana_no_rides.png` |
+| 勇敢炮灰 | D | `assassin_oberon_double.png` |
+| 孤儿狼 | B | `oberon_solo_bust.png` |
+| 队友勿cue | A | `oberon_bench_win.png` |
+| 双炸艺术家 | E | `oberon_double_bust.png` |
+| 浪子回头 | A | `lancelot_red_redemption.png` |
+| 反水大师 | B | `lancelot_blue_betrayal.png` |
+| 双面间谍 | A | `lancelot_double_agent.png` |
+| 阵营摇摆王 | A | `lancelot_switch_win.png` |
 
-「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。使用现有历史投影，无需数据迁移。徽章同样由本月公开次数榜榜首持有，成功率榜不授予。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底；不使用防御称号的盾牌。客户端资源为 `miniprogram/assets/badges/good_shield.png`，原图保存在 `output/imagegen/badges/good_shield.png`；制作记录见 [金牌替身图案](good-shield-artwork.md)。
+「金牌替身」对应既有 `good_shield` 指标，归好人趣味榜，按终局时存活的非梅林好人被最终刀选中的次数统计，包含派西维尔。徽章由本月公开次数榜榜首持有。图案以迎住刺客匕首的金色替身面具为中心，沿用古金边框、月桂和深蓝内底。小程序和网页版从同源服务端读取 `server/web/assets/good_shield.png`。[金牌替身图案](good-shield-artwork.md)
 
 ## 资格
 
+随榜单更新的徽章和新结算的积分月榜永久徽章，均按榜单的 9 人及以上对局门槛评定。已冻结的名次和已发放的永久徽章继续保留。
+
 只按北京时间**当前月**的公开榜计算。趣味徽章取跨玩法、未筛选角色的**次数榜**，不以比例榜授予。积分、场次、总胜率徽章取对应月榜，复用已有参榜门槛、积分调整及原始胜率／样本量排序；所有实际 rank=1 的玩家（包括分页之外的并列榜首）均持有。零数据、隐藏榜单的玩家、游客、陪测账号不获授；开发账号沿用正常参榜资格。
 
-资格按请求动态读取，复用榜单快照与提交后失效机制。榜首变化、公开开关变化、管理员更正或排除记录立即影响后续请求；跨月切换快照。没有历史数据删除、月末永久授予或定时清库。
+实时榜首徽章按请求读取资格，复用榜单快照与提交后失效机制。榜首变化、公开开关变化、管理员更正或排除记录立即影响后续请求，跨月切换快照。
 
 ## 佩戴与展示
 

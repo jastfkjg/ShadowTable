@@ -1,8 +1,8 @@
 "use strict";
 // Facts remain server-only. Projections below expose only the authenticated player's story.
-const VERSION = "fun-2026-11-v6";
+const VERSION = "fun-2026-11-v7";
 const { labels, titles, honors, roleRecords, isCombinedRecord } = require("../miniprogram/fun-copy");
-const { questMembers, questFacts, projectRoleRecords } = require("./role-fun");
+const { questMembers, questFacts, projectRoleRecords, projectQuestTitles } = require("./role-fun");
 const { roles: variantRoles } = require("./variants");
 const bRoles = new Set(Object.keys(variantRoles).slice(Object.keys(variantRoles).indexOf("blueAwakened")));
 const modes = { voted: "玩家票选", classic: "经典", knights: "十二骑士", other: "扩展玩法" };
@@ -275,13 +275,15 @@ function project(record, players, roles) {
         opportunities,
         status: excluded ? "excluded" : known ? "known" : "unknown",
       });
-    projectRoleRecords(record, quests, player, initial, (id, role, achieved, known, detail, round) => {
+    const addRoleRecord = (id, role, achieved, known, detail, round) => {
       add(id, role, Number(!!achieved), 0, !!(achieved || known));
       if (achieved && !excluded) events.push({
         id: (id.startsWith("reverse_") ? "final-" : "") + id,
         role: labelRole(role), label: labels[id], detail, ...(round ? { round } : {}),
       });
-    });
+    };
+    projectRoleRecords(record, quests, player, initial, addRoleRecord);
+    projectQuestTitles(record, quests, player, initial, addRoleRecord);
     if (record.honorResult?.status === "settled" && !player.uid.startsWith("test:") && ["win", "loss"].includes(player.outcome)) {
       for (const key of ["mvp", "svp"]) {
         const award = record.honorResult[key].find(p => p.seat === player.seat);

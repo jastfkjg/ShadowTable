@@ -12,15 +12,152 @@ const { readBadges, saveBadge } = require('../server/badges');
 const { readProfile, saveProfile } = require('../server/profile');
 const presentation = require('../miniprogram/badge-awards');
 const NOW = Date.parse('2026-10-25T08:00:00Z');
+const DECEMBER = Date.parse('2026-12-01T00:00:00+08:00');
 const ids = (s, uid) => readBadges(s, uid).badges.filter(b=>b.permanent).map(b=>b.id);
-function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good' } = {}) {
+function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame = false, winner = 'good', capacity = 9 } = {}) {
   const id = randomUUID();
-  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt, winner, source:'manual',
+  s.archiveMatch({ id, board:'classic', boardName:'经典', capacity, endedAt, winner, source:'manual',
     ...(testGame ? {recordPurpose:'test'} : {}), players:[{ uid,name:uid,seat:1,role:'梅林',faction:'good',outcome:winner?'win':'excluded',
       ...(scored ? {score:{status:'scored',total:points,breakdown:[]}} : {}) }] });
   return id;
 }
 function hidden(s, uid) { const p=readProfile(s,uid);saveProfile(s,uid,{nickname:'隐藏玩家',version:p.version,leaderboardVisible:false}); }
+test('反馈采纳使用 A 款羽笔和永久荣誉文案，混合通知也能呈现全部徽章', () => {
+  const { awardDefinition } = require('../miniprogram/badges');
+  const quill = awardDefinition('feedback_contributor');
+  const single = presentation.present({ badges: [quill] });
+  assert.equal(single.title, '你的反馈被采纳了');
+  assert.equal(single.hero.id, quill.id);
+  assert.match(require('../server/web/badge-award-markup')(single, v => v), /枚永久徽章/);
+  const book = awardDefinition('october_2026_book');
+  const both = presentation.present({ badges: [book, quill] });
+  assert.equal(both.count, 2);
+  assert.equal(both.hero.id, quill.id);
+  assert.deepEqual(both.secondary.map(b => b.id), [book.id]);
+});
+test('升级前已回复的反馈仍可采纳，重启和跨月保留徽章与已读状态', async t => {
+  const feedback = require('../server/feedback');
+  const directory = mkdtempSync(join(tmpdir(), 'feedback-upgrade-'));
+  const database = join(directory, 'test.sqlite'), uid = 'wx:contributor';
+  let store;
+  t.after(() => { store?.close(); rmSync(directory, { recursive: true, force: true }); });
+  store = new Store(database, { clock: () => NOW });
+  const { id } = await feedback.submit(store, uid, randomUUID(), { category: '其他', content: '来自旧版的反馈' });
+  feedback.reply(store, id, '已收到。');
+  store.db.exec('ALTER TABLE feedback DROP COLUMN acceptedAt');
+  store.close();
+  store = new Store(database, { clock: () => NOW });
+  const old = feedback.list(store, uid, new URLSearchParams()).items[0];
+  assert.deepEqual([old.acceptedAt, old.reply], [null, '已收到。']);
+  assert.equal(feedback.accept(store, id).awarded, true);
+  awards.acknowledge(store, uid, { through: awards.notice(store, uid).notice.through });
+  store.close();
+  store = new Store(database, { clock: () => DECEMBER });
+  assert.deepEqual(ids(store, uid), ['feedback_contributor']);
+  assert.equal(feedback.accept(store, id).awarded, false);
+  assert.equal(awards.notice(store, uid).notice, null);
+});
+test('北京时间月初冻结上月公开积分前三，含并列，每月单独获得并可佩戴', () => {
+  let now = DECEMBER - 1;
+  const store = new Store(':memory:', { clock: () => now });
+  try {
+    const players = ['wx:gold', 'wx:silver', 'wx:bronze', 'wx:tied', 'wx:fourth', 'wx:hidden'];
+    players.forEach((uid, index) => game(store, uid, { points: [12, 9, 6, 6, 3, 99][index] }));
+    game(store, 'wx:small-only', { points: 100, capacity: 8 });
+    game(store, 'wx:fourth', { points: 100, capacity: 8 });
+    hidden(store, 'wx:hidden');
+    assert.equal(awards.notice(store, 'wx:gold').notice, null);
+    now++;
+    assert.throws(() => store.transaction(() => {
+      awards.settleMonthly(store);
+      throw Error('rollback');
+    }), /rollback/);
+    assert.equal(store.db.prepare('SELECT count(*) AS count FROM badge_awards').get().count, 0);
+
+    const notice = awards.notice(store, 'wx:gold').notice;
+    const badge = notice.badges[0];
+    assert.deepEqual(ids(store, 'wx:small-only'), []);
+    assert.deepEqual([badge.id, badge.rank, badge.title, badge.grantedAt],
+      ['monthly_points_2026-11_1', 1, '交剑王冠', DECEMBER]);
+    assert.deepEqual(awards.notice(store, 'wx:gold').notice, notice);
+    assert.equal(presentation.present(notice).eyebrow, '2026年11月 · 积分月榜');
+    assert.equal(presentation.present(notice).title, '月榜荣誉已送达');
+    assert.deepEqual(players.slice(1).map(uid => ids(store, uid)),
+      [['monthly_points_2026-11_2'], ['monthly_points_2026-11_3'], ['monthly_points_2026-11_3'], [], []]);
+    awards.acknowledge(store, 'wx:gold', { through: notice.through });
+    assert.equal(awards.notice(store, 'wx:gold').notice, null);
+    game(store, 'wx:fourth', { points: 100, endedAt: DECEMBER - 1 });
+    game(store, 'wx:gold', { points: 99 });
+    hidden(store, 'wx:silver');
+    assert.deepEqual(ids(store, 'wx:silver'), ['monthly_points_2026-11_2']);
+    assert.deepEqual(ids(store, 'wx:fourth'), []);
+
+    now = Date.parse('2027-02-02T12:00:00+08:00');
+    assert.equal(awards.notice(store, 'wx:gold').notice.badges[0].id, 'monthly_points_2026-12_1');
+    assert.equal(store.db.prepare('SELECT ranking_snapshot FROM badge_campaigns WHERE id=?')
+      .get('monthly-points-2027-01').ranking_snapshot, '[]');
+    const state = readBadges(store, 'wx:gold');
+    const collection = require('../miniprogram/badges').presentCollection(state, 'owned');
+    assert.deepEqual(collection.visibleBadges.map(b => b.periodLabel), ['2026年12月', '2026年11月']);
+    const old = state.badges.find(b => b.id === badge.id);
+    const saved = store.transaction(() => saveBadge(store, 'wx:gold', {
+      id: badge.id, equipped: !old.equipped, version: state.version, periodStart: state.periodStart,
+    }));
+    assert.equal(saved.badges.find(b => b.id === badge.id).equipped, !old.equipped);
+  } finally { store.close(); }
+});
+
+test('定时结算在北京时间月初发奖，无需先有人登录', t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: DECEMBER - 1 });
+  const store = new Store(':memory:');
+  game(store, 'wx:scheduled', { points: 9 });
+  const stop = awards.startMonthlyAwards(store);
+  try {
+    const read = store.db.prepare('SELECT badge_id,granted_at FROM badge_awards WHERE uid=?');
+    assert.equal(read.get('wx:scheduled'), undefined);
+    t.mock.timers.tick(1);
+    const award = read.get('wx:scheduled');
+    assert.equal(award.badge_id, 'monthly_points_2026-11_1');
+    assert.equal(award.granted_at, DECEMBER);
+  } finally { stop(); store.close(); }
+});
+
+test('首月徽章使用同源 PNG，调整年月只改变飘带内的日期', async t => {
+  const { createApp } = require('../server/app');
+  let now = DECEMBER - 1;
+  const app = createApp({ database: ':memory:', clock: () => now });
+  game(app.store, 'wx:monthly', { points: 9 });
+  const token = 'b'.repeat(64);
+  app.store.addSession(createHash('sha256').update(token).digest('hex'), 'wx:monthly');
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => { await new Promise(resolve => app.server.close(resolve)); app.store.close(); });
+  const request = (path, body) => fetch('http://127.0.0.1:' + app.server.address().port + path, {
+    method: body ? 'POST' : 'GET',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const url = '/assets/badges/monthly-points/2026-11/1.png';
+  assert.notEqual((await request(url)).status, 200);
+  const noticePath = '/api/me/badges/notice';
+  assert.equal((await (await request(noticePath)).json()).notice, null);
+  now++;
+  const { notice } = await (await request(noticePath)).json();
+  assert.equal(notice.badges[0].imageUrl, url);
+  const res = await request(url);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/png');
+  const november = Buffer.from(await res.arrayBuffer());
+  assert.equal((await request(noticePath, { through: notice.through })).status, 200);
+  assert.equal((await (await request(noticePath)).json()).notice, null);
+  now = Date.parse('2027-01-01T00:00:00+08:00');
+  const december = Buffer.from(await (await request(url.replace('2026-11', '2026-12'))).arrayBuffer());
+  const sharp = require('sharp');
+  const region = { left: 0, top: 0, width: 512, height: 420 };
+  assert.notDeepEqual(november, december);
+  assert.deepEqual(await sharp(november).extract(region).raw().toBuffer(),
+    await sharp(december).extract(region).raw().toBuffer());
+});
+
 test('发布冻结公开积分前三，含并列；后续得分、隐藏及重启不会重新评奖', () => {
   const dir=mkdtempSync(join(tmpdir(),'october-awards-'));let now=NOW;let s=new Store(join(dir,'db'),{clock:()=>now});
   try {
@@ -109,7 +246,7 @@ test('徽章通知 HTTP 鉴权、幂等确认与禁止伪造佩戴，静态资�
     assert.equal((await req('/api/me/badges/notice',{through:value.notice.through})).status,200);
     assert.equal((await(await req('/api/me/badges/notice')).json()).notice,null);
     assert.equal((await req('/api/me/badges/notice',{through:value.notice.through,uid:'wx:other'})).status,400);
-    for(const p of ['/badge-awards.js','/badge-awards.css','/assets/badges/october_2026_crown.png','/assets/badges/october_2026_book-large.png'])assert.equal((await req(p)).status,200,p);
+    for(const p of ['/badge-awards.js','/badge-award-markup.js','/badge-awards.css','/assets/badges/october_2026_crown.png','/assets/badges/october_2026_book-large.png'])assert.equal((await req(p)).status,200,p);
   } finally {await new Promise(r=>app.server.close(r));app.store.close();}
 });
 test('前台通知合并为3/2/1枚；确认断网只重试确认，后台与换号不误确认', async () => {

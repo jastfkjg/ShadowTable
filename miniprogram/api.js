@@ -9,7 +9,7 @@ function request(path, method = "GET", data, requestId, publicRead = false) {
     connection.finish(observation);return value;
   }, error => { connection.finish(observation, error);throw error; });
 }
-function performRequest(path, method = "GET", data, requestId, publicRead) {
+function performRequest(path, method = "GET", data, requestId, publicRead, responseType = "text") {
   if (Date.now() < retryAt)
     return Promise.reject(
       Object.assign(new Error("请求冷却中，请稍后重试"), {
@@ -26,7 +26,8 @@ function performRequest(path, method = "GET", data, requestId, publicRead) {
       url: config.baseUrl + path,
       method,
       data,
-      timeout: 10000,
+      responseType,
+      timeout: path === "/api/me/feedback" && data?.images?.length ? 45000 : 10000,
       header: {
         "content-type": "application/json",
         ...(!publicRead ? { Authorization: "Bearer " + token } : {}),
@@ -146,4 +147,8 @@ function publicRequest(path) {
   if (!["/api/boards", "/api/scoring/rules"].includes(path)) return Promise.reject(new Error("不支持的公开内容"));
   return request(path, "GET", undefined, undefined, true);
 }
-module.exports = { request, publicRequest, login, requestId, uploadAvatar, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };
+// Gallery failures are shown per image, independently of page-wide network feedback.
+function feedbackImage(id, index) {
+  return performRequest("/api/me/feedback/" + id + "/images/" + index, "GET", undefined, undefined, false, "arraybuffer");
+}
+module.exports = { request, publicRequest, feedbackImage, login, requestId, uploadAvatar, assetUrl: path => config.baseUrl.replace(/\/$/, "") + path };

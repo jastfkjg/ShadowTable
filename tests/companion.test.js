@@ -210,11 +210,11 @@ test("陪测账号经HTTP完成任务和刺杀，不替真人提交", async () =
       assert.equal(history.total, 1);
       assert.equal(history.records[0].fun.status, "recorded");
       assert.equal(history.records[0].score.status, "scored");
-      assert.equal((await a.request("/api/leaderboard?metric=points", token)).me.status, "ranked");
+      assert.equal((await a.request("/api/leaderboard?metric=points", token)).me.status, "no_games");
       for (const metric of personal.fun.metrics.filter(row => row.ranked && row.count > 0)) {
         const board = await a.request("/api/leaderboard?metric=fun_" + metric.id, token);
-        assert.equal(board.me.status, "ranked");
-        assert.equal(board.me.count, metric.count);
+        assert.equal(board.me.status, "no_records");
+        assert.equal(board.me.count, 0);
       }
     }
     await command("rematch");

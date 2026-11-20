@@ -18,13 +18,13 @@ const { roles } = require("../server/variants");
 const { createApp } = require("../server/app");
 const run = (r, type, extra = {}, uid = r.host) =>
   command(r, uid, { type, stage: r.stage, ...extra });
-function deal(knight = false, uid = "wx:1") {
+function deal(knight = false, uid = "wx:1", classicCapacity = 6) {
   const r = newRoom(
     "123456",
     uid,
     "我",
-    knight ? "knights" : "classic",
-    knight ? 12 : 6,
+    knight ? "knights" : classicCapacity >= 9 ? "classic-court" : "classic",
+    knight ? 12 : classicCapacity,
   );
   for (let i = 2; i <= r.capacity; i++) enter(r, "wx:" + i, "玩家" + i);
   r.players.forEach((p) => (p.ready = true));
@@ -34,7 +34,7 @@ function deal(knight = false, uid = "wx:1") {
       p.uid,
       knight
         ? "servant"
-        : ["merlin", "percival", "servant", "servant", "morgana", "assassin"][
+        : ["merlin", "percival", "servant", "servant", "morgana", "assassin", "servant", "servant", "mordred", "oberon"][
             i
           ],
     ]),
@@ -95,12 +95,15 @@ const row = (r, uid, id) =>
 function finish(r, extra = { funReason: "assassination", funTarget: 3 }) {
   run(r, "finishTools", { replace: true, ...extra });
 }
-test("趣味称号公开目录包含八项角色次数榜，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
+test("趣味称号公开目录包含 46 项，派西三蓝须护住梅林，三红或梅林被刺每局只计一次", () => {
   const fun = require("../server/fun");
   assert.deepEqual(fun.publicMetrics().map(m => m.honorTitle), [
     "最强派西", "竭尽全力", "闪身步大神", "舍我其谁", "金牌替身", "职业刺客", "背锅侠",
     "绝对防御", "卧龙凤雏", "职业杀手", "痛击队友", "我在阿瓦隆玩重生", "全民公敌", "最强 MVP", "最强 SVP",
     "首席护卫", "最佳新援", "双面骑士", "圆桌劳模", "躺赢大师", "梅林二号", "深藏不露", "最强独狼",
+    "隐身乘客", "幕后军师", "弹射下车", "孤注一掷", "压错宝", "化身梅派", "金牌乘客", "定蓝机", "与世无争",
+    "站错队", "影帝大莫", "车底大莫", "最后王牌", "倒钩王者", "新手演员", "勇敢炮灰", "孤儿狼", "队友勿cue",
+    "双炸艺术家", "浪子回头", "反水大师", "双面间谍", "阵营摇摆王",
   ]);
   for (const [reason, target, green, bust] of [
     ["assassination", 3, 1, 0], ["assassination", 1, 0, 1],
@@ -224,7 +227,7 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
   const store = new Store(":memory:");
   try {
     for (let i = 0; i < 7; i++) {
-      const knight = i >= 4, r = deal(knight);
+      const knight = i >= 4, r = deal(knight, "wx:1", 10);
       if (knight) configure(r, { "wx:1": "merlin", "wx:2": "percival", "wx:6": "assassin" });
       finish(r, i < 2 ? { funReason: "quest_fail" } : {
         funReason: "assassination", funTarget: i < 4 ? 1 : 3,
@@ -232,7 +235,7 @@ test("新增终局趣味榜使用已有记录跨板子汇总，缺失过程不�
       });
       store.transaction(() => store.save(r));
     }
-    const unknown = deal(); finish(unknown, { winner: "good" });
+    const unknown = deal(false, "wx:1", 10); finish(unknown, { winner: "good" });
     store.transaction(() => store.save(unknown));
     const board = new Leaderboard(store);
     for (const [metric, uid, count, opportunities, rate, label] of [
@@ -384,7 +387,7 @@ test("挡刀榜跨板子合并次数和原始分母，少量样本可参与成�
   try {
     for (let i = 0; i < 5; i++) {
       const knight = i >= 3,
-        r = deal(knight, "wx:shield");
+        r = deal(knight, "wx:shield", 10);
       r.roles["wx:shield"] = "servant";
       r.roles["wx:3"] = "merlin";
       r.roles["wx:6"] = "assassin";
@@ -871,12 +874,12 @@ test("趣味榜一次机会可参与比例排名，保留次数并列、分母�
       ["wx:d", 5, 4],
     ]) {
       for (let i = 0; i < total; i++) {
-        const r = deal(false, uid);
+        const r = deal(false, uid, 10);
         finish(r, { funReason: "assassination", funTarget: i < hits ? 3 : 1 });
         store.transaction(() => store.save(r));
       }
     }
-    const zero = deal(false, "wx:zero"), unknown = deal(false, "wx:unknown");
+    const zero = deal(false, "wx:zero", 10), unknown = deal(false, "wx:unknown", 10);
     finish(zero, { funReason: "quest_fail" });
     finish(unknown, { winner: "good" });
     store.transaction(() => { store.save(zero); store.save(unknown); });
@@ -1039,7 +1042,7 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
     boundary = Date.UTC(2026, 9, 1) - 8 * 3600000;
   try {
     for (let i = 0; i < 22; i++) {
-      const r = deal(false, "wx:rank-" + i);
+      const r = deal(false, "wx:rank-" + i, 10);
       finish(r);
       r.matchRecord.endedAt = boundary + (i === 0 ? -1 : 1);
       store.transaction(() => store.archiveMatch(r.matchRecord));
@@ -1065,7 +1068,7 @@ test("趣味榜北京时间月界、分页版本、回滚不失效以及实际�
     assert.equal(month.periodStart, boundary);
     assert.throws(() =>
       store.transaction(() => {
-        const r = deal(false, "wx:rolled");
+        const r = deal(false, "wx:rolled", 10);
         finish(r);
         store.archiveMatch(r.matchRecord);
         throw Error("rollback");

@@ -1,5 +1,6 @@
 "use strict";
 const http = require("node:http");
+const playerFeedback = require("./feedback");
 const { randomBytes, randomInt, createHash } = require("node:crypto");
 const { Store } = require("./store");
 const { actionDetails, completeActionDetails } = require("./audit");
@@ -74,8 +75,8 @@ function createApp({
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
   const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
-  const { serve: serveWeb, serveBadgeArt } = require("./web");
-  const servePublicAsset = webOrigin ? serveWeb : serveBadgeArt;
+  const { serve: serveWeb, serveGameArt } = require("./web");
+  const servePublicAsset = webOrigin ? serveWeb : serveGameArt;
   let webHost = "";
   if (webOrigin) {
     let url;
@@ -203,6 +204,7 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account read/write and login/create limits below apply independently.
       limit(`ip:${clientAddress(req)}`, 6000);
+      if (path.startsWith('/assets/badges/monthly-points/') && await require('./monthly-badge-art').serve(req, res, path, began)) return;
       if (path === "/api/wechat/avatar-review" && wechatAvatarReview) {
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
         if (req.method === "GET") return send(200, wechatAvatarReview.verify(requestUrl.searchParams), true);
@@ -332,6 +334,18 @@ function createApp({
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
       if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
       if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));
+      if (path === "/api/me/feedback") {
+        if (req.method === "GET") return send(200, playerFeedback.list(store, uid, requestUrl.searchParams));
+        check(req.method === "POST", "接口不存在", 404);
+        limit(`feedback:${uid}`, 10);
+        return send(200, await playerFeedback.submit(store, uid, req.headers["idempotency-key"], await body(req, playerFeedback.maxBody)));
+      }
+      const feedbackImage = path.match(/^\/api\/me\/feedback\/(\d+)\/images\/([0-3])$/);
+      if (feedbackImage && req.method === "GET") {
+        const bytes = playerFeedback.image(store, uid, feedbackImage[1], feedbackImage[2]);
+        res.setHeader("Content-Type", "image/jpeg");
+        return send(200, bytes, true);
+      }
       if (path === "/api/me/avatar-uploads") {
         if (req.method === "GET") return send(200, { enabled: uploads.enabled && (uid.startsWith("wx:") || devAuth && uid.startsWith("dev:")) });
         check(req.method === "POST", "接口不存在", 404);

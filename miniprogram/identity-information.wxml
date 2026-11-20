@@ -1,14 +1,15 @@
 <template name="identityInformation">
-  <view class="identity-information">
+  <view wx:if="{{!review || !info || !info.vision.empty || info.inspections.length || info.fairy}}" class="identity-information">
     <block wx:if="{{info}}">
-      <view wx:if="{{info.showVision}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
-        <view class="identity-info-heading"><text>角色视野</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{compact && info.vision.label==='初始见面匪'}}" class="identity-info-meta identity-info-summary">初始见面匪{{info.vision.players.length?' · '+info.vision.players.length+'人':''}}</text><text wx:elif="{{info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
+      <view wx:if="{{info.showVision && !(review && info.vision.empty)}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
+        <view wx:if="{{review}}" class="identity-info-heading"><text>{{info.review.visionHeading}}</text><text wx:if="{{info.review.visionMeta}}" class="identity-info-meta">{{info.review.visionMeta}}</text></view>
+        <view wx:else class="identity-info-heading"><text>{{printed && (info.vision.label==='初始见面匪' || info.vision.label==='你的坏人同伴')?'初始同伴':'角色视野'}}</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{!printed && compact && info.vision.label==='初始见面匪'}}" class="identity-info-meta identity-info-summary">初始见面匪{{info.vision.players.length?' · '+info.vision.players.length+'人':''}}</text><text wx:elif="{{!printed && info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
         <block wx:if="{{info.passive}}">
-          <view class="identity-info-result"><text>存活 B 牌坏人</text><text class="identity-info-value">{{info.passive.result}}</text></view>
+          <view class="identity-info-result"><text wx:if="{{!review}}">存活 B 牌坏人</text><text class="identity-info-value{{info.passive.round && info.passive.result!=='无'?' vision-seats':''}}">{{info.passive.result}}</text></view>
           <view class="identity-info-note">{{info.passive.note}}</view>
         </block>
         <block wx:else>
-          <view wx:if="{{info.vision.label && !(compact && info.vision.label==='初始见面匪')}}" class="identity-info-caption">{{info.vision.label}}</view>
+          <view wx:if="{{!review && info.vision.label && !(printed && (info.vision.label==='初始见面匪' || info.vision.label==='你的坏人同伴')) && !(compact && info.vision.label==='初始见面匪')}}" class="identity-info-caption">{{info.vision.label}}</view>
           <view wx:if="{{info.vision.players.length}}" class="identity-info-players {{info.vision.wide?'is-wide':''}}">
             <view wx:for="{{info.vision.players}}" wx:key="seat" class="identity-info-player">
               <view wx:if="{{showAvatars}}" class="vision-player-avatar" aria-hidden="true"><text>{{item.avatarInitial}}</text><image wx:if="{{item.avatarUrl && !item.avatarFailed}}" src="{{item.avatarUrl}}" mode="aspectFill" data-seat="{{item.seat}}" data-url="{{item.avatarUrl}}" binderror="seatAvatarError" aria-hidden="true" /></view>
@@ -32,8 +33,9 @@
         <view class="identity-info-fairy-result"><text class="identity-info-seat">{{info.fairy.seat}}<text class="identity-info-unit">号</text></text><text class="identity-info-value faction-{{info.fairy.tone}}">{{info.fairy.faction}}</text></view>
       </view>
       <view wx:if="{{summarize && info.summary.length}}" class="identity-info-section identity-info-preview">
-        <view wx:for="{{info.summary}}" wx:key="label" class="identity-info-ability"><text class="identity-info-heading">{{item.label}}</text><text>{{item.text}}</text></view>
+        <view wx:for="{{info.summary}}" wx:key="label" class="identity-info-ability"><text wx:if="{{!printed || item.label!=='能力'}}" class="identity-info-heading">{{item.label}}</text><text>{{printed && item.label==='能力'?info.printedBrief || item.text:item.text}}</text></view>
       </view>
+      <view wx:if="{{printed && !info.summary.length && info.printedBrief}}" class="print-note">{{info.printedBrief}}</view>
       <view wx:if="{{info.ability && !compact && !summarize}}" class="identity-info-section">
         <view class="identity-info-heading">角色能力</view>
         <template is="identityRoleAbility" data="{{ability:info.ability}}" />
@@ -44,8 +46,8 @@
 </template>
 <template name="identityRoleAbility">
   <view wx:if="{{ability.brief && !summarized}}" class="identity-info-brief">{{ability.brief}}</view>
-  <view wx:for="{{ability.lines}}" wx:key="index" class="identity-info-ability {{ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{ability.structured && !detailed?'：':''}}</text><text>{{item.text}}</text></view>
-  <view wx:if="{{ability.note}}" class="identity-info-note"><text wx:if="{{detailed}}" class="identity-role-help-note-title">注意事项</text>{{ability.structured && !detailed?'注意：':''}}{{ability.note}}</view>
+  <view wx:for="{{ability.lines}}" wx:key="index" class="identity-info-ability {{ability.structured?'structured':''}}"><text wx:if="{{item.label}}" class="identity-info-ability-label">{{item.label}}{{ability.structured?'：':''}}</text><text>{{item.text}}</text></view>
+  <view wx:if="{{ability.note}}" class="identity-info-note">{{ability.structured?'注意：':''}}{{ability.note}}</view>
 </template>
 <template name="identitySkillStatus">
   <view wx:if="{{status || ability}}" class="compact-skill-status {{ability?'has-role-help':''}}">

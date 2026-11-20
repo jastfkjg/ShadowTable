@@ -19,10 +19,11 @@ function game(
     ended = Date.now(),
     companion = false,
     score = true,
+    capacity = 6,
   } = {},
 ) {
-  const room = newRoom(code, "wx:1", "林间", "classic", 6);
-  for (let i = 2; i <= 6; i++)
+  const room = newRoom(code, "wx:1", "林间", capacity >= 9 ? "classic-court" : "classic", capacity);
+  for (let i = 2; i <= capacity; i++)
     enter(
       room,
       companion && i === 6 ? "test:" + code + ":6" : "wx:" + i,
@@ -32,7 +33,7 @@ function game(
     type: "updateSettings",
     stage: room.stage,
     board: room.board,
-    capacity: 6,
+    capacity,
     visible: false,
     scoreEnabled: score,
     recordPurpose: purpose,
@@ -46,7 +47,7 @@ function game(
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [
       p.uid,
-      ["merlin", "percival", "servant", "servant", "morgana", "assassin"][i],
+      ["merlin", "percival", "servant", "servant", "morgana", "assassin", "servant", "servant", "mordred", "oberon"][i],
     ]),
   );
   command(room, room.host, {
@@ -82,9 +83,9 @@ const manage = (store, action, ...rooms) =>
 test("删除及恢复同步个人明细、各类榜单、趣味、月份，保留手动得分与独立调分；预览不写入", () => {
   const store = new Store(":memory:");
   try {
-    const first = game(store, { ended: Date.now() - 300 }),
-      second = game(store, { ended: Date.now() - 200 }),
-      third = game(store, { ended: Date.now() - 100 });
+    const first = game(store, { ended: Date.now() - 300, capacity: 10 }),
+      second = game(store, { ended: Date.now() - 200, capacity: 10 }),
+      third = game(store, { ended: Date.now() - 100, capacity: 10 });
     store.transaction(() =>
       store.adjustMatchScores(second.matchId, {
         revision: 0,

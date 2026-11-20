@@ -122,6 +122,22 @@ test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分�
   response.overview.games = 0;
   assert.throws(() => renderer.cards(response), /没有有效对局/);
 });
+test("月报及分享长图统一识别榜单数据里的旧称号", () => {
+  const presentation = require("../miniprogram/monthly-report");
+  const renderer = require("../miniprogram/monthly-report-card");
+  const response = monthlyFixture();
+  const old = { ...response.funBoards[0], id: "merlin_all_rides:count", metric: "merlin_all_rides",
+    title: "灯下黑梅林", label: "灯下黑梅林", subtitle: "按局数 · 灯下黑梅林", unit: "局" };
+  response.funBoards.push(old);
+  response.featuredIds.unshift(old.id);
+  const board = presentation.presentReport(response).featured[0];
+  assert.equal(board.title, "隐身乘客");
+  assert.equal(board.subtitle, "梅林 · 按局数 · 隐身乘客");
+  const section = renderer.cards(response)[0].sections.find(section => section.id === old.metric);
+  assert.equal(section.title, "隐身乘客");
+  assert.equal(section.subtitle, "梅林 · 隐身乘客");
+  assert.equal(old.title, "灯下黑梅林");
+});
 test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重复且全部内容计入高度", () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
   response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));

@@ -55,7 +55,7 @@
     const mode = fairyAction ? "fairy" : finalAction ? "final" : swapOptions.length ? "swap"
       : hunterModes ? hunterMode
       : targets[0]?.value.startsWith("inspect:") ? "inspect"
-      : label.includes("使用刀 / 决斗") ? "attack"
+      : label.includes("使用刀 / 决斗") ? (swordHint ? "sword" : "attack")
       : label.includes("开刀") ? "sword" : label.includes("决斗") ? "duel"
       : label.includes("指定替死者") ? "substitute" : label.includes("秘密守护") ? "guard"
       : label.includes("复活") ? "revive" : label.includes("开枪") ? "gun"
@@ -78,6 +78,7 @@
     const round = room.knights?.round || room.round;
     const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
       selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
+    const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
     const count = mode === "swap" ? swapSeats.size : targets.length;
     return {
       skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
@@ -87,9 +88,9 @@
       skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
         (finalAction ? "最终盘刀" : "技能准备") : "",
       skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-      skillSwordHint: swordHint,
+      skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
       skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
-      skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+      skillOtherChoices: choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
         label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
           ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
       })),
@@ -99,7 +100,7 @@
   function skillTargetCopy(mode) {
     return {
       fairy: { title: "仙女查验", verb: "查验", privateResult: true },
-      sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+      sword: { title: "选择本轮行动", verb: "开刀", pass: "本轮不开刀" },
       duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
       inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
       guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
@@ -1112,8 +1113,8 @@
     app.querySelector('.badge-detail-action')?.focus({ preventScroll: true });
   }
   function badgeArt(badge, className = '') {
-    const classes = (className + (badge.permanent ? ' badge-art-permanent' : '')).trim();
-    return '<img' + (classes ? ' class="' + classes + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
+    const style = badgePresentation.badgeArtStyle(badge);
+    return '<img' + (className ? ' class="' + className + '"' : '') + (style ? ' style="' + style + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
   }
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;
@@ -1597,7 +1598,7 @@
         let detail = null, closed = false;
         const previousFocus = document.activeElement;
         const renderNotice = () => {
-          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwards.markup(value, esc, detail);
+          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwardMarkup(value, esc, detail);
           badgeNoticeHost.querySelector(detail ? '[data-award-back]' : '[data-award-confirm]')?.focus({preventScroll:true});
         };
         const done = confirmed => {
@@ -2079,7 +2080,7 @@ function roomListItems(rooms) {
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
-    patch.operationProgressExpanded = !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
+    patch.operationProgressExpanded = !!room.canUseTools && !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     Object.assign(patch, publicHistory.sync(state, history, room));
     patch.history = history;
@@ -2452,9 +2453,7 @@ function roomListItems(rooms) {
       if (tile.roles.length) html += '<details><summary class="fun-record-role-toggle">按角色查看</summary><div class="fun-record-roles">' + tile.roles.map(role => '<div class="fun-record-role-wrap"><button type="button" class="fun-record-role" data-action="funDetails" data-key="' + esc(tile.key) + '" aria-haspopup="dialog"><span>' + esc(role.label) + '</span><span class="fun-record-role-count">' + esc(role.countLabel) + (role.value == null ? '' : ' ' + esc(tile.unit)) + '</span></button><button type="button" class="fun-record-link is-role" data-action="funRecords" data-metric="' + esc(tile.id) + '" data-mode="' + esc(tile.mode) + '" data-role="' + esc(role.role) + '" aria-label="查看' + esc(role.label) + '的' + esc(tile.title) + '相关对局">›</button></div>').join('') + '</div></details>';
       html += '</article>';
     }
-    html += '</div>';
-    if (data.legacyGames) html += '<p class="fun-records-note">' + data.legacyGames + ' 局旧对局未记录完整过程，缺失数据不按零次计算。</p>';
-    return html + '</div>';
+    return html + '</div></div>';
   }
   function viewFunRankFilters(board) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
@@ -2828,7 +2827,8 @@ function roomListItems(rooms) {
       const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
         byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
       let playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
-      playerCard = { ...playerCard, badges: result.player.badges || [] };
+      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || badge);
+      playerCard = { ...playerCard, badges };
       setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
     } catch (e) {
       if (active()) setState({ playerCardError: e.message || "战绩读取失败，请重试" });
@@ -3245,6 +3245,10 @@ function roomListItems(rooms) {
         room.stage !== actionDraftStage
       )
         return;
+      if (value === "pick-sword-target" && state.swordModes && state.draftChoice === "pass") {
+        setState({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+        return;
+      }
       var choice = state.actionChoices.filter(function (c) {
         return c.value === value;
       })[0];
@@ -3928,25 +3932,26 @@ function roomListItems(rooms) {
         btn("primary", "revealDealtIdentity", state.busy ? "正在读取…" : "查看身份", null, state.busy || !state.network) +
         btn("text-button", "closeDealtIdentity", "稍后查看")) + '</div></div></div>';
   }
-  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false, compact = false, surface = '') {
-    var info = identityVision.presentIdentity(secret, profiles), vision = info.vision;
+  function viewIdentityInformation(secret, profiles = state.seats, showAvatars = false, compact = false, surface = '', info = identityVision.presentIdentity(secret, profiles)) {
+    const vision = info.vision, review = surface === 'review';
+    const revealSurface = surface && !review;
     function heading(label, meta, summary = false) {
       return '<div class="identity-info-heading"><span>' + esc(label) + '</span>' + (meta ? '<span class="identity-info-meta' + (summary ? ' identity-info-summary' : '') + '">' + esc(meta) + '</span>' : '') + '</div>';
     }
     function note(text) { return text ? '<div class="identity-info-note">' + esc(text) + '</div>' : ''; }
     function seat(number) { return '<span class="identity-info-seat">' + esc(number) + '<span class="identity-info-unit">号</span></span>'; }
     var html = '<div class="identity-information">';
-    if (info.showVision) {
+    if (info.showVision && !(review && vision.empty)) {
       var initialSummary = compact && vision.label === '初始见面匪';
       var visionMeta = info.passive?.round ? '第 ' + info.passive.round + ' 轮' : initialSummary ? vision.label + (vision.players.length ? ' · ' + vision.players.length + '人' : '') : vision.label === '初始见面匪' ? '初始视野' : '';
-      html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + heading('角色视野', visionMeta, initialSummary);
-      if (info.passive) html += '<div class="identity-info-result"><span>存活 B 牌坏人</span><span class="identity-info-value">' + esc(info.passive.result) + '</span></div>' + note(info.passive.note);
+      html += '<div class="identity-info-section' + (vision.empty ? ' identity-info-inline' : '') + '">' + (review ? heading(info.review.visionHeading, info.review.visionMeta) : heading('角色视野', visionMeta, initialSummary));
+      if (info.passive) html += '<div class="identity-info-result">' + (review ? '' : '<span>存活 B 牌坏人</span>') + '<span class="identity-info-value">' + esc(info.passive.result) + '</span></div>' + note(info.passive.note);
       else {
-        if (vision.label && !initialSummary) html += '<div class="identity-info-caption">' + esc(vision.label) + '</div>';
+        if (!review && vision.label && !initialSummary) html += '<div class="identity-info-caption">' + esc(vision.label) + '</div>';
         html += vision.players.length ? '<div class="identity-info-players' + (vision.wide ? ' is-wide' : '') + '">' + vision.players.map(player => '<div class="identity-info-player">' +
           (showAvatars ? '<div class="vision-player-avatar" aria-hidden="true"><span>' + esc(player.avatarInitial) + '</span>' +
             (player.avatarUrl && !player.avatarFailed ? '<img src="' + esc(player.avatarUrl) + '" alt="" data-seat="' + player.seat + '" data-seat-avatar-url="' + esc(player.avatarUrl) + '" />' : '') + '</div>' : '') + seat(player.seat) +
-          ((player.name || player.role) ? '<div class="identity-info-player-copy">' + (player.name ? '<span class="identity-info-name">' + esc(player.name) + '</span>' : '') + (player.role ? '<span class="identity-info-role">' + esc(player.role) + '</span>' : '') + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="identity-info-text">' + esc(surface ? info.summaryVision : vision.text) + '</div>';
+          ((player.name || player.role) ? '<div class="identity-info-player-copy">' + (player.name ? '<span class="identity-info-name">' + esc(player.name) + '</span>' : '') + (player.role ? '<span class="identity-info-role">' + esc(player.role) + '</span>' : '') + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="identity-info-text">' + esc(revealSurface ? info.summaryVision : vision.text) + '</div>';
         html += note(vision.note);
       }
       html += '</div>';
@@ -3954,17 +3959,17 @@ function roomListItems(rooms) {
     if (info.inspections.length) html += '<div class="identity-info-section">' + heading('角色查验', info.inspections.length + ' 条记录') + info.inspections.map(record =>
       '<div class="identity-info-inspection"><div class="identity-info-record-label"><span>' + esc(record.label) + '</span><span>' + esc(record.source) + '</span></div><div class="identity-info-result">' + seat(record.seat) + '<span class="identity-info-inspection-result">' + esc(record.result) + '</span></div></div>').join('') + '</div>';
     if (info.fairy) html += '<div class="identity-info-section identity-info-fairy">' + heading('仙女查验') + '<div class="identity-info-fairy-result">' + seat(info.fairy.seat) + '<span class="identity-info-value faction-' + info.fairy.tone + '">' + esc(info.fairy.faction) + '</span></div></div>';
-    if (surface && info.summary.length) html += '<div class="identity-info-section identity-info-preview">' + info.summary.map(line =>
+    if (revealSurface && info.summary.length) html += '<div class="identity-info-section identity-info-preview">' + info.summary.map(line =>
       '<div class="identity-info-ability"><span class="identity-info-heading">' + esc(line.label) + '</span><span>' + esc(line.text) + '</span></div>').join('') + '</div>';
     if (!compact && !surface && info.ability) html += '<div class="identity-info-section">' + heading('角色能力') + viewRoleAbility(info.ability) + '</div>';
-    return html + '</div>' + (compact || surface ? viewSkillStatus(secret, surface ? info.ability : null, surface) : '');
+    return html + '</div>' + (!review && (compact || surface) ? viewSkillStatus(secret, surface ? info.ability : null, surface) : '');
   }
-  function viewRoleAbility(ability, summarized = false, detailed = false) {
+  function viewRoleAbility(ability, summarized = false) {
     var html = ability.brief && !summarized ? '<div class="identity-info-brief">' + esc(ability.brief) + '</div>' : '';
     html += ability.lines.map(line => '<div class="identity-info-ability' + (ability.structured ? ' structured' : '') + '">' +
-      (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured && !detailed ? '：' : '') + '</span>' : '') +
+      (line.label ? '<span class="identity-info-ability-label">' + esc(line.label) + (ability.structured ? '：' : '') + '</span>' : '') +
       '<span>' + esc(line.text) + '</span></div>').join('');
-    if (ability.note) html += '<div class="identity-info-note">' + (detailed ? '<span class="identity-role-help-note-title">注意事项</span>' : ability.structured ? '注意：' : '') + esc(ability.note) + '</div>';
+    if (ability.note) html += '<div class="identity-info-note">' + (ability.structured ? '注意：' : '') + esc(ability.note) + '</div>';
     return html;
   }
   function viewIdentityChange() {
@@ -4049,7 +4054,7 @@ function roomListItems(rooms) {
   function viewIdentityRoleHelp() {
     if (!state.identityRoleHelpOpen || !state.revealed || !state.secret || state.error) return '';
     const secret = state.secret;
-    const { ability, roleOverview } = identityVision.presentIdentity(secret);
+    const { roleOverview } = identityVision.presentIdentity(secret);
     if (!roleOverview) return '';
     const tone = factionTone(secret.faction);
     const art = rolePortraits.portrait(secret.role, tone).portrait;
@@ -4061,12 +4066,15 @@ function roomListItems(rooms) {
       '<div class="identity-history-body"><div class="identity-role-help-intro"><img class="identity-role-help-portrait" src="' + esc(art) + '" alt="" /><div class="identity-role-help-copy">' +
       '<div class="identity-role-help-role faction-' + tone + '">' + esc(secret.role) + '</div><div class="identity-role-help-meta"><span class="faction-' + tone + '">' + esc(secret.faction) + '</span>' +
       (roleOverview.deck ? '<span>· ' + esc(roleOverview.deck) + '</span>' : '') + '</div></div></div>' +
-      '<div class="identity-role-help-overview"><div class="identity-role-help-feature"><img src="/assets/' + roleOverview.icon + '.svg" alt="" /><div class="identity-role-help-copy">' +
+      '<div class="identity-role-help-overview"><div class="identity-role-help-feature">' +
       '<div class="identity-role-help-feature-title"><span>' + esc(roleOverview.title) + '</span>' + (roleOverview.badge ? '<span class="identity-role-help-badge">' + esc(roleOverview.badge) + '</span>' : '') + '</div>' +
-      '<div class="identity-role-help-summary">' + esc(roleOverview.brief) + '</div></div></div>' + rows + '</div>' +
-      (roleOverview.hasDetails ? '<button type="button" class="disclosure-button identity-role-help-toggle" data-action="toggleIdentityHelp" data-surface="role" aria-expanded="' + expanded + '">' +
-        '<img src="/assets/sheet-book.svg" alt="" /><span>' + (expanded ? '收起完整规则' : '展开完整规则') + '</span><span class="identity-help-chevron' + (expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>' : '') +
-      (expanded ? '<div class="identity-role-help-rules">' + viewRoleAbility(ability, true, true) + '</div>' : '') + '</div>' +
+      '<div class="identity-role-help-summary">' + esc(roleOverview.brief) + '</div></div>' + rows + '</div>' +
+      (roleOverview.hasDetails ? '<button type="button" class="disclosure-button identity-role-help-toggle" data-action="toggleIdentityHelp" data-surface="role" aria-label="' + (expanded ? '收起完整规则' : '展开完整规则') + '" aria-expanded="' + expanded + '">' +
+        '<span>完整规则</span><span class="identity-help-chevron' + (expanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>' : '') +
+      (expanded ? '<dl class="identity-role-help-rules">' + roleOverview.rules.map(rule =>
+        '<div class="role-rule"><dt class="role-rule-label">' + esc(rule.label) + '</dt><dd class="role-rule-text">' +
+        (rule.emphasis ? '<strong class="role-rule-emphasis">' + esc(rule.emphasis) + '</strong>' : '') +
+        esc(rule.text) + '</dd></div>').join('') + '</dl>' : '') + '</div>' +
       '<div class="identity-history-footer">' + btn('primary', 'reveal', '立即遮盖') + '</div></section></div>';
   }
   function viewIdentityHistory() {
@@ -4094,14 +4102,30 @@ function roomListItems(rooms) {
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
     var targetMode = !!state.skillTargetMode;
+    const swordPass = state.swordModes && state.draftChoice === 'pass';
     var description = [state.skillHint && 'skill-hint', targetMode && state.skillConsequence && 'skill-consequence'].filter(Boolean).join(' ');
-    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
+    const titleIcon = state.swordModes ? '<img src="/assets/record-swords.svg" alt="">' : '';
+    const title = '<div id="skill-title" class="skill-title">' + titleIcon + esc(state.skillTitle) + '</div>';
+    const meta = targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '';
+    const heading = state.swordModes ? '<div class="sword-title-row">' + title +
+      '<button class="sword-close" type="button" data-action="closeAction" aria-label="稍后选择技能"' +
+      (state.busy ? ' disabled' : '') + '>×</button></div>' + meta : meta + title;
+    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + (state.swordModes ? ' sword-sheet' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
       (description ? ' aria-describedby="' + description + '"' : '') + '>' +
-      '<div class="skill-header">' + (targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '') + '<div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
+      '<div class="skill-header">' + heading +
       (state.skillHint ? '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' : '') +
       '</div><div class="skill-body">';
-    if (targetMode) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
-    if (state.skillSwordHint) html += '<div class="skill-context">' + esc(state.skillSwordHint) + '</div>';
+    if (state.swordModes) {
+      const modeButton = (value, label, active) => '<button type="button" class="sword-mode' + (active ? ' is-active' : '') +
+        '" data-action="submitChoice" data-value="' + value + '" aria-pressed="' + active + '"' + (locked ? ' disabled' : '') +
+        '><span class="sword-radio" aria-hidden="true"></span>' + label + '</button>';
+      html += '<div class="sword-modes" role="group" aria-label="本轮行动">' + modeButton('pick-sword-target', '选择目标开刀', !swordPass) + modeButton('pass', '本轮不开刀', swordPass) + '</div>';
+    }
+    if (targetMode && !swordPass) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
+    if (state.skillSwordHint && !swordPass) {
+      html += '<button type="button" class="disclosure-button sword-help" data-action="toggleSkillHelp" aria-expanded="' + state.skillHelpExpanded + '" aria-controls="sword-rules">技能说明<span class="identity-help-chevron' + (state.skillHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
+      if (state.skillHelpExpanded) html += '<div id="sword-rules" class="skill-context">' + esc(state.skillSwordHint) + '</div>';
+    }
     if (["hunterTurn", "paladinTurn"].includes(state.room.phase) && state.room.operationStatus)
       html += '<div class="skill-context">' + esc(state.room.operationStatus.detail) + '</div>';
     function seatButton(c, swap) {
@@ -4111,7 +4135,7 @@ function roomListItems(rooms) {
         (c.disabledReason || locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + '<span class="skill-seat-unit"> 号</span></span><span class="skill-name">' + esc(c.disabledReason || c.name) + '</span>' +
         (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
     }
-    if (state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
+    if (!swordPass && state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
     if (state.swapOptions.length) html += '<div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
     html += '</div>' + (state.skillOtherChoices.length ? '<div class="skill-other-choices">' : '');
     for (var c of state.skillOtherChoices) {
@@ -4483,21 +4507,33 @@ function roomListItems(rooms) {
       <div class="room-rules-sheet-footer"><button type="button" class="secondary" data-action="openBoardDetails"><img src="/assets/sheet-book.svg" alt="" />板子详情</button>${btn('primary', 'closeRoomRules', '知道了')}</div>
     </section></div>`;
   }
+  function viewCurrentIdentity(identity) {
+    const art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
+    const info = identityVision.presentIdentity(identity, state.seats);
+    const review = info.review, status = identity.skillStatus;
+    const emptyVision = info.showVision && info.vision.empty;
+    const history = identity.identityHistory?.length > 1
+      ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog">身份历程 <span aria-hidden="true">›</span></button>' : '';
+    const summary = !review.skillByFaction && (emptyVision || status?.title || history)
+      ? '<div class="compact-review-row"><div class="compact-review-values">' +
+        (emptyVision ? '<span>' + esc(info.vision.text) + '</span>' : '') +
+        (status?.title ? '<span class="compact-review-skill' + (status.title === '技能可用' ? ' is-ready' : '') + '">' + esc(status.title) + '</span>' : '') +
+        '</div>' + history + '</div>' : '';
+    return '<div class="identity open identity-compact">' +
+      '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><span class="compact-hide-face"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></span></button></div>' +
+      '<div class="compact-role-heading"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-name"><div class="compact-role-title faction-' + esc(identity.factionTone || '') + '">' + esc(identity.role) + '</div>' +
+      (info.showRoleHelp ? '<button type="button" class="compact-role-help" data-action="openIdentityRoleHelp" aria-haspopup="dialog" aria-label="角色说明"><span class="compact-role-help-mark" aria-hidden="true"><img src="/assets/sheet-book.svg" alt="" /></span></button>' : '') +
+      '</div><div class="compact-faction faction-' + esc(identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span>' +
+      (review.skillByFaction ? '<span class="compact-faction-skill">' + esc(status.title) + '</span>' + history : '') + '</div></div></div>' + summary +
+      (status?.detail ? '<div class="identity-info-note compact-review-detail">' + esc(status.detail) + '</div>' : '') +
+      viewIdentityInformation(identity, state.seats, false, true, 'review', info) + viewSkillHistory(identity, true) + '</div>';
+  }
   function viewRoom() {
     var r = state.room;
     var html = viewRoomHeader(r);
     if (r.phase !== "lobby" && r.me.seat !== null) {
       if (state.revealed && state.secret) {
-        var identity = state.secret;
-        var art = rolePortraits.portrait(identity.role, identity.factionTone).portrait;
-        const hasIdentityHistory = identity.identityHistory?.length > 1;
-        html += '<div class="identity open identity-compact">' +
-          '<div class="compact-privacy-row"><div class="compact-privacy-note"><img src="/assets/table-lock.svg" alt="" /><span>仅你可见</span></div><button type="button" class="text-button compact-hide" data-action="reveal"><span class="compact-hide-face"><img src="/assets/identity-hide-muted.svg" alt="" /><span>隐藏身份</span></span></button></div>' +
-          '<div class="compact-role-heading' + (hasIdentityHistory ? ' has-history' : '') + '"><img class="compact-role-art" src="' + esc(art) + '" alt="" /><div class="compact-role-copy"><div class="compact-role-name"><div class="compact-role-title faction-' + (identity.factionTone || '') + '">' + esc(identity.role) + '</div>' +
-          (identityVision.presentIdentity(identity).showRoleHelp ? '<button type="button" class="compact-role-help" data-action="openIdentityRoleHelp" aria-haspopup="dialog" aria-label="角色说明"><span class="compact-role-help-mark" aria-hidden="true"><img src="/assets/sheet-book.svg" alt="" /></span></button>' : '') +
-          '</div><div class="compact-faction faction-' + (identity.factionTone || '') + '"><span class="compact-faction-dot" aria-hidden="true"></span><span>' + esc(identity.faction) + '</span></div></div>' +
-          (hasIdentityHistory ? '<button type="button" class="identity-history-entry compact-history-entry" data-action="openIdentityHistory" aria-haspopup="dialog"><span class="identity-history-icon" aria-hidden="true"></span>身份历程 <span aria-hidden="true">›</span></button>' : '') + '</div>' +
-          viewIdentityInformation(identity, state.seats, false, true) + viewSkillHistory(identity, true) + '</div>';
+        html += viewCurrentIdentity(state.secret);
       }
     }
 
@@ -4556,20 +4592,25 @@ function roomListItems(rooms) {
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
-    if (r.canUseTools && r.operationProgress) {
+    const playerProgress = roomSheets.playerProgressCard(r);
+    if (r.operationProgress && (r.canUseTools || playerProgress)) {
       var progress = r.operationProgress;
       var allCompleted = progress.total > 0 && progress.completed === progress.total;
       html +=
-        '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '"><button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '"><span class="progress-title">当前操作进度</span>' +
-        '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">已完成</span></span>' +
-        '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>' +
+        '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '">' +
+        (playerProgress ? '<div class="player-progress-heading">' :
+          '<button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '">') +
+        '<span class="progress-title">' + (playerProgress ? esc(playerProgress.title) : '当前操作进度') + '</span>' +
+        '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">' + (playerProgress ? '已提交' : '已完成') + '</span></span>' +
+        (playerProgress ? '</div>' : '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>') +
         '<div class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="' + progress.total + '" aria-valuenow="' + progress.completed + '">';
       for (var segment = 0; segment < progress.total; segment++) {
         html += '<span class="progress-segment' + (segment < progress.completed ? ' completed' : '') + '"></span>';
       }
-      html += '</div><div class="progress-note" role="status"><span class="progress-note-dot" aria-hidden="true"></span><span>' +
-        (allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
-      if (state.operationProgressExpanded) {
+      html += '</div><div class="progress-note" role="status">' +
+        (playerProgress && r.me.submitted ? '<span class="progress-check" aria-hidden="true">✓</span>' : '<span class="progress-note-dot" aria-hidden="true"></span>') +
+        '<span>' + (playerProgress ? esc(playerProgress.note) : allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
+      if (r.canUseTools && state.operationProgressExpanded) {
         html += '<div class="progress-players" role="list">';
         for (var q = 0; q < (progress.players || []).length; q++) {
           var pp = progress.players[q];
@@ -5297,6 +5338,9 @@ function roomListItems(rooms) {
     closeDealtIdentity: closeDealtIdentity,
     dismissIdentityHint: dismissIdentityHint,
     revealActionIdentity: revealActionIdentity,
+    toggleSkillHelp: () => {
+      if (state.actionDialog && state.skillSwordHint) setState({ skillHelpExpanded: !state.skillHelpExpanded });
+    },
     openAction: openAction,
     closeAction: closeAction,
     submitChoice: function (el) {

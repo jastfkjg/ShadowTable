@@ -93,7 +93,7 @@ test("上传及审核不修改资料；通过后保存保持幂等、版本、�
     assert.match((await app.req(saved.data.avatarUrl)).headers.get("cache-control"), /immutable/);
     const shown = (await app.req("/api/rooms/" + room.code, token)).data;
     assert.equal(shown.players[0].avatarUrl, saved.data.avatarUrl); assert.equal(shown.players[0].name, "本桌昵称");
-    app.store.archiveMatch({ id: randomUUID(), board: "classic", endedAt: Date.now(), players: [{ uid: uid("owner"), faction: "good", outcome: "win" }] });
+    app.store.archiveMatch({ id: randomUUID(), board: "classic", capacity: 9, endedAt: Date.now(), players: [{ uid: uid("owner"), faction: "good", outcome: "win" }] });
     assert.equal((await app.req("/api/leaderboard?metric=games", token)).data.rows[0].avatarUrl, saved.data.avatarUrl);
     assert.equal(app.store.db.prepare("SELECT data FROM avatar_uploads WHERE id=?").get(row.id).data, null);
     assert.equal((await app.req("/api/me/profile", token, { nickname: "只改名字", version: 2 })).data.avatarUrl, saved.data.avatarUrl);

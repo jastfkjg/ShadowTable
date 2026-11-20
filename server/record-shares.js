@@ -129,6 +129,6 @@ function read(store, id) {
   check(validId(id), "分享不存在或已失效", 404);
   const row = store.db.prepare("SELECT snapshot FROM record_shares WHERE id=?").get(id);
   check(row, "分享不存在或已失效", 404);
-  return JSON.parse(row.snapshot);
+  return funCopy.shareSnapshot(JSON.parse(row.snapshot));
 }
 module.exports = { initialize, create, read, validId, statsData };

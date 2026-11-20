@@ -145,6 +145,28 @@ test("分享快照随数据库重启保留，无效令牌不能读取其他资�
       assert.throws(() => shares.read(store, id), error => error.status === 404);
   } finally { store.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+test("旧趣味分享链接读取新版称号并保留原始快照和计数", () => {
+  const store = setup();
+  try {
+    const fixtures = require("./helpers/record-share-fixtures");
+    const oldFun = { ...fixtures.fun, player: { name: "灯下黑梅林" }, title: "灯下黑梅林的灯下黑梅林 · 3局",
+      data: { ...fixtures.fun.data, metric: "merlin_all_rides", label: "灯下黑梅林", unit: "局", description: "灯下黑梅林的旧说明" } };
+    const oldMatches = { ...fixtures.matches, data: { ...fixtures.matches.data, scope: "全部时间 · 全部玩法 · 占错队" } };
+    const oldSummary = { ...fixtures.funSummary, data: { ...fixtures.funSummary.data,
+      items: fixtures.funSummary.data.items.map((row, index) => ({ ...row, label: ["影帝梅林", "炸飞梅林", "职业刺客"][index] })) } };
+    const insert = store.db.prepare("INSERT INTO record_shares VALUES(?,?,?,?,?)");
+    for (const snapshot of [oldFun, oldMatches, oldSummary]) insert.run(snapshot.id, UID, snapshot.id, JSON.stringify(snapshot), snapshot.createdAt);
+    const fun = shares.read(store, oldFun.id);
+    assert.equal(fun.title, "灯下黑梅林的隐身乘客 · 3局");
+    assert.equal(fun.data.label, "隐身乘客");
+    assert.match(fun.data.description, /每趟任务都上车/);
+    assert.equal(fun.data.count, oldFun.data.count);
+    assert.equal(fun.id, oldFun.id);
+    assert.equal(shares.read(store, oldMatches.id).data.scope, "全部时间 · 全部玩法 · 站错队");
+    assert.deepEqual(shares.read(store, oldSummary.id).data.items.map(row => row.label), ["幕后军师", "弹射下车", "职业刺客"]);
+    assert.deepEqual(JSON.parse(store.db.prepare("SELECT snapshot FROM record_shares WHERE id=?").get(oldFun.id).snapshot), oldFun);
+  } finally { store.close(); }
+});
 test("HTTP 创建要求登录，持有分享链接可匿名读取，普通个人接口仍需登录", async () => {
   const app = createApp({ database: ":memory:", clock: () => NOW, devAuth: true });
   const token = "1".repeat(64);

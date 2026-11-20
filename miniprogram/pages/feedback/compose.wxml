@@ -1,0 +1,39 @@
+<view class="fb-compose">
+  <app-nav title="{{type.label}}" back="{{true}}" bindback="back" />
+  <view class="fb-form">
+    <view wx:if="{{type.id === 'issue'}}" class="fb-field">
+      <view class="fb-label"><text>所在页面</text><text class="fb-meta">选填</text></view>
+      <view class="fb-area-grid">
+        <button wx:for="{{areas}}" wx:key="*this" size="mini" class="fb-area {{area === item ? 'selected' : ''}}"
+          hover-class="none" data-area="{{item}}" bindtap="area" disabled="{{saving}}" aria-pressed="{{area === item}}">{{item}}</button>
+      </view>
+    </view>
+    <view class="fb-field">
+      <view class="fb-label"><text>{{type.heading}}</text><text class="fb-meta">必填</text></view>
+      <view class="fb-inputbox">
+        <textarea value="{{content}}" placeholder="{{type.prompt}}" aria-label="{{type.heading}}，必填" maxlength="1000"
+          disabled="{{saving}}" bindinput="input" cursor-spacing="24" placeholder-class="fb-placeholder" />
+        <view class="fb-count">{{content.length}} / 1000</view>
+      </view>
+    </view>
+    <view class="fb-field">
+      <view class="fb-label"><text>截图</text><text class="fb-meta">选填 · {{photos.length}} / 4 张</text></view>
+      <view class="fb-photos">
+        <view wx:for="{{photos}}" wx:key="*this" class="fb-thumb">
+          <image src="{{item}}" mode="aspectFill" data-path="{{item}}" bindtap="preview" aria-label="预览截图 {{index + 1}}" />
+          <button size="mini" hover-class="none" class="fb-remove" data-path="{{item}}" disabled="{{choosing || saving}}" bindtap="remove" aria-label="移除截图 {{index + 1}}"><text>×</text></button>
+        </view>
+        <button wx:if="{{photos.length < 4}}" size="mini" hover-class="none" class="fb-add" bindtap="choose" disabled="{{saving || choosing}}" aria-label="添加截图">
+          <view class="fb-plus" aria-hidden="true"></view><text>{{choosing ? '添加中…' : '添加截图'}}</text>
+        </button>
+      </view>
+    </view>
+  </view>
+  <view class="fb-footer">
+    <view wx:if="{{error}}" class="fb-error" role="alert">{{error}}</view>
+    <button hover-class="none" class="primary fb-send" bindtap="submit" disabled="{{!ready || saving || choosing}}" loading="{{saving}}">{{saving ? '正在提交' : '提交反馈'}}</button>
+  </view>
+</view>
+<page-container wx:if="{{ready || photos.length || receiptId}}" show="{{!guardPaused}}" overlay="{{false}}" duration="{{0}}"
+  custom-style="height:0;pointer-events:none;" bindafterleave="onGuardClosed" />
+<app-dialog id="app-dialog" />

@@ -1,10 +1,11 @@
 "use strict";
 const { createHash } = require("node:crypto");
 const { RuleError } = require("./engine");
+const { RANK_MIN_PLAYERS } = require("./match-management");
 const fun = require("./fun");
 const { honors } = require("../miniprogram/fun-copy");
 const { monthAt, monthRange } = require("../miniprogram/monthly-report");
-const RULES_VERSION = "monthly-2026-10-v2";
+const RULES_VERSION = "monthly-2026-11-v3";
 const WIN_THRESHOLD = 10, FUN_RATE_THRESHOLD = 5;
 function rankTop(rows, compare) {
   rows.sort((a, b) => compare(a, b) || a.publicId.localeCompare(b.publicId));
@@ -49,10 +50,10 @@ class MonthlyReport {
     const aggregates = db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
       sum(p.faction='good') AS goodTotal, sum(p.faction='good' AND p.outcome='win') AS goodWins,
       sum(p.faction='evil') AS evilTotal, sum(p.faction='evil' AND p.outcome='win') AS evilWins,
-      f.public_id,f.nickname,f.avatar_hash FROM visible_match_players p JOIN profiles f ON f.uid=p.uid
+      f.public_id,f.nickname,f.avatar_hash FROM leaderboard_match_players p JOIN profiles f ON f.uid=p.uid
       WHERE ${valid} AND ${publicPlayers} GROUP BY p.uid`).all(start, end);
     const scores = new Map(db.prepare(`SELECT s.uid,count(*) AS games,sum(s.points) AS points
-      FROM active_match_scores s JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
+      FROM active_match_scores s JOIN leaderboard_match_players p ON p.match_id=s.match_id AND p.uid=s.uid
       WHERE ${valid} AND s.status='scored' GROUP BY s.uid`).all(start, end).map(row => [row.uid, row]));
     const adjustments = new Map(db.prepare("SELECT uid,sum(delta) AS points FROM visible_score_adjustments WHERE created>=? AND created<? GROUP BY uid").all(start, end).map(row => [row.uid, row.points]));
     const players = aggregates.map(row => ({ ...identity(row), total: row.total, wins: row.wins, losses: row.total - row.wins,
@@ -76,7 +77,7 @@ class MonthlyReport {
       count(DISTINCT CASE WHEN s.status='known' THEN s.match_id END) AS knownGames,
       count(DISTINCT CASE WHEN s.status='unknown' THEN s.match_id END) AS unknownGames,
       f.public_id,f.nickname,f.avatar_hash FROM match_fun_stats s
-      JOIN visible_match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN profiles f ON f.uid=s.uid
+      JOIN leaderboard_match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN profiles f ON f.uid=s.uid
       WHERE ${valid} AND ${publicPlayers} GROUP BY s.metric,s.uid`).all(start, end);
     const funBoards = Object.values(fun.metrics).filter(def => honors[def.id] && !def.countOnly).flatMap(def => {
       const rows = funRows.filter(row => row.metric === def.id).map(row => ({ ...identity(row),
@@ -98,7 +99,7 @@ class MonthlyReport {
     if (!highlights.length && mainBoards[2].rows.length) highlights.push(describeWinner(mainBoards[2]) + "本月参赛 " + mainBoards[2].rows[0].total + " 局。");
     return { month, currentMonth: monthAt(now), firstMonth: first == null ? monthAt(now) : monthAt(first),
       periodStart: start, periodEnd: end, timezone: "Asia/Shanghai", status: now < end ? "preview" : "complete",
-      rulesVersion: RULES_VERSION, overview: { ...overview }, mainBoards, funBoards, featuredIds, highlights };
+      rulesVersion: RULES_VERSION, minPlayers: RANK_MIN_PLAYERS, overview: { ...overview }, mainBoards, funBoards, featuredIds, highlights };
   }
   read(params, now = Date.now()) {
     const month = parseMonth(params, now), old = this.cache.get(month);

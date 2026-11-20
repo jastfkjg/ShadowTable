@@ -57,6 +57,7 @@ for (const [board, capacity] of [["classic", 6], ["knights", 12], ["chaos", 12]]
     run(r, "host", "beginActivity", { kind: "vote", team: [1, 2] });
     enter(r, "duringVote", "投票期间加入");
     assert.equal(publicView(r, "duringVote").needsSubmission, false);
+    assert.equal(publicView(r, "duringVote").operationProgress, null);
     assert.equal(publicView(r, "host").operationProgress.total, capacity);
     assert.throws(() => run(r, "watcher", "submit", { value: "approve" }), /没有秘密操作/);
     assert.throws(() => run(r, "duringVote", "submit", { value: "approve" }), /没有秘密操作/);

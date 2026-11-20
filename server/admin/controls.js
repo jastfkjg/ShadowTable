@@ -3,8 +3,8 @@
 // Keep native selects as the source of truth for forms and existing API handlers.
 // The visible control and its popup only change presentation and navigation.
 (() => {
-  const tabs = ["rooms", "scores", "cards", "audit"];
-  const panels = ["room-overview", "score-management", "card-management", "audit-section"];
+  const tabs = ["rooms", "scores", "cards", "feedback", "audit"];
+  const panels = ["room-overview", "score-management", "card-management", "feedback-management", "audit-section"];
   const tabButtons = tabs.map((tab) => document.getElementById("dashboard-tab-" + tab));
   function activateTab(index, focus = false) {
     tabButtons.forEach((button, i) => {
@@ -14,6 +14,7 @@
     });
     closePicker();
     document.querySelectorAll(".room-more[open]").forEach((menu) => { menu.open = false; });
+    if (tabs[index] === "feedback") window.FeedbackInbox?.load();
     if (focus) tabButtons[index].focus();
   }
   tabButtons.forEach((button, index) => {

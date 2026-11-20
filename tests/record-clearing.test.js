@@ -15,7 +15,7 @@ const { readRoomPlayerStats, playerStatsId } = require("../server/player-stats")
 const { monthRange } = require("../miniprogram/monthly-report");
 const NOW = Date.parse("2026-10-26T04:00:00Z"), { start, end } = monthRange("2026-10");
 function game(store, endedAt = NOW, { points = 3, outcome = "win", uid = "wx:me" } = {}) {
-  const record = { id: randomUUID(), code: "123456", board: "classic", boardName: "经典", capacity: 6, startedAt: endedAt - 3600000, endedAt,
+  const record = { id: randomUUID(), code: "123456", board: "classic", boardName: "经典", capacity: 9, startedAt: endedAt - 3600000, endedAt,
     winner: "good", source: "manual", excludedReason: null,
     players: [{ uid, name: "我", seat: 1, role: "梅林", roleId: "merlin", faction: "good", outcome, score: { status: "scored", total: points, breakdown: [] } },
       { uid: "wx:friend", name: "朋友", seat: 2, role: "刺客", roleId: "assassin", faction: "evil", outcome: "loss", score: { status: "scored", total: 1, breakdown: [] } }] };

@@ -102,7 +102,7 @@ test('全部可用板子与人数的实际私密数据均可展示，不修改�
 test('十二骑士的 A 牌和 B 牌都能查阅完整角色规则', () => {
   const room=setup('knights',12);
   const bCards=['blueGuard','gargoyle','witch','magician','paladin','blueKnight','redKnight','blueAwakened','redAwakened','blueHunter','redHunter','prophet'];
-  const aCards=['gareth','gaheris','blueLancelot','redLancelot','redSwordsman','assassin','morgana'];
+  const aCards=['gareth','gaheris','blueLancelot','redLancelot','redSwordsman','assassin','morgana','mordred'];
   for(const role of [...bCards,...aCards]) {
     room.roles.p1=role;room.knights.players.p1.b=bCards.includes(role);
     const secret=privateView(room,'p1'),info=presentIdentity(secret);
@@ -114,6 +114,12 @@ test('十二骑士的 A 牌和 B 牌都能查阅完整角色规则', () => {
     assert.equal(info.ability.note, help.exception);
     assert.equal(info.roleOverview.deck, bCards.includes(role) ? 'B 牌' : 'A 牌');
     assert.ok(info.roleOverview.brief);
+    if (role === 'mordred') {
+      const rules = info.roleOverview.rules;
+      assert.deepEqual(rules.map(rule => rule.label), ['初始视野', '技能环节', '骑士决斗']);
+      assert.equal(rules[2].emphasis, '按好人判定');
+      assert.match(rules[2].text, /仍是坏人/);
+    }
     if (role === 'redSwordsman') {
       assert.equal(info.roleOverview.badge, '1 次');
       assert.match(info.roleOverview.brief, /A 牌刀客或 B 牌角色.*刀错也消耗技能/);
@@ -122,5 +128,25 @@ test('十二骑士的 A 牌和 B 牌都能查阅完整角色规则', () => {
         { label: '初始视野', text: '无视野，不参与坏人互认' },
       ]);
     }
+  }
+});
+
+test('蓝刀客的初始视野以本人为主语，旧身份回看也使用新说明', () => {
+  const room = setup('knights', 12);
+  const vision = '开局时，你不知道其他玩家的身份。';
+  for (const role of ['gareth', 'gaheris', 'blueLancelot']) {
+    room.roles.p1 = role;
+    const secret = privateView(room, 'p1');
+    assert.ok(secret.information.includes(vision), role);
+    const legacy = { ...secret, information: secret.information.replace(vision, '没有初始视野，不参与坏人互认。') };
+    for (const card of [secret, legacy]) {
+      const info = presentIdentity(card);
+      assert.equal(info.summaryVision, vision, card.role);
+      assert.doesNotMatch(JSON.stringify(info), /不参与坏人互认/);
+    }
+  }
+  for (const role of ['redSwordsman', 'redLancelot']) {
+    room.roles.p1 = role;
+    assert.match(presentIdentity(privateView(room, 'p1')).summaryVision, /不参与坏人互认/);
   }
 });

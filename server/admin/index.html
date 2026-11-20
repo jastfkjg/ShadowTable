@@ -9,6 +9,7 @@
     <script src="/admin/app.js" defer></script>
     <script src="/admin/controls.js" defer></script>
     <script src="/admin/matches.js" defer></script>
+    <script src="/admin/feedback.js" defer></script>
     <script src="/admin/avoidance.js" defer></script>
   </head>
   <body>
@@ -48,10 +49,22 @@
             <button id="dashboard-tab-rooms" type="button" role="tab" aria-selected="true" aria-controls="room-overview">房间概览</button>
             <button id="dashboard-tab-scores" type="button" role="tab" aria-selected="false" aria-controls="score-management" tabindex="-1">战绩管理</button>
             <button id="dashboard-tab-cards" type="button" role="tab" aria-selected="false" aria-controls="card-management" tabindex="-1">回避卡</button>
+            <button id="dashboard-tab-feedback" type="button" role="tab" aria-selected="false" aria-controls="feedback-management" tabindex="-1">用户反馈</button>
             <button id="dashboard-tab-audit" type="button" role="tab" aria-selected="false" aria-controls="audit-section" tabindex="-1">操作记录</button>
           </nav>
           <div class="dashboard-tools"><button id="refresh">刷新列表</button><a href="/admin/companion">打开陪测台 →</a></div>
         </div>
+        <section id="feedback-management" role="tabpanel" aria-labelledby="dashboard-tab-feedback" tabindex="0" hidden>
+          <div class="section-heading"><div><h2>用户反馈</h2><p class="cards-intro">可以单独回复或采纳反馈。首次采纳会向玩家发放永久「共建者」徽章。</p></div></div>
+          <div id="feedback-filters" role="group" aria-label="处理状态">
+            <button type="button" data-filter="pending" aria-pressed="true">待回复</button>
+            <button type="button" data-filter="replied" aria-pressed="false">已回复</button>
+            <button type="button" data-filter="all" aria-pressed="false">全部</button>
+          </div>
+          <p id="inbox-status" role="status" aria-live="polite"></p>
+          <div id="feedback-items"></div>
+          <button type="button" id="feedback-more" hidden>加载更多</button>
+        </section>
         <section id="card-management" role="tabpanel" aria-labelledby="dashboard-tab-cards" tabindex="0" hidden>
           <div class="section-heading"><div><h2>发放回避卡</h2><p class="cards-intro">选择发放对象与数量，玩家收到后会弹窗提醒。</p></div><button id="cards-refresh" type="button">刷新玩家</button></div>
           <form id="cards-search"></form>

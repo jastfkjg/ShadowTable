@@ -10,11 +10,12 @@ const {newRoom,enter,command}=require('../server/engine');
 const {Leaderboard,periodRange}=require('../server/leaderboard');
 const {createApp}=require('../server/app');
 function game(store,options={}) {
- const room=newRoom('123456','wx:1','林间','classic',6);
- for(let i=2;i<=6;i++)enter(room,'wx:'+i,'玩家'+i);
- command(room,room.host,{type:'updateSettings',stage:room.stage,board:'classic',capacity:6,visible:false,scoreEnabled:true});
+ const capacity=options.capacity || 6;
+ const room=newRoom('123456','wx:1','林间',capacity >= 9 ? 'classic-court' : 'classic',capacity);
+ for(let i=2;i<=capacity;i++)enter(room,'wx:'+i,'玩家'+i);
+ command(room,room.host,{type:'updateSettings',stage:room.stage,board:room.board,capacity,visible:false,scoreEnabled:true});
  room.players.forEach(p=>p.ready=true);command(room,room.host,{type:'start',stage:room.stage,flexible:true});
- room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin'][i]]));
+ room.roles=Object.fromEntries(room.players.map((p,i)=>[p.uid,['merlin','percival','servant','servant','morgana','assassin','servant','servant','mordred','oberon'][i]]));
  command(room,room.host,{type:'finishTools',stage:room.stage,scoreReason:'assassination',scoreTarget:3});
  if(options.ended)room.matchRecord.endedAt=options.ended;
  store.transaction(()=>store.save(room));return room;
@@ -22,7 +23,7 @@ function game(store,options={}) {
 const adjust=(store,uid,points,mode='delta')=>store.transaction(()=>store.adjustPlayerScore({uid,points,mode,revision:store.scoreRevision(uid),reason:'管理修正'}));
 test('玩家加减和设置总分保留流水，榜单同步但场均、胜负不变，版本冲突及事务回滚安全',()=>{
  const store=new Store(':memory:');try {
-  game(store);const board=new Leaderboard(store),before=store.statsFor('wx:3'),version=store.scoreRevision('wx:3');
+  game(store,{capacity:10});const board=new Leaderboard(store),before=store.statsFor('wx:3'),version=store.scoreRevision('wx:3');
   const first=adjust(store,'wx:3',10);assert.equal(first.after,25);assert.equal(store.statsFor('wx:3').score.average,15);
   assert.equal(board.read('wx:3',new URLSearchParams('metric=points')).me.points,25);
   assert.equal(store.statsFor('wx:3').wins,before.wins);

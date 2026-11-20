@@ -4,21 +4,21 @@
   <scroll-view class="award-scroll" style="{{bodyHeight?'height:'+bodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="award-scroll-content">
       <block wx:if="{{awardDetail}}">
-        <view class="award-eyebrow">2026年10月 · {{awardDetail.category}}</view>
-        <view class="award-large-art"><image src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
+        <view class="award-eyebrow">{{awardDetail.periodLabel}} · {{awardDetail.category}}</view>
+        <view class="award-large-art"><image style="{{awardDetail.artStyle}}" src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
         <view class="award-title">{{awardDetail.title}}</view><view class="award-reason">{{awardDetail.condition}}</view>
         <view wx:if="{{awardDetail.flavor}}" class="award-message">{{awardDetail.flavor}}</view><view class="award-hint">获得后永久保留</view>
       </block>
       <block wx:else>
-        <view class="award-eyebrow">2026年10月 · 内测纪念</view><view class="award-title">{{dialog.title}}</view>
-        <view class="award-count">你获得了 <text>{{dialog.awards.count}}</text> 枚限定徽章</view>
+        <view class="award-eyebrow">{{dialog.awards.eyebrow}}</view><view class="award-title">{{dialog.title}}</view>
+        <view class="award-count">你获得了 <text>{{dialog.awards.count}}</text> 枚永久徽章</view>
         <view wx:if="{{dialog.awards.hero}}" class="award-hero">
-          <button class="award-hero-art" bindtap="showAward" data-badge="{{dialog.awards.hero.id}}" aria-label="{{'查看'+dialog.awards.hero.title+'详情'}}" hover-class="app-dialog-pressed"><image src="{{dialog.awards.hero.imageUrl}}" mode="aspectFit" aria-hidden="true" /></button>
+          <button class="award-hero-art" bindtap="showAward" data-badge="{{dialog.awards.hero.id}}" aria-label="{{'查看'+dialog.awards.hero.title+'详情'}}" hover-class="app-dialog-pressed"><image style="{{dialog.awards.hero.artStyle}}" src="{{dialog.awards.hero.imageUrl}}" mode="aspectFit" aria-hidden="true" /></button>
           <view class="award-hero-name">{{dialog.awards.hero.title}}</view><view class="award-reason {{dialog.awards.ranked?'award-rank':''}}">{{dialog.awards.hero.displayReason}}</view>
         </view>
         <view wx:if="{{dialog.awards.secondary.length}}" class="award-secondary">
           <view wx:for="{{dialog.awards.secondary}}" wx:key="id" class="award-small">
-            <button bindtap="showAward" data-badge="{{item.id}}" aria-label="{{'查看'+item.title+'详情'}}" hover-class="app-dialog-pressed"><view class="award-small-art"><image src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view><view class="award-name">{{item.title}}</view></button>
+            <button bindtap="showAward" data-badge="{{item.id}}" aria-label="{{'查看'+item.title+'详情'}}" hover-class="app-dialog-pressed"><view class="award-small-art"><image style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view><view class="award-name">{{item.title}}</view></button>
             <view class="award-reason">{{item.displayReason}}</view>
           </view>
         </view>

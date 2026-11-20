@@ -75,6 +75,8 @@ function roleHelp(role, capacity = 12) {
       ),
     ];
     exception = aSwordException + attackNote;
+    const openingVision = role === "redLancelot" || role === "redSwordsman"
+      ? "没有初始视野，不参与坏人互认。" : "开局时，你不知道其他玩家的身份。";
     if (["blueLancelot", "redLancelot"].includes(role)) {
       facts.push(
         fact(
@@ -82,14 +84,14 @@ function roleHelp(role, capacity = 12) {
           "抽到转换牌时切换好人／坏人阵营，角色卡和初始视野不变；当前为好人只能投成功，当前为坏人必须投失败。",
         ),
       );
-      facts.push(fact("初始视野", "没有初始视野，不参与坏人互认。"));
+      facts.push(fact("初始视野", openingVision));
       if (capacity === 11 && role === "blueLancelot")
         exception +=
           "11 人局发牌时，蓝兰斯洛特被梅林视为坏人；后续转换不改变初始视野。";
     } else if (role === "assassin") {
       facts.push(fact("初始视野", "与莫德雷德、莫甘娜互相知道座位和身份。"));
     } else {
-      facts.push(fact("初始视野", "没有初始视野，不参与坏人互认。"));
+      facts.push(fact("初始视野", openingVision));
       if (role === "redSwordsman")
         facts.push(fact("任务出牌", "上车执行任务时必须投失败。"));
     }

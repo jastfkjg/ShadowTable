@@ -287,7 +287,14 @@ function archiveResult(room) {
     ...(scoring.isReverseBoard(room) ? { reverseStrike: room.reverseStrike || null } : {}),
     scoreEligibilityReason: scoring.exclusion(room),
     scoreExcludedReason,
-    funFacts: room.fun ? { ...room.fun, attacksComplete: true } : null,
+    funFacts: room.fun ? {
+      ...room.fun, attacksComplete: true,
+      questsComplete: !room.flexible && room.fun.events.filter(event => event.kind === "quest").length === room.quests.length,
+      ...(room.lancelot ? {
+        lancelotConversions: Object.fromEntries(Object.entries(room.lancelot.players)
+          .map(([uid, state]) => [uid, state.identityRevision])),
+      } : {}),
+    } : null,
     ...(replay.supported(room.board) ? { replay: replay.snapshot(room) } : {}),
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
@@ -765,6 +772,11 @@ function rememberKnightIdentity(room, uid, reason = "redraw") {
 }
 function privateView(room, uid) {
   const view = privateIdentity(room, uid);
+  // matchId is randomized at each deal. Reopening the same private card,
+  // including after a reconnect, must keep its illustration.
+  const deal = room.matchId || [room.code, room.createdAt, room.game].join(":");
+  const variant = createHash("sha256").update(JSON.stringify([deal, uid])).digest()[0] & 1;
+  view.cardArt = `/assets/role-cards/${room.roles[uid]}-${variant ? "b" : "a"}.jpg`;
   if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
@@ -1207,18 +1219,9 @@ function roomSummary(room, uid) {
   };
 }
 function operationProgress(room, uid) {
-  if (
-    uid !== room.host ||
-    ![
-      ...SPECIAL_PHASES,
-      "identity",
-      "teamVote",
-      "quest",
-      "assassination",
-      "reverseStrike",
-    ].includes(room.phase)
-  )
-    return null;
+  const host = room.host === uid;
+  if (room.phase !== "identity" && (!hasActiveOperation(room) || room.phase === "offlineFinal")) return null;
+  if (!host && member(room, uid).seat === null) return null;
   const players = room.players.map((p) => {
     const required = !!actionSpec(room, p.uid);
     return {
@@ -1228,9 +1231,12 @@ function operationProgress(room, uid) {
       completed: required && Object.hasOwn(room.submissions || {}, p.uid),
     };
   });
+  const total = players.filter((p) => p.required).length;
+  // Public identity, vote and quest groups already show progress even with one participant.
+  if (!host && total < 2 && !["identity", "teamVote", "quest"].includes(room.phase)) return null;
   return {
-    players,
-    total: players.filter((p) => p.required).length,
+    ...(host ? { players } : {}),
+    total,
     completed: players.filter((p) => p.completed).length,
   };
 }
@@ -2060,6 +2066,7 @@ module.exports = {
   roomSummary,
   privateView,
   actionSpec,
+  roleIds: Object.keys(ROLES),
   roleName: (role) => ROLES[role]?.[0] || null,
   avoidanceOptions: room => [...new Set(roleDeck(room.board, room.capacity))].map(id => ({ id, name: ROLES[id][0], faction: ROLES[id][1], count: roleDeck(room.board, room.capacity).filter(role => role === id).length })),
 };

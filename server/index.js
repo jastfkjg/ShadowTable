@@ -36,8 +36,10 @@ const { server, store } = createApp({
   wechatMessageAESKey: process.env.WECHAT_MESSAGE_AES_KEY || "",
 });
 const backups = require("./backup").startBackups(store, { database, directory: resolve(process.env.BACKUP_DIR || join(dirname(database), "backups")) });
-const octoberAwards = require('./badge-awards').activate(store);
+const badgeAwards = require('./badge-awards');
+const octoberAwards = badgeAwards.activate(store);
 if (octoberAwards) console.log('October badge awards active:', JSON.stringify(octoberAwards));
+const stopMonthlyAwards = badgeAwards.startMonthlyAwards(store);
 const stopMaintenance = process.env.CLEANUP_ENABLED === "0" ? () => {} : require("./retention").startMaintenance(store, { ...cleanupPolicy, canCleanup: backups.hasRecentBackup });
 server.listen(
   Number(process.env.PORT) || 8787,
@@ -50,6 +52,7 @@ server.listen(
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () =>
     server.close(async () => {
+      stopMonthlyAwards();
       stopMaintenance();
       await backups.stop();
       store.close();

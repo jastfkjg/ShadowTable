@@ -10,12 +10,14 @@ const { saveProfile, readProfile } = require('../server/profile');
 const { readBadges, saveBadge, equippedBadges } = require('../server/badges');
 const { catalogue, presentCollection } = require('../miniprogram/badges');
 const { honors, roleRecords } = require('../miniprogram/fun-copy');
+const sharp = require('sharp');
+const roleIds = Object.keys(roleRecords);
 const { createApp } = require('../server/app');
 const NOW = Date.parse('2026-10-13T08:00:00Z');
 const NEXT = Date.parse('2026-10-31T16:00:00Z');
 function game(store, uid, { endedAt = store.clock(), win = true, points = 2 } = {}) {
   const id = randomUUID();
-  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:6, endedAt,
+  store.transaction(() => store.archiveMatch({ id, board:'classic', boardName:'经典', capacity:9, endedAt,
     winner:'good', source:'manual', excludedReason:null,
     players:[{uid,name:'玩家',seat:1,role:'梅林',faction:'good',outcome:win?'win':'loss',score:{status:'scored',total:points,breakdown:[]}}] }));
   return id;
@@ -30,19 +32,18 @@ function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
 }
-test('31 枚徽章涵盖 26 枚月榜及五枚永久活动荣誉，零数据不颁发', () => {
+test('55 枚徽章涵盖 49 枚月榜、五枚永久活动荣誉及共建者，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,31);assert.equal(new Set(catalogue.map(b=>b.id)).size,31);
-    assert.equal(catalogue.filter(b=>b.permanent).length,5);
-    for (const id of Object.keys({ ...honors, ...roleRecords })) assert.ok(catalogue.some(b=>b.id===id));
+    assert.equal(catalogue.length,55);assert.equal(new Set(catalogue.map(b=>b.id)).size,55);
+    assert.equal(catalogue.filter(b=>b.permanent).length,6);
+    for (const id of [...Object.keys(honors), ...roleIds]) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
   } finally {store.close();}
 });
-test('八枚角色徽章只取本月公开达成次数榜，并列、佩戴和跨月使用现有规则', () => {
+test('角色徽章只取本月公开达成次数榜，支持并列、佩戴和跨月切换', () => {
   let now = Date.parse('2026-09-30T15:59:59Z');
   const store = new Store(':memory:', { clock: () => now });
-  const roleIds = Object.keys(roleRecords);
   try {
     for (const id of roleIds) for (let i = 0; i < 3; i++) metric(store, 'wx:previous', id, 1, 0);
     now = NOW;
@@ -73,7 +74,8 @@ test('八枚角色徽章只取本月公开达成次数榜，并列、佩戴和�
       assert.ok(ids(store, uid).every(id => !roleIds.includes(id)));
     for (const badge of equippedBadges(store, 'wx:tie-a')) wear(store, 'wx:tie-a', badge.id, false);
     wear(store, 'wx:tie-a', 'reverse_guard', true);
-    assert.deepEqual(equippedBadges(store, 'wx:tie-a').map(badge => badge.id), ['reverse_guard']);
+    wear(store, 'wx:tie-a', 'lancelot_double_agent', true);
+    assert.deepEqual(equippedBadges(store, 'wx:tie-a').map(badge => badge.id), ['reverse_guard', 'lancelot_double_agent']);
     now = NEXT;
     assert.ok(ids(store, 'wx:tie-a').every(id => !roleIds.includes(id)));
   } finally { store.close(); }
@@ -184,11 +186,12 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
     const homepage = await fetch(origin);
     assert.match(homepage.headers.get('content-type'), /^application\/json/);
     await homepage.arrayBuffer();
-    await Promise.all(Object.keys(roleRecords).map(async id => {
+    await Promise.all([...roleIds, 'good_shield'].map(async id => {
       const image = await fetch(origin + '/assets/badges/' + id + '.png');
       assert.equal(image.status, 200, id);
       assert.equal(image.headers.get('content-type'), 'image/png', id);
-      assert.equal(Buffer.from(await image.arrayBuffer()).subarray(0, 8).toString('hex'), '89504e470d0a1a0a', id);
+      const { format, width, height, hasAlpha } = await sharp(Buffer.from(await image.arrayBuffer())).metadata();
+      assert.deepEqual({ format, width, height, hasAlpha }, { format: 'png', width: 192, height: 192, hasAlpha: true }, id);
     }));
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });
@@ -196,14 +199,18 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
 test('小程序战绩卡适配徽章图片，说明按需打开，关闭后不残留其他玩家徽章', async () => {
   const {initialPlayerCardData,playerCardMethods}=require('../miniprogram/player-card');
   const badge=catalogue.find(b=>b.id==='merlin_hit');
-  const serverBadge=catalogue.find(b=>b.id==='reverse_guard');
+  const serverBadge=catalogue.find(b=>b.id==='merlin_all_rides');
+  const oldBadge={...serverBadge,title:'灯下黑梅林',description:'本月「灯下黑梅林」达成次数榜第一。',imageUrl:'/ignored.png'};
   const p={alive:true,data:{...initialPlayerCardData},setData(value){Object.assign(this.data,value);},
-    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge,{...serverBadge,imageUrl:'/ignored.png'}]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
+    ...playerCardMethods({assetUrl:path=>'https://test.invalid'+path,request:async()=>({player:{id:'one',name:'甲',badges:[badge,oldBadge]},status:'available',stats:{total:1,wins:1,winRate:100,scoreTotal:1,byFaction:[]}})})};
   await p.loadPlayerCard({id:'one',scope:'leaderboard'},'/card');
   assert.equal(p.data.playerCard.badges[0].imageUrl,badge.imageUrl);
   assert.equal(p.data.playerCard.badges[1].imageUrl,'https://test.invalid'+serverBadge.imageUrl);
   assert.equal(p.data.playerCardBadge,null);
   p.showPlayerCardBadge({currentTarget:{dataset:{id:badge.id}}});assert.equal(p.data.playerCardBadge.title,'舍我其谁');
+  p.showPlayerCardBadge({currentTarget:{dataset:{id:oldBadge.id}}});
+  assert.equal(p.data.playerCardBadge.title,'隐身乘客');
+  assert.equal(p.data.playerCardBadge.description,serverBadge.description);
   p.closePlayerCard();assert.equal(p.data.playerCardBadge,null);assert.equal(p.data.playerCard,null);
 });
 

@@ -581,7 +581,7 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
       const board=await a.api("/api/leaderboard?metric="+metric+"&nearby=1",undefined,auth);
       assert.equal(board.me.status,"unsupported");assert.equal(board.me.rank,null);
       assert.equal(board.me.total,stats.total);assert.ok(board.rows.every(row=>!row.isSelf));
-      assert.equal(board.eligibleCount,1);assert.deepEqual(board.nearby,[]);
+      assert.equal(board.eligibleCount,0);assert.deepEqual(board.nearby,[]);
     }
     const funBoard=await a.api("/api/leaderboard?metric=fun_merlin_evade&nearby=1",undefined,auth);
     assert.equal(funBoard.me.status,"unsupported");assert.equal(funBoard.me.count,0);
@@ -612,7 +612,7 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
   assert.equal(a.app.store.statsFor(room.host).total,1);
   await assert.rejects(a.api("/api/me/matches",undefined,auth),e=>e.status===401);
 });
-test("测试房间的管理陪测可投 MVP/SVP，仅真人获奖进入趣味记录和排行榜", async (t) => {
+test("六人测试房间的管理陪测可投 MVP/SVP，真人获奖留在个人趣味记录", async (t) => {
   const a = await setup(t); await a.login();
   const { code, token } = await a.room(); await a.action(code, "test-on");
   const panel = new Companion({ request: (path, actorToken, data, id) =>
@@ -661,8 +661,7 @@ test("测试房间的管理陪测可投 MVP/SVP，仅真人获奖进入趣味记
   const stats = await a.api("/api/me/stats", undefined, a.auth(token));
   assert.equal(stats.fun.metrics.find(p => p.id === "honor_svp").count, 1);
   const ranking = await a.api("/api/leaderboard?metric=fun_honor_svp", undefined, a.auth(token));
-  assert.equal(ranking.rows.length, 1); assert.equal(ranking.rows[0].isSelf, true);
-  assert.equal(ranking.rows[0].count, 1);
+  assert.deepEqual(ranking.rows, []); assert.equal(ranking.me.count, 0);
   assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM match_fun_stats WHERE uid LIKE 'test:%'").get().n, 0);
   assert.doesNotMatch(JSON.stringify(result), /test:|wx:|"uid"/);
 });
@@ -955,4 +954,73 @@ test("自动结算与行动审计同事务提交，重试只记录一次且秘�
     ).status,
     401,
   );
+});
+
+test("玩家反馈含截图可重试、私有读取、由管理平台筛选并回复", async t => {
+  const a = await setup(t);
+  const player = a.auth(await a.player("feedback-player"));
+  const stranger = a.auth(await a.player("other-player"));
+  const path = "/api/me/feedback", admin = "/api/admin/feedback";
+  const headers = { ...player, "Idempotency-Key": randomUUID() };
+  const image = await require("sharp")({ create: { width: 8, height: 12, channels: 3, background: "#e5c68b" } }).png().toBuffer();
+  const data = { category: "问题反馈", area: "牌桌", content: "投票后仍然在等待", images: [image.toString("base64")] };
+  const [{ id }, replay] = await Promise.all([a.api(path, data, headers), a.api(path, data, headers)]);
+  assert.equal(replay.id, id);
+  await assert.rejects(a.api(path, { ...data, content: "其他问题" }, headers), { status: 409 });
+  const mine = (await a.api(path, undefined, player)).items;
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].photos, 1);
+  assert.deepEqual((await a.api(path, undefined, stranger)).items, []);
+  const suffix = "/" + id + "/images/0";
+  assert.equal((await a.raw(path + suffix, undefined, stranger)).status, 404);
+  assert.equal((await a.raw(path + suffix, undefined, player)).headers.get("content-type"), "image/jpeg");
+  assert.equal((await a.raw(admin + suffix)).status, 401);
+  assert.equal((await a.raw(admin)).status, 401);
+  await a.login();
+  assert.equal((await a.api(admin + "?status=pending")).items[0].content, data.content);
+  assert.equal((await a.raw(admin + suffix)).status, 200);
+  const reply = admin + "/" + id + "/reply";
+  await a.api(reply, { reply: "已收到，正在检查。" });
+  await a.api(reply, { reply: "已收到，正在检查。" });
+  await assert.rejects(a.api(reply, { reply: "覆盖已有回复" }), { status: 409 });
+  assert.equal((await a.api(admin + "?status=replied")).items[0].id, id);
+  assert.equal((await a.api(admin + "?status=pending")).items.length, 0);
+  assert.equal((await a.api(path, undefined, player)).items[0].reply, "已收到，正在检查。");
+  for (const invalid of [{ images: Array(5).fill("") }, { images: ["bm90YW5pbWFnZQ=="] }, { content: " " }, { content: "长".repeat(1001) }]) {
+    await assert.rejects(a.api(path, { ...data, ...invalid }, { ...player, "Idempotency-Key": randomUUID() }), { status: 400 });
+  }
+  assert.equal((await a.api(path, undefined, player)).items.length, 1);
+});
+
+test("回复和采纳互相独立，首次采纳发放永久羽笔，重复采纳不会再次通知", async t => {
+  const a = await setup(t);
+  const player = a.auth(await a.player("contributor"));
+  const other = a.auth(await a.player("other-contributor"));
+  const inbox = "/api/me/feedback", notices = "/api/me/badges/notice";
+  const submit = content => a.api(inbox, { category: "功能建议", content }, player);
+  const first = await submit("记住牌桌的显示方式");
+  const second = await submit("改进截图预览");
+  const action = (record, name) => "/api/admin/feedback/" + record.id + "/" + name;
+  assert.equal((await a.raw(action(first, "accept"), {}, player)).status, 401);
+  await a.login();
+  await a.api(action(first, "reply"), { reply: "谢谢，正在评估。" });
+  assert.equal((await a.api(inbox, undefined, player)).items.find(row => row.id === first.id).acceptedAt, null);
+  assert.equal((await a.api(notices, undefined, player)).notice, null);
+  const results = await Promise.all([a.api(action(first, "accept"), {}), a.api(action(first, "accept"), {})]);
+  assert.equal(results.filter(r => r.awarded).length, 1);
+  assert.equal(results[0].acceptedAt, results[1].acceptedAt);
+  const loginAgain = a.auth(await a.player("contributor"));
+  const { notice } = await a.api(notices, undefined, loginAgain);
+  assert.deepEqual(notice.badges.map(b => [b.id, b.title, b.permanent]), [["feedback_contributor", "共建者", true]]);
+  assert.equal((await a.raw(notice.badges[0].imageUrl)).headers.get("content-type"), "image/png");
+  assert.equal((await a.raw(notice.badges[0].largeImageUrl)).status, 200);
+  assert.equal((await a.api(notices, undefined, other)).notice, null);
+  await a.api(notices, { through: notice.through }, loginAgain);
+  assert.equal((await a.api(action(second, "accept"), {})).awarded, false);
+  assert.equal((await a.api(inbox, undefined, loginAgain)).items[0].reply, "");
+  await a.api(action(second, "reply"), { reply: "这个建议已采用。" });
+  const { items } = await a.api(inbox, undefined, loginAgain);
+  assert.ok(items.every(row => row.acceptedAt && row.reply));
+  assert.equal((await a.api(notices, undefined, loginAgain)).notice, null);
+  assert.equal((await a.api("/api/me/badges", undefined, loginAgain)).badges.filter(b => b.id === "feedback_contributor").length, 1);
 });

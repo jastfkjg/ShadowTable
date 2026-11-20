@@ -1,4 +1,5 @@
 "use strict";
+const playerFeedback = require("../feedback");
 const {
   randomBytes,
   randomUUID,
@@ -98,6 +99,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         "/admin/app.js": ["app.js", "text/javascript; charset=utf-8"],
         "/admin/controls.js": ["controls.js", "text/javascript; charset=utf-8"],
         "/admin/matches.js": ["matches.js", "text/javascript; charset=utf-8"],
+        "/admin/feedback.js": ["feedback.js", "text/javascript; charset=utf-8"],
         "/admin/avoidance.js": ["avoidance.js", "text/javascript; charset=utf-8"],
         "/admin/style.css": ["style.css", "text/css; charset=utf-8"],
       };
@@ -182,6 +184,27 @@ function createAdmin({ store, origin, key, body, limit }) {
     }
     const session = authenticate(req);
     limit("admin:" + session.hash, 600);
+    if (path === "/api/admin/feedback" && req.method === "GET") {
+      send(200, playerFeedback.list(store, null, new URL(req.url, origin).searchParams));
+      return true;
+    }
+    const feedbackImage = path.match(/^\/api\/admin\/feedback\/(\d+)\/images\/([0-3])$/);
+    if (feedbackImage && req.method === "GET") {
+      const bytes = playerFeedback.image(store, null, feedbackImage[1], feedbackImage[2]);
+      res.setHeader("Content-Type", "image/jpeg");
+      send(200, bytes, true);
+      return true;
+    }
+    const feedbackReply = path.match(/^\/api\/admin\/feedback\/(\d+)\/reply$/);
+    if (feedbackReply && req.method === "POST") {
+      send(200, playerFeedback.reply(store, feedbackReply[1], (await body(req)).reply));
+      return true;
+    }
+    const feedbackAccept = path.match(/^\/api\/admin\/feedback\/(\d+)\/accept$/);
+    if (feedbackAccept && req.method === "POST") {
+      send(200, playerFeedback.accept(store, feedbackAccept[1]));
+      return true;
+    }
     const scoringMutation = (path,input,action,operation) => {
       fail(input.reason === undefined || typeof input.reason === "string" && input.reason.length<=200,"操作备注最多200字");
       fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId),"缺少合法请求编号");

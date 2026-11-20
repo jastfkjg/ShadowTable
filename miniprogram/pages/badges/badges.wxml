@@ -23,7 +23,7 @@
         <view wx:for="{{badgeCollection.slots}}" wx:key="id" class="badge-slot {{badgePlaced.id === item.id ? 'is-updated' : ''}}">
           <block wx:if="{{!item.empty}}">
             <button class="badge-slot-open" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{'查看'+item.title}}" hover-class="badge-pressed">
-              <view class="badge-slot-medallion"><image class="badge-slot-image {{item.permanent ? 'badge-art-permanent' : ''}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
+              <view class="badge-slot-medallion"><image class="badge-slot-image" style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
               <text class="badge-slot-title">{{item.title}}</text>
             </button>
             <button wx:if="{{badgeManaging}}" class="badge-remove" bindtap="toggleOwnedBadge" data-id="{{item.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" aria-label="{{'摘下'+item.title}}" hover-class="badge-pressed">摘下</button>
@@ -58,7 +58,7 @@
             <text>{{item.status}}</text>
           </view>
         </view>
-        <image class="badge-tile-image {{item.permanent ? 'badge-art-permanent' : ''}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" />
+        <image class="badge-tile-image" style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" />
         <view class="badge-tile-copy">
           <view class="badge-tile-title">{{item.title}}</view>
           <view class="badge-caption">{{item.condition}}</view>
@@ -74,7 +74,7 @@
       <view class="badge-detail-content badge-detail-compact">
         <view class="badge-detail-handle" aria-hidden="true"></view>
         <button class="badge-detail-close" bindtap="closeBadgeDetail" aria-label="关闭徽章详情" disabled="{{badgeManagerSaving}}" hover-class="badge-pressed"><text aria-hidden="true">×</text></button>
-        <view class="badge-detail-art"><image class="badge-detail-image {{!selectedBadge.owned?'is-locked':''}} {{selectedBadge.permanent ? 'badge-art-permanent' : ''}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
+        <view class="badge-detail-art"><image class="badge-detail-image {{!selectedBadge.owned?'is-locked':''}}" style="{{selectedBadge.artStyle}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
         <view class="badge-detail-title">{{selectedBadge.title}}</view>
         <view class="badge-detail-meta">
           <text>{{selectedBadge.periodLabel || badgeCollection.monthLabel}} · {{selectedBadge.kindLabel}}</text>
@@ -111,7 +111,7 @@
             <button wx:if="{{!item.empty}}" class="badge-picker-item {{badgePickerChoice.id === item.id ? 'is-selected' : ''}}" bindtap="chooseBadgePickerItem" data-id="{{item.id}}" aria-pressed="{{badgePickerChoice.id === item.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" hover-class="badge-pressed">
               <text wx:if="{{badgePicker === 'replace'}}" class="badge-picker-slot">位置 {{item.slotIndex + 1}}</text>
               <view wx:if="{{badgePickerChoice.id === item.id}}" class="badge-picker-mark" aria-hidden="true"><view class="badge-check"></view></view>
-              <image class="badge-picker-art {{item.permanent ? 'badge-art-permanent' : ''}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" />
+              <image class="badge-picker-art" style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" />
               <text class="badge-picker-title">{{item.title}}</text>
               <text class="badge-picker-label">{{badgePicker === 'add' ? (item.permanent ? '永久纪念' : '月榜') : (badgePickerChoice.id === item.id ? '将换下' : '已佩戴')}}</text>
             </button>
@@ -119,13 +119,13 @@
         </view>
         <view wx:if="{{badgePicker === 'replace'}}" class="badge-swap" role="status" aria-live="polite">
           <view class="badge-swap-item">
-            <image wx:if="{{badgePickerChoice}}" class="{{badgePickerChoice.permanent ? 'badge-art-permanent' : ''}}" src="{{badgePickerChoice.imageUrl}}" mode="aspectFit" aria-hidden="true" />
+            <image wx:if="{{badgePickerChoice}}" style="{{badgePickerChoice.artStyle}}" src="{{badgePickerChoice.imageUrl}}" mode="aspectFit" aria-hidden="true" />
             <view wx:else class="badge-swap-empty" aria-hidden="true"></view>
             <view class="badge-swap-copy"><text class="badge-caption">换下</text><text class="badge-swap-name">{{badgePickerChoice ? badgePickerChoice.title : '待选择'}}</text></view>
           </view>
           <view class="badge-swap-arrow" aria-hidden="true"></view>
           <view class="badge-swap-item badge-swap-incoming">
-            <image class="{{selectedBadge.permanent ? 'badge-art-permanent' : ''}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" />
+            <image style="{{selectedBadge.artStyle}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" />
             <view class="badge-swap-copy"><text class="badge-caption">换上</text><text class="badge-swap-name">{{selectedBadge.title}}</text></view>
           </view>
         </view>

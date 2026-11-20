@@ -44,7 +44,7 @@ test('登录与恢复牌桌不强制设置；首次创建和加入确认昵称�
     assert.deepEqual((await app.request('/api/me/profile', again)).data, first.data.profile);
     assert.equal((await app.request(path, again)).data.me.name, '林间');
     const uid = 'wx:' + createHash('sha256').update('host').digest('hex');
-    app.store.transaction(() => app.store.archiveMatch({ id: randomUUID(), board: 'classic', endedAt: Date.now(),
+    app.store.transaction(() => app.store.archiveMatch({ id: randomUUID(), board: 'classic', capacity: 9, endedAt: Date.now(),
       players: [{ uid, faction: 'good', outcome: 'win' }] }));
     const ranked = (await app.request('/api/leaderboard?metric=games', again)).data;
     assert.equal(ranked.rows[0].nickname, '林间'); assert.equal(ranked.me.total, 1);
@@ -233,6 +233,7 @@ function webClient(fetch, storage = new Map([['session','token']])) {
   context.window.shadowtableRoomSheets = require('../miniprogram/room-sheet-presentation');
   context.window.shadowtableAvoidance = require('../miniprogram/avoidance');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
+  context.window.shadowtableBadgeAwardMarkup = require('../server/web/badge-award-markup');
   vm.runInNewContext(source.slice(0, source.indexOf('  // ===== boot =====')) + `
     render = function () {}; refresh = async function () {};
     window.test = { state, applyRoute, ACTIONS, viewEntrySheet, submitEntry };

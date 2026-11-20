@@ -23,7 +23,6 @@
             <block wx:if="{{tile.roles.length}}"><button class="disclosure-button fun-record-role-toggle" bindtap="toggleFunRoles" data-id="{{tile.key}}" aria-expanded="{{!!funRoles[tile.key]}}" hover-class="none"><text>按角色查看</text><text aria-hidden="true">{{funRoles[tile.key]?'−':'+'}}</text></button><view wx:if="{{funRoles[tile.key]}}" class="fun-record-roles"><view wx:for="{{tile.roles}}" wx:for-item="role" wx:key="role" class="fun-record-role-wrap"><button class="fun-record-role" data-key="{{tile.key}}" bindtap="openFunDetails" aria-haspopup="dialog" hover-class="stats-pressed"><view>{{role.label}}</view><view class="fun-record-role-count">{{role.countLabel}}{{role.value===null?'':' '+tile.unit}}</view></button><button class="fun-record-link is-role" data-url="{{role.url}}" bindtap="openFunMatches" hover-class="stats-pressed" aria-label="查看{{role.label}}的{{tile.title}}相关对局">›</button></view></view></block>
           </view>
         </view>
-        <view wx:if="{{stats.fun.legacyGames}}" class="fun-records-note">{{stats.fun.legacyGames}} 局旧对局未记录完整过程，缺失数据不按零次计算</view>
       </block>
     </view>
   </view>

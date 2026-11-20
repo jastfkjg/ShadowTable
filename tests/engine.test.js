@@ -71,6 +71,23 @@ test("5–9人配置和视野按角色隔离，随机首队长有效", () => {
     }
   }
 });
+test("私密插画按玩家和本局分配，两套均可出现，推进或重连保持同款", () => {
+  const room = setup();
+  const art = () => privateView(room, "p1").cardArt;
+  const variants = new Set();
+  for (let deal = 0; deal < 16; deal++) {
+    room.matchId = "illustration-fixture-" + deal;
+    variants.add(art());
+  }
+  const base = "/assets/role-cards/" + room.roles.p1;
+  assert.deepEqual(variants, new Set([base + "-a.jpg", base + "-b.jpg"]));
+  const selected = art();
+  all(room);
+  advance(room);
+  assert.equal(privateView(JSON.parse(JSON.stringify(room)), "p1").cardArt, selected);
+  for (const player of room.players)
+    assert.doesNotMatch(JSON.stringify(publicView(room, player.uid)), /role-cards/);
+});
 test("未确认板子及基础配置不支持的人数拒绝启用", () => {
   for (const id of ["shadow-blade"])
     assert.throws(() => newRoom("123456", "p", "a", id, 12), /尚未确认/);
@@ -111,11 +128,11 @@ test("准备、结算和终止阶段移交不会改变对局数据", () => {
     assert.equal(publicView(r, "p1").me.isHost, false);
   }
 });
-test("秘密提交不改变其他普通玩家视图，房主仅额外获得进度", () => {
+test("身份确认只更新其他普通玩家看到的汇总人数", () => {
   const r = setup();
-  const before = JSON.stringify(publicView(r, "p3"));
+  const before = publicView(r, "p3");
   run(r, "p2", "submit", { value: "confirm" });
-  assert.equal(JSON.stringify(publicView(r, "p3")), before);
+  assert.deepEqual(publicView(r, "p3"), { ...before, operationProgress: { total: 6, completed: 1 } });
   assert.throws(() => advance(r), /阶段尚未完成/);
   assert.throws(() => run(r, "p2", "submit", { value: "confirm" }), /已提交/);
 });
@@ -152,9 +169,9 @@ test("组队票在结算时公开，任务票从不返回个人对应", () => {
   advance(r);
   assert.equal(publicView(r, "p1").history[0].votes.length, 6);
   advance(r);
-  const before = JSON.stringify(publicView(r, "p3"));
+  const before = publicView(r, "p3");
   run(r, "p2", "submit", { value: "success" });
-  assert.equal(JSON.stringify(publicView(r, "p3")), before);
+  assert.deepEqual(publicView(r, "p3"), { ...before, operationProgress: { total: 6, completed: 1 } });
 });
 test("好人失败票、非队员任务票、重复目标和非队长组队被拒绝", () => {
   const r = setup();

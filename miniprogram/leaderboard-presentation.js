@@ -13,14 +13,13 @@
     return !!((funCopy.roleRecords[id] || funCopy.honors[id])?.countOnly || definitions.some(item => item.key === key && item.countOnly));
   }
   function funOptions(definitions = [], { includeFinal = false } = {}) {
-    const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_good_shield", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(funCopy.metric).map(item => {
       const title = item.honorTitle || item.title;
       const category = item.category || (/^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
         : /^fun_assassin_/.test(item.key) ? "evil" : "other");
       return { ...item, title, category, tabLabel: title + " · " + item.label,
         accessibilityLabel: [title, item.roleLabel, item.conditionLabel || item.label].filter(Boolean).join("，") };
-    }).sort((a, b) => (first.includes(a.key) ? first.indexOf(a.key) : first.length) - (first.includes(b.key) ? first.indexOf(b.key) : first.length));
+    }).sort((a, b) => funCopy.compareDisplayIds(a.id || a.key.slice(4), b.id || b.key.slice(4)));
   }
   function markTies(rows = []) {
     const ranks = new Map();
@@ -39,6 +38,7 @@
           : board.period === "month"
             ? { title: "每月 1 日 00:00 起算", lines: ["仅统计本月的有效记录。"] }
             : { title: "统计全部历史有效记录", lines: [] };
+    if (board.minPlayers) summary.lines.push("只统计 " + board.minPlayers + " 人及以上的有效对局。");
     const display = { id: "display", title: "展示范围", main: [{ text: "榜单最多展示前 " }, { text: (board.maxRows || 100) + " 位", emphasis: true }, { text: "公开玩家" }], lines: ["我的排名仍按全部上榜玩家计算。"] };
     const sections = board.fun || board.countOnly || selected?.countOnly
       ? [{ id: "calculation", title: "统计方式", main: [], lines: ruleLines.slice(1, -1).filter(Boolean) },
