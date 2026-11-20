@@ -24,6 +24,7 @@ const assets = {
   "/record-clearing-layout.css": ["../../miniprogram/pages/data-management/layout.wxss", "text/css; charset=utf-8"],
   "/record-clearing.css": ["record-clearing.css", "text/css; charset=utf-8"],
   "/badges.js": ["../../miniprogram/badges.js", "text/javascript; charset=utf-8"],
+  "/badge-award-markup.js": ["badge-award-markup.js", "text/javascript; charset=utf-8"],
   "/badge-awards.js": ["../../miniprogram/badge-awards.js", "text/javascript; charset=utf-8"],
   "/badge-awards.css": ["../../miniprogram/badge-awards.wxss", "text/css; charset=utf-8"],
   "/badges.css": ["../../miniprogram/pages/badges/badges.wxss", "text/css; charset=utf-8"],

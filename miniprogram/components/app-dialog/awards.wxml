@@ -11,7 +11,7 @@
       </block>
       <block wx:else>
         <view class="award-eyebrow">{{dialog.awards.eyebrow}}</view><view class="award-title">{{dialog.title}}</view>
-        <view class="award-count">你获得了 <text>{{dialog.awards.count}}</text> 枚限定徽章</view>
+        <view class="award-count">你获得了 <text>{{dialog.awards.count}}</text> 枚永久徽章</view>
         <view wx:if="{{dialog.awards.hero}}" class="award-hero">
           <button class="award-hero-art" bindtap="showAward" data-badge="{{dialog.awards.hero.id}}" aria-label="{{'查看'+dialog.awards.hero.title+'详情'}}" hover-class="app-dialog-pressed"><image src="{{dialog.awards.hero.imageUrl}}" mode="aspectFit" aria-hidden="true" /></button>
           <view class="award-hero-name">{{dialog.awards.hero.title}}</view><view class="award-reason {{dialog.awards.ranked?'award-rank':''}}">{{dialog.awards.hero.displayReason}}</view>

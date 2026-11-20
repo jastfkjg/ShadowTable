@@ -34,6 +34,6 @@
     <button hover-class="none" class="primary fb-send" bindtap="submit" disabled="{{!ready || saving || choosing}}" loading="{{saving}}">{{saving ? '正在提交' : '提交反馈'}}</button>
   </view>
 </view>
-<page-container wx:if="{{ready || photos.length}}" show="{{!guardPaused}}" overlay="{{false}}" duration="{{0}}"
+<page-container wx:if="{{ready || photos.length || receiptId}}" show="{{!guardPaused}}" overlay="{{false}}" duration="{{0}}"
   custom-style="height:0;pointer-events:none;" bindafterleave="onGuardClosed" />
 <app-dialog id="app-dialog" />

@@ -2,6 +2,7 @@
 
 const { createHash } = require("node:crypto");
 const { RuleError } = require("./engine");
+const { grantContributor } = require("./badge-awards");
 
 const categories = ["问题反馈", "功能建议", "其他"];
 const areas = ["牌桌", "对局记录", "我的", "其他"];
@@ -16,12 +17,14 @@ function initialize(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS feedback (
     id INTEGER PRIMARY KEY, uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL,
     category TEXT NOT NULL, area TEXT NOT NULL, content TEXT NOT NULL, created INTEGER NOT NULL,
-    photos INTEGER NOT NULL, reply TEXT NOT NULL DEFAULT '', repliedAt INTEGER,
+    photos INTEGER NOT NULL, reply TEXT NOT NULL DEFAULT '', repliedAt INTEGER, acceptedAt INTEGER,
     UNIQUE(uid, request));
     CREATE INDEX IF NOT EXISTS feedback_owner ON feedback(uid, id DESC);
     CREATE TABLE IF NOT EXISTS feedback_images (
       feedbackId INTEGER NOT NULL, position INTEGER NOT NULL, data BLOB NOT NULL,
       PRIMARY KEY(feedbackId, position));`);
+  if (!db.prepare("PRAGMA table_info(feedback)").all().some(column => column.name === "acceptedAt"))
+    db.exec("ALTER TABLE feedback ADD COLUMN acceptedAt INTEGER");
 }
 
 async function prepareImage(encoded) {
@@ -74,7 +77,7 @@ async function submit(store, uid, key, input) {
   });
 }
 
-const columns = "f.id,f.category,f.area,f.content,f.created,f.photos,f.reply,f.repliedAt";
+const columns = "f.id,f.category,f.area,f.content,f.created,f.photos,f.reply,f.repliedAt,f.acceptedAt";
 function list(store, uid, params) {
   const where = [], args = [];
   if (uid !== null) { where.push("f.uid=?"); args.push(uid); }
@@ -109,4 +112,15 @@ function reply(store, id, text) {
   return { ok: true };
 }
 
-module.exports = { initialize, submit, list, image, reply, maxBody };
+function accept(store, id) {
+  return store.transaction(() => {
+    const item = store.db.prepare("SELECT uid,acceptedAt FROM feedback WHERE id=?").get(id);
+    requireValue(item, "反馈不存在", 404);
+    if (item.acceptedAt !== null) return { acceptedAt: item.acceptedAt, awarded: false };
+    const acceptedAt = store.clock();
+    store.db.prepare("UPDATE feedback SET acceptedAt=? WHERE id=?").run(acceptedAt, id);
+    return { acceptedAt, awarded: grantContributor(store, item.uid) };
+  });
+}
+
+module.exports = { initialize, submit, list, image, reply, accept, maxBody };

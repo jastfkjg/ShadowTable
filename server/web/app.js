@@ -1585,7 +1585,7 @@
         let detail = null, closed = false;
         const previousFocus = document.activeElement;
         const renderNotice = () => {
-          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwards.markup(value, esc, detail);
+          badgeNoticeHost.innerHTML = window.shadowtableBadgeAwardMarkup(value, esc, detail);
           badgeNoticeHost.querySelector(detail ? '[data-award-back]' : '[data-award-confirm]')?.focus({preventScroll:true});
         };
         const done = confirmed => {

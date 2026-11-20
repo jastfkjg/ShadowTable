@@ -783,6 +783,7 @@ dialog::backdrop {
 .ticket-pending { background:#f6edd9; color:#715016; }.ticket-done { background:var(--accent-soft); color:var(--accent); }
 .ticket-excerpt { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .ticket-body { padding:16px 18px; border-top:1px solid var(--line); }
+.ticket-decision { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; margin-bottom:12px; border-bottom:1px solid var(--line); color:var(--muted); font-size:14px; }
 .ticket-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 14px; }
 .ticket-photos,.ticket-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .ticket-photos { margin:12px 0 18px; }

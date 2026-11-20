@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '本月榜首徽章随北京时间本月公开榜实时更新。榜单徽章沿用对应榜单的对局人数门槛。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。';
+  const rules = '本月榜首徽章随北京时间本月公开榜实时更新。榜单徽章沿用对应榜单的对局人数门槛。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
@@ -25,10 +25,18 @@
     { id: 'october_2026_book', title: '内测纪念册', condition: '2026年10月至少参加一场计分对局。', largeImageUrl: '/assets/badges/october_2026_book-large.png' },
   ].map(b => ({ ...b, permanent: true, metric: 'campaign', periodLabel: '2026年10月', category: b.rank ? '积分榜限定荣誉' : '内测参与纪念',
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
-  const catalogue = monthly.concat(october);
+  const contributor = {
+    id: 'feedback_contributor', title: '共建者', permanent: true, metric: 'feedback', periodLabel: '永久',
+    category: '社区贡献', condition: '首次有一条反馈被采纳。', description: '首次有一条反馈被采纳。',
+    flavor: '谢谢你留下这一笔，让下一桌玩得更好。', holdingRule: '获得后永久保留',
+    rules: '管理员采纳反馈后发放，每位玩家只获得一次。',
+    imageUrl: '/assets/badges/feedback_contributor.png', largeImageUrl: '/assets/badges/feedback_contributor-large.png',
+  };
+  const permanent = october.concat(contributor);
+  const catalogue = monthly.concat(permanent);
   // The server also uses catalogue order to choose default equipped badges.
   const funByRole = monthly.slice(standard.length).sort((a, b) => copy.compareDisplayIds(a.id, b.id));
-  const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, october);
+  const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, permanent);
   const placementTitles = ['交剑王冠', '持枪骑士', '铜铸城钥'];
   function monthlyAward(id) {
     const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3])$/.exec(id);
@@ -41,7 +49,7 @@
       imageUrl: '/assets/badges/monthly-points/' + month + '/' + rank + '.png',
       holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月公开积分月榜。前三名（含并列）获得对应名次的永久徽章。' };
   }
-  const awardDefinition = id => monthlyAward(id) || october.find(b => b.id === id);
+  const awardDefinition = id => monthlyAward(id) || permanent.find(b => b.id === id);
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.permanent || badge.id === 'good_shield' || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;

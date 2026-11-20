@@ -22,6 +22,41 @@ function game(s, uid, { points = 0, scored = true, endedAt = s.clock(), testGame
   return id;
 }
 function hidden(s, uid) { const p=readProfile(s,uid);saveProfile(s,uid,{nickname:'隐藏玩家',version:p.version,leaderboardVisible:false}); }
+test('反馈采纳使用 A 款羽笔和永久荣誉文案，混合通知也能呈现全部徽章', () => {
+  const { awardDefinition } = require('../miniprogram/badges');
+  const quill = awardDefinition('feedback_contributor');
+  const single = presentation.present({ badges: [quill] });
+  assert.equal(single.title, '你的反馈被采纳了');
+  assert.equal(single.hero.id, quill.id);
+  assert.match(require('../server/web/badge-award-markup')(single, v => v), /枚永久徽章/);
+  const book = awardDefinition('october_2026_book');
+  const both = presentation.present({ badges: [book, quill] });
+  assert.equal(both.count, 2);
+  assert.equal(both.hero.id, quill.id);
+  assert.deepEqual(both.secondary.map(b => b.id), [book.id]);
+});
+test('升级前已回复的反馈仍可采纳，重启和跨月保留徽章与已读状态', async t => {
+  const feedback = require('../server/feedback');
+  const directory = mkdtempSync(join(tmpdir(), 'feedback-upgrade-'));
+  const database = join(directory, 'test.sqlite'), uid = 'wx:contributor';
+  let store;
+  t.after(() => { store?.close(); rmSync(directory, { recursive: true, force: true }); });
+  store = new Store(database, { clock: () => NOW });
+  const { id } = await feedback.submit(store, uid, randomUUID(), { category: '其他', content: '来自旧版的反馈' });
+  feedback.reply(store, id, '已收到。');
+  store.db.exec('ALTER TABLE feedback DROP COLUMN acceptedAt');
+  store.close();
+  store = new Store(database, { clock: () => NOW });
+  const old = feedback.list(store, uid, new URLSearchParams()).items[0];
+  assert.deepEqual([old.acceptedAt, old.reply], [null, '已收到。']);
+  assert.equal(feedback.accept(store, id).awarded, true);
+  awards.acknowledge(store, uid, { through: awards.notice(store, uid).notice.through });
+  store.close();
+  store = new Store(database, { clock: () => DECEMBER });
+  assert.deepEqual(ids(store, uid), ['feedback_contributor']);
+  assert.equal(feedback.accept(store, id).awarded, false);
+  assert.equal(awards.notice(store, uid).notice, null);
+});
 test('北京时间月初冻结上月公开积分前三，含并列，每月单独获得并可佩戴', () => {
   let now = DECEMBER - 1;
   const store = new Store(':memory:', { clock: () => now });
@@ -211,7 +246,7 @@ test('徽章通知 HTTP 鉴权、幂等确认与禁止伪造佩戴，静态资�
     assert.equal((await req('/api/me/badges/notice',{through:value.notice.through})).status,200);
     assert.equal((await(await req('/api/me/badges/notice')).json()).notice,null);
     assert.equal((await req('/api/me/badges/notice',{through:value.notice.through,uid:'wx:other'})).status,400);
-    for(const p of ['/badge-awards.js','/badge-awards.css','/assets/badges/october_2026_crown.png','/assets/badges/october_2026_book-large.png'])assert.equal((await req(p)).status,200,p);
+    for(const p of ['/badge-awards.js','/badge-award-markup.js','/badge-awards.css','/assets/badges/october_2026_crown.png','/assets/badges/october_2026_book-large.png'])assert.equal((await req(p)).status,200,p);
   } finally {await new Promise(r=>app.server.close(r));app.store.close();}
 });
 test('前台通知合并为3/2/1枚；确认断网只重试确认，后台与换号不误确认', async () => {

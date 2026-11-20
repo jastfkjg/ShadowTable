@@ -991,3 +991,36 @@ test("玩家反馈含截图可重试、私有读取、由管理平台筛选并�
   }
   assert.equal((await a.api(path, undefined, player)).items.length, 1);
 });
+
+test("回复和采纳互相独立，首次采纳发放永久羽笔，重复采纳不会再次通知", async t => {
+  const a = await setup(t);
+  const player = a.auth(await a.player("contributor"));
+  const other = a.auth(await a.player("other-contributor"));
+  const inbox = "/api/me/feedback", notices = "/api/me/badges/notice";
+  const submit = content => a.api(inbox, { category: "功能建议", content }, player);
+  const first = await submit("记住牌桌的显示方式");
+  const second = await submit("改进截图预览");
+  const action = (record, name) => "/api/admin/feedback/" + record.id + "/" + name;
+  assert.equal((await a.raw(action(first, "accept"), {}, player)).status, 401);
+  await a.login();
+  await a.api(action(first, "reply"), { reply: "谢谢，正在评估。" });
+  assert.equal((await a.api(inbox, undefined, player)).items.find(row => row.id === first.id).acceptedAt, null);
+  assert.equal((await a.api(notices, undefined, player)).notice, null);
+  const results = await Promise.all([a.api(action(first, "accept"), {}), a.api(action(first, "accept"), {})]);
+  assert.equal(results.filter(r => r.awarded).length, 1);
+  assert.equal(results[0].acceptedAt, results[1].acceptedAt);
+  const loginAgain = a.auth(await a.player("contributor"));
+  const { notice } = await a.api(notices, undefined, loginAgain);
+  assert.deepEqual(notice.badges.map(b => [b.id, b.title, b.permanent]), [["feedback_contributor", "共建者", true]]);
+  assert.equal((await a.raw(notice.badges[0].imageUrl)).headers.get("content-type"), "image/png");
+  assert.equal((await a.raw(notice.badges[0].largeImageUrl)).status, 200);
+  assert.equal((await a.api(notices, undefined, other)).notice, null);
+  await a.api(notices, { through: notice.through }, loginAgain);
+  assert.equal((await a.api(action(second, "accept"), {})).awarded, false);
+  assert.equal((await a.api(inbox, undefined, loginAgain)).items[0].reply, "");
+  await a.api(action(second, "reply"), { reply: "这个建议已采用。" });
+  const { items } = await a.api(inbox, undefined, loginAgain);
+  assert.ok(items.every(row => row.acceptedAt && row.reply));
+  assert.equal((await a.api(notices, undefined, loginAgain)).notice, null);
+  assert.equal((await a.api("/api/me/badges", undefined, loginAgain)).badges.filter(b => b.id === "feedback_contributor").length, 1);
+});

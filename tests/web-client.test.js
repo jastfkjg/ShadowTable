@@ -40,6 +40,7 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   context.window.shadowtableRolePortraits = require('../miniprogram/role-portraits');
   context.window.shadowtableRoomSheets = require('../miniprogram/room-sheet-presentation');
   context.window.shadowtableBadgeAwards = require('../miniprogram/badge-awards');
+  context.window.shadowtableBadgeAwardMarkup = require('../server/web/badge-award-markup');
   vm.runInNewContext(source.slice(0, source.indexOf("  // ===== boot =====")) + `
     render = function () {};
     roomCode = "123456";

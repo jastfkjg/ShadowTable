@@ -1,12 +1,3 @@
 <app-nav title="建议与意见" back="{{true}}" bindback="back" />
-<view class="fb-page fb-start">
-  <navigator class="fb-history-link" url="history" hover-class="fb-pressed">我的反馈 <text aria-hidden="true">›</text></navigator>
-  <view class="fb-title">你想反馈什么？</view>
-  <navigator wx:for="{{types}}" wx:key="id" class="fb-choice" url="compose?type={{item.id}}" hover-class="fb-pressed">
-    <view class="fb-well {{item.id}}"><image src="./{{item.id}}.svg" aria-hidden="true" /></view>
-    <view class="fb-copy"><view class="fb-choice-title">{{item.label}}</view><view class="fb-muted">{{item.hint}}</view></view>
-    <view class="fb-chevron" aria-hidden="true"></view>
-  </navigator>
-  <image class="fb-art" src="/assets/table-cards.svg" mode="aspectFit" aria-hidden="true" />
-</view>
+<include src="./panel.wxml" />
 <app-dialog id="app-dialog" />

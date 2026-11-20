@@ -200,6 +200,11 @@ function createAdmin({ store, origin, key, body, limit }) {
       send(200, playerFeedback.reply(store, feedbackReply[1], (await body(req)).reply));
       return true;
     }
+    const feedbackAccept = path.match(/^\/api\/admin\/feedback\/(\d+)\/accept$/);
+    if (feedbackAccept && req.method === "POST") {
+      send(200, playerFeedback.accept(store, feedbackAccept[1]));
+      return true;
+    }
     const scoringMutation = (path,input,action,operation) => {
       fail(input.reason === undefined || typeof input.reason === "string" && input.reason.length<=200,"操作备注最多200字");
       fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId),"缺少合法请求编号");

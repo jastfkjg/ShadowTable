@@ -32,11 +32,11 @@ function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
 }
-test('54 枚徽章涵盖 49 枚月榜及五枚永久活动荣誉，零数据不颁发', () => {
+test('55 枚徽章涵盖 49 枚月榜、五枚永久活动荣誉及共建者，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,54);assert.equal(new Set(catalogue.map(b=>b.id)).size,54);
-    assert.equal(catalogue.filter(b=>b.permanent).length,5);
+    assert.equal(catalogue.length,55);assert.equal(new Set(catalogue.map(b=>b.id)).size,55);
+    assert.equal(catalogue.filter(b=>b.permanent).length,6);
     for (const id of [...Object.keys(honors), ...roleIds]) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
   } finally {store.close();}

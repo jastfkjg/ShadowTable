@@ -1,0 +1,57 @@
+<view class="fb-page fb-center">
+  <view class="fb-tabs" role="tablist" aria-label="反馈">
+    <button size="mini" class="fb-tab {{tab === 'write' ? 'selected' : ''}}" role="tab" aria-selected="{{tab === 'write'}}"
+      id="fb-tab-write" aria-controls="fb-write" hover-class="none" data-tab="write" bindtap="selectTab">写反馈</button>
+    <button size="mini" class="fb-tab {{tab === 'history' ? 'selected' : ''}}" role="tab" aria-selected="{{tab === 'history'}}"
+      id="fb-tab-history" aria-controls="fb-history" hover-class="none" data-tab="history" bindtap="selectTab">我的反馈</button>
+  </view>
+  <view wx:if="{{tab === 'write'}}" id="fb-write" role="tabpanel" aria-labelledby="fb-tab-write">
+    <view class="fb-title">选择反馈类型</view>
+    <view class="fb-choices">
+      <navigator wx:for="{{types}}" wx:key="id" class="fb-choice" url="compose?type={{item.id}}" hover-class="fb-pressed">
+        <view class="fb-well {{item.id}}"><image src="./{{item.id}}.svg" mode="aspectFit" aria-hidden="true" /></view>
+        <view class="fb-copy"><view class="fb-choice-title">{{item.label}}</view><view class="fb-muted">{{item.hint}}</view></view>
+        <view class="fb-chevron" aria-hidden="true"></view>
+      </navigator>
+    </view>
+  </view>
+  <view wx:else id="fb-history" role="tabpanel" aria-labelledby="fb-tab-history" class="fb-history">
+    <view wx:if="{{submitted}}" class="fb-receipt" role="status">
+      <view class="fb-check" aria-hidden="true"></view>
+      <view><view class="fb-receipt-title">反馈已提交，谢谢你！</view><view class="fb-muted">反馈首次被采纳时，你会获得永久「共建者」徽章。</view></view>
+    </view>
+    <view wx:for="{{items}}" wx:key="id" class="fb-record">
+      <button class="disclosure-button fb-summary" hover-class="none" aria-expanded="{{expanded === item.id}}" data-id="{{item.id}}" bindtap="toggle">
+        <view class="fb-record-head">
+          <text class="fb-kind">{{item.category}}{{item.area ? ' · ' + item.area : ''}}</text>
+          <text class="fb-status {{item.acceptedAt || item.reply ? 'done' : ''}}">{{item.acceptedAt ? '已采纳' : item.reply ? '已回复' : '待处理'}}</text>
+        </view>
+        <view class="fb-prose {{expanded === item.id ? '' : 'clamped'}}">{{item.content}}</view>
+        <view wx:if="{{item.reply}}" class="fb-response">
+          <view class="fb-response-head"><text>开发者</text><text wx:if="{{expanded === item.id}}" class="fb-meta">{{item.replyDate}}</text></view>
+          <view class="fb-reply-text {{expanded === item.id ? '' : 'clamped'}}">{{item.reply}}</view>
+        </view>
+        <view class="fb-record-foot"><text>{{item.date}}{{item.photos && expanded !== item.id ? ' · 截图 ' + item.photos + ' 张' : ''}}</text>
+          <view class="fb-chevron {{expanded === item.id ? 'open' : ''}}" aria-hidden="true"></view>
+        </view>
+      </button>
+      <view wx:if="{{expanded === item.id && item.photos}}" class="fb-attachments">
+        <view class="fb-subhead">附件截图 <text class="fb-meta">{{item.photos}} 张</text></view>
+        <view class="fb-gallery {{item.photos <= 2 ? 'few' : ''}}">
+          <button wx:for="{{photos}}" wx:for-item="photo" wx:key="index" size="mini" class="fb-photo"
+            hover-class="none" data-id="{{item.id}}" data-index="{{photo.index}}" bindtap="preview"
+            disabled="{{photo.state === 'loading'}}" aria-label="{{photo.state === 'error' ? '重新加载' : '查看'}}第 {{photo.index + 1}} 张截图">
+            <image wx:if="{{photo.src}}" src="{{photo.src}}" mode="aspectFill" data-id="{{item.id}}" data-index="{{photo.index}}"
+              data-src="{{photo.src}}" binderror="imageError" aria-hidden="true" />
+            <text wx:elif="{{photo.state === 'error'}}" class="fb-photo-retry">点击重试</text>
+            <text wx:else>加载中…</text>
+          </button>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{loading}}" class="fb-empty" role="status">正在读取反馈…</view>
+    <view wx:elif="{{error}}" class="fb-empty" role="alert">{{error}}<button hover-class="none" class="secondary" bindtap="retry">重试</button></view>
+    <view wx:elif="{{!items.length}}" class="fb-empty"><view class="fb-choice-title">还没有反馈</view><view class="fb-muted">提交后，可在这里查看进度和回复。</view><button hover-class="none" class="secondary" data-tab="write" bindtap="selectTab">去写反馈</button></view>
+    <button hover-class="none" wx:elif="{{next}}" class="secondary" bindtap="more">加载更多</button>
+  </view>
+</view>
