@@ -1,0 +1,149 @@
+.dialog-backdrop.deal-overlay {
+  padding: 0;
+  background: rgba(6, 15, 22, .78);
+}
+.deal-overlay.is-closing { background: transparent; transition: background 300ms ease; }
+.deal-window { width: 100%; height: 100%; }
+.deal-stage {
+  --deal-height: min(129vw, 510px, calc(100vh - 160px - env(safe-area-inset-bottom)));
+  width: 86vw;
+  max-width: 340px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: max(22px, env(safe-area-inset-top)) 0 max(16px, env(safe-area-inset-bottom));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+/* The front sizes the whole stack, including both animated wrappers. */
+.deal-slot, .deal-flight, .deal-turn { position: relative; width: 100%; }
+.deal-flight { animation: deal-land 350ms ease-out both; }
+.deal-flight.is-flying { animation: deal-stow 360ms 200ms cubic-bezier(.54,.03,.84,.48) both; }
+.deal-turn {
+  transform: perspective(1050px) rotateY(0deg);
+  transform-style: preserve-3d;
+  transition: transform 350ms cubic-bezier(.25,.75,.3,1);
+}
+.deal-turn.is-revealed { transform: perspective(1050px) rotateY(180deg); }
+.is-closing .deal-turn { transition-duration: 220ms; }
+.deal-side {
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 15px;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .35);
+}
+.deal-back {
+  position: absolute;
+  inset: 0;
+  background: #58728b;
+  border: 3px solid #d5c7ab;
+  transform: rotateY(0deg);
+}
+.deal-back-art { display: block; width: 100%; height: 100%; }
+.deal-back button.deal-hit, .deal-back button.deal-hit[disabled]:not([type]) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.deal-back .deal-hit:active { background: rgba(238, 227, 200, .12); }
+.deal-face {
+  position: relative;
+  min-height: var(--deal-height);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  --text: #233b50;
+  --muted: #4d6070;
+  --accent: #345779;
+  --good: #2f5771;
+  --evil: #843f3b;
+  --third: #64547c;
+  --control-bg: #e7dfcc;
+  --border: #9f9989;
+  transform: rotateY(180deg);
+  pointer-events: none;
+  color: var(--text);
+  border: 4px solid #e0d4ba;
+  background: radial-gradient(ellipse at top, #faf5e7, #eee5cf);
+}
+.deal-face::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 3px double #698096;
+  border-radius: 9px;
+  pointer-events: none;
+}
+.deal-turn.is-revealed .deal-face { pointer-events: auto; }
+.deal-face-content { overflow-wrap: anywhere; }
+.deal-heading { position: relative; padding-bottom: 9px; border-bottom: 1px solid #a5a59a; }
+.deal-portrait { display: block; width: 78px; height: 78px; margin: 0 auto 3px; object-fit: contain; }
+.deal-role { font-size: 24px; font-weight: 700; line-height: 1.35; }
+.deal-faction { display: inline-block; margin-top: 5px; padding: 2px 9px; border-radius: 10px; background: #e3dcca; font-size: 13px; font-weight: 600; }
+.deal-face .identity-info-section { padding: 8px 0; }
+.deal-face .identity-info-section + .identity-info-section { border-color: #c4bead; }
+.deal-face .identity-info-player { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 2px 6px; padding: 6px 8px; }
+.deal-face .identity-info-player-copy { grid-column: 1 / -1; }
+.deal-face .vision-player-avatar { width: 24px; height: 24px; color: #f6f1e6; }
+.deal-face .identity-info-name { font-size: 13px; }
+.deal-face button.deal-help {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+}
+.deal-details { text-align: left; }
+.deal-controls { min-height: 62px; position: sticky; bottom: env(safe-area-inset-bottom); padding: 10px 0 4px; box-sizing: border-box; }
+.deal-controls button.deal-stow { width: 88%; min-height: 46px; margin: 0 auto; border-radius: 14px; font-weight: 600; }
+.deal-prompt { color: #f5efe3; font-size: 16px; font-weight: 600; }
+.deal-controls button.deal-later { min-height: 44px; width: auto; margin: 0 auto; padding: 4px 15px; background: transparent; color: #c1cbd0; font-size: 13px; }
+.deal-controls button:active { opacity: .8; }
+@keyframes deal-land {
+  from { opacity: 0; transform: translateY(-34px) rotate(-4deg); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes deal-stow {
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to { transform: translate(var(--deal-x), var(--deal-y)) scale(.07); opacity: 0; }
+}
+@media (max-height: 600px) and (orientation: portrait) {
+  .deal-portrait { height: 54px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .deal-stage { width: 94vw; max-width: 650px; padding-top: 10px; padding-bottom: 8px; --deal-height: 215px; }
+  .deal-face-content { display: grid; grid-template-columns: 92px minmax(0, 1fr); column-gap: 12px; align-content: center; }
+  .deal-heading { grid-column: 1; grid-row: 1 / span 3; align-self: center; padding: 0; border: 0; }
+  .deal-face-content > .identity-information, .deal-face-content > .deal-details, .deal-face-content > .avoidance-result { grid-column: 2; }
+  .deal-face { padding: 10px 16px; }
+  .deal-face .identity-info-section { padding: 4px 0; }
+  .deal-face .identity-info-player { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px 6px; }
+  .deal-face .identity-info-player-copy { flex: 1 1 45px; }
+  .deal-face .identity-info-role { margin: 0; }
+  .deal-heading button.deal-help { position: static; margin: 0 auto; }
+  .deal-portrait { height: 54px; }
+  .deal-back-art { object-fit: contain; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal-flight { animation: none; }
+  .deal-turn, .is-closing .deal-turn, .deal-overlay.is-closing { transition: none; }
+  .deal-flight.is-flying { animation: deal-disappear 1ms both; }
+}
+@keyframes deal-disappear { to { opacity: 0; } }

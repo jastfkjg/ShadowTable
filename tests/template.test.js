@@ -607,7 +607,8 @@ test("初次发牌提醒默认遮盖，可稍后查看；关闭后只有身份�
   const secret = { role: "梅林", faction: "好人阵营", information: "秘密视野" };
   const shown = render({ ...data, dealtIdentitySecret: secret });
   assert.match(JSON.stringify(shown), /秘密视野/);
-  assert.match(JSON.stringify(shown), /记住了，遮盖身份/);
+  assert.match(JSON.stringify(shown), /收起身份/);
+  assert.doesNotMatch(JSON.stringify(render({ ...data, dealClosing: true })), /秘密视野|稍后查看|轻点牌面/);
   const closed = render({ ...data, dealtIdentityDialog: false, dealtIdentitySecret: secret, identityHintVisible: true });
   assert.ok(!JSON.stringify(closed).includes("秘密视野"));
   assert.match(JSON.stringify(closed), /随时点这里/);
@@ -2237,7 +2238,11 @@ test('当前身份名旁显示角色说明图标，技能状态和身份历程�
   assert.ok(byHandler(renderTable({...data,secret:aCard}),'openIdentityRoleHelp'));
   assert.match(JSON.stringify(renderTable({...data,secret:aCard,identityRoleHelpOpen:true,identityHelpExpanded:true})),/首次复活/);
   const dealt = {...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard};
-  assert.doesNotMatch(JSON.stringify(renderTable(dealt)),/首次复活/);
+  const initial = renderTable(dealt);
+  const face = nodes(initial).find(node => node.attr?.class === 'deal-side deal-face');
+  assert.ok(face);
+  assert.ok(!nodes(face).some(node => node.tag === 'wx-scroll-view'));
+  assert.doesNotMatch(JSON.stringify(initial), /首次复活|技能状态|无主动技能/);
   assert.match(JSON.stringify(renderTable({...dealt,identityHelpExpanded:true})),/首次复活/);
 });
 

@@ -133,27 +133,43 @@
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
-<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop table-sheet-backdrop dealt-identity-backdrop" catchtouchmove="blockScroll">
-  <view class="error-dialog dealt-identity-dialog table-sheet {{dealtIdentitySecret?'is-revealed':'is-covered'}} {{dealtIdentitySecret.role==='莫甘娜'?'is-morgana':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="身份已发放">
-    <view class="table-sheet-top dealt-identity-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue" aria-hidden="true"><image src="/assets/table-cards.svg" /></view><text>身份已发放</text></view><button hover-class="none" class="table-sheet-close" bindtap="closeDealtIdentity" aria-label="关闭并遮盖身份">×</button></view></view>
-    <scroll-view class="table-sheet-body dealt-identity-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}">
-      <view class="table-sheet-fields dealt-identity-fields">
-        <view class="small muted identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
-        <block wx:if="{{dealtIdentitySecret}}">
-          <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
-          <view class="dealt-role-heading"><image wx:if="{{dealtIdentitySecret.portrait}}" class="private-role-art" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.role}}</view><view class="private-faction faction-{{dealtIdentitySecret.factionTone}}">● {{dealtIdentitySecret.faction}}</view></view></view>
-          <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true, summarize:true}}" />
-          <template is="identitySkillStatus" data="{{status:dealtIdentitySecret.skillStatus, ability:dealtIdentitySecret.info.ability, surface:'dealt', helpExpanded:identityHelpExpanded}}" />
-          <view class="small muted identity-return-note">之后可在房间号右侧的「查看身份」再次查看。</view>
-        </block>
-        <block wx:else><view class="identity-sealed-art" aria-hidden="true"><image src="/assets/table-cards.svg" /><view><image src="/assets/table-lock.svg" /></view></view><view class="identity-sealed-title">身份已就绪</view><view class="private-info muted identity-sealed-copy">请确认屏幕仅自己可见，再查看身份与视野。</view></block>
+<view wx:if="{{dealtIdentityDialog && !error}}" class="dialog-backdrop deal-overlay {{dealClosing?'is-closing':''}}" catchtouchmove="blockScroll">
+  <scroll-view class="deal-window" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="deal-stage" role="dialog" aria-modal="true" aria-label="我的身份牌">
+      <view id="deal-card-slot" class="deal-slot">
+        <view class="deal-flight {{dealFlightStyle?'is-flying':''}}" style="{{dealFlightStyle}}" bindanimationend="finishDealFlight">
+          <view class="deal-turn {{dealtIdentitySecret?'is-revealed':''}}">
+            <view class="deal-side deal-back" aria-hidden="{{!!dealtIdentitySecret || dealClosing}}">
+              <image class="deal-back-art" src="/assets/identity-card-back.jpg" mode="scaleToFill" aria-hidden="true" />
+              <button wx:if="{{!dealtIdentitySecret && !dealClosing}}" class="deal-hit" hover-class="none" aria-label="轻点牌面，查看身份" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" />
+            </view>
+            <view class="deal-side deal-face" aria-hidden="{{!dealtIdentitySecret}}">
+              <view wx:if="{{dealtIdentitySecret}}" class="deal-face-content">
+                <view class="deal-heading">
+                  <image wx:if="{{dealtIdentitySecret.portrait}}" class="deal-portrait" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" />
+                  <view class="deal-role">{{dealtIdentitySecret.role}}</view>
+                  <text class="deal-faction faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.faction}}</text>
+                  <button wx:if="{{dealtIdentitySecret.info.ability}}" class="disclosure-button deal-help" hover-class="none" bindtap="toggleIdentityHelp" data-surface="dealt" aria-label="角色说明" aria-expanded="{{identityHelpExpanded}}">角色说明<view class="identity-help-chevron {{identityHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
+                </view>
+                <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true, compact:true, summarize:true}}" />
+                <view wx:if="{{identityHelpExpanded && dealtIdentitySecret.info.ability}}" class="deal-details">
+                  <template is="identityRoleAbility" data="{{ability:dealtIdentitySecret.info.ability, summarized:true}}" />
+                </view>
+                <template is="avoidanceResult" data="{{result:dealtIdentitySecret.avoidance}}" />
+              </view>
+            </view>
+          </view>
+        </view>
       </view>
-    </scroll-view>
-    <view class="table-sheet-footer dealt-identity-footer">
-      <button wx:if="{{dealtIdentitySecret}}" hover-class="none" class="primary" bindtap="closeDealtIdentity">记住了，遮盖身份</button>
-      <block wx:else><button hover-class="none" class="primary" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" loading="{{busy && busyAction==='dealtIdentity'}}">查看身份</button><button hover-class="none" class="text-button" bindtap="closeDealtIdentity">稍后查看</button></block>
+      <view class="deal-controls">
+        <button wx:if="{{dealtIdentitySecret}}" class="primary deal-stow" hover-class="none" bindtap="closeDealtIdentity">收起身份</button>
+        <block wx:elif="{{!dealClosing}}">
+          <view class="deal-prompt" role="status">{{busyAction==='dealtIdentity'?'正在查看身份…':network?'轻点牌面，查看身份':'联网后可查看身份'}}</view>
+          <button class="deal-later" hover-class="none" bindtap="closeDealtIdentity">稍后查看</button>
+        </block>
+      </view>
     </view>
-  </view>
+  </scroll-view>
 </view>
 <view wx:if="{{fairyResult && !identityChange && !error}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
   <view class="error-dialog table-sheet process-sheet process-inspection {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="仙女查验结果">

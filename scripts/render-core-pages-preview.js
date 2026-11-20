@@ -428,7 +428,7 @@ merlinSource.knights.initialRoles={...merlinSource.roles};
 const identityNames=['小橙','子龙','林间','初夏','北川','舟舟','阿木','七月','阿辰','小鱼','向晚','晚风'];
 const identityAvatars=['19','04','13','18','14','21','20','16','15','22','27','28'];
 merlinSource.players.forEach((player,index)=>Object.assign(player,{name:identityNames[index],avatarUrl:'/pages/profile/assets/avatars/crayon-'+identityAvatars[index]+'.jpg'}));
-for(const [role,tone] of [['merlin','good'],['morgana','evil']]) {
+for(const [role,tone] of [['merlin','good'],['morgana','evil'],['assassin','evil']]) {
   const player=merlinSource.players.find(player=>merlinSource.roles[player.uid]===role),secret=privateView(merlinSource,player.uid);
   tableScenes['ui-identity-'+role]=tableScene(merlinSource,player.uid,{dealtIdentityDialog:true,dealtIdentitySecret:{...secret,
     factionTone:tone,portrait:portrait(secret.role,tone).portrait,vision:presentVision(secret.information,merlinSource.players)}});

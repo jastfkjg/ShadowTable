@@ -287,6 +287,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     actionSecret: null,
     dealtIdentityDialog: false,
     dealtIdentitySecret: null,
+    dealClosing: false,
+    dealFlightStyle: "",
     identityHintVisible: false,
     actionLoading: false,
     actionLabel: "",
@@ -456,6 +458,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }, 1500);
   },
   mask() {
+    clearTimeout(this.dealReturnTimer);
     this.dismissGrantNotice?.();
     this.dismissRoomSwipe();
     this.closePlayerCard();
@@ -466,6 +469,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       historyOpen: false,
       dealtIdentityDialog: false,
       dealtIdentitySecret: null,
+      dealClosing: false,
+      dealFlightStyle: "",
       identityHintVisible: false,
       fairyResult: null,
       fairyResultRevealed: false,
@@ -881,6 +886,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "",
           dealtIdentityDialog: false,
           dealtIdentitySecret: null,
+          dealClosing: false,
+          dealFlightStyle: "",
           identityHintVisible: false,
           fairyResult: null,
           fairyResultRevealed: false,
@@ -916,6 +923,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       : {};
     // Invalidate pending identity reads before committing the new stage in one update.
     if (privacyChanged) {
+      clearTimeout(this.dealReturnTimer);
       this.generation = (this.generation || 0) + 1;
       this.actionGeneration = (this.actionGeneration || 0) + 1;
     }
@@ -1069,7 +1077,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       serverConnected: true,
       needsLogin: false,
     });
-    if (identityProfileUpdate.dealtIdentitySecret) this.syncProcessSheetLayout();
     this.prepareRoomShare();
     if (
       (!room.needsSubmission || room.me.submitted) &&
@@ -1532,7 +1539,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     if (d.error) return "";
     const stage = d.room?.code + ":" + d.room?.stage;
-    if (d.dealtIdentityDialog) return stage + ":dealt:" + !!d.dealtIdentitySecret;
     if (d.identityRoleHelpOpen && d.revealed) return stage + ":role-help:" + d.identityHelpExpanded;
     if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
     if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
@@ -1552,9 +1558,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const run = () => {
       if (!this.alive || !this.foreground || key !== this.processSheetKey()) return;
       const query = wx.createSelectorQuery().in(this);
-      const selectors = this.data.dealtIdentityDialog
-        ? [".dealt-identity-backdrop", ".dealt-identity-top", ".dealt-identity-fields", ".dealt-identity-footer"]
-        : [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
+      const selectors = [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
       for (const selector of selectors) query.select(selector).boundingClientRect();
       query.exec(rects => {
         if (!this.alive || !this.foreground || revision !== this.processLayoutRevision || key !== this.processSheetKey()) return;
@@ -2496,11 +2500,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.dealtIdentityDialog) return true;
     if (this.identityReceipts().includes(key)) return false;
     this.mask();
-    this.setProcessData({ dealtIdentityDialog: true, processBodyHeight: 0 });
+    this.setData({ dealtIdentityDialog: true });
     return true;
   },
   async revealDealtIdentity() {
-    if (!this.data.dealtIdentityDialog || this.data.busy || !this.data.network || !this.foreground) return;
+    if (!this.data.dealtIdentityDialog || this.data.dealClosing || this.data.dealtIdentitySecret || this.data.busy || !this.data.network || !this.foreground) return;
     const key = this.identityDealKey(), stage = this.data.room.stage;
     const generation = ++this.generation;
     this.setData({ busy: true, busyAction: "dealtIdentity" });
@@ -2510,10 +2514,10 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
         this.data.room.stage !== stage || secret.stage !== stage) return;
       this.rememberDealtIdentity();
-      this.setProcessData({ processBodyHeight: 0, dealtIdentitySecret: {
+      this.setData({ dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
-        information: secret.information, skillStatus: secret.skillStatus,
+        information: secret.information,
         info: roomSheet.presentIdentityInformation(secret, this.data.seats),
         vision: roomSheet.presentVision(secret.information, this.data.seats),
         avoidance: avoidancePresentation.result(secret.avoidance),
@@ -2525,10 +2529,44 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   closeDealtIdentity() {
-    if (!this.data.dealtIdentityDialog) return;
+    if (!this.data.dealtIdentityDialog || this.data.dealClosing) return;
     this.rememberDealtIdentity();
-    this.mask();
     if (!wx.getStorageSync("identityEntryHintSeen")) this.identityHintPending = this.identityDealKey();
+    if (!this.data.dealtIdentitySecret || !wx.createSelectorQuery) {
+      this.mask();
+      this.showIdentityHintWhenVisible();
+      return;
+    }
+
+    const generation = this.generation;
+    const finish = () => {
+      if (generation !== this.generation || !this.data.dealClosing) return;
+      this.mask();
+      this.showIdentityHintWhenVisible();
+    };
+    // Only the public back can remain on screen while measuring or flying.
+    this.setData({ dealtIdentitySecret: null, identityHelpExpanded: false, dealClosing: true }, () => {
+      if (generation !== this.generation || !this.data.dealClosing) return;
+      this.dealReturnTimer = setTimeout(finish, 900);
+      const query = wx.createSelectorQuery().in(this);
+      query.select("#deal-card-slot").boundingClientRect();
+      query.select(".room-identity").boundingClientRect();
+      query.selectViewport().boundingClientRect();
+      query.exec(([card, entry, viewport]) => {
+        if (generation !== this.generation || !this.data.dealClosing) return;
+        if (!card?.width || !entry?.height || !viewport || entry.top < 0 || entry.bottom > viewport.height) {
+          finish();
+          return;
+        }
+        const x = entry.left + entry.width / 2 - card.left - card.width / 2;
+        const y = entry.top + entry.height / 2 - card.top - card.height / 2;
+        this.setData({ dealFlightStyle: `--deal-x:${x}px;--deal-y:${y}px;` });
+      });
+    });
+  },
+  finishDealFlight(event) {
+    if (!["deal-stow", "deal-disappear"].includes(event.detail?.animationName) || !this.data.dealClosing) return;
+    this.mask();
     this.showIdentityHintWhenVisible();
   },
   showIdentityHintWhenVisible() {

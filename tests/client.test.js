@@ -249,23 +249,34 @@ test('游戏弹层原生测量随展开状态更新，关闭、换阶段和后�
   p.syncProcessSheetLayout();p.foreground=false;
   layout.callbacks[4]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
 });
-test('初始身份按内容收紧高度，揭示后重新测量且关闭后旧回调失效', () => {
-  const layout={callbacks:[]},p=page({},new Map(),layout);
-  const rects=[{width:390,height:844},{height:78},{height:180},{height:78}];
-  p.data.room={code:'123456',stage:'stage1',me:{seat:1}};
-  p.setProcessData({dealtIdentityDialog:true});
-  p.setProcessData({dealtIdentitySecret:{role:'梅林'}});
+test('收牌先清空秘密，再按入口实际位置飞回；切后台或过期测量不会重绘', () => {
+  const layout = { callbacks: [] };
+  const p = page({}, new Map([["identityEntryHintSeen", true]]), layout);
+  p.data.room = dealtRoom();
+  const open = () => Object.assign(p.data, { dealtIdentityDialog: true, dealtIdentitySecret: { role: "梅林" } });
+  const rects = [
+    { left: 50, top: 150, width: 250, height: 380 },
+    { left: 290, top: 88, width: 80, height: 44, bottom: 132 },
+    { height: 800 },
+  ];
+  open();
+  p.closeDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret, null);
+  assert.equal(p.data.dealClosing, true);
+  p.closeDealtIdentity();
+  assert.equal(layout.callbacks.length, 1);
   layout.callbacks[0](rects);
-  assert.equal(p.data.processBodyHeight,0);
-  layout.callbacks[1]([rects[0],rects[1],{height:420},rects[3]]);
-  assert.equal(p.data.processBodyHeight,420);
-  p.syncProcessSheetLayout();
-  layout.callbacks[2]([rects[0],rects[1],{height:1000},rects[3]]);
-  assert.equal(p.data.processBodyHeight,600);
-  p.syncProcessSheetLayout();
-  p.data.dealtIdentityDialog=false;
-  layout.callbacks[3](rects);
-  assert.equal(p.data.processBodyHeight,600);
+  assert.equal(p.data.dealFlightStyle, "--deal-x:155px;--deal-y:-230px;");
+  p.finishDealFlight({ detail: { animationName: "deal-land" } });
+  assert.equal(p.data.dealtIdentityDialog, true);
+  p.finishDealFlight({ detail: { animationName: "deal-stow" } });
+  assert.equal(p.data.dealtIdentityDialog, false);
+  open();
+  p.closeDealtIdentity();
+  p.onHide();
+  layout.callbacks[1](rects);
+  assert.equal(p.data.dealFlightStyle, "");
+  assert.equal(p.data.dealtIdentityDialog, false);
 });
 async function settle(p) {
   while (p.data.busy) await new Promise((r) => setTimeout(r, 1));
