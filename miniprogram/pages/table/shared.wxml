@@ -143,14 +143,14 @@
               <image class="deal-back-art" src="/assets/identity-card-back.webp" webp="{{true}}" mode="scaleToFill" aria-hidden="true" />
               <button wx:if="{{!dealtIdentitySecret && !dealClosing}}" class="deal-hit" hover-class="none" aria-label="轻点牌面，查看身份" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" />
             </view>
-            <view class="deal-side deal-face{{dealtIdentitySecret.cardArt?' printed':''}}" aria-hidden="{{!dealtIdentitySecret}}">
+            <view class="deal-side deal-face{{dealtIdentitySecret.cardArt?' printed ink-'+dealtIdentitySecret.factionTone:''}}" aria-hidden="{{!dealtIdentitySecret}}">
               <view wx:if="{{dealtIdentitySecret}}" class="deal-face-content {{dealtIdentitySecret.cardArt?'has-woodcut':''}}">
                 <view class="deal-heading {{dealtIdentitySecret.cardArt?'woodcut':''}}">
                   <image wx:if="{{dealtIdentitySecret.cardArt}}" class="deal-illustration" src="{{dealtIdentitySecret.cardArt}}" mode="aspectFill" data-surface="dealtIdentitySecret" data-src="{{dealtIdentitySecret.cardArt}}" binderror="cardArtError" aria-hidden="true" />
                   <image wx:elif="{{dealtIdentitySecret.portrait}}" class="deal-portrait" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" />
                   <view class="deal-nameplate"><view class="deal-role">{{dealtIdentitySecret.role}}</view>
                   <text class="deal-faction faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.faction}}</text></view>
-                  <button wx:if="{{dealtIdentitySecret.info.ability}}" class="disclosure-button deal-help" hover-class="none" bindtap="toggleIdentityHelp" data-surface="dealt" aria-label="角色说明" aria-expanded="{{identityHelpExpanded}}">角色说明<view class="identity-help-chevron {{identityHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
+                  <button wx:if="{{dealtIdentitySecret.info.ability}}" class="disclosure-button deal-help" hover-class="none" bindtap="toggleIdentityHelp" data-surface="dealt" aria-label="角色说明" aria-expanded="{{identityHelpExpanded}}">{{dealtIdentitySecret.cardArt?'说明':'角色说明'}}<view wx:if="{{!dealtIdentitySecret.cardArt}}" class="identity-help-chevron {{identityHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
                 </view>
                 <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:!dealtIdentitySecret.cardArt, printed:!!dealtIdentitySecret.cardArt, compact:true, summarize:true}}" />
                 <view wx:if="{{identityHelpExpanded && dealtIdentitySecret.info.ability}}" class="deal-details">
@@ -163,7 +163,7 @@
         </view>
       </view>
       <view class="deal-controls">
-        <button wx:if="{{dealtIdentitySecret}}" class="primary deal-stow" hover-class="none" bindtap="closeDealtIdentity">收起身份</button>
+        <button wx:if="{{dealtIdentitySecret}}" class="primary deal-stow {{dealtIdentitySecret.cardArt?'brass':''}}" hover-class="none" bindtap="closeDealtIdentity">收起身份</button>
         <block wx:elif="{{!dealClosing}}">
           <view class="deal-prompt" role="status">{{busyAction==='dealtIdentity'?'正在查看身份…':network?'轻点牌面，查看身份':'联网后可查看身份'}}</view>
           <button class="deal-later" hover-class="none" bindtap="closeDealtIdentity">稍后查看</button>

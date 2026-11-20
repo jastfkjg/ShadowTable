@@ -128,6 +128,7 @@
         .map(line => ({ label: summaryLabels.get(line.label), text: line.text })),
     ] : [];
     return { vision, passive, fairy, inspections, ability, summary,
+      printedBrief: roleAbility?.brief.replace(/^没有额外视野，/, "") || (secret.role === "亚瑟的忠臣" ? "从发言和任务结果中寻找同伴。" : ""),
       summaryVision: openingVision?.replace(/^没有初始视野，/, "无初始视野，") || vision.text,
       roleOverview: roleOverview(secret, ability, vision),
       showRoleHelp: !!ability,

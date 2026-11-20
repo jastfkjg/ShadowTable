@@ -148,58 +148,84 @@
 }
 @keyframes deal-disappear { to { opacity: 0; } }
 
-/* Woodcut art and the nameplate share one print; all private text stays live. */
-.deal-heading.woodcut { border: 0; padding: 0 0 3px; }
-.deal-illustration, .identity-card-banner {
-  display: block;
-  width: 100%;
-  height: min(74vw, 40vh, 300px);
-  border-radius: 7px;
-  object-fit: cover;
-  object-position: center;
+/* The illustration, cartouche and live rules share a single printed sheet. */
+.printed {
+  --ink: #455662;
+  --text: #302318;
+  --muted: #614833;
+  --paper: #efdbb7 url("data:image/webp;base64,UklGRnQAAABXRUJQVlA4IGgAAADwAwCdASovACQAPwF+s1WrKCQjI4oBYCAJZ2nxXMYESXn1qxk4+S0AAP7tIt/pLpchtUUWBiGFqKyW95adBjS3OkufGaeRLZHKYFb7Pwr6einWj+lF8gbZ/2PdK0j1xfnW/N7mONAAAA==") repeat;
+  justify-content: flex-start;
+  padding: 8px 8px 12px;
+  min-height: 0;
+  border: 2px solid #c6a47f;
+  color: var(--text);
+  background: var(--paper);
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
 }
+.printed.ink-evil { --ink: #82432e; }
+.printed.ink-third { --ink: #696038; }
+.printed::before { inset: 3px; border-color: var(--ink); border-radius: 8px; }
+.deal-heading.woodcut { border: 0; padding: 0; }
+.deal-illustration, .identity-card-banner { display: block; width: 100%; object-fit: cover; }
+.deal-illustration { height: min(82vw, 47vh, 320px); border-radius: 5px 5px 0 0; }
 .woodcut .deal-nameplate {
+  --edge: polygon(0 53%,4% 39%,7% 18%,15% 13%,18% 0,82% 0,85% 13%,93% 18%,96% 39%,100% 53%,96% 64%,93% 83%,85% 88%,82% 100%,18% 100%,15% 88%,7% 83%,4% 64%);
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: fit-content;
-  max-width: 92%;
-  margin: -16px auto 0;
-  padding: 2px 14px;
-  border: 3px double #80543a;
-  border-radius: 9px 2px;
-  color: #39291c;
-  background: #f1e4c9;
-  font-family: "Songti SC", "STSong", serif;
+  gap: 7px;
+  width: 94%;
+  min-height: 45px;
+  box-sizing: border-box;
+  margin: -21px auto 0;
+  padding: 3px 8%;
 }
-.printed { --text: #382a20; --muted: #685039; --good: #385667; --evil: #903e30; --third: #69507a; }
-.printed::before { border-color: #895b41; }
-.woodcut .deal-role { font-size: 26px; line-height: 1.35; }
-.woodcut .deal-faction { flex-shrink: 0; margin: 0; padding: 1px 5px; border-radius: 3px; font-size: 12px; color: #fff5db; }
-.woodcut .faction-evil { background: var(--evil); }
-.woodcut .faction-good { background: var(--good); }
-.woodcut .faction-third { background: var(--third); }
-.printed .identity-info-heading { justify-content: center; margin-bottom: 4px; font-family: "Songti SC", serif; font-weight: 700; }
-.printed .identity-info-players { display: flex; flex-direction: column; gap: 2px; }
-.printed .identity-info-player { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 0; background: transparent; }
-.printed .identity-info-player-copy { flex: 0 1 auto; display: flex; gap: 8px; align-items: baseline; }
+.woodcut .deal-nameplate::before, .woodcut .deal-nameplate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: var(--edge);
+  background: var(--ink);
+  z-index: -2;
+}
+.woodcut .deal-nameplate::after { inset: 1.5px 3px; background: var(--paper); z-index: -1; }
+.woodcut .deal-role { font-size: clamp(21px, 6.6vw, 29px); line-height: 1.2; font-weight: 600; }
+.woodcut .deal-faction { flex: none; margin: 0; padding: 2px 5px; border-radius: 2px; font-size: 11px; color: #fff1ce; background: var(--ink); }
+.woodcut button.deal-help { right: 2px; top: 2px; justify-content: center; width: 44px; color: #fff1ce; font: 600 11px/1 serif; background: radial-gradient(ellipse 17px 11px, #493927 95%, transparent); }
+.printed .identity-information { margin: 0 10px; text-align: center; }
+.printed .identity-info-section { padding: 7px 0; }
+.printed .identity-info-inline { display: block; }
+.printed .identity-info-heading { justify-content: center; gap: 9px; margin: 0 0 3px; color: var(--text); font-size: 15px; font-weight: 600; }
+.printed .identity-info-section > .identity-info-heading::before, .printed .identity-info-section > .identity-info-heading::after {
+  content: ''; width: 19%; height: 1px; background: var(--ink); opacity: .55;
+}
+.printed .identity-info-players { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 12px; }
+.printed .identity-info-player, .printed .identity-info-player-copy { display: flex; align-items: baseline; justify-content: center; gap: 4px; flex: 0 1 auto; }
+.printed .identity-info-player { max-width: 100%; padding: 0; background: transparent; }
 .printed .identity-info-seat { font-size: 16px; }
 .printed .identity-info-role { margin: 0; }
-.printed .identity-info-note { text-align: center; }
-.printed .identity-info-section { padding: 6px 0; }
-.printed .identity-info-ability { gap: 8px; }
-
-.woodcut button.deal-help { top: 4px; right: 4px; padding: 0 8px; border-radius: 8px; color: #fff4dc; background: rgba(40,31,24,.85); }
-.identity-card-banner { height: min(55vw, 28vh, 235px); margin: 8px auto; }
+.printed .identity-info-name + .identity-info-role::before { content: "· "; }
+.printed .identity-info-note, .printed .identity-info-caption { margin: 2px 0; }
+.printed .identity-info-section + .identity-info-section, .print-note { border-top: 1px solid #ab8d6c; }
+.printed .identity-info-ability { justify-content: center; font-size: 14px; }
+.print-note { padding: 7px 0 2px; font-size: 14px; }
+.deal-controls button.brass {
+  width: 142px; min-height: 44px; border-radius: 0; color: #372719;
+  font-family: "Songti SC", serif;
+  background: linear-gradient(#f0d297, #d4ab68);
+  clip-path: polygon(7% 8%,93% 8%,100% 31%,100% 69%,93% 92%,7% 92%,0 69%,0 31%);
+}
+.identity-card-banner { height: min(55vw, 28vh, 235px); margin: 8px auto; border-radius: 7px; }
 @media (max-height: 600px) and (orientation: portrait) {
-  .deal-illustration { height: 28vh; }
+  .deal-illustration { height: min(76vw, 36vh); }
+  .deal-stage { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  .deal-face-content.has-woodcut { grid-template-columns: 32% minmax(0, 1fr); }
-  .deal-illustration { height: 30vh; }
-  .woodcut .deal-nameplate { flex-wrap: wrap; gap: 2px 5px; padding: 2px 5px; }
-  .woodcut .deal-role { font-size: 16px; }
-  .woodcut button.deal-help { position: static; background: transparent; color: var(--muted); }
+  .deal-face-content.has-woodcut { grid-template-columns: 36% minmax(0, 1fr); align-items: center; }
+  .deal-illustration { height: 37vh; }
+  .woodcut .deal-nameplate { min-height: 34px; gap: 4px; }
+  .woodcut .deal-role { font-size: 17px; }
+  .woodcut button.deal-help { position: absolute; }
 }
