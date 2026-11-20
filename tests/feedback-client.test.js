@@ -7,7 +7,7 @@ const { wxmlToJs } = require("miniprogram-compiler");
 const types = require("../miniprogram/pages/feedback/types");
 const root = path.resolve(__dirname, "../miniprogram");
 const context = vm.createContext({ global: {}, window: {}, console });
-const render = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
+const render = vm.runInContext("(function(global){" + wxmlToJs(root, { wxmlList: ["feedback", "compose", "history"].map(name => "pages/feedback/" + name + ".wxml") }) + "})(global)", context);
 const nodes = node => typeof node === "object" ? [node, ...(node.children || []).flatMap(nodes)] : [];
 function page(name, api, wx, dependencies = {}) {
   let definition;
@@ -71,13 +71,15 @@ test("截图可预览移除；失败保留输入和请求编号，重试进入�
   assert.deepEqual(navigations, ["history?id=7"]);
   const submitted = render("pages/feedback/compose.wxml")(editor.data);
   assert.ok(!nodes(submitted).some(node => node.tag === "wx-page-container"));
-  const history = page("history", { login: api.login, request: async () => ({ next:null, items: [{
+  const history = page("history", { login: api.login, feedbackImage: async () => "jpeg", request: async () => ({ next:null, items: [{
     id:7, content:"投票后仍在等待", category:"问题反馈", area:"牌桌", photos:1, created:1, reply:"收到，正在排查", repliedAt:2,
-  }] }) }, wx);
+  }] }) }, wx, { "./screenshots": { write: async () => "wxfile://sample.jpg", remove() {} } });
   history.onLoad({ id: "7" });
   await history.onShow();
   const tree = render("pages/feedback/history.wxml")(history.data);
   assert.match(JSON.stringify(tree), /收到，正在排查/);
+  assert.match(JSON.stringify(tree), /反馈已提交/);
+  assert.ok(nodes(tree).some(node => node.tag === "wx-image" && node.attr.src === "wxfile://sample.jpg"));
   const imageButton = nodes(tree).find(node => node.attr?.bindtap === "preview");
   assert.equal(imageButton.attr["data-id"], 7); assert.equal(imageButton.attr["data-index"], 0);
 });
@@ -115,4 +117,48 @@ test("反馈退出沿用共享确认框，取消保留草稿，确认在容器�
   assert.equal(navigations, 1);
   editor.onGuardClosed();
   assert.equal(navigations, 2);
+});
+
+test("历史截图按展开记录读取，单张失败可重试，预览保留顺序并回收过期文件", async () => {
+  const requests = [], removed = [];
+  let viewer, fail = true, resolveWrite, pendingWrites = false, session = "first";
+  const rows = [
+    { id: 8, category: "问题反馈", photos: 3, content: "第一条", created: 1 },
+    { id: 7, category: "功能建议", photos: 1, content: "第二条", created: 1 },
+  ];
+  const history = page("history", { login: async () => {},
+    request: async () => ({ items: rows, next: null }),
+    feedbackImage: async (id, index) => {
+      requests.push([id, index]);
+      if (fail && index === 1) throw Error("offline");
+      return id + "-" + index;
+    },
+  }, { getStorageSync: () => session, previewImage: options => { viewer = options; } }, {
+    "./screenshots": { write: async bytes => pendingWrites ? new Promise(resolve => { resolveWrite = resolve; }) : bytes,
+      remove: src => { if (src) removed.push(src); } },
+  });
+  const event = (id, index) => ({ currentTarget: { dataset: { id, index } } });
+  history.onLoad({}); await history.onShow();
+  assert.equal(history.data.submitted, 0); assert.equal(requests.length, 0);
+  await history.toggle(event(8));
+  assert.deepEqual(Array.from(history.data.photos, p => p.state), ["ready", "error", "ready"]);
+  fail = false;
+  await history.preview(event(8, 1)); await history.preview(event(8, 1));
+  assert.deepEqual(requests, [[8, 0], [8, 1], [8, 2], [8, 1]]);
+  assert.equal(viewer.current, "8-1"); assert.deepEqual(Array.from(viewer.urls), ["8-0", "8-1", "8-2"]);
+  history.onHide(); await history.onShow();
+  assert.equal(requests.length, 4);
+  pendingWrites = true;
+  const switching = history.toggle(event(7));
+  await new Promise(resolve => setImmediate(resolve));
+  await history.toggle(event(7)); resolveWrite("late"); await switching;
+  assert.deepEqual(removed, ["8-0", "8-1", "8-2", "late"]);
+  pendingWrites = false;
+  await history.toggle(event(7));
+  const bad = event(7, 0); bad.currentTarget.dataset.src = "7-0";
+  history.imageError(bad); assert.equal(history.data.photos[0].state, "error");
+  await history.preview(event(7, 0));
+  session = "second"; await history.onShow();
+  assert.equal(history.data.expanded, 0); assert.equal(history.data.photos.length, 0);
+  assert.equal(removed.at(-1), "7-0");
 });

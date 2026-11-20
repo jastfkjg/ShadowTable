@@ -103,7 +103,6 @@ Page({
       if (!this.alive) return;
       this.setData({ ready: false, content: "", area: "", photos: [] });
       this.key = null;
-      wx.showToast({ title: "反馈已提交", icon: "success" });
       wx.redirectTo({ url: "history?id=" + result.id, fail: () => this.setData({ error: "反馈已提交，可返回「我的反馈」查看。" }) });
     } catch (e) {
       if (this.alive) this.setData({ error: e.message || "提交失败，内容已保留，请重试" });

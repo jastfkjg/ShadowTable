@@ -16,7 +16,7 @@ const { present: presentDialog } = require("../miniprogram/dialog");
 const roomConfirmation = require("../miniprogram/room-confirmation");
 const { tabBarVisibility } = require("../miniprogram/tab-navigation");
 const { BOARDS, newRoom, enter, publicView } = require("../server/engine");
-const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision, presentIdentityInformation } = require("../miniprogram/room-sheet-presentation");
+const { shortBoardName, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision, presentIdentityInformation, playerProgressCard } = require("../miniprogram/room-sheet-presentation");
 const { portrait } = require("../miniprogram/role-portraits");
 const tableFixtures = require("../tests/helpers/replay-fixtures");
 const { privateView } = require("../server/engine");
@@ -290,8 +290,18 @@ const tableSource = tableFixtures.setup();
 tableFixtures.task(tableSource,[1,2,3]);
 const tablePlaying = tableScene(tableSource,'wx:replay-5',{historyUnreadCount:1});
 const readmeTable = tableFixtures.setup(readmeRoom);
+// A fixed demo deal keeps the README card illustration stable across renders.
+readmeTable.matchId = 'readme-demo';
+const merlin = readmeTable.players.find(player => readmeTable.roles[player.uid] === 'merlin');
+const readmeIdentity = tableScene(readmeTable, merlin.uid, { dealtIdentityDialog: true });
+readmeIdentity.dealtIdentitySecret = presentPrivateIdentity(privateView(readmeTable, merlin.uid), 'good', readmeIdentity.seats);
 tableFixtures.task(readmeTable, [1, 2, 3]);
+tableFixtures.run(readmeTable, 'beginActivity', { kind: 'vote', team: [1, 3, 5, 7] });
+for (const player of readmeTable.players.slice(0, 5)) {
+  tableFixtures.run(readmeTable, 'submit', { value: 'approve' }, player.uid);
+}
 const readmeTableScene = tableScene(readmeTable, 'wx:replay-5', { historyUnreadCount: 1 });
+readmeTableScene.playerProgressCard = playerProgressCard(readmeTableScene.room);
 for (const seat of readmeTableScene.seats) {
   seat.avatarUrl = `/pages/profile/assets/avatars/geometric-${String(seat.seat).padStart(2, "0")}.jpg`;
 }
@@ -328,6 +338,7 @@ const playerStats = {scoreTotal:9,rateLabel:'37.5%',rateValue:'37.5',total:8,win
   {faction:'good',label:'好人阵营',total:6,wins:2,winRate:100/3,rateLabel:'33.3%',rateValue:'33.3'}]};
 const playerSample = {name:'阿伟',initial:'阿',seat:6,badges:badgeSamples};
 const tableScenes = {
+  'readme-identity': readmeIdentity,
   'readme-table': readmeTableScene,
   'player-card-a': {...tablePlaying, playerCard: {...playerSample, name:'大V', initial:'大', seat:1, isHost:true, avatarUrl:'/pages/profile/assets/avatars/crayon-07.jpg'},
     playerCardStats: {scoreTotal:27,rateLabel:'55.6%',rateValue:'55.6',total:18,wins:10,byFaction:[
