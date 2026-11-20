@@ -104,6 +104,24 @@
 .table-room .action-status-copy { flex: 1 1 180px; font-size: 14px; }
 .table-room .action-status-copy .small { margin-top: 3px; }
 .table-room .action-entry button.primary, .table-room .action-entry button.primary[disabled]:not([type]) { width: auto; min-height: 46px; padding: 9px 18px; font-size: 14px; border-radius: 12px; }
+.table-room button.action-entry-reminder:not([disabled]) { position: relative; overflow: visible; }
+.table-room button.action-entry-reminder:not([disabled])::before {
+  content: "";
+  position: absolute;
+  top: -4px; right: -4px; bottom: -4px; left: -4px;
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 0 7px rgba(229,198,139,.55);
+  pointer-events: none;
+  animation: action-entry-glow 2.6s ease-in-out infinite;
+}
+@keyframes action-entry-glow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-room button.action-entry-reminder:not([disabled])::before { animation: none; opacity: .75; box-shadow: none; }
+}
 .table-room .table-dynamics .latest-result { padding-bottom: 14px; }
 .table-room .result-first .latest-result + .phase-strip { padding-top: 14px; border-top: 1px solid rgba(177,191,198,.13); }
 .table-room .result-first .phase-name { font-size: 14px; }
@@ -162,9 +180,9 @@
 .inline-skill-label { flex-shrink: 0; color: var(--muted); }
 .inline-skill-value { margin-left: auto; min-width: 0; max-width: 100%; font-weight: 500; overflow-wrap: anywhere; }
 .inline-skill-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(177,191,198,.13); font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
-.table-room .identity.open .identity-skill-history { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(177,191,198,.13); }
-.table-room .identity.open .identity-skill-record { display: block; margin-top: 12px; padding-left: 10px; border-left: 1px solid rgba(229,198,139,.3); font-size: 13px; line-height: 1.75; }
-.table-room .identity.open .identity-skill-round { display: block; margin-bottom: 3px; font-size: 11px; }
+.table-room .identity.open .identity-skill-history { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(177,191,198,.13); }
+.table-room .identity.open .identity-skill-record { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; font-size: 13px; line-height: 1.75; }
+.table-room .identity.open .identity-skill-round { flex-shrink: 0; font-size: 12px; }
 .table-room .identity.open .identity-skill-text { display: block; }
 .table-room .identity-card-topline { min-height: 32px; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .table-room button.identity-history-entry { min-height: 44px; padding: 0 6px; font-size: 12px; }
@@ -273,32 +291,15 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
 .table-sheet-fields { padding: 0 18px 8px; overflow-wrap: anywhere; }
 .table-sheet .small { font-size: 12px; }
 .table-sheet .identity-privacy-note { justify-content: center; }
-.dealt-identity-body { height: 380px; max-height: calc(100vh - 260px - env(safe-area-inset-bottom)); }
-.is-morgana .dealt-identity-body { height: 330px; }
-.dealt-identity-dialog.has-measured-body .dealt-identity-body { max-height: none; }
-.table-sheet-backdrop .dealt-identity-dialog { background: #08131a; }
-.dealt-identity-dialog .identity-privacy-note { margin: 0 0 8px; }
-.is-covered .dealt-identity-body { height: 242px; max-height: calc(100vh - 312px - env(safe-area-inset-bottom)); }
 .dealt-role-heading { margin: 10px 0; text-align: center; }
 .dealt-role-heading .private-role-art { width: 56px; height: 56px; margin: 0 auto 6px; }
-.dealt-identity-dialog .dealt-role-heading { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0 12px; }
-.dealt-identity-dialog .dealt-role-heading .private-role-art { width: 44px; height: 44px; margin: 0; flex-shrink: 0; }
 .dealt-role-copy { text-align: left; min-width: 0; }
 .dealt-role-heading .identity-title { font-size: 22px; line-height: 1.4; margin: 0 0 2px; }
-.dealt-identity-dialog .dealt-role-heading .identity-title { font-size: 21px; line-height: 1.35; }
-.dealt-identity-dialog .dealt-role-heading .private-faction { font-size: 12px; line-height: 1.5; }
 .private-info-group { padding: 15px; border-radius: 17px; background: var(--control-bg, #14232c); }
 .table-sheet .private-info { margin: 0; font-size: 13px; line-height: 1.75; }
 .table-sheet .private-info + .private-info { margin-top: 14px; }
 .table-sheet .private-info .label { margin: 0 0 5px; color: var(--muted); font-size: 12px; font-weight: 500; }
 .table-sheet .identity-return-note { margin: 14px 0 8px; }
-.dealt-identity-dialog .identity-return-note { margin: 8px 0 4px; }
-.identity-sealed-art { position: relative; width: 84px; height: 90px; margin: 23px auto 16px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #263e52; }
-.identity-sealed-art > image { width: 50px; height: 50px; }
-.identity-sealed-art > view { display: flex; position: absolute; right: -8px; bottom: -5px; padding: 7px; border: 3px solid var(--surface); border-radius: 50%; background: #34434b; }
-.identity-sealed-art > view image { width: 20px; height: 20px; }
-.identity-sealed-title { font-size: 20px; font-weight: 600; text-align: center; }
-.table-sheet .identity-sealed-copy { max-width: 285px; margin: 8px auto 0; text-align: center; }
 .table-sheet-footer { flex-shrink: 0; padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
 .table-sheet-footer button, .table-sheet-footer button[disabled]:not([type]) { min-height: 50px; padding: 12px; margin: 0; border-radius: 13px; font-size: 16px; line-height: 1.5; }
 .table-sheet-footer button.text-button { min-height: 44px; margin-top: 4px; padding: 10px; font-size: 13px; }
@@ -340,8 +341,6 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
   .table-sheet-backdrop, .player-card-backdrop { padding-top: 20px; }
   .table-sheet-backdrop .table-sheet, .player-card-sheet { max-height: calc(100vh - 20px); }
   .player-card-body { max-height: calc(100vh - 116px - env(safe-area-inset-bottom)); }
-  .dealt-identity-body { max-height: calc(100vh - 192px - env(safe-area-inset-bottom)); }
-  .is-covered .dealt-identity-body { max-height: calc(100vh - 244px - env(safe-area-inset-bottom)); }
   .task-choice-body { max-height: calc(100vh - 280px - env(safe-area-inset-bottom)); }
   .table-room .lobby-action-bar { position: static; padding: 12px 0; margin-top: 16px; }
   .table-room .public-history-dock { position: static; margin: 20px -16px -90px; }

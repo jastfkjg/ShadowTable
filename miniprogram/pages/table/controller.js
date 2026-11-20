@@ -59,7 +59,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const mode = fairyAction ? "fairy" : finalAction ? "final" : swapOptions.length ? "swap"
     : hunterModes ? hunterMode
     : targets[0]?.value.startsWith("inspect:") ? "inspect"
-    : label.includes("使用刀 / 决斗") ? "attack"
+    : label.includes("使用刀 / 决斗") ? (swordHint ? "sword" : "attack")
     : label.includes("开刀") ? "sword" : label.includes("决斗") ? "duel"
     : label.includes("指定替死者") ? "substitute" : label.includes("秘密守护") ? "guard"
     : label.includes("复活") ? "revive" : label.includes("开枪") ? "gun"
@@ -82,6 +82,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const round = room.knights?.round || room.round;
   const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
     selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
+  const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
   const count = mode === "swap" ? swapSeats.size : targets.length;
   return {
     skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
@@ -91,9 +92,9 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
       (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-    skillSwordHint: swordHint,
+    skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
-    skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+    skillOtherChoices: choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
       label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
         ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
     })),
@@ -103,7 +104,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
 function skillTargetCopy(mode) {
   return {
     fairy: { title: "仙女查验", verb: "查验", privateResult: true },
-    sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+    sword: { title: "选择本轮行动", verb: "开刀", pass: "本轮不开刀" },
     duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
     inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
     guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
@@ -287,6 +288,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     actionSecret: null,
     dealtIdentityDialog: false,
     dealtIdentitySecret: null,
+    dealClosing: false,
+    dealFlightStyle: "",
     identityHintVisible: false,
     actionLoading: false,
     actionLabel: "",
@@ -456,6 +459,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }, 1500);
   },
   mask() {
+    clearTimeout(this.dealReturnTimer);
     this.dismissGrantNotice?.();
     this.dismissRoomSwipe();
     this.closePlayerCard();
@@ -466,11 +470,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       historyOpen: false,
       dealtIdentityDialog: false,
       dealtIdentitySecret: null,
+      dealClosing: false,
+      dealFlightStyle: "",
       identityHintVisible: false,
       fairyResult: null,
       fairyResultRevealed: false,
       identityChange: null,
-      identityChangeRevealed: false,
       actionDialog: false,
       actionSecret: null,
       actionLoading: false,
@@ -866,7 +871,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.unchangedPolls = snapshot === this.lastRoomSnapshot ? (this.unchangedPolls || 0) + 1 : 0;
     this.lastRoomSnapshot = snapshot;
     const stageChanged = this.data.room?.stage !== room.stage;
-    const privacyChanged = stageChanged || this.data.room?.me.identityRevision !== room.me.identityRevision;
+    const privacyChanged = stageChanged || this.data.room?.me.identityRevision !== room.me.identityRevision ||
+      (this.data.identityChange && !room.me.identityChanged);
     if (this.data.playerCard) {
       const target = room.players.find(p => p.statsId === this.data.playerCard.id);
       if (privacyChanged || room.code !== this.data.room?.code || !target || target.seat !== this.data.playerCard.seat || target.name !== this.data.playerCard.name || target.avatarUrl !== this.data.playerCard.sourceAvatarUrl)
@@ -881,11 +887,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "",
           dealtIdentityDialog: false,
           dealtIdentitySecret: null,
+          dealClosing: false,
+          dealFlightStyle: "",
           identityHintVisible: false,
           fairyResult: null,
           fairyResultRevealed: false,
           identityChange: null,
-          identityChangeRevealed: false,
           revealed: false,
           secret: null,
           identityHelpExpanded: false,
@@ -916,6 +923,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       : {};
     // Invalidate pending identity reads before committing the new stage in one update.
     if (privacyChanged) {
+      clearTimeout(this.dealReturnTimer);
       this.generation = (this.generation || 0) + 1;
       this.actionGeneration = (this.actionGeneration || 0) + 1;
     }
@@ -1007,7 +1015,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       seatOccupiedCount: seats.filter(s => s.occupied).length,
       seatReadyCount: seats.filter(s => s.occupied && s.ready).length,
-      operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
+      playerProgressCard: roomSheet.playerProgressCard(room),
+      operationProgressExpanded: !!room.canUseTools && !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
       operationProgressSegments: Array.from({ length: room.operationProgress?.total || 0 }, (_, index) => ({
         index, completed: index < room.operationProgress.completed,
       })),
@@ -1069,7 +1078,6 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       serverConnected: true,
       needsLogin: false,
     });
-    if (identityProfileUpdate.dealtIdentitySecret) this.syncProcessSheetLayout();
     this.prepareRoomShare();
     if (
       (!room.needsSubmission || room.me.submitted) &&
@@ -1082,7 +1090,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.foreground &&
       !this.data.identityChange
     )
-      await this.showIdentityChange();
+      this.showIdentityChange();
     if (
       room.me.fairyResultPending &&
       !room.me.identityChanged &&
@@ -1532,10 +1540,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     if (d.error) return "";
     const stage = d.room?.code + ":" + d.room?.stage;
-    if (d.dealtIdentityDialog) return stage + ":dealt:" + !!d.dealtIdentitySecret;
     if (d.identityRoleHelpOpen && d.revealed) return stage + ":role-help:" + d.identityHelpExpanded;
     if (d.identityHistoryOpen && d.revealed) return stage + ":history:" + d.identityHistoryExpandedId;
-    if (d.identityChange) return stage + ":identity:" + d.identityChange.identityRevision + ":" + d.identityChangeRevealed;
+    if (d.identityChange) return "";
     if (d.fairyResult) return stage + ":fairy:" + d.fairyResult.revision + ":" + d.fairyResultRevealed;
     if (d.actionDialog && d.room?.needsSubmission && !d.room.me.submitted)
       return stage + ":action:" + d.skillTargetMode + ":" + (d.actionChoices?.length || 0);
@@ -1552,9 +1559,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const run = () => {
       if (!this.alive || !this.foreground || key !== this.processSheetKey()) return;
       const query = wx.createSelectorQuery().in(this);
-      const selectors = this.data.dealtIdentityDialog
-        ? [".dealt-identity-backdrop", ".dealt-identity-top", ".dealt-identity-fields", ".dealt-identity-footer"]
-        : [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
+      const selectors = [".process-backdrop", ".process-sheet-top", ".process-sheet-fields", ".process-sheet-footer"];
       for (const selector of selectors) query.select(selector).boundingClientRect();
       query.exec(rects => {
         if (!this.alive || !this.foreground || revision !== this.processLayoutRevision || key !== this.processSheetKey()) return;
@@ -2415,6 +2420,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.setProcessData({ actionLoading: false });
     }
   },
+  async readPrivateCard() {
+    const card = await api.request("/api/rooms/" + this.roomCode + "/private");
+    return card.cardArt ? { ...card, cardArt: api.assetUrl(card.cardArt) } : card;
+  },
+  cardArtError(event) {
+    const { surface, src } = event.currentTarget.dataset;
+    if (src && this.data[surface]?.cardArt === src)
+      this.setData({ [surface + ".cardArt"]: "" });
+  },
   async revealActionIdentity() {
     if (this.data.actionSecret) {
       this.setProcessData({ actionSecret: null });
@@ -2433,9 +2447,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const generation = this.actionGeneration;
     this.setProcessData({ busy: true, busyAction: "actionIdentity" });
     try {
-      const secret = await api.request(
-        "/api/rooms/" + this.roomCode + "/private",
-      );
+      const secret = await this.readPrivateCard();
       if (
         this.alive &&
         this.foreground &&
@@ -2447,6 +2459,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       ) {
         this.setProcessData({
           actionSecret: {
+            cardArt: secret.cardArt || "",
             role: secret.role,
             faction: secret.faction,
             factionTone: factionTone(secret.faction),
@@ -2496,27 +2509,34 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (this.data.dealtIdentityDialog) return true;
     if (this.identityReceipts().includes(key)) return false;
     this.mask();
-    this.setProcessData({ dealtIdentityDialog: true, processBodyHeight: 0 });
+    this.setData({ dealtIdentityDialog: true });
     return true;
   },
   async revealDealtIdentity() {
-    if (!this.data.dealtIdentityDialog || this.data.busy || !this.data.network || !this.foreground) return;
+    const change = this.data.identityChange;
+    if ((!this.data.dealtIdentityDialog && !change) || this.data.dealClosing || this.data.dealtIdentitySecret || this.data.busy || !this.data.network || !this.foreground) return;
     const key = this.identityDealKey(), stage = this.data.room.stage;
     const generation = ++this.generation;
     this.setData({ busy: true, busyAction: "dealtIdentity" });
     try {
-      const secret = await api.request("/api/rooms/" + this.roomCode + "/private");
+      const secret = await this.readPrivateCard();
       if (!this.alive || !this.foreground || generation !== this.generation ||
-        !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
-        this.data.room.stage !== stage || secret.stage !== stage) return;
-      this.rememberDealtIdentity();
-      this.setProcessData({ processBodyHeight: 0, dealtIdentitySecret: {
+        key !== this.identityDealKey() || this.data.room?.stage !== stage || secret.stage !== stage) return;
+      if (change) {
+        if (this.data.identityChange?.identityRevision !== change.identityRevision ||
+          secret.identityRevision !== change.identityRevision) return;
+      } else {
+        if (!this.data.dealtIdentityDialog || secret.identityRevision > 0) return;
+        this.rememberDealtIdentity();
+      }
+      this.setData({ dealtIdentitySecret: {
+        cardArt: secret.cardArt || "",
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
-        information: secret.information, skillStatus: secret.skillStatus,
+        information: secret.information,
         info: roomSheet.presentIdentityInformation(secret, this.data.seats),
         vision: roomSheet.presentVision(secret.information, this.data.seats),
-        avoidance: avoidancePresentation.result(secret.avoidance),
+        ...(change ? { skillStatus: secret.skillStatus || null } : { avoidance: avoidancePresentation.result(secret.avoidance) }),
       } });
     } catch (e) {
       if (generation === this.generation && this.foreground) this.handleError(e);
@@ -2525,10 +2545,55 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   closeDealtIdentity() {
-    if (!this.data.dealtIdentityDialog) return;
-    this.rememberDealtIdentity();
+    const change = this.data.identityChange;
+    if ((!this.data.dealtIdentityDialog && !change) || this.data.dealClosing) return;
+    if (change) {
+      if (!this.data.dealtIdentitySecret) return;
+    } else {
+      this.rememberDealtIdentity();
+      if (!wx.getStorageSync("identityEntryHintSeen")) this.identityHintPending = this.identityDealKey();
+    }
+    if (!this.data.dealtIdentitySecret || !wx.createSelectorQuery) {
+      return this.finishStowingCard();
+    }
+
+    const generation = this.generation;
+    const finish = () => {
+      if (generation !== this.generation || !this.data.dealClosing) return;
+      this.finishStowingCard();
+    };
+    // Only the public back can remain on screen while measuring or flying.
+    this.setData({ dealtIdentitySecret: null, identityHelpExpanded: false, dealClosing: true }, () => {
+      if (generation !== this.generation || !this.data.dealClosing) return;
+      this.dealReturnTimer = setTimeout(finish, 900);
+      const query = wx.createSelectorQuery().in(this);
+      query.select("#deal-card-slot").boundingClientRect();
+      query.select(".room-identity").boundingClientRect();
+      query.selectViewport().boundingClientRect();
+      query.exec(([card, entry, viewport]) => {
+        if (generation !== this.generation || !this.data.dealClosing) return;
+        if (!card?.width || !entry?.height || !viewport || entry.top < 0 || entry.bottom > viewport.height) {
+          finish();
+          return;
+        }
+        const x = entry.left + entry.width / 2 - card.left - card.width / 2;
+        const y = entry.top + entry.height / 2 - card.top - card.height / 2;
+        this.setData({ dealFlightStyle: `--deal-x:${x}px;--deal-y:${y}px;` });
+      });
+    });
+  },
+  finishDealFlight(event) {
+    if (!["deal-stow", "deal-disappear"].includes(event.detail?.animationName) || !this.data.dealClosing) return;
+    this.finishStowingCard();
+  },
+  finishStowingCard() {
+    const change = this.data.identityChange;
     this.mask();
-    if (!wx.getStorageSync("identityEntryHintSeen")) this.identityHintPending = this.identityDealKey();
+    if (change) {
+      if (!this.data.busy && !this.data.hasPendingRequest && this.data.network)
+        return this.cmd("ackIdentity", { revision: change.identityRevision });
+      return;
+    }
     this.showIdentityHintWhenVisible();
   },
   showIdentityHintWhenVisible() {
@@ -2562,9 +2627,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       stage = this.data.room.stage;
     this.setData({ busy: true, busyAction: "identity", error: "" });
     try {
-      const secret = await api.request(
-        "/api/rooms/" + this.roomCode + "/private",
-      );
+      const secret = await this.readPrivateCard();
       if (
         this.foreground &&
         this.alive &&
@@ -2605,8 +2668,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const d = this.data;
     const surface = event?.currentTarget?.dataset?.surface;
     if (d.error) return;
-    const info = surface === "dealt" ? d.dealtIdentityDialog && d.dealtIdentitySecret?.info
-      : surface === "change" ? d.identityChangeRevealed && d.identityChange?.info
+    const info = surface === "dealt" ? (d.dealtIdentityDialog || d.identityChange) && d.dealtIdentitySecret?.info
       : surface === "role" && d.identityRoleHelpOpen && d.revealed && d.secret?.info;
     if (!info?.ability || (surface === "role" && !info.roleOverview?.hasDetails)) return;
     this.setProcessData({ identityHelpExpanded: !d.identityHelpExpanded });
@@ -2673,7 +2735,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     }
   },
   hidePrivatePreview() {
-    this.setProcessData({ fairyResultRevealed: false, identityChangeRevealed: false, identityHelpExpanded: false });
+    this.setProcessData({ fairyResultRevealed: false });
   },
   revealFairyResult() {
     if (this.data.busy || !this.foreground || !this.data.fairyResult) return;
@@ -2695,50 +2757,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       this.fairyAckConfirm = false;
     }
   },
-  async showIdentityChange() {
-    const room = this.data.room;
-    if (!room || this.identityChangeLoading) return;
-    this.identityChangeLoading = true;
-    const generation = this.generation;
-    try {
-      const secret = await api.request("/api/rooms/" + room.code + "/private");
-      if (
-        this.foreground &&
-        this.alive &&
-        this.generation === generation &&
-        this.data.room?.code === room.code &&
-        this.data.room?.stage === secret.stage &&
-        this.data.room.me.identityChanged
-      ) {
-        this.closeAction();
-        secret.factionTone = factionTone(secret.faction);
-        this.setProcessData({
-          identityChange: roomSheet.presentPrivateIdentity(secret, secret.factionTone, this.data.seats),
-          identityChangeRevealed: false,
-          revealed: false,
-          secret: null,
-          identityHelpExpanded: false,
-          identityRoleHelpOpen: false,
-          identityHistoryOpen: false,
-          identityHistoryExpandedId: null,
-        });
-      }
-    } catch (e) {
-      this.handleError(e);
-    } finally {
-      this.identityChangeLoading = false;
-    }
-  },
-  revealChangedIdentity() {
-    if (this.data.busy || !this.foreground || !this.data.identityChange) return;
-    this.setProcessData({ identityChangeRevealed: true, identityHelpExpanded: false });
-  },
-  acknowledgeIdentity() {
-    if (this.data.busy || !this.data.identityChangeRevealed) return;
-    const revision = this.data.identityChange?.identityRevision;
-    if (revision === undefined) return;
-    this.setData({ identityChange: null, identityChangeRevealed: false, identityHelpExpanded: false });
-    this.cmd("ackIdentity", { revision });
+  showIdentityChange() {
+    const me = this.data.room?.me;
+    if (!this.alive || !this.foreground || !me?.identityChanged || this.data.identityChange) return;
+    this.mask();
+    this.setData({ identityChange: { identityRevision: me.identityRevision } });
   },
   toggleSwapSeat(e) {
     if (
@@ -2816,6 +2839,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         (this.data.skillAction && this.data.swapOptions.includes(value)))) return;
     this.cmd("submit", { value: this.data.skillTargetMode === "final" ? Number(value.split(":")[1]) : value });
   },
+  toggleSkillHelp() {
+    if (this.data.actionDialog && this.data.skillSwordHint) this.setProcessData({ skillHelpExpanded: !this.data.skillHelpExpanded });
+  },
   async submitChoice(e) {
     const value = e.currentTarget.dataset.value;
     if (this.data.hunterModes && value.startsWith("mode:")) {
@@ -2838,6 +2864,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.room.stage !== this.actionDraftStage
       )
         return;
+      // Returning from pass opens target selection with no seat preselected.
+      if (value === "pick-sword-target" && this.data.swordModes && this.data.draftChoice === "pass") {
+        this.setProcessData({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+        return;
+      }
       const choice = this.data.actionChoices.find((c) => c.value === value);
       if (choice)
         this.setProcessData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes, this.data.skillTargetMode) : choice.label,

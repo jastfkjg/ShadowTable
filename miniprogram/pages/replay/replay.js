@@ -1,6 +1,6 @@
 const api = require("../../api");
 const { backToMe } = require("../../profile");
-const { presentReplay, trajectory } = require("../../replay");
+const { presentReplay, trajectory } = require("./presentation");
 Page({
   data: { loading: true, error: "", replay: null, view: "global", initialPlayers: [], finalPlayers: [],
     rounds: [], taskPips: [], selfTrajectory: null, playerDetail: null, playersExpanded: false, activeRoundId: "" },

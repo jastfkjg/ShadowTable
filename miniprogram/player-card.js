@@ -54,11 +54,8 @@ function playerCardMethods(api, platform = typeof wx === "undefined" ? null : wx
           byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate), rateValue: rateValue(row.winRate) })) } : null;
         let playerCard = card.scope === "leaderboard" ? { ...card, name: result.player.name,
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
-        const { catalogue, MAX_EQUIPPED, badgeImageUrl } = require('./badges');
-        const badges = (result.player.badges || []).flatMap(badge => {
-          const definition = catalogue.find(item => item.id === badge.id);
-          return definition ? [{ ...badge, imageUrl: badgeImageUrl(definition, api.assetUrl) }] : [];
-        });
+        const { MAX_EQUIPPED, presentPlayerBadge } = require('./badges');
+        const badges = (result.player.badges || []).map(badge => presentPlayerBadge(badge, api.assetUrl)).filter(Boolean);
         playerCard = { ...playerCard, badges: badges.slice(0, MAX_EQUIPPED) };
         this.setPlayerCardData({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
       } catch (e) {

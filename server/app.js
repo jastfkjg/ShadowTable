@@ -203,6 +203,7 @@ function createApp({
       // Shared Wi-Fi and local companion players must fit under the IP ceiling.
       // Per-account read/write and login/create limits below apply independently.
       limit(`ip:${clientAddress(req)}`, 6000);
+      if (path.startsWith('/assets/badges/monthly-points/') && await require('./monthly-badge-art').serve(req, res, path, began)) return;
       if (path === "/api/wechat/avatar-review" && wechatAvatarReview) {
         res.setHeader("Content-Type", "text/plain; charset=utf-8");
         if (req.method === "GET") return send(200, wechatAvatarReview.verify(requestUrl.searchParams), true);

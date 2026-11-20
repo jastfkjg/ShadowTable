@@ -441,6 +441,21 @@ test('网页对局摘要与详情合并同一次终局刺杀', async () => {
   assert.match(html, /最终目标为本人（2 号）/);
   assert.doesNotMatch(html, /最终刀落到本人|终局记录/);
 });
+test('网页历史对局的称号摘要和事件均显示新版称号', async () => {
+  const record = { boardName:'经典', capacity:6, endedAt:1, role:'梅林', winner:'good', outcome:'win',
+    fun:{
+      events:[{id:'merlin_all_rides', label:'灯下黑梅林'}, {id:'final-reverse_wrong_side', label:'占错队'},
+        {id:'legacy-event-1', label:'影帝梅林'}, {id:'legacy-event-2', label:'炸飞梅林'}],
+      highlights:[{id:'merlin_all_rides', label:'灯下黑梅林', count:1}],
+    },
+  };
+  const c = client(async () => response({records:[record], total:1, hasMore:false}));
+  await c.applyRoute('#/matches');
+  const html = c.viewMatches();
+  assert.match(html, /class="match-fun-label">隐身乘客</);
+  assert.match(html, /隐身乘客.*幕后军师.*弹射下车.*站错队/);
+  assert.doesNotMatch(html, /灯下黑梅林|影帝梅林|炸飞梅林|占错队/);
+});
 test('网页恢复 Cookie 身份并保留原游客；正式会话过期不会自动新建游客', async () => {
   const storage = new Map([['session', 'guest-token'], ['pendingEntry', 'guest-command'], ['roomCode', '123456']]), calls = [];
   let expired = false;
@@ -843,6 +858,29 @@ test("网页房主进度可展开收起，刷新保留状态，新操作默认�
   room.stage = "next";
   await c.refresh();
   assert.equal(c.state.operationProgressExpanded, false);
+});
+test("网页玩家只有分段进度与自己的提交提示", async () => {
+  const room = dealtWebRoom({ phase: "teamVote", team: [1, 2], needsSubmission: true, operationProgress: { total: 7, completed: 4 } });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.match(c.viewRoom(), /请投票，等待 3 人提交/);
+  room.me.submitted = true;
+  room.operationProgress.completed++;
+  await c.refresh();
+  c.ACTIONS.toggleOperationProgress();
+  const html = c.viewRoom();
+  assert.match(html, /你已投票，等待其余 2 人提交/);
+  assert.equal((html.match(/class="progress-segment completed"/g) || []).length, 5);
+  assert.doesNotMatch(html, /data-action="toggleOperationProgress"|class="progress-players"/);
+  room.phase = "hunterTurn";
+  room.phaseName = "出局技能确认";
+  room.stage = "follow-up";
+  room.me.submitted = false;
+  room.operationProgress.completed = 0;
+  await c.refresh();
+  assert.match(c.viewRoom(), /class="progress-title">出局技能确认</);
+  assert.match(c.viewRoom(), /请完成本轮操作，等待 7 人提交/);
+  assert.doesNotMatch(c.viewRoom(), /data-action="toggleOperationProgress"|class="progress-players"/);
 });
 test("网页最近结果与历史记录隐藏空的原牌复活及最终仍出局，保留旧版实际复活", async () => {
   const event = { kind: "skillResult", text: "技能最终结果", eliminated: [3, 5], redrawn: [3, 5], restored: [], out: [], detail: "本轮出局：3、5号；抽牌复活：3、5号；原牌复活：无；最终仍出局：无" };
@@ -1536,6 +1574,13 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   assert.match(c.viewActionDialog(), /确认对 2 号开刀/);
   c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   assert.match(c.viewActionDialog(), /确认本轮不开刀/);
+  assert.doesNotMatch(c.viewActionDialog(), /skill-target-heading|skill-target-grid|skill-target-caption/);
+  c.ACTIONS.submitChoice({ dataset: { value: "pick-sword-target" } });
+  assert.match(c.viewActionDialog(), /skill-target-grid/);
+  assert.match(c.viewActionDialog(), /请先选择目标/);
+  c.ACTIONS.confirmChoice();
+  assert.equal(c.state.draftChoice, "");
+  c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   c.state.room.stage = "s2";
   c.ACTIONS.confirmChoice();
   assert.equal(writes.length, 0);
@@ -1576,6 +1621,14 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
     assert.doesNotMatch(c.viewActionDialog(), /skill-summary|skill-eligibility|已选 \d \/ 2/, role);
     assert.match(c.viewActionDialog(), /已出局/);
     assert.match(c.viewActionDialog(), /&lt;小鱼&gt;/);
+    if (mode === "sword") {
+      assert.doesNotMatch(c.viewActionDialog(), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+      c.ACTIONS.toggleSkillHelp();
+      await choose("pass");
+      assert.doesNotMatch(c.viewActionDialog(), /toggleSkillHelp|A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+      assert.match(c.viewActionDialog(), /确认本轮不开刀/);
+      await choose("pick-sword-target");
+    }
     if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
     else if (mode === 'sword') {
       assert.match(c.viewActionDialog(), /可攻击其他任意身份/);
@@ -1956,7 +2009,7 @@ test('网页趣味卡片正文显示说明，箭头回查，比例带分母且�
   const c=client(async()=>response({total:2,wins:1,winRate:50,byFaction:[],byRole:[],byBoard:[],recent:[],fun:aggregate([...rows,...unknown],1)}));
   await c.applyRoute('#/stats?tab=fun');assert.equal(c.state.statsTab,'fun');const html=c.viewStats();
   assert.match(html,/data-action="funDetails" data-key="knights:knife_enemy".*?fun-record-title">刀中敌方<.*?fun-record-value good"><span>2<\/span>/);assert.doesNotMatch(html,/&lt;span|style="width:|fun-bar|次数最多/);assert.match(html,/刀中敌方率 66\.7%.*?2 \/ 3 次/);
-  assert.match(html,/缺失数据不按零次计算/);assert.match(html,/加荷里斯<\/span><span class="fun-record-role-count">—<\/span>.*?data-role="gaheris"/);assert.match(html,/&lt;坏标签&gt;/);
+  assert.doesNotMatch(html,/旧对局未记录完整过程/);assert.match(html,/加荷里斯<\/span><span class="fun-record-role-count">—<\/span>.*?data-role="gaheris"/);assert.match(html,/&lt;坏标签&gt;/);
 });
 test('网页趣味回查深链与分页保留过滤，清除回到全部，不混入管理员积分调整',async()=>{
   const urls=[];const c=client(async url=>{urls.push(url);return response({records:[{id:String(urls.length),endedAt:1,members:[],role:'梅林',outcome:'win',fun:{events:[],highlights:[],reason:'旧数据'}}],total:2,hasMore:urls.length===1,adjustments:{records:[{id:'a',delta:2,reason:'积分调整'}],total:1,hasMore:false}});});
@@ -2285,22 +2338,27 @@ test('网页最佳玩家票选不限时，支持房主未投名单、选择修�
 });
 
 test('战绩卡仅显示徽章图案，点击显示称号介绍，关闭还原；佩戴管理提交明确状态', async () => {
-  const badge=require('../miniprogram/badges').catalogue.find(b=>b.id==='assassin_hit');
+  const badge=require('../miniprogram/badges').catalogue.find(b=>b.id==='merlin_all_rides');
   const collection={badges:[{...badge,equipped:true}],version:0,periodStart:1};
   const calls=[];
   const c=client(async(path,options)=>{
     calls.push({path,data:options.body?JSON.parse(options.body):null});
+    if(path.endsWith('/stats')) return response({
+      player:{id:'p',seat:1,name:'玩家',badges:[{...badge,title:'灯下黑梅林',description:'本月「灯下黑梅林」达成次数榜第一。'}]},
+      status:'available',stats:{total:0,wins:0,byFaction:[]},
+    });
     if(options.method==='POST')return response({...collection,version:1,badges:[{...badge,equipped:false}]});
     return response(collection);
   });
-  c.state.playerCard={id:'p',scope:'leaderboard',name:'玩家',initial:'玩',badges:[badge]};
-  c.state.playerCardStats={total:0,wins:0,rateLabel:'—',scoreTotal:0,byFaction:[]};
+  c.state.room=dealtWebRoom({players:[{seat:1,statsId:'p',name:'玩家'}]});
+  await c.openPlayerCard(1);
   const html=c.viewPlayerCard();
-  assert.match(html,/aria-label="查看职业刺客徽章"/);
-  assert.doesNotMatch(html,/>职业刺客</);
+  assert.match(html,/aria-label="查看隐身乘客徽章"/);
+  assert.doesNotMatch(html,/>隐身乘客</);
   c.ACTIONS.showPlayerCardBadge({dataset:{id:badge.id}});
-  assert.match(c.viewPlayerCard(),/>职业刺客</);assert.match(c.viewPlayerCard(),/本月/);
-  c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>职业刺客</);
+  assert.match(c.viewPlayerCard(),/>隐身乘客</);assert.ok(c.viewPlayerCard().includes(badge.description));
+  assert.doesNotMatch(c.viewPlayerCard(),/灯下黑梅林/);
+  c.ACTIONS.closePlayerCardBadge();assert.doesNotMatch(c.viewPlayerCard(),/>隐身乘客</);
   await c.applyRoute('#/badges');
   assert.equal(c.state.badgeCollection.badges[0].equipped,true);
   await c.ACTIONS.toggleOwnedBadge({dataset:{id:badge.id}});
@@ -2339,7 +2397,7 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length - 1);
   c.ACTIONS.showBadgeDetail({dataset:{id:'merlin_bust_exit'}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
-  assert.match(detail,/炸飞梅林/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
+  assert.match(detail,/弹射下车/);assert.match(detail,/未拥有/);assert.doesNotMatch(detail,/data-action="toggleOwnedBadge"/);
   assert.match(detail,/\/assets\/badges\/merlin_bust_exit\.png/);
   c.ACTIONS.closeBadgeDetail(); assert.equal(c.state.selectedBadgeId,'');
 });
@@ -2588,7 +2646,7 @@ test('网页称号网格按实际次数筛选，反向称号可见，空筛选�
   const c = client(async () => { reads++; return response(fixture); });
   await c.applyRoute('#/stats?tab=fun');
   assert.match(c.viewStats(), /全部 49/);
-  assert.match(c.viewStats(), /首席护卫.*最强独狼.*灯下黑梅林.*阵营摇摆王/);
+  assert.match(c.viewStats(), /隐身乘客.*圆桌劳模.*躺赢大师.*金牌乘客.*定蓝机.*与世无争.*首席护卫.*最强独狼.*阵营摇摆王/);
   c.ACTIONS.filterFun({ dataset: { filter: 'counted' } });
   let html = c.viewStats();
   assert.match(html, /data-metric="knife_ally"/);
@@ -2668,7 +2726,7 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   const c=client();c.state.room=dealtWebRoom();c.state.revealed=true;c.state.secret=secret;
   const before=JSON.stringify(secret);
   assert.match(c.viewRoom(),/compact-role-title[^>]*>石像鬼<\/div><button [^>]*data-action="openIdentityRoleHelp"[^>]*aria-label="角色说明"/);
-  assert.match(c.viewRoom(),/技能状态<\/span><span class="compact-skill-value">技能可用<\/span><\/div>/);
+  assert.match(c.viewRoom(),/compact-review-values"><span>无角色视野<\/span><span class="compact-review-skill is-ready">技能可用<\/span>/);
   assert.doesNotMatch(c.viewRoom(),/之后每轮/);
   assert.match(c.viewRoom(),/仙女查验/);
   c.ACTIONS.openIdentityRoleHelp();
@@ -2677,7 +2735,7 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   assert.doesNotMatch(c.viewIdentityRoleHelp(),/之后每轮|注意事项/);
   c.ACTIONS.toggleIdentityHelp(toggle);
   assert.match(c.viewIdentityRoleHelp(),/角色说明.*石像鬼.*之后每轮/);
-  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*identity-role-help-rules.*identity-role-help-note-title">注意事项/);
+  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*identity-role-help-rules.*role-rule-label">查验判定/);
   assert.doesNotMatch(c.viewIdentityRoleHelp(),/6号|仙女查验/);
   c.ACTIONS.closeIdentityRoleHelp();
   assert.equal(c.viewIdentityRoleHelp(),'');
@@ -2689,7 +2747,13 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   assert.equal(c.viewIdentityRoleHelp(),'');
   assert.doesNotMatch(c.viewRoom(),/角色说明|之后每轮/);
   assert.equal(JSON.stringify(secret),before);
-  c.state.revealed=true;c.state.secret={...secret,information:'没有视野。'};
+  c.state.revealed=true;
+  c.state.secret={role:'派西维尔',faction:'好人阵营',information:'梅林与莫甘娜位于：1、12号。你无法区分谁是梅林。',skillStatus:{title:'无主动技能'}};
+  const candidateView=c.viewRoom();
+  assert.match(candidateView,/compact-faction-skill">无主动技能/);
+  assert.doesNotMatch(candidateView,/compact-review-row|class="identity-info-role"/);
+  assert.match(candidateView,/梅林与莫甘娜位于.*2 人.*你无法区分谁是梅林/);
+  c.state.secret={...secret,information:'没有视野。'};
   assert.doesNotMatch(c.viewRoom(),/角色说明/);
   c.ACTIONS.openIdentityRoleHelp();
   assert.equal(c.state.identityRoleHelpOpen,false);

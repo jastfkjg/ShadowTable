@@ -63,6 +63,7 @@ test('小程序通用结束表单直接支持11／12人红蓝兰斯计分，按�
 });
 
 function page(api, storage = new Map(), layout, lobby = false) {
+  api = { assetUrl: path => path, ...api };
   let definition;
   const scrolls = [];
   const wx = {
@@ -236,36 +237,69 @@ test('游戏弹层原生测量随展开状态更新，关闭、换阶段和后�
   const layout={callbacks:[]},p=page({},new Map(),layout);
   const rects=[{width:390,height:844},{height:76},{height:900},{height:100}];
   p.data.room={code:'123456',stage:'stage1',me:{seat:1}};
-  p.data.identityChange={identityRevision:1};
+  p.data.fairyResult={revision:1};
   p.syncProcessSheetLayout();
-  p.setProcessData({identityChangeRevealed:true});
+  p.setProcessData({fairyResultRevealed:true});
   assert.equal(layout.callbacks.length,2);
   layout.callbacks[0](rects);assert.equal(p.data.processBodyHeight,0);
   layout.callbacks[1](rects);assert.equal(p.data.processBodyHeight,580);
-  p.syncProcessSheetLayout();p.data.identityChange=null;
+  p.syncProcessSheetLayout();p.data.fairyResult=null;
   layout.callbacks[2]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
-  p.data.identityChange={identityRevision:2};p.syncProcessSheetLayout();p.data.room.stage='stage2';
+  p.data.fairyResult={revision:2};p.syncProcessSheetLayout();p.data.room.stage='stage2';
   layout.callbacks[3](rects);assert.equal(p.data.processBodyHeight,580);
   p.syncProcessSheetLayout();p.foreground=false;
   layout.callbacks[4]([{...rects[0]},rects[1],{height:100},rects[3]]);assert.equal(p.data.processBodyHeight,580);
 });
-test('初始身份按内容收紧高度，揭示后重新测量且关闭后旧回调失效', () => {
-  const layout={callbacks:[]},p=page({},new Map(),layout);
-  const rects=[{width:390,height:844},{height:78},{height:180},{height:78}];
-  p.data.room={code:'123456',stage:'stage1',me:{seat:1}};
-  p.setProcessData({dealtIdentityDialog:true});
-  p.setProcessData({dealtIdentitySecret:{role:'梅林'}});
+test('收牌先清空秘密，再按入口实际位置飞回；切后台或过期测量不会重绘', () => {
+  const layout = { callbacks: [] };
+  const p = page({}, new Map([["identityEntryHintSeen", true]]), layout);
+  p.data.room = dealtRoom();
+  const open = () => Object.assign(p.data, { dealtIdentityDialog: true, dealtIdentitySecret: { role: "梅林" } });
+  const rects = [
+    { left: 50, top: 150, width: 250, height: 380 },
+    { left: 290, top: 88, width: 80, height: 44, bottom: 132 },
+    { height: 800 },
+  ];
+  open();
+  p.closeDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret, null);
+  assert.equal(p.data.dealClosing, true);
+  p.closeDealtIdentity();
+  assert.equal(layout.callbacks.length, 1);
   layout.callbacks[0](rects);
-  assert.equal(p.data.processBodyHeight,0);
-  layout.callbacks[1]([rects[0],rects[1],{height:420},rects[3]]);
-  assert.equal(p.data.processBodyHeight,420);
-  p.syncProcessSheetLayout();
-  layout.callbacks[2]([rects[0],rects[1],{height:1000},rects[3]]);
-  assert.equal(p.data.processBodyHeight,600);
-  p.syncProcessSheetLayout();
-  p.data.dealtIdentityDialog=false;
-  layout.callbacks[3](rects);
-  assert.equal(p.data.processBodyHeight,600);
+  assert.equal(p.data.dealFlightStyle, "--deal-x:155px;--deal-y:-230px;");
+  p.finishDealFlight({ detail: { animationName: "deal-land" } });
+  assert.equal(p.data.dealtIdentityDialog, true);
+  p.finishDealFlight({ detail: { animationName: "deal-stow" } });
+  assert.equal(p.data.dealtIdentityDialog, false);
+  open();
+  p.closeDealtIdentity();
+  p.onHide();
+  layout.callbacks[1](rects);
+  assert.equal(p.data.dealFlightStyle, "");
+  assert.equal(p.data.dealtIdentityDialog, false);
+});
+test('换牌收起只确认已读的版本，旧动画回调不能确认下一张牌', () => {
+  const layout = { callbacks: [] }, p = page({}, new Map(), layout);
+  p.data.room = dealtRoom();
+  const sent = [];
+  p.cmd = (type, {revision}) => sent.push([type, revision]);
+  const open = revision => Object.assign(p.data, {
+    identityChange: {identityRevision:revision}, dealtIdentitySecret: {role:"红猎人"},
+  });
+  open(1);
+  p.closeDealtIdentity();
+  assert.equal(p.data.dealtIdentitySecret,null);
+  assert.equal(sent.length,0);
+  p.onHide();
+  p.foreground=true;
+  open(2);
+  layout.callbacks[0]([null,null,null]);
+  assert.equal(sent.length,0);
+  p.closeDealtIdentity();
+  layout.callbacks[1]([null,null,null]);
+  p.finishDealFlight({detail:{animationName:"deal-stow"}});
+  assert.deepEqual(sent,[["ackIdentity",2]]);
 });
 async function settle(p) {
   while (p.data.busy) await new Promise((r) => setTimeout(r, 1));
@@ -931,11 +965,11 @@ test("11人红蓝兰斯经HTTP发牌和转换，只有两名兰斯收到私密�
     assert.ok(players.filter(player => ![blue, red].includes(player)).every(player => !player.data.room.me.identityChanged));
     for (const [player, faction] of [[blue, "坏人阵营"], [red, "好人阵营"]]) {
       await player.showIdentityChange();
-      assert.equal(player.data.identityChangeRevealed, false);
-      assert.equal(player.data.identityChange.faction, faction);
-      assert.equal(player.data.identityChange.information, "没有视野。");
-      player.revealChangedIdentity();
-      player.acknowledgeIdentity(); await settle(player);
+      assert.equal(player.data.dealtIdentitySecret, null);
+      await player.revealDealtIdentity();
+      assert.equal(player.data.dealtIdentitySecret.faction, faction);
+      assert.equal(player.data.dealtIdentitySecret.information, "没有视野。");
+      player.closeDealtIdentity(); await settle(player);
       assert.equal(player.data.room.me.identityChanged, false);
     }
   } finally {
@@ -1516,29 +1550,40 @@ test("新身份弹窗使用当前私密牌，后台不显示，确认使用看�
     identityRevision: 2,
     information: "没有视野。",
   };
-  const p = page({ request: async () => secret });
-  p.data.room = { code: "123456", stage: "s1", me: { identityChanged: true } };
-  await p.showIdentityChange();
-  assert.equal(p.data.identityChange.role, "石像鬼");
-  assert.equal(p.data.identityChangeRevealed, false);
-  p.acknowledgeIdentity();
+  let resolve;
+  const p = page({ request: () => new Promise(done => { resolve = done; }) });
+  p.data.room = { code: "123456", stage: "s1", me: { identityChanged: true, identityRevision: 2 } };
+  p.showIdentityChange();
+  assert.equal(resolve, undefined);
+  assert.equal(p.data.identityChange.role, undefined);
+  p.closeDealtIdentity();
   assert.ok(p.data.identityChange);
-  p.revealChangedIdentity();
-  assert.equal(p.data.identityChangeRevealed, true);
+  const request = p.revealDealtIdentity();
   p.onHide();
+  resolve(secret);
+  await request;
   assert.equal(p.data.identityChange, null);
-  assert.equal(p.data.identityChangeRevealed, false);
+  assert.equal(p.data.dealtIdentitySecret, null);
   p.foreground = true;
-  await p.showIdentityChange();
-  assert.equal(p.data.identityChangeRevealed, false);
-  p.revealChangedIdentity();
+  p.showIdentityChange();
+  const mismatch = p.revealDealtIdentity();
+  resolve({ ...secret, identityRevision: 3 });
+  await mismatch;
+  assert.equal(p.data.dealtIdentitySecret, null);
+  const reveal = p.revealDealtIdentity();
+  resolve(secret);
+  await reveal;
+  assert.equal(p.data.dealtIdentitySecret.role, "石像鬼");
   const sent = [];
   p.cmd = (...v) => sent.push(v);
-  p.acknowledgeIdentity();
+  p.closeDealtIdentity();
+  p.closeDealtIdentity();
+  assert.equal(sent.length, 1);
   assert.equal(sent[0][1].revision, 2);
   assert.equal(p.data.identityChange, null);
+  assert.equal(p.data.dealtIdentitySecret, null);
   p.foreground = false;
-  await p.showIdentityChange();
+  p.showIdentityChange();
   assert.equal(p.data.identityChange, null);
 });
 
@@ -1898,10 +1943,8 @@ test("身份遮盖不依赖网络或忙碌状态，未确认提交不开放新�
   await p.revealActionIdentity();
   assert.equal(p.data.actionSecret, null);
   p.data.fairyResultRevealed = true;
-  p.data.identityChangeRevealed = true;
   p.hidePrivatePreview();
   assert.equal(p.data.fairyResultRevealed, false);
-  assert.equal(p.data.identityChangeRevealed, false);
   p.data.busy = false;
   p.data.network = true;
   p.pending = { id: "unconfirmed" };
@@ -2167,13 +2210,19 @@ test("猎人先三选一，再显示对应号码；切换模式不提交，关�
 
 test("技能目标与放弃互斥，断网或未确认请求阻止提交，关闭清除草稿", async () => {
   const options = [{ value: "pass", label: "不使用技能 / 确认" }, { value: "target:2", label: "对 2号开刀" }];
-  const p = page({ request: async () => ({ stage: "s1", action: { choices: options.map(c => c.value), options } }) });
+  const p = page({ request: async () => ({ stage: "s1", action: { choices: options.map(c => c.value), options, swordHint: "开刀规则" } }) });
   p.data.room = { stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, players: [{ seat: 2, name: "玩家乙" }] };
   const writes = [];
   p.cmd = (...args) => writes.push(args);
   const choose = value => p.submitChoice({ currentTarget: { dataset: { value } } });
   await p.openAction();
-  assert.equal(p.data.skillTitle, "选择开刀目标");
+  assert.equal(p.data.skillTitle, "选择本轮行动");
+  assert.equal(p.data.skillHelpExpanded, false);
+  p.toggleSkillHelp();
+  assert.equal(p.data.skillHelpExpanded, true);
+  p.closeAction();
+  await p.openAction();
+  assert.equal(p.data.skillHelpExpanded, false);
   p.confirmChoice();
   await choose("target:2");
   assert.equal(p.data.skillConfirmLabel, "确认对 2 号开刀");
@@ -2181,6 +2230,14 @@ test("技能目标与放弃互斥，断网或未确认请求阻止提交，关�
   assert.equal(p.data.draftChoice, "pass");
   assert.equal(p.data.draftLabel, "本轮不开刀");
   assert.equal(p.data.skillConfirmLabel, "确认本轮不开刀");
+  await choose("pick-sword-target");
+  assert.equal(p.data.draftChoice, "");
+  p.confirmChoice();
+  await choose("target:2");
+  p.toggleSkillHelp();
+  p.toggleSkillHelp();
+  assert.equal(p.data.draftChoice, "target:2");
+  await choose("pass");
   for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }]) {
     Object.assign(p.data, patch);
     p.confirmChoice();
@@ -2497,17 +2554,25 @@ test('对局角色说明仅在已揭示时打开，关闭保留身份卡，遮�
   assert.equal(p.data.identityRoleHelpOpen,false);assert.equal(p.data.secret,null);
 });
 
-test('换身份弹窗每次揭示时折叠角色说明，遮盖后展开按钮失效', () => {
-  const p=page({});
-  const event={currentTarget:{dataset:{surface:'change'}}};
-  p.data.identityChange={info:{ability:{brief:'角色规则'}}};
-  p.revealChangedIdentity();
-  p.toggleIdentityHelp(event);
-  assert.equal(p.data.identityHelpExpanded,true);
-  p.hidePrivatePreview();
-  p.toggleIdentityHelp(event);
-  assert.equal(p.data.identityHelpExpanded,false);
-  p.revealChangedIdentity();
-  assert.equal(p.data.identityChangeRevealed,true);
-  assert.equal(p.data.identityHelpExpanded,false);
+test('换牌遇到断网、忙碌或待确认请求时仍可收起，恢复后可重新翻开未确认的牌', async () => {
+  const secret={role:'红猎人',stage:'s',identityRevision:2,information:'没有视野。 私密能力。'};
+  for (const unavailable of [{network:false}, {busy:true}, {hasPendingRequest:true}]) {
+    const p=page({request:async()=>secret});
+    p.cmd=()=>assert.fail('此时不能提交身份确认');
+    p.data.room={stage:'s',me:{identityChanged:true,identityRevision:2}};
+    p.showIdentityChange();
+    await p.revealDealtIdentity();
+    p.toggleIdentityHelp({currentTarget:{dataset:{surface:'dealt'}}});
+    assert.equal(p.data.identityHelpExpanded,true);
+    Object.assign(p.data,unavailable);
+    p.closeDealtIdentity();
+    assert.equal(p.data.dealtIdentitySecret,null);
+    assert.equal(p.data.identityChange,null);
+    assert.equal(p.data.identityHelpExpanded,false);
+    Object.assign(p.data,{network:true,busy:false,hasPendingRequest:false});
+    p.showIdentityChange();
+    assert.equal(p.data.dealtIdentitySecret,null);
+    await p.revealDealtIdentity();
+    assert.equal(p.data.dealtIdentitySecret.role,'红猎人');
+  }
 });

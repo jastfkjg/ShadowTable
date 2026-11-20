@@ -136,8 +136,13 @@ test("所有角色同时提交，守护免死仅消耗触发的守卫；目标�
   assert.ok(privateView(r, "p1").action.choices.includes("target:3"));
   assert.ok(privateView(r, "p2").action.choices.includes("target:3"));
   const hidden = publicView(r, "p4");
+  assert.deepEqual(hidden.operationProgress, { total: 12, completed: 0 });
   run(r, "p1", "submit", { value: "target:3" });
-  assert.deepEqual(publicView(r, "p4"), hidden);
+  const after = publicView(r, "p4");
+  assert.deepEqual(after, { ...hidden, operationProgress: { total: 12, completed: 1 } });
+  const other = structuredClone(r);
+  other.submissions = { p2: "pass" };
+  assert.deepEqual(publicView(other, "p4"), after);
   for (const p of r.players.filter((p) => p.uid !== "p1"))
     run(r, p.uid, "submit", { value: p.uid === "p2" ? "target:3" : "pass" });
   assert.equal(r.phase, "tools");
@@ -562,6 +567,7 @@ test("仙女可在首轮技能前连续查验，只由当前持有者提交", ()
     assert.throws(() => begin(r, "conversion"), /进行中/);
     assert.deepEqual(r, before);
     assert.equal(publicView(r, "p1").operationProgress.total, 1);
+    assert.equal(publicView(r, "p3").operationProgress, null);
     for (const p of r.players) {
       assert.equal(!!privateView(r, p.uid).action, p.seat === holder);
     }

@@ -57,7 +57,7 @@ test('个人全部目录固定显示所有正式称号，区分无样本、未�
     { id: 'knights:lancelot', metrics: [row('lancelot_both', 'knights', 1, 0)] },
   ] };
   const result = copy.records(input, { includeCatalogue: true });
-  assert.deepEqual(result.tiles.map(tile => tile.id), [...Object.keys(copy.honors), ...Object.keys(copy.roleRecords)]);
+  assert.deepEqual(result.tiles.map(tile => tile.id).sort(), [...Object.keys(copy.honors), ...Object.keys(copy.roleRecords)].sort());
   const tile = id => result.tiles.find(item => item.id === id);
   assert.equal(tile('oberon_two_busts').stateLabel, '暂无该身份记录');
   assert.equal(tile('oberon_two_busts').valueLabel, '—');
@@ -76,6 +76,34 @@ test('个人全部目录固定显示所有正式称号，区分无样本、未�
   assert.deepEqual(result.recordedTiles.map(item => item.id), ['lancelot_both']);
   assert.equal(copy.records(input).totalCount, 3);
   assert.equal(copy.records(null, { includeCatalogue: true }).totalCount, 0);
+});
+
+test('徽章收藏优先展示已拥有，组内角色顺序与趣味记录、榜单一致', () => {
+  const { funOptions } = require('../miniprogram/leaderboard-presentation');
+  const { presentCollection } = require('../miniprogram/badges');
+  const definitions = require('../server/fun').publicMetrics().reverse();
+  const ownedIds = ['servant_green_only', 'merlin_hit', 'servant_bench_win'];
+  const cards = ownedIds.map(id => ({
+    id: 'classic:' + id.split('_')[0], metrics: [row(id, 'classic', 1, 1)],
+  }));
+  const records = copy.records({ cards }, { includeCatalogue: true });
+  const ids = records.tiles.map(tile => tile.id);
+  const groups = ids.map(id => id.split('_')[0]);
+  assert.deepEqual(groups.filter((group, i) => group !== groups[i - 1]), [...new Set(groups)]);
+  assert.deepEqual(funOptions(definitions).map(option => option.id), ids);
+
+  const collection = { badges: [...ownedIds, 'october_2026_book'].map(id => ({ id })) };
+  const badges = filter => presentCollection(collection, filter).visibleBadges
+    .filter(badge => badge.metric.startsWith('fun_')).map(badge => badge.id);
+  const ownedInOrder = ids.filter(id => ownedIds.includes(id));
+  const unownedInOrder = ids.filter(id => !ownedIds.includes(id));
+  const all = presentCollection(collection).visibleBadges;
+  assert.deepEqual(all.slice(0, 4).map(badge => badge.id), [...ownedInOrder, 'october_2026_book']);
+  assert.ok(all.slice(4).every(badge => !badge.owned));
+  assert.deepEqual(badges('all'), [...ownedInOrder, ...unownedInOrder]);
+  assert.deepEqual(badges('owned'), ownedInOrder);
+  assert.deepEqual(badges('unowned'), unownedInOrder);
+  assert.deepEqual(records.recordedTiles.map(tile => tile.id), ownedInOrder);
 });
 
 test('趣味说明呈现称号真实含义、适用身份和个人次数，零与未知不混淆', () => {

@@ -18,17 +18,20 @@
     return date.getUTCFullYear() + "." + pad(date.getUTCMonth() + 1) + "." + pad(date.getUTCDate()) + " " + pad(date.getUTCHours()) + ":" + pad(date.getUTCMinutes());
   }
   function presentBoard(board) {
-    const honor = funCopy.honors[board.metric], rankingSubtitle = board.rankingSubtitle || board.subtitle;
+    const roleRecord = funCopy.roleRecords[board.metric], honor = roleRecord || funCopy.honors[board.metric];
+    const label = roleRecord?.title || board.label;
+    const rankingSubtitle = funCopy.currentTitleScope(board.rankingSubtitle || board.subtitle);
     const countUnit = board.sort === "rate" ? (/^percival_/.test(board.metric) ? "局" : "次") : board.unit;
     const rows = board.rows.map(row => {
       const value = board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
       return { ...row, rankLabel: pad(row.rank), initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
-        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : board.label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
+        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
           : board.id === "points" ? row.scoredGames + " 场计分局" + (row.adjustmentPoints ? " · 调整 " + (row.adjustmentPoints > 0 ? "+" : "") + row.adjustmentPoints + " 分" : "")
           : row.wins + " 胜 / " + row.total + " 局" };
     });
     const icon = board.id === "points" ? "crown" : board.metric?.includes("shield") || board.metric?.startsWith("defense_") || board.id === "good" ? "shield" : board.metric?.includes("assassin") ? "moon" : "sword";
-    return { ...board, ...(honor ? { title: honor.title, roleLabel: honor.roleLabel, roleDetail: honor.roleDetail, conditionLabel: honor.conditionLabel } : {}),
+    return { ...board, ...(roleRecord ? { label, description: roleRecord.description } : {}),
+      ...(honor ? { title: honor.title, roleLabel: honor.roleLabel, roleDetail: honor.roleDetail, conditionLabel: honor.conditionLabel } : {}),
       iconPath: "/assets/monthly-" + icon + ".svg", rankingSubtitle,
       subtitle: board.id === "points" ? "本月积分" : honor ? honor.roleLabel + " · " + rankingSubtitle : board.subtitle, rows };
   }

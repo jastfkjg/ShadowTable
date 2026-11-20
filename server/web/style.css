@@ -451,7 +451,7 @@ button.identity-history-entry { display: flex; align-items: center; gap: 6px; wi
 .identity-history-title { font-size: 23px; font-weight: 600; margin-bottom: 4px; }
 button.identity-history-close { flex-shrink: 0; width: 44px; min-height: 44px; margin: -4px -8px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 26px; font-weight: 400; }
 .identity-history-body { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.identity-role-help-sheet { background: var(--bg); }
+.identity-role-help-sheet { background: var(--bg); padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
 .identity-role-help-sheet .identity-history-heading { align-items: center; margin-bottom: 12px; }
 .identity-role-help-sheet .identity-history-title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 20px; }
 .identity-role-help-sheet .identity-history-body { text-align: left; }
@@ -480,7 +480,7 @@ button.identity-history-toggle { width: 100%; min-height: 44px; margin: 0; paddi
 .identity-history-readonly { margin-top: 12px; }
 .identity-history-footer { flex-shrink: 0; padding-top: 22px; text-align: center; }
 .identity-history-footer button { margin-top: 12px; }
-.identity-role-help-sheet .identity-history-footer { margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(177,191,198,.14); }
+.identity-role-help-sheet .identity-history-footer { margin-top: 6px; padding-top: 7px; border-top: 1px solid rgba(177,191,198,.14); }
 .identity-role-help-sheet .identity-history-footer button { margin: 0; }
 body:has(.identity-history-backdrop) { overflow: hidden; }
 .identity-history-sheet button:focus-visible, .identity-history-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -649,6 +649,8 @@ button.tool-seat-option.active {
   background: var(--bg);
 }
 .operation-progress.all-done { border-color: rgba(229, 198, 139, .25); }
+.player-progress-heading { display: flex; align-items: center; gap: 8px; }
+.progress-check { color: var(--accent); font-weight: 600; }
 button.progress-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; flex-wrap: wrap; line-height: 1.5; }
 .progress-title { flex: 1; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .progress-count { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -1528,6 +1530,23 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .skill-target-dialog button.skill-confirm[disabled] { opacity: 1; background: var(--skill-disabled-bg); color: var(--muted); }
 .skill-target-dialog button[disabled] { cursor: default; }
 .skill-target-dialog button.skill-later { padding: 0; min-height: 44px; margin: 0; font-size: 12px; }
+.sword-modes { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--border); border-radius: 14px; }
+.sword-modes button.sword-mode { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 6px 3px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; line-height: 1.5; }
+.sword-modes button.is-active { background: rgba(229,198,139,.16); border-color: var(--accent); font-weight: 600; }
+.sword-radio { box-sizing: border-box; flex-shrink: 0; width: 15px; height: 15px; border: 1px solid var(--muted); border-radius: 50%; }
+.is-active .sword-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px); }
+.skill-dialog button.sword-help { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; min-height: 44px; margin: 0; padding: 0 8px 0 0; border: 0; background: transparent; color: var(--muted); font-size: 13px; }
+.sword-sheet .skill-target-heading { margin-bottom: 0; }
+.sword-sheet .skill-check { width: 15px; height: 15px; border-radius: 50%; color: var(--bg); background: var(--accent); text-align: center; line-height: 15px; }
+.sword-title-row, .sword-title-row .skill-title { display: flex; align-items: center; gap: 10px; }
+.sword-title-row { justify-content: space-between; }
+.sword-title-row img { box-sizing: border-box; width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: #273b4d; }
+.sword-title-row button.sword-close { width: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 26px; }
+.sword-sheet .skill-target-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sword-sheet button.skill-option.is-selected { background: rgba(229,198,139,.07); color: var(--text); }
+.sword-sheet .is-selected .skill-name { color: var(--text); }
+.sword-sheet .skill-footer { border-top: 1px solid var(--border); background: var(--bg); }
+
 @media (max-height: 480px) {
   .error-dialog.skill-target-dialog { display: block; overflow-y: auto; }
   .skill-target-dialog .skill-body { height: auto !important; max-height: none !important; overflow: visible; overscroll-behavior: auto; }

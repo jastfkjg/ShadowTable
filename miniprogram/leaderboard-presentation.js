@@ -13,14 +13,13 @@
     return !!((funCopy.roleRecords[id] || funCopy.honors[id])?.countOnly || definitions.some(item => item.key === key && item.countOnly));
   }
   function funOptions(definitions = [], { includeFinal = false } = {}) {
-    const first = ["fun_percival_green", "fun_percival_bust", "fun_merlin_evade", "fun_merlin_hit", "fun_good_shield", "fun_assassin_hit", "fun_assassin_miss", "fun_defense_ally", "fun_defense_enemy", "fun_kill_enemy", "fun_kill_ally"];
     return definitions.filter(item => includeFinal || item.key !== "fun_final_hit").map(funCopy.metric).map(item => {
       const title = item.honorTitle || item.title;
       const category = item.category || (/^fun_(good_shield|merlin_|percival_|defense_)/.test(item.key) ? "good"
         : /^fun_assassin_/.test(item.key) ? "evil" : "other");
       return { ...item, title, category, tabLabel: title + " · " + item.label,
         accessibilityLabel: [title, item.roleLabel, item.conditionLabel || item.label].filter(Boolean).join("，") };
-    }).sort((a, b) => (first.includes(a.key) ? first.indexOf(a.key) : first.length) - (first.includes(b.key) ? first.indexOf(b.key) : first.length));
+    }).sort((a, b) => funCopy.compareDisplayIds(a.id || a.key.slice(4), b.id || b.key.slice(4)));
   }
   function markTies(rows = []) {
     const ranks = new Map();

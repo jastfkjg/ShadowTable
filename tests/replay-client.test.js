@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const { wxmlToJs } = require("../scripts/miniprogram-compiler");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("./helpers/replay-fixtures");
-const { presentReplay, trajectory } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const root = path.resolve(__dirname, "../miniprogram");
 function fixture() {
   const store = new Store(":memory:");

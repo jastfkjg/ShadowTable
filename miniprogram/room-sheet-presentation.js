@@ -8,6 +8,21 @@ function shortBoardName(name) {
   return String(name || "").trim().replace(/^阿瓦隆\s*·\s*/, "").replace(/\s*[（(]\s*\d+\s*人\s*[）)]\s*$/, "").trim();
 }
 
+function playerProgressCard(room) {
+  const progress = room.operationProgress;
+  if (!progress || room.canUseTools || room.me.seat == null) return null;
+  const onTeam = room.team?.includes(room.me.seat);
+  const labels = {
+    identity: ["身份确认", "请确认身份", "你已确认身份"],
+    teamVote: [room.team?.length ? "组队投票" : "全员投票", "请投票", "你已投票"],
+    quest: ["任务出牌", onTeam ? "请提交任务牌" : "请确认等待结算", onTeam ? "你已出牌" : "你已确认"],
+  }[room.phase] || [room.phaseName || "操作进度", "请完成本轮操作", "你已提交"];
+  const remaining = progress.total - progress.completed;
+  const personal = room.me.submitted ? labels[2] : room.needsSubmission ? labels[1] : "本轮无需你操作";
+  const waiting = remaining ? `等待${room.me.submitted ? "其余 " : " "}${remaining} 人提交` : "提交已收齐";
+  return { title: labels[0], note: personal + "，" + waiting };
+}
+
 function presentBoardOption(board, capacity) {
   const hints = {
     classic: capacity === 9 ? "逆仆指认" : capacity === 8 ? "线下刺梅林" : capacity === 7 ? "单奥伯伦" : "梅派入门",
@@ -61,5 +76,5 @@ function presentFairyResult(result) {
   return { ...result, displaySeat: match ? Number(match[1]) : null,
     displayFaction: match ? match[2] : "", factionTone: match ? ({好人:"good",坏人:"evil",盗贼阵营:"third"})[match[2]] : "unknown" };
 }
-return { shortBoardName, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present, presentIdentityInformation: identityVision.presentIdentity };
+return { shortBoardName, playerProgressCard, presentBoardOption, presentRoleGroups, fitBody, presentPrivateIdentity, presentFairyResult, presentVision: identityVision.present, presentIdentityInformation: identityVision.presentIdentity };
 });

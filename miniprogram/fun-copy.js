@@ -27,16 +27,16 @@
     morgana_with_percival: ["梅林二号", "evil", "同一局以莫甘娜身份与真正的派西维尔一起参加了至少两次已结算的任务。"],
     mordred_last_bust: ["深藏不露", "evil", "三次任务失败时，莫德雷德在第三次失败的任务中是车上唯一红方。"],
     oberon_two_busts: ["最强独狼", "evil", "同一局以奥伯伦身份亲手在两次任务里提交失败牌，且两次任务均失败。"],
-    merlin_all_rides: ["灯下黑梅林", "good", "蓝方完成三次成功任务并获胜，梅林每趟任务都上车且未被刺中。"],
-    merlin_skip_decider: ["影帝梅林", "good", "梅林未参加决定第三次任务成功或失败的任务，蓝方最终获胜。"],
-    merlin_bust_exit: ["炸飞梅林", "good", "梅林参加过失败任务，之后至少还有一趟任务且本人再未上车，蓝方最终获胜。"],
+    merlin_all_rides: ["隐身乘客", "good", "蓝方完成三次成功任务并获胜，梅林每趟任务都上车且未被刺中。"],
+    merlin_skip_decider: ["幕后军师", "good", "梅林未参加决定第三次任务成功或失败的任务，蓝方最终获胜。"],
+    merlin_bust_exit: ["弹射下车", "good", "梅林参加过失败任务，之后至少还有一趟任务且本人再未上车，蓝方最终获胜。"],
     percival_merlin_streak: ["孤注一掷", "good", "派西维尔在场，连续三趟已结算任务均有梅林上车，蓝方最终获胜。"],
     percival_morgana_streak: ["压错宝", "good", "派西维尔在场，连续三趟已结算任务均有莫甘娜上车，刺杀结果不影响计数。"],
     percival_assassinated: ["化身梅派", "good", "最终刺杀的目标是派西维尔，蓝方最终获胜。"],
     servant_green_only: ["金牌乘客", "good", "忠臣至少上过一趟成功任务，没上过失败任务，且蓝方完成三次成功任务；刺杀结果不影响计数。"],
     servant_all_with_bust: ["定蓝机", "good", "忠臣参加每趟任务且至少经历一次任务失败，蓝方完成三次成功任务；刺杀结果不影响计数。"],
     servant_bench_three_green: ["与世无争", "good", "忠臣全局未参加任务，蓝方完成三次成功任务；刺杀结果不影响计数。"],
-    reverse_wrong_side: ["占错队", "evil", "被逆仆刀命中转红后，红方最终选错刺杀目标，蓝方获胜。"],
+    reverse_wrong_side: ["站错队", "evil", "被逆仆刀命中转红后，红方最终选错刺杀目标，蓝方获胜。"],
     mordred_three_rides: ["影帝大莫", "evil", "莫德雷德参加至少三趟任务，任务及刺杀结果不影响计数。"],
     mordred_bench_win: ["车底大莫", "evil", "莫德雷德全局未参加任务，红方最终获胜。"],
     mordred_decider_only: ["最后王牌", "evil", "莫德雷德只在决胜任务上车，该任务失败并为红方带来三次任务失败的胜利。"],
@@ -84,7 +84,26 @@
   };
   const killIdentities = "蓝刀客·加雷斯、蓝刀客·加赫雷斯、红刀客·奥伯伦、蓝兰斯洛特、红兰斯洛特、刺客、觉醒蓝刀客、觉醒红刀客、蓝骑士、红骑士、蓝猎人、红猎人";
   for (const [id, record] of Object.entries(roleRecords)) labels[id] = record.title;
+  const legacyTitleIds = {
+    灯下黑梅林: "merlin_all_rides",
+    影帝梅林: "merlin_skip_decider",
+    炸飞梅林: "merlin_bust_exit",
+    占错队: "reverse_wrong_side",
+  };
+  const currentTitle = title => Object.hasOwn(legacyTitleIds, title) ? roleRecords[legacyTitleIds[title]].title : title;
+  const currentTitleScope = scope => scope?.split(" · ").map(currentTitle).join(" · ");
   const recordDetails = { ...honors, ...roleRecords };
+  const displayGroups = [
+    'percival', 'merlin', 'servant', 'reverse', 'assassin', 'morgana', 'mordred', 'oberon', 'lancelot',
+    'good', 'defense', 'kill', 'knife', 'gun', 'duel', 'final', 'survival', 'honor',
+  ];
+  const groupOrder = new Map(displayGroups.map((group, index) => [group, index]));
+  const titleOrder = new Map(Object.keys(recordDetails).map((id, index) => [id, index]));
+  function compareDisplayIds(a, b) {
+    const groupA = groupOrder.get(a.split('_')[0]) ?? groupOrder.size;
+    const groupB = groupOrder.get(b.split('_')[0]) ?? groupOrder.size;
+    return groupA - groupB || (titleOrder.get(a) ?? titleOrder.size) - (titleOrder.get(b) ?? titleOrder.size);
+  }
   for (const [id, honor] of Object.entries(recordDetails)) {
     const group = id.split("_")[0];
     honor.roleLabel ||= identities[group] || titles[group];
@@ -114,7 +133,7 @@
     if (label === "三炸收场") return labels.percival_bust;
     if (label === "命中敌方") return labels[type + "_enemy"] || label;
     if (["命中同伴", "命中友方"].includes(label)) return labels[type + "_ally"] || label;
-    return label;
+    return currentTitle(label);
   }
   function recordEntries(cards, splitModes, includeCatalogue) {
     const entries = [];
@@ -153,7 +172,8 @@
         knownGames: 0, unknownGames: 0, opportunities: 0, rate: null });
       return [{ card: { id: mode + ':' + group }, row }];
     });
-    return entries.filter(({ row }) => !Object.hasOwn(roleRecords, row.id)).concat(catalogue);
+    return entries.filter(({ row }) => !Object.hasOwn(roleRecords, row.id)).concat(catalogue)
+      .sort((a, b) => compareDisplayIds(a.row.id, b.row.id));
   }
   function records(value, { splitModes = false, includeCatalogue = false } = {}) {
     const cards = summary(value)?.cards || [];
@@ -328,5 +348,18 @@
         ? { ...record, fun: story(record.fun) } : record);
     return result;
   }
-  return { labels, titles, honors, roleRecords, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response };
+  function shareSnapshot(snapshot) {
+    if (snapshot?.version !== 1 || !snapshot.player || !snapshot.data) return snapshot;
+    const { kind, data, player } = snapshot;
+    if (kind === "fun" && Object.hasOwn(roleRecords, data.metric)) {
+      const record = roleRecords[data.metric];
+      return { ...snapshot, title: `${player.name}的${record.title} · ${data.count}${data.unit}`,
+        data: { ...data, label: record.title, description: record.description } };
+    }
+    if (kind === "funSummary") return { ...snapshot, data: { ...data,
+      items: data.items.map(item => ({ ...item, label: currentTitle(item.label) })) } };
+    if (kind === "matches") return { ...snapshot, data: { ...data, scope: currentTitleScope(data.scope) } };
+    return snapshot;
+  }
+  return { labels, titles, honors, roleRecords, compareDisplayIds, currentTitleScope, metric, summary, records, isCombinedRecord, recordInfo, story, matchStory, groupEvents, leaderboard, response, shareSnapshot };
 });

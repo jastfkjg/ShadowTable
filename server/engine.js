@@ -1219,18 +1219,9 @@ function roomSummary(room, uid) {
   };
 }
 function operationProgress(room, uid) {
-  if (
-    uid !== room.host ||
-    ![
-      ...SPECIAL_PHASES,
-      "identity",
-      "teamVote",
-      "quest",
-      "assassination",
-      "reverseStrike",
-    ].includes(room.phase)
-  )
-    return null;
+  const host = room.host === uid;
+  if (room.phase !== "identity" && (!hasActiveOperation(room) || room.phase === "offlineFinal")) return null;
+  if (!host && member(room, uid).seat === null) return null;
   const players = room.players.map((p) => {
     const required = !!actionSpec(room, p.uid);
     return {
@@ -1240,9 +1231,12 @@ function operationProgress(room, uid) {
       completed: required && Object.hasOwn(room.submissions || {}, p.uid),
     };
   });
+  const total = players.filter((p) => p.required).length;
+  // Public identity, vote and quest groups already show progress even with one participant.
+  if (!host && total < 2 && !["identity", "teamVote", "quest"].includes(room.phase)) return null;
   return {
-    players,
-    total: players.filter((p) => p.required).length,
+    ...(host ? { players } : {}),
+    total,
     completed: players.filter((p) => p.completed).length,
   };
 }

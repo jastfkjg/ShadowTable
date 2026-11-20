@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '月榜徽章按北京时间本月公开榜计算，当前第一名（含并列）持有；排名变化或跨月后自动重新计算。榜单徽章沿用对应榜单的对局人数门槛。活动纪念徽章由服务端授予，获得后永久保留，跨月不收回。';
+  const rules = '本月榜首徽章随北京时间本月公开榜实时更新。榜单徽章沿用对应榜单的对局人数门槛。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
@@ -26,9 +26,30 @@
   ].map(b => ({ ...b, permanent: true, metric: 'campaign', periodLabel: '2026年10月', category: b.rank ? '积分榜限定荣誉' : '内测参与纪念',
     imageUrl: '/assets/badges/' + b.id + '.png', holdingRule: '获得后永久保留', rules: '2026年10月内测限定纪念。积分前三名按首次发布时的公开榜排名锁定，含并列；参与纪念按北京时间10月归档对局授予，获得后永久保留。', description: b.condition }));
   const catalogue = monthly.concat(october);
+  // The server also uses catalogue order to choose default equipped badges.
+  const funByRole = monthly.slice(standard.length).sort((a, b) => copy.compareDisplayIds(a.id, b.id));
+  const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, october);
+  const placementTitles = ['交剑王冠', '持枪骑士', '铜铸城钥'];
+  function monthlyAward(id) {
+    const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3])$/.exec(id);
+    if (!match) return null;
+    const [, month, place] = match;
+    const rank = Number(place), periodLabel = month.replace('-', '年') + '月';
+    const condition = periodLabel + '积分月榜第' + rank + '名';
+    return { id, month, rank, periodLabel, title: placementTitles[rank - 1], condition,
+      description: condition, category: '积分月榜荣誉', metric: 'monthly_points', permanent: true,
+      imageUrl: '/assets/badges/monthly-points/' + month + '/' + rank + '.png',
+      holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月公开积分月榜。前三名（含并列）获得对应名次的永久徽章。' };
+  }
+  const awardDefinition = id => monthlyAward(id) || october.find(b => b.id === id);
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.permanent || badge.id === 'good_shield' || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
+  function presentPlayerBadge(badge, assetUrl = path => path) {
+    const definition = catalogue.find(item => item.id === badge.id) || monthlyAward(badge.id);
+    if (!definition) return null;
+    return { ...badge, ...definition, imageUrl: badgeImageUrl(definition, assetUrl) };
+  }
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',
     survival_revive: '统计十二骑士中实际发生的复活。',
@@ -42,7 +63,8 @@
   };
   function presentCollection(value, filter = 'all', assetUrl = path => path) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
-    const items = catalogue.map(b => {
+    const placements = Array.from(owned.keys(), monthlyAward).filter(Boolean);
+    const items = placements.concat(collectionCatalogue).map(b => {
       const roleRecord = copy.roleRecords[b.id];
       const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
       return { ...b, imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
@@ -54,11 +76,11 @@
     equipped.forEach((b, i) => { if (!Number.isInteger(b.slotIndex)) b.slotIndex = i; });
     const month = new Date((value.periodStart || Date.now()) + 8 * 3600000);
     return { ...value, badges, items, visibleBadges: items.filter(b => filter === 'owned' ? b.owned : filter === 'unowned' ? !b.owned : true),
-      availableBadges: badges.filter(b => !b.equipped), equippedBadges: equipped,
+      availableBadges: items.filter(b => b.owned && !b.equipped), equippedBadges: equipped,
       slots: Array.from({ length: MAX_EQUIPPED }, (_, i) => equipped.find(b => b.slotIndex === i) || { id: 'empty-' + i, empty: true, slotIndex: i }),
-      ownedCount: badges.length, totalCount: catalogue.length, unownedCount: catalogue.length - badges.length,
+      ownedCount: badges.length, totalCount: items.length, unownedCount: items.length - badges.length,
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentCollection };
+  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
 });

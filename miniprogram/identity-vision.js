@@ -30,6 +30,23 @@
         avatarUrl: profile?.avatarUrl || "", avatarFailed: !!profile?.avatarFailed };
     }) };
   }
+  function fullRuleRows(role, ability) {
+    const rules = ability.lines.map(line => {
+      if (line.text === "没有主动技能，技能环节按提示确认即可。")
+        return { label: "技能环节", text: "无主动技能，按提示确认即可。" };
+      if (role === "莫德雷德" && line.text === "刺客、莫德雷德、莫甘娜互相知道座位和身份。")
+        return { label: "初始视野", text: "与刺客、莫甘娜互认座位和身份。" };
+      return { label: line.label || "角色能力", text: line.text };
+    });
+    const opening = rules.findIndex(row => row.label === "初始视野");
+    if (opening > 0) rules.unshift(rules.splice(opening, 1)[0]);
+    if (ability.note) {
+      if (role === "莫德雷德" && ability.note === "骑士决斗时，莫德雷德按好人判定；这不会改变你的真实坏人阵营。")
+        rules.push({ label: "骑士决斗", emphasis: "按好人判定", text: "。你的实际阵营仍是坏人。" });
+      else rules.push({ label: role === "石像鬼" ? "查验判定" : "补充规则", text: ability.note });
+    }
+    return rules;
+  }
   function roleOverview(secret, ability, vision) {
     if (!ability) return null;
     const facts = new Map(ability.lines.map(line => [line.label, line.text]));
@@ -48,7 +65,7 @@
     return {
       deck: typeof secret.knightBCard === "boolean" ? (secret.knightBCard ? "B 牌" : "A 牌") : "",
       title: sword ? "开刀机会" : "能力速查",
-      icon: sword ? "record-swords" : "record-spark",
+      rules: fullRuleRows(secret.role, ability),
       badge: sword ? "1 次" : "",
       brief: sword ? range + "。" + (uses.includes("刀错") ? "刀错也消耗技能。" : "")
         : ability.brief || (first?.label ? first.label + " · " + first.text : first?.text || ""),
@@ -61,6 +78,8 @@
   // and never replace an old identity snapshot with a current inspection.
   function presentIdentity(secret, players) {
     let text = String(secret.information || "").trim();
+    if (/^蓝(?:刀客|兰斯洛特)/.test(secret.role))
+      text = text.replace("初始视野：没有初始视野，不参与坏人互认。", "初始视野：开局时，你不知道其他玩家的身份。");
     let fairy = null, inspections = [], abilityText = "", passive = null;
     let roleAbility = null;
     const helpStart = text.indexOf("\n\n角色能力\n");
@@ -127,11 +146,19 @@
       ...roleAbility.lines.filter(line => summaryLabels.has(line.label))
         .map(line => ({ label: summaryLabels.get(line.label), text: line.text })),
     ] : [];
-    return { vision, passive, fairy, inspections, ability, summary,
+    const showVision = !!passive || (!!text && !(vision.empty && inspections.length));
+    const review = {
+      emptyVision: showVision && vision.empty,
+      skillByFaction: vision.players.length > 0 && secret.skillStatus?.title === "无主动技能" && !secret.skillStatus.detail,
+      visionHeading: passive ? "存活 B 牌坏人" : vision.label || "角色视野",
+      visionMeta: passive?.round ? "第 " + passive.round + " 轮" : vision.players.length ? vision.players.length + " 人" : "",
+    };
+    return { vision, passive, fairy, inspections, ability, summary, review, showVision,
+      printedBrief: roleAbility?.brief.replace(/^没有额外视野，/, "") || (secret.role === "亚瑟的忠臣" ? "从发言和任务结果中寻找同伴。" : ""),
       summaryVision: openingVision?.replace(/^没有初始视野，/, "无初始视野，") || vision.text,
       roleOverview: roleOverview(secret, ability, vision),
       showRoleHelp: !!ability,
-      showVision: !!passive || (!!text && !(vision.empty && inspections.length)) };
+    };
   }
   return { present, presentIdentity };
 });
