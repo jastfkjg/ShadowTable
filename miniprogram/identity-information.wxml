@@ -1,7 +1,7 @@
 <template name="identityInformation">
-  <view class="identity-information">
+  <view wx:if="{{!review || !info || !info.vision.empty || info.inspections.length || info.fairy}}" class="identity-information">
     <block wx:if="{{info}}">
-      <view wx:if="{{info.showVision && !(review && info.review.emptyVision)}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
+      <view wx:if="{{info.showVision && !(review && info.vision.empty)}}" class="identity-info-section {{info.vision.empty?'identity-info-inline':''}}">
         <view wx:if="{{review}}" class="identity-info-heading"><text>{{info.review.visionHeading}}</text><text wx:if="{{info.review.visionMeta}}" class="identity-info-meta">{{info.review.visionMeta}}</text></view>
         <view wx:else class="identity-info-heading"><text>{{printed && (info.vision.label==='初始见面匪' || info.vision.label==='你的坏人同伴')?'初始同伴':'角色视野'}}</text><text wx:if="{{info.passive.round}}" class="identity-info-meta">第 {{info.passive.round}} 轮</text><text wx:elif="{{!printed && compact && info.vision.label==='初始见面匪'}}" class="identity-info-meta identity-info-summary">初始见面匪{{info.vision.players.length?' · '+info.vision.players.length+'人':''}}</text><text wx:elif="{{!printed && info.vision.label==='初始见面匪'}}" class="identity-info-meta">初始视野</text></view>
         <block wx:if="{{info.passive}}">
