@@ -180,9 +180,9 @@
 .inline-skill-label { flex-shrink: 0; color: var(--muted); }
 .inline-skill-value { margin-left: auto; min-width: 0; max-width: 100%; font-weight: 500; overflow-wrap: anywhere; }
 .inline-skill-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(177,191,198,.13); font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
-.table-room .identity.open .identity-skill-history { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(177,191,198,.13); }
-.table-room .identity.open .identity-skill-record { display: block; margin-top: 12px; padding-left: 10px; border-left: 1px solid rgba(229,198,139,.3); font-size: 13px; line-height: 1.75; }
-.table-room .identity.open .identity-skill-round { display: block; margin-bottom: 3px; font-size: 11px; }
+.table-room .identity.open .identity-skill-history { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(177,191,198,.13); }
+.table-room .identity.open .identity-skill-record { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; font-size: 13px; line-height: 1.75; }
+.table-room .identity.open .identity-skill-round { flex-shrink: 0; font-size: 12px; }
 .table-room .identity.open .identity-skill-text { display: block; }
 .table-room .identity-card-topline { min-height: 32px; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .table-room button.identity-history-entry { min-height: 44px; padding: 0 6px; font-size: 12px; }

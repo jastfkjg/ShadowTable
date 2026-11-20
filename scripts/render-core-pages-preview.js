@@ -74,7 +74,7 @@ function write(name, file, data, styles, extra = "") {
     ? owner.connectionPreviewState.connectionVisible ? owner.connectionPreviewState : null
     : runtime ? { ...owner, ...connectionFeedback.present({ ...owner, network:owner.network !== false }, { context:"page", ...runtime }), connectionVisible:true } : null;
   if (previewConnection) owner.connectionVisible = true;
-  for (const key of ['secret', 'dealtIdentitySecret', 'identityChange', 'actionSecret']) {
+  for (const key of ['secret', 'dealtIdentitySecret', 'actionSecret']) {
     if (!data[key]) continue;
     data[key] = { ...data[key], info: presentIdentityInformation(data[key], data.seats) };
     if (data[key].identityHistory) data[key].identityHistory = data[key].identityHistory.map(record => ({ ...record,
@@ -380,12 +380,14 @@ for(const [role,mode,value] of [...skillFixtures.cases,['servant','none','pass']
   tableScenes['skill-'+role]=data;
   tableScenes['skill-'+role+'-selected']={...data,draftChoice:value,draftLabel:choices.find(c=>c.value===value)?.label||'',...skillPresentation.skillSelectionView(value,data.skillTargetMode),...(mode==='swap'?{swapSeats:[2,7],swapPlayers:data.swapPlayers.map(p=>({...p,selected:[2,7].includes(p.seat)}))}:{})};
 }
-const newIdentity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 主动自爆带走相邻一人；或预选场上其他一人，出局时被动开枪；也可不使用技能。主动与被动共用一次技能，替女巫出局不触发被动开枪。',skillStatus:{title:'新技能尚未启用',detail:'下次技能环节可用。'}},'evil');
+const redrawSample = skillFixtures.fixture('redHunter', 'skills');
+Object.assign(redrawSample.source.knights.players.p2, { b: true, availableRound: redrawSample.source.knights.round + 1 });
+const newIdentity = presentPrivateIdentity(privateView(redrawSample.source, 'p2'), 'evil', tablePlaying.seats);
 const identityHistory=[{...newIdentity,id:1,current:true,sinceLabel:'第2轮 · 换牌'},{...presentPrivateIdentity({role:'亚瑟的忠臣',information:'没有视野。',faction:'好人阵营'},'good'),id:0,initial:true,sinceLabel:'开局 · A牌',detailAvailable:true}];
 Object.assign(tableScenes,{
-  'new-identity':{...tablePlaying,identityChange:newIdentity,identityChangeRevealed:true},
-  'new-identity-covered':{...tablePlaying,identityChange:newIdentity},
-  'new-identity-long':{...tablePlaying,identityChange:{...newIdentity,information:newIdentity.information.repeat(8)},identityChangeRevealed:true},
+  'new-identity':{...tablePlaying,identityChange:{identityRevision:1},dealtIdentitySecret:newIdentity},
+  'new-identity-covered':{...tablePlaying,identityChange:{identityRevision:1}},
+  'new-identity-long':{...tablePlaying,identityChange:{identityRevision:1},dealtIdentitySecret:{...newIdentity,information:newIdentity.information.repeat(8)}},
   'identity-history':{...tablePlaying,revealed:true,secret:{...newIdentity,identityHistory},identityHistoryOpen:true,identityHistoryExpandedId:0},
   'fairy-result':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人',information:'7号查验结果：坏人（第2轮）'}),fairyResultRevealed:true},
   'fairy-covered':{...tablePlaying,fairyResult:presentFairyResult({summary:'7号 · 坏人'})},
@@ -428,15 +430,15 @@ merlinSource.knights.initialRoles={...merlinSource.roles};
 const identityNames=['小橙','子龙','林间','初夏','北川','舟舟','阿木','七月','阿辰','小鱼','向晚','晚风'];
 const identityAvatars=['19','04','13','18','14','21','20','16','15','22','27','28'];
 merlinSource.players.forEach((player,index)=>Object.assign(player,{name:identityNames[index],avatarUrl:'/pages/profile/assets/avatars/crayon-'+identityAvatars[index]+'.jpg'}));
-for(const [role,tone] of [['merlin','good'],['morgana','evil'],['assassin','evil']]) {
+for(const [role,tone] of [['merlin','good'],['percival','good'],['morgana','evil'],['assassin','evil']]) {
   const player=merlinSource.players.find(player=>merlinSource.roles[player.uid]===role),secret=privateView(merlinSource,player.uid);
   tableScenes['ui-identity-'+role]=tableScene(merlinSource,player.uid,{dealtIdentityDialog:true,dealtIdentitySecret:{...secret,
     factionTone:tone,portrait:portrait(secret.role,tone).portrait,vision:presentVision(secret.information,merlinSource.players)}});
 }
 for(const [name,profiles] of [['long-name',merlinSource.players.map(player=>player.seat===3?{...player,name:'这是一个很长的完整玩家昵称'}:player)],
   ['avatar-failed',merlinSource.players.map(player=>({...player,avatarFailed:true}))]]) {
-  const scene=tableScenes['ui-identity-morgana'],secret=scene.dealtIdentitySecret;
-  tableScenes['ui-identity-'+name]={...scene,dealtIdentitySecret:{...secret,vision:presentVision(secret.information,profiles)}};
+  const scene=tableScenes['ui-identity-morgana'];
+  tableScenes['ui-identity-'+name]={...scene,seats:scene.seats.map(seat=>({...seat,...profiles.find(p=>p.seat===seat.seat)}))};
 }
 // Focused review scenes use the shipped templates and actual private endpoint
 // projection; the forced role allocation makes the requested example stable.

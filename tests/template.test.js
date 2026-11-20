@@ -631,9 +631,14 @@ test('身份插画与视野一起受主动查看和关闭状态保护', () => {
   assert.match(inline,/merlin\.png/);
   assert.doesNotMatch(JSON.stringify(render({...data,dealtIdentityDialog:false,revealed:false})),/merlin\.png/);
   const illustrated = {...secret,cardArt:'/assets/role-cards/merlin-b.jpg'};
-  const front = JSON.stringify(render({...data,dealtIdentitySecret:illustrated}));
-  assert.match(front,/merlin-b\.jpg/);
-  assert.doesNotMatch(front,/merlin\.png/);
+  for (const deal of [{dealtIdentityDialog:true}, {dealtIdentityDialog:false,identityChange:{identityRevision:1}}]) {
+    const front = JSON.stringify(render({...data,...deal,dealtIdentitySecret:illustrated}));
+    assert.match(front,/merlin-b\.jpg/);
+    assert.doesNotMatch(front,/merlin\.png/);
+  }
+  const review = nodes(render({...data,dealtIdentityDialog:false,revealed:true,secret:illustrated}));
+  assert.equal(review.find(n => n.attr?.class === 'compact-role-art')?.attr.src, secret.portrait);
+  assert.ok(!review.some(n => n.attr?.src === illustrated.cardArt));
   const coveredCard = JSON.stringify(render({...data,secret:illustrated,dealtIdentitySecret:null}));
   assert.doesNotMatch(coveredCard,/role-cards|秘密视野/);
 });
@@ -1126,11 +1131,12 @@ test("十二骑士不提供主动先知查验和刀梅林入口，新身份提�
   const hidden = render(popupData);
   for (const value of ["石像鬼", "坏人阵营", "没有视野。"])
     assert.ok(!JSON.stringify(hidden).includes(value));
-  assert.ok(byHandler(hidden, "revealChangedIdentity"));
-  assert.ok(!byHandler(hidden, "acknowledgeIdentity"));
-  const popup = render({ ...popupData, identityChangeRevealed: true });
+  assert.ok(byHandler(hidden, "revealDealtIdentity"));
+  assert.match(JSON.stringify(hidden), /identity-card-back.webp/);
+  assert.ok(!byHandler(hidden, "closeDealtIdentity"));
+  const popup = render({ ...popupData, identityChange:{identityRevision:1}, dealtIdentitySecret:popupData.identityChange });
   assert.ok(JSON.stringify(popup).includes("石像鬼"));
-  assert.ok(byHandler(popup, "acknowledgeIdentity"));
+  assert.ok(byHandler(popup, "closeDealtIdentity"));
 });
 
 test("技能过程开关仅房主可见，默认不可见", () => {
@@ -1223,16 +1229,25 @@ test("仙女结果弹窗默认不渲染目标与阵营，点击查看后才显�
   assert.ok(byHandler(shown, "acknowledgeFairyResult"));
   assert.ok(byHandler(shown, "hidePrivatePreview"));
 });
-test('新身份的派生插画、能力说明及结构化查验结果均受主动查看保护，确认在滚动区之外', () => {
+test('新身份的派生插画、能力说明及结构化查验结果均受主动查看保护，确认在牌面之外', () => {
   const {presentPrivateIdentity,presentFairyResult}=require('../miniprogram/room-sheet-presentation');
   const identity=presentPrivateIdentity({role:'红猎人',faction:'坏人阵营',information:'没有视野。 私密角色能力说明。',skillStatus:{title:'尚未启用',detail:'下一轮可用。'}},'evil');
-  const data={...base,room:{phase:'tools',code:'123456',team:[],me:{seat:1}},identityChange:identity};
+  const data={...base,room:{phase:'tools',code:'123456',team:[],me:{seat:1}},identityChange:{identityRevision:1}};
   assert.doesNotMatch(JSON.stringify(render(data)),/hunter-red\.png|红猎人|私密角色能力说明/);
-  const shown=render({...data,identityChangeRevealed:true});
+  const shown=render({...data,dealtIdentitySecret:identity});
   assert.match(JSON.stringify(shown),/\/assets\/roles\/hunter-red\.png/);
-  const body=nodes(shown).find(n=>n.attr?.class==='process-sheet-body');
-  assert.equal(byHandler(body,'acknowledgeIdentity'),undefined);
-  assert.ok(byHandler(shown,'acknowledgeIdentity'));assert.ok(byHandler(shown,'hidePrivatePreview'));
+  const face=nodes(shown).find(n=>n.attr?.class?.split(' ').includes('deal-face'));
+  assert.ok(face);
+  assert.match(JSON.stringify(face),/下一轮可用/);
+  assert.equal(byHandler(face,'closeDealtIdentity'),undefined);
+  for (const state of [shown, render({...data, dealtIdentitySecret:identity, busy:true, hasPendingRequest:true, network:false})]) {
+    const footer = nodes(state).find(n => n.attr?.class === 'deal-controls');
+    const buttons = nodes(footer).filter(n => n.tag === 'wx-button');
+    assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].attr.bindtap, 'closeDealtIdentity');
+    assert.equal(buttons[0].children.join(''), '收起身份');
+    assert.ok(!buttons[0].attr.disabled);
+  }
   const fairy={...data,identityChange:null,fairyResult:presentFairyResult({revision:1,summary:'7号 · 盗贼阵营'})};
   assert.doesNotMatch(JSON.stringify(render(fairy)),/盗贼阵营|process-shield-third/);
   const result=render({...fairy,fairyResultRevealed:true});
@@ -2203,11 +2218,12 @@ test('紧凑身份信息在当前、发牌、新身份和旧身份中统一分�
   const scenarios=[
     [{...data,revealed:true,secret},{...data,revealed:false,secret}],
     [{...data,dealtIdentityDialog:true,dealtIdentitySecret:secret},{...data,dealtIdentityDialog:true,dealtIdentitySecret:null}],
-    [{...data,identityChange:secret,identityChangeRevealed:true},{...data,identityChange:secret,identityChangeRevealed:false}],
+    [{...data,identityChange:{identityRevision:1},dealtIdentitySecret:secret},{...data,identityChange:{identityRevision:1},dealtIdentitySecret:null}],
   ];
   for(const [shown,hidden] of scenarios){
     const tree=renderTable(shown),text=JSON.stringify(tree);
-    assert.match(text,/角色视野/);assert.match(text,/存活 B 牌坏人/);assert.match(text,/仙女查验/);
+    if (!shown.revealed) assert.match(text,/角色视野/);
+    assert.match(text,/存活 B 牌坏人/);assert.match(text,/仙女查验/);
     assert.equal(nodes(tree).filter(n=>n.attr?.class==='identity-info-section identity-info-fairy').length,1);
     assert.doesNotMatch(text,/（第1轮）|无 8号查验结果/);
     assert.doesNotMatch(JSON.stringify(renderTable(hidden)),/月下先知|存活 B 牌坏人|仙女查验|prophet\.png/);
@@ -2231,9 +2247,10 @@ test('当前身份名旁显示角色说明图标，技能状态和身份历程�
   assert.equal(help.attr.ariaHaspopup,'dialog');
   assert.match(JSON.stringify(help),/sheet-book\.svg/);
   assert.ok(byHandler(collapsed,'openIdentityHistory'));
-  assert.ok(nodes(collapsed).some(node=>node.attr?.class==='compact-role-heading has-history'));
   assert.equal(byHandler(nameRow,'openIdentityHistory'),undefined);
-  const statusRow=nodes(collapsed).find(node=>node.attr?.class==='compact-skill-heading');
+  const statusRow=nodes(collapsed).find(node=>node.attr?.class==='compact-review-row');
+  assert.ok(byHandler(statusRow,'openIdentityHistory'));
+  assert.match(JSON.stringify(statusRow),/无角色视野.*技能可用/);
   assert.equal(byHandler(statusRow,'toggleIdentityHelp'),undefined);
   assert.doesNotMatch(JSON.stringify(collapsed),/之后每轮/);
   assert.match(JSON.stringify(collapsed),/仙女查验/);
@@ -2244,11 +2261,15 @@ test('当前身份名旁显示角色说明图标，技能状态和身份历程�
   assert.doesNotMatch(JSON.stringify(shown),/之后每轮|注意事项/);
   const expanded=renderTable({...data,identityRoleHelpOpen:true,identityHelpExpanded:true});
   assert.equal(byHandler(expanded,'toggleIdentityHelp').attr.ariaExpanded,true);
-  assert.match(JSON.stringify(expanded),/之后每轮|注意事项/);
+  assert.match(JSON.stringify(expanded),/之后每轮.*查验判定/);
   assert.doesNotMatch(JSON.stringify(renderTable({...data,revealed:false,identityRoleHelpOpen:true})),/之后每轮|角色说明/);
   const aCard={role:'莫甘娜',knightBCard:false,information:'初始见面匪：7号（刺客）。'+identityHelp('morgana',12),skillStatus:{title:'无主动技能'}};
   aCard.info=presentIdentity(aCard);
-  assert.ok(byHandler(renderTable({...data,secret:aCard}),'openIdentityRoleHelp'));
+  const withSeats=renderTable({...data,secret:aCard});
+  assert.ok(byHandler(withSeats,'openIdentityRoleHelp'));
+  assert.ok(nodes(withSeats).some(node=>node.attr?.class==='compact-faction-skill' && node.children.includes('无主动技能')));
+  assert.ok(!nodes(withSeats).some(node=>node.attr?.class==='compact-review-row'));
+  assert.match(JSON.stringify(withSeats),/初始见面匪.*刺客/);
   assert.match(JSON.stringify(renderTable({...data,secret:aCard,identityRoleHelpOpen:true,identityHelpExpanded:true})),/首次复活/);
   const dealt = {...data,revealed:false,dealtIdentityDialog:true,dealtIdentitySecret:aCard};
   const initial = renderTable(dealt);
@@ -2266,21 +2287,18 @@ test('发牌和换牌默认只展示奥伯伦的关键规则，选读详情并�
   secret.info=presentIdentity(secret);
   const data={...base,room:{phase:'tools',players:[],team:[],history:[],me:{seat:1}},identityHelpExpanded:false};
   const details=/攻击范围|刺客只失去技能/;
-  for (const [surface, state, hide] of [
-    ['dealt',{dealtIdentityDialog:true,dealtIdentitySecret:secret},{dealtIdentitySecret:null}],
-    ['change',{identityChange:secret,identityChangeRevealed:true},{identityChangeRevealed:false}],
-  ]) {
-    const collapsed=renderTable({...data,...state});
+  for (const state of [{dealtIdentityDialog:true}, {identityChange:{identityRevision:1}}]) {
+    const collapsed=renderTable({...data,...state,dealtIdentitySecret:secret});
     const summary=JSON.stringify(collapsed);
     assert.match(summary,/无初始视野，不参与坏人互认/);
     assert.match(summary,/有一次开刀机会.*上车执行任务时必须投失败/);
     assert.doesNotMatch(summary,details);
     const toggle=byHandler(collapsed,'toggleIdentityHelp');
     assert.equal(toggle.attr.ariaExpanded,false);
-    assert.equal(toggle.attr['data-surface'],surface);
-    assert.ok(byHandler(collapsed,surface==='dealt'?'closeDealtIdentity':'acknowledgeIdentity'));
-    assert.match(JSON.stringify(renderTable({...data,...state,identityHelpExpanded:true})),details);
-    assert.doesNotMatch(JSON.stringify(renderTable({...data,...state,...hide,identityHelpExpanded:true})),/奥伯伦|必须投失败|刺客只失去技能/);
+    assert.equal(toggle.attr['data-surface'],'dealt');
+    assert.ok(byHandler(collapsed,'closeDealtIdentity'));
+    assert.match(JSON.stringify(renderTable({...data,...state,dealtIdentitySecret:secret,identityHelpExpanded:true})),details);
+    assert.doesNotMatch(JSON.stringify(renderTable({...data,...state,dealtIdentitySecret:null,identityHelpExpanded:true})),/奥伯伦|必须投失败|刺客只失去技能/);
   }
 });
 

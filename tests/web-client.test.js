@@ -2726,7 +2726,7 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   const c=client();c.state.room=dealtWebRoom();c.state.revealed=true;c.state.secret=secret;
   const before=JSON.stringify(secret);
   assert.match(c.viewRoom(),/compact-role-title[^>]*>石像鬼<\/div><button [^>]*data-action="openIdentityRoleHelp"[^>]*aria-label="角色说明"/);
-  assert.match(c.viewRoom(),/技能状态<\/span><span class="compact-skill-value">技能可用<\/span><\/div>/);
+  assert.match(c.viewRoom(),/compact-review-values"><span>无角色视野<\/span><span class="compact-review-skill is-ready">技能可用<\/span>/);
   assert.doesNotMatch(c.viewRoom(),/之后每轮/);
   assert.match(c.viewRoom(),/仙女查验/);
   c.ACTIONS.openIdentityRoleHelp();
@@ -2735,7 +2735,7 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   assert.doesNotMatch(c.viewIdentityRoleHelp(),/之后每轮|注意事项/);
   c.ACTIONS.toggleIdentityHelp(toggle);
   assert.match(c.viewIdentityRoleHelp(),/角色说明.*石像鬼.*之后每轮/);
-  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*identity-role-help-rules.*identity-role-help-note-title">注意事项/);
+  assert.match(c.viewIdentityRoleHelp(),/identity-role-help-summary.*identity-role-help-rules.*role-rule-label">查验判定/);
   assert.doesNotMatch(c.viewIdentityRoleHelp(),/6号|仙女查验/);
   c.ACTIONS.closeIdentityRoleHelp();
   assert.equal(c.viewIdentityRoleHelp(),'');
@@ -2747,7 +2747,13 @@ test('网页角色说明从身份名旁打开独立弹层，支持 A 牌并在�
   assert.equal(c.viewIdentityRoleHelp(),'');
   assert.doesNotMatch(c.viewRoom(),/角色说明|之后每轮/);
   assert.equal(JSON.stringify(secret),before);
-  c.state.revealed=true;c.state.secret={...secret,information:'没有视野。'};
+  c.state.revealed=true;
+  c.state.secret={role:'派西维尔',faction:'好人阵营',information:'梅林与莫甘娜位于：1、12号。你无法区分谁是梅林。',skillStatus:{title:'无主动技能'}};
+  const candidateView=c.viewRoom();
+  assert.match(candidateView,/compact-faction-skill">无主动技能/);
+  assert.doesNotMatch(candidateView,/compact-review-row|class="identity-info-role"/);
+  assert.match(candidateView,/梅林与莫甘娜位于.*2 人.*你无法区分谁是梅林/);
+  c.state.secret={...secret,information:'没有视野。'};
   assert.doesNotMatch(c.viewRoom(),/角色说明/);
   c.ACTIONS.openIdentityRoleHelp();
   assert.equal(c.state.identityRoleHelpOpen,false);
