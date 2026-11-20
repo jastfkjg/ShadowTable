@@ -766,3 +766,31 @@ dialog::backdrop {
 @media (prefers-reduced-motion: reduce) { .record-row { transition: none; } }
 #record-confirm { max-width: 720px; }
 #record-confirm .dialog-actions { position: sticky; bottom: -24px; background: var(--surface); padding: 16px 0; margin-bottom: -16px; }
+
+#feedback-filters { display:flex; gap:6px; flex-wrap:wrap; margin:20px 0 14px; }
+#feedback-filters button[aria-pressed="true"] { color:var(--accent); background:var(--accent-soft); border-color:var(--accent); }
+#inbox-status { color:var(--muted); }
+#inbox-status:empty { display:none; }
+.feedback-ticket { margin:12px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.feedback-ticket summary { position:relative; display:grid; gap:6px; padding:16px 44px 16px 18px; cursor:pointer; list-style:none; }
+.feedback-ticket summary::-webkit-details-marker { display:none; }
+.feedback-ticket summary::after { content:""; position:absolute; top:50%; right:20px; width:7px; height:7px; border:solid var(--muted); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+.feedback-ticket[open] summary::after { transform:rotate(225deg); }
+.feedback-ticket summary:focus-visible { outline:2px solid var(--focus); outline-offset:-3px; }
+.ticket-meta,.ticket-byline,.ticket-reply small { color:var(--muted); font-size:13px; }
+.ticket-meta { display:flex; align-items:center; gap:10px; }
+.ticket-pending,.ticket-done { border-radius:6px; padding:2px 8px; }
+.ticket-pending { background:#f6edd9; color:#715016; }.ticket-done { background:var(--accent-soft); color:var(--accent); }
+.ticket-excerpt { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.ticket-body { padding:16px 18px; border-top:1px solid var(--line); }
+.ticket-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 14px; }
+.ticket-photos,.ticket-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.ticket-photos { margin:12px 0 18px; }
+.ticket-photos img { display:block; width:80px; height:80px; border-radius:8px; object-fit:cover; background:var(--subtle); }
+.ticket-body label { display:block; margin:14px 0 6px; font-weight:600; }
+.ticket-body textarea { width:100%; resize:vertical; }
+.ticket-actions { justify-content:flex-end; margin-top:8px; }
+.ticket-actions span { color:var(--danger); }
+.ticket-reply { background:var(--accent-soft); padding:14px 16px; border-radius:8px; }
+.ticket-reply .ticket-text { margin:6px 0; }
+@media(max-width:700px) { .dashboard-tabs { overflow-x:auto; }.dashboard-tabs button { flex:none; } }

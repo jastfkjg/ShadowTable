@@ -26,7 +26,7 @@ function performRequest(path, method = "GET", data, requestId, publicRead) {
       url: config.baseUrl + path,
       method,
       data,
-      timeout: 10000,
+      timeout: path === "/api/me/feedback" && data?.images?.length ? 45000 : 10000,
       header: {
         "content-type": "application/json",
         ...(!publicRead ? { Authorization: "Bearer " + token } : {}),

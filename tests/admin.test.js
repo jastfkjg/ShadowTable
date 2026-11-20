@@ -955,3 +955,39 @@ test("自动结算与行动审计同事务提交，重试只记录一次且秘�
     401,
   );
 });
+
+test("玩家反馈含截图可重试、私有读取、由管理平台筛选并回复", async t => {
+  const a = await setup(t);
+  const player = a.auth(await a.player("feedback-player"));
+  const stranger = a.auth(await a.player("other-player"));
+  const path = "/api/me/feedback", admin = "/api/admin/feedback";
+  const headers = { ...player, "Idempotency-Key": randomUUID() };
+  const image = await require("sharp")({ create: { width: 8, height: 12, channels: 3, background: "#e5c68b" } }).png().toBuffer();
+  const data = { category: "问题反馈", area: "牌桌", content: "投票后仍然在等待", images: [image.toString("base64")] };
+  const [{ id }, replay] = await Promise.all([a.api(path, data, headers), a.api(path, data, headers)]);
+  assert.equal(replay.id, id);
+  await assert.rejects(a.api(path, { ...data, content: "其他问题" }, headers), { status: 409 });
+  const mine = (await a.api(path, undefined, player)).items;
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].photos, 1);
+  assert.deepEqual((await a.api(path, undefined, stranger)).items, []);
+  const suffix = "/" + id + "/images/0";
+  assert.equal((await a.raw(path + suffix, undefined, stranger)).status, 404);
+  assert.equal((await a.raw(path + suffix, undefined, player)).headers.get("content-type"), "image/jpeg");
+  assert.equal((await a.raw(admin + suffix)).status, 401);
+  assert.equal((await a.raw(admin)).status, 401);
+  await a.login();
+  assert.equal((await a.api(admin + "?status=pending")).items[0].content, data.content);
+  assert.equal((await a.raw(admin + suffix)).status, 200);
+  const reply = admin + "/" + id + "/reply";
+  await a.api(reply, { reply: "已收到，正在检查。" });
+  await a.api(reply, { reply: "已收到，正在检查。" });
+  await assert.rejects(a.api(reply, { reply: "覆盖已有回复" }), { status: 409 });
+  assert.equal((await a.api(admin + "?status=replied")).items[0].id, id);
+  assert.equal((await a.api(admin + "?status=pending")).items.length, 0);
+  assert.equal((await a.api(path, undefined, player)).items[0].reply, "已收到，正在检查。");
+  for (const invalid of [{ images: Array(5).fill("") }, { images: ["bm90YW5pbWFnZQ=="] }, { content: " " }, { content: "长".repeat(1001) }]) {
+    await assert.rejects(a.api(path, { ...data, ...invalid }, { ...player, "Idempotency-Key": randomUUID() }), { status: 400 });
+  }
+  assert.equal((await a.api(path, undefined, player)).items.length, 1);
+});

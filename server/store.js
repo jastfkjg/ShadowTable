@@ -71,6 +71,7 @@ class Store {
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    require("./feedback").initialize(this.db);
     require("./avatar-uploads").initialize(this.db);
     management.initialize(this);
     require('./badge-awards').initialize(this);
