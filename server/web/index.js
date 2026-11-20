@@ -100,6 +100,15 @@ for (const badge of catalogue) {
 }
 for (const url of serverBadgeArt)
   assets[url] = ['assets/' + url.split('/').pop(), 'image/png'];
+const cardArt = new Set();
+for (const role of require("../engine").roleIds) {
+  for (const variant of ["a", "b"]) {
+    const filename = role + "-" + variant + ".jpg";
+    const url = "/assets/role-cards/" + filename;
+    cardArt.add(url);
+    assets[url] = ["assets/role-cards/" + filename, "image/jpeg"];
+  }
+}
 for (const name of ['info','heart','sword','swords','shield','shield-good','spark','medal','users','calendar','list','coin'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
@@ -116,11 +125,11 @@ function serve(req, res, path) {
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
   res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", cardArt.has(path) ? "public, max-age=86400" : "no-store");
   res.writeHead(200);
   res.end(content);
   return true;
 }
 // Mini-program-only deployments also need catalogue artwork hosted by the server.
-const serveBadgeArt = (req, res, path) => serverBadgeArt.has(path) && serve(req, res, path);
-module.exports = { serve, serveBadgeArt };
+const serveGameArt = (req, res, path) => (serverBadgeArt.has(path) || cardArt.has(path)) && serve(req, res, path);
+module.exports = { serve, serveGameArt };

@@ -6,7 +6,7 @@
 const portraits = {
   "梅林": "merlin", "派西维尔": "percival", "派西": "percival",
   "亚瑟的忠臣": "servant", "忠臣": "servant", "逆仆": "reverse",
-  "刺客": "assassin", "莫甘娜": "morgana", "莫德雷德": "mordred", "奥伯伦": "oberon",
+  "刺客": "assassin", "莫甘娜": "morgana", "莫德雷德": "mordred", "莫德雷德的爪牙": "minion", "奥伯伦": "oberon",
   "蓝兰斯洛特": "lancelot-blue", "红兰斯洛特": "lancelot-red", "兰斯洛特": "lancelot",
   "蓝刀客·兰斯洛特": "lancelot-blue", "红刀客·兰斯洛特": "lancelot-red",
   "蓝刀客·加雷斯": "gareth", "蓝刀客·加赫雷斯": "gaheris", "红刀客·奥伯伦": "oberon",
