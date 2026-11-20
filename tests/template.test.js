@@ -996,7 +996,7 @@ test("房主工具入口在任务出牌时收起，普通玩家不能看见管�
   }
 });
 
-test("身份默认只显示一行入口，进度仅房主可见，结束按钮位于记录之后", () => {
+test("身份默认只显示一行入口，进度明细仅房主可见，结束按钮位于记录之后", () => {
   const room = {
     phase: "teamVote",
     canUseTools: true,
@@ -1041,16 +1041,13 @@ test("身份默认只显示一行入口，进度仅房主可见，结束按钮�
   assert.ok(
     footerIndex > all.findIndex((n) => n.attr?.class === "table-dynamics operation-first"),
   );
-  const guest = render({
-    ...base,
-    room: {
-      ...room,
-      canUseTools: false,
-      operationProgress: null,
-      me: { isHost: false },
-    },
-  });
-  assert.ok(!JSON.stringify(guest).includes("当前操作进度"));
+  const player = { ...room, canUseTools: false, me: { seat: 2, submitted: true }, operationProgress: { total: 2, completed: 1 } };
+  const guest = render({ ...base, room: player, operationProgressExpanded: true,
+    playerProgressCard: require("../miniprogram/room-sheet-presentation").playerProgressCard(player) });
+  assert.match(JSON.stringify(guest), /你已投票，等待其余 1 人提交/);
+  assert.equal(nodes(guest).find(n => n.attr?.role === "progressbar").attr.ariaValuenow, 1);
+  assert.ok(!byHandler(guest, "toggleOperationProgress"));
+  assert.ok(!nodes(guest).some(n => n.attr?.role === "listitem"));
 });
 
 test("发身份弹窗默认隐藏，展开后在确认按钮前展示身份和视角", () => {
@@ -1631,10 +1628,17 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
     const data = { ...base, room, actionDialog: true, stagedChoice: true, draftChoice: "", swapOptions, swapSeats: [], swapPlayers: [],
       ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions, secret.action.unavailableHint, secret.action.swordHint) };
     const initial = render(data);
-    const hint = nodes(initial).find(n => n.attr?.class === 'skill-context' && JSON.stringify(n).includes('任意身份'));
-    if (role === 'redSwordsman') assert.match(JSON.stringify(initial), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
-    else if (mode === 'sword') assert.ok(hint, role);
-    else assert.doesNotMatch(JSON.stringify(initial), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+    assert.doesNotMatch(JSON.stringify(initial), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+    if (mode === "sword") {
+      assert.ok(byHandler(initial, "toggleSkillHelp"));
+      const pass = render({ ...data, draftChoice: "pass", skillHelpExpanded: true, ...presentation.skillSelectionView("pass", mode) });
+      assert.doesNotMatch(JSON.stringify(pass), /skill-target-grid|skill-target-heading|skill-target-caption|A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+      assert.ok(!byHandler(pass, "toggleSkillHelp"));
+      assert.equal(byHandler(pass, "confirmChoice").attr.disabled, false);
+      assert.equal(nodes(initial).filter(n => n.attr?.["data-value"] === "pass").length, 1);
+      const expanded = render({ ...data, skillHelpExpanded: true });
+      assert.match(JSON.stringify(expanded), role === "redSwordsman" ? /A 牌刀客或 B 牌角色.*刺客只失去技能/ : /可攻击其他任意身份/);
+    }
     const seats = nodes(initial).filter(n => n.attr?.class?.split(" ").includes("skill-option"));
     assert.equal(seats.length, 12, role);
     assert.ok(seats.some(n => n.attr.disabled && n.attr.ariaLabel.includes("已出局")), role);

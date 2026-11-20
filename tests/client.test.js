@@ -2179,13 +2179,19 @@ test("猎人先三选一，再显示对应号码；切换模式不提交，关�
 
 test("技能目标与放弃互斥，断网或未确认请求阻止提交，关闭清除草稿", async () => {
   const options = [{ value: "pass", label: "不使用技能 / 确认" }, { value: "target:2", label: "对 2号开刀" }];
-  const p = page({ request: async () => ({ stage: "s1", action: { choices: options.map(c => c.value), options } }) });
+  const p = page({ request: async () => ({ stage: "s1", action: { choices: options.map(c => c.value), options, swordHint: "开刀规则" } }) });
   p.data.room = { stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, players: [{ seat: 2, name: "玩家乙" }] };
   const writes = [];
   p.cmd = (...args) => writes.push(args);
   const choose = value => p.submitChoice({ currentTarget: { dataset: { value } } });
   await p.openAction();
-  assert.equal(p.data.skillTitle, "选择开刀目标");
+  assert.equal(p.data.skillTitle, "选择本轮行动");
+  assert.equal(p.data.skillHelpExpanded, false);
+  p.toggleSkillHelp();
+  assert.equal(p.data.skillHelpExpanded, true);
+  p.closeAction();
+  await p.openAction();
+  assert.equal(p.data.skillHelpExpanded, false);
   p.confirmChoice();
   await choose("target:2");
   assert.equal(p.data.skillConfirmLabel, "确认对 2 号开刀");
@@ -2193,6 +2199,14 @@ test("技能目标与放弃互斥，断网或未确认请求阻止提交，关�
   assert.equal(p.data.draftChoice, "pass");
   assert.equal(p.data.draftLabel, "本轮不开刀");
   assert.equal(p.data.skillConfirmLabel, "确认本轮不开刀");
+  await choose("pick-sword-target");
+  assert.equal(p.data.draftChoice, "");
+  p.confirmChoice();
+  await choose("target:2");
+  p.toggleSkillHelp();
+  p.toggleSkillHelp();
+  assert.equal(p.data.draftChoice, "target:2");
+  await choose("pass");
   for (const patch of [{ network: false }, { hasPendingRequest: true }, { busy: true }]) {
     Object.assign(p.data, patch);
     p.confirmChoice();

@@ -55,7 +55,7 @@
     const mode = fairyAction ? "fairy" : finalAction ? "final" : swapOptions.length ? "swap"
       : hunterModes ? hunterMode
       : targets[0]?.value.startsWith("inspect:") ? "inspect"
-      : label.includes("使用刀 / 决斗") ? "attack"
+      : label.includes("使用刀 / 决斗") ? (swordHint ? "sword" : "attack")
       : label.includes("开刀") ? "sword" : label.includes("决斗") ? "duel"
       : label.includes("指定替死者") ? "substitute" : label.includes("秘密守护") ? "guard"
       : label.includes("复活") ? "revive" : label.includes("开枪") ? "gun"
@@ -78,6 +78,7 @@
     const round = room.knights?.round || room.round;
     const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
       selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
+    const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
     const count = mode === "swap" ? swapSeats.size : targets.length;
     return {
       skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
@@ -87,9 +88,9 @@
       skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
         (finalAction ? "最终盘刀" : "技能准备") : "",
       skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-      skillSwordHint: swordHint,
+      skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
       skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
-      skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+      skillOtherChoices: choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
         label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
           ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
       })),
@@ -99,7 +100,7 @@
   function skillTargetCopy(mode) {
     return {
       fairy: { title: "仙女查验", verb: "查验", privateResult: true },
-      sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+      sword: { title: "选择本轮行动", verb: "开刀", pass: "本轮不开刀" },
       duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
       inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
       guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
@@ -2066,7 +2067,7 @@ function roomListItems(rooms) {
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
-    patch.operationProgressExpanded = !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
+    patch.operationProgressExpanded = !!room.canUseTools && !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     Object.assign(patch, publicHistory.sync(state, history, room));
     patch.history = history;
@@ -3231,6 +3232,10 @@ function roomListItems(rooms) {
         room.stage !== actionDraftStage
       )
         return;
+      if (value === "pick-sword-target" && state.swordModes && state.draftChoice === "pass") {
+        setState({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+        return;
+      }
       var choice = state.actionChoices.filter(function (c) {
         return c.value === value;
       })[0];
@@ -4080,14 +4085,30 @@ function roomListItems(rooms) {
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
     var targetMode = !!state.skillTargetMode;
+    const swordPass = state.swordModes && state.draftChoice === 'pass';
     var description = [state.skillHint && 'skill-hint', targetMode && state.skillConsequence && 'skill-consequence'].filter(Boolean).join(' ');
-    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
+    const titleIcon = state.swordModes ? '<img src="/assets/record-swords.svg" alt="">' : '';
+    const title = '<div id="skill-title" class="skill-title">' + titleIcon + esc(state.skillTitle) + '</div>';
+    const meta = targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '';
+    const heading = state.swordModes ? '<div class="sword-title-row">' + title +
+      '<button class="sword-close" type="button" data-action="closeAction" aria-label="稍后选择技能"' +
+      (state.busy ? ' disabled' : '') + '>×</button></div>' + meta : meta + title;
+    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + (state.swordModes ? ' sword-sheet' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
       (description ? ' aria-describedby="' + description + '"' : '') + '>' +
-      '<div class="skill-header">' + (targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '') + '<div id="skill-title" class="skill-title">' + esc(state.skillTitle) + '</div>' +
+      '<div class="skill-header">' + heading +
       (state.skillHint ? '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' : '') +
       '</div><div class="skill-body">';
-    if (targetMode) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
-    if (state.skillSwordHint) html += '<div class="skill-context">' + esc(state.skillSwordHint) + '</div>';
+    if (state.swordModes) {
+      const modeButton = (value, label, active) => '<button type="button" class="sword-mode' + (active ? ' is-active' : '') +
+        '" data-action="submitChoice" data-value="' + value + '" aria-pressed="' + active + '"' + (locked ? ' disabled' : '') +
+        '><span class="sword-radio" aria-hidden="true"></span>' + label + '</button>';
+      html += '<div class="sword-modes" role="group" aria-label="本轮行动">' + modeButton('pick-sword-target', '选择目标开刀', !swordPass) + modeButton('pass', '本轮不开刀', swordPass) + '</div>';
+    }
+    if (targetMode && !swordPass) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
+    if (state.skillSwordHint && !swordPass) {
+      html += '<button type="button" class="disclosure-button sword-help" data-action="toggleSkillHelp" aria-expanded="' + state.skillHelpExpanded + '" aria-controls="sword-rules">技能说明<span class="identity-help-chevron' + (state.skillHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
+      if (state.skillHelpExpanded) html += '<div id="sword-rules" class="skill-context">' + esc(state.skillSwordHint) + '</div>';
+    }
     if (["hunterTurn", "paladinTurn"].includes(state.room.phase) && state.room.operationStatus)
       html += '<div class="skill-context">' + esc(state.room.operationStatus.detail) + '</div>';
     function seatButton(c, swap) {
@@ -4097,7 +4118,7 @@ function roomListItems(rooms) {
         (c.disabledReason || locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + '<span class="skill-seat-unit"> 号</span></span><span class="skill-name">' + esc(c.disabledReason || c.name) + '</span>' +
         (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
     }
-    if (state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
+    if (!swordPass && state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
     if (state.swapOptions.length) html += '<div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
     html += '</div>' + (state.skillOtherChoices.length ? '<div class="skill-other-choices">' : '');
     for (var c of state.skillOtherChoices) {
@@ -4542,20 +4563,25 @@ function roomListItems(rooms) {
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
-    if (r.canUseTools && r.operationProgress) {
+    const playerProgress = roomSheets.playerProgressCard(r);
+    if (r.operationProgress && (r.canUseTools || playerProgress)) {
       var progress = r.operationProgress;
       var allCompleted = progress.total > 0 && progress.completed === progress.total;
       html +=
-        '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '"><button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '"><span class="progress-title">当前操作进度</span>' +
-        '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">已完成</span></span>' +
-        '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>' +
+        '<div class="operation-progress' + (allCompleted ? ' all-done' : '') + '">' +
+        (playerProgress ? '<div class="player-progress-heading">' :
+          '<button type="button" class="progress-heading progress-toggle" data-action="toggleOperationProgress" aria-expanded="' + !!state.operationProgressExpanded + '" aria-label="当前操作进度，' + progress.completed + '人已完成，共' + progress.total + '人，' + (state.operationProgressExpanded ? '收起' : '展开') + '">') +
+        '<span class="progress-title">' + (playerProgress ? esc(playerProgress.title) : '当前操作进度') + '</span>' +
+        '<span class="progress-count"><span class="progress-completed-count">' + progress.completed + '</span><span class="progress-total">/ ' + progress.total + '</span><span class="progress-count-label">' + (playerProgress ? '已提交' : '已完成') + '</span></span>' +
+        (playerProgress ? '</div>' : '<span class="progress-disclosure" aria-hidden="true"><span>' + (state.operationProgressExpanded ? '收起' : '展开') + '</span><span class="progress-chevron' + (state.operationProgressExpanded ? ' expanded' : '') + '"></span></span></button>') +
         '<div class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="' + progress.total + '" aria-valuenow="' + progress.completed + '">';
       for (var segment = 0; segment < progress.total; segment++) {
         html += '<span class="progress-segment' + (segment < progress.completed ? ' completed' : '') + '"></span>';
       }
-      html += '</div><div class="progress-note" role="status"><span class="progress-note-dot" aria-hidden="true"></span><span>' +
-        (allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
-      if (state.operationProgressExpanded) {
+      html += '</div><div class="progress-note" role="status">' +
+        (playerProgress && r.me.submitted ? '<span class="progress-check" aria-hidden="true">✓</span>' : '<span class="progress-note-dot" aria-hidden="true"></span>') +
+        '<span>' + (playerProgress ? esc(playerProgress.note) : allCompleted ? '全部玩家已完成操作' : progress.total > 0 ? '等待 ' + (progress.total - progress.completed) + ' 位玩家完成操作' : '暂无待完成操作') + '</span></div>';
+      if (r.canUseTools && state.operationProgressExpanded) {
         html += '<div class="progress-players" role="list">';
         for (var q = 0; q < (progress.players || []).length; q++) {
           var pp = progress.players[q];
@@ -5283,6 +5309,9 @@ function roomListItems(rooms) {
     closeDealtIdentity: closeDealtIdentity,
     dismissIdentityHint: dismissIdentityHint,
     revealActionIdentity: revealActionIdentity,
+    toggleSkillHelp: () => {
+      if (state.actionDialog && state.skillSwordHint) setState({ skillHelpExpanded: !state.skillHelpExpanded });
+    },
     openAction: openAction,
     closeAction: closeAction,
     submitChoice: function (el) {

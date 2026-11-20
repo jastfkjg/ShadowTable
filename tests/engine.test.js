@@ -128,11 +128,11 @@ test("准备、结算和终止阶段移交不会改变对局数据", () => {
     assert.equal(publicView(r, "p1").me.isHost, false);
   }
 });
-test("秘密提交不改变其他普通玩家视图，房主仅额外获得进度", () => {
+test("身份确认只更新其他普通玩家看到的汇总人数", () => {
   const r = setup();
-  const before = JSON.stringify(publicView(r, "p3"));
+  const before = publicView(r, "p3");
   run(r, "p2", "submit", { value: "confirm" });
-  assert.equal(JSON.stringify(publicView(r, "p3")), before);
+  assert.deepEqual(publicView(r, "p3"), { ...before, operationProgress: { total: 6, completed: 1 } });
   assert.throws(() => advance(r), /阶段尚未完成/);
   assert.throws(() => run(r, "p2", "submit", { value: "confirm" }), /已提交/);
 });
@@ -169,9 +169,9 @@ test("组队票在结算时公开，任务票从不返回个人对应", () => {
   advance(r);
   assert.equal(publicView(r, "p1").history[0].votes.length, 6);
   advance(r);
-  const before = JSON.stringify(publicView(r, "p3"));
+  const before = publicView(r, "p3");
   run(r, "p2", "submit", { value: "success" });
-  assert.equal(JSON.stringify(publicView(r, "p3")), before);
+  assert.deepEqual(publicView(r, "p3"), { ...before, operationProgress: { total: 6, completed: 1 } });
 });
 test("好人失败票、非队员任务票、重复目标和非队长组队被拒绝", () => {
   const r = setup();

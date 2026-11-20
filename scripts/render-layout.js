@@ -394,7 +394,7 @@ for (const mode of ["fairy", "sword"]) {
   command(source, source.host, { type: "beginActivity", kind: mode === "fairy" ? "fairy" : "skills", stage: source.stage });
   const room = publicView(source, uid);
   const action = privateView(source, uid).action;
-  const presentation = skillPresentation.skillView(room, action.options, false, "", []);
+  const presentation = skillPresentation.skillView(room, action.options, false, "", [], action.unavailableHint, action.swordHint);
   const data = { ...roomData(source), room, actionDialog: true, stagedChoice: true,
     actionLabel: action.label, actionChoices: action.options, actionTargets: [],
     draftChoice: "", draftLabel: "", swapOptions: [], swapPlayers: [], swapSeats: [],
@@ -414,7 +414,7 @@ for (const [role, mode, value] of require("../tests/helpers/skill-target-fixture
   const data = { ...roomData(source), room, actionDialog: true, stagedChoice: true,
     actionChoices, actionTargets: [], hunterModes: !!secret.action.hunterModes, hunterMode: secret.action.hunterModes ? mode : "",
     draftChoice: "", draftLabel: "", swapOptions, swapPlayers: [], swapSeats: [],
-    ...skillPresentation.skillView(room, actionChoices, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions) };
+    ...skillPresentation.skillView(room, actionChoices, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions, secret.action.unavailableHint, secret.action.swordHint) };
   scenes[mode + "TargetPicker"] = data;
   scenes[mode + "TargetSelected"] = { ...data, draftChoice: value,
     ...(mode === "swap" ? { swapSeats: [2, 7], swapPlayers: data.swapPlayers.map(p => ({ ...p, selected: [2, 7].includes(p.seat) })) } : {}),

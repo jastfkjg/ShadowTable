@@ -88,6 +88,17 @@
 .process-skill button.skill-confirm, .process-skill button.skill-confirm[disabled]:not([type]) { min-height: 50px; margin: 4px 0 0; padding: 12px; border-radius: 13px; font-size: 16px; line-height: 1.5; }
 .process-skill button.skill-later { min-height: 44px; padding: 10px; margin-top: 4px; font-size: 13px; }
 
+.sword-modes { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--border); border-radius: 14px; }
+.sword-modes button.sword-mode { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 6px 3px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; line-height: 1.5; }
+.sword-modes button.is-active { background: rgba(229,198,139,.16); border-color: var(--accent); font-weight: 600; }
+.sword-radio { box-sizing: border-box; flex-shrink: 0; width: 15px; height: 15px; border: 1px solid var(--muted); border-radius: 50%; }
+.is-active .sword-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px); }
+.skill-dialog button.sword-help { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; min-height: 44px; margin: 0; padding: 0 8px 0 0; border: 0; background: transparent; color: var(--muted); font-size: 13px; }
+.sword-sheet .skill-target-heading { margin-bottom: 0; }
+.sword-sheet .skill-check { width: 15px; height: 15px; border-radius: 50%; color: var(--bg); background: var(--accent); text-align: center; line-height: 15px; }
+.table-sheet-backdrop .table-sheet.sword-sheet, .sword-sheet .skill-footer { background: var(--bg); }
+.sword-sheet .skill-footer { border-top: 1px solid rgba(177,191,198,.18); }
+
 /* Host operation picker and vote/quest cards share the selection language. */
 .process-tool-tabs { display: flex; gap: 4px; padding: 4px; margin: 3px 0 19px; border-radius: 13px; background: var(--control-bg, #14232c); }
 .process-tool-tabs button, .process-tool-tabs button[disabled]:not([type]) { flex: 1; width: auto; min-height: 44px; margin: 0; padding: 7px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.5; }

@@ -59,7 +59,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const mode = fairyAction ? "fairy" : finalAction ? "final" : swapOptions.length ? "swap"
     : hunterModes ? hunterMode
     : targets[0]?.value.startsWith("inspect:") ? "inspect"
-    : label.includes("使用刀 / 决斗") ? "attack"
+    : label.includes("使用刀 / 决斗") ? (swordHint ? "sword" : "attack")
     : label.includes("开刀") ? "sword" : label.includes("决斗") ? "duel"
     : label.includes("指定替死者") ? "substitute" : label.includes("秘密守护") ? "guard"
     : label.includes("复活") ? "revive" : label.includes("开枪") ? "gun"
@@ -82,6 +82,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const round = room.knights?.round || room.round;
   const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
     selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
+  const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
   const count = mode === "swap" ? swapSeats.size : targets.length;
   return {
     skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
@@ -91,9 +92,9 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
       (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-    skillSwordHint: swordHint,
+    skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
-    skillOtherChoices: choices.filter(c => !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+    skillOtherChoices: choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
       label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
         ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
     })),
@@ -103,7 +104,7 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
 function skillTargetCopy(mode) {
   return {
     fairy: { title: "仙女查验", verb: "查验", privateResult: true },
-    sword: { title: "选择开刀目标", verb: "开刀", pass: "本轮不开刀" },
+    sword: { title: "选择本轮行动", verb: "开刀", pass: "本轮不开刀" },
     duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
     inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
     guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
@@ -1015,7 +1016,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatsExpanded: room.phase !== "lobby" && this.data.room?.code === room.code ? this.data.seatsExpanded : true,
       seatOccupiedCount: seats.filter(s => s.occupied).length,
       seatReadyCount: seats.filter(s => s.occupied && s.ready).length,
-      operationProgressExpanded: !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
+      playerProgressCard: roomSheet.playerProgressCard(room),
+      operationProgressExpanded: !!room.canUseTools && !!room.operationProgress && this.data.room?.code === room.code && this.data.room?.stage === room.stage && this.data.operationProgressExpanded,
       operationProgressSegments: Array.from({ length: room.operationProgress?.total || 0 }, (_, index) => ({
         index, completed: index < room.operationProgress.completed,
       })),
@@ -2861,6 +2863,9 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         (this.data.skillAction && this.data.swapOptions.includes(value)))) return;
     this.cmd("submit", { value: this.data.skillTargetMode === "final" ? Number(value.split(":")[1]) : value });
   },
+  toggleSkillHelp() {
+    if (this.data.actionDialog && this.data.skillSwordHint) this.setProcessData({ skillHelpExpanded: !this.data.skillHelpExpanded });
+  },
   async submitChoice(e) {
     const value = e.currentTarget.dataset.value;
     if (this.data.hunterModes && value.startsWith("mode:")) {
@@ -2883,6 +2888,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.room.stage !== this.actionDraftStage
       )
         return;
+      // Returning from pass opens target selection with no seat preselected.
+      if (value === "pick-sword-target" && this.data.swordModes && this.data.draftChoice === "pass") {
+        this.setProcessData({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+        return;
+      }
       const choice = this.data.actionChoices.find((c) => c.value === value);
       if (choice)
         this.setProcessData({ draftChoice: value, draftLabel: this.data.skillAction ? skillDraftLabel(choice, this.data.hunterModes, this.data.skillTargetMode) : choice.label,

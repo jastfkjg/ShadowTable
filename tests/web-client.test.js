@@ -859,6 +859,29 @@ test("网页房主进度可展开收起，刷新保留状态，新操作默认�
   await c.refresh();
   assert.equal(c.state.operationProgressExpanded, false);
 });
+test("网页玩家只有分段进度与自己的提交提示", async () => {
+  const room = dealtWebRoom({ phase: "teamVote", team: [1, 2], needsSubmission: true, operationProgress: { total: 7, completed: 4 } });
+  const c = client(async () => response(structuredClone(room)));
+  await c.refresh();
+  assert.match(c.viewRoom(), /请投票，等待 3 人提交/);
+  room.me.submitted = true;
+  room.operationProgress.completed++;
+  await c.refresh();
+  c.ACTIONS.toggleOperationProgress();
+  const html = c.viewRoom();
+  assert.match(html, /你已投票，等待其余 2 人提交/);
+  assert.equal((html.match(/class="progress-segment completed"/g) || []).length, 5);
+  assert.doesNotMatch(html, /data-action="toggleOperationProgress"|class="progress-players"/);
+  room.phase = "hunterTurn";
+  room.phaseName = "出局技能确认";
+  room.stage = "follow-up";
+  room.me.submitted = false;
+  room.operationProgress.completed = 0;
+  await c.refresh();
+  assert.match(c.viewRoom(), /class="progress-title">出局技能确认</);
+  assert.match(c.viewRoom(), /请完成本轮操作，等待 7 人提交/);
+  assert.doesNotMatch(c.viewRoom(), /data-action="toggleOperationProgress"|class="progress-players"/);
+});
 test("网页最近结果与历史记录隐藏空的原牌复活及最终仍出局，保留旧版实际复活", async () => {
   const event = { kind: "skillResult", text: "技能最终结果", eliminated: [3, 5], redrawn: [3, 5], restored: [], out: [], detail: "本轮出局：3、5号；抽牌复活：3、5号；原牌复活：无；最终仍出局：无" };
   const room = dealtWebRoom({ history: [event] });
@@ -1551,6 +1574,13 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   assert.match(c.viewActionDialog(), /确认对 2 号开刀/);
   c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   assert.match(c.viewActionDialog(), /确认本轮不开刀/);
+  assert.doesNotMatch(c.viewActionDialog(), /skill-target-heading|skill-target-grid|skill-target-caption/);
+  c.ACTIONS.submitChoice({ dataset: { value: "pick-sword-target" } });
+  assert.match(c.viewActionDialog(), /skill-target-grid/);
+  assert.match(c.viewActionDialog(), /请先选择目标/);
+  c.ACTIONS.confirmChoice();
+  assert.equal(c.state.draftChoice, "");
+  c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   c.state.room.stage = "s2";
   c.ACTIONS.confirmChoice();
   assert.equal(writes.length, 0);
@@ -1591,6 +1621,14 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
     assert.doesNotMatch(c.viewActionDialog(), /skill-summary|skill-eligibility|已选 \d \/ 2/, role);
     assert.match(c.viewActionDialog(), /已出局/);
     assert.match(c.viewActionDialog(), /&lt;小鱼&gt;/);
+    if (mode === "sword") {
+      assert.doesNotMatch(c.viewActionDialog(), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+      c.ACTIONS.toggleSkillHelp();
+      await choose("pass");
+      assert.doesNotMatch(c.viewActionDialog(), /toggleSkillHelp|A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+      assert.match(c.viewActionDialog(), /确认本轮不开刀/);
+      await choose("pick-sword-target");
+    }
     if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
     else if (mode === 'sword') {
       assert.match(c.viewActionDialog(), /可攻击其他任意身份/);

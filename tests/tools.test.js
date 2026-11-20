@@ -46,7 +46,7 @@ test("独立投票不必选队伍，结算前保密，连续否决不会结束�
     begin(r, "vote");
     const view = publicView(r, "p3");
     run(r, "p2", "submit", { value: "reject" });
-    assert.deepEqual(publicView(r, "p3"), view);
+    assert.deepEqual(publicView(r, "p3"), { ...view, operationProgress: { total: 6, completed: 1 } });
     for (const p of r.players.filter((p) => p.uid !== "p2"))
       run(r, p.uid, "submit", { value: "reject" });
     assert.equal(r.phase, "tools");
@@ -186,13 +186,17 @@ test("旧顺序房间可保留当前提交转入工具结算，未提交完的�
 test("房主只获得完成状态，任务非队员不计入进度，普通玩家无进度明细", () => {
   const r = setup();
   begin(r, "quest", { team: [1, 2], threshold: 1 });
-  assert.equal(publicView(r, "p2").operationProgress, null);
+  assert.deepEqual(publicView(r, "p2").operationProgress, { total: 2, completed: 0 });
   assert.equal(publicView(r, "p1").operationProgress.total, 2);
   assert.equal(
     publicView(r, "p1").operationProgress.players[2].required,
     false,
   );
   run(r, "p2", "submit", { value: "success" });
+  assert.deepEqual(publicView(r, "p3").operationProgress, { total: 2, completed: 1 });
+  const otherSubmitter = structuredClone(r);
+  otherSubmitter.submissions = { p1: "success" };
+  assert.deepEqual(publicView(otherSubmitter, "p3"), publicView(r, "p3"));
   const status = publicView(r, "p1").operationProgress;
   const sameStatusDifferentVote = structuredClone(r);
   sameStatusDifferentVote.submissions.p2 = "fail";
@@ -219,6 +223,7 @@ test("房主只获得完成状态，任务非队员不计入进度，普通玩�
 test("刀人进度不暴露刺客、目标或选择，所有玩家都有完成状态", () => {
   const r = setup();
   begin(r, "assassination");
+  assert.deepEqual(publicView(r, "p2").operationProgress, { total: 6, completed: 0 });
   const before = publicView(r, "p1").operationProgress;
   assert.equal(before.total, 6);
   assert.ok(before.players.every((p) => p.required && !p.completed));

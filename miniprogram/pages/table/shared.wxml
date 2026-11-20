@@ -238,15 +238,22 @@
     </view>
   </view>
   <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
-    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
+    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{swordModes?'sword-sheet':''}} {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
       <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{skillTargetMode==='fairy' || skillTargetMode==='inspect'?'process-eye':skillTargetMode==='sword' || skillTargetMode==='attack'?'record-swords':'record-spark'}}.svg" aria-hidden="true" /></view><text>{{skillTitle}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择技能">×</button></view></view>
       <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="skill-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
         <view wx:if="{{skillTargetMode!=='fairy'}}" class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
         <view wx:if="{{skillHint}}" class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
-        <view wx:if="{{skillTargetMode}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
-        <view wx:if="{{skillSwordHint}}" class="skill-context">{{skillSwordHint}}</view>
+        <view wx:if="{{swordModes}}" class="sword-modes" aria-label="本轮行动">
+          <button hover-class="none" class="sword-mode {{draftChoice!=='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pick-sword-target" aria-pressed="{{draftChoice!=='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="sword-radio" aria-hidden="true" />选择目标开刀</button>
+          <button hover-class="none" class="sword-mode {{draftChoice==='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pass" aria-pressed="{{draftChoice==='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="sword-radio" aria-hidden="true" />本轮不开刀</button>
+        </view>
+        <view wx:if="{{skillTargetMode && !(swordModes && draftChoice==='pass')}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
+        <block wx:if="{{skillSwordHint && !(swordModes && draftChoice==='pass')}}">
+          <button hover-class="none" class="disclosure-button sword-help" bindtap="toggleSkillHelp" aria-expanded="{{skillHelpExpanded}}" aria-controls="sword-rules"><text>技能说明</text><view class="identity-help-chevron {{skillHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
+          <view wx:if="{{skillHelpExpanded}}" id="sword-rules" class="skill-context">{{skillSwordHint}}</view>
+        </block>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
-        <view wx:if="{{skillTargets.length}}" class="skill-target-grid">
+        <view wx:if="{{skillTargets.length && !(swordModes && draftChoice==='pass')}}" class="skill-target-grid">
           <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view>
         <block wx:if="{{swapOptions.length}}"><view class="skill-target-grid">
@@ -514,17 +521,22 @@
       </block>
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
-    <view wx:if="{{room.canUseTools && room.operationProgress}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
-      <button hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}" aria-label="{{'当前操作进度，'+room.operationProgress.completed+'人已完成，共'+room.operationProgress.total+'人，'+(operationProgressExpanded?'收起':'展开')}}">
+    <view wx:if="{{room.operationProgress && (room.canUseTools || playerProgressCard)}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
+      <button wx:if="{{room.canUseTools}}" hover-class="none" class="disclosure-button progress-heading progress-toggle" bindtap="toggleOperationProgress" aria-expanded="{{operationProgressExpanded}}" aria-label="{{'当前操作进度，'+room.operationProgress.completed+'人已完成，共'+room.operationProgress.total+'人，'+(operationProgressExpanded?'收起':'展开')}}">
         <text class="progress-title">当前操作进度</text>
         <view class="progress-count"><text class="progress-completed-count">{{room.operationProgress.completed}}</text><text class="progress-total">/ {{room.operationProgress.total}}</text><text class="progress-count-label">已完成</text></view>
         <view class="progress-disclosure" aria-hidden="true"><text>{{operationProgressExpanded?'收起':'展开'}}</text><view class="progress-chevron {{operationProgressExpanded?'expanded':''}}" /></view>
       </button>
+      <view wx:else class="player-progress-heading">
+        <text class="progress-title">{{playerProgressCard.title}}</text>
+        <view class="progress-count"><text class="progress-completed-count">{{room.operationProgress.completed}}</text><text class="progress-total">/ {{room.operationProgress.total}}</text><text class="progress-count-label">已提交</text></view>
+      </view>
       <view class="progress-meter" role="progressbar" aria-label="当前操作完成进度" aria-valuemin="0" aria-valuemax="{{room.operationProgress.total}}" aria-valuenow="{{room.operationProgress.completed}}">
         <view wx:for="{{operationProgressSegments}}" wx:key="index" class="progress-segment {{item.completed?'completed':''}}" />
       </view>
-      <view class="progress-note" role="status"><view class="progress-note-dot" aria-hidden="true" /><text>{{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'全部玩家已完成操作':room.operationProgress.total > 0?'等待 '+(room.operationProgress.total-room.operationProgress.completed)+' 位玩家完成操作':'暂无待完成操作'}}</text></view>
-      <block wx:if="{{operationProgressExpanded}}">
+      <view wx:if="{{playerProgressCard}}" class="progress-note" role="status"><text wx:if="{{room.me.submitted}}" class="progress-check" aria-hidden="true">✓</text><view wx:else class="progress-note-dot" aria-hidden="true" /><text>{{playerProgressCard.note}}</text></view>
+      <view wx:else class="progress-note" role="status"><view class="progress-note-dot" aria-hidden="true" /><text>{{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'全部玩家已完成操作':room.operationProgress.total > 0?'等待 '+(room.operationProgress.total-room.operationProgress.completed)+' 位玩家完成操作':'暂无待完成操作'}}</text></view>
+      <block wx:if="{{room.canUseTools && operationProgressExpanded}}">
         <view class="progress-players" role="list">
           <view wx:for="{{room.operationProgress.players}}" wx:key="seat" wx:if="{{item.required}}" class="progress-player {{item.completed?'completed':''}}" role="listitem" aria-label="{{item.seat+'号，'+item.name+'，'+(item.completed?'已完成':'待完成')}}">
             <text class="progress-seat" aria-hidden="true">{{item.seat}}</text>
