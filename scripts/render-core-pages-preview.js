@@ -48,8 +48,8 @@ function html(node) {
     if (key === "hidden" || key === "disabled") return value ? [key] : [];
     if (key.startsWith("aria")) key = key.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
     if (key === "src" && value.startsWith("/")) {
-      const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml" })[path.extname(value)];
-      value = "data:" + mime + ";base64," + fs.readFileSync(path.join(root, value)).toString("base64");
+      const mime = ({ ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml" })[path.extname(value)];
+      value = "data:" + mime + ";base64," + fs.readFileSync(value.startsWith("/assets/role-cards/") ? path.join(__dirname, "../server/web", value) : path.join(root, value)).toString("base64");
     }
     if (key === "style") value = String(value).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
     return ["id", "class", "src", "style", "role", "aria-label", "aria-live", "aria-busy", "aria-selected", "aria-pressed", "aria-expanded", "aria-hidden", "aria-haspopup", "aria-modal", "value", "placeholder", "maxlength"].includes(key) ? [`${key}="${safe(value)}"`] : [];
@@ -449,6 +449,17 @@ Object.assign(reviewSource.roles,{'review-1':'morgana','review-3':'mordred','rev
 reviewSource.knights.initialRoles={...reviewSource.roles};
 const reviewSecret=privateView(reviewSource,'review-1');
 const reviewIdentity={...reviewSecret,factionTone:'evil',portrait:portrait(reviewSecret.role,'evil').portrait,vision:presentVision(reviewSecret.information,reviewSource.players)};
+for (const role of ['mordred', 'minion', 'assassin']) {
+  const sample = structuredClone(reviewSource), uid = 'review-1';
+  Object.assign(sample.roles, { [uid]: role, 'review-3': 'morgana', 'review-7': role === 'assassin' ? 'mordred' : 'assassin' });
+  sample.knights.initialRoles = { ...sample.roles };
+  const secret = privateView(sample, uid);
+  for (const variant of ['a', 'b']) {
+    tableScenes['woodcut-' + role + '-' + variant] = tableScene(sample, uid, { dealtIdentityDialog: true,
+      dealtIdentitySecret: { ...secret, factionTone: 'evil', portrait: portrait(secret.role, 'evil').portrait,
+        cardArt: '/assets/role-cards/' + role + '-' + variant + '.jpg' } });
+  }
+}
 tableScenes['ui-identity-morgana-no-avatars']=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:reviewIdentity});
 for(const [name,information] of [['anonymous','梅林与莫甘娜位于：3、7号。你无法区分谁是梅林。'],['long','完整的私密视野说明。'.repeat(35)]]) {
   tableScenes['ui-identity-'+name]=tableScene(reviewSource,'review-1',{dealtIdentityDialog:true,dealtIdentitySecret:{...reviewIdentity,information,vision:presentVision(information,reviewSource.players)}});

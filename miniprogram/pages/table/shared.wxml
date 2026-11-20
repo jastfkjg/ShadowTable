@@ -31,7 +31,7 @@
       >
       <view wx:if="{{room.operationStatus || room.needsSubmission}}" class="action-entry" role="status">
         <view class="action-status-copy"><view>{{room.needsSubmission && !room.me.submitted ? '请'+actionEntryLabel : room.operationStatus ? room.operationStatus.title : room.me.submitted?'已提交，等待其他玩家':'本次无需你操作'}}</view><view class="small muted">{{room.operationStatus.detail}}</view></view>
-        <button hover-class="none" wx:if="{{room.needsSubmission && !room.me.submitted}}" class="primary" bindtap="openAction" disabled="{{hasPendingRequest || busy || actionLoading || !network}}" loading="{{actionLoading}}">{{actionEntryLabel}}</button>
+        <button hover-class="none" wx:if="{{room.needsSubmission && !room.me.submitted}}" class="{{actionDialog ? 'primary' : 'primary action-entry-reminder'}}" bindtap="openAction" disabled="{{hasPendingRequest || busy || actionLoading || !network}}" loading="{{actionLoading}}">{{actionEntryLabel}}</button>
       </view>
     </view>
 </template>
@@ -140,18 +140,19 @@
         <view class="deal-flight {{dealFlightStyle?'is-flying':''}}" style="{{dealFlightStyle}}" bindanimationend="finishDealFlight">
           <view class="deal-turn {{dealtIdentitySecret?'is-revealed':''}}">
             <view class="deal-side deal-back" aria-hidden="{{!!dealtIdentitySecret || dealClosing}}">
-              <image class="deal-back-art" src="/assets/identity-card-back.jpg" mode="scaleToFill" aria-hidden="true" />
+              <image class="deal-back-art" src="/assets/identity-card-back.webp" webp="{{true}}" mode="scaleToFill" aria-hidden="true" />
               <button wx:if="{{!dealtIdentitySecret && !dealClosing}}" class="deal-hit" hover-class="none" aria-label="轻点牌面，查看身份" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" />
             </view>
-            <view class="deal-side deal-face" aria-hidden="{{!dealtIdentitySecret}}">
-              <view wx:if="{{dealtIdentitySecret}}" class="deal-face-content">
-                <view class="deal-heading">
-                  <image wx:if="{{dealtIdentitySecret.portrait}}" class="deal-portrait" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" />
-                  <view class="deal-role">{{dealtIdentitySecret.role}}</view>
-                  <text class="deal-faction faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.faction}}</text>
+            <view class="deal-side deal-face{{dealtIdentitySecret.cardArt?' printed':''}}" aria-hidden="{{!dealtIdentitySecret}}">
+              <view wx:if="{{dealtIdentitySecret}}" class="deal-face-content {{dealtIdentitySecret.cardArt?'has-woodcut':''}}">
+                <view class="deal-heading {{dealtIdentitySecret.cardArt?'woodcut':''}}">
+                  <image wx:if="{{dealtIdentitySecret.cardArt}}" class="deal-illustration" src="{{dealtIdentitySecret.cardArt}}" mode="aspectFill" data-surface="dealtIdentitySecret" data-src="{{dealtIdentitySecret.cardArt}}" binderror="cardArtError" aria-hidden="true" />
+                  <image wx:elif="{{dealtIdentitySecret.portrait}}" class="deal-portrait" src="{{dealtIdentitySecret.portrait}}" mode="aspectFit" aria-hidden="true" />
+                  <view class="deal-nameplate"><view class="deal-role">{{dealtIdentitySecret.role}}</view>
+                  <text class="deal-faction faction-{{dealtIdentitySecret.factionTone}}">{{dealtIdentitySecret.faction}}</text></view>
                   <button wx:if="{{dealtIdentitySecret.info.ability}}" class="disclosure-button deal-help" hover-class="none" bindtap="toggleIdentityHelp" data-surface="dealt" aria-label="角色说明" aria-expanded="{{identityHelpExpanded}}">角色说明<view class="identity-help-chevron {{identityHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
                 </view>
-                <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:true, compact:true, summarize:true}}" />
+                <template is="identityInformation" data="{{info:dealtIdentitySecret.info, fallback:dealtIdentitySecret.information, showAvatars:!dealtIdentitySecret.cardArt, printed:!!dealtIdentitySecret.cardArt, compact:true, summarize:true}}" />
                 <view wx:if="{{identityHelpExpanded && dealtIdentitySecret.info.ability}}" class="deal-details">
                   <template is="identityRoleAbility" data="{{ability:dealtIdentitySecret.info.ability, summarized:true}}" />
                 </view>
@@ -194,7 +195,8 @@
     <scroll-view class="process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}" scroll-y enhanced show-scrollbar="{{false}}"><view class="process-sheet-fields">
       <view class="identity-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅供本人查看</text></view>
       <block wx:if="{{identityChangeRevealed}}">
-        <view class="dealt-role-heading"><image wx:if="{{identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view></view>
+        <image wx:if="{{identityChange.cardArt}}" class="identity-card-banner" src="{{identityChange.cardArt}}" mode="aspectFill" data-surface="identityChange" data-src="{{identityChange.cardArt}}" binderror="cardArtError" aria-hidden="true" />
+        <view class="dealt-role-heading"><image wx:if="{{!identityChange.cardArt && identityChange.portrait}}" class="private-role-art" src="{{identityChange.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="dealt-role-copy"><view class="identity-title faction-{{identityChange.factionTone}}">{{identityChange.role}}</view><view class="private-faction faction-{{identityChange.factionTone}}">● {{identityChange.faction}}</view></view></view>
         <template is="identityInformation" data="{{info:identityChange.info, fallback:identityChange.information, summarize:true}}" />
         <template is="identitySkillStatus" data="{{status:identityChange.skillStatus, ability:identityChange.info.ability, surface:'change', helpExpanded:identityHelpExpanded}}" />
       </block>
@@ -493,8 +495,9 @@
     <block wx:if="{{room.phase!=='lobby' && room.me.seat!==null}}">
       <view wx:if="{{revealed}}" class="identity open identity-compact">
         <view class="compact-privacy-row"><view class="compact-privacy-note"><image src="/assets/table-lock.svg" aria-hidden="true" /><text>仅你可见</text></view><button hover-class="none" class="text-button compact-hide" bindtap="reveal"><view class="compact-hide-face"><image src="/assets/identity-hide-muted.svg" aria-hidden="true" /><text>隐藏身份</text></view></button></view>
+        <image wx:if="{{secret.cardArt}}" class="identity-card-banner" src="{{secret.cardArt}}" mode="aspectFill" data-surface="secret" data-src="{{secret.cardArt}}" binderror="cardArtError" aria-hidden="true" />
         <view class="compact-role-heading {{secret.identityHistory.length > 1?'has-history':''}}">
-          <image wx:if="{{secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
+          <image wx:if="{{!secret.cardArt && secret.portrait}}" class="compact-role-art" src="{{secret.portrait}}" mode="aspectFit" aria-hidden="true" />
           <view class="compact-role-copy"><view class="compact-role-name"><view class="compact-role-title faction-{{secret.factionTone}}">{{secret.role}}</view><button wx:if="{{secret.info.showRoleHelp}}" hover-class="none" class="compact-role-help" bindtap="openIdentityRoleHelp" aria-label="角色说明" aria-haspopup="dialog"><view class="compact-role-help-mark" aria-hidden="true"><image src="/assets/sheet-book.svg" /></view></button></view><view class="compact-faction faction-{{secret.factionTone}}"><view class="compact-faction-dot" aria-hidden="true" /><text>{{secret.faction}}</text></view></view>
           <button wx:if="{{secret.identityHistory.length > 1}}" hover-class="none" class="identity-history-entry compact-history-entry" bindtap="openIdentityHistory" aria-haspopup="dialog"><view class="identity-history-icon" aria-hidden="true" />身份历程 <text aria-hidden="true">›</text></button>
         </view>
@@ -505,8 +508,10 @@
     </block>
     <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : room.phase==='tools' || room.phase==='ended'?'result-first':'operation-first'}}">
       <block wx:if="{{room.result}}"><template is="tableFinalResult" data="{{room, honors, network, hasPendingRequest, busy}}" /></block>
-      <block wx:elif="{{room.phase==='tools' || room.phase==='ended'}}"><template is="tableResult" data="{{room, latestResult}}" /><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
-      <block wx:else><template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, network}}" /></block>
+      <block wx:else>
+        <template is="tableResult" data="{{room, latestResult}}" />
+        <template is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
+      </block>
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
     <view wx:if="{{room.canUseTools && room.operationProgress}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">

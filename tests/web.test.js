@@ -66,6 +66,24 @@ async function setup(t, opts = {}) {
   return { app, raw, api, auth };
 }
 
+test("小程序可以加载每个身份的两幅不同插画，网页版关闭时也可用", async (t) => {
+  const disabled = await setup(t);
+  const seen = new Set();
+  for (const role of require("../server/engine").roleIds) {
+    for (const variant of ["a", "b"]) {
+      const path = "/assets/role-cards/" + role + "-" + variant + ".jpg";
+      const response = await disabled.raw(path);
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers["content-type"], "image/jpeg", path);
+      assert.equal(response.bytes.readUInt16BE(0), 0xffd8, path);
+      const hash = require("node:crypto").createHash("sha256").update(response.bytes).digest("hex");
+      assert.ok(!seen.has(hash), path);
+      seen.add(hash);
+    }
+  }
+  const enabled = await setup(t, { webOrigin: origin });
+  assert.equal((await enabled.raw("/assets/role-cards/assassin-b.jpg")).status, 200);
+});
 test("网页版默认关闭；WEB_ORIGIN 需完整 HTTPS 源且不含路径", async (t) => {
   const a = await setup(t);
   assert.equal((await a.raw("/")).status, 401);

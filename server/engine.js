@@ -772,6 +772,11 @@ function rememberKnightIdentity(room, uid, reason = "redraw") {
 }
 function privateView(room, uid) {
   const view = privateIdentity(room, uid);
+  // matchId is randomized at each deal. Reopening the same private card,
+  // including after a reconnect, must keep its illustration.
+  const deal = room.matchId || [room.code, room.createdAt, room.game].join(":");
+  const variant = createHash("sha256").update(JSON.stringify([deal, uid])).digest()[0] & 1;
+  view.cardArt = `/assets/role-cards/${room.roles[uid]}-${variant ? "b" : "a"}.jpg`;
   if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
@@ -2067,6 +2072,7 @@ module.exports = {
   roomSummary,
   privateView,
   actionSpec,
+  roleIds: Object.keys(ROLES),
   roleName: (role) => ROLES[role]?.[0] || null,
   avoidanceOptions: room => [...new Set(roleDeck(room.board, room.capacity))].map(id => ({ id, name: ROLES[id][0], faction: ROLES[id][1], count: roleDeck(room.board, room.capacity).filter(role => role === id).length })),
 };

@@ -630,6 +630,12 @@ test('身份插画与视野一起受主动查看和关闭状态保护', () => {
   const inline = JSON.stringify(render({...data,dealtIdentityDialog:false,revealed:true}));
   assert.match(inline,/merlin\.png/);
   assert.doesNotMatch(JSON.stringify(render({...data,dealtIdentityDialog:false,revealed:false})),/merlin\.png/);
+  const illustrated = {...secret,cardArt:'/assets/role-cards/merlin-b.jpg'};
+  const front = JSON.stringify(render({...data,dealtIdentitySecret:illustrated}));
+  assert.match(front,/merlin-b\.jpg/);
+  assert.doesNotMatch(front,/merlin\.png/);
+  const coveredCard = JSON.stringify(render({...data,secret:illustrated,dealtIdentitySecret:null}));
+  assert.doesNotMatch(coveredCard,/role-cards|秘密视野/);
 });
 test('任务牌只展示当前允许选项，先选后确认且固定操作在滚动内容之外', () => {
   const room = {phase:'quest',code:'123456',capacity:12,team:[1,6,8],needsSubmission:true,me:{seat:1,submitted:false}};
@@ -1451,10 +1457,13 @@ test("牌桌阶段集中待办、结果可回看，任务进度与座位明确�
   const located = render({ ...data, historyOpen: true, focusedHistoryKey: 0, visibleHistory: [{ key: 0, text: "任务成功" }] });
   const record = nodes(located).find(n => n.attr?.id === "history-record-0");
   assert.match(record.attr.class, /public-history-row is-focused/);
-  const pending = render({ ...data, room: { ...room, phase: "quest", needsSubmission: true }, actionEntryLabel: "提交任务牌" });
-  const phase = nodes(pending).find(n => n.attr?.class === "phase-strip");
+  const pending = { ...data, room: { ...room, phase: "quest", needsSubmission: true }, actionEntryLabel: "提交任务牌" };
+  const phase = nodes(render(pending)).find(n => n.attr?.class === "phase-strip");
   assert.ok(byHandler(phase, "openAction"));
-  assert.equal(byHandler(phase, "openAction").attr.class, "primary");
+  assert.equal(byHandler(phase, "openAction").attr.class, "primary action-entry-reminder");
+  assert.equal(byHandler(render({ ...pending, actionDialog: true }), "openAction").attr.class, "primary");
+  assert.equal(byHandler(render({ ...pending, room: { ...pending.room, me: { seat: 1, submitted: true } } }), "openAction"), undefined);
+  assert.equal(byHandler(tree, "openAction"), undefined);
 });
 
 test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，私密弹窗优先', () => {

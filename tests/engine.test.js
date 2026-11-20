@@ -71,6 +71,23 @@ test("5–9人配置和视野按角色隔离，随机首队长有效", () => {
     }
   }
 });
+test("私密插画按玩家和本局分配，两套均可出现，推进或重连保持同款", () => {
+  const room = setup();
+  const art = () => privateView(room, "p1").cardArt;
+  const variants = new Set();
+  for (let deal = 0; deal < 16; deal++) {
+    room.matchId = "illustration-fixture-" + deal;
+    variants.add(art());
+  }
+  const base = "/assets/role-cards/" + room.roles.p1;
+  assert.deepEqual(variants, new Set([base + "-a.jpg", base + "-b.jpg"]));
+  const selected = art();
+  all(room);
+  advance(room);
+  assert.equal(privateView(JSON.parse(JSON.stringify(room)), "p1").cardArt, selected);
+  for (const player of room.players)
+    assert.doesNotMatch(JSON.stringify(publicView(room, player.uid)), /role-cards/);
+});
 test("未确认板子及基础配置不支持的人数拒绝启用", () => {
   for (const id of ["shadow-blade"])
     assert.throws(() => newRoom("123456", "p", "a", id, 12), /尚未确认/);

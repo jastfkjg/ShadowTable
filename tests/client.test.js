@@ -63,6 +63,7 @@ test('小程序通用结束表单直接支持11／12人红蓝兰斯计分，按�
 });
 
 function page(api, storage = new Map(), layout, lobby = false) {
+  api = { assetUrl: path => path, ...api };
   let definition;
   const scrolls = [];
   const wx = {

@@ -73,8 +73,8 @@ function createApp({
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
   const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
-  const { serve: serveWeb, serveBadgeArt } = require("./web");
-  const servePublicAsset = webOrigin ? serveWeb : serveBadgeArt;
+  const { serve: serveWeb, serveGameArt } = require("./web");
+  const servePublicAsset = webOrigin ? serveWeb : serveGameArt;
   let webHost = "";
   if (webOrigin) {
     let url;

@@ -104,6 +104,24 @@
 .table-room .action-status-copy { flex: 1 1 180px; font-size: 14px; }
 .table-room .action-status-copy .small { margin-top: 3px; }
 .table-room .action-entry button.primary, .table-room .action-entry button.primary[disabled]:not([type]) { width: auto; min-height: 46px; padding: 9px 18px; font-size: 14px; border-radius: 12px; }
+.table-room button.action-entry-reminder:not([disabled]) { position: relative; overflow: visible; }
+.table-room button.action-entry-reminder:not([disabled])::before {
+  content: "";
+  position: absolute;
+  top: -4px; right: -4px; bottom: -4px; left: -4px;
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 0 7px rgba(229,198,139,.55);
+  pointer-events: none;
+  animation: action-entry-glow 2.6s ease-in-out infinite;
+}
+@keyframes action-entry-glow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-room button.action-entry-reminder:not([disabled])::before { animation: none; opacity: .75; box-shadow: none; }
+}
 .table-room .table-dynamics .latest-result { padding-bottom: 14px; }
 .table-room .result-first .latest-result + .phase-strip { padding-top: 14px; border-top: 1px solid rgba(177,191,198,.13); }
 .table-room .result-first .phase-name { font-size: 14px; }

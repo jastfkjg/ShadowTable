@@ -2419,6 +2419,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.setProcessData({ actionLoading: false });
     }
   },
+  async readPrivateCard() {
+    const card = await api.request("/api/rooms/" + this.roomCode + "/private");
+    return card.cardArt ? { ...card, cardArt: api.assetUrl(card.cardArt) } : card;
+  },
+  cardArtError(event) {
+    const { surface, src } = event.currentTarget.dataset;
+    if (src && this.data[surface]?.cardArt === src)
+      this.setData({ [surface + ".cardArt"]: "" });
+  },
   async revealActionIdentity() {
     if (this.data.actionSecret) {
       this.setProcessData({ actionSecret: null });
@@ -2437,9 +2446,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const generation = this.actionGeneration;
     this.setProcessData({ busy: true, busyAction: "actionIdentity" });
     try {
-      const secret = await api.request(
-        "/api/rooms/" + this.roomCode + "/private",
-      );
+      const secret = await this.readPrivateCard();
       if (
         this.alive &&
         this.foreground &&
@@ -2451,6 +2458,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       ) {
         this.setProcessData({
           actionSecret: {
+            cardArt: secret.cardArt || "",
             role: secret.role,
             faction: secret.faction,
             factionTone: factionTone(secret.faction),
@@ -2509,12 +2517,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const generation = ++this.generation;
     this.setData({ busy: true, busyAction: "dealtIdentity" });
     try {
-      const secret = await api.request("/api/rooms/" + this.roomCode + "/private");
+      const secret = await this.readPrivateCard();
       if (!this.alive || !this.foreground || generation !== this.generation ||
         !this.data.dealtIdentityDialog || key !== this.identityDealKey() ||
         this.data.room.stage !== stage || secret.stage !== stage) return;
       this.rememberDealtIdentity();
       this.setData({ dealtIdentitySecret: {
+        cardArt: secret.cardArt || "",
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         portrait: portrait(secret.role, factionTone(secret.faction)).portrait,
         information: secret.information,
@@ -2600,9 +2609,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       stage = this.data.room.stage;
     this.setData({ busy: true, busyAction: "identity", error: "" });
     try {
-      const secret = await api.request(
-        "/api/rooms/" + this.roomCode + "/private",
-      );
+      const secret = await this.readPrivateCard();
       if (
         this.foreground &&
         this.alive &&
@@ -2739,7 +2746,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.identityChangeLoading = true;
     const generation = this.generation;
     try {
-      const secret = await api.request("/api/rooms/" + room.code + "/private");
+      const secret = await this.readPrivateCard();
       if (
         this.foreground &&
         this.alive &&

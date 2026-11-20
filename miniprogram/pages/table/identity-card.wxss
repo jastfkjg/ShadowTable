@@ -147,3 +147,59 @@
   .deal-flight.is-flying { animation: deal-disappear 1ms both; }
 }
 @keyframes deal-disappear { to { opacity: 0; } }
+
+/* Woodcut art and the nameplate share one print; all private text stays live. */
+.deal-heading.woodcut { border: 0; padding: 0 0 3px; }
+.deal-illustration, .identity-card-banner {
+  display: block;
+  width: 100%;
+  height: min(74vw, 40vh, 300px);
+  border-radius: 7px;
+  object-fit: cover;
+  object-position: center;
+}
+.woodcut .deal-nameplate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 92%;
+  margin: -16px auto 0;
+  padding: 2px 14px;
+  border: 3px double #80543a;
+  border-radius: 9px 2px;
+  color: #39291c;
+  background: #f1e4c9;
+  font-family: "Songti SC", "STSong", serif;
+}
+.printed { --text: #382a20; --muted: #685039; --good: #385667; --evil: #903e30; --third: #69507a; }
+.printed::before { border-color: #895b41; }
+.woodcut .deal-role { font-size: 26px; line-height: 1.35; }
+.woodcut .deal-faction { flex-shrink: 0; margin: 0; padding: 1px 5px; border-radius: 3px; font-size: 12px; color: #fff5db; }
+.woodcut .faction-evil { background: var(--evil); }
+.woodcut .faction-good { background: var(--good); }
+.woodcut .faction-third { background: var(--third); }
+.printed .identity-info-heading { justify-content: center; margin-bottom: 4px; font-family: "Songti SC", serif; font-weight: 700; }
+.printed .identity-info-players { display: flex; flex-direction: column; gap: 2px; }
+.printed .identity-info-player { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 0; background: transparent; }
+.printed .identity-info-player-copy { flex: 0 1 auto; display: flex; gap: 8px; align-items: baseline; }
+.printed .identity-info-seat { font-size: 16px; }
+.printed .identity-info-role { margin: 0; }
+.printed .identity-info-note { text-align: center; }
+.printed .identity-info-section { padding: 6px 0; }
+.printed .identity-info-ability { gap: 8px; }
+
+.woodcut button.deal-help { top: 4px; right: 4px; padding: 0 8px; border-radius: 8px; color: #fff4dc; background: rgba(40,31,24,.85); }
+.identity-card-banner { height: min(55vw, 28vh, 235px); margin: 8px auto; }
+@media (max-height: 600px) and (orientation: portrait) {
+  .deal-illustration { height: 28vh; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .deal-face-content.has-woodcut { grid-template-columns: 32% minmax(0, 1fr); }
+  .deal-illustration { height: 30vh; }
+  .woodcut .deal-nameplate { flex-wrap: wrap; gap: 2px 5px; padding: 2px 5px; }
+  .woodcut .deal-role { font-size: 16px; }
+  .woodcut button.deal-help { position: static; background: transparent; color: var(--muted); }
+}
