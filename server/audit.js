@@ -24,6 +24,7 @@ const labels = {
   configure: "修改板子",
   start: "开始对局",
   rematch: "同房重开",
+  restartPlaytest: "陪测快速重开（本局不计战绩）",
   terminate: "终止对局",
   offline: "转线下结算",
   closeOffline: "完成线下结算",
@@ -175,6 +176,10 @@ const namedText = (room, text) =>
 // in the administrator audit, never in public history or player responses.
 function completeActionDetails(details, before, room) {
   if (!before) return details;
+  if (details.command === "restartPlaytest") {
+    details.outcomes = [{ kind: "game", status: "cancelled", text: `第${before.game}局不计战绩，已为第${room.game}局重新发牌`, lines: [] }];
+    return details;
+  }
   const outcomes = [];
   const history = (room.history || []).slice(before.history?.length || 0);
   if (details.command === "start") details.game = room.game;
@@ -521,7 +526,7 @@ function auditGroups(store, code, offset) {
   const args = code === null ? [] : [code];
   const cte = `WITH source AS (
     SELECT *, CASE
-      WHEN json_extract(details, '$.command') IN ('start', 'rematch', 'finishTools')
+      WHEN json_extract(details, '$.command') IN ('start', 'rematch', 'restartPlaytest', 'finishTools')
         OR json_extract(details, '$.phaseKey') IN ('tools', 'ended', 'terminated')
         OR json_extract(details, '$.phase') IN ('等待房主发起操作', '对局结束', '对局已终止') THEN code || ':event:' || id
       WHEN json_extract(details, '$.stage') IS NOT NULL THEN code || ':stage:' || json_extract(details, '$.stage')

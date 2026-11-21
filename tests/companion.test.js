@@ -14,13 +14,14 @@ async function launch(opts = {}) {
   });
   await new Promise((r) => app.server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + app.server.address().port;
-  const request = async (path, token, data, id = randomUUID()) => {
+  const request = async (path, token, data, id = randomUUID(), extraHeaders = {}) => {
     const response = await fetch(base + path, {
       method: data ? "POST" : "GET",
       headers: {
         Authorization: "Bearer " + (token || ""),
         "Content-Type": "application/json",
         "Idempotency-Key": id,
+        ...extraHeaders,
       },
       body: data ? JSON.stringify(data) : undefined,
     });
@@ -99,6 +100,34 @@ test("面板需显式开发开关，拒绝外部Host/Origin与非本机访问", 
     false,
   );
 });
+test("本机陪测可在顺序流程重新发牌，要求已入座开发账号和本机同源请求", async t => {
+  const a = await launch();
+  t.after(a.close);
+  const host = (await a.request("/api/dev-login", null, {})).token;
+  const { code } = await a.request("/api/rooms", host, { name: "房主" });
+  const path = `/api/rooms/${code}/commands`;
+  const panel = new Companion({ request: a.request });
+  const bot = await panel.add(code);
+  await panel.fill();
+  await panel.batch("ready");
+  const stage = () => a.app.store.get(code).stage;
+  await a.request(path, host, { type: "ready", stage: stage(), ready: true });
+  await a.request(path, host, { type: "start", stage: stage() });
+  const initial = stage();
+  const input = { type: "restartPlaytest", stage: initial, confirm: true };
+  const standby = (await a.request("/api/dev-login", null, {})).token;
+  await a.request(`/api/rooms/${code}/join`, standby, { name: "围观者" });
+  await assert.rejects(a.request(path, standby, input, randomUUID(), { Origin: a.base }), e => e.status === 403);
+  for (const headers of [{}, { Origin: "https://example.com" }])
+    await assert.rejects(a.request(path, bot.token, input, randomUUID(), headers), e => e.status === 403);
+  await a.request(path, bot.token, input, randomUUID(), { Origin: a.base });
+  const next = a.app.store.get(code);
+  assert.equal(next.game, 2);
+  assert.equal(next.phase, "identity");
+  assert.notEqual(next.stage, initial);
+  assert.equal(next.spectators.length, 1);
+});
+
 test("生产模式即使误传开发开关也无法提供面板或匿名开发登录", async () => {
   const original = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";

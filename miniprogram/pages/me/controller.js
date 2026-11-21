@@ -57,8 +57,9 @@ module.exports = function createMePage() { return {
     try {
       const result = await api.request("/api/me/rooms");
       if (this.alive && sequence === this.sequence) this.updateChangedData({ currentRoom: currentRoom(result?.rooms || []) });
-    } catch (_) {
-      if (this.alive && sequence === this.sequence) this.updateChangedData({ currentRoom: null });
+    } catch (error) {
+      // Keep the last room during a transient refresh failure.
+      if (this.alive && sequence === this.sequence && [401, 403].includes(error.status)) this.updateChangedData({ currentRoom: null });
     }
   },
   blockMonthlyResetScroll() {},

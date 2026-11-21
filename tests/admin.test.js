@@ -248,6 +248,67 @@ test("清空响应丢失后跨刷新重试原编号，不重复清理新陪测�
   await assert.rejects(a.api(`/api/admin/rooms/${code}`, invalidReuse), error => error.status === 409);
 });
 
+test("陪测台可在真人房主的十二骑士局中重新发牌，回执重试不重复开局，放弃的局不入战绩", async t => {
+  const a = await setup(t);
+  await a.login();
+  const { code, token } = await a.room();
+  const room = () => a.app.store.get(code);
+  const path = `/api/rooms/${code}/commands`;
+  const host = (type, extra = {}) => a.api(path, { type, stage: room().stage, ...extra }, a.auth(token));
+  await host("configure", { board: "knights", capacity: 12 });
+  await a.action(code, "test-on");
+  const panel = managedPanel(a);
+  const actor = await panel.add(code);
+  const restart = () => panel.command(actor, "restartPlaytest", { confirm: true });
+  await assert.rejects(restart, e => e.status === 409);
+  await panel.fill();
+  await panel.batch("ready");
+  await host("ready", { ready: true });
+  await host("start");
+  await host("beginActivity", { kind: "vote", team: [1, 2, 3] });
+  await panel.refresh();
+  await panel.command(actor, "submit", { value: "approve" });
+  const before = room();
+  assert.equal(before.submissions[before.players[1].uid], "approve");
+  await assert.rejects(host("restartPlaytest", { confirm: true }), e => e.status === 403);
+  await assert.rejects(panel.command(actor, "restartPlaytest"), /请确认/);
+  assert.equal(room().stage, before.stage);
+  const request = panel.request;
+  panel.request = async (...args) => {
+    await request(...args);
+    throw new Error("回执丢失");
+  };
+  await assert.rejects(restart, /回执丢失/);
+  panel.request = request;
+  assert.equal(panel.restartActor(), actor);
+  await panel.retry(actor);
+  await panel.refresh();
+  const next = room();
+  assert.equal(next.game, before.game + 1);
+  assert.notEqual(next.stage, before.stage);
+  assert.notEqual(next.matchId, before.matchId);
+  for (const field of ["host", "board", "capacity", "players", "recordPurpose", "scoreEnabled", "fairyEnabled", "flexible"])
+    assert.deepEqual(next[field], before[field]);
+  assert.equal(next.phase, "tools");
+  assert.equal(next.round, 1);
+  assert.equal(next.activity, null);
+  assert.deepEqual(next.history, []);
+  assert.deepEqual(next.submissions, {});
+  assert.deepEqual(next.knights.initialRoles, next.roles);
+  assert.deepEqual(next.replay.events, []);
+  assert.ok(panel.actors.every(p => p.room.game === next.game && p.secret.stage === next.stage));
+  await assert.rejects(panel.request(path, actor.token, { type: "restartPlaytest", confirm: true, stage: before.stage }), e => e.status === 409);
+  await host("finishTools", { winner: "good" });
+  await panel.refresh();
+  await assert.rejects(restart, e => e.status === 409);
+  const db = a.app.store.db;
+  assert.deepEqual(db.prepare("SELECT id FROM matches").all().map(m => m.id), [next.matchId]);
+  for (const table of ["match_players", "match_scores", "match_events", "match_fun_stats", "avoidance_reward_matches"])
+    assert.equal(db.prepare(`SELECT count(*) AS n FROM ${table} WHERE match_id=?`).get(before.matchId).n, 0, table);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM avoidance_reward_matches WHERE match_id=?").get(next.matchId).n, 1);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM admin_audit WHERE json_extract(details,'$.command')='restartPlaytest'").get().n, 1);
+});
+
 test("失效陪测房主可结束并重开后清空，真人房主的进行中对局及唯一陪测房主保持不变", async (t) => {
   const a = await setup(t);
   await a.login();

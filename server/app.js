@@ -22,6 +22,7 @@ const {
   newRoom,
   enter,
   command,
+  restartPlaytest,
   publicView,
   invitationView,
   roomSummary,
@@ -73,7 +74,7 @@ function createApp({
 } = {}) {
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
-  const panel = devAuth && devPanel ? require("./dev-panel").serve : null;
+  const panel = devAuth && devPanel ? require("./dev-panel") : null;
   const { serve: serveWeb, serveGameArt } = require("./web");
   const servePublicAsset = webOrigin ? serveWeb : serveGameArt;
   let webHost = "";
@@ -194,7 +195,7 @@ function createApp({
       )
         return send(404, { error: "管理平台未启用" });
       if (path === "/dev" || path.startsWith("/dev/")) {
-        if (!panel || !panel(req, res, path))
+        if (!panel?.serve(req, res, path))
           return send(404, { error: "接口不存在" });
         return;
       }
@@ -613,6 +614,18 @@ function createApp({
                 "房间已满，请刷新后重试", 409);
             }
             enter(room, uid, b.name);
+          } else if (b.type === "restartPlaytest") {
+            const managedActor = uid.startsWith("test:") && room.testRoom === true;
+            const localActor = uid.startsWith("dev:") && req.headers.origin && panel?.isLocalRequest(req);
+            check(managedActor || localActor, "仅陪测台可快速重开", 403);
+            check(room.players.some(p => p.uid === uid), "请先让陪测玩家入座", 403);
+            check(b.confirm === true, "请确认本局不计战绩");
+            check(b.stage === room.stage, "阶段已变化，请刷新后重新操作", 409);
+            const discardedMatch = room.matchId;
+            restartPlaytest(room);
+            if (discardedMatch)
+              store.db.prepare("DELETE FROM avoidance_reward_matches WHERE match_id=?").run(discardedMatch);
+            avoidanceRewards.registerStart(store, room);
           } else if (["honorStart", "honorVote", "honorClose"].includes(b.type)) {
             honors.handle(store, room, uid, b);
             room = store.get(room.code);

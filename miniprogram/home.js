@@ -1,5 +1,6 @@
 const createLobby = require("./pages/table/controller");
 const createPersonal = require("./pages/me/controller");
+const { currentRoom } = require("./room-list");
 const { selectTab } = require("./tab-navigation");
 const { isSinglePage } = require("./records-share");
 const intro = { label: "桌边助手", heading: "和朋友，一起入座", description: "创建或加入阿瓦隆牌桌，记录对局、战绩与趣味故事，让精彩留在同桌之间。" };
@@ -14,7 +15,6 @@ module.exports = function createHomePage(initialTab = 0) {
       this.foreground = false;
       this.homeQuery = query;
       this.startedPanels = [false, false];
-      this.tabScrollTops = [0, 0];
       const activeTab = query.main === "0" ? 0 : query.main === "1" ? 1 : initialTab;
       const singlePage = isSinglePage();
       this.setData({ activeTab, singlePage });
@@ -46,6 +46,9 @@ module.exports = function createHomePage(initialTab = 0) {
         const loading = controller.onLoad(this.homeQuery);
         // The lobby bootstraps on load; personal reads start on show.
         if (index === 0) return loading;
+        if (this.lobbyController.roomsServerTime) {
+          controller.updateChangedData({ currentRoom: currentRoom(this.lobbyController.data.memberRooms) });
+        }
       }
       return controller.onShow();
     },
@@ -78,7 +81,6 @@ module.exports = function createHomePage(initialTab = 0) {
       if (this.startedPanels[1]) this.personalController.onUnload();
     },
     onPageScroll(event) {
-      if (!this.restoringTabScroll) this.tabScrollTops[this.data.activeTab] = event.scrollTop;
       if (this.data.activeTab === 0 && this.startedPanels[0]) this.lobbyController.onPageScroll(event);
     },
     onResize(event) {
@@ -91,15 +93,7 @@ module.exports = function createHomePage(initialTab = 0) {
         const controller = previous === 0 ? this.lobbyController : this.personalController;
         controller.onHide?.();
       }
-      const scrollTop = this.tabScrollTops[index];
-      const sequence = this.tabSwitchSequence = (this.tabSwitchSequence || 0) + 1;
-      this.restoringTabScroll = true;
-      this.setData({ activeTab: index }, () => {
-        if (!this.alive || sequence !== this.tabSwitchSequence) return;
-        const complete = () => { if (sequence === this.tabSwitchSequence) this.restoringTabScroll = false; };
-        if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop, duration: 0, complete });
-        else complete();
-      });
+      this.setData({ activeTab: index });
       selectTab(this, index);
       if (this.foreground) return this.showMainPanel(index);
     },

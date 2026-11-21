@@ -488,7 +488,7 @@ test('时间快捷选项与原生选择器共用草稿，确认前不请求，�
 function renderMainPanel(factory, index, data) {
   const tree = factory('pages/lobby/lobby.wxml')({ activeTab: index, lobby: index === 0 ? data : { isLobby: true }, personal: index === 1 ? data : {} });
   const find = node => typeof node === 'object' &&
-    (node.attr?.class === 'main-panel' && !node.attr.hidden ? node : (node.children || []).map(find).find(Boolean));
+    (node.attr?.class === 'main-panel' && !node.attr.ariaHidden ? node : (node.children || []).map(find).find(Boolean));
   return find(tree);
 }
 
@@ -539,21 +539,19 @@ test('朋友圈进入完整首页恢复分享时的标签，无效标签参数�
     p.onUnload();
   }
 });
-test('首页在同一窗口保留两个区域、表单和滚动位置，切回时刷新且不调用页面导航', async () => {
-  const scrolls = [], pages = [];
+test('首页切换保留表单和资料，不导航也不滚动共享页面', async () => {
+  const pages = [];
   const api = { ...apiBase, request: async url => url === '/api/boards' ? { boards: BOARDS }
     : url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { rooms: [], records: [], total: 0 } };
-  const { p, navigations } = page('lobby', api, { home: true, pages, wx: { pageScrollTo: options => { scrolls.push(options.scrollTop); options.complete(); } } });
+  const { p, navigations } = page('lobby', api, { home: true, pages, wx: { pageScrollTo: () => assert.fail('切换时不应重定位页面') } });
   p.route = 'pages/lobby/lobby'; pages.push(p);
   p.onLoad(); await p.onShow();
   p.inputName({ detail: { value: '本桌草稿' } });
   p.setData({ 'lobby.code': '654321' }); p.lobbyController.data.code = '654321';
-  p.onPageScroll({ scrollTop: 240 });
   await p.switchMainTab(1);
   const shownProfile = p.data.personal.profile;
   assert.equal(p.data.activeTab, 1);
   assert.equal(shownProfile.displayName, '林间');
-  p.onPageScroll({ scrollTop: 120 });
   await p.switchMainTab(0);
   assert.equal(p.data.activeTab, 0);
   assert.equal(p.data.lobby.name, '本桌草稿');
@@ -561,10 +559,34 @@ test('首页在同一窗口保留两个区域、表单和滚动位置，切回�
   assert.equal(p.data.personal.profile, shownProfile);
   await p.switchMainTab(1);
   assert.equal(p.data.personal.profile, shownProfile);
-  assert.deepEqual(scrolls, [0, 240, 120]);
   assert.equal(navigations.length, 0);
   assert.equal(p.route, 'pages/lobby/lobby');
   p.onUnload();
+});
+
+test('从大厅首次切到我的复用当前牌桌，临时读取失败保留入口，确认已离桌后移除', async () => {
+  const room = { code: '123456', status: 'playing', seat: 2, capacity: 12, boardName: '十二骑士' };
+  const refresh = deferred();
+  let roomReads = 0;
+  const { p } = page('lobby', { ...apiBase, request: async url => {
+    if (url === '/api/me/rooms') {
+      if (++roomReads === 1) return { rooms: [room] };
+      if (roomReads === 2) return refresh.promise;
+      return { rooms: [] };
+    }
+    if (url === '/api/boards') return { boards: BOARDS };
+    return url.endsWith('/profile') ? profile : url.endsWith('/stats') ? emptyStats : { records: [] };
+  } }, { home: true });
+  try {
+    p.onLoad(); await p.onShow();
+    const showing = p.switchMainTab(1);
+    assert.equal(p.data.personal.currentRoom.code, room.code);
+    await showing;
+    refresh.reject(new Error('网络中断')); await new Promise(setImmediate);
+    assert.equal(p.data.personal.currentRoom.code, room.code);
+    await p.load();
+    assert.equal(p.data.personal.currentRoom, null);
+  } finally { p.onUnload(); }
 });
 
 test('我的入口只读个人数据与牌桌摘要，资料与记录预览仍从当前首页传给下一页', async () => {
@@ -605,16 +627,18 @@ test('从我的入口进入的牌桌返回原首页对局区域，隐藏页不�
   assert.ok(reads.includes('/api/me/rooms')); home.onUnload();
 });
 
-test('同一首页模板保留两个区域，仅隐藏非当前区域且顶部导航只渲染一次', () => {
+test('两个首页入口各自保留两个面板，非当前面板不可见，顶部导航只渲染一次', () => {
   const context = { window: {}, global: {} }; vm.createContext(context);
   const factory = vm.runInContext('(function(global){' + wxmlToJs(root) + '})(global)', context);
   const nodes = n => typeof n === 'object' ? [n, ...(n.children || []).flatMap(nodes)] : [];
-  for (const activeTab of [0, 1]) {
-    const tree = factory('pages/lobby/lobby.wxml')({ activeTab, lobby: { isLobby: true, name: '草稿' }, personal: { profile: { displayName: '林间' } } });
-    const panels = nodes(tree).filter(node => node.attr?.class === 'main-panel');
+  for (const route of ['lobby','me']) for (const activeTab of [0, 1]) {
+    const tree = factory('pages/'+route+'/'+route+'.wxml')({ activeTab, lobby: { isLobby: true, name: '草稿' }, personal: { profile: { displayName: '林间' } } });
+    const panels = nodes(tree).find(node => node.attr?.class === 'home-panels').children;
     assert.equal(panels.length, 2);
-    assert.equal(panels[activeTab].attr.hidden, false);
-    assert.equal(panels[1 - activeTab].attr.hidden, true);
+    assert.equal(panels[activeTab].attr.class, 'main-panel');
+    assert.equal(panels[activeTab].attr.ariaHidden, false);
+    assert.equal(panels[1 - activeTab].attr.class, 'main-panel is-inactive');
+    assert.equal(panels[1 - activeTab].attr.ariaHidden, true);
     assert.ok(panels.every(panel => panel.children.length > 0));
     assert.equal(nodes(tree).filter(node => node.tag === 'wx-app-nav').length, 1);
   }
@@ -1633,7 +1657,8 @@ test('窗口与顶部导航保持深色，底栏随页面绘制，所有页面�
     if (route === 'pages/shared/shared') { assert.equal(pageConfig.navigationStyle,'default');assert.equal(pageConfig.singlePage.navigationBarFit,'squeezed');continue; }
     assert.equal(pageConfig.usingComponents['app-nav'], '/components/app-nav/app-nav', route);
     if (route.endsWith('/lobby/lobby') || route.endsWith('/me/me')) {
-      assert.match(template, /<app-nav/);
+      assert.ok(template.includes('../home/shell.wxml'));
+      assert.match(fs.readFileSync(path.join(root, 'pages/home/shell.wxml'), 'utf8'), /<app-nav/);
     } else if (route.endsWith('/table/table')) {
       assert.match(fs.readFileSync(path.join(root, 'pages/table/shared.wxml'), 'utf8'), /<app-nav/);
     } else if (['pages/stats/stats','pages/matches/matches'].includes(route)) {

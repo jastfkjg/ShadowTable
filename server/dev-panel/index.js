@@ -8,9 +8,7 @@ const assets = {
   "/dev/panel.js": ["panel.js", "text/javascript; charset=utf-8"],
   "/dev/panel.css": ["panel.css", "text/css; charset=utf-8"],
 };
-function serve(req, res, path) {
-  const asset = assets[path];
-  if (!asset || req.method !== "GET") return false;
+function isLocalRequest(req) {
   const local = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
     req.socket.remoteAddress,
   );
@@ -23,7 +21,11 @@ function serve(req, res, path) {
     !["http://" + host, "https://" + host].includes(req.headers.origin)
   )
     return false;
-  if (req.headers["sec-fetch-site"] === "cross-site") return false;
+  return req.headers["sec-fetch-site"] !== "cross-site";
+}
+function serve(req, res, path) {
+  const asset = assets[path];
+  if (!asset || req.method !== "GET" || !isLocalRequest(req)) return false;
   res.setHeader("Content-Type", asset[1]);
   res.setHeader(
     "Content-Security-Policy",
@@ -34,4 +36,4 @@ function serve(req, res, path) {
   res.end(readFileSync(join(__dirname, asset[0])));
   return true;
 }
-module.exports = { serve };
+module.exports = { serve, isLocalRequest };
