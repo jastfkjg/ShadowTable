@@ -1,7 +1,7 @@
 const {test}=require("node:test"),assert=require("node:assert/strict"),vm=require("node:vm"),fs=require("node:fs"),path=require("node:path");
 const folder=path.resolve(__dirname,"../miniprogram/pages/personality");
 const quiz=require("../miniprogram/pages/personality/quiz.json"),scoring=require("../miniprogram/pages/personality/scoring"),present=require("../miniprogram/pages/personality/presentation");
-const fixture=require("./fixtures/personality/reachability-v3.json").fixtures.find(row=>row.expectedTypeId==="ASS-B");
+const fixture=require("./fixtures/personality/reachability-v3.1.json").fixtures.find(row=>row.expectedTypeId==="ASS-B");
 const view=present.result(scoring.scoreQuiz(quiz,fixture.answers));
 
 // Load the page and its dependencies as JavaScript, without Node's JSON loader.
@@ -40,6 +40,24 @@ function native({single=false,latest=null,saveResult,shareResult=()=>({id:"c".re
 }
 test("小程序 JS 题库与原始 JSON 完全一致", () => {
   assert.deepEqual(require("../miniprogram/pages/personality/quiz-data"), quiz);
+});
+test("规则手册按当前局面打开，切换板型和返回都保留原答案",async()=>{
+  const h=native(),page=h.page;await page.onLoad();page.start();
+  try{
+    for(const q of quiz.questions){
+      page.answer({currentTarget:{dataset:{id:fixture.answers[q.id]}}});
+      const before=page.data.question;
+      page.rules();
+      assert.equal(page.data.guide.id,q.rulesetId||"terms");
+      page.selectGuide({currentTarget:{dataset:{id:"L11"}}});
+      assert.ok(page.data.guide.rows.some(row=>row.text.includes("换阵营")));
+      page.back();
+      assert.equal(page.data.rulesOpen,false);
+      assert.equal(page.data.mode,"quiz");
+      assert.equal(page.data.question,before);
+      if(q!==quiz.questions.at(-1))await page.next();
+    }
+  }finally{page.onUnload();}
 });
 test("原生朋友圈单页只读公开摘要，首次进入与重试都不登录、不读取本地账号",async()=>{
   const h=native({single:true});await h.page.onLoad({share:"c".repeat(48)});h.page.onShow();await h.page.retry();

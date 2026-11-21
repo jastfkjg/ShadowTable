@@ -57,7 +57,9 @@ Page({
   answer(event){this.flow.answer(event.currentTarget.dataset.id);},
   next(){return this.flow.next();},
   previous(){this.flow.previous();},
-  rules(){this.flow.toggle("rulesOpen");},
+  rules(){this.flow.openGuide();},
+  closeRules(){this.flow.closeGuide();},
+  selectGuide(event){this.flow.selectGuide(event.currentTarget.dataset.id);},
   selectResultTab(event){this.flow.selectTab(event.currentTarget.dataset.tab);},
   details(){this.flow.toggle("detailsOpen");},
   catalogue(){this.flow.toggle("catalogueOpen");},
@@ -86,6 +88,7 @@ Page({
     this.lastCredential=wx.getStorageSync("session")||"";
   },
   back(){
+    if(this.data.rulesOpen){this.closeRules();return;}
     if(this.data.mode==="quiz"){this.flow.persist();this.flow.intro();return;}
     return backToMe();
   },

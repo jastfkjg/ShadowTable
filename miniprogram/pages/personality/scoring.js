@@ -103,6 +103,40 @@ function resolveSubtype(config, value, tieOptionId) {
   return {subtype: o.subtype, resolution: 'style_tiebreak'};
 }
 
+function decisionMoments(config, selected, denominator, primary, runner, role, style, tieAnswers) {
+  const epsilon = config.scoring.epsilon;
+  const candidates = selected.map((answer,index) => {
+    const vector = config.coreDimensions.map(d => (answer.centered[d] ?? 0) / denominator[d]);
+    const support = dot(vector, primary);
+    const intervention = (answer.centered[config.styleDimension] ?? 0) * (style.subtype === 'A' ? 1 : -1);
+    const question = config.questions[index];
+    const inCharacter = !question.scene || question.selfRole === role.roleId ||
+      (role.roleId === 'lancelot' && question.selfRole === 'lancelot_initial_good');
+    return { answer, question, inCharacter, support, contrast: support - dot(vector, runner), intervention };
+  });
+  // A choice that merely counts against the runner-up cannot explain the winning role.
+  const forRole = candidates.filter(c => c.support > epsilon)
+    .sort((a, b) => Number(b.contrast > epsilon) - Number(a.contrast > epsilon) ||
+      Number(b.inCharacter) - Number(a.inCharacter) || b.support - a.support || b.contrast - a.contrast)[0];
+  const forStyle = candidates.filter(c => c.intervention > epsilon)
+    .sort((a, b) => b.intervention - a.intervention ||
+      Number(a === forRole) - Number(b === forRole) ||
+      Object.keys(a.answer.centered).length - Object.keys(b.answer.centered).length)[0];
+  function evidence(question, optionId) {
+    const option = question?.options.find(o => o.id === optionId);
+    return option && { questionId:question.id, optionId, moment:option.moment, text:option.text,
+      title:question.title || question.prompt, interpretation:option.interpretation };
+  }
+  function fromCandidate(candidate) {
+    if (!candidate) return null;
+    return evidence(candidate.question, candidate.answer.optionId);
+  }
+  return {
+    role:role.resolution === 'role_tiebreak' ? evidence(config.tieBreakers.role, tieAnswers.T_ROLE) : fromCandidate(forRole),
+    style:style.resolution === 'style_tiebreak' ? evidence(config.tieBreakers.style, tieAnswers.T_STYLE) : fromCandidate(forStyle),
+  };
+}
+
 function scoreQuiz(config, answers, tieAnswers = {}) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('answers must be an object keyed by stable question ID');
   const qmap = new Map(config.questions.map(q => [q.id, q]));
@@ -145,7 +179,10 @@ function scoreQuiz(config, answers, tieAnswers = {}) {
     profile, rankedRoles: ranked, secondaryRoleIds, signalStrength, cosineGap,
     tendencyLabel: mixed ? '混合倾向' : '相对鲜明',
     roleResolution: role.resolution, subtypeResolution: subtype.resolution,
-    tiedRoleIds: role.tiedRoleIds, explanations
+    tiedRoleIds: role.tiedRoleIds, explanations,
+    ...(config.scoring.decisionMoments ? {
+      moments:decisionMoments(config, selected, denominator, primaryUnit, runnerUnit, role, subtype, tieAnswers)
+    } : {})
   };
 }
 

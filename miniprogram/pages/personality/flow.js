@@ -7,7 +7,6 @@
   const validAttempt=value=>typeof value === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(value);
   const firstQuestion=quiz.questions[0].id;
   const lastQuestion=quiz.questions[quiz.questions.length-1].id;
-  const legacyVersion="2.0.0";
   const tabs = [
     { id:"overview", label:"风格解读" },
     { id:"preferences", label:"本次偏好" },
@@ -29,7 +28,8 @@
     let alive=true,epoch=0,account=null,credential="",draft=null,saving=null;
     let state={ mode:"intro",loading:true,error:"",storageError:"",saveError:"",shareError:"",notice:"",saving:false,sharing:false,
       hasDraft:false,completedCount:0,question:null,result:null,record:null,shared:null,history:[],rulesOpen:false,detailsOpen:false,catalogueOpen:false,
-      terms:present.terms,catalogue:present.catalogue(),version:quiz.version,questionTotal:quiz.questions.length,identityType:"",oldDraft:false,
+      guide:present.guideTopics[0],guideTabs:present.guideTopics.map(({id,label})=>({id,label})),
+      catalogue:present.catalogue(),version:quiz.version,questionTotal:quiz.questions.length,identityType:"",oldDraft:false,
       resultTab:"overview",tabs,preferences:[] };
     const emit=patch=>{
       if(!alive)return;
@@ -49,16 +49,35 @@
       const raw=cache.draft(account.accountKey,quiz.version);
       const oldVersion=cache.previousVersion(account.accountKey);
       draft=validateDraft(raw);
-      // An older, finished attempt may have lost its save response. Its local
-      // view can be shown immediately; the server recomputes it with v2 weights.
+      let upgradedDraft=false;
       if(!draft){
-        const legacy=cache.draft(account.accountKey,legacyVersion);
-        if(legacy?.completed && legacy.version===legacyVersion && validAttempt(legacy.attemptId) &&
-          legacy.localView?.version===legacyVersion && legacy.localView.typeId && legacy.answers && legacy.tieAnswers){
-          draft=JSON.parse(JSON.stringify(legacy));
+        // Look up finished attempts even if the final storage write lost the version pointer.
+        const older=["3.0.0","2.0.0"].map(version=>{
+          const value=cache.draft(account.accountKey,version);
+          return value?.version===version ? value : null;
+        });
+        const pending=older.find(value=>value?.completed && validAttempt(value.attemptId) &&
+          value.localView?.version===value.version && value.localView.typeId && value.answers && value.tieAnswers);
+        const previous=older.find(value=>value?.version==="3.0.0");
+        if(pending){
+          draft=JSON.parse(JSON.stringify(pending));
+        } else if(oldVersion==="3.0.0" && previous && !previous.completed && validAttempt(previous.attemptId)){
+          // Unchanged choices keep their IDs. The rewritten shield question has a new ID.
+          const answers={};
+          for(const q of quiz.questions){
+            if(q.options.some(o=>o.id===previous.answers?.[q.id])) answers[q.id]=previous.answers[q.id];
+          }
+          const missing=quiz.questions.find(q=>!answers[q.id]);
+          const oldIndex=quiz.questions.findIndex(q=>q.id===previous.current);
+          const current=oldIndex>=0 && (!missing || oldIndex<quiz.questions.indexOf(missing)) ? previous.current : missing?.id || lastQuestion;
+          draft={version:quiz.version,total:quiz.questions.length,attemptId:deps.requestId(),answers,tieAnswers:{},current,completed:false};
+          if(persist()){
+            try{cache.removeDraft(account.accountKey,oldVersion);}catch{/* The new version is already the active draft. */}
+          }
+          upgradedDraft=true;
         }
       }
-      emit({hasDraft:!!draft,completedCount:Object.keys(draft?.answers||{}).length,oldDraft:!draft && !!oldVersion && oldVersion!==quiz.version,
+      emit({upgradedDraft,hasDraft:!!draft,completedCount:Object.keys(draft?.answers||{}).length,oldDraft:!draft && !!oldVersion && oldVersion!==quiz.version,
         ...(raw&&!draft?{storageError:"本地进度无法识别，原记录已保留。请开始一次新测试。"}:{})});
     }
     function showQuestion(id) {
@@ -82,7 +101,7 @@
     async function load(options={}) {
       const at=++epoch;
       saving=null;
-      emit({loading:true,saving:false,sharing:false,error:"",saveError:"",shareError:"",shared:null,question:null,result:null,record:null,resultTab:"overview",detailsOpen:false});
+      emit({loading:true,saving:false,sharing:false,error:"",saveError:"",shareError:"",shared:null,question:null,result:null,record:null,resultTab:"overview",detailsOpen:false,rulesOpen:false});
       if(options.share){
         if(!validId(options.share)){emit({loading:false,error:"分享不存在或已失效",mode:"shared"});return;}
         try{const shared=await deps.publicRequest("/api/personality/shares/"+options.share);if(!alive||at!==epoch)return;emit({mode:"shared",shared,result:shared.view});}
@@ -114,7 +133,7 @@
       if(!guard()||state.loading||state.saving||state.sharing)return;
       if(!draft||fresh){
         draft={version:quiz.version,total:quiz.questions.length,attemptId:deps.requestId(),answers:{},tieAnswers:{},current:firstQuestion,completed:false};
-        emit({shared:null,record:null,saveError:"",shareError:"",notice:"",resultTab:"overview",detailsOpen:false,catalogueOpen:false,oldDraft:false});
+        emit({shared:null,record:null,saveError:"",shareError:"",notice:"",resultTab:"overview",detailsOpen:false,catalogueOpen:false,oldDraft:false,upgradedDraft:false});
       }
       if(draft.completed){
         const view=draft.version===quiz.version?present.result(scoring.scoreQuiz(quiz,draft.answers,draft.tieAnswers)):draft.localView;
@@ -199,7 +218,17 @@
     return {load,start,answer,next,previous,save,share,openResult,
       selectTab(id){if(state.mode==="result"&&tabs.some(tab=>tab.id===id))emit({resultTab:id});},
       intro(){if(guard())emit({mode:"intro",rulesOpen:false});},
-      toggle(key){if(["rulesOpen","detailsOpen","catalogueOpen"].includes(key))emit({[key]:!state[key]});},
+      openGuide(){
+        if(state.loading || !["intro","quiz"].includes(state.mode))return;
+        const topic=state.mode==="quiz" && present.guideTopics.find(item=>item.id===state.question?.rulesetId);
+        emit({guide:topic || present.guideTopics[0],rulesOpen:true});
+      },
+      selectGuide(id){
+        const topic=present.guideTopics.find(item=>item.id===id);
+        if(state.rulesOpen && topic && topic!==state.guide)emit({guide:topic});
+      },
+      closeGuide(){if(state.rulesOpen)emit({rulesOpen:false});},
+      toggle(key){if(["detailsOpen","catalogueOpen"].includes(key))emit({[key]:!state[key]});},
       persist(){if(guard()&&draft)persist();},
       state:()=>state,
       dispose(){alive=false;epoch++;},

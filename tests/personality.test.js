@@ -9,7 +9,7 @@ const legacyQuiz=require("../server/personality-quiz-v2.json");
 const scoring=require("../miniprogram/pages/personality/scoring");
 const presentation=require("../miniprogram/pages/personality/presentation");
 const legacyFixtures=require("./fixtures/personality/reachability-fixtures.json").fixtures;
-const fixtures=require("./fixtures/personality/reachability-v3.json").fixtures;
+const fixtures=require("./fixtures/personality/reachability-v3.1.json").fixtures;
 const { Store }=require("../server/store");
 const personality=require("../server/personality");
 const payload=(i=0,attemptId="personality_attempt_0001")=>({version:quiz.version,attemptId,answers:fixtures[i].answers,tieAnswers:{}});
@@ -38,6 +38,19 @@ test("新版 15 题覆盖全部 16 种结果，解释来自真实选项",()=>{
     const reordered=structuredClone(quiz);reordered.questions.reverse();reordered.questions.forEach(q=>q.options.reverse());
     assert.equal(scoring.scoreQuiz(reordered,fixture.answers).typeId,result.typeId);
     const view=presentation.result(result);
+    assert.equal(view.moments.length,2);
+    for(const moment of view.moments){
+      const q=quiz.questions.find(q=>q.id===moment.questionId);
+      const option=q.options.find(o=>o.id===fixture.answers[q.id]);
+      assert.equal(moment.moment,option.moment);
+      assert.ok(view.explanations.some(e=>e.questionId===q.id && e.text===option.text));
+    }
+    const aggregate=scoring.aggregateProfile(quiz,fixture.answers);
+    const role=quiz.roles.find(r=>r.id===result.roleId);
+    const roleAnswer=aggregate.selected.find(s=>s.questionId===result.moments.role.questionId);
+    assert.ok(quiz.coreDimensions.reduce((sum,d,i)=>sum+role.prototype[i]*(roleAnswer.centered[d]||0)/aggregate.denominator[d],0)>0);
+    const styleAnswer=aggregate.selected.find(s=>s.questionId===result.moments.style.questionId);
+    assert.ok(styleAnswer.centered.E*(result.subtype==="A"?1:-1)>0);
     assert.equal(view.dimensions.length,7);assert.equal(view.style.id,"E");
     for(const e of view.explanations){assert.equal(fixture.answers[e.questionId],e.optionId);assert.equal(quiz.questions.find(q=>q.id===e.questionId).options.find(o=>o.id===e.optionId).text,e.text);}
   }
@@ -58,10 +71,39 @@ test("新版情景符合任务人数，奥伯伦必失败，刺杀阶段只能�
     }
   }
   const [,oberon,,assassin]=scenarios;
-  assert.match(oberon.situation,/只能出失败/);
+  assert.match(oberon.scene.facts.map(f=>f.text).join(""),/只能出失败/);
   assert.equal(assassin.phase,"assassination");
-  assert.match(assassin.situation,/全桌禁言/);
+  assert.match(assassin.scene.context,/全桌禁言/);
   assert.ok(assassin.options.every(option=>/^刀 [345]。/.test(option.text)));
+  assert.ok(scenarios[0].scene.facts.some(f=>f.text.includes("4 号队长")));
+  for(const [i,q] of scenarios.entries()){
+    assert.equal(presentation.question(q.id).stageLabel,"牌局情景 · "+(i+1)+" / 5");
+    assert.ok(q.scene.role && q.scene.title && q.scene.facts.length>=2);
+  }
+});
+test("主动和择机选项在三个位置均衡分布，掩护倾向覆盖后段独立牌局",()=>{
+  const styleQuestions=quiz.questions.filter(q=>q.measuredDims.includes("E"));
+  for(const extreme of [Math.min,Math.max]){
+    const counts=[0,0,0];
+    for(const q of styleQuestions){
+      const scores=q.options.map(o=>o.scores.E);
+      counts[scores.indexOf(extreme(...scores))]++;
+    }
+    assert.ok(Math.max(...counts)-Math.min(...counts)<=1);
+  }
+  assert.ok(quiz.questions.filter(q=>q.measuredDims.includes("S")).length>=3);
+  assert.ok(quiz.questions.some(q=>q.scene && q.measuredDims.includes("S")));
+});
+test("旧版 v3 答卷仍按旧权重保存，十六种历史结果可复算",()=>{
+  const previous=require("../server/personality-quiz-v3.json");
+  const store=new Store(":memory:");personality.initialize(store);
+  try{
+    for(const f of require("./fixtures/personality/reachability-v3.json").fixtures){
+      const result=personality.save(store,"wx:older",{version:previous.version,attemptId:"previous_attempt_"+f.expectedTypeId,answers:f.answers,tieAnswers:{}});
+      assert.equal(result.view.typeId,f.expectedTypeId);
+      assert.equal(result.view.moments,undefined);
+    }
+  }finally{store.close();}
 });
 test("缺答和非法答案不能定型，E独立于角色，精确同分按各自补题处理",()=>{
   assert.equal(scoring.scoreQuiz(quiz,{}).status,"incomplete");
@@ -96,6 +138,9 @@ test("账号结果复算、重试幂等、历史隔离，公开分享固定且�
     assert.doesNotMatch(JSON.stringify(snapshot),/answers|explanations|questionId|optionId|dimensions|profile|accountKey|attemptId|wx:one|uid/);
     now++;const second=personality.save(store,"wx:one",payload(1,"personality_attempt_0002"));
     assert.equal(second.view.version,quiz.version);
+    assert.ok(second.view.moments.length);
+    const freshShare=personality.share(store,"wx:one",{resultId:second.id});
+    assert.doesNotMatch(JSON.stringify(freshShare),/moments|explanations|questionId|optionId|dimensions/);
     assert.equal(personality.account(store,"wx:one").latest.id,second.id);
     assert.equal(personality.account(store,"wx:one").history.length,2);
     assert.deepEqual(personality.readShare(store,snapshot.id),snapshot);

@@ -13,30 +13,54 @@
       <view class="persona-intro-copy">从看人、站边到藏身份，<text>发现你习惯的牌桌决策方式。</text></view>
       <view class="persona-facts"><view><text>{{questionTotal}}</text>道题</view><view><text>16</text>种风格</view><view><text>随时</text>暂停续答</view></view>
       <button hover-class="none" class="persona-primary" bindtap="start" disabled="{{!!error}}">{{hasDraft?'继续答题 · '+completedCount+'/'+questionTotal:'开始探索'}}</button>
-      <view class="persona-small persona-center">每题独立，按你通常会采取的行动选择</view>
+      <view class="persona-small persona-center">10 道短题，5 个独立牌局。选你平时会做的事。</view>
     </view>
+    <view wx:if="{{upgradedDraft}}" class="persona-message">已带入旧版选择。继续答题时，只需补上新的局面和未答题目。</view>
     <view wx:if="{{oldDraft}}" class="persona-message">发现旧版未完成进度，已保留。当前题库已更新，请开始一次新测试。</view>
     <view wx:if="{{identityType==='guest'||identityType==='dev'}}" class="persona-small persona-account-note">当前为{{identityType==='guest'?'游客':'开发'}}账号。清除登录信息后无法自动找回账号结果。</view>
-    <button hover-class="none" class="disclosure-button persona-disclosure" bindtap="rules" aria-expanded="{{rulesOpen}}"><text>开始前，了解这些约定</text><text>{{rulesOpen?'收起':'展开'}}</text></button>
+    <button hover-class="none" class="persona-disclosure" bindtap="rules" aria-haspopup="dialog"><text>规则与术语</text><image class="persona-book-icon" src="/assets/sheet-book.svg" aria-hidden="true" /></button>
     <button hover-class="none" wx:if="{{hasDraft}}" class="persona-text-button" bindtap="retest">重新开始</button>
   </block>
 
   <block wx:if="{{!loading && mode==='quiz' && question}}">
-    <view class="persona-progress-meta"><text>{{question.supplemental?'补充选择':('第 '+question.number+' / '+questionTotal+' 题')}}</text><text>{{storageError?'进度待保存':'进度自动保存'}}</text></view>
+    <view class="persona-progress-meta">
+      <view class="persona-progress-count" aria-label="{{question.supplemental?'补充选择':'第 '+question.number+' 题，共 '+questionTotal+' 题'}}">
+        <text class="persona-current-number">{{question.supplemental?'补题':question.numberLabel}}</text>
+        <text wx:if="{{!question.supplemental}}" class="persona-total-number">/ {{questionTotal}}</text>
+      </view>
+      <text class="persona-save-status">{{storageError?'进度待保存':'进度自动保存'}}</text>
+      <button class="persona-guide-trigger" hover-class="none" bindtap="rules" aria-haspopup="dialog"><image class="persona-book-icon" src="/assets/sheet-book.svg" aria-hidden="true" /><text>规则与术语</text></button>
+    </view>
     <view class="persona-progress {{question.progressClass}}" aria-hidden="true"><view class="persona-progress-fill"></view></view>
-    <view class="persona-question" id="persona-question">
-      <view wx:if="{{question.ruleset}}" class="persona-context"><text>{{question.ruleset}}</text><text wx:if="{{question.selfRole}}">本题你是 · {{question.selfRole}}</text></view>
-      <view wx:if="{{question.supplemental}}" class="persona-small">还差一个选择，帮助区分你的倾向。</view>
-      <view wx:if="{{question.situation}}" class="persona-situation">{{question.situation}}</view>
-      <view class="persona-prompt">{{question.prompt}}</view>
-      <view class="persona-options" role="radiogroup" aria-label="{{question.prompt}}"><button wx:for="{{question.options}}" wx:key="id" class="persona-option {{item.selected?'is-selected':''}}" data-id="{{item.id}}" bindtap="answer" hover-class="none" role="radio" aria-checked="{{item.selected}}"><text class="persona-option-mark">{{item.selected?'✓':item.label}}</text><text class="persona-option-copy">{{item.text}}</text></button></view>
+    <view class="persona-question {{question.scene?'persona-scene-question':''}}" id="persona-question">
+      <view wx:if="{{question.scene}}" class="persona-scene">
+        <view class="persona-scene-head">
+          <view class="persona-scene-copy">
+            <text class="persona-scene-stage">{{question.stageLabel}}</text>
+            <view class="persona-scene-title">{{question.scene.title}}</view>
+            <view class="persona-scene-role">{{question.ruleset}} · 你是{{question.scene.role}}</view>
+          </view>
+          <image class="persona-scene-art" src="{{question.scenePortrait}}" mode="aspectFit" aria-hidden="true" />
+        </view>
+        <view wx:if="{{question.scene.context}}" class="persona-scene-context">{{question.scene.context}}</view>
+        <view class="persona-scene-fact" wx:for="{{question.scene.facts}}" wx:key="label">
+          <text class="persona-fact-label">{{item.label}}</text><text>{{item.text}}</text>
+        </view>
+      </view>
+      <view wx:elif="{{question.ruleset}}" class="persona-context"><text>{{question.ruleset}}</text><text wx:if="{{question.selfRole}}">本题你是 · {{question.selfRole}}</text></view>
+      <view wx:if="{{question.supplemental}}" class="persona-small">两种倾向很接近，再选一个更像你的做法。</view>
+      <view class="persona-question-head {{!question.scene && !question.supplemental?'persona-short-head':''}}">
+        <view class="persona-question-copy">
+          <view wx:if="{{question.situation}}" class="persona-situation">{{question.situation}}</view>
+          <view class="persona-prompt">{{question.ask}}</view>
+        </view>
+        <view wx:if="{{!question.scene && !question.supplemental}}" class="persona-deck" aria-hidden="true"><image src="/assets/identity-card-back.webp" mode="aspectFill" /></view>
+      </view>
+      <view class="persona-options" role="radiogroup" aria-label="{{question.prompt}}"><button wx:for="{{question.options}}" wx:key="id" class="persona-option {{item.selected?'is-selected':''}}" data-id="{{item.id}}" bindtap="answer" hover-class="none" role="radio" aria-checked="{{item.selected}}"><text class="persona-option-mark" aria-hidden="true">{{item.label}}</text><text class="persona-option-copy">{{item.text}}</text><text class="persona-option-radio" aria-hidden="true">{{item.selected?'✓':''}}</text></button></view>
       <view wx:if="{{question.ruleNote}}" class="persona-rule-note">{{question.ruleNote}}</view>
-      <button hover-class="none" class="disclosure-button persona-text-button" bindtap="rules" aria-expanded="{{rulesOpen}}">{{rulesOpen?'收起规则与术语':'查看规则与术语'}}</button>
     </view>
     <view class="persona-answer-actions"><button hover-class="none" class="persona-secondary" bindtap="previous" disabled="{{question.number===1}}">上一题</button><button hover-class="none" class="persona-primary" bindtap="next" disabled="{{!question.selected}}">{{question.supplemental||question.last?'查看结果':'下一题'}}</button></view>
   </block>
-
-  <view wx:if="{{rulesOpen}}" class="persona-rules"><view wx:for="{{terms}}" wx:key="title" class="persona-rule"><view class="persona-section-title">{{item.title}}</view><view>{{item.text}}</view></view></view>
 
   <block wx:if="{{!loading && result && (mode==='result'||mode==='shared')}}">
     <view wx:if="{{mode==='shared'}}" class="persona-shared-by">{{shared.name}} 的牌桌风格</view>
@@ -47,11 +71,19 @@
         <image class="persona-portrait" src="{{result.portrait}}" mode="aspectFit" aria-label="{{result.roleName+'角色形象'}}" />
       </view>
       <view class="persona-role-line"><text>{{result.roleName}}</text><text class="persona-role-english">{{result.english}}</text></view>
-      <view class="persona-subtype">{{result.title}}</view>
+      <view class="persona-subtype" role="heading" aria-level="1">{{result.title}}</view>
       <view class="persona-result-summary">{{result.description || result.summary}}</view>
     </view>
 
     <block wx:if="{{mode==='result'}}">
+      <view wx:if="{{result.moments && result.moments.length}}" class="persona-moments">
+        <view class="persona-section-title" role="heading" aria-level="2">为什么像你</view>
+        <view wx:for="{{result.moments}}" wx:key="heading" class="persona-moment">
+          <view class="persona-moment-heading">{{item.heading}}</view>
+          <view class="persona-moment-copy">{{item.moment}}</view>
+        </view>
+        <view wx:if="{{result.tendencyLabel==='混合倾向' && result.secondary.length}}" class="persona-mixed-note">这次也接近{{result.secondary[0].name}}的打法</view>
+      </view>
       <view class="persona-result-actions">
         <button hover-class="none" class="persona-primary" bindtap="saveImage" disabled="{{rendering}}">{{rendering?'正在准备图片…':'保存图片'}}</button>
         <button hover-class="none" class="persona-secondary" open-type="share" disabled="{{sharing}}" loading="{{sharing}}">{{sharing?'正在准备…':'分享结果'}}</button>
@@ -136,5 +168,23 @@
   <view wx:if="{{catalogueOpen}}" id="persona-catalogue" class="persona-catalogue" role="region" aria-label="全部十六人格"><view wx:for="{{catalogue}}" wx:key="typeId" class="persona-catalogue-item"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text class="persona-small">{{item.roleName}}</text><view class="persona-section-title">{{item.title}}</view><view class="persona-small">{{item.description}}</view></view></view></view>
   <view wx:if="{{!loading && mode!=='quiz' && mode!=='shared' && history.length}}" class="persona-section {{mode==='result'?'persona-result-history':''}}"><view class="persona-section-title">最近的测试</view><button hover-class="none" wx:for="{{history}}" wx:key="id" class="persona-history-result" data-id="{{item.id}}" bindtap="openHistory" disabled="{{saving||sharing}}"><image src="{{item.portrait}}" mode="aspectFit" aria-hidden="true" /><view><text>{{item.roleName}} · {{item.title}}</text><text class="persona-small">{{item.dateLabel || item.version}}</text></view><text aria-hidden="true">›</text></button></view>
 </view>
+<page-container wx:if="{{!singlePage && (mode==='intro' || mode==='quiz')}}" show="{{rulesOpen}}" position="bottom" duration="{{180}}" z-index="{{1200}}" close-on-slide-down="{{true}}" overlay-style="background:rgba(4,12,17,.68);" custom-style="background:transparent;" bindclickoverlay="closeRules" bindbeforeleave="closeRules">
+  <view class="persona-guide-sheet" role="dialog" aria-modal="true" aria-label="规则与术语">
+    <view class="persona-guide-header">
+      <view><view class="persona-guide-source">{{mode==='quiz'?'当前题目 · '+question.title:'阿瓦隆十六人格'}}</view><view class="persona-guide-title">规则与术语</view></view>
+      <button class="persona-guide-close" hover-class="none" bindtap="closeRules" aria-label="关闭规则与术语">×</button>
+    </view>
+    <view class="persona-guide-tabs" role="group" aria-label="查看内容">
+      <button wx:for="{{guideTabs}}" wx:key="id" class="persona-guide-tab {{guide.id===item.id?'is-current':''}}" data-id="{{item.id}}" bindtap="selectGuide" hover-class="none" aria-pressed="{{guide.id===item.id}}">{{item.label}}</button>
+    </view>
+    <scroll-view scroll-y class="persona-guide-scroll" scroll-into-view="{{'guide-'+guide.id}}">
+      <view class="persona-guide-content" id="{{'guide-'+guide.id}}">
+        <view wx:if="{{guide.title}}" class="persona-guide-board">{{guide.title}}</view>
+        <view wx:for="{{guide.rows}}" wx:key="label" class="persona-guide-row"><text class="persona-guide-term">{{item.label}}</text><text class="persona-guide-definition">{{item.text}}</text></view>
+        <view wx:if="{{guide.id==='terms'}}" class="persona-guide-note">每题都是独立局面。按你平时会做的事选，结果只描述这次的打法。</view>
+      </view>
+    </scroll-view>
+  </view>
+</page-container>
 <canvas wx:if="{{!singlePage}}" type="2d" id="personality-canvas" class="persona-export-canvas" aria-hidden="true"></canvas>
 <app-dialog id="app-dialog" />

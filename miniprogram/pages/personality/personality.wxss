@@ -31,31 +31,74 @@
 .persona-message button { color:var(--accent,#e5c68b); padding:8px 0; }
 .persona-error { color:#f2b6ae; }
 .persona-status { text-align:center; padding:80px 0; color:var(--muted,#b1bfc6); }
-.persona-answering { padding-top:20px; padding-bottom:calc(118px + env(safe-area-inset-bottom)); }
-.persona-progress-meta { display:flex; justify-content:space-between; gap:12px; color:var(--muted,#b1bfc6); font-size:12px; }
-.persona-progress-meta>text:first-child { color:var(--accent,#e5c68b); }
-.persona-progress { height:3px; background:#30434e; border-radius:4px; overflow:hidden; margin:12px 0 26px; }
+.persona-answering { padding-top:12px; padding-bottom:calc(106px + env(safe-area-inset-bottom)); }
+.persona-progress-meta { display:flex; align-items:center; gap:10px; min-height:44px; }
+.persona-progress-count { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
+.persona-current-number { color:var(--accent); font:600 23px/1.1 Georgia,"Songti SC",serif; font-variant-numeric:tabular-nums; }
+.persona-total-number, .persona-save-status { font-size:12px; color:var(--muted); }
+.persona-page button.persona-guide-trigger { display:flex; align-items:center; gap:7px; margin-left:auto; min-height:44px; padding:0 3px 0 10px; background:transparent; border:0; color:#c4d0d2; font-size:13px; font-weight:400; white-space:nowrap; }
+.persona-book-icon { width:17px; height:17px; flex-shrink:0; }
+.persona-progress { height:3px; background:#2b3d46; border-radius:4px; overflow:hidden; margin:4px 0 22px; }
 .persona-progress-fill { height:100%; background:var(--accent,#e5c68b); transition:width .24s ease; }
 .persona-context { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:var(--accent,#e5c68b); margin-bottom:14px; }
 .persona-context>text:first-child { color:var(--muted,#b1bfc6); }
-.persona-situation { font-size:16px; line-height:1.85; }
-.persona-history { margin-top:18px; padding:7px 12px; background:#1b2b35; border-radius:10px; }
-.persona-history-row { display:flex; gap:10px; justify-content:space-between; font-size:12px; padding:5px 0; color:var(--muted,#b1bfc6); }
-.persona-prompt { margin:26px 0 18px; font-size:21px; line-height:1.6; font-weight:600; }
-.persona-options { display:flex; flex-direction:column; gap:12px; }
-.persona-page .persona-option { display:flex; align-items:flex-start; gap:12px; width:100%; text-align:left; padding:17px 16px; background:var(--surface,#1b2b35); border:1px solid #4b606b; color:var(--text,#f2eee5); font-size:15px; line-height:1.8; transition:background .15s,border-color .15s; }
-.persona-page .persona-option.is-selected { background:#30372f; border-color:var(--accent,#e5c68b); }
-.persona-option-mark { display:flex; width:25px; height:25px; margin-top:1px; align-items:center; justify-content:center; border:1px solid #83949b; border-radius:50%; flex-shrink:0; font-size:12px; color:var(--muted,#b1bfc6); }
-.is-selected .persona-option-mark { background:var(--accent,#e5c68b); border-color:var(--accent,#e5c68b); color:#17232a; }
+.persona-scene { overflow:hidden; border:1px solid #43545a; border-radius:16px; padding:0 16px 4px; background:#1a2b33; }
+.persona-scene-head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:12px 0; }
+.persona-scene-copy { flex:1; min-width:0; }
+.persona-scene-stage, .persona-moment-heading { color:#e5c68b; font-size:12px; line-height:1.6; font-weight:600; }
+.persona-scene-title { font-family:"Songti SC","Noto Serif CJK SC",SimSun,serif; font-size:24px; font-weight:700; line-height:1.45; }
+.persona-scene-role { color:#c2cfd3; font-size:13px; line-height:1.6; }
+.persona-scene-art { width:72px; height:78px; flex-shrink:0; }
+.persona-scene-context { margin-bottom:9px; color:#e1d5b8; font-size:14px; }
+.persona-scene-fact { display:grid; grid-template-columns:4em minmax(0,1fr); gap:10px; align-items:baseline; padding:8px 0; border-top:1px solid #394a50; font-size:15px; line-height:1.6; }
+.persona-fact-label { font-size:13px; color:#bdcbd0; }
+.persona-question-head { margin:20px 0 16px; }
+.persona-short-head { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:92px; margin:24px 0 22px; }
+.persona-question-copy { flex:1; min-width:0; }
+.persona-situation { color:#c3d0d0; font-size:15px; font-weight:400; line-height:1.7; }
+.persona-page .persona-prompt { margin:0; color:var(--text); font-family:"Songti SC","Noto Serif CJK SC",SimSun,serif; font-weight:700; font-size:25px; line-height:1.43; text-wrap:balance; }
+.persona-situation+.persona-prompt { padding-top:5px; }
+.persona-deck { position:relative; width:58px; height:75px; margin-right:5px; flex:none; }
+.persona-deck::before, .persona-deck image { position:absolute; top:2px; left:4px; width:45px; height:67px; border-radius:4px; }
+.persona-deck::before { content:""; transform:rotate(-10deg); background:#2d4858; border:1px solid #8a7957; }
+.persona-deck image { transform:translate(5px,1px) rotate(8deg); box-shadow:0 4px 10px rgba(0,0,0,.2); }
+.persona-options { overflow:hidden; border:1px solid #394d56; border-radius:17px; background:#1a2b34; }
+.persona-page button.persona-option { position:relative; display:flex; align-items:center; gap:12px; width:100%; margin:0; padding:16px 15px; min-height:70px; text-align:left; background:transparent; color:var(--text); border:0; border-radius:0; font-size:15px; line-height:1.65; font-weight:400; }
+.persona-option+.persona-option::before { content:""; position:absolute; left:15px; right:15px; top:0; height:1px; background:#34464e; }
+.persona-option-mark { width:25px; height:27px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:6px; background:#283b44; color:#c4d1d2; font:500 15px/1 Georgia,serif; }
 .persona-option-copy { flex:1; min-width:0; }
-.persona-rule-note { color:var(--muted,#b1bfc6); font-size:12px; margin:20px 0 0; }
-.persona-answer-actions { position:fixed; z-index:50; bottom:0; left:0; right:0; width:100%; max-width:600px; margin:auto; display:flex; gap:12px; padding:14px 22px calc(14px + env(safe-area-inset-bottom)); background:#101c24; border-top:1px solid #30434e; }
-.persona-answer-actions .persona-secondary { width:104px; flex-shrink:0; }
-.persona-answer-actions .persona-primary { flex:1; }
-.persona-rules { padding:0 0 20px; }
-.persona-rule { margin:20px 0; font-size:14px; color:var(--muted,#b1bfc6); }
-.persona-rule { white-space:pre-line; }
-.persona-rule .persona-section-title { margin-bottom:8px; }
+.persona-option-radio { width:16px; height:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid #7d9095; border-radius:50%; font-size:11px; font-weight:700; line-height:1; }
+.persona-page button.persona-option.is-selected { background:#2b3837; box-shadow:inset 3px 0 #e5c68b; }
+.is-selected .persona-option-mark { background:#3f4338; color:#efd49d; }
+.is-selected .persona-option-radio { background:#e5c68b; border-color:#e5c68b; color:#1b2529; }
+.persona-page button.persona-option:focus-visible { outline-offset:-3px; }
+.persona-scene-question .persona-question-head { margin:17px 0 12px; }
+.persona-scene-question .persona-prompt { font-size:22px; }
+.persona-page .persona-scene-question .persona-option { min-height:56px; padding-block:11px; }
+.persona-rule-note { color:var(--muted); font-size:12px; margin:16px 0 0; }
+.persona-answer-actions { position:fixed; z-index:50; bottom:0; left:0; right:0; width:100%; max-width:600px; margin:auto; display:flex; align-items:center; gap:12px; padding:12px var(--persona-gutter) calc(12px + env(safe-area-inset-bottom)); background:#101c24; border-top:1px solid #30434e; }
+.persona-answer-actions .persona-secondary { width:96px; flex-shrink:0; padding:11px 10px; background:transparent; }
+.persona-answer-actions .persona-primary { flex:1; padding:11px 12px; }
+.persona-answer-actions .persona-secondary[disabled] { background:transparent; color:#91a0a5; border:1px solid #33454d; opacity:1; }
+.persona-answer-actions .persona-primary[disabled] { background:#2b3c44; color:#a2b0b4; border:0; opacity:1; }
+.persona-guide-sheet { box-sizing:border-box; display:flex; flex-direction:column; width:100%; max-width:600px; height:72vh; max-height:560px; margin:0 auto; min-height:0; padding:0 0 env(safe-area-inset-bottom); overflow:hidden; border:1px solid #40525b; border-bottom:0; border-radius:24px 24px 0 0; color:#f2eee5; background:#1a2932; }
+.persona-guide-header { flex:none; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:20px 18px 8px 22px; }
+.persona-guide-source { color:#b9c7ca; font-size:12px; line-height:1.5; }
+.persona-guide-title { font-family:"Songti SC","Noto Serif CJK SC",SimSun,serif; font-size:26px; line-height:1.5; font-weight:700; }
+button.persona-guide-close { width:44px; height:44px; min-height:44px; flex:none; margin:0; padding:0; border:0; border-radius:50%; background:transparent; color:#c7d1d4; font:400 26px/1 sans-serif; }
+.persona-guide-tabs { display:flex; flex:none; gap:18px; padding:0 22px; border-bottom:1px solid #394a52; }
+button.persona-guide-tab { position:relative; flex:none; width:auto; min-height:44px; padding:0 2px; margin:0; border:0; background:transparent; border-radius:0; color:#b8c6cb; line-height:1.4; font-family:inherit; font-size:14px; font-weight:400; }
+button.persona-guide-tab.is-current { color:#efd49d; font-weight:600; }
+.persona-guide-tab.is-current::before { content:""; position:absolute; left:1px; right:1px; bottom:0; height:2px; background:#e5c68b; }
+.persona-guide-sheet button::after { border:0; }
+.persona-guide-scroll { flex:1; min-height:0; height:0; overflow-y:auto; overscroll-behavior:contain; }
+.persona-guide-content { padding:5px 22px 20px; }
+.persona-guide-board { margin:14px 0 0; color:#e5c68b; font-size:14px; font-weight:600; }
+.persona-guide-row { display:grid; grid-template-columns:4.2em minmax(0,1fr); gap:12px; padding:12px 0; align-items:baseline; font-size:14px; line-height:1.65; }
+.persona-guide-row+.persona-guide-row { border-top:1px solid #34454c; }
+.persona-guide-term { color:#eee9dd; font-weight:600; }
+.persona-guide-definition { color:#c5d0d3; }
+.persona-guide-note { margin-top:6px; padding:10px 12px; border-left:2px solid #8b805f; background:#22323a; color:#bfccce; font-size:13px; line-height:1.65; }
 .persona-shared-by { text-align:center; font-size:13px; color:var(--muted,#b1bfc6); margin-bottom:18px; }
 .persona-result-hero { padding:20px 16px 23px; text-align:center; border:1px solid #68644c; border-radius:20px; background:radial-gradient(ellipse at 49% 36%,#3b3a2a,#232e2c 52%,#172832 93%); }
 .persona-role-line { display:flex; align-items:baseline; justify-content:center; gap:9px; margin:4px 0; color:var(--accent,#e5c68b); font-size:14px; }
@@ -65,7 +108,12 @@
 .persona-orbit::after { content:""; position:absolute; inset:13px; border:1px solid rgba(229,198,139,.16); border-radius:50%; }
 .persona-portrait { position:relative; z-index:1; width:204px; height:204px; animation:persona-arrive .45s ease both; }
 .persona-subtype { margin:0; font-size:32px; line-height:1.35; color:var(--text,#f2eee5); font-weight:650; letter-spacing:1px; }
-.persona-result-summary { font-size:14px; line-height:1.65; color:#d4dfda; max-width:320px; margin:9px auto 0; }
+.persona-result-summary { font-size:14px; line-height:1.65; color:#d4dfda; max-width:320px; margin:9px auto 0; line-break:strict; text-wrap:balance; }
+.persona-moments { margin:22px 2px 18px; }
+.persona-moment { padding-top:10px; }
+.persona-moment+.persona-moment { margin-top:12px; border-top:1px solid #34454c; }
+.persona-moment-copy { margin-top:3px; color:#d4dfda; font-size:15px; line-height:1.65; line-break:strict; text-wrap:balance; }
+.persona-mixed-note { margin-top:12px; color:#c4b699; font-size:13px; }
 .persona-result-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:13px 0 0; }
 .persona-result-actions>button { min-width:0; width:100%; padding:10px 6px; font-size:14px; }
 .persona-result-actions>button[disabled] { opacity:.65; }

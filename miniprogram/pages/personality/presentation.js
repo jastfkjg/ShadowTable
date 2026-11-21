@@ -7,24 +7,43 @@
   const roleNames = Object.fromEntries(quiz.roles.map(role => [role.id, role.name]));
   const names = { ...roleNames, lancelot_initial_good: "初始蓝兰", lancelot_initial_evil: "初始红兰", observer: "旁观者" };
   const english = { merlin:"MERLIN", percival:"PERCIVAL", loyal:"LOYAL SERVANT", morgana:"MORGANA", mordred:"MORDRED", assassin:"ASSASSIN", oberon:"OBERON", lancelot:"LANCELOT" };
-  const terms = [
-    { title:"作答约定", text:quiz.contentRules.join("\n") },
-    ...Object.values(quiz.rulesets).map(rule=>({
-      title:rule.name,
-      text:[
-        "蓝方："+rule.goodRoles.map(id=>names[id]).join("、")+"。红方："+rule.evilRoles.map(id=>names[id]).join("、")+"。",
-        "五次任务人数依次为 "+rule.teamSizes.join(" / ")+"，第四任务至少两张失败票才失败。",
-        ...rule.specialRules,
-      ].join("\n"),
+  function lineup(roles) {
+    return [...new Set(roles)].map(id => {
+      const count=roles.filter(role=>role===id).length;
+      return names[id]+(count>1 ? " × "+count : "");
+    }).join("、");
+  }
+  const guideTopics = [
+    { id:"terms", label:"常用术语", rows:[
+      {label:"失败票", text:"任务中的破坏牌。翻出一张，说明上车的人里至少有一名红方。"},
+      {label:"上车", text:"被选进本轮执行任务的队伍。"},
+      {label:"成功车", text:"完成了任务的队伍。车上仍可能有红方。"},
+      {label:"票型", text:"组队表决时，谁赞成这份名单、谁反对。"},
+      {label:"挡刀", text:"替别人分担被刺客认作梅林的风险。"},
+      {label:"排水", text:"让自己的发言符合普通好人的视角，减少知情身份留下的痕迹。"},
+    ] },
+    ...Object.entries(quiz.rulesets).map(([id,rule])=>({
+      id, label:rule.players+" 人局", title:rule.name,
+      rows:[
+        ...rule.specialRules.map((text,i)=>({label:(id==="C10"?["奥伯伦","梅林","刺杀"]:["换边","出牌"])[i],text})),
+        {label:"任务人数",text:"五轮依次为 "+rule.teamSizes.join("、")+" 人。第四轮至少 "+rule.failThresholds[3]+" 张失败票才会失败。"},
+        {label:"蓝方角色",text:lineup(rule.goodRoles)},
+        {label:"红方角色",text:lineup(rule.evilRoles)},
+      ],
     })),
   ];
   function portrait(roleId) { return "/assets/roles/" + (art[roleId] || roleId) + ".png"; }
+  const scenes = quiz.questions.filter(q => q.scene);
   function question(id, selected) {
     const q = quiz.questions.find(row => row.id === id) || Object.values(quiz.tieBreakers).find(row => row.id === id);
     if (!q) return null;
     const index = quiz.questions.findIndex(row => row.id === id);
+    const split = q.kind === "short" && !q.situation ? q.prompt.lastIndexOf("。")+1 : 0;
     return {
-      id:q.id, title:q.title || "补充一个选择", prompt:q.prompt, situation:q.situation,
+      id:q.id, title:q.title || "补充一个选择", prompt:q.prompt, situation:q.situation || q.prompt.slice(0,split),
+      ask:q.prompt.slice(split), rulesetId:q.rulesetId, numberLabel:String(index+1).padStart(2,"0"),
+      scene:q.scene, scenePortrait:q.scene && portrait(q.selfRole === "lancelot_initial_good" ? "lancelot" : q.selfRole),
+      stageLabel:q.scene ? "牌局情景 · " + (scenes.indexOf(q) + 1) + " / " + scenes.length : "",
       number:index + 1, supplemental:index < 0, last:index === quiz.questions.length - 1,
       ruleset:quiz.rulesets[q.rulesetId]?.name, selfRole:names[q.selfRole] || q.selfRole,
       progress:index < 0 ? 100 : Math.round((index + 1) / quiz.questions.length * 100),
@@ -43,14 +62,23 @@
       return { id:d.id, label:d.label, negative:d.negative, positive:d.positive, position,
         positionClass:"p"+position, tendency:Math.abs(score) < .1 ? "两端接近" : score < 0 ? "偏向 · " + d.negative : "偏向 · " + d.positive };
     });
+    const moments = value.moments && [
+      { heading:"角色线索 · " + role.name, evidence:value.moments.role },
+      { heading:value.subtype === "A" ? "介入方式 · 主动介入" : "介入方式 · 择机介入", evidence:value.moments.style },
+    ].filter(row => row.evidence).map(({heading,evidence}) => ({heading,...evidence}));
+    const explanations=(value.explanations || []).map(item => ({ questionId:item.questionId, optionId:item.optionId,
+      title:config.questions.find(q => q.id === item.questionId)?.title || item.questionId, text:item.text, interpretation:item.interpretation }));
+    // Keep the original option behind each of the two short first-person summaries.
+    const details=moments ? [...moments, ...explanations].filter((item,index,rows) =>
+      rows.findIndex(row=>row.questionId === item.questionId) === index).slice(0,3) : explanations;
     return {
       version:value.version, typeId:value.typeId, roleId:role.id, roleName:role.name, english:english[role.id], title:subtype.title,
       portrait:portrait(role.id), summary:role.summary, description:subtype.description,
+      ...(moments ? { moments } : {}),
       strength:role.strength, blindspot:role.blindspot, tip:role.tip, tendencyLabel:value.tendencyLabel,
       dimensions:dimensions.filter(d => d.id !== "E"), style:dimensions.find(d => d.id === "E"),
       secondary:(value.secondaryRoleIds || []).map(id => ({ id, name:roleNames[id], portrait:portrait(id) })),
-      explanations:(value.explanations || []).map(item => ({ questionId:item.questionId, optionId:item.optionId,
-        title:config.questions.find(q => q.id === item.questionId)?.title || item.questionId, text:item.text, interpretation:item.interpretation })),
+      explanations:details,
       note:"娱乐性对局风格探索，反映本次选择，不代表能力、胜率或固定人格。",
     };
   }
@@ -73,5 +101,5 @@
     });
   }
   function date(at) { const d = new Date(at + 8*3600000); return d.toISOString().slice(0,10).replace(/-/g,"."); }
-  return { question, result, preferences, catalogue, terms, portrait, date, version:quiz.version, total:quiz.questions.length };
+  return { question, result, preferences, catalogue, guideTopics, portrait, date, version:quiz.version, total:quiz.questions.length };
 });

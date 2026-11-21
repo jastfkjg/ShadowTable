@@ -93,10 +93,78 @@
       <div class="persona-tip"><span class="persona-tip-label">下次试试</span><div>${esc(v.tip)}</div></div>${related}`;
   }
 
+  function sceneBrief(q) {
+    if (!q.scene) return q.ruleset
+      ? `<div class="persona-context"><span>${esc(q.ruleset)}</span><span>本题你是 · ${esc(q.selfRole)}</span></div>` : "";
+    const facts=q.scene.facts.map(row => `<div class="persona-scene-fact"><span class="persona-fact-label">${esc(row.label)}</span><span>${esc(row.text)}</span></div>`).join("");
+    return `<section class="persona-scene" aria-labelledby="scene-title">
+      <div class="persona-scene-head"><div class="persona-scene-copy">
+        <span class="persona-scene-stage">${esc(q.stageLabel)}</span>
+        <h2 id="scene-title" class="persona-scene-title" tabindex="-1">${esc(q.scene.title)}</h2>
+        <div class="persona-scene-role">${esc(q.ruleset)} · 你是${esc(q.scene.role)}</div>
+      </div>${img(q.scenePortrait,"persona-scene-art")}</div>
+      ${q.scene.context?`<div class="persona-scene-context">${esc(q.scene.context)}</div>`:""}${facts}</section>`;
+  }
+
+  const guideDialog=document.getElementById("persona-guide");
+  function syncGuide(state) {
+    if(!state.rulesOpen){
+      if(guideDialog.open){
+        guideDialog.close();
+        root.querySelector('[data-action="rules"]')?.focus({preventScroll:true});
+      }
+      return;
+    }
+    const tabs=guideDialog.querySelector(".persona-guide-tabs");
+    if(!tabs.children.length){
+      tabs.innerHTML=state.guideTabs.map(t=>`<button type="button" class="persona-guide-tab" data-topic="${esc(t.id)}">${esc(t.label)}</button>`).join("");
+    }
+    if(!guideDialog.open || previous?.guide!==state.guide){
+      const guide=state.guide;
+      for(const item of tabs.children){
+        const active=item.dataset.topic===guide.id;
+        item.classList.toggle("is-current",active);
+        item.setAttribute("aria-pressed",String(active));
+      }
+      guideDialog.querySelector(".persona-guide-source").textContent=state.mode==="quiz"?"当前题目 · "+state.question.title:"阿瓦隆十六人格";
+      const title=guide.title?`<div class="persona-guide-board">${esc(guide.title)}</div>`:"";
+      const rows=guide.rows.map(row=>`<div class="persona-guide-row"><span class="persona-guide-term">${esc(row.label)}</span><span class="persona-guide-definition">${esc(row.text)}</span></div>`).join("");
+      const note=guide.id==="terms"?'<div class="persona-guide-note">每题都是独立局面。按你平时会做的事选，结果只描述这次的打法。</div>':"";
+      guideDialog.querySelector(".persona-guide-content").innerHTML=title+rows+note;
+      guideDialog.querySelector(".persona-guide-scroll").scrollTop=0;
+    }
+    if(!guideDialog.open)guideDialog.showModal();
+  }
+  function questionPage(state) {
+    const q=state.question,short=!q.scene && !q.supplemental;
+    const reference=`<button type="button" class="persona-guide-trigger" data-action="rules" aria-haspopup="dialog">${img("/assets/sheet-book.svg","persona-book-icon")}<span>规则与术语</span></button>`;
+    const options=q.options.map(o=>`<button type="button" data-action="answer" data-id="${esc(o.id)}" role="radio" aria-checked="${o.selected}" class="persona-option${o.selected?" is-selected":""}">
+      <span class="persona-option-mark" aria-hidden="true">${esc(o.label)}</span><span class="persona-option-copy">${esc(o.text)}</span><span class="persona-option-radio" aria-hidden="true">${o.selected?"✓":""}</span></button>`).join("");
+    return `<div class="persona-progress-meta">
+      <div class="persona-progress-count" aria-label="${q.supplemental?"补充选择":"第 "+q.number+" 题，共 "+state.questionTotal+" 题"}"><span class="persona-current-number">${q.supplemental?"补题":q.numberLabel}</span>${q.supplemental?"":`<span class="persona-total-number">/ ${state.questionTotal}</span>`}</div>
+      <span class="persona-save-status">${state.storageError?"进度待保存":"进度自动保存"}</span>${reference}</div>
+      <div class="persona-progress ${q.progressClass}" aria-hidden="true"><div class="persona-progress-fill"></div></div>
+      <div class="persona-question${q.scene?" persona-scene-question":""}">${sceneBrief(q)}
+        ${q.supplemental?'<div class="persona-small">两种倾向很接近，再选一个更像你的做法。</div>':""}
+        <div class="persona-question-head${short?" persona-short-head":""}"><div class="persona-question-copy">
+          ${q.situation?`<div class="persona-situation" id="persona-situation">${esc(q.situation)}</div>`:""}
+          <h1 class="persona-prompt" tabindex="-1" id="persona-prompt"${q.situation?' aria-describedby="persona-situation"':""}>${esc(q.ask)}</h1></div>
+          ${short?`<div class="persona-deck" aria-hidden="true">${img("/assets/identity-card-back.webp")}</div>`:""}</div>
+        <div class="persona-options" role="radiogroup" aria-labelledby="persona-prompt">${options}</div>
+        ${q.ruleNote?`<div class="persona-rule-note">${esc(q.ruleNote)}</div>`:""}</div>
+      <div class="persona-answer-actions">${button("上一题","previous","persona-secondary",q.number===1)}${button(q.supplemental||q.last?"查看结果":"下一题","next","persona-primary",!q.selected)}</div>`;
+  }
+
   function resultPage(state) {
     const v=state.result;
     const shared=state.mode==="shared";
     const report=`${resultPanel(state)}<div class="persona-footnote">${esc(v.note)}</div>`;
+    const personal=!shared && v.moments?.length;
+    const mixed=personal && v.tendencyLabel==="混合倾向" && v.secondary?.length;
+    const moments=personal ? `<section class="persona-moments" aria-labelledby="persona-moments-title">
+      <h2 id="persona-moments-title" class="persona-section-title">为什么像你</h2>
+      ${v.moments.map(item=>`<div class="persona-moment"><div class="persona-moment-heading">${esc(item.heading)}</div><div class="persona-moment-copy">${esc(item.moment)}</div></div>`).join("")}
+      ${mixed?`<div class="persona-mixed-note">这次也接近${esc(v.secondary[0].name)}的打法</div>`:""}</section>` : "";
     const hero=`<section class="persona-result-hero">
       <span class="persona-eyebrow">阿瓦隆十六人格</span>
       <div class="persona-portrait-stage"><div class="persona-orbit" aria-hidden="true"></div>${img(v.portrait,"persona-portrait",v.roleName+"角色形象")}</div>
@@ -116,7 +184,7 @@
         ` data-id="${tab.id}" id="persona-tab-${tab.id}" role="tab" aria-selected="${active}" aria-controls="persona-panel-${tab.id}" tabindex="${active?0:-1}"`);
     }).join("");
     const manualShare=state.shared?.id===manualShareId;
-    return `${hero}<div class="persona-result-actions">
+    return `${hero}${moments}<div class="persona-result-actions">
       ${button(imageBusy?"正在准备图片…":"保存图片","image","persona-primary",imageBusy)}
       ${button(state.sharing?"正在准备…":manualShare?"复制分享链接":"分享结果","share","persona-secondary",state.sharing)}
     </div>
@@ -144,23 +212,21 @@
     let html=state.loading?'<p class="persona-status" role="status">正在读取你的牌桌故事…</p>':"";
     html+=message(state.error,"retry","重新载入")+(state.notice?`<div class="persona-message" role="status">${esc(state.notice)}</div>`:"")+message(state.storageError,state.mode==="quiz"?"persist":null,"重试保存进度");
     if(!state.loading&&state.mode==="intro"){
-      html+=`<section class="persona-intro"><span class="persona-eyebrow">AVALON · 16 PERSONALITIES</span><h1 class="persona-intro-title" tabindex="-1">你是哪一种<span>阿瓦隆人格？</span></h1><div class="persona-intro-art" aria-hidden="true">${img("/assets/roles/assassin.png","persona-intro-side persona-intro-left")}${img("/assets/roles/merlin.png","persona-intro-main")}${img("/assets/roles/percival.png","persona-intro-side persona-intro-right")}</div><div class="persona-intro-copy">从看人、站边到藏身份，<span>发现你习惯的牌桌决策方式。</span></div><div class="persona-facts"><div><span>${state.questionTotal}</span>道题</div><div><span>16</span>种风格</div><div><span>随时</span>暂停续答</div></div>${button(state.hasDraft?"继续答题 · "+state.completedCount+"/"+state.questionTotal:"开始探索","start","persona-primary",!!state.error)}<div class="persona-small persona-center">每题独立，按你通常会采取的行动选择</div></section>`;
+      html+=`<section class="persona-intro"><span class="persona-eyebrow">AVALON · 16 PERSONALITIES</span><h1 class="persona-intro-title" tabindex="-1">你是哪一种<span>阿瓦隆人格？</span></h1><div class="persona-intro-art" aria-hidden="true">${img("/assets/roles/assassin.png","persona-intro-side persona-intro-left")}${img("/assets/roles/merlin.png","persona-intro-main")}${img("/assets/roles/percival.png","persona-intro-side persona-intro-right")}</div><div class="persona-intro-copy">从看人、站边到藏身份，<span>发现你习惯的牌桌决策方式。</span></div><div class="persona-facts"><div><span>${state.questionTotal}</span>道题</div><div><span>16</span>种风格</div><div><span>随时</span>暂停续答</div></div>${button(state.hasDraft?"继续答题 · "+state.completedCount+"/"+state.questionTotal:"开始探索","start","persona-primary",!!state.error)}<div class="persona-small persona-center">10 道短题，5 个独立牌局。选你平时会做的事。</div></section>`;
+      if(state.upgradedDraft)html+='<div class="persona-message">已带入旧版选择。继续答题时，只需补上新的局面和未答题目。</div>';
       if(state.oldDraft)html+='<div class="persona-message">发现旧版未完成进度，已保留。当前题库已更新，请开始一次新测试。</div>';
       if(["guest","dev"].includes(state.identityType))html+='<div class="persona-small persona-account-note">当前为游客或开发账号，清除登录信息后无法自动找回结果。<a href="/#/me">前往我的</a></div>';
-      html+=button(state.rulesOpen?"收起规则约定":"开始前，了解这些约定","rules","persona-disclosure",false,` aria-expanded="${state.rulesOpen}"`);
+      html+=`<button type="button" class="persona-disclosure" data-action="rules" aria-haspopup="dialog"><span>规则与术语</span>${img("/assets/sheet-book.svg","persona-book-icon")}</button>`;
       if(state.hasDraft)html+=button("重新开始","retest");
     }
-    if(!state.loading&&state.mode==="quiz"&&state.question){
-      const q=state.question;
-      html+=`<div class="persona-progress-meta"><span>${q.supplemental?"补充选择":"第 "+q.number+" / "+state.questionTotal+" 题"}</span><span>${state.storageError?"进度待保存":"进度自动保存"}</span></div><div class="persona-progress ${q.progressClass}" aria-hidden="true"><div class="persona-progress-fill"></div></div><div class="persona-question">${q.ruleset?`<div class="persona-context"><span>${esc(q.ruleset)}</span>${q.selfRole?`<span>本题你是 · ${esc(q.selfRole)}</span>`:""}</div>`:""}${q.supplemental?'<div class="persona-small">还差一个选择，帮助区分你的倾向。</div>':""}${q.situation?`<div class="persona-situation">${esc(q.situation)}</div>`:""}<h1 class="persona-prompt" tabindex="-1" id="persona-prompt">${esc(q.prompt)}</h1><div class="persona-options" role="radiogroup" aria-labelledby="persona-prompt">${q.options.map(o=>button("","answer","persona-option"+(o.selected?" is-selected":""),false,` data-id="${o.id}" role="radio" aria-checked="${o.selected}"`).replace('</button>',`<span class="persona-option-mark">${o.selected?"✓":o.label}</span><span class="persona-option-copy">${esc(o.text)}</span></button>`)).join("")}</div>${q.ruleNote?`<div class="persona-rule-note">${esc(q.ruleNote)}</div>`:""}${button(state.rulesOpen?"收起规则与术语":"查看规则与术语","rules","persona-text-button",false,` aria-expanded="${state.rulesOpen}"`)}</div><div class="persona-answer-actions">${button("上一题","previous","persona-secondary",q.number===1)}${button(q.supplemental||q.last?"查看结果":"下一题","next","persona-primary",!q.selected)}</div>`;
-    }
-    if(state.rulesOpen)html+=`<div class="persona-rules">${state.terms.map(t=>`<section class="persona-rule"><h2 class="persona-section-title">${esc(t.title)}</h2><div>${esc(t.text)}</div></section>`).join("")}</div>`;
+    if(!state.loading&&state.mode==="quiz"&&state.question)html+=questionPage(state);
     if(!state.loading&&state.result&&["result","shared"].includes(state.mode))html+=resultPage(state);
     if(state.catalogueOpen)html+=`<div class="persona-catalogue" id="persona-catalogue" tabindex="-1" role="region" aria-label="全部十六人格">${state.catalogue.map(t=>`<div class="persona-catalogue-item">${img(t.portrait)}<div><span class="persona-small">${esc(t.roleName)}</span><div class="persona-section-title">${esc(t.title)}</div><div class="persona-small">${esc(t.description)}</div></div></div>`).join("")}</div>`;
     if(!state.loading&&!["quiz","shared"].includes(state.mode)&&state.history.length)html+=`<section class="persona-section${state.mode==="result"?" persona-result-history":""}"><h2 class="persona-section-title">最近的测试</h2>${state.history.map(h=>`<button class="persona-history-result" type="button" data-action="history" data-id="${h.id}"${state.saving||state.sharing?" disabled":""}>${img(h.portrait)}<span>${esc(h.roleName+" · "+h.title)}<span class="persona-small">${esc(h.dateLabel)}</span></span><span aria-hidden="true">›</span></button>`).join("")}</section>`;
     root.innerHTML=html;
-    if(scrollToTop){window.scrollTo(0,0);root.querySelector("h1")?.focus({preventScroll:true});}
+    if(scrollToTop){window.scrollTo(0,0);(root.querySelector("#scene-title") || root.querySelector("h1"))?.focus({preventScroll:true});}
     else if(focusAction){[...root.querySelectorAll("[data-action]")].find(e=>e.dataset.action===focusAction&&e.dataset.id===focusId)?.focus({preventScroll:true});}
+    syncGuide(state);
     previous=state;
   }
   const session=window.shadowtablePersonalityFlow.create({storage,credential,login,request:fetchJSON,publicRequest:path=>fetchJSON(path,"GET",undefined,true),requestId:()=>"personality_"+crypto.randomUUID(),onChange:render});
@@ -227,7 +293,7 @@
     }catch(error){if(currentImage())imageError=error.message;}
     finally{imageBusy=false;if(pageAlive)render(ui);}
   }
-  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.toggle("rulesOpen"),details:()=>session.toggle("detailsOpen"),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
+  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.openGuide(),details:()=>session.toggle("detailsOpen"),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
     catalogue:()=>{
       session.toggle("catalogueOpen");
       const catalogue=root.querySelector("#persona-catalogue");
@@ -246,6 +312,12 @@
     share:shareResult,
     image:imageDownload,
   };
+  guideDialog.addEventListener("click",event=>{
+    const tab=event.target.closest("[data-topic]");
+    if(tab)session.selectGuide(tab.dataset.topic);
+    else if(event.target===guideDialog || event.target.closest(".persona-guide-close"))session.closeGuide();
+  });
+  guideDialog.addEventListener("cancel",event=>{event.preventDefault();session.closeGuide();});
   root.addEventListener("click",event=>{const el=event.target.closest("[data-action]");if(el&&!el.disabled)Promise.resolve(actions[el.dataset.action]?.(el)).catch(error=>announce(error.message));});
   root.addEventListener("keydown",event=>{
     const el=event.target.closest('[role="radio"],[role="tab"]');
