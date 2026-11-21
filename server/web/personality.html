@@ -8,5 +8,11 @@
   <script src="/personality/presentation.js" defer></script><script src="/personality/storage.js" defer></script><script src="/personality/flow.js" defer></script>
   <script src="/poster-canvas.js" defer></script><script src="/personality/poster.js" defer></script><script src="/personality/web.js" defer></script>
 </head>
-<body class="personality-web"><header class="persona-web-nav"><a href="/#/me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></a><span>阿瓦隆十六人格</span><span class="persona-web-brand">桌边助手</span></header><main id="personality" class="persona-page"><p class="persona-status">正在读取你的牌桌故事…</p></main><div id="persona-announcement" role="status" aria-live="polite"></div><dialog id="persona-retest"><form method="dialog"><h2>重新测试？</h2><p>将开始一份新答卷，替换本机未完成的进度。已保存的账号结果和分享卡仍会保留。</p><div><button value="cancel">取消</button><button value="confirm">开始新测试</button></div></form></dialog></body>
+<body class="personality-web"><header class="persona-web-nav"><a href="/#/me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></a><span>阿瓦隆十六人格</span><span class="persona-web-brand">桌边助手</span></header><main id="personality" class="persona-page"><p class="persona-status">正在读例牌桌故事…</p></main><div id="persona-announcement" role="status" aria-live="polite"></div><dialog id="persona-guide" aria-labelledby="persona-guide-title">
+  <div class="persona-guide-sheet">
+    <div class="persona-guide-header"><div><div class="persona-guide-source"></div><div class="persona-guide-title" id="persona-guide-title">规则与术语</div></div><button type="button" class="persona-guide-close" aria-label="关闭规则与术语">×</button></div>
+    <div class="persona-guide-tabs" role="group" aria-label="查看内容"></div>
+    <div class="persona-guide-scroll" tabindex="0"><div class="persona-guide-content"></div></div>
+  </div>
+</dialog><dialog id="persona-retest"><form method="dialog"><h2>重新测试？</h2><p>将开始一份新答卷，替换本机未完成的进度。已保存的账号结果和分享卡仍会保留。</p><div><button value="cancel">取消</button><button value="confirm">开始新测试</button></div></form></dialog></body>
 </html>

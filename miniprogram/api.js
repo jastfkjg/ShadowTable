@@ -76,6 +76,7 @@ function performRequest(path, method = "GET", data, requestId, publicRead, respo
           message = "暂时无法连接游戏服务，请检查网络或稍后重试原请求";
         const failure = new Error(message);
         if (/url not in domain list|不在.*合法域名/i.test(detail)) failure.retryable = false;
+        else if (/timeout|超时|connection[ _](refused|reset)|network/i.test(detail)) failure.retryable = true;
         reject(failure);
       },
     }),

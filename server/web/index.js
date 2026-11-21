@@ -70,6 +70,7 @@ const assets = {
   "/personality": ["personality.html", "text/html; charset=utf-8"],
   "/personality/web.js": ["personality.js", "text/javascript; charset=utf-8"],
   "/personality/web.css": ["personality.css", "text/css; charset=utf-8"],
+  "/assets/identity-card-back.webp": ["../../miniprogram/assets/identity-card-back.webp", "image/webp"],
   "/personality/layout.css": ["../../miniprogram/pages/personality/personality.wxss", "text/css; charset=utf-8"],
   "/personality/quiz.js": ["../../miniprogram/pages/personality/quiz.json", "text/javascript; charset=utf-8"],
   "/personality/scoring.js": ["../../miniprogram/pages/personality/scoring.js", "text/javascript; charset=utf-8"],
@@ -82,7 +83,7 @@ const assets = {
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "record-more", "share-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "record-more", "share-dark", "share", "share-save-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const name of ["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];

@@ -1,6 +1,14 @@
 <import src="../../loading-placeholder.wxml" />
 <template name="personalityEntry">
-  <navigator class="me-personality" hover-start-time="{{0}}" hover-stay-time="{{70}}" url="/pages/personality/personality" open-type="navigate" hover-class="me-pressed" aria-label="{{personality.title}}"><image class="me-personality-art" src="{{personality.portrait}}" mode="aspectFit" aria-hidden="true" /><view class="me-personality-copy"><text class="me-personality-label">AVALON · 16 PERSONALITIES</text><view class="me-personality-title">{{personality.title}}</view><view class="me-personality-caption">{{personality.caption}}</view></view><view class="me-chevron" aria-hidden="true"></view></navigator>
+  <navigator class="me-personality {{compact ? 'me-personality-compact' : ''}}" hover-start-time="{{0}}" hover-stay-time="{{70}}" url="/pages/personality/personality" open-type="navigate" hover-class="me-pressed" aria-label="{{compact ? '阿瓦隆人格，' + personality.entryLabel : personality.title}}">
+    <image class="me-personality-art" src="{{personality.portrait}}" mode="aspectFit" aria-hidden="true" />
+    <view class="me-personality-copy">
+      <text class="me-personality-label">{{compact ? '阿瓦隆人格' : 'AVALON · 16 PERSONALITIES'}}</text>
+      <view class="me-personality-title">{{compact ? personality.entryLabel : personality.title}}</view>
+      <view wx:if="{{!compact}}" class="me-personality-caption">{{personality.caption}}</view>
+    </view>
+    <view class="me-chevron" aria-hidden="true"></view>
+  </navigator>
 </template>
 <template name="meMenuLink">
   <navigator class="personal-link" url="{{url}}" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}">
@@ -14,13 +22,14 @@
   <template wx:if="{{loading && !profile}}" is="loadingPlaceholder" data="{{kind:'personal'}}" />
   <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><view>{{error}}</view><button class="secondary" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" bindtap="load" loading="{{loading}}" disabled="{{loading}}">重新加载</button></view>
   <block wx:if="{{profile}}">
-    <navigator class="me-profile" url="/pages/profile/profile" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="编辑资料，头像和昵称">
-      <view class="me-profile-main">
+    <view class="me-profile-row">
+      <navigator class="me-profile" url="/pages/profile/profile" open-type="navigate" hover-class="me-pressed" hover-start-time="{{0}}" hover-stay-time="{{70}}" aria-label="编辑资料，头像和昵称，{{profile.displayName}}">
         <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" aria-label="我的头像" />
         <view wx:else class="profile-avatar avatar-fallback" aria-hidden="true">{{profile.initial}}</view>
         <view class="profile-identity"><view class="profile-name">{{profile.displayName}}</view><view class="me-profile-caption">编辑资料<view class="me-chevron" aria-hidden="true"></view></view></view>
-      </view>
-    </navigator>
+      </navigator>
+      <template is="personalityEntry" data="{{personality, compact: true}}" />
+    </view>
     <view wx:if="{{profile.identityType==='guest'}}" class="account-note small muted">当前为游客身份。清除缓存或登录过期后，无法自动找回资料与战绩。</view>
     <view class="me-overview">
       <view class="me-overview-heading">
@@ -47,7 +56,6 @@
       <view class="me-room-copy"><view class="me-room-title"><text>当前牌桌</text><text class="me-room-state {{currentRoom.status==='playing'?'playing':''}}">{{currentRoom.statusLabel}}</text></view><view class="me-room-caption">{{currentRoom.boardLabel}} · {{currentRoom.capacity}}人 · {{currentRoom.relationLabel}}</view></view>
       <view class="me-room-return"><text>返回</text><view class="me-chevron" aria-hidden="true"></view></view>
     </navigator>
-    <template is="personalityEntry" data="{{personality}}" />
     <view class="personal-links me-links me-links-primary">
       <view class="me-section-label">我的记录</view>
       <view class="me-link-group">

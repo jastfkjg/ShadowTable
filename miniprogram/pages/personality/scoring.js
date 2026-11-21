@@ -4,15 +4,17 @@
 function validateConfig(config) {
   const ids = new Set();
   const dims = [...config.coreDimensions, config.styleDimension];
-  if (config.questions.length !== 28 || config.roles.length !== 8 || dims.length !== 8) throw new Error('Invalid v2.0.0 cardinality');
+  const measured = new Set();
+  if (!config.questions.length || config.roles.length !== 8 || dims.length !== 8 || new Set(dims).size !== dims.length) throw new Error('Invalid quiz cardinality');
   for (const q of config.questions) {
     if (ids.has(q.id)) throw new Error(`Duplicate question ${q.id}`);
     ids.add(q.id);
-    if (q.options.length !== 3 || q.measuredDims.length < 2 || q.measuredDims.length > 3) throw new Error(`Invalid question ${q.id}`);
+    if (q.options.length !== 3 || q.measuredDims.length < 1 || q.measuredDims.length > 3) throw new Error(`Invalid question ${q.id}`);
     if (new Set(q.options.map(o => o.id)).size !== 3) throw new Error(`Duplicate option ${q.id}`);
     if (new Set(q.measuredDims).size !== q.measuredDims.length) throw new Error(`Duplicate dimension ${q.id}`);
     for (const d of q.measuredDims) {
       if (!dims.includes(d)) throw new Error(`Unknown dimension ${d}`);
+      measured.add(d);
       const values = q.options.map(o => o.scores[d]);
       if (values.some(v => !Number.isInteger(v) || v < -2 || v > 2)) throw new Error(`Invalid score ${q.id}.${d}`);
       if (Math.max(...values) === Math.min(...values)) throw new Error(`Constant measured dimension ${q.id}.${d}`);
@@ -21,6 +23,7 @@ function validateConfig(config) {
       if (Object.keys(o.scores).sort().join() !== [...q.measuredDims].sort().join()) throw new Error(`Score key mismatch ${q.id}.${o.id}`);
     }
   }
+  if (measured.size !== dims.length) throw new Error('The quiz must measure every dimension');
   if (new Set(config.roles.map(r => r.id)).size !== 8) throw new Error('Duplicate role');
   for (const r of config.roles) {
     if (r.prototype.length !== 7 || !r.prototype.every(Number.isFinite) || Math.hypot(...r.prototype) === 0) throw new Error(`Invalid prototype ${r.id}`);
@@ -100,6 +103,57 @@ function resolveSubtype(config, value, tieOptionId) {
   return {subtype: o.subtype, resolution: 'style_tiebreak'};
 }
 
+function decisionMoments(config, aggregate, primary, runner, role, style, tieAnswers) {
+  const {selected, denominator, profile} = aggregate;
+  const epsilon = config.scoring.epsilon;
+  const axis = config.styleDimension;
+  const closeStyle = Number.isFinite(config.scoring.nearStyleThreshold) &&
+    Math.abs(profile[axis]) <= config.scoring.nearStyleThreshold + epsilon;
+  const candidates = selected.map((answer,index) => {
+    const vector = config.coreDimensions.map(d => (answer.centered[d] ?? 0) / denominator[d]);
+    const support = dot(vector, primary);
+    const question = config.questions[index];
+    const inCharacter = !question.scene || question.selfRole === role.roleId ||
+      (role.roleId === 'lancelot' && question.selfRole === 'lancelot_initial_good');
+    return { answer, question, inCharacter, support, contrast: support - dot(vector, runner) };
+  });
+  // A choice that merely counts against the runner-up cannot explain the winning role.
+  const forRole = candidates.filter(c => c.support > epsilon)
+    .sort((a, b) => Number(b.contrast > epsilon) - Number(a.contrast > epsilon) ||
+      Number(b.inCharacter) - Number(a.inCharacter) || b.support - a.support || b.contrast - a.contrast)[0];
+  function styleExample(subtype) {
+    const sign = subtype === 'A' ? 1 : -1;
+    const matches = candidates.filter(({answer, question}) => {
+      if (!(answer.centered[axis] * sign > epsilon)) return false;
+      // Centering can give a neutral option a small contribution. It cannot illustrate either extreme.
+      return !closeStyle || question.options.find(o => o.id === answer.optionId).scores[axis] * sign > 0;
+    });
+    matches.sort((a, b) => {
+      const support = (b.answer.centered[axis] - a.answer.centered[axis]) * sign;
+      const repeat = Number(a === forRole) - Number(b === forRole);
+      return (closeStyle ? repeat || support : support || repeat) ||
+        Object.keys(a.answer.centered).length - Object.keys(b.answer.centered).length;
+    });
+    return fromCandidate(matches[0]);
+  }
+  function evidence(question, optionId) {
+    const option = question?.options.find(o => o.id === optionId);
+    return option && { questionId:question.id, optionId, moment:option.moment, text:option.text,
+      title:question.title || question.prompt, interpretation:option.interpretation };
+  }
+  function fromCandidate(candidate) {
+    if (!candidate) return null;
+    return evidence(candidate.question, candidate.answer.optionId);
+  }
+  const styleExamples = closeStyle ? {A:styleExample('A'), B:styleExample('B')} : null;
+  return {
+    role:role.resolution === 'role_tiebreak' ? evidence(config.tieBreakers.role, tieAnswers.T_ROLE) : fromCandidate(forRole),
+    style:style.resolution === 'style_tiebreak' ? evidence(config.tieBreakers.style, tieAnswers.T_STYLE) :
+      styleExamples ? styleExamples[style.subtype] : styleExample(style.subtype),
+    ...(styleExamples ? {styleExamples} : {}),
+  };
+}
+
 function scoreQuiz(config, answers, tieAnswers = {}) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('answers must be an object keyed by stable question ID');
   const qmap = new Map(config.questions.map(q => [q.id, q]));
@@ -142,7 +196,10 @@ function scoreQuiz(config, answers, tieAnswers = {}) {
     profile, rankedRoles: ranked, secondaryRoleIds, signalStrength, cosineGap,
     tendencyLabel: mixed ? '混合倾向' : '相对鲜明',
     roleResolution: role.resolution, subtypeResolution: subtype.resolution,
-    tiedRoleIds: role.tiedRoleIds, explanations
+    tiedRoleIds: role.tiedRoleIds, explanations,
+    ...(config.scoring.decisionMoments ? {
+      moments:decisionMoments(config, aggregate, primaryUnit, runnerUnit, role, subtype, tieAnswers)
+    } : {})
   };
 }
 

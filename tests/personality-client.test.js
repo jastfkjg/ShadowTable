@@ -5,7 +5,8 @@ const cacheFactory=require("../miniprogram/personality-storage");
 const quiz=require("../miniprogram/pages/personality/quiz.json");
 const scoring=require("../miniprogram/pages/personality/scoring");
 const presentation=require("../miniprogram/pages/personality/presentation");
-const fixtures=require("./fixtures/personality/reachability-fixtures.json").fixtures;
+const lastQuestion=quiz.questions.at(-1);
+const fixtures=require("./fixtures/personality/reachability-v3.1.json").fixtures;
 function harness(values=new Map()) {
   let credential="session-one",offline=false,failSave=false,attempt=0,posts=0;
   const account={accountKey:"a".repeat(64),identityType:"wx",latest:null,history:[]};
@@ -29,9 +30,11 @@ function harness(values=new Map()) {
 async function complete(session,answers) {session.start();for(const q of quiz.questions){assert.equal(session.state().question.id,q.id);session.answer(answers[q.id]);await session.next();}}
 test("断点续答恢复选项与位置，上一题修改按稳定ID保存",async()=>{
   const h=harness();let session=h.create();await session.load();session.start();
-  session.answer("C");session.next();session.answer("A");session.next();session.dispose();
+  session.answer("C");session.next();const order=session.state().question.options.map(o=>o.id);session.answer("A");session.next();session.dispose();
   session=h.create();await session.load();assert.equal(session.state().hasDraft,true);assert.equal(session.state().completedCount,2);
   session.start();assert.equal(session.state().question.id,"Q03");session.previous();assert.equal(session.state().question.selected,"A");
+  assert.deepEqual(session.state().question.options.map(o=>o.id),order);
+  assert.equal(session.state().question.options.find(o=>o.selected).id,"A");
   session.answer("B");session.previous();assert.equal(session.state().question.selected,"C");
   const saved=cacheFactory.create(h.storage).draft(h.account.accountKey,quiz.version);assert.equal(saved.answers.Q02,"B");
   session.dispose();
@@ -43,6 +46,23 @@ test("断网可恢复已绑定账号进度，完整结果本地保留，联网�
   session.dispose();h.offline(false);session=h.create();await session.load();assert.ok(session.state().record);assert.equal(session.state().hasDraft,false);assert.equal(h.posts(),1);
   assert.equal(cacheFactory.create(h.storage).draft(h.account.accountKey,quiz.version),null);
   const saved=await session.share();assert.equal(saved.id,"f".repeat(48));session.dispose();
+});
+test("题库版本冲突提示先保存图片，其他同步冲突保留原提示",async()=>{
+  const h=harness(), request=h.deps.request;
+  let reason="题库版本已更新，请保留本地结果并更新小程序后重新测试";
+  h.deps.request=(path,...args)=>{
+    if(reason && path==="/api/me/personality/results")throw Object.assign(new Error(reason),{status:409});
+    return request(path,...args);
+  };
+  const session=h.create();
+  try{
+    await session.load();await complete(session,fixtures[0].answers);
+    assert.match(session.state().saveError,/题库版本不一致.*先保存图片/);
+    reason="答卷编号已用于其他结果";
+    await session.save();assert.equal(session.state().saveError,reason);
+    reason="";await session.save();
+    assert.equal(session.state().saveError,"");assert.ok(session.state().record);
+  }finally{session.dispose();}
 });
 test("真实风格同分进入补题，返回修改清除旧补题，完成后才展示人格",async()=>{
   let seed=19,answers,result;
@@ -57,10 +77,13 @@ test("真实风格同分进入补题，返回修改清除旧补题，完成后�
   assert.equal(session.state().question.id,"T_STYLE");assert.equal(session.state().question.options.length,2);
   session.answer("B");session.previous();
   while(session.state().question.supplemental)session.previous();
-  const option=quiz.questions[27].options.find(o=>o.id!==answers.Q28).id;session.answer(option);
+  const option=lastQuestion.options.find(o=>o.id!==answers[lastQuestion.id]).id;session.answer(option);
   assert.deepEqual(cacheFactory.create(h.storage).draft(h.account.accountKey,quiz.version).tieAnswers,{});
-  session.answer(answers.Q28);await session.next();
+  session.answer(answers[lastQuestion.id]);await session.next();
   while(session.state().mode==="quiz"){session.answer(session.state().question.id==="T_STYLE"?"B":"A");await session.next();}
+  const deciding=session.state().result.moments.find(m=>m.questionId==="T_STYLE");
+  assert.equal(deciding.text,quiz.tieBreakers.style.options.find(o=>o.id==="B").text);
+  assert.ok(session.state().result.explanations.some(e=>e.questionId==="T_STYLE" && e.optionId==="B"));
   assert.match(session.state().result.typeId,/-B$/);session.dispose();
 });
 test("旧版进度保留且不套用新权重，账号切换不显示或提交上一账号答案",async()=>{
@@ -71,12 +94,70 @@ test("旧版进度保留且不套用新权重，账号切换不显示或提交�
   session.answer("A");h.credential("another-account");session.next();assert.equal(session.state().question,null);assert.match(session.state().error,/账号已变化/);assert.equal(h.posts(),0);
   assert.equal(cache.account("another-account"),null);session.dispose();
 });
+test("v3 未完成答卷复用稳定 ID，更新的第 13 题重新作答",async()=>{
+  const h=harness(),cache=cacheFactory.create(h.storage);cache.bind("session-one",h.account);
+  const previous=require("./fixtures/personality/reachability-v3.json").fixtures[0];
+  const {Q15,...answers}=previous.answers;
+  cache.saveDraft(h.account.accountKey,{version:"3.0.0",current:"Q15",attemptId:"previous_attempt_01",completed:false,answers,tieAnswers:{}});
+  const session=h.create();await session.load();session.start();
+  assert.equal(session.state().question.id,"Q13S");
+  assert.equal(session.state().completedCount,13);
+  assert.equal(session.state().question.selected,"");
+  session.answer("B");await session.next();
+  assert.equal(session.state().question.selected,answers.Q14);
+  session.dispose();
+});
+test("v3.1 草稿保留第 14 题和续答位置，补题按新答卷重新判断",async()=>{
+  const h=harness(),cache=cacheFactory.create(h.storage),answers={...fixtures[0].answers};
+  delete answers.Q15;
+  cache.bind("session-one",h.account);
+  cache.saveDraft(h.account.accountKey,{version:"3.1.0",current:"Q14",attemptId:"previous_attempt_01",completed:false,answers,tieAnswers:{T_STYLE:"B"}});
+  const session=h.create();await session.load();session.start();
+  try{
+    assert.equal(session.state().question.id,"Q14");
+    assert.equal(session.state().question.selected,answers.Q14);
+    const migrated=cache.draft(h.account.accountKey,quiz.version);
+    assert.deepEqual(migrated.answers,answers);assert.deepEqual(migrated.tieAnswers,{});
+    assert.equal(cache.draft(h.account.accountKey,"3.1.0"),null);
+    await session.next();session.answer(fixtures[0].answers.Q15);await session.next();
+    assert.equal(session.state().result.version,quiz.version);
+    assert.ok(session.state().result.styleNote);
+  }finally{session.dispose();}
+});
+for(const [legacyFile, fixturesFile] of [
+  ["../server/personality-quiz-v2.json","./fixtures/personality/reachability-fixtures.json"],
+  ["../server/personality-quiz-v3.json","./fixtures/personality/reachability-v3.json"],
+  ["../server/personality-quiz-v3.1.json","./fixtures/personality/reachability-v3.1.json"],
+]) test("升级后原样同步已完成的旧答卷 "+legacyFile,async()=>{
+  const legacy=require(legacyFile);
+  const {answers}=require(fixturesFile).fixtures[0];
+  const localView=presentation.result(scoring.scoreQuiz(legacy,answers),legacy);
+  const h=harness(),cache=cacheFactory.create(h.storage);
+  cache.bind("session-one",h.account);
+  cache.saveDraft(h.account.accountKey,{version:legacy.version,completed:true,current:legacy.questions.at(-1).id,answers,tieAnswers:{},localView,attemptId:"legacy_attempt_0001"});
+  const request=h.deps.request;
+  let submitted;
+  h.deps.request=(path,method,data)=>{
+    if(path!=="/api/me/personality/results")return request(path,method,data);
+    submitted=data;
+    return Promise.resolve({id:"b".repeat(48),version:legacy.version,view:localView,createdAt:1700000000000});
+  };
+  const session=h.create();
+  await session.load();
+  assert.deepEqual(submitted,{version:legacy.version,answers,tieAnswers:{},attemptId:"legacy_attempt_0001"});
+  assert.equal(session.state().result.version,legacy.version);
+  assert.equal(cache.draft(h.account.accountKey,legacy.version),null);
+  session.start(true);
+  assert.equal(session.state().questionTotal,15);
+  assert.equal(session.state().question.id,"Q01");
+  session.dispose();
+});
 test("晚到的保存响应不会泄露到切换后的账号，分享读取无需登录与本地存储",async()=>{
   const h=harness();let release;
   const original=h.deps.request;
   h.deps.request=(path,...args)=>path==="/api/me/personality/results"?new Promise(r=>{release=()=>original(path,...args).then(r);}):original(path,...args);
   const session=h.create();await session.load();session.start();
-  for(const q of quiz.questions){session.answer(fixtures[0].answers[q.id]);if(q.id!=="Q28")await session.next();}
+  for(const q of quiz.questions){session.answer(fixtures[0].answers[q.id]);if(q.id!==lastQuestion.id)await session.next();}
   const pending=session.next();await Promise.resolve();h.credential("session-two");release();await pending;assert.equal(session.state().record,null);session.dispose();
   const publicFlow=flow.create({...h.deps,login:()=>{throw new Error("must not login");},storage:{get(){throw new Error("no storage");}},credential:()=>{throw new Error("no credential");}});
   await publicFlow.load({share:"f".repeat(48)});assert.equal(publicFlow.state().mode,"shared");assert.equal(publicFlow.state().result.title,"静默猎手");publicFlow.dispose();
@@ -86,4 +167,62 @@ test("本地存储失败明确反馈，不伪称已保存；重测保留账号�
   session.start(true);session.answer("B");assert.equal(h.account.latest.view.typeId,fixtures[0].expectedTypeId);
   session.dispose();
   const broken=h.create();h.storage.set=()=>{throw new Error("quota");};await broken.load();broken.start();broken.answer("A");assert.match(broken.state().storageError,/无法保存/);broken.dispose();
+});
+test("保存和分享响应丢失后各自用相同参数重试，分享等待同一次账号保存",async()=>{
+  const h=harness();
+  const original=h.deps.request;
+  const writes=[];
+  h.deps.request=async(path,method,data)=>{
+    const response=await original(path,method,data);
+    if(method==="POST"){
+      const first=!writes.some(write=>write.path===path);
+      writes.push({path,data:structuredClone(data)});
+      if(first)throw Object.assign(new Error("模拟响应丢失"),{retryable:true});
+    }
+    return response;
+  };
+  const session=h.create();
+  await session.load();
+  session.start();
+  for(const q of quiz.questions){
+    session.answer(fixtures[0].answers[q.id]);
+    if(q.id!==lastQuestion.id)session.next();
+  }
+  const saving=session.next();
+  assert.equal(session.state().mode,"result");
+  const sharing=session.share();
+  await saving;
+  assert.equal((await sharing).id,"f".repeat(48));
+  assert.equal(writes.length,4);
+  assert.deepEqual(writes[0],writes[1]);
+  assert.deepEqual(writes[2],writes[3]);
+  assert.equal(writes[2].data.resultId,session.state().record.id);
+  assert.equal(session.state().saveError,"");
+  assert.equal(session.state().shareError,"");
+  session.dispose();
+});
+test("两次超时后保留本机结果，分享反馈等待同步并可在恢复联网后重试",async()=>{
+  const h=harness();
+  const original=h.deps.request;
+  let fail=true, attempts=0;
+  h.deps.request=(path,method,data)=>{
+    if(path==="/api/me/personality/results"){
+      attempts++;
+      if(fail)throw Object.assign(new Error("模拟超时"),{retryable:true});
+    }
+    return original(path,method,data);
+  };
+  const session=h.create();
+  await session.load();
+  await complete(session,fixtures[0].answers);
+  assert.equal(attempts,2);
+  assert.match(session.state().saveError,/暂未确认账号保存/);
+  assert.ok(cacheFactory.create(h.storage).draft(h.account.accountKey,quiz.version).completed);
+  assert.equal(await session.share(),null);
+  assert.match(session.state().shareError,/先保存图片/);
+  fail=false;
+  await session.save();
+  assert.equal(session.state().shareError,"");
+  assert.ok((await session.share()).id);
+  session.dispose();
 });

@@ -5,8 +5,14 @@ const poster = require("./poster");
 const dialog = require("../../dialog");
 const { backToMe } = require("../../profile");
 const { isSinglePage } = require("../../records-share");
+const pagePath="/pages/personality/personality";
+function shareContent(shared, forwarding=false) {
+  return shared
+    ? {title:forwarding ? shared.name+"的阿瓦隆人格 · "+shared.view.title : "我是"+shared.view.title+"，你是哪种阿瓦隆人格？",path:pagePath+"?share="+shared.id,imageUrl:shared.view.portrait||"/assets/roles/merlin.png"}
+    : {title:"探索你的阿瓦隆人格",path:pagePath,imageUrl:"/assets/roles/merlin.png"};
+}
 Page({
-  data:{mode:"intro",loading:true,result:null,error:"",singlePage:false,imagePath:"",rendering:false,imageError:"",albumDenied:false,sharePanel:false},
+  data:{mode:"intro",loading:true,result:null,error:"",singlePage:false,imagePath:"",rendering:false,imageError:"",albumDenied:false},
   onLoad(options={}) {
     this.alive=true;this.options=options;const singlePage=isSinglePage();
     this.lastCredential=singlePage?"":wx.getStorageSync("session")||"";
@@ -20,12 +26,19 @@ Page({
       onChange:state=>{
         if(!this.alive)return;
         const changedQuestion=state.question?.id!==this.data.question?.id,changedMode=state.mode!==this.data.mode;
-        const changedResult=state.result?.typeId!==this.data.result?.typeId || state.record?.id!==this.data.record?.id;
-        this.setData({...state,...(changedResult?{imagePath:"",imageError:"",sharePanel:false}:{})});
-        if(changedResult)this.imageEpoch=(this.imageEpoch||0)+1;
+        const catalogueOpened=state.catalogueOpen&&!this.data.catalogueOpen;
+        const posterChanged=poster.imageKey(state.result)!==poster.imageKey(this.data.result);
+        if(posterChanged)this.imageEpoch=(this.imageEpoch||0)+1;
+        this.setData({...state,
+          ...(posterChanged?{imagePath:"",imageError:"",albumDenied:false}:{}),
+        },catalogueOpened?()=>this.revealCatalogue():undefined);
         if(changedQuestion||changedMode)wx.pageScrollTo?.({scrollTop:0,duration:0});
-        if(state.mode==="quiz")wx.hideShareMenu?.();
-        else if(!this.data.singlePage)wx.showShareMenu?.({menus:["shareAppMessage","shareTimeline"]});
+        const shareMenu=!this.data.singlePage && state.mode!=="quiz" && (state.mode!=="result" || !!state.shared);
+        if(shareMenu!==this.shareMenu && !this.data.singlePage){
+          this.shareMenu=shareMenu;
+          if(shareMenu)wx.showShareMenu?.({menus:["shareAppMessage","shareTimeline"]});
+          else wx.hideShareMenu?.();
+        }
       },
     });
     if(singlePage&&!options.share){this.setData({loading:false,mode:"shared",error:"打开小程序，探索你的阿瓦隆人格。"});return;}
@@ -44,9 +57,22 @@ Page({
   answer(event){this.flow.answer(event.currentTarget.dataset.id);},
   next(){return this.flow.next();},
   previous(){this.flow.previous();},
-  rules(){this.flow.toggle("rulesOpen");},
-  details(){this.flow.toggle("detailsOpen");},
-  catalogue(){this.flow.toggle("catalogueOpen");},
+  rules(){this.flow.openGuide();},
+  closeRules(){this.flow.closeGuide();},
+  selectGuide(event){this.flow.selectGuide(event.currentTarget.dataset.id);},
+  selectResultTab(event){this.flow.selectTab(event.currentTarget.dataset.tab);},
+  catalogue(){this.flow.toggleCatalogue();},
+  revealCatalogue(){
+    if(!this.alive||!this.data.catalogueOpen)return;
+    const query=wx.createSelectorQuery();
+    query.select("#persona-nav").boundingClientRect();
+    query.select("#persona-catalogue").boundingClientRect();
+    query.selectViewport().scrollOffset();
+    query.exec(([nav,catalogue,viewport])=>{
+      if(this.alive&&this.data.catalogueOpen&&catalogue&&viewport)
+        wx.pageScrollTo({scrollTop:Math.max(0,viewport.scrollTop+catalogue.top-(nav?.height||0)-12),duration:0});
+    });
+  },
   retrySave(){return this.flow.save();},
   retryLocalSave(){this.flow.persist();},
   openHistory(event){return this.flow.openResult(event.currentTarget.dataset.id);},
@@ -61,36 +87,52 @@ Page({
     this.lastCredential=wx.getStorageSync("session")||"";
   },
   back(){
+    if(this.data.rulesOpen){this.closeRules();return;}
     if(this.data.mode==="quiz"){this.flow.persist();this.flow.intro();return;}
     return backToMe();
   },
-  async prepareShare(){
-    const shared=await this.flow.share();if(shared&&this.alive){this.setData({sharePanel:true});wx.showShareMenu?.({menus:["shareAppMessage","shareTimeline"]});}
-  },
-  async prepareImage(){
-    if(!this.alive||!this.canvasReady||!this.data.result||this.data.rendering)return null;
-    if(this.data.imagePath)return this.data.imagePath;
-    const at=this.imageEpoch=(this.imageEpoch||0)+1;
+  async saveImage(){
+    if(!this.alive||!this.data.result||this.data.singlePage||this.data.rendering)return;
+    if(!this.canvasReady){this.setData({imageError:"图片正在准备，请稍后再试。"});return;}
+    const at=this.imageEpoch;
     this.setData({rendering:true,imageError:"",albumDenied:false});
     try{
-      const path=await renderImage(this,{view:this.data.result},{renderer:poster,selector:"#personality-canvas"});
-      if(this.alive&&at===this.imageEpoch&&path){this.setData({imagePath:path});return path;}
-    }catch(error){if(this.alive&&at===this.imageEpoch)this.setData({imageError:error.message});}
+      const path=this.data.imagePath||await renderImage(this,{view:this.data.result},{renderer:poster,selector:"#personality-canvas"});
+      if(!this.alive||at!==this.imageEpoch)return;
+      if(!path)throw new Error("图片未能生成，请重试。");
+      this.setData({imagePath:path});
+      await new Promise((resolve,reject)=>wx.saveImageToPhotosAlbum({filePath:path,success:resolve,fail:reject}));
+      if(this.alive&&at===this.imageEpoch)wx.showToast?.({title:"已保存到相册",icon:"success"});
+    }catch(error){
+      if(!this.alive||at!==this.imageEpoch||/cancel/i.test(error.errMsg||""))return;
+      const denied=/auth|denied|authorize/i.test(error.errMsg||"");
+      this.setData({albumDenied:denied,imageError:denied?"保存需要相册权限，可在设置中开启。":error.message||"保存到相册失败，可先预览图片。"});
+    }
     finally{if(this.alive)this.setData({rendering:false});}
-    return null;
   },
-  async saveImage(){
-    if(this.data.rendering||this.data.singlePage)return;
-    const path=await this.prepareImage();if(!path||!this.alive)return;
-    wx.saveImageToPhotosAlbum({filePath:path,
-      success:()=>{if(this.alive)wx.showToast?.({title:"已保存到相册",icon:"success"});},
-      fail:error=>{if(!this.alive||/cancel/i.test(error.errMsg||""))return;const denied=/auth|denied|authorize/i.test(error.errMsg||"");this.setData({albumDenied:denied,imageError:denied?"保存需要相册权限，可在设置中开启。":"图片保存失败，请重试。"});},
-    });
+  previewImage(){
+    const path=this.data.imagePath;
+    if(!path)return;
+    wx.previewImage({current:path,urls:[path],fail:()=>{
+      if(this.alive)this.setData({imagePath:"",imageError:"图片无法打开，请重新生成。"});
+    }});
   },
   albumSettings(){wx.openSetting({success:r=>{if(this.alive&&r.authSetting?.["scope.writePhotosAlbum"])this.setData({albumDenied:false,imageError:"权限已开启，请再次保存图片。"});}});},
-  onShareAppMessage(){
-    const shared=this.data.shared;
-    return {title:shared?"我是"+shared.view.title+"，你是哪种阿瓦隆人格？":"28 个情境，探索你的阿瓦隆人格",path:"/pages/personality/personality"+(shared?"?share="+shared.id:""),imageUrl:shared?.view.portrait||"/assets/roles/merlin.png"};
+  onShareAppMessage(event){
+    const {shared,mode,singlePage}=this.data;
+    const content=shareContent(shared,mode==="shared");
+    if(shared||mode!=="result"||singlePage||event?.from!=="button")return content;
+    const started=Date.now();
+    return {...content,promise:this.flow.share().then(result=>{
+      if(!result||!this.alive)return content;
+      // The native share sheet may have used its default card on a slow connection.
+      if(Date.now()-started>=3000)wx.showToast?.({title:"结果已就绪，请再点一次分享",icon:"none"});
+      return shareContent(result);
+    })};
   },
-  onShareTimeline(){const content=this.onShareAppMessage();return {title:content.title,query:this.data.shared?"share="+this.data.shared.id:"",imageUrl:content.imageUrl};},
+  onShareTimeline(){
+    const shared=this.data.shared;
+    const {title,imageUrl}=shareContent(shared,this.data.mode==="shared");
+    return {title,query:shared?"share="+shared.id:"",imageUrl};
+  },
 });
