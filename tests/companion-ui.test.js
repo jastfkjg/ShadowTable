@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 const flush = () => new Promise(setImmediate);
 
-function panel({ overrides = {}, search = "", saved, pathname = "/admin/companion", playerCookie = false,
+function panel({ overrides = {}, search = "", saved, pathname = "/admin/companion", playerCookie = false, confirm = () => true,
   actorStatus = 200, cleanupFailure = false } = {}) {
   const elements = new Map();
   const element = (id) => {
@@ -63,11 +63,11 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
         addEventListener() {},
         querySelectorAll: (selector) =>
           selector === "button"
-            ? [element("fill"), element("refresh"), element("leave"), element('batch-ready')]
+            ? [element("fill"), element("refresh"), element("restart"), element("leave"), element('batch-ready')]
             : selector === '[data-batch]' ? [element('batch-ready')] : [],
       },
       URLSearchParams,
-      confirm: () => true,
+      confirm,
       location: { pathname, search },
       sessionStorage: {
         getItem: () => JSON.stringify(saved || { code: "123456", actors }),
@@ -136,6 +136,40 @@ function panel({ overrides = {}, search = "", saved, pathname = "/admin/companio
     }),
   };
 }
+
+test("快速重开显示当前房间和局号，取消不发请求，确认和连点只重开一次", async () => {
+  const overrides = { phase: "lobby", game: 8 };
+  let accepted = false;
+  const p = panel({ overrides, confirm: message => {
+    assert.match(message, /123456.*第 8 局.*不计战绩/);
+    return accepted;
+  } });
+  await flush();
+  const button = p.element("restart");
+  assert.equal(button.disabled, true);
+  overrides.phase = "tools";
+  await p.poll();
+  assert.equal(button.disabled, false);
+  await button.onclick();
+  assert.equal(p.calls.filter(c => c.method === "POST").length, 0);
+  accepted = true;
+  p.hold(true);
+  const done = button.onclick();
+  assert.equal(button.disabled, true);
+  await button.onclick();
+  const writes = p.calls.filter(c => c.method === "POST");
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0].data, { type: "restartPlaytest", stage: "s1", confirm: true });
+  p.hold(false);
+  p.pending.forEach(r => r.resolve());
+  await done;
+  assert.match(p.element("feedback").textContent, /已重新发牌/);
+  for (const phase of ["terminated", "ended"]) {
+    overrides.phase = phase;
+    await p.poll();
+    assert.equal(button.disabled, true);
+  }
+});
 
 function openHonors(extra = {}) {
   return { matchId: "honor-1", status: "open", completed: 0, total: 6, required: 3,

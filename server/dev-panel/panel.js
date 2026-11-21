@@ -160,6 +160,14 @@ class Companion {
       type === "leave" ? "leave" : undefined,
     );
   }
+  restartActor() {
+    if (this.cleanup) return null;
+    const pending = this.actors.find(a => a.pending?.data?.type === "restartPlaytest");
+    if (pending) return pending;
+    if (this.actors.some(a => a.pending)) return null;
+    return this.actors.find(a => a.joined && a.room?.me.seat != null &&
+      !["lobby", "ended", "terminated"].includes(a.room.phase));
+  }
   async fill(progress = () => {}) {
     if (this.cleanup) throw new Error("请先重试清空陪测玩家，确认后再补位");
     if (this.actors.some((a) => a.pending))
@@ -742,6 +750,9 @@ if (typeof document !== "undefined") {
         (room.phase !== "lobby" || room.players.length >= room.capacity));
       $("leave").disabled = !managed && companion.actors.some((a) => a.pending);
       $("leave").textContent = companion.cleanup ? "重试清空陪测玩家" : "清空陪测玩家";
+      const restartActor = companion.restartActor();
+      $("restart").disabled = !restartActor;
+      $("restart").textContent = restartActor?.pending ? "重试快速重开" : "快速重开";
       $("switch-room").disabled = false;
       $("forget-unavailable").disabled = !companion.actors.some(
         (a) => a.unavailable,
@@ -837,6 +848,17 @@ if (typeof document !== "undefined") {
   };
   $("fill").onclick = () =>
     run(() => companion.fill(progress("已加入")), "测试玩家已补齐；请全员准备后由房主开局", { refresh: false });
+  $("restart").onclick = () => {
+    const actor = companion.restartActor();
+    if (!actor || busy || acting.size) return;
+    if (!actor.pending && !confirm(
+      `放弃房间 ${companion.code} 的第 ${actor.room.game} 局？本局不计战绩。保留房主、座位和板子，立即重新发牌。`,
+    )) return;
+    return run(
+      () => actor.pending ? companion.retry(actor) : companion.command(actor, "restartPlaytest", { confirm: true }),
+      "已重新发牌，上一局未计入战绩",
+    );
+  };
   $("refresh").onclick = () =>
     run(() => companion.refresh(), "状态已刷新", { refresh: false });
   $("reveal").onchange = render;

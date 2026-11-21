@@ -135,7 +135,7 @@
         <div class="persona-question-head${short?" persona-short-head":""}"><div class="persona-question-copy">
           ${q.situation?`<div class="persona-situation" id="persona-situation">${esc(q.situation)}</div>`:""}
           <h1 class="persona-prompt" tabindex="-1" id="persona-prompt"${q.situation?' aria-describedby="persona-situation"':""}>${esc(q.ask)}</h1></div>
-          ${short?`<div class="persona-deck" aria-hidden="true">${img("/assets/identity-card-back.webp")}</div>`:""}</div>
+          ${short?`<div class="persona-deck" aria-hidden="true">${img("/assets/identity-card-back.jpg")}</div>`:""}</div>
         <div class="persona-options" role="radiogroup" aria-labelledby="persona-prompt">${options}</div>
         ${q.ruleNote?`<div class="persona-rule-note">${esc(q.ruleNote)}</div>`:""}</div>
       <div class="persona-answer-actions">${button("上一题","previous","persona-secondary",q.number===1)}${button(q.supplemental||q.last?"查看结果":"下一题","next","persona-primary",!q.selected)}</div>`;

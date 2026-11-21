@@ -53,10 +53,16 @@
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.permanent || badge.id === 'good_shield' || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
+  // The quill fills its canvas. Match the painted area of the other permanent badges.
+  function badgeArtStyle(badge, awardPopup = false) {
+    const frameScale = badge.permanent && !awardPopup ? 1.14 : 1;
+    const scale = frameScale * (badge.id === contributor.id ? 0.8 : 1);
+    return scale === 1 ? '' : 'transform:scale(' + Number(scale.toFixed(3)) + ')';
+  }
   function presentPlayerBadge(badge, assetUrl = path => path) {
     const definition = catalogue.find(item => item.id === badge.id) || monthlyAward(badge.id);
     if (!definition) return null;
-    return { ...badge, ...definition, imageUrl: badgeImageUrl(definition, assetUrl) };
+    return { ...badge, ...definition, artStyle: badgeArtStyle(definition), imageUrl: badgeImageUrl(definition, assetUrl) };
   }
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',
@@ -75,7 +81,7 @@
     const items = placements.concat(collectionCatalogue).map(b => {
       const roleRecord = copy.roleRecords[b.id];
       const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
-      return { ...b, imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
+      return { ...b, artStyle: badgeArtStyle(b), imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
       condition, detailCondition: b.permanent ? condition : condition + '（含并列）', detailNote: roleRecord?.description || detailNotes[b.id] || '', kindLabel: b.permanent ? '永久' : '月榜',
       periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首变动或跨月时重新计算',
       status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }; });
@@ -90,5 +96,5 @@
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
+  return { catalogue, rules, MAX_EQUIPPED, usesServerArt, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
 });

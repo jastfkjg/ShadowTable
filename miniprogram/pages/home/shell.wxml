@@ -1,0 +1,16 @@
+<import src="./panels.wxml" />
+<import src="../me/shared.wxml" />
+<import src="../shared/content.wxml" />
+<block wx:if="{{singlePage}}"><template is="sharedRecordContent" data="{{intro:publicIntro,singlePage:true}}" /></block>
+<view wx:else class="home-shell">
+  <app-nav title="{{activeTab === 1 ? '我的' : '对局'}}" />
+  <view class="home-panels">
+    <view class="main-panel{{activeTab !== 0 ? ' is-inactive' : ''}}" aria-hidden="{{activeTab !== 0}}">
+      <template is="lobbyPanel" data="{{...lobby, homeShell: true}}" />
+    </view>
+    <view class="main-panel{{activeTab !== 1 ? ' is-inactive' : ''}}" aria-hidden="{{activeTab !== 1}}">
+      <template is="personalPanel" data="{{...personal}}" />
+    </view>
+  </view>
+  <app-dialog id="app-dialog" />
+</view>

@@ -148,7 +148,7 @@
         <view class="deal-flight {{dealFlightStyle?'is-flying':''}}" style="{{dealFlightStyle}}" bindanimationend="finishDealFlight">
           <view class="deal-turn {{dealtIdentitySecret?'is-revealed':''}}">
             <view class="deal-side deal-back" aria-hidden="{{!!dealtIdentitySecret || dealClosing}}">
-              <image class="deal-back-art" src="/assets/identity-card-back.webp" webp="{{true}}" mode="scaleToFill" aria-hidden="true" />
+              <image class="deal-back-art" src="/assets/identity-card-back.jpg" mode="scaleToFill" aria-hidden="true" />
               <button wx:if="{{!dealtIdentitySecret && !dealClosing}}" class="deal-hit" hover-class="none" aria-label="{{identityChange?'轻点牌面，查看新身份':'轻点牌面，查看身份'}}" bindtap="revealDealtIdentity" disabled="{{busy || !network}}" />
             </view>
             <view class="deal-side deal-face{{dealtIdentitySecret.cardArt?' printed ink-'+dealtIdentitySecret.factionTone:''}}" aria-hidden="{{!dealtIdentitySecret}}">

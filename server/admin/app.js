@@ -307,7 +307,7 @@ function renderAudit({ groups, total, pageSize }) {
     const event =
       ["tools", "ended", "terminated"].includes(d.phaseKey) ||
       ["等待房主发起操作", "对局结束", "对局已终止"].includes(d.phase) ||
-      ["start", "rematch", "finishTools"].includes(d.command);
+      ["start", "rematch", "restartPlaytest", "finishTools"].includes(d.command);
     const lobby = d.phaseKey === "lobby" || d.phase === "入座与准备";
     const title = event
       ? d.command === "beginActivity"

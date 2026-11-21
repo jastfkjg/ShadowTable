@@ -1113,8 +1113,8 @@
     app.querySelector('.badge-detail-action')?.focus({ preventScroll: true });
   }
   function badgeArt(badge, className = '') {
-    const classes = (className + (badge.permanent ? ' badge-art-permanent' : '')).trim();
-    return '<img' + (classes ? ' class="' + classes + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
+    const style = badgePresentation.badgeArtStyle(badge);
+    return '<img' + (className ? ' class="' + className + '"' : '') + (style ? ' style="' + style + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
   }
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter) : null;

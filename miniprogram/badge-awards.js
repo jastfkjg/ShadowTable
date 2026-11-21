@@ -1,10 +1,10 @@
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./avoidance'));
-  else root.shadowtableBadgeAwards = factory(root.shadowtableAvoidance);
-})(typeof window === 'object' ? window : this, function (notices) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./avoidance'), require('./badges'));
+  else root.shadowtableBadgeAwards = factory(root.shadowtableAvoidance, root.shadowtableBadges);
+})(typeof window === 'object' ? window : this, function (notices, catalogue) {
   function present(notice) {
     const badges = (notice?.badges || []).map(b => ({ ...b,
-      displayReason: b.condition,
+      displayReason: b.condition, artStyle: catalogue.badgeArtStyle(b, true),
     }));
     const contributor = badges.find(b => b.id === 'feedback_contributor');
     if (contributor) {

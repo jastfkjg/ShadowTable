@@ -112,7 +112,9 @@ test('所有小程序路由都包含共享宿主，业务代码不再使用原�
   const app=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8'));
   assert.equal(app.usingComponents['app-dialog'],'/components/app-dialog/app-dialog');
   const routes=[...app.pages,...app.subPackages.flatMap(g=>g.pages.map(p=>g.root+'/'+p))];
-  for(const route of routes) assert.match(fs.readFileSync(path.join(root,route+'.wxml'),'utf8'),/<app-dialog id="app-dialog"\s*\/>/,route);
+  const template = file => fs.readFileSync(file, 'utf8').replace(/<include src="([^"]+)"\s*\/>/g,
+    (_, name) => template(path.resolve(path.dirname(file), name)));
+  for(const route of routes) assert.match(template(path.join(root,route+'.wxml')),/<app-dialog id="app-dialog"\s*\/>/,route);
   for(const file of fs.readdirSync(root,{recursive:true}).filter(f=>f.endsWith('.js'))) assert.doesNotMatch(fs.readFileSync(path.join(root,file),'utf8'),/wx\.(showModal|showActionSheet)\s*\(/,file);
   assert.equal(present({showCancel:false}).confirmText,'知道了');
   assert.equal(present({danger:true}).danger,true);

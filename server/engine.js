@@ -431,6 +431,48 @@ for (const b of BOARDS) {
       ]),
     );
 }
+function clearGame(room) {
+  room.fairyEnabled = fairy.enabled(room);
+  for (const key of [
+    "roles",
+    "knights",
+    "lancelot",
+    "fairy",
+    "submissions",
+    "leader",
+    "round",
+    "quests",
+    "team",
+    "result",
+    "proposalSubmitted",
+    "rejects",
+    "teamApproved",
+    "convertedReverse",
+    "reverseStrike",
+    "flexible",
+    "activity",
+    "toolSequence",
+    "matchId",
+    "startedAt",
+    "matchRecord",
+    "recordManagement",
+    "scorePolicy",
+    "scoringFacts",
+    "fun",
+    "replay",
+    "avoidanceChoices",
+    "avoidanceResults",
+    "avoidanceUnavailable",
+  ])
+    delete room[key];
+  room.history = [];
+}
+function restartPlaytest(room) {
+  requireRule(!["lobby", "ended", "terminated"].includes(room.phase), "只能快速重开进行中的对局", 409);
+  const flexible = room.flexible === true;
+  clearGame(room);
+  start(room, flexible);
+}
 function start(room, flexible = false) {
   requireRule(
     room.players.length === room.capacity && room.players.every((p) => p.ready),
@@ -1800,40 +1842,7 @@ function applyCommand(room, uid, input) {
       ["ended", "terminated"].includes(room.phase),
       "只能在结束后重开",
     );
-    room.fairyEnabled = fairy.enabled(room);
-    for (const key of [
-      "roles",
-      "knights",
-      "lancelot",
-      "fairy",
-      "submissions",
-      "leader",
-      "round",
-      "quests",
-      "team",
-      "result",
-      "proposalSubmitted",
-      "rejects",
-      "teamApproved",
-      "convertedReverse",
-      "reverseStrike",
-      "flexible",
-      "activity",
-      "toolSequence",
-      "matchId",
-      "startedAt",
-      "matchRecord",
-      "recordManagement",
-      "scorePolicy",
-      "scoringFacts",
-      "fun",
-      "replay",
-      "avoidanceChoices",
-      "avoidanceResults",
-      "avoidanceUnavailable",
-    ])
-      delete room[key];
-    room.history = [];
+    clearGame(room);
     room.players.forEach((p) => (p.ready = false));
     stage(room, "lobby");
     return;
@@ -2061,6 +2070,7 @@ module.exports = {
   newRoom,
   enter,
   command,
+  restartPlaytest,
   publicView,
   invitationView,
   roomSummary,

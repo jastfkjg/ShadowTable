@@ -1174,7 +1174,10 @@ test("十二骑士不提供主动先知查验和刀梅林入口，新身份提�
   for (const value of ["石像鬼", "坏人阵营", "没有视野。"])
     assert.ok(!JSON.stringify(hidden).includes(value));
   assert.ok(byHandler(hidden, "revealDealtIdentity"));
-  assert.match(JSON.stringify(hidden), /identity-card-back.webp/);
+  const backArt = nodes(hidden).find(node => node.attr?.class === "deal-back-art");
+  assert.equal(backArt.attr.src, "/assets/identity-card-back.jpg");
+  const jpeg = require("node:fs").readFileSync(path.join(root, backArt.attr.src));
+  assert.equal(jpeg.subarray(0, 3).toString("hex"), "ffd8ff");
   assert.ok(!byHandler(hidden, "closeDealtIdentity"));
   const popup = render({ ...popupData, identityChange:{identityRevision:1}, dealtIdentitySecret:popupData.identityChange });
   assert.ok(JSON.stringify(popup).includes("石像鬼"));

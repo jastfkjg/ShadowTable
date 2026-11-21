@@ -54,7 +54,7 @@
           <view wx:if="{{question.situation}}" class="persona-situation">{{question.situation}}</view>
           <view class="persona-prompt">{{question.ask}}</view>
         </view>
-        <view wx:if="{{!question.scene && !question.supplemental}}" class="persona-deck" aria-hidden="true"><image src="/assets/identity-card-back.webp" mode="aspectFill" /></view>
+        <view wx:if="{{!question.scene && !question.supplemental}}" class="persona-deck" aria-hidden="true"><image src="/assets/identity-card-back.jpg" mode="aspectFill" /></view>
       </view>
       <view class="persona-options" role="radiogroup" aria-label="{{question.prompt}}"><button wx:for="{{question.options}}" wx:key="id" class="persona-option {{item.selected?'is-selected':''}}" data-id="{{item.id}}" bindtap="answer" hover-class="none" role="radio" aria-checked="{{item.selected}}"><text class="persona-option-mark" aria-hidden="true">{{item.label}}</text><text class="persona-option-copy">{{item.text}}</text><text class="persona-option-radio" aria-hidden="true">{{item.selected?'✓':''}}</text></button></view>
       <view wx:if="{{question.ruleNote}}" class="persona-rule-note">{{question.ruleNote}}</view>
