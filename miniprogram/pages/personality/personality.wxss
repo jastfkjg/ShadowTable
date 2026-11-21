@@ -45,7 +45,7 @@
 .persona-scene { overflow:hidden; border:1px solid #43545a; border-radius:16px; padding:0 16px 4px; background:#1a2b33; }
 .persona-scene-head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:12px 0; }
 .persona-scene-copy { flex:1; min-width:0; }
-.persona-scene-stage, .persona-moment-heading { color:#e5c68b; font-size:12px; line-height:1.6; font-weight:600; }
+.persona-scene-stage { color:#e5c68b; font-size:12px; line-height:1.6; font-weight:600; }
 .persona-scene-title { font-family:"Songti SC","Noto Serif CJK SC",SimSun,serif; font-size:24px; font-weight:700; line-height:1.45; }
 .persona-scene-role { color:#c2cfd3; font-size:13px; line-height:1.6; }
 .persona-scene-art { width:72px; height:78px; flex-shrink:0; }
@@ -109,16 +109,30 @@ button.persona-guide-tab.is-current { color:#efd49d; font-weight:600; }
 .persona-portrait { position:relative; z-index:1; width:204px; height:204px; animation:persona-arrive .45s ease both; }
 .persona-subtype { margin:0; font-size:32px; line-height:1.35; color:var(--text,#f2eee5); font-weight:650; letter-spacing:1px; }
 .persona-result-summary { font-size:14px; line-height:1.65; color:#d4dfda; max-width:320px; margin:9px auto 0; line-break:strict; text-wrap:balance; }
-.persona-moments { margin:22px 2px 18px; }
-.persona-moment { padding-top:10px; }
-.persona-moment+.persona-moment { margin-top:12px; border-top:1px solid #34454c; }
-.persona-moment-copy { margin-top:3px; color:#d4dfda; font-size:15px; line-height:1.65; line-break:strict; text-wrap:balance; }
-.persona-mixed-note { margin-top:12px; color:#c4b699; font-size:13px; }
-.persona-result-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:13px 0 0; }
-.persona-result-actions>button { min-width:0; width:100%; padding:10px 6px; font-size:14px; }
+.persona-result-tools { margin-top:14px; }
+.persona-result-tools.has-moments { padding:17px 17px 14px; border:1px solid #3d4b4d; border-radius:16px; background:linear-gradient(145deg,#263334 0%,#1b2930 52%,#1a2831 100%); }
+.persona-moments-title { display:flex; align-items:center; gap:14px; color:#f3ebda; font:700 21px/1.45 "Songti SC","Noto Serif CJK SC",SimSun,serif; }
+.persona-moments-title::after { content:""; flex:1; height:1px; background:linear-gradient(to right,#706a52,rgba(112,106,82,.12)); }
+.persona-moment-list { margin:16px 0 0 2px; }
+.persona-moment { position:relative; padding-left:18px; }
+.persona-moment+.persona-moment { margin-top:14px; }
+.persona-moment::before { content:""; position:absolute; left:0; top:6px; width:5px; height:5px; border:1px solid #cbb17d; background:#cbb17d; transform:rotate(45deg); }
+.persona-moment+.persona-moment::before { background:transparent; }
+.persona-moment:not(:last-child)::after { content:""; position:absolute; left:3px; top:16px; bottom:-17px; width:1px; background:#596157; }
+.persona-moment-heading { color:#ddc596; font-size:12px; line-height:1.55; font-weight:500; letter-spacing:.3px; }
+.persona-moment-copy { margin-top:4px; color:#e9e9e1; font-size:15px; line-height:1.65; line-break:strict; text-wrap:pretty; }
+.persona-moment-phrase { display:inline-block; max-width:100%; vertical-align:top; }
+.persona-mixed-note { margin:10px 0 0 20px; color:#b6c3be; font-size:13px; }
+.persona-result-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.persona-moments+.persona-result-actions { border-top:1px solid #3c494c; margin-top:16px; padding-top:13px; }
+.persona-page .persona-result-actions>button { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; min-width:0; min-height:44px; padding:8px 6px; border-radius:10px; font-size:14px; line-height:1.45; }
+.persona-result-actions>.persona-secondary { background:transparent; border-color:#53636a; }
+.persona-action-icon { flex:none; width:17px; height:17px; }
+.persona-result-actions>button:active { opacity:.82; }
 .persona-result-actions>button[disabled] { opacity:.65; }
-.persona-sync-error { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; column-gap:8px; padding-block:6px; }
-.persona-page .persona-sync-error button { flex-shrink:0; min-height:44px; padding:6px 0; font-size:13px; }
+.persona-sync-error { display:grid; grid-template-columns:16px minmax(0,1fr) auto; align-items:center; gap:8px; margin:8px 2px 0; color:#bfcbc9; font-size:13px; line-height:1.55; text-wrap:balance; overflow-wrap:anywhere; }
+.persona-sync-icon { width:16px; height:16px; }
+.persona-page .persona-sync-error button { min-height:44px; padding:4px 2px; font-size:13px; }
 .persona-image-actions { display:flex; flex-wrap:wrap; gap:14px; }
 .persona-result-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; padding:3px; margin:16px 0; border:1px solid #2e3f4a; border-radius:13px; background:#0e171e; }
 .persona-page button.persona-result-tab { width:100%; min-width:0; min-height:44px; padding:6px 2px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--muted,#b1bfc6); font-size:14px; }
@@ -153,22 +167,20 @@ button.persona-guide-tab.is-current { color:#efd49d; font-weight:600; }
 .persona-evidence:last-child { padding-bottom:0; }
 .persona-evidence-source { display:block; color:var(--accent,#e5c68b); font-size:14px; line-height:1.5; font-weight:600; }
 .persona-quote { margin:6px 0 5px; font-size:15px; line-height:1.65; text-wrap:pretty; }
-.persona-dimension { padding:13px 0 12px; border-bottom:1px solid var(--report-divider); }
-.persona-dimension-heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 8px; font-size:14px; font-weight:600; margin-bottom:7px; }
-.persona-dimension-heading>text:last-child { font-size:12px; color:var(--accent,#e5c68b); font-weight:500; }
-.persona-axis-labels { display:flex; justify-content:space-between; gap:24px; color:var(--muted,#b1bfc6); font-size:12px; line-height:1.6; }
+.persona-dimension { padding:14px 0; }
+.persona-dimension+.persona-dimension { border-top:1px solid var(--report-divider); }
+.persona-dimension:first-child { padding-top:0; }
+.persona-dimension:last-child { padding-bottom:3px; }
+.persona-dimension-heading { font-size:15px; font-weight:600; margin-bottom:7px; text-wrap:balance; }
+.persona-axis-labels { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; color:var(--muted,#b1bfc6); font-size:13px; line-height:1.5; text-wrap:balance; }
 .persona-axis-labels>text { flex:1; max-width:47%; }
 .persona-axis-labels>text:last-child { text-align:right; }
 .persona-axis { position:relative; height:4px; background:#435760; margin:10px 7px 3px; border-radius:8px; }
 .persona-axis-center { position:absolute; left:50%; top:-3px; height:11px; width:1px; background:#b1bfc6; }
 .persona-axis-dot { position:absolute; top:-4px; width:12px; height:12px; margin-left:-6px; border:1px solid #101c24; border-radius:50%; background:var(--accent,#e5c68b); box-shadow:0 0 0 1px var(--accent,#e5c68b); }
-.persona-page button.persona-more { padding-left:0; font-size:13px; }
-.persona-style { margin-top:8px; padding:13px 14px 14px; border-radius:13px; background:var(--surface,#1b2b35); }
-.persona-style .persona-axis-labels { margin-top:12px; }
 .persona-secondary-roles { display:flex; gap:24px; padding-top:16px; }
 .persona-secondary-roles>view { flex:1; display:flex; flex-direction:column; align-items:center; font-size:14px; }
 .persona-secondary-roles image { width:90px; height:90px; }
-.persona-footnote { max-width:22em; margin-top:13px; font-size:12px; line-height:1.65; color:var(--report-muted); text-wrap:balance; }
 .persona-has-result-dock { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
 .persona-result-dock {
   position:fixed;

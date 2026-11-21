@@ -7,7 +7,7 @@
   const WIDTH=1080,HEIGHT=1560;
   function imagePaths(card){return [card.view.portrait,QR];}
   function imageKey(view) {
-    return view ? JSON.stringify([view.roleName,view.english,view.typeId,view.portrait,view.title,view.description,view.summary,view.tendencyLabel]) : "";
+    return view ? JSON.stringify([view.roleName,view.english,view.typeId,view.portrait,view.title,view.description,view.styleNote,view.summary,view.tendencyLabel]) : "";
   }
   function drawCard(ctx,card,avatar,images){
     images=images||new Map();
@@ -31,13 +31,13 @@
     ctx.drawImage(art,540-w/2,498-h/2,w,h);
     p.text(v.roleName+"   "+v.english,540,769,30,colors.gold,850,"center",500);
     p.text(v.title,540,826,72,colors.text,850,"center",600);
-    const summary=canvas.wrap(v.description||v.summary,31,770);
+    const summary=canvas.wrap(v.styleNote||v.description||v.summary,31,770);
     if(summary.length>1 && Array.from(summary[summary.length-1]).length<8){
       const tail=Array.from(summary.splice(-2).join("")),middle=Math.ceil(tail.length/2);
       summary.push(tail.slice(0,middle).join(""),tail.slice(middle).join(""));
     }
     p.lines(summary,540,933,31,"#d4dfda",800,49,400,"center");
-    p.text(v.typeId+"  ·  "+v.tendencyLabel,540,1080,24,colors.muted,850,"center");
+    p.text(v.typeId+"  ·  角色倾向"+(v.tendencyLabel==="混合倾向"?"混合":v.tendencyLabel),540,1080,24,colors.muted,850,"center");
     const qr=images.get(QR);
     const hasCode=qr?.width&&qr.height;
     if(hasCode){p.round(790,1210,210,210,24,"#fff");ctx.drawImage(qr,800,1220,190,190);}

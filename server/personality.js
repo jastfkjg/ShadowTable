@@ -4,9 +4,10 @@ const { RuleError } = require("./engine");
 const quiz = require("../miniprogram/pages/personality/quiz.json");
 const legacyQuiz = require("./personality-quiz-v2.json");
 const previousQuiz = require("./personality-quiz-v3.json");
+const quiz31 = require("./personality-quiz-v3.1.json");
 const scoring = require("../miniprogram/pages/personality/scoring");
 const presentation = require("../miniprogram/pages/personality/presentation");
-const quizzes = new Map([quiz, previousQuiz, legacyQuiz].map(config => [config.version, config]));
+const quizzes = new Map([quiz, quiz31, previousQuiz, legacyQuiz].map(config => [config.version, config]));
 const check = (condition, message, status=400) => { if (!condition) throw new RuleError(message,status); };
 const hash = text => createHash("sha256").update(text).digest("hex");
 const validId = id => typeof id === "string" && /^[a-f0-9]{48}$/.test(id);
@@ -59,10 +60,10 @@ function share(store,uid,input) {
   return store.transaction(() => {
     const previous=store.db.prepare("SELECT snapshot FROM personality_shares WHERE uid=? AND result_id=?").get(uid,record.id);
     if(previous) return JSON.parse(previous.snapshot);
-    const { version,typeId,roleId,roleName,english,title,portrait,summary,description,strength,blindspot,tip,tendencyLabel,note }=record.view;
+    const { version,typeId,roleId,roleName,english,title,portrait,summary,description,strength,blindspot,tip,tendencyLabel,styleNote,note }=record.view;
     const name=store.db.prepare("SELECT nickname FROM profiles WHERE uid=?").get(uid)?.nickname || "一位牌桌朋友";
     const snapshot={ id:randomBytes(24).toString("hex"), kind:"personality", name, createdAt:store.clock(), testedAt:record.createdAt,
-      view:{ version,typeId,roleId,roleName,english,title,portrait,summary,description,strength,blindspot,tip,tendencyLabel,note } };
+      view:{ version,typeId,roleId,roleName,english,title,portrait,summary,description,strength,blindspot,tip,tendencyLabel,...(styleNote?{styleNote}:{}),note } };
     store.db.prepare("INSERT INTO personality_shares VALUES(?,?,?,?,?)").run(snapshot.id,uid,record.id,JSON.stringify(snapshot),snapshot.createdAt);
     return snapshot;
   });

@@ -62,6 +62,9 @@ test("规则手册按当前局面打开，切换板型和返回都保留原答�
 test("原生朋友圈单页只读公开摘要，首次进入与重试都不登录、不读取本地账号",async()=>{
   const h=native({single:true});await h.page.onLoad({share:"c".repeat(48)});h.page.onShow();await h.page.retry();
   assert.equal(h.page.data.mode,"shared");assert.equal(h.page.data.result.title,"静默猎手");
+  assert.match(h.page.data.result.description,/TA会记住/);
+  assert.match(h.page.onShareAppMessage().title,/朋友的阿瓦隆人格/);
+  assert.equal(h.page.onShareTimeline().title,h.page.onShareAppMessage().title);
   assert.ok(h.reads.every(url=>url==="https://example.test/api/personality/shares/"+"c".repeat(48)));
   assert.equal(h.page.onShareAppMessage().path,"/pages/personality/personality?share="+"c".repeat(48));h.page.onUnload();
   const intro=native({single:true});await intro.page.onLoad({});await intro.page.retry();assert.equal(intro.reads.length,0);intro.page.onUnload();
@@ -77,6 +80,7 @@ test("原生首击分享直接提供异步卡片，已保存的结果仅在主�
   const card=await first.promise;
   assert.match(card.path,/\?share=c{48}$/);
   assert.match(card.title,/静默猎手/);
+  assert.match(card.title,/^我是/);
   assert.equal(h.page.onShareAppMessage({from:"button"}).path,card.path);
   assert.equal(h.page.onShareTimeline().query,"share="+"c".repeat(48));
   assert.equal(h.reads.filter(request=>request==="/api/me/personality/shares").length,1);
@@ -164,6 +168,6 @@ test("出图期间同步同一份结果不会取消相册保存，页签仍能�
   assert.equal(h.page.data.imagePath,"/tmp/personality-after-sync.png");
   h.page.selectResultTab({currentTarget:{dataset:{tab:"preferences"}}});
   assert.equal(h.page.data.resultTab,"preferences");
-  assert.equal(h.page.data.preferences.length,7);
+  assert.deepEqual(h.page.data.preferences.map(axis=>axis.id),quiz.dimensions.map(axis=>axis.id));
   h.page.onUnload();
 });

@@ -38,7 +38,9 @@ test("新版 15 题覆盖全部 16 种结果，解释来自真实选项",()=>{
     const reordered=structuredClone(quiz);reordered.questions.reverse();reordered.questions.forEach(q=>q.options.reverse());
     assert.equal(scoring.scoreQuiz(reordered,fixture.answers).typeId,result.typeId);
     const view=presentation.result(result);
-    assert.equal(view.moments.length,2);
+    const closeStyle=Math.abs(result.profile.E)<=quiz.scoring.nearStyleThreshold;
+    assert.equal(view.moments.length,closeStyle ? 3 : 2);
+    assert.equal(!!view.styleNote,closeStyle);
     for(const moment of view.moments){
       const q=quiz.questions.find(q=>q.id===moment.questionId);
       const option=q.options.find(o=>o.id===fixture.answers[q.id]);
@@ -52,9 +54,20 @@ test("新版 15 题覆盖全部 16 种结果，解释来自真实选项",()=>{
     const styleAnswer=aggregate.selected.find(s=>s.questionId===result.moments.style.questionId);
     assert.ok(styleAnswer.centered.E*(result.subtype==="A"?1:-1)>0);
     assert.equal(view.dimensions.length,7);assert.equal(view.style.id,"E");
+    const axes=presentation.preferences(view);
+    assert.deepEqual(axes.map(axis=>axis.id),quiz.dimensions.map(dim=>dim.id));
+    assert.deepEqual(axes.map(axis=>axis.position),[...view.dimensions,view.style].map(axis=>axis.position));
     for(const e of view.explanations){assert.equal(fixture.answers[e.questionId],e.optionId);assert.equal(quiz.questions.find(q=>q.id===e.questionId).options.find(o=>o.id===e.optionId).text,e.text);}
   }
   assert.equal(new Set(fixtures.map(f=>f.expectedTypeId)).size,16);
+});
+test("分享摘要从朋友视角呈现，本人原文和对局中的引语保留",()=>{
+  const role=quiz.roles.find(r=>r.id==="assassin");
+  const original={description:role.subtypes.A.description,styleNote:"你的判断方式很像刺客。",tip:"提出不同名单时，说出你和大家都能核对的那条依据。"};
+  const shared=presentation.sharedResult(original);
+  assert.match(shared.description,/^TA喜欢追问一句「你是什么时候知道的」/);
+  assert.match(shared.tip,/自己和大家/);assert.match(shared.styleNote,/^TA的/);
+  assert.match(original.description,/^你喜欢/);
 });
 test("新版情景符合任务人数，奥伯伦必失败，刺杀阶段只能落刀",()=>{
   const scenarios=quiz.questions.filter(q=>q.kind==="scenario");
@@ -80,6 +93,55 @@ test("新版情景符合任务人数，奥伯伦必失败，刺杀阶段只能�
     assert.equal(presentation.question(q.id).stageLabel,"牌局情景 · "+(i+1)+" / 5");
     assert.ok(q.scene.role && q.scene.title && q.scene.facts.length>=2);
   }
+});
+test("第 14 题的三条落刀理由只改变推理维度，3.1 仍按旧权重保存",()=>{
+  const previous=require("../server/personality-quiz-v3.1.json");
+  assert.deepEqual(quiz.questions.find(q=>q.id==="Q14").options.map(o=>o.scores),[{D:2},{D:1},{D:-2}]);
+  const profiles=["A","B","C"].map(Q14=>scoring.aggregateProfile(quiz,{...fixtures[0].answers,Q14}).profile);
+  for(const id of quiz.dimensions.map(d=>d.id).filter(id=>id!=="D"))
+    assert.equal(new Set(profiles.map(p=>p[id])).size,1,id);
+  assert.ok(profiles[0].D>profiles[1].D && profiles[1].D>profiles[2].D);
+  const store=new Store(":memory:");personality.initialize(store);
+  try{
+    for(const fixture of fixtures){
+      const old=personality.save(store,"wx:older",{version:previous.version,attemptId:"archived_attempt_"+fixture.expectedTypeId,answers:fixture.answers,tieAnswers:{}});
+      assert.equal(old.view.typeId,fixture.expectedTypeId);
+      assert.equal(old.view.moments.length,2);
+      assert.equal(old.view.styleNote,undefined);
+    }
+  }finally{store.close();}
+});
+test("梅林角色鲜明时也可以有两种介入风格，双方例子与实际答卷一致",()=>{
+  for(const Q10 of ["A","B","C"]){
+    const answers={...fixtures[0].answers,Q10};
+    const ties=Q10==="B"?{T_STYLE:"B"}:{};
+    const result=scoring.scoreQuiz(quiz,answers,ties), view=presentation.result(result);
+    assert.equal(view.roleName,"梅林");
+    assert.equal(view.tendencyLabel,"相对鲜明");
+    assert.equal(result.subtype,Q10==="A"?"A":"B");
+    assert.match(view.styleNote,/梅林.*主动.*择机/);
+    assert.ok(view.styleNote.endsWith({A:"略偏先开口。",B:"倾向持平。",C:"略偏等时机。"}[Q10]));
+    assert.equal(view.style.tendency,"两端接近");
+    for(const [direction,example] of Object.entries(result.moments.styleExamples)){
+      assert.equal(answers[example.questionId],example.optionId);
+      const option=quiz.questions.find(q=>q.id===example.questionId).options.find(o=>o.id===example.optionId);
+      assert.ok(option.scores.E*(direction==="A"?1:-1)>0);
+      assert.ok(view.explanations.some(e=>e.text===option.text));
+    }
+    assert.equal(view.explanations.some(e=>e.questionId==="T_STYLE"),Q10==="B");
+  }
+});
+test("角色混合与介入接近可同时成立，中性选项不会被当成反方向例子",()=>{
+  const mixed=scoring.scoreQuiz(quiz,{...fixtures[0].answers,Q07:"B"});
+  const view=presentation.result(mixed);
+  assert.equal(view.tendencyLabel,"混合倾向");
+  assert.match(view.styleNote,/几种角色的特点，其中包括梅林/);
+  assert.equal(view.style.tendency,"两端接近");
+  const answers={...fixtures[0].answers,Q02:"B",Q03:"B",Q06:"B",Q10:"B",Q15:"A"};
+  const oneSide=scoring.scoreQuiz(quiz,answers);
+  assert.ok(oneSide.moments.styleExamples.A);
+  assert.equal(oneSide.moments.styleExamples.B,null);
+  assert.ok(!presentation.result(oneSide).moments.some(m=>m.heading.includes("择机介入")));
 });
 test("主动和择机选项在三个位置均衡分布，掩护倾向覆盖后段独立牌局",()=>{
   const styleQuestions=quiz.questions.filter(q=>q.measuredDims.includes("E"));
@@ -143,6 +205,10 @@ test("账号结果复算、重试幂等、历史隔离，公开分享固定且�
     assert.doesNotMatch(JSON.stringify(freshShare),/moments|explanations|questionId|optionId|dimensions/);
     assert.equal(personality.account(store,"wx:one").latest.id,second.id);
     assert.equal(personality.account(store,"wx:one").history.length,2);
+    const close=personality.save(store,"wx:one",payload(0,"balanced_attempt_01"));
+    const closeShare=personality.share(store,"wx:one",{resultId:close.id});
+    assert.equal(closeShare.view.styleNote,close.view.styleNote);
+    assert.doesNotMatch(JSON.stringify(closeShare),/moments|explanations|questionId|optionId|styleExamples|T_STYLE|profile/);
     assert.deepEqual(personality.readShare(store,snapshot.id),snapshot);
     assert.throws(()=>personality.save(store,"wx:one",{...payload(),view:{typeId:"ASS-B"}}));
     assert.throws(()=>personality.save(store,"wx:one",{...payload(),version:"old"}),e=>e.status===409);

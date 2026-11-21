@@ -6,9 +6,9 @@ const dialog = require("../../dialog");
 const { backToMe } = require("../../profile");
 const { isSinglePage } = require("../../records-share");
 const pagePath="/pages/personality/personality";
-function shareContent(shared) {
+function shareContent(shared, forwarding=false) {
   return shared
-    ? {title:"我是"+shared.view.title+"，你是哪种阿瓦隆人格？",path:pagePath+"?share="+shared.id,imageUrl:shared.view.portrait||"/assets/roles/merlin.png"}
+    ? {title:forwarding ? shared.name+"的阿瓦隆人格 · "+shared.view.title : "我是"+shared.view.title+"，你是哪种阿瓦隆人格？",path:pagePath+"?share="+shared.id,imageUrl:shared.view.portrait||"/assets/roles/merlin.png"}
     : {title:"探索你的阿瓦隆人格",path:pagePath,imageUrl:"/assets/roles/merlin.png"};
 }
 Page({
@@ -61,8 +61,7 @@ Page({
   closeRules(){this.flow.closeGuide();},
   selectGuide(event){this.flow.selectGuide(event.currentTarget.dataset.id);},
   selectResultTab(event){this.flow.selectTab(event.currentTarget.dataset.tab);},
-  details(){this.flow.toggle("detailsOpen");},
-  catalogue(){this.flow.toggle("catalogueOpen");},
+  catalogue(){this.flow.toggleCatalogue();},
   revealCatalogue(){
     if(!this.alive||!this.data.catalogueOpen)return;
     const query=wx.createSelectorQuery();
@@ -121,7 +120,7 @@ Page({
   albumSettings(){wx.openSetting({success:r=>{if(this.alive&&r.authSetting?.["scope.writePhotosAlbum"])this.setData({albumDenied:false,imageError:"权限已开启，请再次保存图片。"});}});},
   onShareAppMessage(event){
     const {shared,mode,singlePage}=this.data;
-    const content=shareContent(shared);
+    const content=shareContent(shared,mode==="shared");
     if(shared||mode!=="result"||singlePage||event?.from!=="button")return content;
     const started=Date.now();
     return {...content,promise:this.flow.share().then(result=>{
@@ -133,7 +132,7 @@ Page({
   },
   onShareTimeline(){
     const shared=this.data.shared;
-    const {title,imageUrl}=shareContent(shared);
+    const {title,imageUrl}=shareContent(shared,this.data.mode==="shared");
     return {title,query:shared?"share="+shared.id:"",imageUrl};
   },
 });

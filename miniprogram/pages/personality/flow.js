@@ -13,6 +13,10 @@
     { id:"evidence", label:"作答依据" },
   ];
   const transient = error => [408, 502, 503, 504].includes(error.status) || error.retryable === true;
+  function syncErrorMessage(error) {
+    if(error.status===409 && /题库版本/.test(error.message))return "题库版本不一致，可先保存图片。";
+    return transient(error) ? "暂未确认账号保存，请重试。" : error.message;
+  }
   function validateDraft(value) {
     if(!value || value.version!==quiz.version || !validAttempt(value.attemptId))return null;
     try {
@@ -27,15 +31,15 @@
     const cache=cacheFactory.create(deps.storage);
     let alive=true,epoch=0,account=null,credential="",draft=null,saving=null;
     let state={ mode:"intro",loading:true,error:"",storageError:"",saveError:"",shareError:"",notice:"",saving:false,sharing:false,
-      hasDraft:false,completedCount:0,question:null,result:null,record:null,shared:null,history:[],rulesOpen:false,detailsOpen:false,catalogueOpen:false,
+      hasDraft:false,completedCount:0,question:null,result:null,record:null,shared:null,history:[],rulesOpen:false,catalogueOpen:false,
       guide:present.guideTopics[0],guideTabs:present.guideTopics.map(({id,label})=>({id,label})),
       catalogue:present.catalogue(),version:quiz.version,questionTotal:quiz.questions.length,identityType:"",oldDraft:false,
-      resultTab:"overview",tabs,preferences:[] };
+      resultTab:"overview",tabs,preferences:[],momentRows:[] };
     const emit=patch=>{
       if(!alive)return;
       if("result" in patch && patch.result!==state.result){
         patch.preferences=present.preferences(patch.result);
-        patch.activeStyle=patch.result?.typeId?.slice(-1) || "";
+        patch.momentRows=present.momentRows(patch.result);
       }
       state={...state,...patch};deps.onChange?.(state);
     };
@@ -52,16 +56,16 @@
       let upgradedDraft=false;
       if(!draft){
         // Look up finished attempts even if the final storage write lost the version pointer.
-        const older=["3.0.0","2.0.0"].map(version=>{
+        const older=["3.1.0","3.0.0","2.0.0"].map(version=>{
           const value=cache.draft(account.accountKey,version);
           return value?.version===version ? value : null;
         });
         const pending=older.find(value=>value?.completed && validAttempt(value.attemptId) &&
           value.localView?.version===value.version && value.localView.typeId && value.answers && value.tieAnswers);
-        const previous=older.find(value=>value?.version==="3.0.0");
+        const previous=older.find(value=>value?.version===oldVersion);
         if(pending){
           draft=JSON.parse(JSON.stringify(pending));
-        } else if(oldVersion==="3.0.0" && previous && !previous.completed && validAttempt(previous.attemptId)){
+        } else if(["3.1.0","3.0.0"].includes(oldVersion) && previous && !previous.completed && validAttempt(previous.attemptId)){
           // Unchanged choices keep their IDs. The rewritten shield question has a new ID.
           const answers={};
           for(const q of quiz.questions){
@@ -101,10 +105,10 @@
     async function load(options={}) {
       const at=++epoch;
       saving=null;
-      emit({loading:true,saving:false,sharing:false,error:"",saveError:"",shareError:"",shared:null,question:null,result:null,record:null,resultTab:"overview",detailsOpen:false,rulesOpen:false});
+      emit({loading:true,saving:false,sharing:false,error:"",saveError:"",shareError:"",shared:null,question:null,result:null,record:null,resultTab:"overview",rulesOpen:false});
       if(options.share){
         if(!validId(options.share)){emit({loading:false,error:"分享不存在或已失效",mode:"shared"});return;}
-        try{const shared=await deps.publicRequest("/api/personality/shares/"+options.share);if(!alive||at!==epoch)return;emit({mode:"shared",shared,result:shared.view});}
+        try{const shared=await deps.publicRequest("/api/personality/shares/"+options.share);if(!alive||at!==epoch)return;emit({mode:"shared",shared,result:present.sharedResult(shared.view)});}
         catch(error){if(alive&&at===epoch)emit({mode:"shared",error:error.message});}
         finally{if(alive&&at===epoch)emit({loading:false});}
         return;
@@ -133,7 +137,7 @@
       if(!guard()||state.loading||state.saving||state.sharing)return;
       if(!draft||fresh){
         draft={version:quiz.version,total:quiz.questions.length,attemptId:deps.requestId(),answers:{},tieAnswers:{},current:firstQuestion,completed:false};
-        emit({shared:null,record:null,saveError:"",shareError:"",notice:"",resultTab:"overview",detailsOpen:false,catalogueOpen:false,oldDraft:false,upgradedDraft:false});
+        emit({shared:null,record:null,saveError:"",shareError:"",notice:"",resultTab:"overview",catalogueOpen:false,oldDraft:false,upgradedDraft:false});
       }
       if(draft.completed){
         const view=draft.version===quiz.version?present.result(scoring.scoreQuiz(quiz,draft.answers,draft.tieAnswers)):draft.localView;
@@ -187,7 +191,7 @@
           account={...account,latest:record,history:[{id:record.id,version:record.version,createdAt:record.createdAt,roleName:record.view.roleName,title:record.view.title,portrait:record.view.portrait},...(account.history||[]).filter(row=>row.id!==record.id)].slice(0,20)};
           try{cache.bind(credential,account);cache.removeDraft(account.accountKey,attempt.version);emit({storageError:""});}catch{emit({storageError:"结果已保存到账号，本机缓存更新失败。"});}
           draft=null;emit({result:record.view,record,hasDraft:false,history:account.history.map(row=>({...row,dateLabel:present.date(row.createdAt)})),notice:"",saveError:"",shareError:""});return record;
-        }catch(error){if(alive&&at===epoch){if(!current(at))guard();else emit({saveError:transient(error)?"暂未确认账号保存，请重试。":error.message});}return null;}
+        }catch(error){if(alive&&at===epoch){if(!current(at))guard();else emit({saveError:syncErrorMessage(error)});}return null;}
         finally{if(saving===pending)saving=null;if(alive&&at===epoch)emit({saving:false});}
       };
       const pending=Promise.resolve().then(run);
@@ -211,7 +215,7 @@
     async function openResult(id) {
       if(!guard()||state.loading||state.saving||state.sharing||!validId(id))return;
       const at=++epoch;emit({loading:true,error:"",shared:null});
-      try{const record=await deps.request("/api/me/personality/results/"+id);if(current(at))emit({mode:"result",result:record.view,record,resultTab:"overview",detailsOpen:false,catalogueOpen:false,shareError:""});}
+      try{const record=await deps.request("/api/me/personality/results/"+id);if(current(at))emit({mode:"result",result:record.view,record,resultTab:"overview",catalogueOpen:false,shareError:""});}
       catch(error){if(current(at))emit({error:error.message});}
       finally{if(current(at))emit({loading:false});}
     }
@@ -228,7 +232,7 @@
         if(state.rulesOpen && topic && topic!==state.guide)emit({guide:topic});
       },
       closeGuide(){if(state.rulesOpen)emit({rulesOpen:false});},
-      toggle(key){if(["detailsOpen","catalogueOpen"].includes(key))emit({[key]:!state[key]});},
+      toggleCatalogue(){emit({catalogueOpen:!state.catalogueOpen});},
       persist(){if(guard()&&draft)persist();},
       state:()=>state,
       dispose(){alive=false;epoch++;},

@@ -1,6 +1,6 @@
 // Generated from quiz.json by scripts/sync-personality-quiz.js.
 module.exports = {
-  "version": "3.1.0",
+  "version": "3.2.0",
   "title": "阿瓦隆十六人格：你的牌桌风格",
   "locale": "zh-CN",
   "coreDimensions": [
@@ -1084,9 +1084,7 @@ module.exports = {
       "phase": "assassination",
       "prompt": "只能凭刚才的线索，你会刀谁？",
       "measuredDims": [
-        "D",
-        "H",
-        "F"
+        "D"
       ],
       "options": [
         {
@@ -1094,31 +1092,25 @@ module.exports = {
           "text": "刀 3。有人反对过名单，但他能点出具体的人。",
           "interpretation": "优先寻找早于公开信息的具体判断。",
           "scores": {
-            "D": 2,
-            "H": -2,
-            "F": -1
+            "D": 2
           },
           "moment": "最后指认梅林时，我押最早说准具体身份的人。"
         },
         {
           "id": "B",
           "text": "刀 4。替别人接话，也可能是在掩护自己的判断。",
-          "interpretation": "会考虑玩家如何用接话掩盖自己的判断，保留一种不同的身份解释。",
+          "interpretation": "从替谁接话、替谁解围，判断谁可能掌握身份信息。",
           "scores": {
-            "D": 1,
-            "H": 1,
-            "F": 2
+            "D": 1
           },
           "moment": "最后指认梅林时，我会留心那个总替人接话的人。"
         },
         {
           "id": "C",
           "text": "刀 5。连续两次换下红方，我更相信行动留下的线索。",
-          "interpretation": "愿意用连续行动核对知情程度，也留意公开发言较少的人。",
+          "interpretation": "用连续两轮换人的记录判断谁可能知情。",
           "scores": {
-            "D": -2,
-            "H": 2,
-            "F": -2
+            "D": -2
           },
           "moment": "最后指认梅林时，我更看重谁连续换下了红方。"
         }
@@ -1280,7 +1272,8 @@ module.exports = {
     "centering": "within_question_option_mean",
     "roleComparison": "dot_product_of_normalized_dimension_scores_and_unit_role_prototype",
     "subtype": "sign_of_E_with_separate_tiebreak",
-    "decisionMoments": true
+    "decisionMoments": true,
+    "nearStyleThreshold": 0.15
   },
   "contentRules": [
     "每道题是独立局面，座位和信息不跨题继承。按平时会采取的行动选择。",

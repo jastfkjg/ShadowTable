@@ -46,34 +46,20 @@
     })().finally(()=>{initializing=null;});
     return initializing;
   }
-  const button=(label,action,classes="persona-text-button",disabled=false,extra="")=>`<button type="button" class="${classes}" data-action="${action}"${disabled?" disabled":""}${extra}>${esc(label)}</button>`;
+  const button=(label,action,classes="persona-text-button",disabled=false,extra="",icon="")=>`<button type="button" class="${classes}" data-action="${action}"${disabled?" disabled":""}${extra}>${icon?img(icon,"persona-action-icon"):""}${esc(label)}</button>`;
   const img=(src,classes="",alt="")=>`<img src="${esc(src)}" class="${classes}" alt="${esc(alt)}">`;
   const message=(text,action,label)=>text?`<div class="persona-message persona-error" role="alert">${esc(text)}${action?button(label,action):""}</div>`:"";
-  function axis(d) {
-    return `<div class="persona-axis-labels"><span>${esc(d.negative)}</span><span>${esc(d.positive)}</span></div>
-      <div class="persona-axis ${d.positionClass}" role="img" aria-label="${esc(d.tendency)}"><div class="persona-axis-center"></div><div class="persona-axis-dot"></div></div>`;
-  }
   function insight(label, text) {
     return `<div class="persona-insight"><span class="persona-insight-label">${label}</span><div>${esc(text)}</div></div>`;
   }
   function resultPanel(state) {
     const v=state.result;
     if(state.resultTab==="preferences"){
-      const shown=state.detailsOpen?state.preferences:state.preferences.slice(0,3);
-      const dimensions=shown.map(d=>`<div class="persona-dimension">
-        <div class="persona-dimension-heading"><span>${esc(d.label)}</span><span>${esc(d.tendency)}</span></div>${axis(d)}
+      return state.preferences.map(d=>`<div class="persona-dimension">
+        <div class="persona-dimension-heading">${esc(d.label)}</div>
+        <div class="persona-axis-labels"><span>${esc(d.negative)}</span><span>${esc(d.positive)}</span></div>
+        <div class="persona-axis ${esc(d.positionClass)}" role="img" aria-label="${esc(d.label+" "+d.tendency)}"><div class="persona-axis-center"></div><div class="persona-axis-dot"></div></div>
       </div>`).join("");
-      const more=state.preferences.length>3?button(
-        state.detailsOpen?"收起其他维度":"查看其余 "+(state.preferences.length-3)+" 项",
-        "details","persona-text-button persona-more",false,` aria-expanded="${state.detailsOpen}"`
-      ):"";
-      return `<h2 class="persona-report-title">你在两种做法之间的位置</h2>
-        <div class="persona-small">来自本次作答，两端各有用途。</div>${dimensions}${more}
-        <div class="persona-style">
-          <div class="persona-dimension-heading"><span>介入风格</span><span>${state.activeStyle==="A"?"主动介入":"择机介入"}</span></div>
-          <div class="persona-small">${esc(v.description)}</div>
-          ${v.style?axis({...v.style,negative:"择机介入",positive:"主动介入"}):""}
-        </div>`;
     }
     if(state.resultTab==="evidence"){
       const evidence=v.explanations?.map(e=>`<div class="persona-evidence">
@@ -88,9 +74,9 @@
       <div class="persona-small">${v.tendencyLabel==="混合倾向"?"你的选择呈现混合倾向，主角色是本次最接近的方向。":"部分选择也与这些角色的策略取向接近。"}</div>
       <div class="persona-secondary-roles">${v.secondary.map(r=>`<div>${img(r.portrait)}<span>${esc(r.name)}</span></div>`).join("")}</div>
     </div>`:"";
-    return `<h2 class="persona-report-title">你的牌桌风格</h2><div class="persona-prose">${esc(v.summary)}</div>
-      <div class="persona-insights">${insight("你的长处",v.strength)}${insight("容易错过",v.blindspot)}</div>
-      <div class="persona-tip"><span class="persona-tip-label">下次试试</span><div>${esc(v.tip)}</div></div>${related}`;
+    return `<h2 class="persona-report-title">${state.mode==="shared"?"TA 的牌桌风格":"你的牌桌风格"}</h2><div class="persona-prose">${esc(v.summary)}</div>
+      <div class="persona-insights">${insight(state.mode==="shared"?"TA 的长处":"你的长处",v.strength)}${insight("容易错过",v.blindspot)}</div>
+      <div class="persona-tip"><span class="persona-tip-label">${state.mode==="shared"?"给 TA 的建议":"下次试试"}</span><div>${esc(v.tip)}</div></div>${related}`;
   }
 
   function sceneBrief(q) {
@@ -158,19 +144,19 @@
   function resultPage(state) {
     const v=state.result;
     const shared=state.mode==="shared";
-    const report=`${resultPanel(state)}<div class="persona-footnote">${esc(v.note)}</div>`;
-    const personal=!shared && v.moments?.length;
+    const report=resultPanel(state);
+    const personal=!shared && state.momentRows.length;
     const mixed=personal && v.tendencyLabel==="混合倾向" && v.secondary?.length;
     const moments=personal ? `<section class="persona-moments" aria-labelledby="persona-moments-title">
-      <h2 id="persona-moments-title" class="persona-section-title">为什么像你</h2>
-      ${v.moments.map(item=>`<div class="persona-moment"><div class="persona-moment-heading">${esc(item.heading)}</div><div class="persona-moment-copy">${esc(item.moment)}</div></div>`).join("")}
+      <h2 id="persona-moments-title" class="persona-moments-title">为什么像你</h2>
+      <div class="persona-moment-list">${state.momentRows.map(item=>`<div class="persona-moment"><div class="persona-moment-heading">${esc(item.heading)}</div><div class="persona-moment-copy">${item.phrases.map(phrase=>`<span class="persona-moment-phrase">${esc(phrase)}</span>`).join("")}</div></div>`).join("")}</div>
       ${mixed?`<div class="persona-mixed-note">这次也接近${esc(v.secondary[0].name)}的打法</div>`:""}</section>` : "";
     const hero=`<section class="persona-result-hero">
       <span class="persona-eyebrow">阿瓦隆十六人格</span>
       <div class="persona-portrait-stage"><div class="persona-orbit" aria-hidden="true"></div>${img(v.portrait,"persona-portrait",v.roleName+"角色形象")}</div>
       <div class="persona-role-line"><span>${esc(v.roleName)}</span><span class="persona-role-english">${esc(v.english)}</span></div>
       <h1 class="persona-subtype" tabindex="-1">${esc(v.title)}</h1>
-      <div class="persona-result-summary">${esc(v.description||v.summary)}</div>
+      <div class="persona-result-summary">${esc(v.styleNote||v.description||v.summary)}</div>
     </section>`;
     if(shared){
       return `<div class="persona-shared-by">${esc(state.shared.name)} 的牌桌风格</div>${hero}
@@ -184,11 +170,13 @@
         ` data-id="${tab.id}" id="persona-tab-${tab.id}" role="tab" aria-selected="${active}" aria-controls="persona-panel-${tab.id}" tabindex="${active?0:-1}"`);
     }).join("");
     const manualShare=state.shared?.id===manualShareId;
-    return `${hero}${moments}<div class="persona-result-actions">
-      ${button(imageBusy?"正在准备图片…":"保存图片","image","persona-primary",imageBusy)}
-      ${button(state.sharing?"正在准备…":manualShare?"复制分享链接":"分享结果","share","persona-secondary",state.sharing)}
+    return `${hero}<div class="persona-result-tools${personal?" has-moments":""}">${moments}
+      <div class="persona-result-actions">
+        ${button(imageBusy?"正在准备图片…":"保存图片","image","persona-primary",imageBusy,"",imageBusy?"":"/assets/share-save-dark.svg")}
+        ${button(state.sharing?"正在准备…":manualShare?"复制分享链接":"分享结果","share","persona-secondary",state.sharing,"",state.sharing?"":manualShare?"/assets/sheet-copy.svg":"/assets/share.svg")}
+      </div>
     </div>
-    ${retry?`<div class="persona-message persona-error persona-sync-error" role="alert"><span>${esc(state.saveError)}</span>${button("重试同步","save")}</div>`:""}
+    ${retry?`<div class="persona-sync-error" role="alert">${img("/assets/record-info.svg","persona-sync-icon")}<span>${esc(state.saveError)}</span>${button("重试同步","save")}</div>`:""}
     ${message(imageError)}${message(state.shareError)}
     ${manualShare?`<input class="persona-share-link" aria-label="人格分享链接" readonly value="${esc(shareLink(state.shared))}">`:""}
     <div class="persona-result-tabs" role="tablist" aria-label="人格报告">${tabs}</div>
@@ -209,11 +197,11 @@
     if(poster.imageKey(state.result)!==poster.imageKey(previous?.result))imageError="";
     const focused=document.activeElement?.dataset,focusAction=focused?.action,focusId=focused?.id;
     root.className="persona-page"+(state.mode==="quiz"?" persona-answering":!state.loading&&state.result&&state.mode==="result"?" persona-has-result-dock":"");
-    let html=state.loading?'<p class="persona-status" role="status">正在读取你的牌桌故事…</p>':"";
+    let html=state.loading?'<p class="persona-status" role="status">正在读例牌桌故事…</p>':"";
     html+=message(state.error,"retry","重新载入")+(state.notice?`<div class="persona-message" role="status">${esc(state.notice)}</div>`:"")+message(state.storageError,state.mode==="quiz"?"persist":null,"重试保存进度");
     if(!state.loading&&state.mode==="intro"){
       html+=`<section class="persona-intro"><span class="persona-eyebrow">AVALON · 16 PERSONALITIES</span><h1 class="persona-intro-title" tabindex="-1">你是哪一种<span>阿瓦隆人格？</span></h1><div class="persona-intro-art" aria-hidden="true">${img("/assets/roles/assassin.png","persona-intro-side persona-intro-left")}${img("/assets/roles/merlin.png","persona-intro-main")}${img("/assets/roles/percival.png","persona-intro-side persona-intro-right")}</div><div class="persona-intro-copy">从看人、站边到藏身份，<span>发现你习惯的牌桌决策方式。</span></div><div class="persona-facts"><div><span>${state.questionTotal}</span>道题</div><div><span>16</span>种风格</div><div><span>随时</span>暂停续答</div></div>${button(state.hasDraft?"继续答题 · "+state.completedCount+"/"+state.questionTotal:"开始探索","start","persona-primary",!!state.error)}<div class="persona-small persona-center">10 道短题，5 个独立牌局。选你平时会做的事。</div></section>`;
-      if(state.upgradedDraft)html+='<div class="persona-message">已带入旧版选择。继续答题时，只需补上新的局面和未答题目。</div>';
+      if(state.upgradedDraft)html+='<div class="persona-message">已带入旧版选择，可以从上次的进度继续。</div>';
       if(state.oldDraft)html+='<div class="persona-message">发现旧版未完成进度，已保留。当前题库已更新，请开始一次新测试。</div>';
       if(["guest","dev"].includes(state.identityType))html+='<div class="persona-small persona-account-note">当前为游客或开发账号，清除登录信息后无法自动找回结果。<a href="/#/me">前往我的</a></div>';
       html+=`<button type="button" class="persona-disclosure" data-action="rules" aria-haspopup="dialog"><span>规则与术语</span>${img("/assets/sheet-book.svg","persona-book-icon")}</button>`;
@@ -293,9 +281,9 @@
     }catch(error){if(currentImage())imageError=error.message;}
     finally{imageBusy=false;if(pageAlive)render(ui);}
   }
-  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.openGuide(),details:()=>session.toggle("detailsOpen"),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
+  const actions={retry:()=>session.load(options),start:()=>session.start(),answer:el=>session.answer(el.dataset.id),next:()=>session.next(),previous:()=>session.previous(),rules:()=>session.openGuide(),save:()=>session.save(),persist:()=>session.persist(),history:el=>session.openResult(el.dataset.id),
     catalogue:()=>{
-      session.toggle("catalogueOpen");
+      session.toggleCatalogue();
       const catalogue=root.querySelector("#persona-catalogue");
       if(catalogue){
         catalogue.focus({preventScroll:true});

@@ -29,14 +29,14 @@ scenes["q01-selected"]={...scenes.q01,question:present.question("Q01","B")};
 scenes["q01-guide"]={...scenes.q01,rulesOpen:true};
 for(const f of fixtures){
   const view=present.result(scoring.scoreQuiz(quiz,f.answers));
-  scenes[f.expectedTypeId]={...base,mode:"result",result:view,record:{id:"fixture"},preferences:present.preferences(view),activeStyle:view.typeId.slice(-1)};
+  scenes[f.expectedTypeId]={...base,mode:"result",result:view,record:{id:"fixture"},preferences:present.preferences(view),momentRows:present.momentRows(view)};
 }
 for(const q of quiz.questions.filter(q=>q.scene)){
   scenes[q.id.toLowerCase()]={...base,mode:"quiz",question:present.question(q.id)};
 }
 scenes.preferences={...scenes["OBE-B"],resultTab:"preferences"};
 scenes.evidence={...scenes["OBE-B"],resultTab:"evidence"};
-scenes.shared={...scenes["OBE-B"],mode:"shared",shared:{name:"演示玩家"},record:null};
+scenes.shared={...scenes["OBE-B"],mode:"shared",result:present.sharedResult(scenes["OBE-B"].result),shared:{name:"演示玩家"},record:null};
 const styles=css("app.wxss")+css("components/app-nav/app-nav.wxss")+css("pages/personality/personality.wxss")+
   ".preview-native-sheet{position:fixed;inset:0;z-index:1200;background:rgba(4,12,17,.68);display:flex;align-items:flex-end;justify-content:center}";
 fs.mkdirSync(out,{recursive:true});

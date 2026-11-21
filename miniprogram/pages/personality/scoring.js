@@ -103,25 +103,39 @@ function resolveSubtype(config, value, tieOptionId) {
   return {subtype: o.subtype, resolution: 'style_tiebreak'};
 }
 
-function decisionMoments(config, selected, denominator, primary, runner, role, style, tieAnswers) {
+function decisionMoments(config, aggregate, primary, runner, role, style, tieAnswers) {
+  const {selected, denominator, profile} = aggregate;
   const epsilon = config.scoring.epsilon;
+  const axis = config.styleDimension;
+  const closeStyle = Number.isFinite(config.scoring.nearStyleThreshold) &&
+    Math.abs(profile[axis]) <= config.scoring.nearStyleThreshold + epsilon;
   const candidates = selected.map((answer,index) => {
     const vector = config.coreDimensions.map(d => (answer.centered[d] ?? 0) / denominator[d]);
     const support = dot(vector, primary);
-    const intervention = (answer.centered[config.styleDimension] ?? 0) * (style.subtype === 'A' ? 1 : -1);
     const question = config.questions[index];
     const inCharacter = !question.scene || question.selfRole === role.roleId ||
       (role.roleId === 'lancelot' && question.selfRole === 'lancelot_initial_good');
-    return { answer, question, inCharacter, support, contrast: support - dot(vector, runner), intervention };
+    return { answer, question, inCharacter, support, contrast: support - dot(vector, runner) };
   });
   // A choice that merely counts against the runner-up cannot explain the winning role.
   const forRole = candidates.filter(c => c.support > epsilon)
     .sort((a, b) => Number(b.contrast > epsilon) - Number(a.contrast > epsilon) ||
       Number(b.inCharacter) - Number(a.inCharacter) || b.support - a.support || b.contrast - a.contrast)[0];
-  const forStyle = candidates.filter(c => c.intervention > epsilon)
-    .sort((a, b) => b.intervention - a.intervention ||
-      Number(a === forRole) - Number(b === forRole) ||
-      Object.keys(a.answer.centered).length - Object.keys(b.answer.centered).length)[0];
+  function styleExample(subtype) {
+    const sign = subtype === 'A' ? 1 : -1;
+    const matches = candidates.filter(({answer, question}) => {
+      if (!(answer.centered[axis] * sign > epsilon)) return false;
+      // Centering can give a neutral option a small contribution. It cannot illustrate either extreme.
+      return !closeStyle || question.options.find(o => o.id === answer.optionId).scores[axis] * sign > 0;
+    });
+    matches.sort((a, b) => {
+      const support = (b.answer.centered[axis] - a.answer.centered[axis]) * sign;
+      const repeat = Number(a === forRole) - Number(b === forRole);
+      return (closeStyle ? repeat || support : support || repeat) ||
+        Object.keys(a.answer.centered).length - Object.keys(b.answer.centered).length;
+    });
+    return fromCandidate(matches[0]);
+  }
   function evidence(question, optionId) {
     const option = question?.options.find(o => o.id === optionId);
     return option && { questionId:question.id, optionId, moment:option.moment, text:option.text,
@@ -131,9 +145,12 @@ function decisionMoments(config, selected, denominator, primary, runner, role, s
     if (!candidate) return null;
     return evidence(candidate.question, candidate.answer.optionId);
   }
+  const styleExamples = closeStyle ? {A:styleExample('A'), B:styleExample('B')} : null;
   return {
     role:role.resolution === 'role_tiebreak' ? evidence(config.tieBreakers.role, tieAnswers.T_ROLE) : fromCandidate(forRole),
-    style:style.resolution === 'style_tiebreak' ? evidence(config.tieBreakers.style, tieAnswers.T_STYLE) : fromCandidate(forStyle),
+    style:style.resolution === 'style_tiebreak' ? evidence(config.tieBreakers.style, tieAnswers.T_STYLE) :
+      styleExamples ? styleExamples[style.subtype] : styleExample(style.subtype),
+    ...(styleExamples ? {styleExamples} : {}),
   };
 }
 
@@ -181,7 +198,7 @@ function scoreQuiz(config, answers, tieAnswers = {}) {
     roleResolution: role.resolution, subtypeResolution: subtype.resolution,
     tiedRoleIds: role.tiedRoleIds, explanations,
     ...(config.scoring.decisionMoments ? {
-      moments:decisionMoments(config, selected, denominator, primaryUnit, runnerUnit, role, subtype, tieAnswers)
+      moments:decisionMoments(config, aggregate, primaryUnit, runnerUnit, role, subtype, tieAnswers)
     } : {})
   };
 }
