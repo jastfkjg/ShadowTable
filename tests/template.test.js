@@ -1708,6 +1708,16 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
       ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions, secret.action.unavailableHint, secret.action.swordHint) };
     const initial = render(data);
     assert.doesNotMatch(JSON.stringify(initial), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+    if (options.some(choice => choice.value === "pass")) {
+      const pick = nodes(initial).find(n => n.attr?.["data-value"] === "pick-skill-target");
+      const skip = nodes(initial).filter(n => n.attr?.["data-value"] === "pass");
+      assert.equal(pick.attr.ariaPressed, true, role);
+      assert.equal(skip.length, 1, role);
+      assert.ok(skip[0].attr.class.includes("skill-mode"), role);
+      const skipped = render({ ...data, draftChoice: "pass", ...presentation.skillSelectionView("pass", mode) });
+      assert.doesNotMatch(JSON.stringify(skipped), /skill-target-grid|skill-target-heading/, role);
+      assert.equal(byHandler(skipped, "confirmChoice").attr.disabled, false, role);
+    }
     if (mode === "sword") {
       assert.ok(byHandler(initial, "toggleSkillHelp"));
       const pass = render({ ...data, draftChoice: "pass", skillHelpExpanded: true, ...presentation.skillSelectionView("pass", mode) });

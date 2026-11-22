@@ -760,6 +760,53 @@ test("六人测试房间的管理陪测可投 MVP/SVP，真人获奖留在个人
   assert.equal(a.app.store.db.prepare("SELECT count(*) AS n FROM match_fun_stats WHERE uid LIKE 'test:%'").get().n, 0);
   assert.doesNotMatch(JSON.stringify(result), /test:|wx:|"uid"/);
 });
+test("房间概览先按全房最近活跃时间排序再分页，同一时间按房间号排序", async (t) => {
+  let now = Date.now();
+  const a = await setup(t, { clock: () => now });
+  await a.login();
+  const { newRoom } = require("../server/engine");
+  const store = a.app.store;
+  const codes = Array.from({ length: 51 }, (_, i) => String(100000 + i));
+  for (const code of [...codes].reverse()) store.save(newRoom(code, "host", "房主"));
+
+  now++;
+  store.save(store.get(codes[1]));
+  now++;
+  store.visitRoom("host", codes[50]);
+  now++;
+  await a.api("/api/admin/rooms/" + codes[2]);
+  const first = await a.api("/api/admin/rooms");
+  const next = await a.api("/api/admin/rooms?offset=50");
+  const expected = [codes[50], codes[1], codes[0], ...codes.slice(2, 50)];
+  assert.equal(first.total, codes.length);
+  assert.deepEqual(first.rooms.map(room => room.code), expected.slice(0, 50));
+  assert.deepEqual(next.rooms.map(room => room.code), expected.slice(50));
+});
+
+test("满7天的房间立即从后台隐藏，物理回收前也无法操作或新增陪测", async (t) => {
+  let now = Date.now();
+  const a = await setup(t, { clock: () => now });
+  await a.login();
+  const { code, token } = await a.room();
+  await a.action(code, "test-on");
+  const actor = await a.api("/api/admin/actors", { code });
+  now += 7 * 86400000;
+  const fresh = await a.room();
+  const list = await a.api("/api/admin/rooms");
+  assert.equal(list.total, 1);
+  assert.deepEqual(list.rooms.map(room => room.code), [fresh.code]);
+  assert.deepEqual((await a.api("/api/admin/audit")).rooms, [fresh.code]);
+  assert.equal((await a.raw("/api/admin/rooms/" + code)).status, 410);
+  await assert.rejects(a.action(code, "test-off"), { status: 410 });
+  assert.equal((await a.raw("/api/admin/actors", { code })).status, 410);
+  assert.equal((await a.raw("/api/rooms/" + code, undefined, a.auth(actor.token))).status, 410);
+  assert.equal((await a.raw("/api/me/rooms/" + code, { action: "visit" }, a.auth(token))).status, 410);
+  const store = a.app.store;
+  assert.deepEqual(store.roomsFor(store.get(code).host), []);
+  assert.equal(require("../server/retention").cleanup(store).rooms, 1);
+  assert.equal((await a.raw("/api/rooms/" + code, undefined, a.auth(actor.token))).status, 401);
+});
+
 test("管理写操作原因选填，保留状态冲突检查与概览身份隔离", async (t) => {
   const a = await setup(t);
   await a.login();

@@ -1580,7 +1580,7 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   assert.match(c.viewActionDialog(), /确认本轮不开刀/);
   assert.doesNotMatch(c.viewActionDialog(), /skill-target-heading|skill-target-grid|skill-target-caption/);
-  c.ACTIONS.submitChoice({ dataset: { value: "pick-sword-target" } });
+  c.ACTIONS.submitChoice({ dataset: { value: "pick-skill-target" } });
   assert.match(c.viewActionDialog(), /skill-target-grid/);
   assert.match(c.viewActionDialog(), /请先选择目标/);
   c.ACTIONS.confirmChoice();
@@ -1632,7 +1632,7 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       await choose("pass");
       assert.doesNotMatch(c.viewActionDialog(), /toggleSkillHelp|A 牌刀客或 B 牌角色|可攻击其他任意身份/);
       assert.match(c.viewActionDialog(), /确认本轮不开刀/);
-      await choose("pick-sword-target");
+      await choose("pick-skill-target");
     }
     if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
     else if (mode === 'sword') {
@@ -1640,6 +1640,14 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       assert.doesNotMatch(c.viewActionDialog(), /刺客只失去技能/);
     } else assert.doesNotMatch(c.viewActionDialog(), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
     assert.doesNotMatch(JSON.stringify(room), /swordHint|刺客只失去技能/);
+    if (c.state.actionChoices.some(choice => choice.value === "pass")) {
+      assert.equal(c.viewActionDialog().match(/data-value="pass"/g).length, 1, role);
+      await choose("pass");
+      assert.doesNotMatch(c.viewActionDialog(), /skill-target-grid|skill-target-heading/, role);
+      await choose("pick-skill-target");
+      assert.equal(c.state.draftChoice, "", role);
+      assert.match(c.viewActionDialog(), /skill-target-grid/, role);
+    }
     const grid = mode === "swap" ? c.state.swapPlayers : c.state.skillTargets;
     assert.equal(grid.length, 12, role);
     assert.equal(!grid.find(t => t.seat === 2).disabledReason, selfAllowed, role);
@@ -1656,6 +1664,7 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       await choose("pass");
       assert.equal(c.state.swapSeats.length, 0);
       assert.ok(c.state.swapPlayers.every(t => !t.selected));
+      await choose("pick-skill-target");
       toggle(2); toggle(7);
       assert.equal(c.state.swapPlayers.find(t => t.seat === 5).disabledReason, "已出局");
     } else {

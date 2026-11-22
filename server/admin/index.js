@@ -1,4 +1,5 @@
 "use strict";
+const { roomActivityCutoff } = require("../retention");
 const playerFeedback = require("../feedback");
 const {
   randomBytes,
@@ -237,13 +238,15 @@ function createAdmin({ store, origin, key, body, limit }) {
     if (path === "/api/admin/rooms" && req.method === "GET") {
       const query = new URL(req.url, origin).searchParams;
       const offset = Math.max(0, Math.floor(Number(query.get("offset")) || 0));
+      const cutoff = roomActivityCutoff(store.clock());
       const rooms = store.db
-        .prepare("SELECT state FROM rooms ORDER BY code LIMIT 50 OFFSET ?")
-        .all(offset)
+        .prepare(`SELECT rooms.state FROM rooms JOIN room_lifecycle USING (code) WHERE activity>?
+          ORDER BY room_lifecycle.activity DESC, rooms.code ASC LIMIT 50 OFFSET ?`)
+        .all(cutoff, offset)
         .map((row) => describe(JSON.parse(row.state)));
       send(200, {
         rooms,
-        total: store.db.prepare("SELECT count(*) AS n FROM rooms").get().n,
+        total: store.db.prepare("SELECT count(*) AS n FROM room_lifecycle WHERE activity>?").get(cutoff).n,
         offset,
       });
       return true;
@@ -279,15 +282,15 @@ function createAdmin({ store, origin, key, body, limit }) {
                 .get(...args).n,
             }),
         rooms: store.db
-          .prepare("SELECT code FROM rooms ORDER BY code")
-          .all()
+          .prepare("SELECT code FROM room_lifecycle WHERE activity>? ORDER BY code")
+          .all(roomActivityCutoff(store.clock()))
           .map((row) => row.code),
       });
       return true;
     }
     if (path === "/api/admin/actors" && req.method === "POST") {
       const b = await body(req);
-      const room = store.get(b.code);
+      const room = store.accessibleRoom(b.code);
       fail(
         room?.testRoom && room.phase === "lobby",
         "只能在准备阶段的测试房间添加陪测玩家",
@@ -394,7 +397,7 @@ function createAdmin({ store, origin, key, body, limit }) {
     }
     const match = path.match(/^\/api\/admin\/rooms\/(\d{6})$/);
     if (match && req.method === "GET") {
-      const room = store.get(match[1]);
+      const room = store.accessibleRoom(match[1]);
       fail(room, "房间不存在", 404);
       send(200, describe(room));
       return true;
@@ -443,14 +446,11 @@ function createAdmin({ store, origin, key, body, limit }) {
             return;
           }
         }
-        const room = store.get(match[1]);
+        const room = store.accessibleRoom(match[1]);
         fail(room, "房间不存在", 404);
         fail(b.stage === room.stage, "房间状态已变化，请刷新后重试", 409);
         if (b.action === "delete") {
           store.remove(room.code);
-          store.db
-            .prepare("DELETE FROM sessions WHERE uid LIKE ?")
-            .run(`test:${room.code}:%`);
         } else {
           if (b.action === "clear-testers") {
             const humans = room.players.filter((p) => !p.uid.startsWith("test:"));

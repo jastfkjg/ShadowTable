@@ -2337,7 +2337,7 @@ test("技能目标与放弃互斥，断网或未确认请求阻止提交，关�
   assert.equal(p.data.draftChoice, "pass");
   assert.equal(p.data.draftLabel, "本轮不开刀");
   assert.equal(p.data.skillConfirmLabel, "确认本轮不开刀");
-  await choose("pick-sword-target");
+  await choose("pick-skill-target");
   assert.equal(p.data.draftChoice, "");
   p.confirmChoice();
   await choose("target:2");
@@ -2394,6 +2394,8 @@ test("十二骑士各类选人技能复用确认弹窗，保留合法目标和�
       await choose("pass");
       assert.equal(p.data.swapSeats.length, 0);
       assert.ok(p.data.swapPlayers.every(t => !t.selected));
+      await choose("pick-skill-target");
+      assert.equal(p.data.skillConfirmLabel, "请选择两个座位");
       toggle(2); toggle(7);
     } else {
       await choose(value);

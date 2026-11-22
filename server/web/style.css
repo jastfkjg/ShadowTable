@@ -1540,22 +1540,22 @@ button.room-filter.active { color: var(--accent); background: var(--surface); }
 .skill-target-dialog button.skill-confirm[disabled] { opacity: 1; background: var(--skill-disabled-bg); color: var(--muted); }
 .skill-target-dialog button[disabled] { cursor: default; }
 .skill-target-dialog button.skill-later { padding: 0; min-height: 44px; margin: 0; font-size: 12px; }
-.sword-modes { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--border); border-radius: 14px; }
-.sword-modes button.sword-mode { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 6px 3px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; line-height: 1.5; }
-.sword-modes button.is-active { background: rgba(229,198,139,.16); border-color: var(--accent); font-weight: 600; }
-.sword-radio { box-sizing: border-box; flex-shrink: 0; width: 15px; height: 15px; border: 1px solid var(--muted); border-radius: 50%; }
-.is-active .sword-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px); }
+.skill-modes { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--border); border-radius: 14px; }
+.skill-modes button.skill-mode { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 6px 3px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; line-height: 1.5; }
+.skill-modes button.is-active { background: rgba(229,198,139,.16); border-color: var(--accent); font-weight: 600; }
+.skill-radio { box-sizing: border-box; flex-shrink: 0; width: 15px; height: 15px; border: 1px solid var(--muted); border-radius: 50%; }
+.is-active .skill-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px); }
 .skill-dialog button.sword-help { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: auto; min-height: 44px; margin: 0; padding: 0 8px 0 0; border: 0; background: transparent; color: var(--muted); font-size: 13px; }
-.sword-sheet .skill-target-heading { margin-bottom: 0; }
-.sword-sheet .skill-check { width: 15px; height: 15px; border-radius: 50%; color: var(--bg); background: var(--accent); text-align: center; line-height: 15px; }
-.sword-title-row, .sword-title-row .skill-title { display: flex; align-items: center; gap: 10px; }
-.sword-title-row { justify-content: space-between; }
-.sword-title-row img { box-sizing: border-box; width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: #273b4d; }
-.sword-title-row button.sword-close { width: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 26px; }
-.sword-sheet .skill-target-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.sword-sheet button.skill-option.is-selected { background: rgba(229,198,139,.07); color: var(--text); }
-.sword-sheet .is-selected .skill-name { color: var(--text); }
-.sword-sheet .skill-footer { border-top: 1px solid var(--border); background: var(--bg); }
+.skill-sheet .skill-target-heading:has(+ .sword-help) { margin-bottom: 0; }
+.skill-sheet .skill-check { width: 15px; height: 15px; border-radius: 50%; color: var(--bg); background: var(--accent); text-align: center; line-height: 15px; }
+.skill-title-row, .skill-title-row .skill-title { display: flex; align-items: center; gap: 10px; }
+.skill-title-row { justify-content: space-between; }
+.skill-title-row img { box-sizing: border-box; width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: #273b4d; }
+.skill-title-row button.skill-close { width: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 26px; }
+.skill-sheet .skill-target-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.skill-sheet button.skill-option.is-selected { background: rgba(229,198,139,.07); color: var(--text); }
+.skill-sheet .is-selected .skill-name { color: var(--text); }
+.skill-sheet .skill-footer { border-top: 1px solid var(--border); background: var(--bg); }
 
 @media (max-height: 480px) {
   .error-dialog.skill-target-dialog { display: block; overflow-y: auto; }

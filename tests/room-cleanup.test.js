@@ -27,14 +27,14 @@ async function user(app) {
 }
 function candidate(room) { return { code: room.code, createdAt: room.createdAt }; }
 
-test("已结束房间满72小时自动从列表隐藏，旧入口不能续期，战绩复盘与个人条目保留", async () => {
+test("已结束房间满7天自动从列表隐藏，旧入口不能续期，战绩复盘与个人条目保留", async () => {
   let now = Date.now(); const app = await launch({ clock: () => now });
   try {
     const token = "a".repeat(64), uid = "wx:replay-5", store = app.store;
     store.addSession(createHash("sha256").update(token).digest("hex"), uid);
     const room = completed(); store.save(room);
     const records = store.matchesFor(uid), replay = store.replayFor(uid, room.matchRecord.id);
-    now += 3 * DAY - 1;
+    now += 7 * DAY - 1;
     assert.equal((await app.request("/api/me/rooms", token)).data.rooms[0].available, true);
     now++;
     const list = (await app.request("/api/me/rooms", token)).data.rooms;

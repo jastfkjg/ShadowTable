@@ -70,7 +70,6 @@ function createApp({
   trustedProxies = "",
   logger = console,
   clock = () => Date.now(),
-  endedRoomRetentionDays,
 } = {}) {
   // Defense in depth: callers cannot enable development features in production.
   devAuth = devAuth && process.env.NODE_ENV !== "production";
@@ -99,7 +98,7 @@ function createApp({
   }
   const clientAddress = require("./network").clientAddressResolver(trustedProxies);
   const metrics = require("./network").createMetrics({ clock, logger });
-  const store = new Store(database, { clock, endedRoomRetentionDays }),
+  const store = new Store(database, { clock }),
     limits = new Map();
   const leaderboard = new Leaderboard(store);
   const monthlyReport = new MonthlyReport(store);
@@ -302,7 +301,7 @@ function createApp({
           "陪测账号只能访问绑定房间、本人数据和排行榜",
           403,
         );
-        check(store.get(code)?.testRoom === true, "该房间未开启测试模式", 403);
+        check(store.accessibleRoom(code)?.testRoom === true, "该房间未开启测试模式", 403);
       }
       limit(`${req.method === "GET" ? "read" : "write"}:${uid}`, req.method === "GET" ? 180 : 60);
       avoidance.ensureAccount(store, uid);
@@ -475,9 +474,8 @@ function createApp({
       }
       const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/stats$/);
       if (req.method === "GET" && playerStats) {
-        const room = store.get(playerStats[1]);
+        const room = store.accessibleRoom(playerStats[1]);
         check(room, "房间不存在", 404);
-        check(!store.roomExpired(room), "房间已失效", 410);
         res.setHeader("Cache-Control", "no-store");
         return send(200, readRoomPlayerStats(store, room, uid, playerStats[2]));
       }
@@ -486,9 +484,8 @@ function createApp({
         /^\/api\/rooms\/(\d{6})(?:\/(join|commands|private|delete|management|invitation|avoidance))?$/,
       );
       if (req.method === "GET" && match) {
-        const room = store.get(match[1]);
+        const room = store.accessibleRoom(match[1]);
         check(room, "房间不存在", 404);
-        check(!store.roomExpired(room), "房间已失效", 410);
         if (requestUrl.searchParams.has("instance"))
           check(requestUrl.searchParams.get("instance") === String(room.createdAt || 0), "该邀请已失效", 410);
         if (match[2] === "invitation") {
@@ -581,9 +578,8 @@ function createApp({
           details = actionDetails(room, uid, "create", b);
           response = { code };
         } else {
-          room = store.get(match[1]);
+          room = store.accessibleRoom(match[1]);
           check(room, "房间不存在", 404);
-          check(!store.roomExpired(room), "房间已失效", 410);
           auditBefore = structuredClone(room);
           if ([...room.players, ...(room.spectators || [])].some((p) => p.uid === uid))
             details = actionDetails(
