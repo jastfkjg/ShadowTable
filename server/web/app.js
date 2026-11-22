@@ -4645,16 +4645,22 @@ function roomListItems(rooms) {
         "</div>";
       html += "</div>";
     }
-    var quests = r.phase === "lobby" ? [] : state.history.filter(function (h) { return h.questResult; });
     const waiting = r.phase === "lobby";
     const occupied = state.seatOccupiedCount + '/' + r.capacity + ' 人';
-    html += '<div class="task-progress"><div class="section-title history-heading"><span class="seat-section-title"><span>' + (quests.length ? '任务进度' : '玩家') + '</span>' +
-      (waiting ? '' : '<span class="seat-count">' + occupied + '</span>') + '</span>' +
+    html += '<div class="task-progress">';
+    if (!waiting) {
+      const rounds = publicHistory.questRounds(r, state.history.filter(h => h.questResult));
+      html += '<div class="quest-track">' + rounds.map(round =>
+        '<button type="button" class="quest-round" aria-label="' + esc(round.label) + '"' +
+        (round.key === null ? ' disabled' : ' data-action="showQuestRecord" data-key="' + round.key + '"') + '>' +
+        '<span aria-hidden="true" class="quest-disc ' + round.result + (round.protectedRound ? ' protected' : '') + '">' +
+        (round.key === null ? '' : '<span class="quest-mark"></span>') + '</span><span aria-hidden="true">' + round.number + '</span></button>'
+      ).join("") + '</div>';
+    }
+    html += '<div class="section-title history-heading"><span class="seat-section-title"><span>玩家</span>' +
+      (waiting ? '' : '<span class="seat-count">' + state.seatOccupiedCount + '人</span>') + '</span>' +
       (waiting ? '<span class="seat-count">' + occupied + '入座 · ' + state.seatReadyCount + ' 人已准备</span>' :
         '<button type="button" class="history-toggle" data-action="toggleSeats" aria-expanded="' + !!state.seatsExpanded + '">' + (state.seatsExpanded ? "收起座位" : "座位（" + r.capacity + "）⌄") + '</button>') + '</div>';
-    if (quests.length) html += '<div class="quest-timeline">' + quests.map(function (h, i) {
-      return btn("quest-step " + h.questResult, "showQuestRecord", "第" + (i + 1) + "次 · " + (h.questResult === "success" ? "✓ 成功" : "× 失败"), { key: h.key });
-    }).join("") + '</div>';
     html += '</div>';
     if (r.phase === "lobby" || state.seatsExpanded) {
     html += '<div class="seats' + (r.capacity >= 10 ? ' seats-compact' : '') + '">';

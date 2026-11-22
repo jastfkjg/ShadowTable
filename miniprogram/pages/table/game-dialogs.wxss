@@ -75,7 +75,7 @@
 .process-skill .skill-other-choices { display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 16px 0 0; }
 .process-skill button.skill-other, .process-skill button.skill-other[disabled]:not([type]) { display: flex; align-items: center; justify-content: flex-start; gap: 11px; width: 100%; min-height: 76px; margin: 0; padding: 14px; border: 1px solid rgba(177,191,198,.22); border-radius: 15px; background: var(--control-bg, #14232c); color: var(--text); text-align: left; font-size: 16px; line-height: 1.6; }
 .process-skill.has-targets button.skill-other { min-height: 60px; padding: 10px 12px; font-size: 14px; }
-.process-skill button.skill-other > text { flex: 1; min-width: 0; font-weight: 600; }
+.skill-other-copy { flex: 1; min-width: 0; font-weight: 600; }
 .process-skill button.skill-other.is-selected { border-color: var(--accent); background: rgba(229,198,139,.06); }
 .process-choice-symbol { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; background: rgba(177,191,198,.08); }
 .process-choice-symbol image { width: 19px; height: 19px; }
@@ -83,12 +83,16 @@
 .is-selected .process-choice-radio { background: var(--accent); border-color: var(--accent); }
 .process-skill button.skill-navigation { min-height: 44px; justify-content: center; padding: 8px; color: var(--muted); background: transparent; border: 0; font-size: 13px; }
 .process-skill button.skill-navigation .process-choice-symbol, .process-skill button.skill-navigation .process-choice-radio { display: none; }
-.process-skill button.skill-navigation > text { flex: 0 1 auto; font-weight: 400; }
+.skill-navigation .skill-other-copy { flex: 0 1 auto; font-weight: 400; }
 .process-skill .skill-footer { padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
 .process-skill .skill-summary, .process-skill .skill-consequence { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.65; }
 .process-skill .skill-footer .small { margin-bottom: 8px; }
 .process-skill button.skill-confirm, .process-skill button.skill-confirm[disabled]:not([type]) { min-height: 50px; margin: 4px 0 0; padding: 12px; border-radius: 13px; font-size: 16px; line-height: 1.5; }
 .process-skill button.skill-later { min-height: 44px; padding: 10px; margin-top: 4px; font-size: 13px; }
+.table-sheet-backdrop .no-skill-sheet, .no-skill-sheet .skill-footer { background: var(--bg); }
+.process-skill.no-skill-sheet .skill-body { height: 126px; }
+.no-skill-sheet button.skill-other.is-selected { background: var(--control-bg); }
+.no-skill-reason { margin-top: 2px; font-size: 13px; font-weight: 400; color: var(--muted); }
 
 .sword-modes { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--border); border-radius: 14px; }
 .sword-modes button.sword-mode { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; min-width: 0; width: auto; min-height: 44px; margin: 0; padding: 6px 3px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; line-height: 1.5; }
@@ -117,6 +121,13 @@
 .process-vote .quest-choice-symbol image { width: 20px; height: 20px; }
 .process-vote .task-choice-context { margin-top: 3px; }
 .process-vote .process-sheet-fields { padding-top: 0; }
+.table-sheet-backdrop .quest-card-sheet { background: var(--bg); }
+.quest-team { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; font-size: 14px; }
+.quest-team-seat { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; border-radius: 50%; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.quest-card-sheet .identity-privacy-note { justify-content: flex-start; }
+.quest-card-sheet button.quest-choice, .quest-card-sheet button.quest-choice[disabled]:not([type]) { min-height: 58px; padding: 10px 14px; border-radius: 14px; }
+.quest-choice-face { width: 28px; height: 40px; flex-shrink: 0; border-radius: 3px; }
+.quest-card-sheet .process-sheet-footer button.primary[disabled]:not([type]) { background: #384852; color: #bfccd2; }
 .process-generic .action-choice-list, .process-action-targets { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 0; }
 .process-generic .action-choice-list button, .process-action-targets button { min-height: 48px; margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 15px; }
 .process-generic .action-team, .process-generic .private-info, .process-generic .label { font-size: 13px; line-height: 1.75; }

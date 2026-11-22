@@ -294,7 +294,7 @@ function createApp({
       honors.settleOrphaned(store);
       if (uid.startsWith("test:")) {
         check(admin, "陪测平台未启用", 403);
-        const adminSession = admin.authenticate(req);
+        const adminSession = admin.authenticate(req, res);
         const [, code, owner] = uid.split(":");
         check(owner === adminSession.hash, "陪测账号不属于当前管理员会话", 403);
         const ownDataRead = req.method === "GET" && ([

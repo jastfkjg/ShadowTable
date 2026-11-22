@@ -7,6 +7,12 @@ const root = path.resolve(__dirname, "../miniprogram");
 const config = JSON.parse(fs.readFileSync(path.join(root, "app.json"), "utf8"));
 const packages = config.subPackages || [];
 
+test("随包卡背可在三倍屏上清晰显示", async () => {
+  const art = await require("sharp")(path.join(root, "assets/identity-card-back.jpg")).metadata();
+  assert.equal(art.format, "jpeg");
+  assert.ok(art.width >= 1020 && art.height >= 1530, "卡背最大宽度 340px，需要三倍屏像素密度");
+});
+
 function files(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const file = path.join(directory, entry.name);

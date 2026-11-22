@@ -152,7 +152,40 @@ test("重新部署保留管理员和陪测归属、未确认请求；退出和�
   await reverted.close();
 });
 
-test("管理员会话保持八小时有效期，过期 Cookie 与陪测令牌不能继续操作", async (t) => {
+test("后台登录和每次使用都将会话与 Cookie 的有效期延至 30 天后", async (t) => {
+  const day = 86400000;
+  let now = Date.now();
+  const a = await setup(t, { clock: () => now });
+  const expiry = () => a.app.store.db.prepare("SELECT expires FROM admin_sessions").get().expires;
+  const login = await a.raw("/api/admin/login", { key });
+  const cookie = login.headers.get("set-cookie");
+  assert.match(cookie, /Max-Age=2592000(?:;|$)/);
+  assert.equal(expiry(), now + 30 * day);
+
+  // A still-valid session from the previous eight-hour policy renews on first use.
+  a.app.store.db.prepare("UPDATE admin_sessions SET expires=?").run(now + 8 * 3600000);
+  now += 3600000;
+  for (const path of ["/api/admin/session", "/api/admin/rooms"]) {
+    const response = await a.raw(path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("set-cookie"), cookie);
+    assert.equal(expiry(), now + 30 * day);
+    now += 29 * day;
+  }
+
+  const expires = expiry();
+  const denied = await a.raw("/api/admin/rooms", undefined, { "Sec-Fetch-Site": "cross-site" });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers.get("set-cookie"), undefined);
+  assert.equal(expiry(), expires);
+  now = expires;
+  const expired = await a.raw("/api/admin/session");
+  assert.equal((await expired.json()).authenticated, false);
+  assert.equal(expired.headers.get("set-cookie"), undefined);
+  assert.equal(expiry(), expires);
+});
+
+test("旧版管理员会话过期后，原 Cookie 与陪测令牌不能继续操作", async (t) => {
   let now = Date.now();
   const a = await setup(t, { clock: () => now });
   await a.login();
@@ -160,6 +193,7 @@ test("管理员会话保持八小时有效期，过期 Cookie 与陪测令牌不
   await a.action(code, "test-on");
   const c = managedPanel(a);
   const actor = await c.add(code);
+  a.app.store.db.prepare("UPDATE admin_sessions SET expires=?").run(now + 8 * 3600000);
   now += 8 * 3600000;
   assert.equal((await a.api("/api/admin/session")).authenticated, false);
   await assert.rejects(c.command(actor, "ready", { ready: true }), error => error.status === 401);

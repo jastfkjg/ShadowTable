@@ -3,7 +3,8 @@
     <view class="public-history-icon" aria-hidden="{{true}}"><image src="/assets/home-clock.svg" mode="aspectFit" /></view>
     <view class="public-history-entry-copy">
       <view class="public-history-entry-title"><text>公开记录</text><text class="public-history-total">{{history.length || 0}}</text></view>
-      <view class="public-history-preview {{historyLatest.resultTone}}">{{historyLatest?(historyLatest.historyText || historyLatest.text)+(historyLatest.timeLabel?' · '+historyLatest.timeLabel:''):'本局暂无公开记录'}}</view>
+      <view wx:if="{{questReveal}}" class="public-history-preview">正在翻任务票</view>
+      <view wx:else class="public-history-preview {{historyLatest.resultTone}}">{{historyLatest?(historyLatest.historyText || historyLatest.text)+(historyLatest.timeLabel?' · '+historyLatest.timeLabel:''):'本局暂无公开记录'}}</view>
     </view>
     <text wx:if="{{historyUnreadCount}}" class="public-history-badge">{{historyUnreadCount}}条新</text>
     <view class="public-history-chevron is-forward" aria-hidden="{{true}}" />

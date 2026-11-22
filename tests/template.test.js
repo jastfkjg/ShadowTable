@@ -695,7 +695,9 @@ test('任务牌只展示当前允许选项，先选后确认且固定操作在�
   assert.equal(byHandler(tree,'confirmChoice').attr.disabled,true);
   const scroll = nodes(tree).find(n=>n.attr?.class?.split(' ').includes('task-choice-body'));
   assert.ok(scroll);
-  assert.match(JSON.stringify(scroll), /结算后公开任务结果和汇总票数，个人出牌保密/);
+  assert.match(JSON.stringify(scroll), /个人出牌保密/);
+  assert.doesNotMatch(JSON.stringify(tree), /结算后公开任务结果|本轮任务牌 · 点击选择/);
+  assert.deepEqual(nodes(scroll).filter(n=>n.attr?.class==='quest-team-seat').map(n=>n.attr.ariaLabel), ['1号','6号','8号']);
   assert.equal(byHandler(scroll,'confirmChoice'),undefined);
   const selected = render({...data,draftChoice:'success',draftLabel:'任务成功'});
   assert.equal(byHandler(selected,'confirmChoice').attr.disabled,false);
@@ -708,6 +710,8 @@ test('任务牌只展示当前允许选项，先选后确认且固定操作在�
   }
   const evil=render({...data,actionChoices:[...data.actionChoices,{value:'fail',label:'任务失败'}]});
   assert.deepEqual(nodes(evil).filter(n=>n.attr?.bindtap==='submitChoice').map(n=>n.attr['data-value']),['success','fail']);
+  const fail=nodes(evil).find(n=>n.attr?.['data-value']==='fail');
+  assert.ok(nodes(fail).some(n=>n.attr?.src==='/assets/quest-tickets/fail.jpg'));
   assert.equal(byHandler(render({...data,room:{...room,me:{...room.me,submitted:true}}}),'confirmChoice'),undefined);
 });
 test("WXML入口加载/错误/禁用绑定为真实布尔条件", () => {
@@ -1476,7 +1480,7 @@ test("湖仙设置所有板子可见，5/6人及查验进行中禁用开关", ()
 
 test("结果卡和表决展示队伍，座位可折叠，公开记录入口固定且不会挤掉待办", () => {
   const entry = { key: 3, text: "投票通过", resultTone: "success", resultTeam: "1、4号", latestDetail: "2票赞成", timeLabel: "23:38", recordLabel: "记录 4" };
-  const data = { ...base, room: { phase: "teamVote", team: [1, 4], me: { submitted: false }, needsSubmission: true }, teamText: "1、4", actionDialog: true, seatsExpanded: false, latestResult: entry, history: [entry, entry, entry, entry], visibleHistory: [entry], questTimeline: [{ key: 1, number: 2, text: "任务成功", questResult: "success" }] };
+  const data = { ...base, room: { phase: "teamVote", team: [1, 4], me: { submitted: false }, needsSubmission: true }, teamText: "1、4", actionDialog: true, seatsExpanded: false, latestResult: entry, history: [entry, entry, entry, entry], visibleHistory: [entry], questRounds: [{ key: 1, number: 2, result: "success", label: "第2次任务，成功，查看详情" }] };
   const tree = render(data);
   const text = JSON.stringify(tree);
   assert.ok(text.includes("任务队伍：1、4号"));
@@ -1501,12 +1505,18 @@ test("查验结果突出座位阵营，可临时遮盖且仅有一个永久关�
 
 test("牌桌阶段集中待办、结果可回看，任务进度与座位明确分区", () => {
   const room = { phase: "tools", phaseName: "等待房主发起操作", flexible: true, capacity: 12, me: { seat: 1 }, team: [] };
-  const data = { ...base, room, seatsExpanded: false, questSummary: { total: 1, success: 1, failure: 0 }, questTimeline: [{ key: 1, number: 1, questResult: "success" }], latestResult: { text: "任务成功", detail: "成功1张" } };
+  const data = { ...base, room, seatsExpanded: false, questSummary: { total: 1, success: 1, failure: 0 }, seatOccupiedCount: 12, questRounds: require("../miniprogram/public-history").questRounds({ ...room, history: [{ threshold: 2 }] }, [{ key: 0, questResult: "success" }]), latestResult: { text: "任务成功", detail: "成功1张" } };
   const tree = render(data), text = JSON.stringify(tree);
   assert.equal((text.match(/等待房主发起操作/g) || []).length, 1);
   assert.ok(byHandler(tree, "showLatestRecord"));
   const progress = nodes(tree).find(n => n.attr?.class === "task-progress");
-  assert.ok(JSON.stringify(progress).includes("任务进度"));
+  assert.doesNotMatch(JSON.stringify(progress), /任务进度|12\/12/);
+  const rounds = nodes(progress).filter(n => n.attr?.class === "quest-round");
+  assert.equal(rounds.length, 5);
+  assert.equal(rounds[0].attr.disabled, false);
+  assert.match(rounds[0].attr["aria-label"] || rounds[0].attr.ariaLabel, /保护轮，成功/);
+  assert.ok(rounds.slice(1).every(n => n.attr.disabled));
+  assert.ok(JSON.stringify(progress).indexOf("quest-track") < JSON.stringify(progress).indexOf("seat-section-title"));
   assert.ok(byHandler(progress, "toggleSeats"));
   assert.ok(byHandler(progress, "showQuestRecord"));
   assert.ok(!text.includes("我在1号"));
@@ -1627,6 +1637,30 @@ test("动态区仅等待及结束时显示结果，操作中提交前后均隐�
   assert.ok(!nodes(empty).some(n => n.attr?.class === "latest-result"));
 });
 
+test("最近结果内的任务票只展示已经翻开的正面，跳过后恢复原结果", () => {
+  const room = { phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: null } };
+  const latestResult = { key: 0, questResult: "success", text: "任务成功", detail: "1、3、6、7、11号 · 1张失败票" };
+  const cards = ["success", "success", "magic", "thiefFail", "fail"].map((kind, index) => ({
+    index, kind, label: kind === "magic" ? "魔法票" : "任务票",
+  }));
+  const panel = questReveal => nodes(renderTable({ ...base, room, latestResult, questReveal })).find(n => n.attr?.class === "latest-result");
+  const active = panel({ cards, columns: 5, turnMs: 520, revealed: 3 });
+  const tickets = nodes(active).filter(n => n.attr?.class === "quest-ticket");
+  assert.equal(tickets.length, 5);
+  assert.match(JSON.stringify(tickets[2]), /魔法票/);
+  assert.match(JSON.stringify(tickets[3]), /未翻开/);
+  assert.doesNotMatch(JSON.stringify(active), /thiefFail\.jpg|fail\.jpg|任务成功|11号/);
+  const allUp = panel({ cards, columns: 5, turnMs: 520, revealed: 5 });
+  assert.deepEqual(nodes(allUp).filter(n => n.attr?.class === "quest-ticket-front").map(n => n.attr.src),
+    cards.map(card => "/assets/quest-tickets/" + card.kind + ".jpg"));
+  assert.equal(nodes(active).filter(n => n.attr?.class === "quest-ticket-turn is-up").length, 3);
+  assert.ok(byHandler(active, "finishQuestReveal"));
+  const done = panel(null);
+  assert.match(JSON.stringify(done), /任务成功/);
+  assert.match(JSON.stringify(done), /1张失败票/);
+  assert.ok(!byHandler(done, "finishQuestReveal"));
+});
+
 test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限制", () => {
   const legacy = { code: "438671", isHost: true, isMember: true, capacity: 12, phaseName: "入座与准备" };
   const data = { ...base, memberRooms: [legacy], visibleMemberRooms: [legacy], roomMenu: legacy };
@@ -1657,6 +1691,27 @@ test("读取身份只让身份入口加载，不触发提交或结算动画", ()
   assert.equal(byHandler(action, "confirmChoice").attr.loading, false);
 });
 
+const skillSource = require("node:fs").readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8");
+const presentation = vm.runInNewContext("(function(){" + skillSource.slice(skillSource.indexOf("function skillView("), skillSource.indexOf("function factionTone(")) + "return { skillView, skillSelectionView };})()");
+
+test("无技能时将原因并入已选卡片，保留确认和稍后入口", () => {
+  const { room, secret } = require("./helpers/skill-target-fixtures").fixture("servant", "none");
+  const data = { ...base, room, actionDialog: true,
+    ...presentation.skillView(room, secret.action.options, false, "", [], secret.action.unavailableHint) };
+  const tree = render(data);
+  const card = byHandler(tree, "submitChoice");
+  assert.equal(card.attr.ariaPressed, true);
+  assert.equal(card.attr.ariaLabel, "本轮不使用技能，你没有技能，已选");
+  assert.ok(nodes(card).some(n => n.attr?.class === "no-skill-reason" && n.children.includes("你没有技能")));
+  assert.doesNotMatch(JSON.stringify(tree), /skill-summary|process-empty-target/);
+  assert.deepEqual(Array.from(byHandler(tree, "confirmChoice").children), ["确认选择"]);
+  assert.equal(byHandler(tree, "confirmChoice").attr.disabled, false);
+  assert.ok(nodes(tree).some(n => n.attr?.bindtap === "closeAction" && n.children.includes("稍后选择")));
+  for (const blocked of [{network: false}, {busy: true}, {hasPendingRequest: true}]) {
+    assert.equal(byHandler(render({ ...data, ...blocked }), "confirmChoice").attr.disabled, true);
+  }
+});
+
 test("技能网格独立选择，底部确认默认禁用并显示明确目标", () => {
   const data = { ...base, room: { phase: "skillPrepare", needsSubmission: true, me: { submitted: false }, team: [] },
     actionDialog: true, skillAction: true, skillTitle: "使用技能 · 开刀", skillHint: "请选择目标", skillBodyHeight: 164,
@@ -1667,7 +1722,7 @@ test("技能网格独立选择，底部确认默认禁用并显示明确目标",
   assert.equal(nodes(initial).filter(n => n.attr?.bindtap === "submitChoice").length, 2);
   assert.equal(byHandler(initial, "confirmChoice").attr.disabled, true);
   assert.ok(!byHandler(initial, "confirmSwap"));
-  const selected = render({ ...data, draftChoice: "target:2", draftLabel: "对 2号开刀" });
+  const selected = render({ ...data, draftChoice: "target:2", ...presentation.skillSelectionView("target:2", "", [], "对 2号开刀") });
   assert.equal(byHandler(selected, "confirmChoice").attr.disabled, false);
   assert.match(JSON.stringify(byHandler(selected, "confirmChoice")), /确认对 2号开刀/);
   assert.ok(nodes(selected).some(n => n.attr?.class?.includes("skill-option is-selected")));
@@ -1676,8 +1731,6 @@ test("技能网格独立选择，底部确认默认禁用并显示明确目标",
 });
 
 test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回不伪装成选项", () => {
-  const source = require("node:fs").readFileSync(require.resolve("../miniprogram/pages/table/controller.js"), "utf8");
-  const presentation = vm.runInNewContext("(function(){" + source.slice(source.indexOf("function skillView("), source.indexOf("function factionTone(")) + "return { skillView, skillSelectionView };})()");
   const { cases, fixture } = require("./helpers/skill-target-fixtures");
   for (const [role, mode, value] of cases) {
     const { room, secret } = fixture(role, mode);
