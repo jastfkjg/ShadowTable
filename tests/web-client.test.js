@@ -1395,7 +1395,7 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   assert.equal(c.state.history[0].timeLabel, "");
   let html = c.viewRoom();
   assert.match(html, /查看公开记录，共4条/);
-  assert.match(html, /第1次 · × 失败/);
+  assert.match(html, /aria-label="第1次任务，失败，查看详情" data-action="showQuestRecord" data-key="0"/);
   assert.doesNotMatch(html, /id="history-record-/);
   assert.match(html, /data-action="openHistory"/);
   c.ACTIONS.openHistory();
@@ -1475,7 +1475,9 @@ test("网页阶段集中待办，房主工具与任务进度优先，最近结�
   let html = c.viewRoom();
   assert.equal((html.match(/等待房主发起操作/g) || []).length, 1);
   assert.ok(html.indexOf('data-action="openTool"') < html.indexOf('data-action="toggleSeats"'));
-  assert.ok(html.indexOf("任务进度") < html.indexOf('data-action="toggleSeats"'));
+  assert.doesNotMatch(html, /任务进度/);
+  assert.match(html, /class="quest-track"[\s\S]*class="seat-section-title"><span>玩家<\/span><span class="seat-count">6人/);
+  assert.equal((html.match(/class="quest-round"/g) || []).length, 5);
   c.ACTIONS.showLatestRecord();
   assert.equal(c.lookups.at(-1), "history-record-" + c.state.latestResult.key);
   assert.equal(c.scrolls.length, 0);

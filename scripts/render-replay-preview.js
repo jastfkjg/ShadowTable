@@ -2,10 +2,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./compile-miniprogram");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures");
-const { presentReplay, trajectory } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const { presentMatches } = require("../miniprogram/profile");
 const createRecords = require("../miniprogram/pages/records/controller");
 const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(__dirname, "../output/playwright/replay");

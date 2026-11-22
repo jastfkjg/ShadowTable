@@ -1,6 +1,6 @@
 // Layout projection of production WXML; interaction is tested separately.
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./compile-miniprogram");
 const clearing = require("../miniprogram/pages/data-management/presentation");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(process.argv[2] || "output/playwright/record-clearing");

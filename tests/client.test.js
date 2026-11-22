@@ -100,6 +100,7 @@ function page(api, storage = new Map(), layout, lobby = false) {
         if (name === '../../fun-copy') return require('../miniprogram/fun-copy');
         if (name === '../../room-share') return require('../miniprogram/room-share');
         if (name === '../../public-history') return require('../miniprogram/public-history');
+        if (name === './quest-reveal') return require('../miniprogram/pages/table/quest-reveal');
         if (name === '../../room-swipe') return require('../miniprogram/room-swipe');
         if (name === '../../room-list') return require('../miniprogram/room-list');
         if (name === '../../connection-feedback') return require('../miniprogram/connection-feedback');
@@ -1270,6 +1271,8 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     assert.equal(ps[2].data.room.needsSubmission, false);
     await host.refresh();
     assert.equal(host.data.room.phase, "tools");
+    assert.equal(host.data.questReveal.cards.length, 2);
+    host.finishQuestReveal();
     assert.ok(host.data.history.at(-1).text.includes("任务成功"));
     assert.equal(host.data.latestResult.text, "任务成功");
     host.openTool({ currentTarget: { dataset: { kind: "vote" } } });
@@ -1815,6 +1818,92 @@ test("小程序点自己的座位确认站起，点空位坐下，点他人不�
   assert.equal(calls.length, 2);
 });
 
+test("任务票按公开票数逐张翻，结尾停留后同步公布结果、任务进度和公开记录", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const room = { code: "123456", createdAt: 100, game: 1, stage: "q", phase: "quest", capacity: 12,
+    players: [], team: [1, 3, 6, 7, 11], me: { seat: 3 }, history: [] };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  await p.refresh();
+  room.history.push({ kind: "toolQuest", number: 3, team: room.team, fails: 1, threshold: 2, success: true });
+  room.phase = "tools"; room.stage = "q-done"; room.team = [];
+  await p.refresh();
+  assert.equal(p.data.questReveal.revealed, 0);
+  assert.equal(p.data.questReveal.cards.filter(c => c.kind === "fail").length, 1);
+  assert.equal(p.data.historyLatest, null);
+  assert.equal(p.data.questTimeline.length, 0);
+  assert.ok(p.data.questRounds.every(round => round.result === "pending"));
+  p.showLatestRecord();
+  assert.equal(p.data.visibleHistory.length, 0);
+  p.closeHistory();
+  t.mock.timers.tick(699);
+  assert.equal(p.data.questReveal.revealed, 0);
+  t.mock.timers.tick(1);
+  await p.refresh();
+  assert.equal(p.data.questReveal.revealed, 1);
+  assert.equal(p.data.questReveal.turnMs, 520);
+  for (let i = 2; i <= 5; i++) {
+    t.mock.timers.tick(919);
+    assert.equal(p.data.questReveal.revealed, i - 1);
+    t.mock.timers.tick(1);
+    assert.equal(p.data.questReveal.revealed, i);
+    assert.equal(p.data.history.length, 0);
+  }
+  t.mock.timers.tick(1719);
+  assert.ok(p.data.questReveal);
+  t.mock.timers.tick(1);
+  assert.equal(p.data.questReveal, null);
+  assert.equal(p.data.historyLatest.questResult, "success");
+  assert.equal(p.data.questTimeline.length, 1);
+  assert.equal(p.data.questRounds[0].result, "success");
+  assert.equal(p.data.questRounds[0].protectedRound, true);
+  assert.equal(p.data.historyUnreadCount, 1);
+  await p.refresh();
+  assert.equal(p.data.questReveal, null);
+});
+
+test("任务翻票只呈现新结算；跳过、切后台和下一次操作均能打断，混沌票不关联座位", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const room = { code: "654321", game: 1, phase: "tools", stage: "t0", capacity: 6,
+    team: [], players: [], me: { seat: 1 }, history: [] };
+  const p = page({ request: async () => structuredClone(room) });
+  p.roomCode = room.code;
+  const addResult = number => {
+    room.stage = "t" + number;
+    room.history.push({ kind: "toolQuest", number, team: [1, 2, 3, 4], fails: 2, success: false,
+      counts: { success: 1, fail: 1, magic: 1, thiefFail: 1 } });
+  };
+  addResult(1);
+  await p.refresh();
+  assert.equal(p.data.questReveal, null);
+  const other = page({ request: async () => structuredClone(room) });
+  other.roomCode = room.code;
+  await other.refresh();
+  addResult(2);
+  await p.refresh();
+  room.me.seat = 2; room.history[1].team.reverse();
+  await other.refresh();
+  assert.deepEqual(p.data.questReveal.cards, other.data.questReveal.cards);
+  assert.deepEqual(p.data.questReveal.cards.map(c => c.kind).sort(), ["fail", "magic", "success", "thiefFail"]);
+  assert.ok(p.data.questReveal.cards.every(c => !("seat" in c)));
+  p.finishQuestReveal();
+  assert.equal(p.data.questReveal, null);
+  assert.equal(p.data.history.length, 2);
+  other.onHide();
+  addResult(3);
+  other.foreground = true;
+  await other.refresh();
+  assert.equal(other.data.questReveal, null);
+  assert.equal(other.data.questTimeline.length, 3);
+  await p.refresh();
+  assert.ok(p.data.questReveal);
+  room.stage = "v"; room.phase = "teamVote";
+  await p.refresh();
+  t.mock.timers.tick(3000);
+  assert.equal(p.data.questReveal, null);
+  assert.equal(p.data.questTimeline.length, 3);
+});
+
 test("公开记录抽屉默认收起，分类保留完整记录且刷新后保持筛选", async () => {
   const room = { code: "123456", stage: "t1", phase: "tools", capacity: 6, players: [], team: [], me: { seat: 1 }, history: [
     { kind: "toolVote", approved: true, team: [1], votes: [{ seat: 1, approve: true }] },
@@ -2163,14 +2252,25 @@ test("技能记录分行且仅在有人仍出局时展示最终结果", async ()
   assert.equal(p.data.history[0].resultRows.at(-1).value, "4 号");
 });
 
-test("小程序无技能和技能已使用提示沿用本人私密状态", async () => {
+test("小程序仅在本人没有技能且只能跳过时预选，仍须手动确认", async () => {
   for (const unavailableHint of ["你没有技能", "技能已使用", "新技能尚未启用，下次技能环节可用"]) {
     const p = page({ request: async () => ({ stage: "s1", action: { choices: ["pass"], unavailableHint } }) });
+    const submitted = [];
+    p.cmd = (type, { value }) => submitted.push([type, value]);
     p.data.room = { code: "123456", stage: "s1", phase: "skillPrepare", needsSubmission: true, me: { submitted: false } };
     await p.openAction();
+    const noSkill = unavailableHint === "你没有技能";
+    assert.equal(p.data.draftChoice, noSkill ? "pass" : "");
     assert.equal(p.data.skillHint, unavailableHint);
     assert.equal(p.data.actionSecret, null);
     p.closeAction();
+    assert.equal(p.data.draftChoice, "");
+    assert.equal(p.data.noSkillPass, false);
+    assert.deepEqual(submitted, []);
+    await p.openAction();
+    assert.deepEqual(submitted, []);
+    p.confirmChoice();
+    assert.deepEqual(submitted, noSkill ? [["submit", "pass"]] : []);
   }
 });
 

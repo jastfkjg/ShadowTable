@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { BOARDS, newRoom, publicView, invitationView, enter, command } = require('../server/engine');
-const { wxmlToJs } = require('miniprogram-compiler');
+const { wxmlToJs } = require('../scripts/compile-miniprogram');
 const root = path.resolve(__dirname,'../miniprogram');
 function page(route, api, { storage = new Map(), appState = {}, pages = [{},{}], wx: overrides = {}, home = false, timers } = {}) {
   let definition;

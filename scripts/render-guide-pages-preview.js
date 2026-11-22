@@ -2,7 +2,7 @@
 // Native WeChat picker, scroll-view and device safe-area behavior need device QA.
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const { createRequire } = require("node:module");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./compile-miniprogram");
 const { BOARDS } = require("../server/engine"), detail = require("../server/board-info");
 const presentation = require("../miniprogram/board-detail"), { decorateBoard } = require("../miniprogram/board-detail-art");
 const { boardMetadata } = require("../miniprogram/rule-discovery");

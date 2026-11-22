@@ -2,7 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./compile-miniprogram");
 const monthly = require("../miniprogram/monthly-report");
 const { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
 const root = path.resolve(__dirname, "../miniprogram");

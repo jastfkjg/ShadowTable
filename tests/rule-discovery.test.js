@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const { createRequire } = require("node:module");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("../scripts/compile-miniprogram");
 const { BOARDS } = require("../server/engine");
 const details = require("../server/board-info");
 const discovery = require("../miniprogram/rule-discovery");

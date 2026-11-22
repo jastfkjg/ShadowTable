@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("./compile-miniprogram");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/monthly-points"));
 const context = { window: {}, global: {}, console };

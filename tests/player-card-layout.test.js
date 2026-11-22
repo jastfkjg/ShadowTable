@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("../scripts/compile-miniprogram");
 const { initialPlayerCardData, playerCardMethods } = require("../miniprogram/player-card");
 const card = { id: "player-a", name: "大V", initial: "大", seat: 1,
   badges: [{ id: "points", title: "积分王者", imageUrl: "/assets/badges/points.png" }] };

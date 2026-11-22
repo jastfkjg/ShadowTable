@@ -3,10 +3,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { wxmlToJs } = require("miniprogram-compiler");
+const { wxmlToJs } = require("../scripts/compile-miniprogram");
 const { Store } = require("../server/store");
 const { completed, onlineCompleted } = require("./helpers/replay-fixtures");
-const { presentReplay, trajectory } = require("../miniprogram/replay");
+const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const root = path.resolve(__dirname, "../miniprogram");
 function fixture() {
   const store = new Store(":memory:");

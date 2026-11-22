@@ -1,7 +1,7 @@
 // Layout-only projection of the production shared dialog, not another client.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const {wxmlToJs}=require('miniprogram-compiler');
+const {wxmlToJs}=require('./compile-miniprogram');
 const {catalogue,monthlyAward}=require('../miniprogram/badges');
 const {present}=require('../miniprogram/badge-awards');
 const markup=require('../server/web/badge-award-markup');
