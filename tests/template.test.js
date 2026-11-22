@@ -653,7 +653,9 @@ test('任务牌只展示当前允许选项，先选后确认且固定操作在�
   assert.equal(byHandler(tree,'confirmChoice').attr.disabled,true);
   const scroll = nodes(tree).find(n=>n.attr?.class?.split(' ').includes('task-choice-body'));
   assert.ok(scroll);
-  assert.match(JSON.stringify(scroll), /结算后公开任务结果和汇总票数，个人出牌保密/);
+  assert.match(JSON.stringify(scroll), /个人出牌保密/);
+  assert.doesNotMatch(JSON.stringify(tree), /结算后公开任务结果|本轮任务牌 · 点击选择/);
+  assert.deepEqual(nodes(scroll).filter(n=>n.attr?.class==='quest-team-seat').map(n=>n.attr.ariaLabel), ['1号','6号','8号']);
   assert.equal(byHandler(scroll,'confirmChoice'),undefined);
   const selected = render({...data,draftChoice:'success',draftLabel:'任务成功'});
   assert.equal(byHandler(selected,'confirmChoice').attr.disabled,false);
@@ -666,6 +668,8 @@ test('任务牌只展示当前允许选项，先选后确认且固定操作在�
   }
   const evil=render({...data,actionChoices:[...data.actionChoices,{value:'fail',label:'任务失败'}]});
   assert.deepEqual(nodes(evil).filter(n=>n.attr?.bindtap==='submitChoice').map(n=>n.attr['data-value']),['success','fail']);
+  const fail=nodes(evil).find(n=>n.attr?.['data-value']==='fail');
+  assert.ok(nodes(fail).some(n=>n.attr?.src==='/assets/quest-swords-red.svg'));
   assert.equal(byHandler(render({...data,room:{...room,me:{...room.me,submitted:true}}}),'confirmChoice'),undefined);
 });
 test("WXML入口加载/错误/禁用绑定为真实布尔条件", () => {

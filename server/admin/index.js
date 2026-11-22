@@ -12,6 +12,7 @@ const { auditGroups } = require("../audit");
 const scoring = require("../scoring");
 const fun = require("../fun");
 const { RuleError, command, roomSummary } = require("../engine");
+const SESSION_AGE_SECONDS = 30 * 24 * 60 * 60;
 const digest = (s) => createHash("sha256").update(s).digest();
 const fail = (ok, message, status = 400) => {
   if (!ok) throw new RuleError(message, status);
@@ -39,7 +40,10 @@ function createAdmin({ store, origin, key, body, limit }) {
     .run(sessionBinding, store.clock());
   const cookie = (token, age) =>
     `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure ? "; Secure" : ""}`;
-  function authenticate(req) {
+  const renewSession = store.db.prepare(
+    "UPDATE admin_sessions SET expires=? WHERE hash=? AND binding=? AND expires>? RETURNING hash,expires",
+  );
+  function authenticate(req, res) {
     fail(req.headers.host === url.host, "管理平台域名不匹配", 403);
     fail(req.headers["sec-fetch-site"] !== "cross-site", "禁止跨站请求", 403);
     if (req.method !== "GET")
@@ -50,10 +54,15 @@ function createAdmin({ store, origin, key, body, limit }) {
         .map((s) => s.trim())
         .find((s) => s.startsWith(cookieName + "="))
         ?.slice(cookieName.length + 1) || "";
-    const session = store.db
-      .prepare("SELECT hash,expires FROM admin_sessions WHERE hash=? AND binding=? AND expires>?")
-      .get(digest(raw).toString("hex"), sessionBinding, store.clock());
+    const now = store.clock();
+    const session = renewSession.get(
+      now + SESSION_AGE_SECONDS * 1000,
+      digest(raw).toString("hex"),
+      sessionBinding,
+      now,
+    );
     fail(session, "请先登录管理平台", 401);
+    res.setHeader("Set-Cookie", cookie(raw, SESSION_AGE_SECONDS));
     return session;
   }
   function asset(res, file, type) {
@@ -117,7 +126,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         "/admin/companion/icon.svg": ["icon.svg", "image/svg+xml"],
       };
       if (companionAssets[path]) {
-        authenticate(req);
+        authenticate(req, res);
         const [file, type] = companionAssets[path];
         if (file === "index.html") {
           let html = readFileSync(
@@ -166,15 +175,15 @@ function createAdmin({ store, origin, key, body, limit }) {
       const token = randomBytes(32).toString("hex");
       store.db
         .prepare("INSERT INTO admin_sessions VALUES(?,?,?)")
-        .run(digest(token).toString("hex"), sessionBinding, store.clock() + 8 * 3600000);
+        .run(digest(token).toString("hex"), sessionBinding, store.clock() + SESSION_AGE_SECONDS * 1000);
       audit("login");
-      res.setHeader("Set-Cookie", cookie(token, 8 * 3600));
+      res.setHeader("Set-Cookie", cookie(token, SESSION_AGE_SECONDS));
       send(200, { ok: true });
       return true;
     }
     if (path === "/api/admin/session" && req.method === "GET") {
       try {
-        authenticate(req);
+        authenticate(req, res);
         send(200, { authenticated: true });
       } catch (error) {
         if (error.status !== 401) throw error;
@@ -182,7 +191,7 @@ function createAdmin({ store, origin, key, body, limit }) {
       }
       return true;
     }
-    const session = authenticate(req);
+    const session = authenticate(req, res);
     limit("admin:" + session.hash, 600);
     if (path === "/api/admin/feedback" && req.method === "GET") {
       send(200, playerFeedback.list(store, null, new URL(req.url, origin).searchParams));

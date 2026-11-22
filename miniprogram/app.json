@@ -2,18 +2,18 @@
   "pages": [
     "pages/lobby/lobby",
     "pages/me/me",
-    "pages/badges/badges",
     "pages/stats/stats",
     "pages/shared/shared",
     "pages/matches/matches",
     "pages/scores/scores",
     "pages/match-detail/match-detail",
     "pages/table/table",
-    "pages/settings/settings",
-    "pages/board-details/board-details",
     "pages/web-login/web-login"
   ],
   "subPackages": [
+    { "root": "pages/badges", "pages": ["badges"] },
+    { "root": "pages/settings", "pages": ["settings"] },
+    { "root": "pages/board-details", "pages": ["board-details"] },
     { "root": "pages/feedback", "pages": ["feedback", "compose", "history"] },
     {
       "root": "pages/leaderboard",

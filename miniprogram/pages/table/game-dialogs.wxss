@@ -117,6 +117,13 @@
 .process-vote .quest-choice-symbol image { width: 20px; height: 20px; }
 .process-vote .task-choice-context { margin-top: 3px; }
 .process-vote .process-sheet-fields { padding-top: 0; }
+.table-sheet-backdrop .quest-card-sheet { background: var(--bg); }
+.quest-team { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; font-size: 14px; }
+.quest-team-seat { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; border-radius: 50%; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.quest-card-sheet .identity-privacy-note { justify-content: flex-start; }
+.quest-card-sheet button.quest-choice, .quest-card-sheet button.quest-choice[disabled]:not([type]) { min-height: 58px; padding: 10px 14px; border-radius: 14px; }
+.quest-card-sheet .is-fail .quest-choice-symbol { background: rgba(239,139,132,.10); }
+.quest-card-sheet .process-sheet-footer button.primary[disabled]:not([type]) { background: #384852; color: #bfccd2; }
 .process-generic .action-choice-list, .process-action-targets { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 0; }
 .process-generic .action-choice-list button, .process-action-targets button { min-height: 48px; margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 15px; }
 .process-generic .action-team, .process-generic .private-info, .process-generic .label { font-size: 13px; line-height: 1.75; }

@@ -71,7 +71,7 @@ SQLite `room_entries` 以 `(uid, code)` 隔离个人快照、隐藏状态、备�
 
 ## 管理与正式陪测（2026-09-16）
 
-`server/admin` 提供独立 `/admin` 页面和 `/api/admin/*` 接口。仅配置 ADMIN_ORIGIN 与 ADMIN_KEY 后启用；正式环境要求 HTTPS。管理接口使用源地址检查与独立 HttpOnly Cookie 会话，不接受普通玩家 Bearer token 作为管理员凭据。当前单管理密钥模式，会话8小时有效；会话哈希、配置绑定摘要及到期时间保存在 SQLite 的 `admin_sessions`，重启保留未到期会话，退出、过期或修改管理源地址／密钥后失效。
+`server/admin` 提供独立 `/admin` 页面和 `/api/admin/*` 接口。仅配置 ADMIN_ORIGIN 与 ADMIN_KEY 后启用，正式环境要求 HTTPS。管理接口使用源地址检查与独立 HttpOnly Cookie 会话，不接受普通玩家 Bearer token 作为管理员凭据。登录时以及每次请求通过管理员身份校验时，服务端会话和浏览器 Cookie 的到期时间都会延至 30 天后。会话哈希、配置绑定摘要及到期时间保存在 SQLite 的 `admin_sessions`，重启保留未到期会话，退出、过期或修改管理源地址／密钥后失效。
 
 管理概览使用字段白名单，只有房间号、板子、人数、阶段和测试标记，不返回真人角色或行动。管理写操作要求当前 stage、房间号确认和原因，变更与审计在同一 SQLite 事务中完成。可结束、同房重开、删除房间、切换准备阶段房间的陪测标记以及清理测试账号。
 
