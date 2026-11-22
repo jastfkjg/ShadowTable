@@ -2051,7 +2051,7 @@ function roomListItems(rooms) {
     history.forEach(function (entry, i) {
       var source = room.history[i];
       entry.category = publicHistory.category(source);
-      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
+      entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
       var time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");

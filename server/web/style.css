@@ -1304,11 +1304,11 @@ button.history-more:focus-visible { outline: 2px solid var(--accent); outline-of
 .quest-round::before { content: ""; position: absolute; left: 0; right: 0; top: 19px; height: 2px; background: #87979c; }
 .quest-round:nth-child(5n + 1)::before { left: 50%; }
 .quest-round:nth-child(5n)::before, .quest-round:last-child::before { right: 50%; }
-.quest-disc { position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; box-sizing: border-box; color: #10272a; }
-.quest-disc.success { background: #9ed8af; }
-.quest-disc.failure { background: #e68370; }
+.quest-disc { --quest-color: #9ed8af; position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; box-sizing: border-box; color: #10272a; }
+.quest-disc.failure { --quest-color: #e68370; }
+.quest-disc.success, .quest-disc.failure { background: var(--quest-color); }
 .quest-disc.pending { border: 2px solid #8d9da3; background: var(--surface); }
-.quest-disc.protected { outline: 2px solid #9ed8af; outline-offset: 3px; }
+.quest-disc.protected { outline: 2px solid var(--quest-color); outline-offset: 3px; }
 .quest-disc.success .quest-mark { width: 13px; height: 7px; border: solid currentColor; border-width: 0 0 2px 2px; transform: translateY(-2px) rotate(-45deg); }
 .quest-disc.failure .quest-mark::before, .quest-disc.failure .quest-mark::after { content: ""; position: absolute; top: 50%; left: 50%; width: 15px; height: 2px; background: currentColor; transform: translate(-50%, -50%) rotate(45deg); }
 .quest-disc.failure .quest-mark::after { transform: translate(-50%, -50%) rotate(-45deg); }

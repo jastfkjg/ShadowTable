@@ -1926,12 +1926,6 @@ button.player-badge-button { display: inline-flex; vertical-align: middle; width
 .player-badge-button image { width: 44px; height: 44px; }
 /* Permanent badge art has more transparent padding than monthly badge art. */
 .badge-pressed { opacity: .7; }
-.player-badge-detail { padding: 20rpx 0; border-top: 1rpx solid var(--border); }
-.player-badge-detail-heading { display: flex; align-items: center; gap: 16rpx; font-weight: 600; }
-.player-badge-detail-heading image { width: 120rpx; height: 120rpx; flex-shrink: 0; }
-.player-badge-detail-heading text { flex: 1; }
-button.player-badge-detail-close { width: 48px; height: 48px; min-height: 48px; padding: 0; margin: 0; font-size: 24px; }
-.player-badge-detail .muted { margin-top: 12rpx; }
 .badge-manager { padding: 16rpx 0 24rpx; }
 .badge-manager-row { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 0; border-bottom: 1rpx solid var(--border); }
 .badge-manager-image { flex-shrink: 0; width: 112rpx; height: 112rpx; }

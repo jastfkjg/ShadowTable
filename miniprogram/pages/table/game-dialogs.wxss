@@ -25,13 +25,13 @@
 .process-selection-summary { margin: 0 0 10px; }
 
 /* Two main metrics, one supporting sentence; faction rates are data, not progress. */
-.player-card-metrics { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 0 0 15px; }
+.player-card-metrics { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 0 0 8px; }
 .player-card-metric { flex: 1; min-width: 0; }
 .player-card-metric > text { display: block; margin-bottom: 5px; font-size: 12px; line-height: 18px; }
 .player-card-score, .player-card-rate { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; line-height: 1.25; overflow-wrap: anywhere; }
-.player-card-score > text:first-child { min-width: 0; font-size: 36px; font-weight: 600; color: var(--accent); }
+.player-card-score > text:first-child { min-width: 0; font-size: 32px; font-weight: 600; color: var(--accent); }
 .player-card-score > text.is-long-score { font-size: 22px; }
-.player-card-rate > text:first-child { min-width: 0; font-size: 36px; font-weight: 600; }
+.player-card-rate > text:first-child { min-width: 0; font-size: 32px; font-weight: 600; }
 .player-card-unit { flex-shrink: 0; font-size: 13px; font-weight: 400; color: var(--muted); }
 .player-card-total-rate { text-align: right; }
 .player-card-rate { justify-content: flex-end; }
@@ -204,7 +204,6 @@
   .process-sheet-fields, .process-sheet-footer, .process-skill .skill-footer { padding-left: 14px; padding-right: 14px; }
   .player-card-metrics { gap: 12px; }
   .player-card-score > text.is-long-score { font-size: 20px; }
-  .player-card-rate > text:first-child { font-size: 34px; }
   .player-card-record-line { gap: 3px 7px; font-size: 12px; }
   .process-skill .skill-target-grid, .process-team-grid { gap: 6px; }
   .process-skill button.skill-option, .process-tool .process-team-grid button.tool-seat-option { min-height: 64px; }

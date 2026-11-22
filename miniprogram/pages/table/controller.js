@@ -205,7 +205,6 @@ function toolHistory(h, key) {
       key,
       text: (h.success ? "任务成功" : "任务失败"),
       questResult: h.success ? "success" : "failure",
-      teamLabel: h.team.join("、") + " 号",
       cards: Object.entries(
         h.counts || { success: h.team.length - h.fails, fail: h.fails },
       )
@@ -273,6 +272,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     roomNavTitle: "",
     ...initialPlayerCardData,
     latestResult: null,
+    questTickets: null,
     questReveal: null,
     processBodyHeight: 0,
     ...publicHistory.initialData(),
@@ -1006,6 +1006,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      if (entry.questResult && source.team?.length) entry.teamLabel = source.team.join("、") + " 号";
       if (source.kind === "skillResult" && Array.isArray(source.eliminated) && Array.isArray(source.redrawn) && Array.isArray(source.restored) && Array.isArray(source.out)) {
         entry.historyText = "技能结算";
         entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
@@ -1016,7 +1017,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
-      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
+      entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
     });
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     const latestResult = history.filter((entry) =>
@@ -1024,13 +1025,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       (room.history[entry.key].kind === "variant" && (room.history[entry.key].number || room.history[entry.key].resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(room.history[entry.key].text)))
     ).pop() || null;
     const previousReveal = this.data.questReveal;
+    const questTickets = questBallots.forResult(room, latestResult);
     const questReveal = this.foreground && !this.skipQuestCatchup
-      ? questBallots.forResult(room, latestResult, this.data.room, previousReveal) : null;
+      ? questBallots.reveal(room, questTickets, this.data.room, previousReveal) : null;
     if (this.foreground) this.skipQuestCatchup = false;
     if (questReveal !== previousReveal) clearTimeout(this.questRevealTimer);
     this.pendingQuestHistory = questReveal ? history : null;
     const historyUpdate = tableHistoryView(this.data, room,
-      questReveal ? history.filter(entry => entry.key < questReveal.key) : history);
+      questReveal ? history.filter(entry => entry.key < questTickets.key) : history);
     const honors = honorPresentation.present(room.honors, api.assetUrl, this.honorAvatarFailures || new Set());
     const honorState = honorPresentation.sync(this.data, honors, this.data.historyOpen || this.data.playerCard || this.data.resultDialog || !this.foreground);
     const identityProfileUpdate = {};
@@ -1061,7 +1063,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         index, completed: index < room.operationProgress.completed,
       })),
       ...historyUpdate,
-      latestResult, questReveal,
+      latestResult, questTickets, questReveal,
       notice:
         this.data.notice === "请求较多，冷却后会自动刷新"
           ? ""
@@ -1149,7 +1151,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.questRevealTimer = setTimeout(() => {
       const reveal = this.data.questReveal;
       if (!this.alive || !this.foreground || reveal?.id !== id) return;
-      const total = reveal.cards.length;
+      const total = this.data.questTickets.cards.length;
       if (reveal.revealed === total) return this.finishQuestReveal();
       const revealed = reveal.revealed + 1;
       this.setData({ questReveal: { ...reveal, revealed } });
@@ -1186,6 +1188,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatReadyCount: 0,
       history: [],
       latestResult: null,
+      questTickets: null,
       questReveal: null,
       selected: [],
       code: "",

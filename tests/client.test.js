@@ -1271,7 +1271,7 @@ test("小程序经HTTP发身份后自由发起任务、投票、刀梅林，并�
     assert.equal(ps[2].data.room.needsSubmission, false);
     await host.refresh();
     assert.equal(host.data.room.phase, "tools");
-    assert.equal(host.data.questReveal.cards.length, 2);
+    assert.equal(host.data.questTickets.cards.length, 2);
     host.finishQuestReveal();
     assert.ok(host.data.history.at(-1).text.includes("任务成功"));
     assert.equal(host.data.latestResult.text, "任务成功");
@@ -1829,27 +1829,28 @@ test("任务票按公开票数逐张翻，结尾停留后同步公布结果、�
   room.phase = "tools"; room.stage = "q-done"; room.team = [];
   await p.refresh();
   assert.equal(p.data.questReveal.revealed, 0);
-  assert.equal(p.data.questReveal.cards.filter(c => c.kind === "fail").length, 1);
+  const tickets = structuredClone(p.data.questTickets);
+  assert.equal(p.data.questTickets.cards.filter(c => c.kind === "fail").length, 1);
   assert.equal(p.data.historyLatest, null);
   assert.equal(p.data.questTimeline.length, 0);
   assert.ok(p.data.questRounds.every(round => round.result === "pending"));
   p.showLatestRecord();
   assert.equal(p.data.visibleHistory.length, 0);
   p.closeHistory();
-  t.mock.timers.tick(699);
+  t.mock.timers.tick(999);
   assert.equal(p.data.questReveal.revealed, 0);
   t.mock.timers.tick(1);
   await p.refresh();
   assert.equal(p.data.questReveal.revealed, 1);
   assert.equal(p.data.questReveal.turnMs, 520);
   for (let i = 2; i <= 5; i++) {
-    t.mock.timers.tick(919);
+    t.mock.timers.tick(1319);
     assert.equal(p.data.questReveal.revealed, i - 1);
     t.mock.timers.tick(1);
     assert.equal(p.data.questReveal.revealed, i);
     assert.equal(p.data.history.length, 0);
   }
-  t.mock.timers.tick(1719);
+  t.mock.timers.tick(2519);
   assert.ok(p.data.questReveal);
   t.mock.timers.tick(1);
   assert.equal(p.data.questReveal, null);
@@ -1858,8 +1859,11 @@ test("任务票按公开票数逐张翻，结尾停留后同步公布结果、�
   assert.equal(p.data.questRounds[0].result, "success");
   assert.equal(p.data.questRounds[0].protectedRound, true);
   assert.equal(p.data.historyUnreadCount, 1);
+  assert.deepEqual(p.data.questTickets, tickets);
+  assert.equal(p.data.latestResult.teamLabel, "1、3、6、7、11 号");
   await p.refresh();
   assert.equal(p.data.questReveal, null);
+  assert.deepEqual(p.data.questTickets, tickets);
 });
 
 test("任务翻票只呈现新结算；跳过、切后台和下一次操作均能打断，混沌票不关联座位", async t => {
@@ -1876,6 +1880,7 @@ test("任务翻票只呈现新结算；跳过、切后台和下一次操作均�
   addResult(1);
   await p.refresh();
   assert.equal(p.data.questReveal, null);
+  assert.equal(p.data.questTickets.cards.length, 4);
   const other = page({ request: async () => structuredClone(room) });
   other.roomCode = room.code;
   await other.refresh();
@@ -1883,11 +1888,12 @@ test("任务翻票只呈现新结算；跳过、切后台和下一次操作均�
   await p.refresh();
   room.me.seat = 2; room.history[1].team.reverse();
   await other.refresh();
-  assert.deepEqual(p.data.questReveal.cards, other.data.questReveal.cards);
-  assert.deepEqual(p.data.questReveal.cards.map(c => c.kind).sort(), ["fail", "magic", "success", "thiefFail"]);
-  assert.ok(p.data.questReveal.cards.every(c => !("seat" in c)));
+  assert.deepEqual(p.data.questTickets.cards, other.data.questTickets.cards);
+  assert.deepEqual(p.data.questTickets.cards.map(c => c.kind).sort(), ["fail", "magic", "success", "thiefFail"]);
+  assert.ok(p.data.questTickets.cards.every(c => !("seat" in c)));
   p.finishQuestReveal();
   assert.equal(p.data.questReveal, null);
+  assert.deepEqual(p.data.questTickets.cards, other.data.questTickets.cards);
   assert.equal(p.data.history.length, 2);
   other.onHide();
   addResult(3);
@@ -1901,6 +1907,7 @@ test("任务翻票只呈现新结算；跳过、切后台和下一次操作均�
   await p.refresh();
   t.mock.timers.tick(3000);
   assert.equal(p.data.questReveal, null);
+  assert.equal(p.data.questTickets, null);
   assert.equal(p.data.questTimeline.length, 3);
 });
 

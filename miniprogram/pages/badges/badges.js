@@ -1,7 +1,7 @@
 const dialog = require("../../dialog");
 const api = require('../../api');
 const { presentCollection, rules } = require('../../badges');
-const { initialBadgeManager, badgeManagerMethods } = require('../../badge-manager');
+const { initialBadgeManager, badgeManagerMethods } = require('./badge-manager');
 const { backToMe } = require('../../profile');
 Page({
   data: { ...initialBadgeManager, badgeFilter: 'all', selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0, badgePicker: '', badgePickerSlot: null, badgePickerHeight: 0 },

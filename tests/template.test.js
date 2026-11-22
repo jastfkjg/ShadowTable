@@ -1524,7 +1524,7 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
 test('任务和投票收起仅显示摘要，展开后完整展示队伍票数，所有记录保留时间与箭头列', () => {
   const historyUI = require('../miniprogram/public-history');
   const history = [
-    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }] },
     { key: 1, category: 'vote', text: '投票通过', timeLabel: '15:51', teamLabel: '10、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '10、12 号' }] },
     { key: 2, category: 'other', text: '本轮不转换', timeLabel: '15:52' },
   ];
@@ -1549,7 +1549,8 @@ test('任务和投票收起仅显示摘要，展开后完整展示队伍票数�
     assert.ok(!nodes(summary).some(n => ['public-history-team', 'public-history-counts'].includes(n.attr?.class)));
     assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-team'));
     assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-counts'));
-    assert.match(JSON.stringify(details), key === 0 ? /至少 1 张失败票才失败/ : /2票赞成/);
+    assert.match(JSON.stringify(details), key === 0 ? /成功 3 张/ : /2票赞成/);
+    assert.doesNotMatch(JSON.stringify(details), /失败票才失败/);
     Object.assign(state, historyUI.toggleRow(state, key));
     assert.ok(!nodes(records(render(state)).find(n => n.attr.id === `history-record-${key}`)).some(n => n.attr?.class === 'public-history-details'));
   }
@@ -1595,28 +1596,35 @@ test("动态区仅等待及结束时显示结果，操作中提交前后均隐�
   assert.ok(!nodes(empty).some(n => n.attr?.class === "latest-result"));
 });
 
-test("最近结果内的任务票只展示已经翻开的正面，跳过后恢复原结果", () => {
+test("翻票结束后原位保留匿名票面，进度行换成红绿结论和任务成员", () => {
   const room = { phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: null } };
-  const latestResult = { key: 0, questResult: "success", text: "任务成功", detail: "1、3、6、7、11号 · 1张失败票" };
+  const latestResult = { key: 0, questResult: "success", teamLabel: "1、3、6、7、11 号" };
   const cards = ["success", "success", "magic", "thiefFail", "fail"].map((kind, index) => ({
     index, kind, label: kind === "magic" ? "魔法票" : "任务票",
   }));
-  const panel = questReveal => nodes(renderTable({ ...base, room, latestResult, questReveal })).find(n => n.attr?.class === "latest-result");
-  const active = panel({ cards, columns: 5, turnMs: 520, revealed: 3 });
+  const questTickets = { cards, columns: 5 };
+  const panel = (questReveal, result = latestResult) => nodes(renderTable({ ...base, room, latestResult: result, questTickets, questReveal })).find(n => n.attr?.class === "latest-result");
+  const active = panel({ turnMs: 520, revealed: 3 });
   const tickets = nodes(active).filter(n => n.attr?.class === "quest-ticket");
   assert.equal(tickets.length, 5);
   assert.match(JSON.stringify(tickets[2]), /魔法票/);
   assert.match(JSON.stringify(tickets[3]), /未翻开/);
-  assert.doesNotMatch(JSON.stringify(active), /thiefFail\.jpg|fail\.jpg|任务成功|11号/);
-  const allUp = panel({ cards, columns: 5, turnMs: 520, revealed: 5 });
+  assert.doesNotMatch(JSON.stringify(active), /thiefFail\.jpg|fail\.jpg|任务成功|成员/);
+  const allUp = panel({ turnMs: 520, revealed: 5 });
+  assert.doesNotMatch(JSON.stringify(allUp), /任务成功|成员/);
   assert.deepEqual(nodes(allUp).filter(n => n.attr?.class === "quest-ticket-front").map(n => n.attr.src),
     cards.map(card => "/assets/quest-tickets/" + card.kind + ".jpg"));
   assert.equal(nodes(active).filter(n => n.attr?.class === "quest-ticket-turn is-up").length, 3);
   assert.ok(byHandler(active, "finishQuestReveal"));
-  const done = panel(null);
-  assert.match(JSON.stringify(done), /任务成功/);
-  assert.match(JSON.stringify(done), /1张失败票/);
-  assert.ok(!byHandler(done, "finishQuestReveal"));
+  for (const [tone, verdict] of [["success", "任务成功"], ["failure", "任务失败"]]) {
+    const done = panel(null, { ...latestResult, questResult: tone });
+    const elements = nodes(done);
+    assert.deepEqual(elements.filter(n => n.attr?.class === "quest-ticket-front").map(n => n.attr.src),
+      cards.map(card => "/assets/quest-tickets/" + card.kind + ".jpg"));
+    assert.match(JSON.stringify(elements.find(n => n.attr?.class === "quest-verdict " + tone).children), new RegExp(verdict));
+    assert.match(JSON.stringify(done), /成员 1、3、6、7、11 号/);
+    assert.doesNotMatch(JSON.stringify(done), /quest-result-icon|已翻|跳过|未翻开/);
+  }
 });
 
 test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限制", () => {

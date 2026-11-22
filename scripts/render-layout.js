@@ -558,7 +558,7 @@ scenes.publicHistoryHost = { ...historyBase,room: {...historyBase.room,phase:'te
 const previewHistoryRows = [
   { ...historyRows[0], timeLabel: '15:49' },
   { ...historyRows[1], timeLabel: '15:49' },
-  { key: 2, category: 'quest', text: '任务成功', resultTone: 'success', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+  { key: 2, category: 'quest', text: '任务成功', resultTone: 'success', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }] },
   { key: 3, category: 'skill', text: '技能结算', timeLabel: '15:50', detail: '本轮技能已结算' },
   { key: 4, category: 'other', text: '本轮不转换', timeLabel: '15:51' },
   { key: 5, category: 'other', text: '仙女查验已完成', timeLabel: '15:52' },
