@@ -123,9 +123,13 @@
 </template>
 <template name="tableFinalResult">
   <view class="final-result" role="status" aria-label="本局最终结果">
-    <text class="kicker {{room.replayId?'final-result-replay-kicker':''}}">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
-    <button wx:if="{{room.replayId}}" class="final-result-replay" bindtap="viewReplay" hover-class="none" disabled="{{hasPendingRequest || busy}}" aria-label="查看本局复盘"><view class="final-result-replay-control"><image class="final-result-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
-    <view class="final-result-title">{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view>
+    <view class="final-result-heading">
+      <view class="final-result-outcome">
+        <text class="kicker">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
+        <view class="final-result-title">{{winnerLabel || ((room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负')}}</view>
+      </view>
+      <button wx:if="{{room.replayId}}" class="final-result-replay" bindtap="viewReplay" hover-class="none" disabled="{{hasPendingRequest || busy}}" aria-label="查看本局复盘"><view class="final-result-replay-control"><image class="final-result-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
+    </view>
     <view wx:if="{{room.result.reason && room.result.reason!=='房主已登记线下结果，战绩已归档。' && room.result.reason!=='房主已登记线下胜负，战绩已归档。'}}" class="final-result-detail">{{room.result.reason}}</view>
     <view wx:if="{{room.result.source}}" class="small muted final-result-source">{{room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</view>
     <view wx:if="{{room.recordNotice}}" class="small muted final-result-source">{{room.recordNotice}}</view>
@@ -133,10 +137,12 @@
       <block wx:if="{{room.myScore}}">
         <block wx:if="{{room.myScore.status==='scored'}}">
           <view class="final-result-score-heading">
-            <view class="metric-value accent">本局 {{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</view>
-            <button class="text-button final-result-score-link" hover-class="none" bindtap="viewScoreRecord">查看积分明细 ›</button>
+            <view class="final-result-points"><text>我的积分</text><text class="metric-value accent">{{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</text></view>
+            <button class="text-button" hover-class="none" bindtap="viewScoreRecord" aria-label="查看积分明细">积分明细 ›</button>
           </view>
-          <view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view>
+          <block wx:if="{{room.myScore.breakdown.length!==1 || room.myScore.breakdown[0].label!==winnerLabel || room.myScore.breakdown[0].points!==room.myScore.total}}">
+            <view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view>
+          </block>
         </block>
         <view wx:else class="small muted">不计积分 · {{room.myScore.reason}}</view>
       </block>
@@ -145,13 +151,15 @@
     <view wx:if="{{room.myFun.hasEffectiveHighlights && room.phase==='ended'}}" class="final-result-fun">
       <view class="final-result-fun-heading">
         <view class="label">我的本局趣味记录</view>
-        <button class="text-button final-result-fun-link" hover-class="none" bindtap="viewFunRecord">查看趣味统计 ›</button>
+        <button class="text-button" hover-class="none" bindtap="viewFunRecord">查看趣味统计 ›</button>
       </view>
       <view wx:for="{{room.myFun.highlights}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.count}}{{item.unit}}</text></view>
       <view wx:if="{{room.myFun.reason}}" class="small muted final-result-source">{{room.myFun.reason}}</view>
     </view>
-    <template is="honorResults" data="{{honors,busy:busy || hasPendingRequest || !network}}" />
-    <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{honors.status==='not_started' || honors.status==='open'?'secondary':'primary'}}" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
+  </view>
+  <view class="postgame-actions">
+    <template is="honorResults" data="{{honors,honorPendingExpanded,busy:busy || hasPendingRequest || !network}}" />
+    <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{honors.status==='not_started'?'secondary':'primary'}}" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
@@ -555,7 +563,7 @@
     </block>
     <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result && !questReveal ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?'result-first':'operation-first'}}">
       <template wx:if="{{!room.result || questTickets}}" is="tableResult" data="{{room, latestResult, questReveal, questTickets, shown:questReveal?questReveal.revealed:questTickets.cards.length}}" />
-      <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, network, hasPendingRequest, busy}}" />
+      <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, honorPendingExpanded, network, hasPendingRequest, busy, winnerLabel:room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':''}}" />
       <template wx:if="{{!room.result}}" is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
@@ -601,10 +609,13 @@
     </view>
     <view class="task-progress">
       <view wx:if="{{questRounds.length && room.phase!=='lobby'}}" class="quest-track">
-        <button wx:for="{{questRounds}}" wx:key="number" class="quest-round" hover-class="none" bindtap="showQuestRecord" disabled="{{item.key===null}}" data-key="{{item.key}}" aria-label="{{item.label}}">
-          <view aria-hidden="true" class="quest-disc {{item.result}} {{item.protectedRound?'protected':''}}"><view wx:if="{{item.result!=='pending'}}" class="quest-mark" /></view>
-          <text aria-hidden="true">{{item.number}}</text>
-        </button>
+        <view wx:if="{{room.result && !questReveal}}" class="quest-track-title">任务记录</view>
+        <view class="quest-rounds">
+          <button wx:for="{{questRounds}}" wx:key="number" class="quest-round" hover-class="none" bindtap="showQuestRecord" disabled="{{item.key===null}}" data-key="{{item.key}}" aria-label="{{item.label}}">
+            <view aria-hidden="true" class="quest-disc {{item.result}} {{item.protectedRound?'protected':''}}"><view wx:if="{{item.result!=='pending'}}" class="quest-mark" /></view>
+            <text aria-hidden="true">{{item.number}}</text>
+          </button>
+        </view>
       </view>
       <view wx:if="{{room.phase!=='lobby' && room.team.length}}" class="seat-team-summary"><view class="seat-team-dot" aria-hidden="true" /><text class="seat-team-label">任务队伍 ·</text><text class="seat-team-seats">{{teamText}}号</text></view>
       <view class="section-title history-heading">

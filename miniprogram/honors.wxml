@@ -5,13 +5,30 @@
       <button wx:if="{{honors.canStart}}" class="primary honor-primary" bindtap="startHonors" disabled="{{busy}}" hover-class="none">发起 MVP / SVP 投票</button>
       <view wx:else class="honor-help">等待房主发起票选</view>
     </block>
+    <block wx:elif="{{honors.status==='open' && honors.canClose}}">
+      <view class="honor-heading">本场最佳 · 投票中</view>
+      <view class="honor-help">匿名票选</view>
+      <view class="honor-host-count"><text>已投票</text><text>{{honors.completed}} / {{honors.total}} 人</text></view>
+      <view class="honor-host-track" aria-hidden="true"><view class="honor-host-fill" style="width:{{honors.total ? 100 * honors.completed / honors.total : 0}}%"></view></view>
+      <button wx:if="{{honors.pendingPlayers.length}}" class="disclosure-button honor-host-row" bindtap="toggleHonorPending" aria-expanded="{{honorPendingExpanded}}" hover-class="none">
+        <text>未投票 {{honors.pendingPlayers.length}} 人</text>
+        <text class="honor-host-link">{{honorPendingExpanded?'收起名单':'查看名单'}} <text aria-hidden="true">{{honorPendingExpanded?'⌃':'›'}}</text></text>
+      </button>
+      <view wx:if="{{honorPendingExpanded && honors.pendingPlayers.length}}" class="honor-host-roster">
+        <view wx:for="{{honors.pendingPlayers}}" wx:key="seat" class="honor-host-player"><text>{{item.seat}}号</text><text>{{item.name}}</text></view>
+      </view>
+      <button wx:if="{{honors.canVote}}" class="honor-host-row honor-host-ballot" bindtap="openHonors" disabled="{{busy}}" hover-class="none">
+        <view><text wx:if="{{honors.ballot}}" class="honor-host-check" aria-hidden="true">✓</text>{{honors.ballot?'我的选票已提交':'我的选票待提交'}}</view>
+        <text class="honor-host-link">{{honors.ballot?'修改投票':'去投票'}}</text>
+      </button>
+      <view class="honor-footnote">至少 {{honors.required}} 人投票才颁奖</view>
+      <button class="secondary honor-host-close" bindtap="closeHonors" disabled="{{busy}}" hover-class="none">结束投票并结算</button>
+    </block>
     <block wx:elif="{{honors.status==='open'}}">
       <view class="honor-heading">本场最佳 · 投票中</view>
       <view class="honor-progress"><text>{{honors.completed}} / {{honors.total}} 人已投票</text></view>
-      <view wx:if="{{honors.canClose && honors.pendingLabel}}" class="honor-help honor-pending">未投票：{{honors.pendingLabel}}</view>
       <button wx:if="{{honors.canVote}}" class="primary honor-primary" bindtap="openHonors" disabled="{{busy}}" hover-class="none">{{honors.ballot?'已提交 · 修改投票':'投出我的 MVP / SVP'}}</button>
       <view class="honor-footnote">至少 {{honors.required}} 人完成投票才颁奖 · 匿名票选</view>
-      <button wx:if="{{honors.canClose}}" class="text-button honor-close-poll" bindtap="closeHonors" disabled="{{busy}}" hover-class="none">结束投票并结算</button>
     </block>
     <block wx:elif="{{honors.status==='settled'}}">
       <view class="honor-result-heading"><view class="honor-heading">本场最佳</view><view class="honor-help">{{honors.completed}} / {{honors.total}} 人票选</view></view>

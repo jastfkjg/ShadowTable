@@ -337,7 +337,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     boardIndex: 0,
     capacityIndex: 1,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
-    honors: null, honorDialog: false, honorMatchId: "", honorDismissed: "", honorDraft: { mvp: null, svp: null }, honorGroups: [], honorReady: false,
+    honors: null, honorPendingExpanded: false, honorDialog: false, honorMatchId: "", honorDismissed: "", honorDraft: { mvp: null, svp: null }, honorGroups: [], honorReady: false,
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
@@ -1051,6 +1051,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
       ...privacyUpdate, ...identityProfileUpdate, honors, ...honorState,
+      honorPendingExpanded: this.data.honorPendingExpanded && honors?.status === "open" && !!honors.canClose
+        && !!honors.pendingPlayers?.length && honors.matchId === this.data.honorMatchId,
       ...(stageChanged ? { resultDialog: false } : {}),
       ...(room.phase === "quest" && this.data.toolType ? { toolType: "" } : {}),
       ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
@@ -2305,6 +2307,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   startHonors() {
     if (!this.data.honors?.canStart) return;
     return this.cmd("honorStart", { matchId: this.data.honors.matchId });
+  },
+  toggleHonorPending() {
+    const honors = this.data.honors;
+    if (honors?.status === "open" && honors.canClose && honors.pendingPlayers?.length)
+      this.setData({ honorPendingExpanded: !this.data.honorPendingExpanded });
   },
   openHonors() {
     const h = this.data.honors;

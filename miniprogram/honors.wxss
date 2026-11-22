@@ -12,6 +12,18 @@
 .honor-progress { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
 .honor-pending { margin-top: 6px; overflow-wrap: anywhere; word-break: break-all; }
 .honor-close-poll { min-height: 44px; font-size: 13px; }
+.honor-host-count { display: flex; justify-content: space-between; margin-top: 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.honor-host-track { height: 6px; margin: 6px 0 4px; border-radius: 6px; background: rgba(177,191,198,.25); overflow: hidden; }
+.honor-host-fill { height: 100%; border-radius: inherit; background: var(--good); }
+.honor-result button.honor-host-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; margin: 0; padding: 6px 0; border-radius: 0; font-size: 14px; text-align: left; }
+.honor-host-link { flex-shrink: 0; color: var(--accent); font-size: 13px; font-weight: 500; }
+.honor-host-roster { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px 12px; padding: 0 0 12px; font-size: 13px; }
+.honor-host-player { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.honor-host-player > text:first-child { flex-shrink: 0; color: var(--muted); }
+.honor-host-player > text:last-child { overflow-wrap: anywhere; word-break: break-all; }
+.honor-result button.honor-host-ballot { border-block: 1px solid rgba(177,191,198,.24); }
+.honor-host-check { margin-right: 7px; color: var(--good); font-weight: 600; }
+.honor-result button.honor-host-close { min-height: 44px; margin: 10px 0 0; font-size: 14px; }
 .honor-award, .honor-ballot-group { --honor-color: #e5c68b; }
 .honor-ballot-group { margin-top: 20px; }
 .honor-award { padding: 10px; min-width: 0; background: var(--surface); border: 1px solid rgba(229,198,139,.24); border-radius: 10px; }

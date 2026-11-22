@@ -2612,10 +2612,17 @@ test('最佳玩家弹窗只自动提示一次，可修改本人选票，刷新�
   p.chooseHonor({currentTarget:{dataset:{key:'mvp',seat:2}}});p.chooseHonor({currentTarget:{dataset:{key:'svp',seat:5}}});
   await p.refresh();assert.equal(p.data.honorReady,true);assert.equal(p.data.honorDraft.mvp,2);
   p.dismissHonors();await p.refresh();assert.equal(p.data.honorDialog,false);
+  assert.equal(p.data.honorPendingExpanded,false);
+  p.toggleHonorPending();
+  room.honors.pendingPlayers=[{seat:5,name:'晚风'}];
+  await p.refresh();assert.equal(p.data.honorPendingExpanded,true);assert.equal(p.data.honors.pendingLabel,'5号 晚风');
+  p.toggleHonorPending();assert.equal(p.data.honorPendingExpanded,false);
+  p.toggleHonorPending();
   room.honors.ballot={mvp:2,svp:5};await p.refresh();p.openHonors();assert.equal(p.data.honorReady,true);
   let sent;p.cmd=(type,data)=>sent={type,data};p.submitHonors();assert.equal(sent.type,'honorVote');assert.equal(sent.data.matchId,'match-1');assert.equal(sent.data.mvp,2);
   room.honors={matchId:'match-1',status:'settled',mvp:[{seat:2,name:'林间',votes:3}],svp:[{seat:5,name:'晚风',votes:3}]};
   await p.refresh();assert.equal(p.data.honorDialog,false);assert.equal(p.data.honors.awards[0].players[0].votes,3);
+  assert.equal(p.data.honorPendingExpanded,false);
 });
 
 test('回避角色先本地选择再确认，关闭和切后台清空私密草稿并丢弃迟到响应', async () => {

@@ -1180,15 +1180,6 @@ button.room-open {
 .faction-third {
   color: var(--third);
 }
-.result-good {
-  background: #263c38;
-}
-.result-evil {
-  background: #3a2a2c;
-}
-.result-neutral {
-  background: var(--surface);
-}
 .history-vote-count.approve,
 .history-vote-count.approve .history-count {
   color: var(--good);
@@ -1462,9 +1453,7 @@ button.history-toggle { width: auto; min-height: 88rpx; padding: 16rpx 8rpx; mar
   .history-row-focused { animation-timing-function: steps(1, end); }
 }
 
-/* Shared stage/result panel. Order changes only with the game phase. */
 button.home-entry,
-/* Shared stage/result panel. Order changes only with the game phase. */
 button.home-entry[disabled]:not([type]) { background: transparent; padding: 16rpx; min-height: 88rpx; }
 .brand { padding-bottom: 24rpx; }
 .room-summary { flex-wrap: wrap; margin-top: 8rpx; }
@@ -1489,30 +1478,36 @@ button.identity-hint-close { flex-shrink: 0; width: 88rpx; min-height: 88rpx; ma
 .operation-first .phase-name { font-size: 32rpx; }
 .table-dynamics.is-lobby { border: 0; padding: 0; background: transparent; }
 .table-dynamics + .task-progress { margin-top: 32rpx; }
-.table-dynamics.is-final { padding: 32rpx; }
-.table-dynamics.is-final.result-good { background: #263c38; }
-.table-dynamics.is-final.result-evil { background: #3a2a2c; }
-.final-result { position: relative; }
-.final-result-replay-kicker { display: inline-block; max-width: calc(100% - 240rpx); }
+.table-dynamics.is-final { --result-surface: var(--surface); display: flex; flex-direction: column; gap: 12px; background: transparent; }
+.table-dynamics.result-good { --result-surface: #263c38; }
+.table-dynamics.result-evil { --result-surface: #3a2a2c; }
+.final-result, .postgame-actions { padding: 16px; border-radius: 18px; background: var(--result-surface); }
+.final-result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.final-result-outcome { min-width: 0; }
 button.final-result-replay,
-button.final-result-replay[disabled]:not([type]) { position: absolute; top: -6rpx; right: 0; width: auto; min-height: 48px; margin: 0; padding: 0; border-radius: 0; overflow: visible; color: var(--accent); font-size: 26rpx; font-weight: 500; background: transparent; }
+button.final-result-replay[disabled]:not([type]) { flex-shrink: 0; width: auto; min-height: 44px; margin: -4px 0 0; padding: 0; border-radius: 0; overflow: visible; color: var(--accent); font-size: 26rpx; font-weight: 500; background: transparent; }
 /* The inner control owns the round outline; keep it at least one CSS pixel. */
 .final-result-replay-control { display: flex; align-items: center; justify-content: center; gap: 12rpx; box-sizing: border-box; min-height: 72rpx; padding: 0 20rpx; border: 1px solid var(--accent); border-radius: 14rpx; background: rgba(229,198,139,.04); white-space: nowrap; }
 .final-result-replay-icon { display: block; width: 34rpx; height: 34rpx; flex-shrink: 0; }
 button.final-result-replay:not([disabled]):active .final-result-replay-control { background: rgba(229,198,139,.12); }
-.final-result-title { margin: 20rpx 0; font-size: 48rpx; font-weight: 700; line-height: 1.4; }
-.final-result-detail { overflow-wrap: anywhere; }
+.final-result-title { margin-top: 6px; font-size: 48rpx; font-weight: 700; line-height: 1.4; }
+.final-result-detail { margin-top: 8px; overflow-wrap: anywhere; }
 .final-result-source { margin-top: 8rpx; }
-.final-result-score, .final-result-fun { margin-top: 24rpx; padding-top: 24rpx; border-top: 2rpx solid var(--border); }
-.final-result-score .metric-value { font-size: 36rpx; }
+.final-result-score { margin-top: 12px; }
+.final-result-fun { margin-top: 12px; padding-top: 6px; border-top: 1px solid rgba(177,191,198,.24); }
+.final-result-points { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; min-width: 0; font-weight: 600; }
+.final-result-score .metric-value { font-size: 40rpx; }
 .final-result-score-heading, .final-result-fun-heading { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
 .final-result-score-heading .metric-value { min-width: 0; overflow-wrap: anywhere; }
 .final-result-fun-heading .label { min-width: 0; margin: 0; font-size: 28rpx; }
-button.final-result-score-link,
-button.final-result-fun-link,
-button.final-result-score-link[disabled]:not([type]),
-button.final-result-fun-link[disabled]:not([type]) { flex-shrink: 0; width: auto; min-height: 44px; margin: 0; padding: 8rpx 0; font-size: 24rpx; white-space: nowrap; }
-.final-result-waiting { margin-top: 24rpx; }
+.final-result button.text-button { flex-shrink: 0; width: auto; min-height: 44px; margin: 0; padding: 8rpx 0; font-size: 24rpx; white-space: nowrap; }
+.final-result .score-award > text:last-child { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.postgame-actions { display: flex; flex-direction: column; gap: 10px; }
+.postgame-actions .honor-result { margin: 0; padding: 0; border: 0; }
+.postgame-actions .honor-primary { margin: 12px 0 0; }
+.postgame-actions > button.primary, .postgame-actions > button.secondary { min-height: 48px; margin: 0; }
+.postgame-actions .honor-result + .final-result-waiting { padding-top: 10px; border-top: 1px solid rgba(177,191,198,.18); }
+.final-result-waiting { font-size: 13px; }
 
 .table-dynamics .action-entry button.primary,
 .table-dynamics .action-entry button.primary[disabled]:not([type]) { background: var(--accent); color: var(--bg); border-color: var(--accent); }
@@ -1669,8 +1664,6 @@ button.room-filter.active[disabled]:not([type]) { color: var(--accent); backgrou
 .score-reasons { display: flex; flex-direction: column; gap: 16rpx; margin: 24rpx 0; }
 .score-reasons button { width: 100%; min-height: 48px; margin: 0; white-space: normal; }
 .score-targets { margin: 24rpx 0; }
-.score-result { margin: 24rpx 0; padding: 24rpx; background: var(--surface); border-radius: 16rpx; }
-.score-result .metric-value { font-size: 36rpx; }
 .score-award { display: flex; justify-content: space-between; gap: 24rpx; margin-top: 12rpx; font-size: 26rpx; }
 .score-reasons button.is-selected, .score-targets button.is-selected { border-color: var(--accent); color: var(--accent); outline: 4rpx solid var(--accent); outline-offset: -4rpx; }
 /* Result registration: one selection task, a separate fallback panel, fixed actions. */
