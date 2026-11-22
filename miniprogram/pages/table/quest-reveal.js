@@ -5,7 +5,7 @@ const labels = {
   magic: "魔法票",
 };
 
-const timing = { leadInMs: 700, turnMs: 520, readMs: 400, finalReadMs: 1200 };
+const timing = { leadInMs: 1000, turnMs: 520, readMs: 800, finalReadMs: 2000 };
 
 // Shuffle public totals, never individual submissions. The public event ID
 // gives every device the same draw even if their polls arrive at different times.
@@ -19,19 +19,11 @@ function shuffle(cards, id) {
   }
 }
 
-function forResult(room, entry, previous, active) {
-  if (!entry?.questResult || !previous ||
-      previous.code !== room.code || previous.createdAt !== room.createdAt || previous.game !== room.game ||
-      !["tools", "questResult", "offlineFinal", "ended"].includes(room.phase)) return null;
+function forResult(room, entry) {
+  if (!entry?.questResult || !["tools", "questResult", "offlineFinal", "ended"].includes(room.phase)) return null;
   const event = room.history[entry.key];
   const number = event.number ?? event.round;
   const id = [room.code, room.createdAt, room.game, event.kind, number ?? entry.key, event.startedAt].join("/");
-  if (active?.id === id && previous.stage === room.stage) return active;
-  if (!previous.history || previous.phase === "lobby") return null;
-  const alreadyKnown = number == null ? entry.key < previous.history.length
-    : previous.history.some(h => h.kind === event.kind && (h.number ?? h.round) === number);
-  if (alreadyKnown) return null;
-
   const total = event.team?.length;
   if (!total || !Number.isInteger(event.fails) || event.fails < 0 || event.fails > total) return null;
   const counts = event.counts ?? { success: total - event.fails, fail: event.fails };
@@ -44,7 +36,18 @@ function forResult(room, entry, previous, active) {
   if (cards.length !== total) return null;
   shuffle(cards, id);
   const columns = total <= 6 ? total : Math.ceil(total / 2);
-  return { id, key: entry.key, cards: cards.map((card, index) => ({ ...card, index })), columns, revealed: 0, turnMs: timing.turnMs };
+  return { id, key: entry.key, cards: cards.map((card, index) => ({ ...card, index })), columns };
 }
 
-module.exports = { forResult, timing };
+function reveal(room, tickets, previous, active) {
+  if (!tickets || !previous?.history || previous.phase === "lobby" ||
+      previous.code !== room.code || previous.createdAt !== room.createdAt || previous.game !== room.game) return null;
+  if (active?.id === tickets.id && previous.stage === room.stage) return active;
+  const event = room.history[tickets.key];
+  const number = event.number ?? event.round;
+  const known = number == null ? tickets.key < previous.history.length
+    : previous.history.some(h => h.kind === event.kind && (h.number ?? h.round) === number);
+  return known ? null : { id: tickets.id, revealed: 0, turnMs: timing.turnMs };
+}
+
+module.exports = { forResult, reveal, timing };

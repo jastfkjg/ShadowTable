@@ -83,12 +83,12 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
   const round = room.knights?.round || room.round;
   const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
     selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
-  const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
+  const skillPassLabel = copy?.pass && choices.some(c => c.value === "pass") ? copy.pass : "";
   // A lone pass also occurs for spent skills and passive roles. Only preselect
   // the private no-skill case, and only while there is no other legal choice.
   const noSkillPass = skillAction && !mode && !hunterModes && unavailableHint === "你没有技能" &&
     choices.length === 1 && choices[0].value === "pass";
-  const skillOtherChoices = choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => {
+  const skillOtherChoices = choices.filter(c => !(skillPassLabel && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => {
     const label = c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
       ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label;
     const icon = c.value === "pass" ? "process-skip" : c.value === "mode:" ? "record-list" : "record-spark";
@@ -107,7 +107,8 @@ function skillView(room, choices, hunterModes, hunterMode, swapOptions, unavaila
     skillTargetMeta: noSkillPass ? "技能环节" + (round ? " · 第 " + round + " 轮" : "") : mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
       (finalAction ? "最终盘刀" : "技能准备") : "",
     skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-    skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
+    skillSwordHint: swordHint, skillHelpExpanded: false, skillPassLabel,
+    skillPickLabel: skillPassLabel ? copy.pick || "选择目标" + copy.verb : "",
     skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
     skillOtherChoices,
     ...skillSelectionView("", mode),
@@ -120,15 +121,15 @@ function skillTargetCopy(mode) {
     duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
     inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
     guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
-    substitute: { title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
+    substitute: { pick: "选择替死者", title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
     detonate: { title: "猎人主动自爆", verb: "自爆开枪", consequence: "你将自爆出局 · 确认后不可更改" },
     passive: { title: "猎人被动开枪", verb: "被动开枪", consequence: "出局时向目标开枪，替女巫出局时不触发 · 确认后不可更改" },
     gun: { title: "选择开枪目标", verb: "开枪", pass: "本轮不开枪" },
-    attack: { title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
+    attack: { pick: "选择技能目标", title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
     revive: { title: "选择复活目标", verb: "复活", pass: "本轮不复活" },
-    swap: { title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
+    swap: { pick: "选择座位换号", title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
     final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标。", verb: "最终盘刀" },
-    target: { title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
+    target: { pick: "选择技能目标", title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
   }[mode];
 }
 function skillSelectionView(value, mode, swapSeats = [], draftLabel = "") {
@@ -205,7 +206,6 @@ function toolHistory(h, key) {
       key,
       text: (h.success ? "任务成功" : "任务失败"),
       questResult: h.success ? "success" : "failure",
-      teamLabel: h.team.join("、") + " 号",
       cards: Object.entries(
         h.counts || { success: h.team.length - h.fails, fail: h.fails },
       )
@@ -273,6 +273,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     roomNavTitle: "",
     ...initialPlayerCardData,
     latestResult: null,
+    questTickets: null,
     questReveal: null,
     processBodyHeight: 0,
     ...publicHistory.initialData(),
@@ -336,7 +337,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     boardIndex: 0,
     capacityIndex: 1,
     statsOpen: false, stats: null, statsLoading: false, statsError: "",
-    honors: null, honorDialog: false, honorMatchId: "", honorDismissed: "", honorDraft: { mvp: null, svp: null }, honorGroups: [], honorReady: false,
+    honors: null, honorPendingExpanded: false, honorDialog: false, honorMatchId: "", honorDismissed: "", honorDraft: { mvp: null, svp: null }, honorGroups: [], honorReady: false,
     resultDialog: false, resultChoice: "",
     memberRooms: [],
     visibleMemberRooms: [],
@@ -1006,6 +1007,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
+      if (entry.questResult && source.team?.length) entry.teamLabel = source.team.join("、") + " 号";
       if (source.kind === "skillResult" && Array.isArray(source.eliminated) && Array.isArray(source.redrawn) && Array.isArray(source.restored) && Array.isArray(source.out)) {
         entry.historyText = "技能结算";
         entry.historyNote = source.text.includes("提前截止") ? "提前截止" : "";
@@ -1016,7 +1018,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       }
       entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
       entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
-      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
+      entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
     });
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
     const latestResult = history.filter((entry) =>
@@ -1024,13 +1026,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       (room.history[entry.key].kind === "variant" && (room.history[entry.key].number || room.history[entry.key].resultType === "conversion" || /^本轮(?:阵营转换|不转换)$/.test(room.history[entry.key].text)))
     ).pop() || null;
     const previousReveal = this.data.questReveal;
+    const questTickets = questBallots.forResult(room, latestResult);
     const questReveal = this.foreground && !this.skipQuestCatchup
-      ? questBallots.forResult(room, latestResult, this.data.room, previousReveal) : null;
+      ? questBallots.reveal(room, questTickets, this.data.room, previousReveal) : null;
     if (this.foreground) this.skipQuestCatchup = false;
     if (questReveal !== previousReveal) clearTimeout(this.questRevealTimer);
     this.pendingQuestHistory = questReveal ? history : null;
     const historyUpdate = tableHistoryView(this.data, room,
-      questReveal ? history.filter(entry => entry.key < questReveal.key) : history);
+      questReveal ? history.filter(entry => entry.key < questTickets.key) : history);
     const honors = honorPresentation.present(room.honors, api.assetUrl, this.honorAvatarFailures || new Set());
     const honorState = honorPresentation.sync(this.data, honors, this.data.historyOpen || this.data.playerCard || this.data.resultDialog || !this.foreground);
     const identityProfileUpdate = {};
@@ -1048,6 +1051,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const actionEntryLabel = ({ identity: "查看身份", teamVote: "参与表决", quest: "提交任务牌" })[room.phase] || "完成本轮操作";
     this.updateChangedData({
       ...privacyUpdate, ...identityProfileUpdate, honors, ...honorState,
+      honorPendingExpanded: this.data.honorPendingExpanded && honors?.status === "open" && !!honors.canClose
+        && !!honors.pendingPlayers?.length && honors.matchId === this.data.honorMatchId,
       ...(stageChanged ? { resultDialog: false } : {}),
       ...(room.phase === "quest" && this.data.toolType ? { toolType: "" } : {}),
       ...(this.data.resultDialog && !stageChanged ? resultFlow({ ...this.data, room }) : {}),
@@ -1061,7 +1066,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         index, completed: index < room.operationProgress.completed,
       })),
       ...historyUpdate,
-      latestResult, questReveal,
+      latestResult, questTickets, questReveal,
       notice:
         this.data.notice === "请求较多，冷却后会自动刷新"
           ? ""
@@ -1149,7 +1154,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.questRevealTimer = setTimeout(() => {
       const reveal = this.data.questReveal;
       if (!this.alive || !this.foreground || reveal?.id !== id) return;
-      const total = reveal.cards.length;
+      const total = this.data.questTickets.cards.length;
       if (reveal.revealed === total) return this.finishQuestReveal();
       const revealed = reveal.revealed + 1;
       this.setData({ questReveal: { ...reveal, revealed } });
@@ -1186,6 +1191,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       seatReadyCount: 0,
       history: [],
       latestResult: null,
+      questTickets: null,
       questReveal: null,
       selected: [],
       code: "",
@@ -2302,6 +2308,11 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (!this.data.honors?.canStart) return;
     return this.cmd("honorStart", { matchId: this.data.honors.matchId });
   },
+  toggleHonorPending() {
+    const honors = this.data.honors;
+    if (honors?.status === "open" && honors.canClose && honors.pendingPlayers?.length)
+      this.setData({ honorPendingExpanded: !this.data.honorPendingExpanded });
+  },
   openHonors() {
     const h = this.data.honors;
     if (!h?.canVote || h.status !== "open" || this.data.busy || this.pending) return;
@@ -2918,8 +2929,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       )
         return;
       // Returning from pass opens target selection with no seat preselected.
-      if (value === "pick-sword-target" && this.data.swordModes && this.data.draftChoice === "pass") {
-        this.setProcessData({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+      if (value === "pick-skill-target" && this.data.skillPassLabel && this.data.draftChoice === "pass") {
+        this.setProcessData({ draftChoice: "", draftLabel: "", ...skillSelectionView("", this.data.skillTargetMode) });
         return;
       }
       const choice = this.data.actionChoices.find((c) => c.value === value);

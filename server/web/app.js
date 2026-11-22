@@ -78,7 +78,7 @@
     const round = room.knights?.round || room.round;
     const swapPlayers = mode === "swap" ? players.map(player => ({ seat: player.seat, name: player.name,
       selected: false, disabledReason: unavailable(player, swapSeats.has(player.seat)) })) : [];
-    const swordModes = mode === "sword" && choices.some(c => c.value === "pass");
+    const skillPassLabel = copy?.pass && choices.some(c => c.value === "pass") ? copy.pass : "";
     const count = mode === "swap" ? swapSeats.size : targets.length;
     return {
       skillAction, skillTargetMode: mode, skillTitle: copy?.title || (hunterModes ? "使用技能 · 猎人" : "使用技能"),
@@ -88,9 +88,10 @@
       skillTargetMeta: mode && !fairyAction ? (round ? "第 " + round + " 轮 · " : "") +
         (finalAction ? "最终盘刀" : "技能准备") : "",
       skillTargetCaption: copy?.privateResult ? "结果仅你可见" : "可选目标 " + count + " 人",
-      skillSwordHint: swordHint, skillHelpExpanded: false, swordModes,
+      skillSwordHint: swordHint, skillHelpExpanded: false, skillPassLabel,
+      skillPickLabel: skillPassLabel ? copy.pick || "选择目标" + copy.verb : "",
       skillBodyHeight: mode ? Math.ceil((mode === "swap" ? swapPlayers.length : skillTargets.length) / 3) * 77 + 84 + (mode === "swap" ? 30 : 0) : Math.ceil(targets.length / 3) * 164,
-      skillOtherChoices: choices.filter(c => !(swordModes && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
+      skillOtherChoices: choices.filter(c => !(skillPassLabel && c.value === "pass") && !targets.some(t => t.value === c.value)).map(c => ({ ...c,
         label: c.value === "target:0" && finalAction ? "本次空刀" : c.value === "pass"
           ? copy?.pass || (hunterModes ? "本轮不开枪" : c.label === "确认" ? "本轮确认" : "本轮不使用技能") : c.label,
       })),
@@ -104,15 +105,15 @@
       duel: { title: "骑士决斗", verb: "决斗", pass: "本轮不决斗", consequence: "决斗失败时，你将出局 · 确认后不可更改" },
       inspect: { title: "石像鬼查验", hint: "查验目标是否拥有主动击杀能力。", verb: "查验", pass: "本轮不查验", privateResult: true },
       guard: { title: "秘密守护", verb: "守护", pass: "本轮不守护" },
-      substitute: { title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
+      substitute: { pick: "选择替死者", title: "指定替死者", verb: "指定替死", pass: "本轮不指定替死者" },
       detonate: { title: "猎人主动自爆", verb: "自爆开枪", consequence: "你将自爆出局 · 确认后不可更改" },
       passive: { title: "猎人被动开枪", verb: "被动开枪", consequence: "出局时向目标开枪，替女巫出局时不触发 · 确认后不可更改" },
       gun: { title: "选择开枪目标", verb: "开枪", pass: "本轮不开枪" },
-      attack: { title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
+      attack: { pick: "选择技能目标", title: "选择技能目标", hint: "按当前身份使用刀或决斗。", verb: "使用技能", pass: "本轮不使用技能" },
       revive: { title: "选择复活目标", verb: "复活", pass: "本轮不复活" },
-      swap: { title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
+      swap: { pick: "选择座位换号", title: "魔术师秘密换号", hint: "再次点击已选座位可取消。", verb: "换号", pass: "本轮不换号" },
       final: { title: "选择最终盘刀目标", hint: "录入线下多数决议的梅林目标。", verb: "最终盘刀" },
-      target: { title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
+      target: { pick: "选择技能目标", title: "选择技能目标", verb: "使用技能", pass: "本轮不使用技能" },
     }[mode];
   }
   function skillSelectionView(value, mode, swapSeats = []) {
@@ -2064,7 +2065,7 @@ function roomListItems(rooms) {
     history.forEach(function (entry, i) {
       var source = room.history[i];
       entry.category = publicHistory.category(source);
-      entry.thresholdLabel = source.threshold ? `至少 ${source.threshold} 张失败票才失败` : "";
+      entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
       var time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
       entry.resultTone = entry.questResult || (["toolVote", "team"].includes(source.kind) ? (source.approved ? "success" : "failure") : "");
@@ -3245,8 +3246,8 @@ function roomListItems(rooms) {
         room.stage !== actionDraftStage
       )
         return;
-      if (value === "pick-sword-target" && state.swordModes && state.draftChoice === "pass") {
-        setState({ draftChoice: "", draftLabel: "", ...skillSelectionView("", "sword") });
+      if (value === "pick-skill-target" && state.skillPassLabel && state.draftChoice === "pass") {
+        setState({ draftChoice: "", draftLabel: "", ...skillSelectionView("", state.skillTargetMode) });
         return;
       }
       var choice = state.actionChoices.filter(function (c) {
@@ -4102,27 +4103,28 @@ function roomListItems(rooms) {
   function viewSkillDialog() {
     var locked = state.busy || state.hasPendingRequest || !state.network;
     var targetMode = !!state.skillTargetMode;
-    const swordPass = state.swordModes && state.draftChoice === 'pass';
-    var description = [state.skillHint && 'skill-hint', targetMode && state.skillConsequence && 'skill-consequence'].filter(Boolean).join(' ');
-    const titleIcon = state.swordModes ? '<img src="/assets/record-swords.svg" alt="">' : '';
+    const skipping = state.skillPassLabel && state.draftChoice === 'pass';
+    var description = [state.skillHint && !skipping && 'skill-hint', targetMode && state.skillConsequence && 'skill-consequence'].filter(Boolean).join(' ');
+    const icon = state.skillTargetMode === 'inspect' ? 'process-eye' : ['sword', 'attack', 'duel'].includes(state.skillTargetMode) ? 'record-swords' : 'record-spark';
+    const titleIcon = state.skillPassLabel ? '<img src="/assets/' + icon + '.svg" alt="">' : '';
     const title = '<div id="skill-title" class="skill-title">' + titleIcon + esc(state.skillTitle) + '</div>';
     const meta = targetMode && state.skillTargetMode !== 'fairy' ? '<div class="skill-meta">' + esc(state.skillTargetMeta) + '</div>' : '';
-    const heading = state.swordModes ? '<div class="sword-title-row">' + title +
-      '<button class="sword-close" type="button" data-action="closeAction" aria-label="稍后选择技能"' +
+    const heading = state.skillPassLabel ? '<div class="skill-title-row">' + title +
+      '<button class="skill-close" type="button" data-action="closeAction" aria-label="稍后选择技能"' +
       (state.busy ? ' disabled' : '') + '>×</button></div>' + meta : meta + title;
-    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + (state.swordModes ? ' sword-sheet' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
+    var html = '<div class="dialog-backdrop' + (targetMode ? ' skill-target-backdrop' : '') + '"><div class="error-dialog action-dialog skill-dialog' + (targetMode ? ' skill-target-dialog' : '') + (state.skillPassLabel ? ' skill-sheet' : '') + '" role="dialog" aria-modal="true" aria-labelledby="skill-title"' +
       (description ? ' aria-describedby="' + description + '"' : '') + '>' +
       '<div class="skill-header">' + heading +
-      (state.skillHint ? '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' : '') +
+      (state.skillHint && !skipping ? '<div id="skill-hint" class="skill-hint">' + esc(state.skillHint) + '</div>' : '') +
       '</div><div class="skill-body">';
-    if (state.swordModes) {
-      const modeButton = (value, label, active) => '<button type="button" class="sword-mode' + (active ? ' is-active' : '') +
+    if (state.skillPassLabel) {
+      const modeButton = (value, label, active) => '<button type="button" class="skill-mode' + (active ? ' is-active' : '') +
         '" data-action="submitChoice" data-value="' + value + '" aria-pressed="' + active + '"' + (locked ? ' disabled' : '') +
-        '><span class="sword-radio" aria-hidden="true"></span>' + label + '</button>';
-      html += '<div class="sword-modes" role="group" aria-label="本轮行动">' + modeButton('pick-sword-target', '选择目标开刀', !swordPass) + modeButton('pass', '本轮不开刀', swordPass) + '</div>';
+        '><span class="skill-radio" aria-hidden="true"></span>' + label + '</button>';
+      html += '<div class="skill-modes" role="group" aria-label="本轮行动">' + modeButton('pick-skill-target', state.skillPickLabel, !skipping) + modeButton('pass', state.skillPassLabel, skipping) + '</div>';
     }
-    if (targetMode && !swordPass) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
-    if (state.skillSwordHint && !swordPass) {
+    if (targetMode && !skipping) html += '<div class="skill-target-heading"><span>' + (state.skillTargetMode === 'swap' ? '选择两个座位' : '选择目标') + '</span><span class="skill-target-caption">' + esc(state.skillTargetCaption) + '</span></div>';
+    if (state.skillSwordHint && !skipping) {
       html += '<button type="button" class="disclosure-button sword-help" data-action="toggleSkillHelp" aria-expanded="' + state.skillHelpExpanded + '" aria-controls="sword-rules">技能说明<span class="identity-help-chevron' + (state.skillHelpExpanded ? ' is-expanded' : '') + '" aria-hidden="true"></span></button>';
       if (state.skillHelpExpanded) html += '<div id="sword-rules" class="skill-context">' + esc(state.skillSwordHint) + '</div>';
     }
@@ -4135,8 +4137,8 @@ function roomListItems(rooms) {
         (c.disabledReason || locked || (swap && state.swapSeats.length === 2 && !selected) ? ' disabled' : '') + '><span class="skill-seat">' + c.seat + '<span class="skill-seat-unit"> 号</span></span><span class="skill-name">' + esc(c.disabledReason || c.name) + '</span>' +
         (selected ? '<span class="skill-check" aria-hidden="true">✓</span>' : '') + '</button>';
     }
-    if (!swordPass && state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
-    if (state.swapOptions.length) html += '<div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
+    if (!skipping && state.skillTargets.length) html += '<div class="skill-target-grid">' + state.skillTargets.map(c => seatButton(c, false)).join('') + '</div>';
+    if (!skipping && state.swapOptions.length) html += '<div class="skill-target-grid">' + state.swapPlayers.map(c => seatButton(c, true)).join('') + '</div>';
     html += '</div>' + (state.skillOtherChoices.length ? '<div class="skill-other-choices">' : '');
     for (var c of state.skillOtherChoices) {
       var selected = state.draftChoice === c.value;

@@ -1,12 +1,14 @@
 "use strict";
 const DAY = 86400000;
-const defaults = Object.freeze({ lobbyDays: 7, graceDays: 3, endedDays: 3, entryDays: 90, receiptDays: 90, batchSize: 100 });
+const ROOM_IDLE_DAYS = 7;
+const roomActivityCutoff = now => now - ROOM_IDLE_DAYS * DAY;
+const defaults = Object.freeze({ entryDays: 90, receiptDays: 90, batchSize: 100 });
 
 function initialize(store) {
   const db = store.db;
   db.exec(`CREATE TABLE IF NOT EXISTS maintenance_meta(name TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS room_lifecycle(code TEXT PRIMARY KEY, phase TEXT NOT NULL, activity INTEGER NOT NULL, pending_since INTEGER NOT NULL DEFAULT 0);
-    CREATE INDEX IF NOT EXISTS room_lifecycle_activity ON room_lifecycle(phase,activity);
+    CREATE INDEX IF NOT EXISTS room_lifecycle_recent ON room_lifecycle(activity DESC,code ASC);
     CREATE TABLE IF NOT EXISTS receipt_tombstones(uid TEXT NOT NULL, request TEXT NOT NULL, PRIMARY KEY(uid,request));
     CREATE INDEX IF NOT EXISTS room_entries_code ON room_entries(code);
     CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires);
@@ -18,7 +20,10 @@ function initialize(store) {
     const migrated = db.prepare("SELECT 1 FROM maintenance_meta WHERE name='room-entries-v1'").get();
     for (const row of db.prepare("SELECT state FROM rooms").all()) {
       const room = JSON.parse(row.state);
-      const activity = Math.max(room.updatedAt || room.createdAt || store.clock(), db.prepare("SELECT coalesce(max(entered),0) AS n FROM room_entries WHERE code=?").get(room.code).n);
+      const lastEntered = db.prepare("SELECT max(entered) AS at FROM room_entries WHERE code=?").get(room.code).at;
+      const recorded = Math.max(room.updatedAt || room.createdAt || 0, lastEntered || 0);
+      // Only give an undated legacy room a starting time on its first migration.
+      const activity = recorded || (db.prepare("SELECT activity FROM room_lifecycle WHERE code=?").get(room.code)?.activity ?? store.clock());
       db.prepare(`INSERT INTO room_lifecycle(code,phase,activity) VALUES(?,?,?)
         ON CONFLICT(code) DO UPDATE SET phase=excluded.phase,activity=max(activity,excluded.activity),
         pending_since=CASE WHEN excluded.activity>activity THEN 0 ELSE pending_since END`).run(room.code, room.phase, activity);
@@ -34,7 +39,7 @@ function cleanup(store, options = {}) {
   const policy = { ...defaults, ...options }, now = store.clock(), db = store.db;
   for (const key of Object.keys(defaults)) if (!Number.isSafeInteger(policy[key]) || policy[key] < 1 || policy[key] > (key === "batchSize" ? 1000 : 3650)) throw new Error("无效清理配置：" + key);
   return store.transaction(() => {
-    const result = { sessions: 0, receipts: 0, rooms: 0, candidates: 0, entries: 0 };
+    const result = { sessions: 0, receipts: 0, rooms: 0, entries: 0 };
     const limit = policy.batchSize;
     result.sessions = db.prepare("DELETE FROM sessions WHERE hash IN (SELECT hash FROM sessions WHERE expires<=? ORDER BY expires LIMIT ?)").run(now, limit).changes;
     if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='web_sessions'").get()) {
@@ -47,23 +52,13 @@ function cleanup(store, options = {}) {
       db.prepare("DELETE FROM receipts WHERE uid=? AND request=?").run(row.uid, row.request);
       result.receipts++;
     }
-    const rooms = db.prepare(`SELECT * FROM room_lifecycle WHERE
-      (phase='lobby' AND activity<? AND (pending_since=0 OR pending_since<=?)) OR
-      (phase IN ('ended','terminated') AND activity<=?) ORDER BY activity LIMIT ?`)
-      .all(now - policy.lobbyDays * DAY, now - policy.graceDays * DAY, now - policy.endedDays * DAY, limit);
-    for (const entry of rooms) {
-      const room = store.get(entry.code);
-      if (!room || !["lobby", "ended", "terminated"].includes(room.phase)) continue;
-      if (room.phase === "lobby" && !entry.pending_since) {
-        db.prepare("UPDATE room_lifecycle SET pending_since=? WHERE code=?").run(now, room.code);
-        result.candidates++;
-      } else {
-        // An old or damaged finished game without an archive source needs manual review.
-        if (room.phase === "ended" && !room.matchRecord) continue;
-        if (room.matchRecord) store.archiveMatch(room.matchRecord);
-        store.remove(room.code);
-        result.rooms++;
-      }
+    const rooms = db.prepare(`SELECT code FROM room_lifecycle WHERE activity<=?
+      ORDER BY activity, code LIMIT ?`).all(roomActivityCutoff(now), limit);
+    for (const { code } of rooms) {
+      const room = store.get(code);
+      if (room?.matchRecord) store.archiveMatch(room.matchRecord);
+      store.remove(code);
+      result.rooms++;
     }
     result.entries = db.prepare(`DELETE FROM room_entries WHERE rowid IN
       (SELECT rowid FROM room_entries WHERE unavailable_since>0 AND unavailable_since<? AND note='' ORDER BY unavailable_since LIMIT ?)`)
@@ -85,4 +80,4 @@ function startMaintenance(store, { intervalMs = 3600000, logger = console, canCl
   timer = setTimeout(run, 60000); timer.unref?.();
   return () => { stopped = true; clearTimeout(timer); };
 }
-module.exports = { initialize, cleanup, startMaintenance, defaults, DAY };
+module.exports = { initialize, cleanup, startMaintenance, defaults, DAY, ROOM_IDLE_DAYS, roomActivityCutoff };

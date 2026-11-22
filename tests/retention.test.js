@@ -16,7 +16,7 @@ function endedRoom() {
   run(room, "finishTools", { scoreReason: "assassination", scoreTarget: 0 });
   return room;
 }
-test("结束与终止牌桌满3天按默认策略回收，活跃访问续期，准备与进行中保持原规则", () => {
+test("所有阶段满7天失效并分批回收，主动进入重新计时", () => {
   let now = Date.now(); const store = new Store(":memory:", { clock: () => now });
   try {
     const ended = endedRoom(); store.save(ended);
@@ -24,12 +24,40 @@ test("结束与终止牌桌满3天按默认策略回收，活跃访问续期，�
     const renewed = endedRoom(); renewed.code = "333333"; store.save(renewed);
     const lobby = newRoom("444444", "wx:host", "房主"); store.save(lobby);
     const playing = newRoom("555555", "wx:host", "房主"); playing.phase = "tools"; store.save(playing);
+    const legacy = newRoom("666666", "wx:host", "房主"); legacy.phase = "ended"; store.save(legacy);
+    const stale = [ended, terminated, lobby, playing, legacy];
     now += 2 * DAY; store.visitRoom("wx:host", renewed.code);
-    now += DAY - 1; assert.equal(cleanup(store).rooms, 0);
-    now++; assert.equal(cleanup(store).rooms, 2);
-    assert.ok(store.get(renewed.code)); assert.ok(store.get(lobby.code)); assert.ok(store.get(playing.code));
+    now += 5 * DAY - 1;
+    for (const room of stale) assert.equal(store.roomExpired(room), false);
+    assert.equal(cleanup(store).rooms, 0);
+    now++;
+    for (const room of stale) assert.equal(store.roomExpired(room), true);
+    assert.equal(store.roomExpired(renewed), false);
+    assert.equal(cleanup(store, { batchSize: 2 }).rooms, 2);
+    assert.equal(cleanup(store).rooms, 3);
+    for (const room of stale) assert.equal(store.get(room.code), null);
+    assert.ok(store.get(renewed.code));
     now += 2 * DAY; assert.equal(cleanup(store).rooms, 1);
   } finally { store.close(); }
+});
+test("升级时缺少时间字段的旧对局只补一次活动时间，后续重启不会续期", () => {
+  let now = Date.now();
+  const dir = mkdtempSync(join(tmpdir(), "shadow-legacy-expiry-")), file = join(dir, "rooms.sqlite");
+  const open = () => new Store(file, { clock: () => now });
+  let store = open();
+  try {
+    const room = newRoom("112655", "host", "房主");
+    room.phase = "tools";
+    delete room.createdAt;
+    delete room.updatedAt;
+    store.db.prepare("INSERT INTO rooms(code,state) VALUES(?,?)").run(room.code, JSON.stringify(room));
+    store.close(); store = open();
+    assert.ok(store.accessibleRoom(room.code));
+    now += 7 * DAY;
+    store.close(); store = open();
+    assert.throws(() => store.accessibleRoom(room.code), { status: 410 });
+    assert.equal(cleanup(store).rooms, 1);
+  } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 test("缺少近期已验证备份时停止自动清理，恢复后继续分批执行", t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -42,7 +70,7 @@ test("缺少近期已验证备份时停止自动清理，恢复后继续分批�
     ready=true;t.mock.timers.tick(2000);assert.equal(logs[1].sessions,1);
   } finally {stop();store.close();}
 });
-test("清理仅删除过期临时数据，归档、积分、趣味记录和进行中牌桌保留", () => {
+test("清理回收闲置的进行中牌桌并保留归档、积分和趣味记录", () => {
   let now = Date.now(); const store = new Store(":memory:", { clock: () => now });
   try {
     const ended = endedRoom(); store.save(ended);
@@ -53,8 +81,8 @@ test("清理仅删除过期临时数据，归档、积分、趣味记录和进�
     now += 91 * DAY;
     store.addSession("fresh", "wx:host");
     const result = cleanup(store);
-    assert.equal(result.rooms, 1); assert.equal(result.sessions, 1); assert.equal(result.receipts, 1);
-    assert.equal(store.get(ended.code), null); assert.equal(store.get(active.code).phase, "tools");
+    assert.equal(result.rooms, 2); assert.equal(result.sessions, 1); assert.equal(result.receipts, 1);
+    assert.equal(store.get(ended.code), null); assert.equal(store.get(active.code), null);
     assert.ok(store.session("fresh")); assert.equal(store.session("expired"), undefined);
     const later = now; now -= 91 * DAY;
     assert.deepEqual(store.statsFor("wx:host"), stats); assert.deepEqual(store.matchesFor("wx:host"), matches);
@@ -62,14 +90,13 @@ test("清理仅删除过期临时数据，归档、积分、趣味记录和进�
     assert.throws(() => store.receipt("wx:host", "legacy-request-001"), e => e.status === 410);
   } finally { store.close(); }
 });
-test("准备房间有72小时宽限，访问/重开取消过期，失效条目90天后清理且备注保留", () => {
+test("准备房间满7天直接回收，失效条目90天后清理且备注保留", () => {
   let now = Date.now(); const store = new Store(":memory:", { clock: () => now });
   try {
     for (const code of ["111111", "222222", "333333"]) store.save(newRoom(code, "host", "房主"));
     store.db.prepare("UPDATE room_entries SET note='周五朋友局' WHERE code='333333'").run();
-    now += 8 * DAY; assert.equal(cleanup(store).candidates, 3);
-    now += 2 * DAY; assert.equal(cleanup(store).rooms, 0);
-    store.touchRoom("111111"); now += DAY;
+    now += 6 * DAY; store.visitRoom("host", "111111");
+    now += DAY;
     assert.equal(cleanup(store).rooms, 2); assert.ok(store.get("111111"));
     assert.equal(store.personalRooms("host").find(r => r.code === "222222").available, false);
     const active = store.get("111111"); active.phase = "tools"; store.save(active);

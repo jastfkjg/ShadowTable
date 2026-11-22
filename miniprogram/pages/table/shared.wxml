@@ -97,18 +97,19 @@
 <import src="../../honors.wxml" />
 <template is="honorBallot" data="{{honorDialog:honorDialog && !error,honorGroups,honorReady,honorSelected,honorRequired,honors,busy:busy || hasPendingRequest || !network}}" />
 <template name="tableResult">
-    <view wx:if="{{latestResult && (questReveal || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
+    <view wx:if="{{latestResult && (questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
       <view class="result-summary-heading"><view class="table-result-label"><image src="/assets/home-clock.svg" aria-hidden="true" /><text class="small muted">最近结果</text></view><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
-      <view wx:if="{{questReveal}}" class="quest-reveal">
-        <view class="quest-tickets" style="--quest-turn: {{questReveal.turnMs}}ms; grid-template-columns: repeat({{questReveal.columns}}, minmax(0, 1fr)); max-width: {{questReveal.columns * 60 + (questReveal.columns - 1) * 6}}px;">
-          <view wx:for="{{questReveal.cards}}" wx:key="index" class="quest-ticket" aria-label="{{'第'+(index+1)+'张，'+(index < questReveal.revealed ? item.label : '未翻开')}}">
-            <view class="quest-ticket-turn {{index < questReveal.revealed ? 'is-up' : ''}}" aria-hidden="true">
+      <view wx:if="{{latestResult.questResult}}" class="quest-reveal">
+        <view wx:if="{{questTickets}}" class="quest-tickets" style="--quest-turn: {{questReveal.turnMs || 0}}ms; grid-template-columns: repeat({{questTickets.columns}}, minmax(0, 1fr)); max-width: {{questTickets.columns * 60 + (questTickets.columns - 1) * 6}}px;">
+          <view wx:for="{{questTickets.cards}}" wx:key="index" class="quest-ticket" aria-label="{{'第'+(index+1)+'张，'+(index < shown ? item.label : '未翻开')}}">
+            <view class="quest-ticket-turn {{index < shown ? 'is-up' : ''}}" aria-hidden="true">
               <image class="quest-ticket-back" src="/assets/identity-card-back.jpg" mode="scaleToFill" />
-              <image wx:if="{{index < questReveal.revealed}}" class="quest-ticket-front" src="/assets/quest-tickets/{{item.kind}}.jpg" mode="aspectFill" />
+              <image wx:if="{{index < shown}}" class="quest-ticket-front" src="/assets/quest-tickets/{{item.kind}}.jpg" mode="aspectFill" />
             </view>
           </view>
         </view>
-        <view class="quest-reveal-footer"><text>已翻 {{questReveal.revealed}} / {{questReveal.cards.length}}</text><button class="quest-reveal-skip" bindtap="finishQuestReveal" hover-class="none" aria-label="跳过翻票，查看任务结果">跳过</button></view>
+        <view wx:if="{{questReveal}}" class="quest-reveal-footer"><text>已翻 {{shown}} / {{questTickets.cards.length}}</text><button class="quest-reveal-skip" bindtap="finishQuestReveal" hover-class="none" aria-label="跳过翻票，查看任务结果">跳过</button></view>
+        <view wx:else class="quest-reveal-footer quest-settled"><text class="quest-verdict {{latestResult.questResult}}">{{latestResult.questResult==='success'?'任务成功':'任务失败'}}</text><text wx:if="{{latestResult.teamLabel}}" class="quest-members">成员 {{latestResult.teamLabel}}</text></view>
       </view>
       <block wx:else>
       <view class="latest-result-title result-heading"><text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text><text>{{latestResult.resultRows ? '技能最终结果' : latestResult.text}}</text><text wx:if="{{latestResult.resultTeam}}" class="result-team">队伍 {{latestResult.resultTeam}}</text></view>
@@ -122,9 +123,13 @@
 </template>
 <template name="tableFinalResult">
   <view class="final-result" role="status" aria-label="本局最终结果">
-    <text class="kicker {{room.replayId?'final-result-replay-kicker':''}}">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
-    <button wx:if="{{room.replayId}}" class="final-result-replay" bindtap="viewReplay" hover-class="none" disabled="{{hasPendingRequest || busy}}" aria-label="查看本局复盘"><view class="final-result-replay-control"><image class="final-result-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
-    <view class="final-result-title">{{room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负'}}</view>
+    <view class="final-result-heading">
+      <view class="final-result-outcome">
+        <text class="kicker">{{room.result.winner?'最终结果':(room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'线下结算完毕':'本局终止'}}</text>
+        <view class="final-result-title">{{winnerLabel || ((room.flexible || room.assisted || room.offlineAssassination) && room.phase==='ended'?'以线下结算为准':'不判胜负')}}</view>
+      </view>
+      <button wx:if="{{room.replayId}}" class="final-result-replay" bindtap="viewReplay" hover-class="none" disabled="{{hasPendingRequest || busy}}" aria-label="查看本局复盘"><view class="final-result-replay-control"><image class="final-result-replay-icon" src="/assets/record-replay.svg" aria-hidden="true" /><text>查看复盘</text></view></button>
+    </view>
     <view wx:if="{{room.result.reason && room.result.reason!=='房主已登记线下结果，战绩已归档。' && room.result.reason!=='房主已登记线下胜负，战绩已归档。'}}" class="final-result-detail">{{room.result.reason}}</view>
     <view wx:if="{{room.result.source}}" class="small muted final-result-source">{{room.result.source==='manual'?'房主登记':room.result.source==='system'?'系统判定':''}}</view>
     <view wx:if="{{room.recordNotice}}" class="small muted final-result-source">{{room.recordNotice}}</view>
@@ -132,10 +137,12 @@
       <block wx:if="{{room.myScore}}">
         <block wx:if="{{room.myScore.status==='scored'}}">
           <view class="final-result-score-heading">
-            <view class="metric-value accent">本局 {{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</view>
-            <button class="text-button final-result-score-link" hover-class="none" bindtap="viewScoreRecord">查看积分明细 ›</button>
+            <view class="final-result-points"><text>我的积分</text><text class="metric-value accent">{{room.myScore.total>=0?'+':''}}{{room.myScore.total}} 分</text></view>
+            <button class="text-button" hover-class="none" bindtap="viewScoreRecord" aria-label="查看积分明细">积分明细 ›</button>
           </view>
-          <view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view>
+          <block wx:if="{{room.myScore.breakdown.length!==1 || room.myScore.breakdown[0].label!==winnerLabel || room.myScore.breakdown[0].points!==room.myScore.total}}">
+            <view wx:for="{{room.myScore.breakdown}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.points>=0?'+':''}}{{item.points}}</text></view>
+          </block>
         </block>
         <view wx:else class="small muted">不计积分 · {{room.myScore.reason}}</view>
       </block>
@@ -144,13 +151,15 @@
     <view wx:if="{{room.myFun.hasEffectiveHighlights && room.phase==='ended'}}" class="final-result-fun">
       <view class="final-result-fun-heading">
         <view class="label">我的本局趣味记录</view>
-        <button class="text-button final-result-fun-link" hover-class="none" bindtap="viewFunRecord">查看趣味统计 ›</button>
+        <button class="text-button" hover-class="none" bindtap="viewFunRecord">查看趣味统计 ›</button>
       </view>
       <view wx:for="{{room.myFun.highlights}}" wx:key="id" class="score-award"><text>{{item.label}}</text><text>{{item.count}}{{item.unit}}</text></view>
       <view wx:if="{{room.myFun.reason}}" class="small muted final-result-source">{{room.myFun.reason}}</view>
     </view>
-    <template is="honorResults" data="{{honors,busy:busy || hasPendingRequest || !network}}" />
-    <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{honors.status==='not_started' || honors.status==='open'?'secondary':'primary'}}" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
+  </view>
+  <view class="postgame-actions">
+    <template is="honorResults" data="{{honors,honorPendingExpanded,busy:busy || hasPendingRequest || !network}}" />
+    <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{honors.status==='not_started'?'secondary':'primary'}}" bindtap="rematch" disabled="{{hasPendingRequest || busy}}">同房再开一局</button>
     <view wx:else class="muted final-result-waiting">等待房主开启下一局</view>
   </view>
 </template>
@@ -241,25 +250,25 @@
     </view>
   </view>
   <view wx:if="{{actionDialog && !error && room.needsSubmission && !room.me.submitted}}" class="dialog-backdrop table-sheet-backdrop process-backdrop" catchtouchmove="blockScroll">
-    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{noSkillPass?'no-skill-sheet':''}} {{swordModes?'sword-sheet':''}} {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
+    <view wx:if="{{skillAction}}" class="error-dialog action-dialog skill-dialog table-sheet process-sheet process-skill {{noSkillPass?'no-skill-sheet':''}} {{skillPassLabel?'skill-sheet':''}} {{skillTargetMode?'has-targets':''}} {{processBodyHeight?'has-measured-body':''}}" role="dialog" aria-modal="true" aria-label="{{skillTitle}}">
       <view class="process-sheet-top"><view class="table-sheet-handle" aria-hidden="true" /><view class="table-sheet-heading"><view class="table-sheet-title"><view class="table-symbol blue"><image src="/assets/{{skillHeaderIcon}}.svg" aria-hidden="true" /></view><text>{{skillTitle}}</text></view><button class="table-sheet-close" hover-class="none" bindtap="closeAction" disabled="{{busy}}" aria-label="稍后选择技能">×</button></view></view>
       <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="skill-body process-sheet-body" style="{{processBodyHeight?'height:'+processBodyHeight+'px;':''}}"><view class="process-sheet-fields">
         <view wx:if="{{skillTargetMode!=='fairy'}}" class="process-context"><text>{{skillTargetMeta || '技能环节'}}</text><text wx:if="{{!skillTargetMeta && (room.knights.round || room.round)}}">第 {{room.knights.round || room.round}} 轮</text></view>
-        <view wx:if="{{skillHint && !noSkillPass}}" class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
-        <view wx:if="{{swordModes}}" class="sword-modes" aria-label="本轮行动">
-          <button hover-class="none" class="sword-mode {{draftChoice!=='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pick-sword-target" aria-pressed="{{draftChoice!=='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="sword-radio" aria-hidden="true" />选择目标开刀</button>
-          <button hover-class="none" class="sword-mode {{draftChoice==='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pass" aria-pressed="{{draftChoice==='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="sword-radio" aria-hidden="true" />本轮不开刀</button>
+        <view wx:if="{{skillPassLabel}}" class="skill-modes" aria-label="本轮行动">
+          <button hover-class="none" class="skill-mode {{draftChoice!=='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pick-skill-target" aria-pressed="{{draftChoice!=='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="skill-radio" aria-hidden="true" />{{skillPickLabel}}</button>
+          <button hover-class="none" class="skill-mode {{draftChoice==='pass'?'is-active':''}}" bindtap="submitChoice" data-value="pass" aria-pressed="{{draftChoice==='pass'}}" disabled="{{hasPendingRequest || busy || !network}}"><view class="skill-radio" aria-hidden="true" />{{skillPassLabel}}</button>
         </view>
-        <view wx:if="{{skillTargetMode && !(swordModes && draftChoice==='pass')}}" class="skill-target-heading"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
-        <block wx:if="{{skillSwordHint && !(swordModes && draftChoice==='pass')}}">
+        <view wx:if="{{skillHint && !noSkillPass && !(skillPassLabel && draftChoice==='pass')}}" class="skill-hint {{!skillTargetMode && !hunterModes?'process-empty-target':''}}"><image wx:if="{{!skillTargetMode && !hunterModes}}" src="/assets/record-info.svg" aria-hidden="true" /><text>{{skillHint}}</text></view>
+        <view wx:if="{{skillTargetMode && !(skillPassLabel && draftChoice==='pass')}}" class="skill-target-heading {{skillSwordHint?'has-skill-help':''}}"><text>{{skillTargetMode==='swap'?'选择两个座位':'选择目标'}}</text><text class="skill-target-caption">{{skillTargetCaption}}</text></view>
+        <block wx:if="{{skillSwordHint && !(skillPassLabel && draftChoice==='pass')}}">
           <button hover-class="none" class="disclosure-button sword-help" bindtap="toggleSkillHelp" aria-expanded="{{skillHelpExpanded}}" aria-controls="sword-rules"><text>技能说明</text><view class="identity-help-chevron {{skillHelpExpanded?'is-expanded':''}}" aria-hidden="true" /></button>
           <view wx:if="{{skillHelpExpanded}}" id="sword-rules" class="skill-context">{{skillSwordHint}}</view>
         </block>
         <view wx:if="{{room.phase==='hunterTurn' || room.phase==='paladinTurn'}}" class="skill-context">{{room.operationStatus.detail}}</view>
-        <view wx:if="{{skillTargets.length && !(swordModes && draftChoice==='pass')}}" class="skill-target-grid">
+        <view wx:if="{{skillTargets.length && !(skillPassLabel && draftChoice==='pass')}}" class="skill-target-grid">
           <button hover-class="none" wx:for="{{skillTargets}}" wx:key="value" class="skill-option {{draftChoice===item.value?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="submitChoice" data-value="{{item.value}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network}}" aria-pressed="{{draftChoice===item.value}}" aria-label="{{item.label+' '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(draftChoice===item.value?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{draftChoice===item.value}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view>
-        <block wx:if="{{swapOptions.length}}"><view class="skill-target-grid">
+        <block wx:if="{{swapOptions.length && !(skillPassLabel && draftChoice==='pass')}}"><view class="skill-target-grid">
           <button hover-class="none" wx:for="{{swapPlayers}}" wx:key="seat" class="skill-option {{item.selected?'is-selected':''}} {{item.disabledReason?'skill-option-unavailable':''}}" bindtap="toggleSwapSeat" data-seat="{{item.seat}}" disabled="{{item.disabledReason || hasPendingRequest || busy || !network || (swapSeats.length===2 && !item.selected)}}" aria-pressed="{{item.selected}}" aria-label="{{item.seat+'号 '+item.name+(item.disabledReason?'，'+item.disabledReason:'')+(item.selected?'，已选':'')}}"><view class="skill-seat">{{item.seat}}<text class="skill-seat-unit">号</text></view><view class="skill-name">{{item.disabledReason || item.name}}</view><text wx:if="{{item.selected}}" class="skill-check" aria-hidden="true">✓</text></button>
         </view></block>
         <view wx:if="{{skillOtherChoices.length}}" class="skill-other-choices">
@@ -552,12 +561,10 @@
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>
     </block>
-    <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{questReveal ? 'result-first' : room.result ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?'result-first':'operation-first'}}">
-      <block wx:if="{{room.result && !questReveal}}"><template is="tableFinalResult" data="{{room, honors, network, hasPendingRequest, busy}}" /></block>
-      <block wx:else>
-        <template is="tableResult" data="{{room, latestResult, questReveal}}" />
-        <template wx:if="{{!room.result}}" is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
-      </block>
+    <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result && !questReveal ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?'result-first':'operation-first'}}">
+      <template wx:if="{{!room.result || questTickets}}" is="tableResult" data="{{room, latestResult, questReveal, questTickets, shown:questReveal?questReveal.revealed:questTickets.cards.length}}" />
+      <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, honorPendingExpanded, network, hasPendingRequest, busy, winnerLabel:room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':''}}" />
+      <template wx:if="{{!room.result}}" is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
     <view wx:if="{{room.operationProgress && (room.canUseTools || playerProgressCard)}}" class="operation-progress {{room.operationProgress.total > 0 && room.operationProgress.completed === room.operationProgress.total?'all-done':''}}">
@@ -602,10 +609,13 @@
     </view>
     <view class="task-progress">
       <view wx:if="{{questRounds.length && room.phase!=='lobby'}}" class="quest-track">
-        <button wx:for="{{questRounds}}" wx:key="number" class="quest-round" hover-class="none" bindtap="showQuestRecord" disabled="{{item.key===null}}" data-key="{{item.key}}" aria-label="{{item.label}}">
-          <view aria-hidden="true" class="quest-disc {{item.result}} {{item.protectedRound?'protected':''}}"><view wx:if="{{item.result!=='pending'}}" class="quest-mark" /></view>
-          <text aria-hidden="true">{{item.number}}</text>
-        </button>
+        <view wx:if="{{room.result && !questReveal}}" class="quest-track-title">任务记录</view>
+        <view class="quest-rounds">
+          <button wx:for="{{questRounds}}" wx:key="number" class="quest-round" hover-class="none" bindtap="showQuestRecord" disabled="{{item.key===null}}" data-key="{{item.key}}" aria-label="{{item.label}}">
+            <view aria-hidden="true" class="quest-disc {{item.result}} {{item.protectedRound?'protected':''}}"><view wx:if="{{item.result!=='pending'}}" class="quest-mark" /></view>
+            <text aria-hidden="true">{{item.number}}</text>
+          </button>
+        </view>
       </view>
       <view wx:if="{{room.phase!=='lobby' && room.team.length}}" class="seat-team-summary"><view class="seat-team-dot" aria-hidden="true" /><text class="seat-team-label">任务队伍 ·</text><text class="seat-team-seats">{{teamText}}号</text></view>
       <view class="section-title history-heading">

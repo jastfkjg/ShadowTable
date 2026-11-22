@@ -3,6 +3,18 @@ const assert = require('node:assert/strict');
 const historyUI = require('../miniprogram/public-history');
 
 const room = { code: '123456', game: 1, phase: 'tools' };
+test('公开任务详情只在保护轮说明失败票门槛', () => {
+  const standard = { capacity: 8, flexible: false };
+  const custom = { capacity: 8, flexible: true };
+  const note = '至少 2 张失败票才失败';
+  for (const kind of ['quest', 'toolQuest']) {
+    assert.equal(historyUI.questThresholdLabel(standard, { kind, round: 4, threshold: 1 }), '');
+    assert.equal(historyUI.questThresholdLabel(custom, { kind, round: 1, threshold: 2 }), note);
+  }
+  assert.equal(historyUI.questThresholdLabel(standard, { kind: 'quest', round: 4 }), note);
+  assert.equal(historyUI.questThresholdLabel(custom, { kind: 'toolQuest', number: 4 }), '');
+});
+
 function model() {
   const history = [
     { key: 0, category: 'vote', text: '投票通过', voteGroups: [{ count: 3, label: '赞成', tone: 'approve', seats: '1、10、12 号' }, { count: 0, label: '反对', tone: 'reject', seats: '无' }] },

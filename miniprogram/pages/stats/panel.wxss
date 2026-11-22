@@ -41,7 +41,6 @@ button.stats-role-tile { display:flex; align-items:center; justify-content:flex-
 .stats-role-name>view:last-child { min-width:0; }
 .stats-role-record { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; margin-top:2px; color:var(--muted); font-size:12px; line-height:1.5; font-variant-numeric:tabular-nums; }
 .stats-role-separator { opacity:.7; }.stats-role-rate { color:var(--text); }
-.stats-role-hint,.stats-scope-note { margin-top:18px; text-align:center; color:var(--muted); font-size:11px; line-height:1.6; }
 .stats-roles-empty { padding:24px 0; color:var(--muted); text-align:center; font-size:13px; }
 .stats-empty { padding:28px 4px 8px; font-size:14px; }.stats-empty .small { margin-top:8px; font-size:12px; }
 .stats-share-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:4px 4px 0; color:var(--muted); font-size:12px; line-height:1.6; }

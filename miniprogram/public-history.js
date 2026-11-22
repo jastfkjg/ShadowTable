@@ -29,6 +29,14 @@
     return Number.isInteger(source.actor) && source.actor > 0 && Number.isInteger(source.target) && source.target > 0
       ? `${source.actor}号查验了${source.target}号` : "";
   }
+  function isProtectedRound(room, number, threshold, source) {
+    return threshold != null ? threshold === 2
+      : (!room.flexible || source?.kind === "quest") && room.capacity >= 7 && number === 4;
+  }
+  function questThresholdLabel(room, source) {
+    if (source.kind !== "quest" && source.kind !== "toolQuest") return "";
+    return isProtectedRound(room, source.round, source.threshold, source) ? "至少 2 张失败票才失败" : "";
+  }
   function questRounds(room, quests) {
     if (room.phase === "lobby") return [];
     const activeQuest = room.activity?.kind === "quest" ? room.activity : null;
@@ -38,8 +46,7 @@
       const entry = quests[index];
       const source = entry ? room.history[entry.key] : null;
       const threshold = source?.threshold ?? (index === quests.length ? activeQuest?.threshold : null);
-      const protectedRound = threshold != null ? threshold === 2
-        : (!room.flexible || source?.kind === "quest") && room.capacity >= 7 && number === 4;
+      const protectedRound = isProtectedRound(room, number, threshold, source);
       const result = entry?.questResult || "pending";
       const status = { success: "成功", failure: "失败", pending: "未结算" }[result];
       return { number, key: entry?.key ?? null, result, protectedRound,
@@ -113,5 +120,5 @@
     const patch = { historyExpandedRows: { ...state.historyExpandedRows, [key]: !state.historyExpandedRows[key] } };
     return { ...patch, visibleHistory: rows({ ...state, ...patch }, state.history || []) };
   }
-  return { initialData, category, inspectionLabel, questRounds, sync, open, filter, toggleRow };
+  return { initialData, category, inspectionLabel, questThresholdLabel, questRounds, sync, open, filter, toggleRow };
 });

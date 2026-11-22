@@ -1,5 +1,5 @@
-const api = require('./api');
-const { catalogue, presentCollection, MAX_EQUIPPED } = require('./badges');
+const api = require('../../api');
+const { catalogue, presentCollection, MAX_EQUIPPED } = require('../../badges');
 const initialBadgeManager = { badgeCollection: null, badgeTotalCount: catalogue.length, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '', badgePickerChoice: null, badgePlaced: null };
 function badgeManagerMethods() {
   return {

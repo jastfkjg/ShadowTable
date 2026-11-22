@@ -8,8 +8,7 @@ const positiveInteger = (name, fallback, maximum = 3650) => {
   return value;
 };
 const cleanupPolicy = {
-  lobbyDays: positiveInteger("ROOM_LOBBY_RETENTION_DAYS", 7), graceDays: positiveInteger("ROOM_GRACE_DAYS", 3),
-  endedDays: positiveInteger("ROOM_ENDED_RETENTION_DAYS", 3), entryDays: positiveInteger("ROOM_ENTRY_RETENTION_DAYS", 90),
+  entryDays: positiveInteger("ROOM_ENTRY_RETENTION_DAYS", 90),
   receiptDays: positiveInteger("RECEIPT_RETENTION_DAYS", 90), batchSize: positiveInteger("CLEANUP_BATCH_SIZE", 100, 1000),
   intervalMs: positiveInteger("CLEANUP_INTERVAL_MINUTES", 60, 1440) * 60000,
 };
@@ -24,7 +23,6 @@ const { server, store } = createApp({
   webOrigin: process.env.WEB_ORIGIN,
   webWechatLogin: process.env.WECHAT_WEB_LOGIN === "1",
   database,
-  endedRoomRetentionDays: cleanupPolicy.endedDays,
   trustedProxies: process.env.TRUSTED_PROXY_CIDRS || "",
   devAuth,
   devPanel: process.env.DEV_PANEL === "1",

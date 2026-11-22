@@ -1381,8 +1381,8 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   const r = newRoom("123456", "host", "房主", "classic", 8);
   r.phase = "tools";
   r.history = [
-    { kind: "toolQuest", number: 1, team: [1, 3], fails: 1, success: false },
-    { kind: "toolQuest", number: 2, team: [1, 3], fails: 0, success: true },
+    { kind: "toolQuest", number: 1, team: [1, 3], fails: 1, threshold: 1, success: false },
+    { kind: "toolQuest", number: 2, team: [1, 3], fails: 0, threshold: 2, success: true },
     { kind: "toolVote", number: 3, team: [1, 4], approved: true, votes: [{ seat: 1, approve: true }], startedAt: new Date(2026, 8, 21, 23, 38).getTime() },
     { kind: "variant", resultType: "conversion", text: "本轮阵营转换", startedAt: new Date(2026, 8, 21, 23, 40).getTime() },
   ];
@@ -1391,6 +1391,8 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   assert.equal(c.state.latestResult.text, "本轮阵营转换");
   assert.equal(c.state.history[2].resultTone, "success");
   assert.equal(c.state.history[0].resultTone, "failure");
+  assert.equal(c.state.history[0].thresholdLabel, "");
+  assert.equal(c.state.history[1].thresholdLabel, "至少 2 张失败票才失败");
   assert.equal(c.state.history[2].timeLabel, "23:38");
   assert.equal(c.state.history[0].timeLabel, "");
   let html = c.viewRoom();
@@ -1418,7 +1420,7 @@ test('网页任务与投票详情在收起时隐藏，点击展开后呈现队�
   c.state.room = dealtWebRoom();
   c.state.dealtIdentityDialog = false;
   c.state.history = [
-    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }] },
     { key: 1, category: 'vote', text: '投票通过', timeLabel: '15:51', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '10、12 号' }] },
     { key: 2, category: 'other', text: '仙女查验已完成', timeLabel: '15:52' },
   ];
@@ -1431,7 +1433,7 @@ test('网页任务与投票详情在收起时隐藏，点击展开后呈现队�
     html = c.viewHistorySheet();
     assert.match(html, /public-history-details/);
     assert.match(html, key === 0 ? /成功 3 张/ : /2票赞成/);
-    if (key === 0) assert.match(html, /至少 1 张失败票才失败/);
+    assert.doesNotMatch(html, /失败票才失败/);
     c.ACTIONS.toggleHistoryRow({ dataset: { key: String(key) } });
     assert.doesNotMatch(c.viewHistorySheet(), /public-history-details/);
   }
@@ -1578,7 +1580,7 @@ test("网页技能先选再确认，过期和后台草稿不提交", async () =>
   c.ACTIONS.submitChoice({ dataset: { value: "pass" } });
   assert.match(c.viewActionDialog(), /确认本轮不开刀/);
   assert.doesNotMatch(c.viewActionDialog(), /skill-target-heading|skill-target-grid|skill-target-caption/);
-  c.ACTIONS.submitChoice({ dataset: { value: "pick-sword-target" } });
+  c.ACTIONS.submitChoice({ dataset: { value: "pick-skill-target" } });
   assert.match(c.viewActionDialog(), /skill-target-grid/);
   assert.match(c.viewActionDialog(), /请先选择目标/);
   c.ACTIONS.confirmChoice();
@@ -1630,7 +1632,7 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       await choose("pass");
       assert.doesNotMatch(c.viewActionDialog(), /toggleSkillHelp|A 牌刀客或 B 牌角色|可攻击其他任意身份/);
       assert.match(c.viewActionDialog(), /确认本轮不开刀/);
-      await choose("pick-sword-target");
+      await choose("pick-skill-target");
     }
     if (role === 'redSwordsman') assert.match(c.viewActionDialog(), /A 牌刀客或 B 牌角色.*刺客只失去技能/);
     else if (mode === 'sword') {
@@ -1638,6 +1640,14 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       assert.doesNotMatch(c.viewActionDialog(), /刺客只失去技能/);
     } else assert.doesNotMatch(c.viewActionDialog(), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
     assert.doesNotMatch(JSON.stringify(room), /swordHint|刺客只失去技能/);
+    if (c.state.actionChoices.some(choice => choice.value === "pass")) {
+      assert.equal(c.viewActionDialog().match(/data-value="pass"/g).length, 1, role);
+      await choose("pass");
+      assert.doesNotMatch(c.viewActionDialog(), /skill-target-grid|skill-target-heading/, role);
+      await choose("pick-skill-target");
+      assert.equal(c.state.draftChoice, "", role);
+      assert.match(c.viewActionDialog(), /skill-target-grid/, role);
+    }
     const grid = mode === "swap" ? c.state.swapPlayers : c.state.skillTargets;
     assert.equal(grid.length, 12, role);
     assert.equal(!grid.find(t => t.seat === 2).disabledReason, selfAllowed, role);
@@ -1654,6 +1664,7 @@ test("网页十二骑士选人技能统一网格，双选与特殊目标仍提�
       await choose("pass");
       assert.equal(c.state.swapSeats.length, 0);
       assert.ok(c.state.swapPlayers.every(t => !t.selected));
+      await choose("pick-skill-target");
       toggle(2); toggle(7);
       assert.equal(c.state.swapPlayers.find(t => t.seat === 5).disabledReason, "已出局");
     } else {

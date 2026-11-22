@@ -515,11 +515,11 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
 
 test('结束牌桌显示本人得分或房主关闭计分的原因，准备页没有历史结算',()=>{
   const room={phase:'ended',capacity:6,me:{seat:1},team:[],players:[],history:[],result:{winner:'good',reason:'对局已归档',source:'system'},myScore:{status:'scored',total:7,breakdown:[{id:'remote',label:'服务端奖励',points:7}]}};
-  const ended=render({...base,room});assert.match(JSON.stringify(ended),/本局 \+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);
+  const ended=render({...base,room});assert.match(JSON.stringify(ended),/我的积分.*\+7 分/);assert.match(JSON.stringify(ended),/服务端奖励/);
   room.myScore={status:'excluded',reason:'本局未开启计分'};assert.match(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
   room.phase='lobby';assert.doesNotMatch(JSON.stringify(render({...base,room})),/不计积分 · 本局未开启计分/);
 });
-test('最终结果替换顶部最近操作，积分和再开一局在同一卡片，覆盖零分、排除及终止', () => {
+test('最终结果与赛后操作分卡，覆盖各阵营、零分、排除及终止', () => {
   const room = { phase:'ended', phaseName:'对局结束', flexible:true, capacity:6, team:[], me:{seat:1,isHost:true}, scoreSettings:{enabled:true} };
   for (const [winner, title] of [['good','好人获胜'],['evil','坏人获胜'],['third','盗贼阵营获胜'],[null,'以线下结算为准']]) {
     for (const total of [0, 7, -2]) {
@@ -529,12 +529,14 @@ test('最终结果替换顶部最近操作，积分和再开一局在同一卡�
       const final = nodes(dynamic).find(n => n.attr?.class === 'final-result');
       assert.ok(final);
       assert.match(JSON.stringify(final), new RegExp(title));
-      assert.ok(JSON.stringify(final).includes(`本局 ${total>=0?'+':''}${total} 分`));
       const scoreHeading = nodes(final).find(n => n.attr?.class === 'final-result-score-heading');
-      assert.ok(JSON.stringify(scoreHeading).includes(`本局 ${total>=0?'+':''}${total} 分`));
+      assert.match(JSON.stringify(scoreHeading), /我的积分/);
+      assert.ok(JSON.stringify(scoreHeading).includes(`${total>=0?'+':''}${total} 分`));
       assert.ok(byHandler(scoreHeading, 'viewScoreRecord'));
       assert.equal(nodes(final).filter(n => n.attr?.bindtap === 'viewScoreRecord').length, 1);
-      assert.ok(byHandler(final, 'rematch'));
+      const actions = dynamic.children.find(n => n.attr?.class === 'postgame-actions');
+      assert.ok(byHandler(actions, 'rematch'));
+      assert.ok(!byHandler(final, 'rematch'));
       assert.equal(flat.filter(n => n.attr?.class === 'final-result').length, 1);
       assert.ok(!flat.some(n => n.attr?.class === 'latest-result' || n.attr?.class === 'phase-strip' || n.attr?.class === 'score-result'));
       assert.doesNotMatch(JSON.stringify(dynamic), /本轮不转换|最近结果/);
@@ -551,6 +553,22 @@ test('最终结果替换顶部最近操作，积分和再开一局在同一卡�
     assert.match(JSON.stringify(final), /不计积分 · 本局未开启计分/);
     assert.ok(!byHandler(final, 'viewScoreRecord'));
   }
+});
+test('结算卡省略重复的单项胜分，保留多项明细和本人有效趣味记录', () => {
+  const win = {id:'good_win',label:'好人获胜',points:9};
+  const shield = {id:'shield',label:'替梅林挡刀',points:6};
+  const room = {phase:'ended',team:[],me:{seat:3},result:{winner:'good'},myScore:{status:'scored',total:9,breakdown:[win]}};
+  const result = data => nodes(render({...base,room:data})).find(n => n.attr?.class === 'final-result');
+  const awards = node => nodes(node).filter(n => n.attr?.class === 'score-award');
+  assert.equal(awards(result(room)).length, 0);
+  assert.ok(byHandler(result(room), 'viewScoreRecord'));
+  assert.ok(!byHandler(result(room), 'viewFunRecord'));
+  assert.equal(awards(result({...room,myScore:{...room.myScore,total:8}})).length, 1);
+  const fun = {hasEffectiveHighlights:true,highlights:[{id:'shield',label:'挡刀',count:1,unit:'次'}]};
+  const card = result({...room,myScore:{status:'scored',total:15,breakdown:[win,shield]},myFun:fun});
+  assert.equal(awards(card).length, 3);
+  assert.ok(byHandler(card, 'viewFunRecord'));
+  assert.ok(!byHandler(result({...room,myFun:{...fun,hasEffectiveHighlights:false}}), 'viewFunRecord'));
 });
 test('房主始终位于座位右上角，湖仙徽章独立于头像并保留任务和出局状态', () => {
   const seat = {seat:1,name:'甲',occupied:true,mine:true,host:true,alive:false,inTeam:true};
@@ -1566,7 +1584,7 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
 test('任务和投票收起仅显示摘要，展开后完整展示队伍票数，所有记录保留时间与箭头列', () => {
   const historyUI = require('../miniprogram/public-history');
   const history = [
-    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }], thresholdLabel: '至少 1 张失败票才失败' },
+    { key: 0, category: 'quest', text: '任务成功', timeLabel: '15:50', teamLabel: '2、4、6 号', cards: [{ label: '成功', count: 3, tone: 'success' }] },
     { key: 1, category: 'vote', text: '投票通过', timeLabel: '15:51', teamLabel: '10、12 号', voteGroups: [{ label: '赞成', count: 2, tone: 'approve', seats: '10、12 号' }] },
     { key: 2, category: 'other', text: '本轮不转换', timeLabel: '15:52' },
   ];
@@ -1591,7 +1609,8 @@ test('任务和投票收起仅显示摘要，展开后完整展示队伍票数�
     assert.ok(!nodes(summary).some(n => ['public-history-team', 'public-history-counts'].includes(n.attr?.class)));
     assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-team'));
     assert.ok(nodes(details).some(n => n.attr?.class === 'public-history-counts'));
-    assert.match(JSON.stringify(details), key === 0 ? /至少 1 张失败票才失败/ : /2票赞成/);
+    assert.match(JSON.stringify(details), key === 0 ? /成功 3 张/ : /2票赞成/);
+    assert.doesNotMatch(JSON.stringify(details), /失败票才失败/);
     Object.assign(state, historyUI.toggleRow(state, key));
     assert.ok(!nodes(records(render(state)).find(n => n.attr.id === `history-record-${key}`)).some(n => n.attr?.class === 'public-history-details'));
   }
@@ -1637,28 +1656,35 @@ test("动态区仅等待及结束时显示结果，操作中提交前后均隐�
   assert.ok(!nodes(empty).some(n => n.attr?.class === "latest-result"));
 });
 
-test("最近结果内的任务票只展示已经翻开的正面，跳过后恢复原结果", () => {
+test("翻票结束后原位保留匿名票面，进度行换成红绿结论和任务成员", () => {
   const room = { phase: "tools", phaseName: "等待房主发起操作", team: [], me: { seat: null } };
-  const latestResult = { key: 0, questResult: "success", text: "任务成功", detail: "1、3、6、7、11号 · 1张失败票" };
+  const latestResult = { key: 0, questResult: "success", teamLabel: "1、3、6、7、11 号" };
   const cards = ["success", "success", "magic", "thiefFail", "fail"].map((kind, index) => ({
     index, kind, label: kind === "magic" ? "魔法票" : "任务票",
   }));
-  const panel = questReveal => nodes(renderTable({ ...base, room, latestResult, questReveal })).find(n => n.attr?.class === "latest-result");
-  const active = panel({ cards, columns: 5, turnMs: 520, revealed: 3 });
+  const questTickets = { cards, columns: 5 };
+  const panel = (questReveal, result = latestResult) => nodes(renderTable({ ...base, room, latestResult: result, questTickets, questReveal })).find(n => n.attr?.class === "latest-result");
+  const active = panel({ turnMs: 520, revealed: 3 });
   const tickets = nodes(active).filter(n => n.attr?.class === "quest-ticket");
   assert.equal(tickets.length, 5);
   assert.match(JSON.stringify(tickets[2]), /魔法票/);
   assert.match(JSON.stringify(tickets[3]), /未翻开/);
-  assert.doesNotMatch(JSON.stringify(active), /thiefFail\.jpg|fail\.jpg|任务成功|11号/);
-  const allUp = panel({ cards, columns: 5, turnMs: 520, revealed: 5 });
+  assert.doesNotMatch(JSON.stringify(active), /thiefFail\.jpg|fail\.jpg|任务成功|成员/);
+  const allUp = panel({ turnMs: 520, revealed: 5 });
+  assert.doesNotMatch(JSON.stringify(allUp), /任务成功|成员/);
   assert.deepEqual(nodes(allUp).filter(n => n.attr?.class === "quest-ticket-front").map(n => n.attr.src),
     cards.map(card => "/assets/quest-tickets/" + card.kind + ".jpg"));
   assert.equal(nodes(active).filter(n => n.attr?.class === "quest-ticket-turn is-up").length, 3);
   assert.ok(byHandler(active, "finishQuestReveal"));
-  const done = panel(null);
-  assert.match(JSON.stringify(done), /任务成功/);
-  assert.match(JSON.stringify(done), /1张失败票/);
-  assert.ok(!byHandler(done, "finishQuestReveal"));
+  for (const [tone, verdict] of [["success", "任务成功"], ["failure", "任务失败"]]) {
+    const done = panel(null, { ...latestResult, questResult: tone });
+    const elements = nodes(done);
+    assert.deepEqual(elements.filter(n => n.attr?.class === "quest-ticket-front").map(n => n.attr.src),
+      cards.map(card => "/assets/quest-tickets/" + card.kind + ".jpg"));
+    assert.match(JSON.stringify(elements.find(n => n.attr?.class === "quest-verdict " + tone).children), new RegExp(verdict));
+    assert.match(JSON.stringify(done), /成员 1、3、6、7、11 号/);
+    assert.doesNotMatch(JSON.stringify(done), /quest-result-icon|已翻|跳过|未翻开/);
+  }
 });
 
 test("旧房间摘要缺少字段时不伪造房主、活动时间或离开限制", () => {
@@ -1742,6 +1768,16 @@ test("十二骑士原生选人弹窗统一座位与禁用原因，猎人返回�
       ...presentation.skillView(room, options, !!secret.action.hunterModes, secret.action.hunterModes ? mode : "", swapOptions, secret.action.unavailableHint, secret.action.swordHint) };
     const initial = render(data);
     assert.doesNotMatch(JSON.stringify(initial), /A 牌刀客或 B 牌角色|可攻击其他任意身份/);
+    if (options.some(choice => choice.value === "pass")) {
+      const pick = nodes(initial).find(n => n.attr?.["data-value"] === "pick-skill-target");
+      const skip = nodes(initial).filter(n => n.attr?.["data-value"] === "pass");
+      assert.equal(pick.attr.ariaPressed, true, role);
+      assert.equal(skip.length, 1, role);
+      assert.ok(skip[0].attr.class.includes("skill-mode"), role);
+      const skipped = render({ ...data, draftChoice: "pass", ...presentation.skillSelectionView("pass", mode) });
+      assert.doesNotMatch(JSON.stringify(skipped), /skill-target-grid|skill-target-heading/, role);
+      assert.equal(byHandler(skipped, "confirmChoice").attr.disabled, false, role);
+    }
     if (mode === "sword") {
       assert.ok(byHandler(initial, "toggleSkillHelp"));
       const pass = render({ ...data, draftChoice: "pass", skillHelpExpanded: true, ...presentation.skillSelectionView("pass", mode) });
@@ -2124,7 +2160,7 @@ test('最终结果为所有玩家显示获奖头像昵称号码票数，平票�
   assert.doesNotMatch(JSON.stringify(polling),/剩余|截止前可修改|关闭后可从牌桌继续|NaN/);
 });
 
-test('等待票选仅显示简短提示，房主显示未投名单和结束入口',()=>{
+test('投票中房主可展开未投名单，再开一局是主操作，玩家仅能操作自己的选票',()=>{
   const hp=require('../miniprogram/honors');
   const room={code:'123456',phase:'ended',result:{winner:'good'},capacity:6,me:{seat:1,isHost:false},players:[],history:[],team:[]};
   const data={...base,room,network:true};
@@ -2133,14 +2169,24 @@ test('等待票选仅显示简短提示，房主显示未投名单和结束入�
   assert.doesNotMatch(waiting,/胜方 MVP|可选环节|每局仅一次|等待房主选择/);
   const start=renderTable({...data,honors:hp.present({status:'not_started',canStart:true})});
   assert.ok(byHandler(start,'startHonors'));
-  const open=hp.present({status:'open',canVote:true,canClose:true,total:6,completed:2,required:3,
+  const open=hp.present({status:'open',canVote:true,canClose:true,total:6,completed:4,required:3,
     pendingPlayers:[{seat:3,name:'林间'},{seat:5,name:'晚风'}]});
-  const host=renderTable({...data,honors:open});
-  assert.match(JSON.stringify(host),/未投票：3号 林间、5号 晚风/);
-  assert.ok(byHandler(host,'closeHonors'));
-  assert.doesNotMatch(JSON.stringify(host),/剩余|NaN/);
-  const player=renderTable({...data,honors:hp.present({...open,canClose:false})});
-  assert.doesNotMatch(JSON.stringify(player),/未投票：/);
+  const hostData={...data,room:{...room,me:{seat:1,isHost:true}},honors:open};
+  const host=renderTable(hostData);
+  assert.match(JSON.stringify(byHandler(host,'toggleHonorPending')),/未投票 2 人/);
+  assert.doesNotMatch(JSON.stringify(host),/林间|晚风|NaN/);
+  assert.equal(byHandler(host,'rematch').attr.class,'primary');
+  assert.match(byHandler(host,'closeHonors').attr.class,/secondary/);
+  assert.match(JSON.stringify(byHandler(host,'openHonors')),/去投票/);
+  const expanded=renderTable({...hostData,honorPendingExpanded:true,honors:{...open,ballot:{mvp:3,svp:5}}});
+  const roster=nodes(expanded).filter(n=>n.attr?.class==='honor-host-player');
+  assert.deepEqual(roster.map(n=>n.children.map(child=>child.children.join('')).join(' ')),['3号 林间','5号 晚风']);
+  assert.match(JSON.stringify(byHandler(expanded,'toggleHonorPending')),/收起名单/);
+  assert.match(JSON.stringify(byHandler(expanded,'openHonors')),/修改投票/);
+  const player=renderTable({...data,honorPendingExpanded:true,honors:hp.present({...open,canClose:false})});
+  assert.equal(byHandler(player,'toggleHonorPending'),undefined);
+  assert.doesNotMatch(JSON.stringify(player),/林间|晚风/);
+  assert.match(byHandler(player,'openHonors').attr.class,/primary/);
   assert.equal(byHandler(player,'closeHonors'),undefined);
 });
 

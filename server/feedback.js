@@ -87,8 +87,10 @@ function list(store, uid, params) {
     where.push("f.id<?"); args.push(Number(before));
   }
   const status = params.get("status") || "all";
-  requireValue(["all", "pending", "replied"].includes(status), "状态无效");
-  if (status !== "all") where.push(status === "pending" ? "f.repliedAt IS NULL" : "f.repliedAt IS NOT NULL");
+  requireValue(["all", "pending", "replied", "accepted"].includes(status), "状态无效");
+  if (status === "pending") where.push("f.repliedAt IS NULL AND f.acceptedAt IS NULL");
+  if (status === "replied") where.push("f.repliedAt IS NOT NULL");
+  if (status === "accepted") where.push("f.acceptedAt IS NOT NULL");
   const admin = uid === null;
   const rows = store.db.prepare(`SELECT ${columns}${admin ? ",p.nickname" : ""} FROM feedback f
     ${admin ? "LEFT JOIN profiles p ON p.uid=f.uid" : ""}

@@ -255,7 +255,7 @@ test('小程序达到3枚时阻止额外佩戴请求，仍可摘下', async () =
   const api=require('../miniprogram/api'),request=api.request,requestId=api.requestId;
   let calls=0;
   api.request=async()=>{calls++;return {badges:catalogue.slice(0,4).map(b=>({...b,equipped:false})),version:1};};api.requestId=()=>randomUUID();
-  const {initialBadgeManager,badgeManagerMethods}=require('../miniprogram/badge-manager');
+  const {initialBadgeManager,badgeManagerMethods}=require('../miniprogram/pages/badges/badge-manager');
   const p={alive:true,data:{...initialBadgeManager,badgeCollection:{badges:catalogue.slice(0,4).map((b,i)=>({...b,equipped:i<3})),version:0,periodStart:1}},setData(v){Object.assign(this.data,v);},...badgeManagerMethods()};
   try {
     await p.toggleOwnedBadge({currentTarget:{dataset:{id:catalogue[3].id}}});
