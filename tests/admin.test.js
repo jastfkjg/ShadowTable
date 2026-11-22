@@ -1159,6 +1159,10 @@ test("回复和采纳互相独立，首次采纳发放永久羽笔，重复采�
   assert.equal((await a.api(notices, undefined, other)).notice, null);
   await a.api(notices, { through: notice.through }, loginAgain);
   assert.equal((await a.api(action(second, "accept"), {})).awarded, false);
+  const filteredIds = async status => (await a.api("/api/admin/feedback?status=" + status)).items.map(row => row.id);
+  assert.deepEqual(await filteredIds("accepted"), [second.id, first.id]);
+  assert.deepEqual(await filteredIds("replied"), [first.id]);
+  assert.deepEqual(await filteredIds("pending"), []);
   assert.equal((await a.api(inbox, undefined, loginAgain)).items[0].reply, "");
   await a.api(action(second, "reply"), { reply: "这个建议已采用。" });
   const { items } = await a.api(inbox, undefined, loginAgain);

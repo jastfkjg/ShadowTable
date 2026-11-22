@@ -31,9 +31,7 @@
           </button>
         </view>
         <view wx:if="{{roleRows && !roleRows.length}}" class="stats-roles-empty">该阵营暂无角色战绩</view>
-        <view class="stats-role-hint">点击角色，查看战绩</view>
       </view>
-      <view class="stats-scope-note">胜率按结算时的角色与阵营统计</view>
     </view>
     <view wx:else class="stats-empty"><view>暂无有效对局</view><view class="small muted">完成并登记胜负后，这里会展示你的战绩。</view></view>
   </block>

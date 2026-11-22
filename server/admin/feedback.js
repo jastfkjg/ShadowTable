@@ -14,10 +14,14 @@
     card.className = "feedback-ticket";
     const summary = document.createElement("summary");
     const meta = el("span", "", "ticket-meta");
-    meta.append(el("span", item.reply ? "已回复" : "待回复", item.reply ? "ticket-done" : "ticket-pending"),
-      el("span", [item.category, item.area].filter(Boolean).join(" · ")));
-    const adoption = el("span", "已采纳", "ticket-done");
-    if (item.acceptedAt != null) meta.append(adoption);
+    function updateMeta() {
+      meta.replaceChildren();
+      if (item.reply) meta.append(el("span", "已回复", "ticket-done"));
+      if (item.acceptedAt != null) meta.append(el("span", "已采纳", "ticket-done"));
+      else if (!item.reply) meta.append(el("span", "待回复", "ticket-pending"));
+      meta.append(el("span", [item.category, item.area].filter(Boolean).join(" · ")));
+    }
+    updateMeta();
     summary.append(meta, el("strong", item.content, "ticket-excerpt"),
       el("span", (item.nickname || "玩家") + " · " + timestamp(item.created), "ticket-byline"));
     card.append(summary);
@@ -53,10 +57,15 @@
         try {
           const result = await api("feedback/" + item.id + "/accept", {});
           if (!list.contains(card)) return;
-          meta.append(adoption);
+          item.acceptedAt = result.acceptedAt;
+          updateMeta();
           decisionStatus.textContent = acceptedText(result.acceptedAt)
             + (result.awarded ? " · 已发放「共建者」徽章" : " · 玩家已拥有「共建者」徽章");
           accept.remove();
+          if (filter === "pending") {
+            card.remove();
+            status.textContent = decisionStatus.textContent + "。" + (list.childElementCount || next ? "" : "当前没有待回复的反馈。");
+          }
         } catch (error) {
           decisionStatus.textContent = error.message;
           accept.disabled = false;
@@ -100,8 +109,8 @@
           if (!list.contains(card)) return;
           form.remove();
           renderReply(reply, Date.now());
-          const badge = meta.firstElementChild;
-          badge.textContent = "已回复"; badge.className = "ticket-done";
+          item.reply = reply;
+          updateMeta();
           if (filter === "pending") card.remove();
           status.textContent = list.childElementCount || next ? "回复已发送。" : "回复已发送，当前没有待回复的反馈。";
         } catch (e) {
@@ -127,7 +136,7 @@
       if (version !== revision) return;
       for (const item of page.items) list.append(record(item));
       next = page.next;
-      status.textContent = list.childElementCount ? "" : ({ pending: "当前没有待回复的反馈。", replied: "还没有已回复的反馈。", all: "还没有玩家提交反馈。" })[filter];
+      status.textContent = list.childElementCount ? "" : ({ pending: "当前没有待回复的反馈。", replied: "还没有已回复的反馈。", accepted: "还没有已采纳的反馈。", all: "还没有玩家提交反馈。" })[filter];
     } catch (e) {
       if (revision === version) status.textContent = e.message + "，可点击「" + (append ? "加载更多" : "刷新列表") + "」重试。";
     } finally {
