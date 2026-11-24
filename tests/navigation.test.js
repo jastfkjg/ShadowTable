@@ -2917,8 +2917,14 @@ test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作�
   assert.equal(p.data.selectedBadge.imageUrl,'https://test.invalid/assets/badges/percival_assassinated.png');
   p.showBadgeDetail(event('points')); assert.equal(p.data.selectedBadge.owned,false);
   await p.toggleOwnedBadge(event('points')); assert.equal(writes.length,0);
-  p.chooseBadgeFilter(event('owned')); p.showBadgeDetail(event('games'));
+  p.chooseBadgeFilter(event('owned'));
+  p.chooseBadgeFilter({currentTarget:{dataset:{category:'荣誉徽章'}}});
+  assert.equal(p.data.badgeCollection.visibleBadges.length, 0);
+  p.chooseBadgeFilter({currentTarget:{dataset:{category:'趣味徽章'}}});
+  assert.equal(p.data.badgeCollection.visibleBadges.length, 2);
+  p.showBadgeDetail(event('games'));
   await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,1);
+  assert.equal(p.data.badgeCollection.category, '趣味徽章');
   assert.equal(p.data.selectedBadge,null); assert.equal(writes[0].periodStart,current.periodStart);
   await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,2);
   p.back(); assert.deepEqual(navigations,['back']);

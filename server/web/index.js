@@ -81,11 +81,12 @@ for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const role of require("../../miniprogram/role-portraits").assetNames)
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
-const { catalogue, usesServerArt } = require('../../miniprogram/badges');
+const { catalogue, usesServerArt, rankedBadge } = require('../../miniprogram/badges');
 const serverBadgeArt = new Set();
 for (const badge of catalogue) {
   if (usesServerArt(badge)) serverBadgeArt.add(badge.imageUrl);
   else assets[badge.imageUrl] = ['../../miniprogram' + badge.imageUrl, 'image/png'];
+  if (badge.metric === 'podium') for (const rank of [2, 3]) serverBadgeArt.add(rankedBadge(badge, rank).imageUrl);
   if (badge.largeImageUrl) serverBadgeArt.add(badge.largeImageUrl);
 }
 for (const url of serverBadgeArt)

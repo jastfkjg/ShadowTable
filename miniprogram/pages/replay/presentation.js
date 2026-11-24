@@ -50,13 +50,16 @@ function event(raw, initialPlayers) {
     if (raw.earlyClosed) footer = "提前截止，未提交者记为弃权";
   } else if (raw.kind === "quest") {
     title = "任务结果"; badge = raw.success ? "任务成功" : "任务失败"; tone = raw.success ? "good" : "evil";
-    summary = `${(raw.team || []).length - raw.fails}张成功 · ${raw.fails}张失败 · 失败门槛${raw.threshold}张`;
-    stats = [statistic("success", (raw.team || []).length - raw.fails, "成功票", "good"),
-      statistic("fail", raw.fails, "失败票", "evil"), statistic("threshold", raw.threshold, "失败门槛")];
     teamLabel = seats(raw.team);
+    if (Number.isInteger(raw.fails)) {
+      stats = [statistic("success", raw.team.length - raw.fails, "成功票", "good"),
+        statistic("fail", raw.fails, "失败票", "evil")];
+    }
+    if (Number.isInteger(raw.threshold)) stats.push(statistic("threshold", raw.threshold, "失败门槛"));
+    summary = stats.length ? stats.map(s => s.value + s.unit + s.label).join(" · ") : "任务队伍 " + teamLabel;
     rows = (raw.cards || []).map((card, i) => ({ id: i,
       headline: card.actor ? card.actor.seat + "号 " + (card.actor.name || card.actor.role || "") : "玩家未记录",
-      detail: card.value === "success" ? "成功" : card.value === "fail" ? "失败" : "未记录",
+      detail: (card.value === "success" ? "成功" : card.value === "fail" ? "失败" : "未记录") + (card.defaulted ? "（系统补票）" : ""),
       tone: card.value === "fail" ? "evil" : card.value === "success" ? "good" : "neutral", relatedSeats: [card.actor?.seat].filter(Boolean) }));
     relatedSeats = raw.team || [];
   } else if (raw.kind === "conversion") {

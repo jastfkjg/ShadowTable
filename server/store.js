@@ -114,6 +114,7 @@ class Store {
         this.initializeLeaderboardProfile(row.uid);
       this.restoreCompanionMatches();
       this.restoreFunRecords();
+      require('./badge-awards').reconcileMilestones(this);
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);
         if (migrateKnights(room)) this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), row.code);
@@ -314,6 +315,7 @@ class Store {
     if (changed) {
       avoidanceRewards.reconcile(this, [match.id]);
       require('./badge-awards').reconcileParticipants(this);
+      require('./badge-awards').reconcileMilestones(this, participants.map(p => p.uid));
     }
   }
   requireActiveMatch(id) {
@@ -427,6 +429,7 @@ class Store {
     this.syncScoreRooms(id);
     this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
+    require('./badge-awards').reconcileMilestones(this, players.map(p => p.uid));
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision,
       ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }
@@ -471,6 +474,7 @@ class Store {
     }
     this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
+    require('./badge-awards').reconcileMilestones(this, players.map(p => p.uid));
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision,
       ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }

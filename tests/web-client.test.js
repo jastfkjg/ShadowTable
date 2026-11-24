@@ -2404,9 +2404,14 @@ test('网页荣誉入口进入独立路由，目录筛选与未拥有详情不�
   assert.equal(c.state.page,'badges'); assert.equal(c.viewNavigation(),'');
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length);
   assert.ok(c.viewBadgeManager().includes('已拥有 1 / ' + catalogue.length));assert.match(c.viewBadgeManager(),/金牌替身/);
-  assert.match(c.viewBadgeManager(),/data-action="badgeRules" aria-label="荣誉徽章规则"><img[^>]+\/><\/button>/);
+  assert.match(c.viewBadgeManager(),/data-action="badgeRules" aria-label="徽章规则"><img[^>]+\/><\/button>/);
   c.ACTIONS.badgeFilter({dataset:{id:'owned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,1);
+  c.ACTIONS.badgeCategory({dataset:{category:'荣誉徽章'}});
+  assert.match(c.viewBadgeManager(), /暂无已拥有的徽章/);
+  c.ACTIONS.badgeCategory({dataset:{category:'趣味徽章'}});
+  assert.match(c.viewBadgeManager(), /class="badge-tile-title">牌桌常青树</);
+  c.ACTIONS.badgeCategory({dataset:{category:'全部分类'}});
   c.ACTIONS.badgeFilter({dataset:{id:'unowned'}});
   assert.equal((c.viewBadgeManager().match(/class="badge-tile /g)||[]).length,catalogue.length - 1);
   c.ACTIONS.showBadgeDetail({dataset:{id:'merlin_bust_exit'}});

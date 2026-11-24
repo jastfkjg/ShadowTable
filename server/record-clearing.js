@@ -67,6 +67,7 @@ function clear(store, uid, input) {
   const insert = store.db.prepare("INSERT INTO player_record_clears VALUES(?,?,?,?)");
   for (const row of data.matches) insert.run(uid, "match", row.match_id, id);
   for (const row of data.adjustments) insert.run(uid, "adjustment", row.id, id);
+  if (data.matches.length) require('./badge-awards').reconcileMilestones(store, [uid]);
   store.touchScore(uid);
   store.db.prepare("INSERT INTO badge_versions VALUES(?,1) ON CONFLICT(uid) DO UPDATE SET version=version+1").run(uid);
   store.invalidateLeaderboard();

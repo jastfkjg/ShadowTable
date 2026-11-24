@@ -98,7 +98,7 @@ test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可�
     const card=await get(path,viewer);
     assert.equal(card.status,200);assert.equal(card.cache,'no-store');
     assert.deepEqual(card.data.player,{id,name:'公开昵称',avatarUrl:null,badges:card.data.player.badges});
-    assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','overall']);
+    assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','overall','alternating_streak']);
     assert.equal(card.data.stats.total,5);assert.equal(card.data.stats.wins,3);assert.equal(card.data.stats.winRate,60);
     assert.equal(card.data.stats.byFaction.length,2);
     assert.deepEqual(Object.keys(card.data.stats).sort(),['byFaction','scoreTotal','total','winRate','wins']);

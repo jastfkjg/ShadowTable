@@ -2,8 +2,9 @@
 const { Leaderboard, periodRange } = require('./leaderboard');
 const { RuleError } = require('./engine');
 const fun = require('./fun');
-const { catalogue, MAX_EQUIPPED, monthlyAward } = require('../miniprogram/badges');
+const { catalogue, MAX_EQUIPPED, monthlyAward, rankedBadge } = require('../miniprogram/badges');
 const { settleMonthly } = require('./badge-awards');
+const { monthlyAchievements } = require('./monthly-achievements');
 const boards = new WeakMap();
 function boardFor(store) {
   if (!boards.has(store)) boards.set(store, new Leaderboard(store));
@@ -15,8 +16,14 @@ function readBadges(store, uid, now = store.clock()) {
   const version = store.db.prepare('SELECT version FROM badge_versions WHERE uid=?').get(uid)?.version || 0;
   const preferences = new Map(store.db.prepare('SELECT badge_id,equipped FROM badge_preferences WHERE uid=? AND period_start IN (?,0)').all(uid, range.start).map(row => [row.badge_id, !!row.equipped]));
   const board = boardFor(store), badges = [];
-  if (/^(wx|dev):/.test(uid)) for (const definition of catalogue) {
+  const earned = /^(wx|dev|guest):/.test(uid) ? monthlyAchievements(store, now).get(uid)?.earned : null;
+  for (const definition of catalogue) {
     if (definition.permanent) continue;
+    if (definition.achievement) {
+      if (earned?.has(definition.id)) badges.push({ ...rankedBadge(definition, earned.get(definition.id)), equipped: false });
+      continue;
+    }
+    if (!/^(wx|dev):/.test(uid)) continue;
     const snapshot = definition.metric.startsWith('fun_')
       ? board.funSnapshot({ metric: definition.metric, period: 'month', funMetric: fun.metrics[definition.id], mode: 'all', role: null, sort: 'count' }, now)
       : board.snapshot(definition.metric, 'month', now);

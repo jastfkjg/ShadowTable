@@ -1,9 +1,9 @@
 <import src="../../loading-placeholder.wxml" />
-<app-nav title="荣誉徽章" back="{{true}}" backLabel="返回我的" bindback="back" />
+<app-nav title="徽章收藏" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page badge-page">
   <view class="badge-period-row">
     <text class="badge-period">{{badgeCollection ? badgeCollection.monthLabel : '本月荣誉'}}</text>
-    <button class="badge-rules" bindtap="showBadgeRules" aria-label="荣誉徽章规则" hover-class="badge-pressed">
+    <button class="badge-rules" bindtap="showBadgeRules" aria-label="徽章规则" hover-class="badge-pressed">
       <image class="badge-info-icon" src="/assets/record-info.svg" aria-hidden="true" />
     </button>
   </view>
@@ -42,16 +42,17 @@
       <text class="badge-collection-title">徽章收藏</text>
       <text class="badge-collection-total">已拥有 {{badgeCollection.ownedCount}} / {{badgeCollection.totalCount}}</text>
     </view>
-    <view class="badge-filters" aria-label="筛选徽章">
-      <button class="{{badgeFilter==='all'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="all" aria-pressed="{{badgeFilter==='all'}}" hover-class="badge-pressed">全部<text>{{badgeCollection.totalCount}}</text></button>
-      <button class="{{badgeFilter==='owned'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="owned" aria-pressed="{{badgeFilter==='owned'}}" hover-class="badge-pressed">已拥有<text>{{badgeCollection.ownedCount}}</text></button>
-      <button class="{{badgeFilter==='unowned'?'selected':''}}" bindtap="chooseBadgeFilter" data-id="unowned" aria-pressed="{{badgeFilter==='unowned'}}" hover-class="badge-pressed">未拥有<text>{{badgeCollection.unownedCount}}</text></button>
+    <view class="badge-filters" role="group" aria-label="徽章分类">
+      <button wx:for="{{badgeCollection.categories}}" wx:key="*this" class="{{badgeCollection.category===item?'selected':''}}" bindtap="chooseBadgeFilter" data-category="{{item}}" aria-pressed="{{badgeCollection.category===item}}" hover-class="badge-pressed">{{item}}</button>
     </view>
-    <view wx:if="{{!badgeCollection.visibleBadges.length}}" class="badge-empty-message">{{badgeFilter==='owned'?'暂无已拥有的徽章，点开徽章可查看获取条件。':'已拥有全部徽章。'}}</view>
+    <view class="badge-filters" role="group" aria-label="拥有状态">
+      <button wx:for="{{badgeCollection.ownershipFilters}}" wx:key="id" class="{{badgeFilter===item.id?'selected':''}}" bindtap="chooseBadgeFilter" data-id="{{item.id}}" aria-pressed="{{badgeFilter===item.id}}" hover-class="badge-pressed">{{item.title}}<text>{{item.count}}</text></button>
+    </view>
+    <view wx:if="{{!badgeCollection.visibleBadges.length}}" class="badge-empty-message">{{badgeCollection.emptyMessage}}</view>
     <view class="badge-grid">
-      <button wx:for="{{badgeCollection.visibleBadges}}" wx:key="id" class="badge-tile {{item.owned?'is-owned':'is-locked'}}" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{item.title+'，'+item.kindLabel+'徽章，'+item.status+'，查看详情'}}" hover-class="badge-pressed">
+      <button wx:for="{{badgeCollection.visibleBadges}}" wx:key="id" class="badge-tile {{item.owned?'is-owned':'is-locked'}}" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{item.title+'，'+item.kindLabel+' · '+item.category+'，'+item.status+'，查看详情'}}" hover-class="badge-pressed">
         <view class="badge-tile-meta">
-          <text>{{item.kindLabel}}</text>
+          <text>{{item.kindLabel}} · {{item.category}}</text>
           <view class="badge-tile-status">
             <view wx:if="{{!item.owned}}" class="badge-lock" aria-hidden="true"></view>
             <view wx:if="{{item.equipped}}" class="badge-check" aria-hidden="true"></view>
@@ -77,7 +78,7 @@
         <view class="badge-detail-art"><image class="badge-detail-image {{!selectedBadge.owned?'is-locked':''}}" style="{{selectedBadge.artStyle}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
         <view class="badge-detail-title">{{selectedBadge.title}}</view>
         <view class="badge-detail-meta">
-          <text>{{selectedBadge.periodLabel || badgeCollection.monthLabel}} · {{selectedBadge.kindLabel}}</text>
+          <text>{{selectedBadge.periodLabel || badgeCollection.monthLabel}} · {{selectedBadge.kindLabel}} · {{selectedBadge.category}}</text>
           <text class="badge-detail-status {{selectedBadge.owned ? 'is-owned' : ''}}">{{selectedBadge.status}}</text>
         </view>
         <view class="badge-detail-criteria">

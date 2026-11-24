@@ -1997,6 +1997,17 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   assert.match(nodes(missingRoom).find(n => n.attr?.class?.includes('entry-code-field')).attr.class, /has-error/);
 });
 
+test('房间面板测量时遮罩与表单共用入场状态，键盘弹出后不再进入测量态', () => {
+  for (const entryMode of ['join', 'create']) {
+    for (const [entryMeasuring, entryKeyboardHeight] of [[true, 0], [false, 0], [false, 280]]) {
+      const tree = render({ ...base, entrySheet: true, entryMode, entryMeasuring, entryKeyboardHeight });
+      const backdrop = nodes(tree).find(n => n.attr?.class?.includes('entry-backdrop'));
+      assert.equal(backdrop.attr.class.split(/\s+/).includes('is-measuring'), entryMeasuring);
+      assert.ok(nodes(backdrop).some(n => n.tag === 'wx-form'));
+    }
+  }
+});
+
 test('创建和加入表单的铅笔为可点击按钮，昵称焦点绑定生效，请求期间禁用', () => {
   for (const entryMode of ['create', 'join']) {
     for (const state of [{}, { busy: true }, { hasPendingRequest: true }]) {

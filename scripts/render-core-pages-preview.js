@@ -88,7 +88,7 @@ function write(name, file, data, styles, extra = "") {
   scenes.push(name);
 }
 // Browser projection of the native selector-query measurement, not app behavior.
-const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');sheet.classList.remove('is-measuring');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
+const sheetProjection = `<script>window.fitRoomSheets=()=>{const fit=${fitBody.toString()};for(const [prefix,sheetSelector,bodySelector] of [['.entry','.entry-sheet','.entry-sheet-scroll-region'],['.room-rules','.room-rules-sheet','.room-rules-body']]){const sheet=document.querySelector(sheetSelector),backdrop=document.querySelector(prefix+'-backdrop');if(!sheet||!backdrop)continue;const rects=[backdrop,...['-sheet-top','-sheet-fields','-sheet-footer'].map(s=>document.querySelector(prefix+s))].map(el=>el?.getBoundingClientRect());const height=fit(rects,prefix==='.entry'?parseFloat(getComputedStyle(sheet).getPropertyValue('--entry-keyboard-height'))||0:0);if(height!==null){document.querySelector(bodySelector).style.height=height+'px';sheet.classList.add('has-measured-body');(prefix==='.entry'?backdrop:sheet).classList.remove('is-measuring');}}};addEventListener('load',window.fitRoomSheets);addEventListener('resize',window.fitRoomSheets);</script>`;
 const store = new Store(":memory:");
 let raw, online, readmeReplay;
 try {
@@ -235,7 +235,7 @@ for (const [name, appDialog] of Object.entries({
   'dialog-leave-host': roomConfirmation.present('leave', { code:'993636', status:'lobby', isHost:true }),
   'dialog-dissolve': roomConfirmation.present('delete', { code:'858201', status:'lobby' }),
   'dialog-information': require('../miniprogram/about').present(),
-  'dialog-long': { title:'荣誉徽章规则', content:require('../miniprogram/badges').rules + '\n趣味徽章按次数榜授予。最多佩戴3枚。', showCancel:false },
+  'dialog-long': { title:'徽章规则', content:require('../miniprogram/badges').rules + '\n最多佩戴3枚。', showCancel:false },
 })) homeScenes[name] = { ...redesign, appDialog };
 function entryScene(capacity, boardId, extra = {}) {
   const page = createTable({ lobby: true });

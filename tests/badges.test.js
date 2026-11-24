@@ -32,11 +32,27 @@ function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
 }
-test('55 枚徽章涵盖 49 枚月榜、五枚永久活动荣誉及共建者，零数据不颁发', () => {
+test('旧版 55 枚徽章逐枚对应荣誉或趣味分类，已获得的积分月榜名次章归荣誉', () => {
+  const expected = {
+    '荣誉徽章': '加冕圣剑 银盔骑士 林间守望 积分王者 常胜将军 躺赢大师 定蓝机 双炸艺术家 最强派西 孤注一掷 化身梅派 闪身步大神 隐身乘客 幕后军师 金牌乘客 首席护卫 最佳新援 职业刺客 梅林二号 倒钩王者 深藏不露 影帝大莫 最后王牌 最强独狼 孤儿狼 双面骑士 浪子回头 反水大师 金牌替身 绝对防御 职业杀手 最强MVP',
+    '趣味徽章': '共建圆桌 内测纪念册 竭尽全力 舍我其谁 与世无争 牌桌常青树 压错宝 弹射下车 圆桌劳模 站错队 背锅侠 勇敢炮灰 新手演员 车底大莫 队友勿cue 双面间谍 阵营摇摆王 卧龙凤雏 痛击队友 我在阿瓦隆玩重生 全民公敌 最强SVP 共建者',
+  };
+  for (const [category, titles] of Object.entries(expected)) {
+    const { visibleBadges } = presentCollection({ badges: [] }, 'all', undefined, category);
+    assert.deepEqual(visibleBadges.filter(b => !b.achievement).map(b => b.title.replace(/\s/g, '')).sort(), titles.split(' ').sort());
+  }
+  const id = 'monthly_points_2026-11_2';
+  const value = { badges: [{ id }, { id: 'feedback_contributor', equipped: true }] };
+  const honor = presentCollection(value, 'owned', undefined, '荣誉徽章');
+  assert.deepEqual(honor.visibleBadges.map(b => b.id), [id]);
+  assert.equal(honor.ownershipFilters.find(f => f.id === 'owned').count, 1);
+  assert.equal(honor.slots[0].id, 'feedback_contributor');
+});
+test('87 枚固定徽章涵盖 78 枚月度及 9 枚永久荣誉，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,55);assert.equal(new Set(catalogue.map(b=>b.id)).size,55);
-    assert.equal(catalogue.filter(b=>b.permanent).length,6);
+    assert.equal(catalogue.length,87);assert.equal(new Set(catalogue.map(b=>b.id)).size,87);
+    assert.equal(catalogue.filter(b=>b.permanent).length,9);
     for (const id of [...Object.keys(honors), ...roleIds]) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
   } finally {store.close();}
@@ -110,12 +126,13 @@ test('北京时间月榜独立于总榜，并列榜首全员获授，新月撤�
   try {
     for(let i=0;i<8;i++)game(store,'wx:old',{endedAt:Date.parse('2026-09-30T15:59:59Z')});
     game(store,'wx:a');game(store,'wx:b');
-    assert.deepEqual(ids(store,'wx:old'),[]);
+    assert.deepEqual(ids(store,'wx:old'),['five_wins']);
     for(const uid of ['wx:a','wx:b'])assert.deepEqual(ids(store,uid),['points','games','overall']);
     wear(store,'wx:a','games',false);
     assert.equal(equippedBadges(store,'wx:a').some(b=>b.id==='games'),false);
     now=NEXT;assert.deepEqual(ids(store,'wx:a'),[]);
-    game(store,'wx:a');assert.ok(readBadges(store,'wx:a').badges.every(b=>b.equipped));
+    game(store,'wx:a');assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),['points','games','overall']);
+    assert.ok(ids(store,'wx:a').includes('attendance'));
   } finally {store.close();}
 });
 test('趣味次数榜以完整快照颁发，超过100名的并列第一不遗漏，比例第一不会误获次数徽章', () => {
@@ -186,7 +203,8 @@ test('徽章 API 鉴权、仅本人修改、幂等回执与公开战绩卡只显
     const homepage = await fetch(origin);
     assert.match(homepage.headers.get('content-type'), /^application\/json/);
     await homepage.arrayBuffer();
-    await Promise.all([...roleIds, 'good_shield'].map(async id => {
+    const newArt = catalogue.filter(b => b.achievement).flatMap(b => b.metric === 'podium' ? [b.id, b.id+'-silver', b.id+'-bronze'] : [b.id]);
+    await Promise.all([...roleIds, ...newArt, 'good_shield', 'honor_svp'].map(async id => {
       const image = await fetch(origin + '/assets/badges/' + id + '.png');
       assert.equal(image.status, 200, id);
       assert.equal(image.headers.get('content-type'), 'image/png', id);
@@ -220,7 +238,7 @@ test('最多默认佩戴3枚，拒绝第四枚；摘下不自动补位，自选�
   try {
     metric(store,'wx:a','merlin_evade',1);metric(store,'wx:a','assassin_hit',1);
     const before=readBadges(store,'wx:a');
-    assert.equal(before.badges.length,5);assert.equal(before.equippedCount,3);assert.equal(before.maxEquipped,3);
+    assert.equal(before.badges.length,7);assert.equal(before.equippedCount,3);assert.equal(before.maxEquipped,3);
     assert.deepEqual(equippedBadges(store,'wx:a').map(b=>b.id),['points','games','overall']);
     assert.throws(()=>wear(store,'wx:a','assassin_hit',true),e=>e.status===400&&/最多佩戴3枚/.test(e.message));
     assert.deepEqual(readBadges(store,'wx:a'),before);

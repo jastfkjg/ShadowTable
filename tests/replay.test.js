@@ -6,9 +6,76 @@ const { join } = require("node:path");
 const { createHash, randomBytes } = require("node:crypto");
 const { Store } = require("../server/store");
 const { createApp } = require("../server/app");
-const { publicView, privateView } = require("../server/engine");
+const { newRoom, enter, publicView, privateView } = require("../server/engine");
 const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const { setup, completed, onlineCompleted, run, task, skills, submit } = require("./helpers/replay-fixtures");
+
+test("标准局归档所有线上组队票型、独立发起的任务与系统补票", () => {
+  for (const [board, count] of [["classic", 6], ["classic-court", 10], ["classic-11", 11]]) {
+    const room = newRoom("123456", "p1", "玩家1", board, count);
+    for (let i = 2; i <= count; i++) enter(room, "p" + i, "玩家" + i);
+    room.players.forEach(p => p.ready = true);
+    run(room, "start", { flexible: true });
+    run(room, "beginActivity", { kind: "vote", team: [1, 2] });
+    run(room, "submit", { value: "approve" }, "p1");
+    run(room, "submit", { value: "reject" }, "p2");
+    run(room, "closeWaiting", { confirm: true });
+    run(room, "beginActivity", { kind: "vote", team: [2, 3] });
+    submit(room);
+    task(room, [2, 3]);
+    run(room, "beginActivity", { kind: "quest", team: [1, 2], threshold: 1 });
+    run(room, "submit", { value: "success" }, "p1");
+    run(room, "cancelActivity");
+    run(room, "beginActivity", { kind: "quest", team: [1, 3], threshold: 2 });
+    run(room, "submit", { value: "success" }, "p1");
+    run(room, "closeWaiting", { confirm: true });
+    assert.equal(publicView(room, room.host).replayId, null);
+    assert.doesNotMatch(JSON.stringify(publicView(room, room.host)), /"cards"|"initialPlayers"|"defaulted"/);
+    run(room, "finishTools", { winner: "good" });
+    const store = new Store(":memory:");
+    try {
+      store.save(room);
+      const id = room.matchRecord.id;
+      assert.equal(publicView(room, room.host).replayId, id);
+      assert.equal(store.matchFor("p3", id).replayAvailable, true);
+      assert.throws(() => store.replayFor("outsider", id), { status: 404 });
+      const raw = store.replayFor("p3", id);
+      assert.equal(raw.status, "complete");
+      assert.deepEqual(raw.initialPlayers.map(p => p.roleId), room.players.map(p => room.roles[p.uid]));
+      assert.deepEqual(raw.events.map(e => [e.round, e.kind]), [[1,"vote"], [1,"vote"], [1,"quest"], [2,"canceled"], [2,"quest"]]);
+      const [first, second, quest, , direct] = raw.events;
+      assert.deepEqual(first.team, [1, 2]);
+      assert.deepEqual(first.votes, room.players.map(p => ({ seat: p.seat, approve: p.seat <= 2 ? p.seat === 1 : null })));
+      assert.equal(first.approved, false);
+      assert.equal(second.approved, true);
+      assert.deepEqual(second.team, quest.team);
+      assert.deepEqual(quest.cards.map(c => [c.actor.seat, c.value]), [[2,"success"], [3,"success"]]);
+      assert.equal(direct.success, true);
+      assert.equal(direct.threshold, 2);
+      assert.deepEqual(direct.team, [1, 3]);
+      assert.equal(direct.cards[0].defaulted, undefined);
+      assert.equal(direct.cards[1].defaulted, true);
+      assert.equal(direct.cards[1].value, raw.initialPlayers[2].faction === "good" ? "success" : "fail");
+      assert.equal(direct.fails, direct.cards.filter(c => c.value === "fail").length);
+      const mine = presentReplay(raw, "mine");
+      assert.equal(mine.rounds[0].events[0].rows[0].detail, "弃权");
+      assert.match(mine.rounds[1].events.at(-1).rows[0].detail, /系统补票/);
+      // Old archives may contain ballots and task outcomes but no individual card facts.
+      const saved = JSON.parse(store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(id).snapshot);
+      delete saved.replay;
+      for (const e of saved.funFacts.events) delete e.members;
+      const update = store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?");
+      update.run(JSON.stringify(saved), id);
+      const legacy = store.replayFor("p3", id);
+      assert.equal(legacy.status, "legacy");
+      assert.deepEqual(legacy.events.filter(e => e.kind === "vote").map(e => e.votes), [first.votes, second.votes]);
+      assert.deepEqual(legacy.events.filter(e => e.kind === "quest").map(e => [e.team, e.cards]), [[[2, 3], []], [[1, 3], []]]);
+      delete saved.funFacts.badgeTimeline;
+      update.run(JSON.stringify(saved), id);
+      assert.deepEqual(store.replayFor("p3", id).events.map(e => e.kind), ["quest", "quest"]);
+    } finally { store.close(); }
+  }
+});
 
 test("完整复盘保留初始身份、当时阵营、同时互刀、抽牌顺序和最终计分，主流程结果不变", () => {
   const room = completed(), record = room.matchRecord;
@@ -65,7 +132,7 @@ test("牌桌只给已结束对局的参与者提供复盘编号，删除和重�
     }
     assert.equal(publicView(room, "spectator").replayId, null);
     assert.equal(publicView({ ...room, matchRecord: undefined }, room.host).replayId, null);
-    assert.equal(publicView({ ...room, matchRecord: { ...room.matchRecord, board: "classic" } }, room.host).replayId, null);
+    assert.equal(publicView({ ...room, matchRecord: { ...room.matchRecord, board: "chaos" } }, room.host).replayId, null);
     store.transaction(() => store.manageMatches({ action: "exclude", reason: "核对", matches: [{ id, revision: 0 }] }));
     assert.equal(publicView(store.get(room.code), room.host).replayId, id);
     assert.equal(store.replayFor(room.host, id).self.outcome, "excluded");
