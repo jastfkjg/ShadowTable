@@ -123,6 +123,7 @@ class Store {
     require("./retention").initialize(this);
     require("./avoidance").initialize(this);
     avoidanceRewards.initialize(this);
+    this.badgeRanks = this.transaction(() => new (require("./badge-ranks").BadgeRanks)(this));
   }
   restoreFunRecords() {
     const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='excluded' AND json_extract(m.snapshot,'$.excludedReason') IS NULL AND p.outcome IN ('win','loss')) OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
@@ -185,6 +186,7 @@ class Store {
     this.leaderboardDirty = false;
     try {
       const result = fn();
+      if (this.leaderboardDirty) this.badgeRanks?.captureMonthly();
       this.db.exec("COMMIT");
       if (this.leaderboardDirty) this.leaderboardRevision++;
       return result;
@@ -198,7 +200,7 @@ class Store {
   }
   invalidateLeaderboard() {
     if (this.inTransaction) this.leaderboardDirty = true;
-    else this.leaderboardRevision++;
+    else this.transaction(() => { this.leaderboardDirty = true; });
   }
   initializeLeaderboardProfile(uid) {
     if (!/^(wx|dev|test):/.test(uid)) return;

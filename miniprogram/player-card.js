@@ -56,13 +56,31 @@ function playerCardMethods(api, platform = typeof wx === "undefined" ? null : wx
           initial: Array.from(result.player.name || "友")[0], avatarUrl: result.player.avatarUrl ? api.assetUrl(result.player.avatarUrl) : "" } : card;
         const { MAX_EQUIPPED, presentPlayerBadge } = require('./badges');
         const badges = (result.player.badges || []).map(badge => presentPlayerBadge(badge, api.assetUrl)).filter(Boolean);
-        playerCard = { ...playerCard, badges: badges.slice(0, MAX_EQUIPPED) };
+        playerCard = { ...playerCard, badges: badges.slice(0, MAX_EQUIPPED), ownedBadgeCount: result.player.ownedBadgeCount, badgesLimited: !!result.player.badgesLimited };
         this.setPlayerCardData({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
       } catch (e) {
         if (active()) this.setPlayerCardData({ playerCardError: e.message || "战绩读取失败，请重试" });
       } finally {
         if (active()) this.setPlayerCardData({ playerCardLoading: false });
       }
+    },
+    openPlayerCollection() {
+      const card = this.data.playerCard;
+      if (!card?.ownedBadgeCount || this.collectionReturn) return;
+      const scope = card.scope === 'leaderboard' ? 'leaderboard' : this.data.room.code;
+      this.collectionReturn = { id: card.id, seat: card.seat, scope };
+      platform.navigateTo({ url: '/pages/badges/player?scope=' + scope + '&id=' + encodeURIComponent(card.id),
+        fail: () => { this.collectionReturn = null; platform.showToast({ title: '徽章页打开失败，请重试', icon: 'none' }); } });
+    },
+    restoreCollectionCard(target = this.collectionReturn) {
+      this.collectionReturn = null;
+      if (!target || !this.alive || !this.foreground) return;
+      if (target.scope === 'leaderboard') {
+        const event = { currentTarget: { dataset: { id: target.id } } };
+        return this.openRankPlayerCard ? this.openRankPlayerCard(event) : this.openMonthlyPlayer(event);
+      }
+      if (this.data.room?.code === target.scope && this.data.room.players.some(p => p.seat === target.seat && p.statsId === target.id))
+        return this.openPlayerCard(target.seat);
     },
     playerCardAvatarError() { if (this.data.playerCard) this.setData({ playerCard: { ...this.data.playerCard, avatarFailed: true } }); },
     showPlayerCardBadge(e) {

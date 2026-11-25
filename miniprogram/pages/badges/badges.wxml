@@ -7,7 +7,7 @@
       <image class="badge-info-icon" src="/assets/record-info.svg" aria-hidden="true" />
     </button>
   </view>
-  <view class="badge-title">我的徽章</view>
+  <view class="badge-title-row"><view class="badge-title">我的徽章</view><navigator class="badge-rank-link" hover-class="badge-pressed" url="/pages/badges/ranks" aria-label="查看徽章榜"><view class="badge-rank-pill"><image src="/assets/record-cup.svg" aria-hidden="true"/>徽章榜<view class="badge-chevron"></view></view></navigator></view>
   <template wx:if="{{badgeManagerLoading && !badgeCollection}}" is="loadingPlaceholder" data="{{kind:'metrics'}}" />
   <view wx:if="{{badgeManagerError && !connectionVisible}}" class="inline-error" role="alert"><text>{{badgeManagerError}}</text><button class="secondary" bindtap="loadBadgeManager" disabled="{{badgeManagerLoading || badgeManagerSaving}}" hover-class="badge-pressed">刷新徽章</button></view>
   <block wx:if="{{badgeCollection}}">

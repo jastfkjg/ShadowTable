@@ -8,9 +8,12 @@
       <view class="player-card-identity {{playerCard.name.length>8 ? 'is-long-name' : ''}}">
         <view class="player-card-avatar"><text>{{playerCard.initial}}</text><image class="player-card-avatar-image" wx:if="{{playerCard.avatarUrl && !playerCard.avatarFailed}}" src="{{playerCard.avatarUrl}}" mode="aspectFill" binderror="playerCardAvatarError" aria-hidden="{{true}}" /></view>
         <view class="player-card-name"><text class="player-card-display-name">{{playerCard.name}}</text><text wx:if="{{playerCard.scope!=='leaderboard'}}" class="small muted">{{playerCard.seat+'号位'+(playerCard.isHost?' · 房主':'')}}</text></view>
-        <scroll-view wx:if="{{playerCard.badges.length}}" class="player-card-badges" scroll-x="{{true}}" show-scrollbar="{{true}}" aria-label="佩戴的徽章，可横向滑动查看">
+        <view wx:if="{{playerCard.badges.length || playerCard.ownedBadgeCount}}" class="player-card-badges">
+        <scroll-view wx:if="{{playerCard.badges.length}}" scroll-x="{{true}}" show-scrollbar="{{true}}" aria-label="佩戴的徽章，可横向滑动查看">
           <button wx:for="{{playerCard.badges}}" wx:key="id" class="disclosure-button player-badge-button {{playerCardBadge.id===item.id?'is-selected':''}}" hover-class="none" bindtap="showPlayerCardBadge" data-id="{{item.id}}" aria-label="{{(playerCardBadge.id===item.id?'收起':'查看')+item.title+'徽章介绍'}}" aria-expanded="{{playerCardBadge.id===item.id}}"><image style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="{{true}}" /></button>
         </scroll-view>
+        <button wx:if="{{playerCard.ownedBadgeCount}}" class="disclosure-button player-collection-link" hover-class="none" bindtap="openPlayerCollection" aria-label="{{'查看'+playerCard.name+'的徽章'}}">{{playerCard.badgesLimited?'公开':'全部'}} {{playerCard.ownedBadgeCount}} 枚 <text aria-hidden="true">›</text></button>
+        </view>
       </view>
       <view wx:if="{{playerCardBadge}}" class="player-badge-detail">
         <image class="player-badge-detail-art" style="{{playerCardBadge.artStyle}}" src="{{playerCardBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" />

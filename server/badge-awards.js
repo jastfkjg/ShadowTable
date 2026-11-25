@@ -29,6 +29,7 @@ function grant(store, uid, id, { rank = null, points = null, campaign = CAMPAIGN
     .run(uid, id, campaign, grantedAt, rank, points);
   if (result.changes) store.db.prepare(`INSERT INTO badge_versions(uid,version) VALUES(?,1)
     ON CONFLICT(uid) DO UPDATE SET version=version+1`).run(uid);
+  if (result.changes) store.badgeRanks?.record(uid, id);
   return result.changes > 0;
 }
 function grantContributor(store, uid) {

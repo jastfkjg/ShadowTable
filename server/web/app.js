@@ -717,6 +717,11 @@
     if (parts[0] === '#/help') return { page: 'help', fromLobby: query.get('from') === 'lobby' };
     if (parts[0] === '#/stats') return { page: 'stats', tab: query.get('tab') === 'fun' ? 'fun' : 'records' };
     if (parts[0] === '#/monthly') return { page: 'monthly', month: query.get('month') || monthlyPresentation.monthAt() };
+    const collection = /^#\/player-badges\/(leaderboard|\d{6})\/([a-f0-9-]+)$/.exec(hash || '');
+    if (collection && badgePresentation.playerCollectionPath(collection[1], collection[2]))
+      return { page: 'player-badges', path: badgePresentation.playerCollectionPath(collection[1], collection[2]), scope: collection[1] };
+    const badgeRank = /^#\/badge-ranks(?:\/(honor|fun)(?:\/(self|[a-f0-9]{32}))?)?$/.exec(hash || '');
+    if (badgeRank) return { page:'badge-ranks', kind:badgeRank[1] || 'honor', player:badgeRank[2] || '' };
     var name = (hash || '').replace(/^#\//, '');
     return { page: ['lobby', 'me', 'profile', 'stats', 'leaderboard', 'badges', 'help', 'login', 'data-management'].includes(name) ? name : 'lobby' };
   }
@@ -731,20 +736,27 @@
   async function navigate(page, code, replace = false) {
     if (!(await mayNavigate())) return;
     const hash = '#/' + page + (code ? '/' + code : '');
-    window.history[replace ? 'replaceState' : 'pushState']({}, '', hash);
+    const entry = page === 'player-badges' ? { collectionOrigin } : page.startsWith('badge-ranks') ? {
+      badgeParent:replace ? window.history.state?.badgeParent : currentRoute,
+    } : {};
+    window.history[replace ? 'replaceState' : 'pushState'](entry, '', hash);
     await applyRoute(hash);
   }
   async function applyRoute(hash) {
     closeFunInfo?.();
     if (state.page === 'login' && routeInfo(hash).page !== 'login' && !await cancelWebLogin()) return;
+    const restore = state.page === 'player-badges' && collectionOrigin?.hash === hash ? collectionOrigin : null;
     const sequence = ++routeSequence, route = routeInfo(hash);
+    collectionOrigin = route.page === 'player-badges' ? window.history.state?.collectionOrigin || null : null;
+    if (restore && route.page === 'monthly') route.month = restore.month;
     ++monthlySequence;
     ++badgeManagerSequence;
-    currentRoute = '#/' + route.page + (route.code ? '/' + route.code : '');
+    if (badgeRankController) { badgeRankController.pause(); badgeRankController = null; }
+    currentRoute = ['badge-ranks', 'player-badges'].includes(route.page) ? hash : '#/' + route.page + (route.code ? '/' + route.code : '');
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
     if(route.page==='matches'){scoreAdjustmentRecords=[];scoreAdjustmentTotal=0;scoreAdjustmentMore=false;scoreAdjustmentError='';}
-    setState({ page: route.page, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+    setState({ page: route.page, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', entrySheet: false, entryError: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
@@ -773,12 +785,24 @@
       } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats(), loadRooms().catch(() => {})]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
-      else if (route.page === 'leaderboard') await loadLeaderboard();
+      else if (route.page === 'leaderboard' && !(restore && state.rankBoard)) await loadLeaderboard();
+      else if (route.page === 'player-badges') await loadPlayerCollection(route);
+      else if (route.page === 'badge-ranks') {
+        badgeRankController = window.shadowtableBadgeRanks.create({ request, update:view => {
+          if (alive && sequence === routeSequence) setState({ badgeRankView:view });
+        } },route.kind,route.player);
+        await badgeRankController.load();
+      }
       else if (route.page === 'badges') await loadBadgeManager();
       else if (route.page === 'data-management') await loadRecordClearing();
       else if (route.page === 'monthly') await loadMonthlyReport(route.month);
       else if (route.page === 'matches') await loadMatches();
       else if (route.page === 'help') await loadScoreRules();
+      if (restore && sequence === routeSequence) {
+        if (route.page === 'leaderboard') await openRankPlayerCard(restore.id);
+        else if (route.page === 'monthly') await openMonthlyPlayer(restore.id);
+        else if (state.room?.players.some(p => p.statsId === restore.id && p.seat === restore.seat)) await openPlayerCard(restore.seat);
+      }
     } catch (e) { if (sequence === routeSequence) handleError(e); }
   }
   function profileDraft(profile) {
@@ -1053,6 +1077,7 @@
     if (state.page !== 'data-management' || !state.clearingConfirming || !preview) return '';
     return '<div class="data-confirm-backdrop" data-action="closeRecordClearingConfirmation"><section class="data-confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="clearing-confirm-title" aria-describedby="clearing-confirm-month clearing-confirm-warning" data-action="clearingSheetContent"><div class="data-confirm-top"><div class="data-sheet-handle" aria-hidden="true"></div><div class="data-confirm-heading"><h2 class="data-confirm-title" id="clearing-confirm-title">核对清理范围</h2><button type="button" class="data-confirm-close" data-action="closeRecordClearingConfirmation" aria-label="关闭确认面板"' + (state.clearingSaving ? ' disabled' : '') + '>×</button></div><div class="data-confirm-month" id="clearing-confirm-month">' + clearingIcon('calendar') + '<span>' + esc(preview.label) + '</span>' + (preview.isCurrent ? '<span class="data-month-tag">本月</span>' : '') + '</div></div><div class="data-confirm-body"><div class="data-confirm-content"><div class="data-confirm-overview">' + viewClearingMetrics(preview) + '</div><section class="data-confirm-scope"><h3 class="data-confirm-scope-title">这些数据将一并清理</h3>' + recordClearing.sheetLines.map(row => '<div class="data-scope-line"><img class="data-icon" src="' + row.icon + '" alt="" /><span>' + row.text + '</span></div>').join('') + '</section>' + viewClearingRetained() + (state.clearingError ? '<p class="data-confirm-error" role="alert">' + esc(state.clearingError) + '</p>' : '') + (clearingPending && !state.clearingSaving ? '<p class="data-confirm-pending" role="status">结果尚未确认，请重试原请求。重试不会清除后来新增的对局。</p>' : '') + '</div></div><footer class="data-confirm-footer"><div class="data-footer-note is-danger" id="clearing-confirm-warning">' + clearingWarning + '</div><div class="data-confirm-actions">' + btn('data-confirm-cancel', 'closeRecordClearingConfirmation', '暂不清理', null, state.clearingSaving) + btn('data-confirm-submit', 'confirmPersonalRecordClearing', state.clearingSaving ? '正在清除…' : clearingPending ? '重试并核对结果' : '确认清除', null, state.clearingSaving) + '</div></footer></section></div>';
   }
+  let badgeRankController = null;
   let badgeManagerSequence = 0;
   async function loadBadgeManager() {
     if (state.badgeManagerSaving) return;
@@ -1111,7 +1136,7 @@
       '<header class="badge-web-header"><button type="button" class="badge-web-back" data-action="navigate" data-page="me" aria-label="返回我的">‹</button><h1 tabindex="-1" data-page-heading>徽章收藏</h1><span></span></header>' +
       '<div class="badge-period-row"><span class="badge-period">' + (c ? esc(c.monthLabel) : '本月荣誉') + '</span>' +
       '<button type="button" class="badge-rules" data-action="badgeRules" aria-label="徽章规则"><img class="badge-info-icon" src="/assets/record-info.svg" alt="" /></button></div>' +
-      '<div class="badge-title">我的徽章</div>';
+      '<div class="badge-title-row"><div class="badge-title">我的徽章</div><button class="badge-rank-link" data-action="navigate" data-page="badge-ranks" aria-label="查看徽章榜"><span class="badge-rank-pill"><img src="/assets/record-cup.svg" alt="">徽章榜<span class="badge-chevron" aria-hidden="true"></span></span></button></div>';
     if (state.badgeManagerLoading) html += '<div class="status" role="status">正在读取徽章…</div>';
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';
@@ -1198,9 +1223,48 @@
       (choices.length ? btn('primary badge-detail-action', 'confirmBadgePicker', state.badgeManagerSaving ? '正在保存…' : label, null, busy || !picked) : '') +
       '</footer></section></div>';
   }
-  function viewPlayerBadges(badges) {
-    if (!badges?.length) return '';
-    return '<div class="player-card-badges" role="group" aria-label="佩戴的徽章，可横向滑动查看">' + badges.slice(0, 3).map(badge => '<button type="button" class="player-badge-button" data-action="showPlayerCardBadge" data-id="' + esc(badge.id) + '" aria-label="查看' + esc(badge.title) + '徽章" aria-expanded="' + (state.playerCardBadge?.id === badge.id) + '">' + badgeArt(badge) + '</button>').join('') + '</div>';
+  var collectionOrigin = null, collectionSequence = 0;
+  function openPlayerCollection() {
+    const card = state.playerCard;
+    if (!card?.ownedBadgeCount) return;
+    const scope = card.scope === 'leaderboard' ? 'leaderboard' : state.room?.code;
+    if (!badgePresentation.playerCollectionPath(scope, card.id)) return;
+    collectionOrigin = { hash: location.hash || currentRoute, id: card.id, seat: card.seat, month: state.monthlyMonth };
+    return navigate('player-badges', scope + '/' + card.id);
+  }
+  async function loadPlayerCollection(route) {
+    const sequence = ++collectionSequence, activeRoute = routeSequence;
+    const active = () => sequence === collectionSequence && activeRoute === routeSequence && foreground;
+    setState({ playerCollection: null, collectionError: '' });
+    try {
+      const value = await request(route.path);
+      if (active()) setState({ playerCollection: badgePresentation.presentPlayerCollection(value) });
+    } catch (error) {
+      if (active()) setState({ collectionError: error.message || '徽章读取失败，请重试' });
+    }
+  }
+  function viewPlayerCollection() {
+    const c = state.playerCollection;
+    const header = '<header class="badge-web-header"><button type="button" class="badge-web-back" data-action="backPlayerCollection" aria-label="返回">‹</button><h1 tabindex="-1" data-page-heading>玩家徽章</h1><span></span></header>';
+    let body;
+    if (state.collectionError) body = '<div role="alert">' + esc(state.collectionError) + btn('text-button','retryPlayerCollection','重试') + '</div>';
+    else if (!c) body = '<p role="status">正在读取徽章…</p>';
+    else {
+      const avatar = c.avatarUrl ? '<img src="' + esc(c.avatarUrl) + '" alt="" data-collection-avatar>' : esc(c.initial);
+      body = '<div class="owned-summary"><span class="owned-avatar">'+ avatar +'</span><div class="owned-name"><div>'+esc(c.name)+'的徽章</div><span>'+(c.limited?'已公开的徽章':'已拥有的徽章')+'</span></div><div class="owned-count"><span>'+c.count+'</span> 枚</div></div>';
+      for (const group of c.groups) {
+        body += '<section><h2 class="owned-heading"><span>'+group.title+'</span><span>'+group.items.length+' 枚</span></h2><div class="owned-grid">' +
+          group.items.map(b => '<div class="owned-row">'+badgeArt(b)+'<div>'+esc(b.title)+'<span class="'+(b.equipped?'worn':'')+'">'+esc(b.label)+'</span></div></div>').join('')+'</div></section>';
+      }
+      if (!c.count) body += '<p class="muted">'+(c.limited?'暂无公开的徽章':'暂无已拥有的徽章')+'</p>';
+    }
+    return '<div class="badge-page">'+header+'<div class="owned-page">'+body+'</div></div>';
+  }
+  function viewPlayerBadges(card) {
+    const { badges = [], ownedBadgeCount } = card;
+    if (!badges.length && !ownedBadgeCount) return '';
+    const icons = '<div class="player-card-badges" role="group" aria-label="佩戴的徽章，可横向滑动查看">' + badges.slice(0, 3).map(badge => '<button type="button" class="player-badge-button" data-action="showPlayerCardBadge" data-id="' + esc(badge.id) + '" aria-label="查看' + esc(badge.title) + '徽章" aria-expanded="' + (state.playerCardBadge?.id === badge.id) + '">' + badgeArt(badge) + '</button>').join('') + '</div>';
+    return '<div class="player-card-collection">' + icons + (ownedBadgeCount ? btn('player-collection-link','openPlayerCollection',(card.badgesLimited ? '公开 ' : '全部 ') + ownedBadgeCount + ' 枚 ›') : '') + '</div>';
   }
   function viewPlayerBadgeDetail() {
     const badge = state.playerCardBadge;
@@ -1882,7 +1946,7 @@ function roomListItems(rooms) {
         return;
       }
       var hash = webAccountExpired ? '#/login' : location.hash || (inviteCode ? '#/table/' + inviteCode : '#/lobby');
-      window.history.replaceState({}, '', hash);
+      window.history.replaceState(routeInfo(hash).page === 'player-badges' ? window.history.state : {}, '', hash);
       await applyRoute(hash);
     } catch (e) {
       handleError(e);
@@ -2830,7 +2894,7 @@ function roomListItems(rooms) {
         byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
       let playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
       const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || badge);
-      playerCard = { ...playerCard, badges };
+      playerCard = { ...playerCard, badges, ownedBadgeCount: result.player.ownedBadgeCount, badgesLimited: result.player.badgesLimited };
       setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
     } catch (e) {
       if (active()) setState({ playerCardError: e.message || "战绩读取失败，请重试" });
@@ -3895,7 +3959,7 @@ function roomListItems(rooms) {
   function viewPlayerCard() {
     const p = state.playerCard, stats = state.playerCardStats;
     if (!p || state.error || state.actionDialog || state.dealtIdentityDialog || state.identityChange || state.fairyResult || state.identityHistoryOpen || state.identityRoleHelpOpen || state.historyOpen) return "";
-    let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity' + (p.name.length > 8 ? ' is-long-name' : '') + '"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div>' + viewPlayerBadges(p.badges) + '</div>' + viewPlayerBadgeDetail();
+    let html = '<div class="dialog-backdrop player-card-backdrop" data-player-card-backdrop><section class="player-card-sheet" role="dialog" aria-modal="true" aria-label="' + esc(p.name + '的玩家战绩') + '"><div class="player-card-handle" aria-hidden="true"></div><div class="player-card-heading"><span>玩家战绩</span>' + '<button type="button" class="player-card-close" data-action="closePlayerCard" aria-label="关闭玩家战绩">×</button>' + '</div><div class="player-card-body"><div class="player-card-identity' + (p.name.length > 8 ? ' is-long-name' : '') + '"><div class="player-card-avatar"><span>' + esc(p.initial) + '</span>' + (p.avatarUrl && !p.avatarFailed ? '<img class="player-card-avatar-image" src="' + esc(p.avatarUrl) + '" alt="" data-player-card-avatar />' : '') + '</div><div class="player-card-name"><span class="player-card-display-name">' + esc(p.name) + '</span>' + (p.scope !== 'leaderboard' ? '<span class="small muted">' + p.seat + '号位' + (p.isHost ? ' · 房主' : '') + '</span>' : '') + '</div>' + viewPlayerBadges(p) + '</div>' + viewPlayerBadgeDetail();
     if (state.playerCardLoading) html += '<div class="player-card-message muted" role="status">正在读取战绩…</div>';
     else if (state.playerCardError) html += '<div class="player-card-message" role="alert">' + esc(state.playerCardError) + btn('text-button','retryPlayerCard','重试') + '</div>';
     else if (state.playerCardStatus === 'untracked') html += '<div class="player-card-message muted">陪测玩家不记录个人战绩</div>';
@@ -5199,15 +5263,15 @@ function roomListItems(rooms) {
       (state.page === 'profile' ? viewProfileHeader() : shell ? viewShellHeader() : '') + '<div class="page' +
       (state.page === 'lobby' ? ' home-lobby' : state.page === 'me' ? ' me-page' : state.page === 'table' ? ' table-page' : '') +
       (state.page === 'table' && state.room?.phase === 'lobby' ? ' has-lobby-actions' : '') + (state.page === 'table' && state.room && state.room.phase !== 'lobby' ? ' has-public-history' : '') + (hasHostBar ? " has-host-bar" : "") + (["lobby","me"].includes(state.page) ? " has-bottom-nav" : "") + (["me","profile","stats","leaderboard","monthly","help"].includes(state.page) ? " personal-page" : "") +
-      (state.page === 'data-management' ? ' data-page-shell' : '') + (state.page === 'badges' ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (roomSheet || state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || state.identityRoleHelpOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
-      (['table', 'me', 'profile', 'badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
+      (state.page === 'data-management' ? ' data-page-shell' : '') + (['badges','badge-ranks','player-badges'].includes(state.page) ? ' badge-page-shell' : '') + (state.page === 'monthly' ? ' monthly-page-shell' : '') + (state.page === 'profile' ? ' profile-page' + (profilePending ? ' has-pending-save' : '') : '') + '"' + (roomSheet || state.clearingConfirming || state.avoidanceOpen || state.page === 'me' && state.monthlyReset || state.identityHistoryOpen || state.identityRoleHelpOpen || (state.page === 'table' && (hasPublicHistorySheet() || state.honorDialog && !state.error)) ? ' inert' : '') + '>' +
+      (['table', 'me', 'profile', 'badges', 'badge-ranks', 'player-badges', 'data-management', 'monthly'].includes(state.page) ? '' : viewBrand()) +
       (state.loading && state.page !== 'table' ? '<div class="status">正在连接牌桌…</div>' : "") +
       viewActionDialog() +
       viewToolDialog() +
       viewResultDialog() +
       (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'data-management' ? viewRecordClearing() : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
+      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'data-management' ? viewRecordClearing() : state.page === 'player-badges' ? viewPlayerCollection() : state.page === 'badge-ranks' ? window.shadowtableBadgeRankView(state.badgeRankView,esc) : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" + viewEntrySheet() + viewRoomRules() + viewRecordClearingConfirmation() +
       (state.page === 'table' ? viewHistorySheet() + viewHonorBallot() : '') + viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewErrorDialog() + (state.page === "me" && state.monthlyReset ? "" : viewNavigation()) + viewMonthlyReset();
@@ -5220,6 +5284,16 @@ function roomListItems(rooms) {
 
   // ===== event delegation =====
   var ACTIONS = {
+    brBack: el => {
+      const parent = window.history.state?.badgeParent, target = '#/' + el.dataset.page;
+      if (parent === target || parent === '#/badge-ranks' && target === '#/badge-ranks/honor') return window.history.back();
+      return navigate(el.dataset.page,null,true);
+    },
+    brSelect: el => { if (el.dataset.kind !== state.badgeRankView?.kind) return navigate('badge-ranks/'+el.dataset.kind,null,true); },
+    brPlayer: el => navigate('badge-ranks/'+state.badgeRankView.kind+'/'+el.dataset.id),
+    brMore: () => badgeRankController?.load(true),
+    brReload: () => badgeRankController?.load(),
+    brToggle: () => badgeRankController?.visibility(!state.badgeRankView.detail.visible),
     monthlyResetDismiss: dismissMonthlyReset,
     reloadRecordClearing: loadRecordClearing,
     clearPersonalRecords,
@@ -5278,6 +5352,13 @@ function roomListItems(rooms) {
     closeBadgeDetail,
     badgeRules: () => confirm('徽章规则', badgePresentation.rules + '\n最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', false),
     toggleOwnedBadge: el => toggleOwnedBadge(el.dataset.id),
+    openPlayerCollection,
+    retryPlayerCollection: () => loadPlayerCollection(routeInfo(currentRoute)),
+    backPlayerCollection: () => {
+      if (window.history.state?.collectionOrigin) return window.history.back();
+      const scope = routeInfo(currentRoute).scope;
+      return scope === 'leaderboard' ? navigate('leaderboard', null, true) : navigate('table', scope, true);
+    },
     showPlayerCardBadge: el => showPlayerCardBadge(el.dataset.id),
     closePlayerCardBadge,
     closePlayerCard: () => closePlayerCard(),
@@ -5751,6 +5832,8 @@ function roomListItems(rooms) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
       setState({ rankBoard: { ...state.rankBoard, rows: state.rankBoard.rows.map(row => row.publicId === id && row.avatarUrl === src ? { ...row, avatarFailed: true } : row) } });
     }
+    if (e.target?.hasAttribute?.('data-collection-avatar') && state.playerCollection)
+      setState({ playerCollection: { ...state.playerCollection, avatarUrl: '' } });
     if (e.target?.hasAttribute?.('data-player-card-avatar') && state.playerCard) setState({ playerCard: { ...state.playerCard, avatarFailed: true } });
   }, true);
   app.addEventListener("click", function (e) {
@@ -5883,6 +5966,8 @@ function roomListItems(rooms) {
       if (state.page === 'login') pollWebLogin();
       if (state.page === 'monthly') loadMonthlyReport();
       if (state.page === 'badges') loadBadgeManager();
+      if (state.page === 'player-badges') loadPlayerCollection(routeInfo(currentRoute));
+      if (state.page === 'badge-ranks' && !badgeRankController?.state.saving) badgeRankController?.load();
       if (alive) {
         if (state.reconnecting || pending) recoverConnection();
         else if (roomCode && !state.needsLogin) refresh().catch(handleError);

@@ -124,3 +124,9 @@ section.badge-detail { overflow-y: auto; }
 @media (max-height: 500px) { .badge-detail-art { width: 76px; height: 76px; } .badge-detail-image { width: 72px; height: 72px; } }
 @keyframes badge-detail-enter { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .badge-page button, .badge-detail button { transition: none; } .badge-detail { animation: none; } }
+
+.badge-title-row { display:flex; align-items:center; justify-content:space-between; margin:3px 0 16px; }
+.badge-title-row .badge-title { margin:0; }
+.badge-page .badge-rank-link { display:flex; align-items:center; width:auto; min-height:44px; margin:-3px 0; padding:0; background:transparent; text-decoration:none; }
+.badge-rank-pill { display:flex; align-items:center; gap:6px; min-height:29px; padding:0 10px; border:1px solid var(--badge-gold-line); border-radius:18px; background:var(--badge-gold-fill); color:var(--accent); font-size:13px; font-weight:600; }
+.badge-rank-pill image, .badge-rank-pill img { width:15px; height:15px; }

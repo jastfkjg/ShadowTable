@@ -3260,3 +3260,20 @@ test('趣味卡片打开说明不切换标签或请求对局，防止重复弹�
   assert.match(requests.at(-1),/fun=survival_knifed&mode=knights/);
   p.onUnload();
 });
+
+test('从名片打开全部徽章，返回同一位玩家时重新读取数量', async () => {
+  const id = '12345678-1234-1234-1234-123456789abc';
+  const { p, navigations } = page('leaderboard', { ...apiBase, request: async () => ({
+    player: { id, name: '大V', badges: [], ownedBadgeCount: 5 }, status: 'available',
+    stats: { byFaction: [], winRate: null },
+  }) });
+  p.setData({ loading: false, board: { rows: [{ publicId: id, nickname: '大V' }] } });
+  await p.openRankPlayerCard({ currentTarget: { dataset: { id } } });
+  p.openPlayerCollection();
+  assert.deepEqual(navigations, ['/pages/badges/player?scope=leaderboard&id=' + id]);
+  p.onHide();
+  await p.onShow();
+  assert.equal(p.data.playerCard.id, id);
+  assert.equal(p.data.playerCard.ownedBadgeCount, 5);
+  assert.equal(p.data.playerCard.badges.length, 0);
+});

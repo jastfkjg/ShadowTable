@@ -115,6 +115,23 @@
     if (!definition) return null;
     return { ...badge, ...definition, artStyle: badgeArtStyle(definition), imageUrl: badgeImageUrl(definition, assetUrl) };
   }
+  function playerCollectionPath(scope, id) {
+    if (scope === 'leaderboard' && /^[a-f0-9-]{36}$/.test(id)) return '/api/leaderboard/players/' + id + '/badges';
+    if (/^\d{6}$/.test(scope) && /^[a-f0-9]{64}$/.test(id)) return '/api/rooms/' + scope + '/players/' + id + '/badges';
+    return '';
+  }
+  function presentPlayerCollection(value, assetUrl = path => path) {
+    const badges = value.badges.map(b => presentPlayerBadge(b, assetUrl)).filter(Boolean);
+    const groups = [{ title: '本月持有', items: [] }, { title: '永久收藏', items: [] }];
+    for (const badge of badges) {
+      const label = badge.equipped ? '名片佩戴' : badge.permanent ? badge.periodLabel || '永久' : badge.category;
+      groups[badge.permanent ? 1 : 0].items.push({ id: badge.id, title: badge.title, imageUrl: badge.imageUrl,
+        artStyle: badge.artStyle, equipped: badge.equipped, label });
+    }
+    return { name: value.player.name, initial: Array.from(value.player.name || '友')[0],
+      avatarUrl: value.player.avatarUrl ? assetUrl(value.player.avatarUrl) : '', limited: value.limited,
+      count: badges.length, groups: groups.filter(g => g.items.length) };
+  }
   const detailNotes = {
     overall: '按原始胜率排序，胜率相同时比较有效局数。',
     survival_revive: '统计十二骑士中实际发生的复活。',
@@ -159,5 +176,5 @@
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { catalogue, categories, rules, MAX_EQUIPPED, usesServerArt, rankedBadge, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
+  return { playerCollectionPath, presentPlayerCollection, catalogue, categories, rules, MAX_EQUIPPED, usesServerArt, rankedBadge, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
 });

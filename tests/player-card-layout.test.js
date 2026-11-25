@@ -92,3 +92,25 @@ test("玩家战绩原生滚动区绑定内容高度，标题和安全区固定�
   assert.match(rendered, /当前积分|55.6|坏人阵营/);
   assert.doesNotMatch(rendered, /仅统计有效对局|胜场 \/ 有效局|场有效对局/);
 });
+
+test("玩家收藏页展示当前和永久两组，佩戴标识、逐月纪念章与银框跟随实际数据", () => {
+  const { presentPlayerCollection } = require("../miniprogram/badges");
+  const collection = presentPlayerCollection({
+    player: { name: "大V" }, badges: [
+      { id: "rate_good", rank: 2, equipped: true },
+      { id: "monthly_points_2026-11_1" },
+      { id: "feedback_contributor" },
+    ],
+  }, url => "https://example.invalid" + url);
+  assert.equal(collection.count, 3);
+  assert.deepEqual(collection.groups.map(g => [g.title, g.items.length]), [["本月持有", 1], ["永久收藏", 2]]);
+  const badge = collection.groups[0].items[0];
+  assert.match(badge.imageUrl, /-silver\.png$/);
+  assert.equal(badge.label, "名片佩戴");
+  const context = { window: {}, global: {}, console };
+  vm.createContext(context);
+  const factory = vm.runInContext("(function(global){" + wxmlToJs(path.resolve(__dirname, "../miniprogram")) + "})(global)", context);
+  const template = JSON.stringify(factory("pages/badges/player.wxml")({ collection }));
+  for (const text of ["本月持有", "永久收藏", "名片佩戴", "共建者", "圣光正义"]) assert.ok(template.includes(text));
+  assert.doesNotMatch(template, /调整佩戴|替换佩戴/);
+});

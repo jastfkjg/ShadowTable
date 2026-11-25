@@ -13,7 +13,7 @@ Page({
     const month = /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") ? options.month : monthly.monthAt();
     this.setData({ month, ...monthHeading(month), navTop: status + (menu?.height ? menu.height + gap * 2 : 44) });
   },
-  onShow() { this.foreground = true; return this.load(); },
+  onShow() { this.foreground = true; return this.collectionReturn ? this.restoreCollectionCard() : this.load(); },
   onHide() { this.foreground = false; this.closePlayerCard(); this.closeRules(); },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.closePlayerCard(); },
   async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },

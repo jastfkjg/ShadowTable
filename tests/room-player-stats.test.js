@@ -93,6 +93,10 @@ test('同房战绩 HTTP 默认开放且忽略旧开关，鉴权、离房及房�
     assert.match(target.statsId,/^[a-f0-9]{64}$/);
     assert.equal((await req(path)).status,401);
     assert.equal((await req(path,stranger)).status,403);
+    const badgesPath=path.replace('/stats','/badges');
+    assert.equal((await req(badgesPath,stranger)).status,403);
+    const inventory=(await req(badgesPath,peer)).data;
+    assert.equal(inventory.player.name,'房主'); assert.deepEqual(inventory.badges,[]);
     const success=await req(path,peer);
     assert.equal(success.status,200);assert.equal(success.data.status,'available');assert.equal(success.data.stats.winRate,null);
     assert.equal(success.headers.get('cache-control'),'no-store');
@@ -103,6 +107,7 @@ test('同房战绩 HTTP 默认开放且忽略旧开关，鉴权、离房及房�
     const current=(await req(roomPath,peer)).data;
     assert.equal((await req(roomPath+'/commands',peer,{type:'leave',stage:current.stage})).status,200);
     assert.equal((await req(path,peer)).status,403);
+    assert.equal((await req(badgesPath,peer)).status,403);
     app.store.remove(created.code);assert.equal((await req(path,host)).status,404);
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });

@@ -1,0 +1,35 @@
+<app-nav title="{{rank.player ? rank.label : '徽章榜'}}" back="{{true}}" backLabel="{{rank.player ? '返回徽章榜' : '返回徽章收藏'}}" bindback="back" />
+<view wx:if="{{rank}}" class="br-page br-{{rank.kind}}">
+  <block wx:if="{{!rank.player}}">
+    <view class="br-selector">
+      <view class="br-choices" role="group" aria-label="切换徽章榜">
+        <button wx:for="{{rank.choices}}" wx:key="kind" class="br-choice {{rank.kind===item.kind?'selected':''}}" hover-class="badge-pressed" data-kind="{{item.kind}}" bindtap="select" aria-pressed="{{rank.kind===item.kind}}">
+          <image class="br-choice-art" src="{{item.art}}" mode="aspectFit" aria-hidden="true"/>
+          <text>{{item.title}}</text>
+          <view wx:if="{{rank.kind===item.kind}}" class="br-choice-check" aria-hidden="true"></view>
+        </button>
+      </view>
+      <view class="br-selector-meta">累计获得<text wx:if="{{rank.board}}"> · {{rank.board.total}} 位玩家上榜</text></view>
+    </view>
+    <block wx:if="{{rank.board}}">
+      <view wx:if="{{rank.board.total}}" class="br-columns"><text class="br-rank-label">名次</text><text class="br-player-label">玩家</text><text>已获得</text></view>
+      <button hover-class="badge-pressed" wx:for="{{rank.board.rows}}" wx:key="publicId" class="br-row {{item.rank===1?'first':''}}" data-id="{{item.publicId}}" bindtap="open">
+        <text class="br-place">{{item.rank}}</text><view class="br-player"><image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" class="br-avatar" mode="aspectFill"/><text wx:else class="br-avatar">{{item.initial}}</text><text class="br-name">{{item.nickname}}</text></view>
+        <view class="br-number">{{item.count}} <text>枚</text></view><view class="br-chevron"></view>
+      </button>
+      <view wx:if="{{!rank.board.total}}" class="br-status">还没有玩家获得{{rank.label}}</view>
+      <button hover-class="badge-pressed" wx:if="{{rank.board.nextOffset!==null && !rank.error}}" class="br-more" bindtap="more" disabled="{{rank.loading}}">{{rank.loading?'加载中…':'查看更多玩家'}}</button>
+      <button hover-class="badge-pressed" class="br-mine" bindtap="open" data-id="self"><view class="br-me-name"><view>我的排名</view><view class="br-muted">{{rank.board.me.nickname}}</view></view><text>{{rank.board.me.rank?'第 '+rank.board.me.rank+' 名 · '+rank.board.me.count+' 枚':'暂未上榜'}}</text><view class="br-chevron"></view></button>
+    </block>
+  </block>
+  <block wx:elif="{{rank.detail}}">
+    <view class="br-person"><image wx:if="{{rank.detail.player.avatarUrl}}" src="{{rank.detail.player.avatarUrl}}" class="br-avatar" mode="aspectFill"/><text wx:else class="br-avatar">{{rank.detail.player.initial}}</text><view><view class="br-person-name">{{rank.detail.player.nickname}}</view><view class="br-muted">{{rank.detail.player.rank?'第 '+rank.detail.player.rank+' 名 · ':''}}已获得 {{rank.detail.player.count}} 枚{{rank.label}}</view></view></view>
+    <label wx:if="{{rank.detail.isSelf}}" class="br-privacy"><view><view>公开我的{{rank.label}}明细</view><view class="br-muted">关闭后，他人仍可看到名次和数量</view></view><switch checked="{{rank.detail.visible}}" disabled="{{rank.saving}}" bindchange="toggle" color="#b89c66" /></label>
+    <view wx:if="{{!rank.detail.isSelf && !rank.detail.visible}}" class="br-status">该玩家已隐藏徽章明细</view>
+    <view wx:elif="{{!rank.detail.badges.length}}" class="br-status">尚未获得{{rank.label}}</view>
+    <view wx:else class="br-grid"><view wx:for="{{rank.detail.badges}}" wx:key="id" class="br-tile"><image src="{{item.imageUrl}}" mode="aspectFit"/><view>{{item.title}}</view><text class="br-muted">{{item.periodLabel || (item.permanent?'永久徽章':'月度徽章')}}</text></view></view>
+  </block>
+  <view wx:if="{{rank.loading && !rank.board}}" class="br-status">正在读取…</view>
+  <view wx:if="{{rank.error}}" class="br-status" role="alert">{{rank.error}}<button hover-class="badge-pressed" class="br-more" bindtap="retry">重新加载</button></view>
+</view>
+<app-dialog id="app-dialog" />

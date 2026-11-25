@@ -23,6 +23,10 @@ const assets = {
   "/record-clearing.js": ["../../miniprogram/pages/data-management/presentation.js", "text/javascript; charset=utf-8"],
   "/record-clearing-layout.css": ["../../miniprogram/pages/data-management/layout.wxss", "text/css; charset=utf-8"],
   "/record-clearing.css": ["record-clearing.css", "text/css; charset=utf-8"],
+  "/badge-ranks.js": ["../../miniprogram/pages/badges/rank-controller.js", "text/javascript; charset=utf-8"],
+  "/badge-rank-view.js": ["badge-rank-view.js", "text/javascript; charset=utf-8"],
+  "/player-badges.css": ["../../miniprogram/pages/badges/player.wxss", "text/css; charset=utf-8"],
+  "/badge-ranks.css": ["../../miniprogram/pages/badges/ranks.wxss", "text/css; charset=utf-8"],
   "/badges.js": ["../../miniprogram/badges.js", "text/javascript; charset=utf-8"],
   "/badge-award-markup.js": ["badge-award-markup.js", "text/javascript; charset=utf-8"],
   "/badge-awards.js": ["../../miniprogram/badge-awards.js", "text/javascript; charset=utf-8"],
@@ -100,7 +104,7 @@ for (const role of require("../engine").roleIds) {
     assets[url] = ["assets/role-cards/" + filename, "image/jpeg"];
   }
 }
-for (const name of ['info','heart','sword','swords','shield','shield-good','spark','medal','users','calendar','list','coin'])
+for (const name of ['cup','info','heart','sword','swords','shield','shield-good','spark','medal','users','calendar','list','coin'])
   assets['/assets/record-' + name + '.svg'] = ['../../miniprogram/assets/record-' + name + '.svg', 'image/svg+xml'];
 // Public, self-contained player web app. Same-origin with /api/ so no CORS.
 function serve(req, res, path) {
@@ -110,7 +114,7 @@ function serve(req, res, path) {
   let content = asset[0] === null
     ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0]));
-  if (["/home.css", "/room-sheets.css", "/me.css"].includes(path)) content = webStyles(content);
+  if (["/home.css", "/room-sheets.css", "/me.css", "/player-badges.css"].includes(path)) content = webStyles(content);
   if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + webTags[tag]);
   res.setHeader("Content-Type", asset[1]);
   res.setHeader("Content-Security-Policy", CSP);
