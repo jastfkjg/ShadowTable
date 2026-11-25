@@ -415,12 +415,16 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.returningHome = false;
     this.foreground = true;
     this.openPublicEntry();
+    const collectionTarget = this.collectionReturn;
+    this.collectionReturn = null;
     this.syncRoomSheetLayout("entry");
     this.syncRoomSheetLayout("rules");
     if (this.alive) {
       if (this.data.reconnecting || this.pending) this.recoverConnection();
       else if (this.data.isLobby && !this.data.loading) this.refreshLobby();
-      else if (this.roomCode) this.refresh().catch((e) => this.handleError(e));
+      else if (this.roomCode) this.refresh().then(() => {
+        if (collectionTarget) return this.restoreCollectionCard(collectionTarget);
+      }).catch((e) => this.handleError(e));
       else if (this.inviteCode && !this.resumingRoom && !this.data.loading && !this.data.invitationNeedsName && !this.data.invitationError) this.retry();
       this.schedule();
     }

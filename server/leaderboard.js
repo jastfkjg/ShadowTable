@@ -59,6 +59,9 @@ const summary = row => {
 function compare(a, b, metric) {
   if (metric === "points") return b.points - a.points;
   if (metric === "games") return b.total - a.total;
+  return compareWinRate(a, b);
+}
+function compareWinRate(a, b) {
   const delta = BigInt(b.wins) * BigInt(a.total) - BigInt(a.wins) * BigInt(b.total);
   return delta > 0n ? 1 : delta < 0n ? -1 : b.total - a.total;
 }
@@ -200,4 +203,4 @@ class Leaderboard {
       nextOffset:nextOffset<end ? nextOffset : null,hasMore:nextOffset<end,me:{...stats,rank:own?.rank || null,status,remaining} };
   }
 }
-module.exports = { Leaderboard, periodRange };
+module.exports = { Leaderboard, periodRange, compareWinRate };

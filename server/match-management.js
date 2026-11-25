@@ -285,6 +285,7 @@ function change(store, input) {
       .run(JSON.stringify(game), d.id);
     d.players.filter(p => !p.companion).forEach((p) => uids.add(p.uid));
   }
+  require('./badge-awards').reconcileMilestones(store, uids);
   for (const uid of uids) store.touchScore(uid);
   require("./avoidance-rewards").reconcile(store, selected.map(d => d.id));
   store.syncScoreRooms();

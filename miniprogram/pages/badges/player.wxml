@@ -1,0 +1,23 @@
+<app-nav title="玩家徽章" back="{{true}}" bindback="back" />
+<view class="page owned-page">
+  <view wx:if="{{loading}}" class="muted" role="status">正在读取徽章…</view>
+  <view wx:elif="{{error}}" class="inline-error" role="alert"><text>{{error}}</text><button class="text-button" hover-class="none" bindtap="load">重试</button></view>
+  <block wx:elif="{{collection}}">
+    <view class="owned-summary">
+      <view class="owned-avatar"><image wx:if="{{collection.avatarUrl && !avatarFailed}}" src="{{collection.avatarUrl}}" mode="aspectFill" binderror="avatarError" /><text wx:else>{{collection.initial}}</text></view>
+      <view class="owned-name"><view>{{collection.name}}的徽章</view><text>{{collection.limited?'已公开的徽章':'已拥有的徽章'}}</text></view>
+      <view class="owned-count"><text>{{collection.count}}</text> 枚</view>
+    </view>
+    <view wx:for="{{collection.groups}}" wx:key="title" wx:for-item="group">
+      <view class="owned-heading"><text>{{group.title}}</text><text>{{group.items.length}} 枚</text></view>
+      <view class="owned-grid">
+        <view class="owned-row" wx:for="{{group.items}}" wx:key="id">
+          <image src="{{item.imageUrl}}" style="{{item.artStyle}}" mode="aspectFit" aria-hidden="true" />
+          <view><view>{{item.title}}</view><text class="{{item.equipped?'worn':''}}">{{item.label}}</text></view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{!collection.count}}" class="muted owned-empty">{{collection.limited?'暂无公开的徽章':'暂无已拥有的徽章'}}</view>
+  </block>
+</view>
+<app-dialog id="app-dialog" />

@@ -2922,8 +2922,14 @@ test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作�
   assert.equal(p.data.selectedBadge.imageUrl,'https://test.invalid/assets/badges/percival_assassinated.png');
   p.showBadgeDetail(event('points')); assert.equal(p.data.selectedBadge.owned,false);
   await p.toggleOwnedBadge(event('points')); assert.equal(writes.length,0);
-  p.chooseBadgeFilter(event('owned')); p.showBadgeDetail(event('games'));
+  p.chooseBadgeFilter(event('owned'));
+  p.chooseBadgeFilter({currentTarget:{dataset:{category:'荣誉徽章'}}});
+  assert.equal(p.data.badgeCollection.visibleBadges.length, 0);
+  p.chooseBadgeFilter({currentTarget:{dataset:{category:'趣味徽章'}}});
+  assert.equal(p.data.badgeCollection.visibleBadges.length, 2);
+  p.showBadgeDetail(event('games'));
   await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,1);
+  assert.equal(p.data.badgeCollection.category, '趣味徽章');
   assert.equal(p.data.selectedBadge,null); assert.equal(writes[0].periodStart,current.periodStart);
   await p.toggleOwnedBadge(event('games')); assert.equal(p.data.badgeCollection.equippedCount,2);
   p.back(); assert.deepEqual(navigations,['back']);
@@ -3258,4 +3264,21 @@ test('趣味卡片打开说明不切换标签或请求对局，防止重复弹�
   assert.equal(p.data.tab,'matches'); assert.equal(dialogs.length,1);
   assert.match(requests.at(-1),/fun=survival_knifed&mode=knights/);
   p.onUnload();
+});
+
+test('从名片打开全部徽章，返回同一位玩家时重新读取数量', async () => {
+  const id = '12345678-1234-1234-1234-123456789abc';
+  const { p, navigations } = page('leaderboard', { ...apiBase, request: async () => ({
+    player: { id, name: '大V', badges: [], ownedBadgeCount: 5 }, status: 'available',
+    stats: { byFaction: [], winRate: null },
+  }) });
+  p.setData({ loading: false, board: { rows: [{ publicId: id, nickname: '大V' }] } });
+  await p.openRankPlayerCard({ currentTarget: { dataset: { id } } });
+  p.openPlayerCollection();
+  assert.deepEqual(navigations, ['/pages/badges/player?scope=leaderboard&id=' + id]);
+  p.onHide();
+  await p.onShow();
+  assert.equal(p.data.playerCard.id, id);
+  assert.equal(p.data.playerCard.ownedBadgeCount, 5);
+  assert.equal(p.data.playerCard.badges.length, 0);
 });

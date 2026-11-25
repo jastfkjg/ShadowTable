@@ -5,7 +5,7 @@ const labels = {
   magic: "魔法票",
 };
 
-const timing = { leadInMs: 1000, turnMs: 520, readMs: 800, finalReadMs: 2000 };
+const timing = { leadInMs: 1000, turnMs: 520, readMs: 800, finalReadMs: 800 };
 
 // Shuffle public totals, never individual submissions. The public event ID
 // gives every device the same draw even if their polls arrive at different times.

@@ -353,10 +353,19 @@ function createApp({
       }
       const uploadStatus = path.match(/^\/api\/me\/avatar-uploads\/([a-f0-9-]{36})$/);
       if (req.method === "GET" && uploadStatus) return send(200, require("./avatar-uploads").readUpload(store, uid, uploadStatus[1]));
-      const rankedPlayerStats = path.match(/^\/api\/leaderboard\/players\/([a-f0-9-]{36})\/stats$/);
+      const badgeRank = path.match(/^\/api\/badge-ranks\/(honor|fun)(?:\/(self|[0-9a-f]{32}))?$/);
+      if (badgeRank) {
+        const [, kind, player] = badgeRank;
+        res.setHeader('Cache-Control', 'no-store');
+        if (req.method === 'GET') return send(200, player
+          ? store.badgeRanks.detail(uid, kind, player) : store.badgeRanks.list(uid, kind, requestUrl.searchParams));
+        check(req.method === 'POST' && player === 'self', '接口不存在', 404);
+        return send(200, store.badgeRanks.setVisibility(uid, kind, await body(req)));
+      }
+      const rankedPlayerStats = path.match(/^\/api\/leaderboard\/players\/([a-f0-9-]{36})\/(stats|badges)$/);
       if (req.method === "GET" && rankedPlayerStats) {
         res.setHeader("Cache-Control", "no-store");
-        return send(200, readLeaderboardPlayerStats(store, rankedPlayerStats[1]));
+        return send(200, readLeaderboardPlayerStats(store, rankedPlayerStats[1], uid, rankedPlayerStats[2]));
       }
       if (req.method === "GET" && path === "/api/leaderboard")
         return send(200, leaderboard.read(uid, requestUrl.searchParams, clock()));
@@ -493,12 +502,12 @@ function createApp({
         const rooms = store.personalRooms(uid).filter(r => r.available !== false && r.status !== "unavailable");
         return send(200, { rooms, serverTime: store.clock() });
       }
-      const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/stats$/);
+      const playerStats = path.match(/^\/api\/rooms\/(\d{6})\/players\/([a-f0-9]{64})\/(stats|badges)$/);
       if (req.method === "GET" && playerStats) {
         const room = store.accessibleRoom(playerStats[1]);
         check(room, "房间不存在", 404);
         res.setHeader("Cache-Control", "no-store");
-        return send(200, readRoomPlayerStats(store, room, uid, playerStats[2]));
+        return send(200, readRoomPlayerStats(store, room, uid, playerStats[2], playerStats[3]));
       }
       const personal = path.match(/^\/api\/me\/rooms\/(\d{6})$/);
       const match = path.match(

@@ -8,7 +8,7 @@ Page({
   data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funMetrics: [], funOptions: [], pointsAvailable: true, period: "month", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
-  onShow() { this.foreground = true; return this.load(); },
+  onShow() { this.foreground = true; return this.collectionReturn ? this.restoreCollectionCard() : this.load(); },
   onResize() { this.syncPlayerCardLayout(); if (this.data.metricsExpanded) this.measureFunOptions(this.data.funOptionsScrollTarget); },
   onHide() { this.foreground = false; this.closePlayerCard(); },
   openRankPlayerCard(e) {

@@ -9,7 +9,7 @@ function badgeManagerMethods() {
       this.setData({ badgeManagerLoading: true, badgeManagerError: '', badgePlaced: null });
       try {
         const value = await api.request('/api/me/badges');
-        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl) });
+        if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeCollection: presentCollection(value, this.data.badgeFilter, api.assetUrl, this.data.badgeCategory) });
       } catch (e) {
         if (this.alive && sequence === this.badgeManagerSequence) this.setData({ badgeManagerError: e.message });
       } finally {
@@ -30,7 +30,7 @@ function badgeManagerMethods() {
       try {
         const value = await api.request('/api/me/badges', 'POST', { id: badge.id, equipped: !badge.equipped, version: collection.version, periodStart: collection.periodStart, ...(replaceId ? { replaceId } : {}), ...(Number.isInteger(slotIndex) ? { slotIndex } : {}) }, api.requestId());
         if (this.alive && sequence === this.badgeManagerSequence) {
-          const badgeCollection = presentCollection(value, this.data.badgeFilter, api.assetUrl);
+          const badgeCollection = presentCollection(value, this.data.badgeFilter, api.assetUrl, this.data.badgeCategory);
           const badgePlaced = replaceId || Number.isInteger(slotIndex) ? badgeCollection.slots.find(slot => slot.id === badge.id) || null : null;
           this.setData({ badgeCollection, badgePlaced, selectedBadge: null, badgePicker: '', badgePickerChoice: null });
         }

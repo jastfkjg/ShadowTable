@@ -1850,7 +1850,7 @@ test("任务票按公开票数逐张翻，结尾停留后同步公布结果、�
     assert.equal(p.data.questReveal.revealed, i);
     assert.equal(p.data.history.length, 0);
   }
-  t.mock.timers.tick(2519);
+  t.mock.timers.tick(1319);
   assert.ok(p.data.questReveal);
   t.mock.timers.tick(1);
   assert.equal(p.data.questReveal, null);

@@ -38,7 +38,15 @@
           <template is="honorResults" data="{{honors:item.honors,compactTitles:true}}" />
           <view wx:if="{{item.members.length}}" class="match-members-section">
             <button hover-class="none" class="disclosure-button match-members-toggle" bindtap="historyToggleMembers" data-id="{{item.id}}" aria-expanded="{{item.membersExpanded}}" aria-label="{{item.membersExpanded?'收起':'展开'}}同桌成员，共{{item.members.length}}人"><image class="match-members-icon" src="/assets/record-users.svg" mode="aspectFit" aria-hidden="true" /><text class="match-members-label">同桌成员<text class="match-member-count"> {{item.members.length}}人</text></text><view class="match-arrow {{item.membersExpanded?'expanded':''}}" aria-hidden="true"></view></button>
-            <view wx:if="{{item.membersExpanded}}" class="match-members"><view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}"><text class="match-seat">{{member.seat}}号</text><text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text></view></view>
+            <view wx:if="{{item.membersExpanded}}" class="match-members">
+              <view wx:for="{{item.members}}" wx:for-item="member" wx:key="seat" class="match-member {{member.isSelf?'is-self':''}}">
+                <text class="match-seat">{{member.seat}}号</text>
+                <view class="match-member-info">
+                  <text class="match-member-name">{{member.name}}<text wx:if="{{member.isSelf}}" class="match-self">（我）</text></text>
+                  <text wx:if="{{member.role}}" class="match-member-role">{{member.role}}</text>
+                </view>
+              </view>
+            </view>
           </view>
         </view>
 </template>

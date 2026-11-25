@@ -289,13 +289,14 @@ function archiveResult(room) {
     scoreExcludedReason,
     funFacts: room.fun ? {
       ...room.fun, attacksComplete: true,
+      badgeTimeline: badgeTimeline(room),
       questsComplete: !room.flexible && room.fun.events.filter(event => event.kind === "quest").length === room.quests.length,
       ...(room.lancelot ? {
         lancelotConversions: Object.fromEntries(Object.entries(room.lancelot.players)
           .map(([uid, state]) => [uid, state.identityRevision])),
       } : {}),
     } : null,
-    ...(replay.supported(room.board) ? { replay: replay.snapshot(room) } : {}),
+    replay: replay.snapshot(room),
     players: room.players.map(p => ({
       uid: p.uid, name: p.name, seat: p.seat, role: ROLES[room.roles[p.uid]]?.[0] || "未知角色", roleId: room.roles[p.uid] || null,
       alive: room.knights?.players[p.uid].alive ?? true,
@@ -491,6 +492,7 @@ function start(room, flexible = false) {
   delete room.avoidanceChoices;
   delete room.avoidanceUnavailable;
   fun.init(room);
+  room.voteSides = {};
   room.game++;
   room.matchId = randomUUID();
   room.startedAt = Date.now();
@@ -513,7 +515,7 @@ function start(room, flexible = false) {
   room.activity = null;
   room.toolSequence = 0;
   if (isKnights(room.board)) knights.init(room, shuffle);
-  if (isKnights(room.board)) replay.init(room, ROLES);
+  replay.init(room, ROLES);
   if (room.board === "lancelot") room.lancelot = {
     conversions: shuffle([true, true, false, false, false, false, false]),
     players: Object.fromEntries(Object.entries(room.roles)
@@ -1030,6 +1032,22 @@ function beginActivity(room, input) {
     }[kind],
   );
 }
+// Keep vote-time alignments private even on boards with public voting history.
+function recordVote(room, entry) {
+  (room.voteSides ||= {})[room.history.length] = Object.fromEntries(
+    room.players.map(p => [p.seat, faction(room, p.uid)]));
+  room.history.push(entry);
+}
+function badgeTimeline(room) {
+  return room.history.flatMap((e, i) => {
+    if (e.kind === "team" || e.kind === "toolVote") return [{ kind: "vote", team: e.team,
+      votes: e.votes, approved: e.approved, sides: room.voteSides?.[i] }];
+    if (e.kind === "quest" || e.kind === "toolQuest") return [{ kind: "quest", team: e.team, success: e.success }];
+    if (e.resultType === "fairy") return [{ kind: "fairy", actor: e.actor, target: e.target }];
+    if (e.kind === "toolCanceled") return [{ kind: "canceled" }];
+    return [];
+  });
+}
 function settleActivity(room, defaulted = []) {
   requireRule(
     hasActiveOperation(room) && room.phase !== "offlineFinal",
@@ -1088,7 +1106,7 @@ function settleActivity(room, defaulted = []) {
           ? null
           : room.submissions[p.uid] === "approve",
     }));
-    room.history.push({
+    recordVote(room, {
       kind: "toolVote",
       number,
       team: [...room.team],
@@ -1367,7 +1385,7 @@ function publicView(room, uid) {
     myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     myFun: excludedRecord ? null : funCopy.story(room.matchRecord?.players.find(player => player.uid === uid)?.fun) || null,
     replayId: ["ended", "terminated"].includes(room.phase) && managedState !== "deleted" &&
-      replay.supported(room.matchRecord?.board) && room.matchRecord.players.some(player => player.uid === uid)
+      room.matchRecord?.players.some(player => player.uid === uid)
       ? room.matchRecord.id : null,
     canKick:
       room.host === uid &&
@@ -1866,11 +1884,7 @@ function applyCommand(room, uid, input) {
     return;
   }
   if (type === "closeOffline") {
-    requireRule(
-      (room.board === "shadow-assist" || offlineAssassination(room)) &&
-        room.phase === "offlineFinal",
-      "当前不是线下结算阶段",
-    );
+    requireRule(room.phase === "offlineFinal", "当前不是线下结算阶段");
     if (room.flexible || input.keepPlaying === true) {
       room.flexible = true;
       room.history.push({ kind: "toolOffline", number: room.activity?.number });
@@ -1879,6 +1893,7 @@ function applyCommand(room, uid, input) {
       return;
     }
     const winner = manualResult(room, input);
+    room.history.push({ kind: "toolOffline" });
     end(
       room,
       winner,
@@ -1962,7 +1977,7 @@ function applyCommand(room, uid, input) {
       }));
       const approved =
         votes.filter((v) => v.approve).length > room.capacity / 2;
-      room.history.push({
+      recordVote(room, {
         kind: "team",
         round: room.round,
         leader: room.leader,

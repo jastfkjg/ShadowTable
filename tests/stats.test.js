@@ -73,7 +73,7 @@ test('个人战绩按最终阵营统计，重开、移出、删房和重启均�
     assert.doesNotMatch(JSON.stringify(stats), /wx:2|players|uid/);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
-test('对局记录分页返回完整历史，成员只包含座位与当时昵称', () => {
+test('对局记录分页返回完整历史，成员包含座位、当时昵称和当局角色名称', () => {
   const store = new Store(':memory:');
   try {
     for (let i = 0; i < 22; i++) store.archiveMatch({
@@ -81,7 +81,7 @@ test('对局记录分页返回完整历史，成员只包含座位与当时昵�
       startedAt: i, endedAt: i, winner: 'good', source: 'manual', excludedReason: null,
       players: [
         { uid: 'wx:me', name: '我', seat: 1, role: '梅林', faction: 'good', outcome: 'win' },
-        { uid: 'wx:friend', name: '朋友', seat: 2, role: '刺客', faction: 'evil', outcome: 'loss' },
+        { uid: 'wx:friend', name: '朋友', seat: 2, role: i % 2 ? '刺客' : '莫甘娜', faction: 'evil', outcome: 'loss' },
       ],
     });
     const first = store.matchesFor('wx:me'), second = store.matchesFor('wx:me', 20);
@@ -90,7 +90,8 @@ test('对局记录分页返回完整历史，成员只包含座位与当时昵�
     assert.equal(second.records.length, 2);
     assert.equal(second.hasMore, false);
     assert.equal(first.records[0].endedAt, 21);
-    assert.deepEqual(first.records[0].members, [{ seat: 1, name: '我' }, { seat: 2, name: '朋友' }]);
+    assert.deepEqual(first.records[0].members, [{ seat: 1, name: '我', role: '梅林' }, { seat: 2, name: '朋友', role: '刺客' }]);
+    assert.equal(first.records[1].members[1].role, '莫甘娜');
     assert.equal(store.matchesFor('wx:stranger').total, 0);
     assert.doesNotMatch(JSON.stringify(first), /wx:|"uid"/);
   } finally { store.close(); }
@@ -117,7 +118,9 @@ test('陪测只保留同桌上下文，真实玩家可更正陪测目标，重�
       const game=JSON.parse(store.db.prepare('SELECT snapshot FROM matches WHERE id=?').get(r.matchId).snapshot);
       assert.equal(game.companions.length,1);
       assert.deepEqual(Object.keys(game.companions[0]).sort(),['alive','faction','name','role','roleId','seat','uid']);
-      assert.equal(store.matchesFor('wx:1').records[0].members.length,6);
+      const members = store.matchesFor('wx:1').records[0].members;
+      assert.equal(members.length,6);
+      assert.deepEqual(members[2], {seat:3, name:r.players[2].name, role:'梅林'});
       assert.doesNotMatch(JSON.stringify(store.statsFor('wx:1')),/test:|"companions"/);
       const view=publicView(store.get(r.code),'test:merlin');
       assert.equal(view.myScore?.status || null,store.get(r.code).recordManagement.state==='excluded' ? 'excluded' : null);

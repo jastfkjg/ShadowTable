@@ -1931,3 +1931,6 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 @import "pages/table/presentation.wxss";
 @import "pages/table/game-dialogs.wxss";
 @import "pages/table/identity-card.wxss";
+
+button.player-collection-link { width: auto; min-height: 32px; margin: 0 0 0 auto; padding: 0 4px; color: var(--accent); background: transparent; font-size: 13px; gap: 5px; }
+.player-collection-link text { font-size: 18px; }

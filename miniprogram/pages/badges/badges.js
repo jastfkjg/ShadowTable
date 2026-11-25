@@ -1,10 +1,10 @@
 const dialog = require("../../dialog");
 const api = require('../../api');
-const { presentCollection, rules } = require('../../badges');
+const { categories, presentCollection, rules } = require('../../badges');
 const { initialBadgeManager, badgeManagerMethods } = require('./badge-manager');
 const { backToMe } = require('../../profile');
 Page({
-  data: { ...initialBadgeManager, badgeFilter: 'all', selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0, badgePicker: '', badgePickerSlot: null, badgePickerHeight: 0 },
+  data: { ...initialBadgeManager, badgeFilter: 'all', badgeCategory: categories[0], selectedBadge: null, badgeManaging: false, badgeDetailHeight: 0, badgePicker: '', badgePickerSlot: null, badgePickerHeight: 0 },
   ...badgeManagerMethods(),
   onLoad() { this.alive = true; },
   async onShow() {
@@ -30,9 +30,14 @@ Page({
     } finally { wx.stopPullDownRefresh(); }
   },
   chooseBadgeFilter(e) {
-    const badgeFilter = e.currentTarget.dataset.id;
-    if (!['all', 'owned', 'unowned'].includes(badgeFilter)) return;
-    this.setData({ badgeFilter, ...(this.data.badgeCollection ? { badgeCollection: presentCollection(this.data.badgeCollection, badgeFilter, api.assetUrl) } : {}) });
+    const { id, category } = e.currentTarget.dataset;
+    if (!categories.includes(category) && !['all', 'owned', 'unowned'].includes(id)) return;
+    const badgeFilter = id || this.data.badgeFilter;
+    const badgeCategory = category || this.data.badgeCategory;
+    const collection = this.data.badgeCollection;
+    this.setData({ badgeFilter, badgeCategory, ...(collection ? {
+      badgeCollection: presentCollection(collection, badgeFilter, api.assetUrl, badgeCategory),
+    } : {}) });
   },
   showBadgeDetail(e) {
     const selectedBadge = this.data.badgeCollection?.items.find(b => b.id === e.currentTarget.dataset.id);
@@ -94,7 +99,7 @@ Page({
     if (!this.data.badgeManagerSaving) this.setData({ badgePicker: '', badgePickerChoice: null, badgeDetailHeight: 0 }, () => this.measureBadgeDetail());
   },
   manageBadges() { if (!this.data.badgeManagerSaving && !this.data.badgeManagerLoading) this.setData({ badgeManaging: !this.data.badgeManaging }); },
-  showBadgeRules() { dialog.show({ title: '荣誉徽章规则', content: rules + '\n趣味徽章按次数榜授予。最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', showCancel: false }); },
+  showBadgeRules() { dialog.show({ title: '徽章规则', content: rules + '\n最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', showCancel: false }); },
   blockScroll() {},
   back: backToMe,
 });

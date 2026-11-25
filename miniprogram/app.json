@@ -11,7 +11,7 @@
   ],
   "subPackages": [
     { "root": "pages/web-login", "pages": ["web-login"] },
-    { "root": "pages/badges", "pages": ["badges"] },
+    { "root": "pages/badges", "pages": ["badges", "ranks", "player"] },
     { "root": "pages/settings", "pages": ["settings"] },
     { "root": "pages/board-details", "pages": ["board-details"] },
     { "root": "pages/feedback", "pages": ["feedback", "compose", "history"] },

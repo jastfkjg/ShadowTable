@@ -22,11 +22,11 @@
             <view class="award-reason">{{item.displayReason}}</view>
           </view>
         </view>
-        <view wx:if="{{dialog.awards.message}}" class="award-message">{{dialog.awards.message}}</view><view class="award-hint">可在「荣誉徽章」中查看与佩戴</view>
+        <view wx:if="{{dialog.awards.message}}" class="award-message">{{dialog.awards.message}}</view><view class="award-hint">可在「徽章收藏」中查看与佩戴</view>
       </block>
     </view>
   </scroll-view>
   <view class="award-actions"><button wx:if="{{awardDetail}}" class="award-confirm" bindtap="closeAward" hover-class="app-dialog-pressed">返回</button>
-    <block wx:else><button class="award-confirm" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">收下徽章</button><button class="award-view" bindtap="viewAwardCollection" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">查看荣誉徽章 ›</button></block>
+    <block wx:else><button class="award-confirm" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">收下徽章</button><button class="award-view" bindtap="viewAwardCollection" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">查看徽章收藏 ›</button></block>
   </view>
 </view>

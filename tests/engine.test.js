@@ -155,6 +155,13 @@ test("六人组队3:3平票拒绝，第5次否决直接坏人胜", () => {
   }
   assert.equal(r.result.winner, "evil");
   assert.equal(r.rejects, 5);
+  const ballots = r.matchRecord.replay.events;
+  assert.equal(ballots.length, 5);
+  for (const [i, ballot] of ballots.entries()) {
+    assert.equal(ballot.round, 1);
+    assert.equal(ballot.leader, r.history[i].leader);
+    assert.deepEqual(ballot.votes, r.players.map(p => ({ seat: p.seat, approve: p.seat <= 3 })));
+  }
 });
 test("组队票在结算时公开，任务票从不返回个人对应", () => {
   const r = setup();

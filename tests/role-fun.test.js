@@ -278,6 +278,8 @@ test("兰斯回填已知换边，合并两种身份的次数榜，并区分补�
       const rank = id => new Leaderboard(store).read(red.uid, new URLSearchParams({ metric: "fun_" + id, period: "all" }));
       assert.equal(rank("lancelot_switch_win").rows.reduce((sum, player) => sum + player.count, 0), 2);
       const snapshot = JSON.parse(store.db.prepare("SELECT snapshot FROM matches WHERE id=?").get(betrayal.matchId).snapshot);
+      // Simulate an old Lancelot archive without either source of exact conversion counts.
+      delete snapshot.replay;
       delete snapshot.funFacts.lancelotConversions;
       store.db.prepare("UPDATE matches SET snapshot=? WHERE id=?").run(JSON.stringify(snapshot), betrayal.matchId);
       store.db.prepare("UPDATE match_players SET snapshot=json_set(snapshot,'$.fun.version','fun-2026-11-v6') WHERE match_id=?").run(betrayal.matchId);

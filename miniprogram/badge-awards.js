@@ -10,9 +10,14 @@
     if (contributor) {
       const single = badges.length === 1;
       return { badges, count: badges.length, hero: contributor, ranked: false, secondary: badges.filter(b => b !== contributor),
-        eyebrow: single ? '社区贡献 · 永久荣誉' : '永久荣誉',
+        eyebrow: single ? '社区贡献 · 趣味徽章' : '永久徽章',
         title: single ? '你的反馈被采纳了' : '新的荣誉已送达',
         message: contributor.flavor };
+    }
+    if (badges.some(b => b.metric === 'milestone')) {
+      const hero = badges.length === 1 ? badges[0] : null;
+      return { badges, count: badges.length, hero, ranked: false, secondary: hero ? [] : badges,
+        eyebrow: '永久荣誉', title: hero ? '达成' + hero.title : '新的荣誉已送达', message: '已加入你的荣誉收藏。' };
     }
     const monthly = badges.find(b => b.month);
     const ranked = monthly || badges.find(b => b.rank), hero = ranked || (badges.length === 1 ? badges[0] : null);

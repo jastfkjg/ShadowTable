@@ -47,8 +47,8 @@ button.replay-round-toggle { display: flex; justify-content: flex-start; gap: 12
 .replay-stage-heading > text:first-child { min-width: 0; overflow-wrap: anywhere; }
 .replay-event-summary { font-size: 13px; color: var(--muted); line-height: 1.7; }
 .replay-task-summary { background: var(--surface); border-radius: 12px; padding: 14px 16px; }
-.replay-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
-.replay-stat { padding-left: 16px; border-left: 1px solid var(--replay-divider); }.replay-stat:first-child { padding-left: 0; border-left: 0; }
+.replay-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); row-gap: 12px; }
+.replay-stat { padding-left: 16px; border-left: 1px solid var(--replay-divider); }.replay-stat:nth-child(3n+1) { padding-left: 0; border-left: 0; }
 .replay-stat-value { font-size: 24px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }.replay-stat-value > text { font-size: 11px; font-weight: 400; margin-left: 4px; }
 .replay-stat-label { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .replay-team { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; border-top: 1rpx solid var(--replay-divider); margin-top: 14px; padding-top: 12px; font-size: 13px; line-height: 1.7; }

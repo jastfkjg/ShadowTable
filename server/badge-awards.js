@@ -29,10 +29,31 @@ function grant(store, uid, id, { rank = null, points = null, campaign = CAMPAIGN
     .run(uid, id, campaign, grantedAt, rank, points);
   if (result.changes) store.db.prepare(`INSERT INTO badge_versions(uid,version) VALUES(?,1)
     ON CONFLICT(uid) DO UPDATE SET version=version+1`).run(uid);
+  if (result.changes) store.badgeRanks?.record(uid, id);
   return result.changes > 0;
 }
 function grantContributor(store, uid) {
   return grant(store, uid, 'feedback_contributor', { campaign: 'feedback' });
+}
+// Evaluate in the transaction that changes eligibility so a later correction
+// or personal record removal cannot revoke an already earned milestone.
+function reconcileMilestones(store, uids) {
+  const candidates = uids || store.db.prepare("SELECT DISTINCT uid FROM match_players").all().map(row => row.uid);
+  const outcomes = store.db.prepare(`SELECT outcome FROM visible_match_players
+    WHERE uid=? AND outcome IN ('win','loss') ORDER BY ended,match_id`);
+  const existing = store.db.prepare("SELECT badge_id FROM badge_awards WHERE uid=? AND campaign='milestones'");
+  for (const uid of new Set(candidates)) {
+    if (!/^(wx|dev|guest):/.test(uid)) continue;
+    const owned = new Set(existing.all(uid).map(row => row.badge_id));
+    if (owned.size === 3) continue;
+    let wins = 0, run = 0, longest = 0;
+    for (const row of outcomes.iterate(uid)) {
+      if (row.outcome === 'win') { wins++; run++; longest = Math.max(longest, run); }
+      else run = 0;
+    }
+    for (const [id, qualifies] of [['five_wins', longest >= 5], ['ten_wins', longest >= 10], ['hundred_wins', wins >= 100]])
+      if (qualifies && !owned.has(id)) grant(store, uid, id, { campaign: 'milestones' });
+  }
 }
 // Participation is independent of public leaderboard visibility and winning.
 // Spectators have no match_players row. Companion/test/deleted/excluded records
@@ -132,4 +153,4 @@ function acknowledge(store, uid, input) {
   store.db.prepare('UPDATE badge_awards SET seen=1 WHERE uid=? AND id<=?').run(uid, input.through);
   return { acknowledged: input.through };
 }
-module.exports = { initialize, activate, settleMonthly, startMonthlyAwards, reconcileParticipants, grantContributor, notice, acknowledge, summary, CAMPAIGN, START, END, FIRST_MONTH };
+module.exports = { initialize, activate, reconcileMilestones, settleMonthly, startMonthlyAwards, reconcileParticipants, grantContributor, notice, acknowledge, summary, CAMPAIGN, START, END, FIRST_MONTH };

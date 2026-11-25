@@ -323,7 +323,8 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   const { presentMatches } = require('../miniprogram/profile');
   const record = { boardName: '阿瓦隆 · 十二骑士', capacity: 12, role: '派西维尔', faction: 'good', outcome: 'loss', winner: 'evil', source: 'manual', seat: 2,
     score: { status: 'legacy', reason: '积分功能启用前的记录' },
-    fun: { status: 'legacy', reason: '旧对局未记录完整过程', events: [], highlights: [] }, members: [{ seat: 2, name: '林间' }] };
+    fun: { status: 'legacy', reason: '旧对局未记录完整过程', events: [], highlights: [] },
+    members: [{ seat: 1, name: '晚风', role: '莫甘娜' }, { seat: 2, name: '林间', role: '派西维尔' }] };
   const records = presentMatches([
     { ...record, id: 'one', endedAt: new Date(2026, 9, 1, 21, 26, 21).getTime() },
     { ...record, id: 'two', endedAt: new Date(2026, 9, 1, 20, 48, 19).getTime(), score: { status: 'scored', total: 0, breakdown: [] } },
@@ -344,11 +345,11 @@ test('对局列表同日合并，详情不提前显示成员，旧过程说明�
   assert.equal(byHandler(render(), 'historyShareRecord'), undefined);
   assert.match(text(render()), /同桌成员/);
   assert.match(text(render()), /本局暂无过程记录/);
-  assert.doesNotMatch(text(render()), /我的趣味记录|林间/);
+  assert.doesNotMatch(text(render()), /我的趣味记录|林间|莫甘娜/);
   assert.equal(byHandler(render(), 'historyToggleMembers').attr.ariaExpanded, false);
   records[0].membersExpanded = true;
-  assert.match(text(render()), /林间/);
-  assert.match(text(render()), /（我）/);
+  assert.deepEqual(nodes(render()).filter(n => n.attr?.class === 'match-member-info').map(text),
+    ['晚风 莫甘娜', '林间 （我） 派西维尔']);
 
   records[0] = { ...presentMatches([{ ...record, id: 'one', endedAt: 1,
     fun: { status: 'partial', initialRole: '梅林', reason: '最终结果未记录；已完成的技能仍可查看', events: [{ id: 'knife', round: 2, role: '派西维尔', label: '刀中敌方', detail: '目标：3号' }], highlights: [] } }])[0], expanded: true };
@@ -2037,6 +2038,17 @@ test('首页仅展示快捷入口，表单按需展开，复制与更多使用�
   assert.match(JSON.stringify(error), /未找到该房间/);
   assert.match(JSON.stringify(error), /请检查房间码是否正确/);
   assert.match(nodes(missingRoom).find(n => n.attr?.class?.includes('entry-code-field')).attr.class, /has-error/);
+});
+
+test('房间面板测量时遮罩与表单共用入场状态，键盘弹出后不再进入测量态', () => {
+  for (const entryMode of ['join', 'create']) {
+    for (const [entryMeasuring, entryKeyboardHeight] of [[true, 0], [false, 0], [false, 280]]) {
+      const tree = render({ ...base, entrySheet: true, entryMode, entryMeasuring, entryKeyboardHeight });
+      const backdrop = nodes(tree).find(n => n.attr?.class?.includes('entry-backdrop'));
+      assert.equal(backdrop.attr.class.split(/\s+/).includes('is-measuring'), entryMeasuring);
+      assert.ok(nodes(backdrop).some(n => n.tag === 'wx-form'));
+    }
+  }
 });
 
 test('创建和加入表单的铅笔为可点击按钮，昵称焦点绑定生效，请求期间禁用', () => {

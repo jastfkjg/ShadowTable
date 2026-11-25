@@ -8,12 +8,8 @@ function questMembers(room, team, faction, defaulted) {
     const { uid, seat } = player;
     const role = room.roles[uid];
     return { seat, role, faction: faction(room, uid),
-      ...(lancelots.includes(role) || oberons.includes(role) ? {
-        playedFailure: !defaulted.includes(uid) && room.submissions[uid] === "fail",
-      } : {}),
-      ...(lancelots.includes(role) ? {
-        playedSuccess: !defaulted.includes(uid) && room.submissions[uid] === "success",
-      } : {}),
+      playedFailure: !defaulted.includes(uid) && ["fail", "thiefFail"].includes(room.submissions[uid]),
+      playedSuccess: !defaulted.includes(uid) && room.submissions[uid] === "success",
     };
   });
 }
@@ -37,7 +33,7 @@ function questFacts(record, players) {
       return { ...quest, members: members.map(member => {
         const value = cards.get(member.seat)?.value;
         if (replay.earlyClosed || value == null) return member;
-        return { playedFailure: value === "fail", playedSuccess: value === "success", ...member };
+        return { playedFailure: ["fail", "thiefFail"].includes(value), playedSuccess: value === "success", ...member };
       }) };
     }
     if (quest.members) return quest;

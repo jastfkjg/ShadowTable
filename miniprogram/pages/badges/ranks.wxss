@@ -1,0 +1,319 @@
+.br-page {
+  --br-ink: #e5c68b;
+  --br-line: #635b47;
+  --br-wash: #2b302c;
+  box-sizing: border-box;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 16px calc(100px + env(safe-area-inset-bottom));
+  color: var(--text, #f2eee5);
+}
+.br-page.br-fun {
+  --br-ink: #9bd2c5;
+  --br-line: #405d56;
+  --br-wash: #203432;
+}
+.br-page button {
+  margin: 0;
+  padding: 0;
+  width: auto;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.br-selector {
+  margin: 0 -16px 8px;
+  padding: 15px 16px 12px;
+  background: linear-gradient(100deg, #17262c, #1b292d);
+  border-bottom: 1px solid #33464c;
+}
+.br-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.br-page .br-choice {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  padding: 4px 7px;
+  border: 1px solid #3d5056;
+  border-radius: 10px;
+  background: #16262d;
+  color: #c9d1d0;
+  font: 600 17px/1.3 "Songti SC", serif;
+  text-align: left;
+}
+.br-choice-art {
+  flex: none;
+  width: 43px;
+  height: 43px;
+  object-fit: contain;
+  filter: saturate(.68);
+  opacity: .81;
+}
+.br-choice.selected .br-choice-art {
+  filter: drop-shadow(0 3px 5px rgba(5, 10, 14, .27));
+  opacity: 1;
+}
+.br-page .br-choice.selected {
+  border-color: #97835b;
+  background: linear-gradient(108deg, #393b2e, #2d332d);
+  color: #f0d9a9;
+}
+.br-fun .br-choice.selected {
+  border-color: #608e7e;
+  background: linear-gradient(108deg, #29443d, #233833);
+  color: #c6e6d8;
+}
+.br-choice-check {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 7px;
+  height: 4px;
+  border: solid var(--br-ink);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+.br-selector-meta {
+  margin-top: 9px;
+  color: #b1bfc6;
+  font-size: 12px;
+}
+@media (max-width: 355px) {
+  .br-page .br-choice { gap: 3px; padding: 3px 5px; font-size: 15px; }
+  .br-choice-art { width: 34px; height: 34px; }
+}
+.br-muted,
+.br-status {
+  color: #b1bfc6;
+  font-size: 13px;
+}
+.br-columns,
+.br-page .br-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto 8px;
+  gap: 9px;
+  align-items: center;
+  padding: 0 10px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.br-columns {
+  height: 38px;
+  color: #afbdc2;
+  font-size: 12px;
+}
+.br-rank-label,
+.br-place {
+  text-align: center;
+}
+.br-page .br-row {
+  min-height: 62px;
+  border-radius: 0;
+  border-bottom: 1px solid #30424a;
+}
+.br-page .br-row.first {
+  border-radius: 9px;
+  border: 1px solid var(--br-line);
+  background: var(--br-wash);
+}
+.br-place,
+.br-number {
+  color: #dce3e3;
+  font:
+    22px/1.3 Georgia,
+    serif;
+}
+.br-number {
+  white-space: nowrap;
+}
+.br-number text,
+.br-number small {
+  font: 12px sans-serif;
+  color: #b1bfc6;
+}
+.br-row.first .br-number,
+.br-row.first .br-place {
+  color: var(--br-ink);
+}
+.br-player,
+.br-person,
+.br-privacy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.br-name,
+.br-person-name {
+  overflow-wrap: anywhere;
+}
+.br-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.br-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: #34474e;
+  color: #e8ddc9;
+  object-fit: cover;
+  font-size: 14px;
+}
+.br-chevron {
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 1px 1px 0 0;
+  transform: rotate(45deg);
+  color: #acb6b8;
+}
+.br-page .br-mine {
+  position: fixed;
+  z-index: 3;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: calc(100% - 32px);
+  max-width: 648px;
+  padding: 10px 14px;
+  text-align: left;
+  border: 1px solid #43575d;
+  border-radius: 12px;
+  background: #1d3038;
+  box-shadow: 0 0 0 5px var(--bg, #101c24);
+  font-weight: 600;
+}
+.br-me-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.br-mine > text,
+.br-mine > strong {
+  color: var(--br-ink);
+  font-size: 14px;
+}
+.br-status,
+.br-page .br-more {
+  text-align: center;
+  padding: 18px 4px;
+}
+.br-page .br-more {
+  display: block;
+  width: 100%;
+  color: var(--br-ink);
+  font-size: 14px;
+}
+.br-person {
+  padding: 22px 2px;
+}
+.br-person .br-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+.br-person-name {
+  margin: 0;
+  font: 700 24px/1.4 "Songti SC", serif;
+}
+.br-privacy {
+  border: 1px solid #42545b;
+  padding: 12px;
+  border-radius: 12px;
+  background: #1b2d34;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.br-privacy .br-muted {
+  font-size: 12px;
+}
+.br-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.br-tile {
+  padding: 10px;
+  border: 1px solid #384952;
+  border-radius: 12px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 35%, #26363d, #15242c);
+  font-size: 15px;
+  font-weight: 600;
+}
+.br-tile image,
+.br-tile img {
+  display: block;
+  margin: 0 auto 5px;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+.br-tile .br-muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+.br-page button.br-privacy {
+  display: flex;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #42545b;
+  border-radius: 12px;
+  background: #1b2d34;
+}
+.br-switch {
+  display: block;
+  flex: none;
+  width: 39px;
+  height: 23px;
+  border-radius: 14px;
+  background: #526168;
+}
+.br-switch::before {
+  content: "";
+  display: block;
+  width: 17px;
+  height: 17px;
+  margin: 3px;
+  border-radius: 50%;
+  background: white;
+}
+.br-privacy[aria-checked="true"] .br-switch {
+  background: #b89c66;
+}
+.br-privacy[aria-checked="true"] .br-switch::before {
+  margin-left: 19px;
+}
+.badge-pressed {
+  opacity: 0.72;
+}
+.br-player-label {
+  padding-left: 44px;
+}
+.br-page .badge-web-back {
+  width: 44px;
+  min-height: 48px;
+  font-size: 28px;
+}

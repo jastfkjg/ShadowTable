@@ -2141,3 +2141,9 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 .rank-month-label span { color:var(--muted); font-size:12px; }
 
 .monthly-reset-stats>div:nth-child(2) .monthly-reset-value { font-size:22px; letter-spacing:-.5px; white-space:nowrap; }
+
+.player-card-collection { max-width: 100%; flex: 0 0 156px; text-align: right; }
+.player-card-collection .player-card-badges { width: 100%; }
+.player-card-identity.is-long-name .player-card-collection { margin-left: 68px; }
+.player-card-identity.is-long-name .player-card-collection .player-card-badges { width: 100%; margin-left: 0; }
+button.player-collection-link { width: auto; min-height: 32px; padding: 0 4px; margin: 0 0 0 auto; background: transparent; color: var(--accent); font-size: 13px; border: 0; }

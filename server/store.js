@@ -114,6 +114,7 @@ class Store {
         this.initializeLeaderboardProfile(row.uid);
       this.restoreCompanionMatches();
       this.restoreFunRecords();
+      require('./badge-awards').reconcileMilestones(this);
       for (const row of this.db.prepare("SELECT code, state FROM rooms").all()) {
         const room = JSON.parse(row.state);
         if (migrateKnights(room)) this.db.prepare("UPDATE rooms SET state=? WHERE code=?").run(JSON.stringify(room), row.code);
@@ -122,6 +123,7 @@ class Store {
     require("./retention").initialize(this);
     require("./avoidance").initialize(this);
     avoidanceRewards.initialize(this);
+    this.badgeRanks = this.transaction(() => new (require("./badge-ranks").BadgeRanks)(this));
   }
   restoreFunRecords() {
     const rows = this.db.prepare("SELECT DISTINCT m.id,m.snapshot FROM matches m JOIN match_players p ON p.match_id=m.id WHERE json_extract(p.snapshot,'$.fun.version') IS NULL OR json_extract(p.snapshot,'$.fun.version')<>? OR (json_extract(p.snapshot,'$.fun.status')='excluded' AND json_extract(m.snapshot,'$.excludedReason') IS NULL AND p.outcome IN ('win','loss')) OR (json_extract(p.snapshot,'$.fun.status')='legacy' AND json_extract(m.snapshot,'$.board') IN ('classic','classic-court') AND json_extract(m.snapshot,'$.scoringFacts.reason') IS NOT NULL)").all(fun.VERSION);
@@ -184,6 +186,7 @@ class Store {
     this.leaderboardDirty = false;
     try {
       const result = fn();
+      if (this.leaderboardDirty) this.badgeRanks?.captureMonthly();
       this.db.exec("COMMIT");
       if (this.leaderboardDirty) this.leaderboardRevision++;
       return result;
@@ -197,7 +200,7 @@ class Store {
   }
   invalidateLeaderboard() {
     if (this.inTransaction) this.leaderboardDirty = true;
-    else this.leaderboardRevision++;
+    else this.transaction(() => { this.leaderboardDirty = true; });
   }
   initializeLeaderboardProfile(uid) {
     if (!/^(wx|dev|test):/.test(uid)) return;
@@ -314,6 +317,7 @@ class Store {
     if (changed) {
       avoidanceRewards.reconcile(this, [match.id]);
       require('./badge-awards').reconcileParticipants(this);
+      require('./badge-awards').reconcileMilestones(this, participants.map(p => p.uid));
     }
   }
   requireActiveMatch(id) {
@@ -427,6 +431,7 @@ class Store {
     this.syncScoreRooms(id);
     this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
+    require('./badge-awards').reconcileMilestones(this, players.map(p => p.uid));
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.scoringFacts,revision:match.scoreRevision,
       ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }
@@ -471,6 +476,7 @@ class Store {
     }
     this.rebuildFun(match,players);this.syncScoreRooms(id);this.invalidateLeaderboard();
     avoidanceRewards.reconcile(this, [id]);
+    require('./badge-awards').reconcileMilestones(this, players.map(p => p.uid));
     return {id,winner:match.winner,revision:match.scoreRevision,before,after:{winner:match.winner,facts:match.funFacts.terminal,revision:match.scoreRevision,
       ...(scoring.isReverseBoard(match) ? {reverseStrike:match.reverseStrike || null} : {})}};
   }
@@ -664,7 +670,7 @@ class Store {
     const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
     return {
       id: row.match_id, boardName: game.boardName, capacity: game.capacity,
-      replayAvailable: replay.supported(game.board),
+      replayAvailable: true,
       startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
       source: game.source, excludedReason: game.excludedReason,
       name: player.name, seat: player.seat, role: player.role,
@@ -673,7 +679,7 @@ class Store {
       honorResult: game.excludedReason ? null : game.honorResult || null,
       score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
       scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
-      members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),
+      members: this.matchParticipants(game).map(({ seat, name, role }) => ({ seat, name, role: role || "未知角色" })),
     };
   }
 
@@ -682,7 +688,6 @@ class Store {
       FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? AND p.match_id=?`).get(uid, id);
     if (!row) throw new RuleError("对局记录不存在或已移除", 404);
     const { game, player } = management.present(this, id, JSON.parse(row.game), JSON.parse(row.player));
-    if (!replay.supported(game.board)) throw new RuleError("当前板子暂未提供复盘", 404);
     return replay.present(game, this.matchParticipants(game), uid, player, roleName);
   }
 
