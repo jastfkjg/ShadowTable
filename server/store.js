@@ -668,7 +668,7 @@ class Store {
     const {game,player} = management.present(this,row.match_id,JSON.parse(row.game),JSON.parse(row.player));
     return {
       id: row.match_id, boardName: game.boardName, capacity: game.capacity,
-      replayAvailable: replay.supported(game.board),
+      replayAvailable: true,
       startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
       source: game.source, excludedReason: game.excludedReason,
       name: player.name, seat: player.seat, role: player.role,
@@ -686,7 +686,6 @@ class Store {
       FROM visible_match_players p JOIN matches m ON m.id=p.match_id WHERE p.uid=? AND p.match_id=?`).get(uid, id);
     if (!row) throw new RuleError("对局记录不存在或已移除", 404);
     const { game, player } = management.present(this, id, JSON.parse(row.game), JSON.parse(row.player));
-    if (!replay.supported(game.board)) throw new RuleError("当前板子暂未提供复盘", 404);
     return replay.present(game, this.matchParticipants(game), uid, player, roleName);
   }
 

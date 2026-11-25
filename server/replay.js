@@ -2,8 +2,6 @@
 
 // Observations only: replay never decides or changes a game's outcome.
 const VERSION = 1;
-const classic = board => ["classic", "classic-court", "classic-11"].includes(board);
-const supported = board => classic(board) || /^knights(?:-|$)/.test(board || "");
 const clone = value => structuredClone(value);
 const cleanPlayer = p => p ? { seat: p.seat, name: p.name, role: p.role || null,
   roleId: p.roleId || null, faction: p.faction || "unknown", alive: p.alive !== false } : null;
@@ -11,12 +9,11 @@ function player(room, uid, roles, snapshot) {
   const member = room.players.find(p => p.uid === uid);
   if (!member) return null;
   const roleId = (snapshot?.roles || room.roles)[uid];
-  const state = (snapshot?.players || room.knights?.players)?.[uid];
+  const state = (snapshot?.players || room.knights?.players || room.lancelot?.players)?.[uid];
   return cleanPlayer({ seat: member.seat, name: member.name, roleId,
     role: roles[roleId]?.[0], faction: room.convertedReverse === uid ? "evil" : state?.faction || roles[roleId]?.[1], alive: state?.alive });
 }
 function init(room, roles, complete = true) {
-  if (!supported(room.board)) return;
   const initial = room.knights?.initialRoles || room.fun?.initialRoles || {};
   room.replay = { version: VERSION, complete, initialPlayers: room.players.map(p => {
     const roleId = initial[p.uid];
@@ -25,12 +22,11 @@ function init(room, roles, complete = true) {
   }), events: [] };
 }
 function append(room, roles, event) {
-  if (!supported(room.board)) return;
   if (!room.replay) init(room, roles, false);
   room.replay.events.push({ id: "replay:" + room.replay.events.length, ...clone(event) });
 }
 function capture(room, roles) {
-  if (!supported(room.board) || !room.roles || ["lobby", "ended", "terminated"].includes(room.phase)) return null;
+  if (!room.roles || ["lobby", "ended", "terminated"].includes(room.phase)) return null;
   return { historyLength: room.history.length,
     activity: clone(room.activity), submissions: { ...room.submissions },
     players: room.players.map(p => player(room, p.uid, roles)),
@@ -75,13 +71,13 @@ function skills(room, actions, drawn, roles) {
     summary: clone(k.summary) });
 }
 function observe(room, before, input, uid, roles) {
-  if (!before || !supported(room.board) || input.type === "rematch") return;
+  if (!before || input.type === "rematch") return;
   if (!room.replay) init(room, roles, false);
   const entries = room.history.slice(before.historyLength);
   if (!entries.length && !room.knights) return;
   const after = room.players.map(p => player(room, p.uid, roles));
   const submissions = { ...before.submissions, ...(input.type === "submit" ? { [uid]: input.value } : {}) };
-  // In flexible classic games room.round does not advance. Each settled quest
+  // Outside the knight skill cycle, flexible games do not advance room.round. Each settled quest
   // closes one round, while rejected votes and canceled tasks stay in that round.
   let completedQuests = !room.knights
     ? room.history.slice(0, before.historyLength).filter(e => ["quest", "toolQuest"].includes(e.kind)).length : 0;
@@ -98,6 +94,7 @@ function observe(room, before, input, uid, roles) {
       completedQuests++;
       append(room, roles, { ...base, kind: "quest", team: [...entry.team], success: entry.success,
         fails: entry.fails, threshold: entry.threshold, earlyClosed: !!entry.earlyClosed,
+        ...(entry.counts ? { counts: entry.counts } : {}),
         cards: room.players.filter(p => entry.team.includes(p.seat)).map(p => {
           const actor = before.players.find(old => old.seat === p.seat);
           const defaulted = entry.earlyClosed && input.type === "closeWaiting" && actor?.alive && !submissions[p.uid];
@@ -132,7 +129,7 @@ function observe(room, before, input, uid, roles) {
   }
 }
 function snapshot(room) { return room.replay ? clone(room.replay) : null; }
-function historicalClassicEvents(game, participants, roleName) {
+function historicalTeamEvents(game, participants, roleName) {
   const quests = (game.funFacts?.events || []).filter(e => e.kind === "quest");
   const timeline = game.funFacts?.badgeTimeline || quests;
   let completed = 0;
@@ -149,12 +146,13 @@ function historicalClassicEvents(game, participants, roleName) {
       fails: quest?.fails, threshold: quest?.threshold, cards: members.map(m => ({
         actor: cleanPlayer({ seat: m.seat, name: participants.find(p => p.seat === m.seat)?.name,
           roleId: m.role, role: roleName(m.role), faction: m.faction }),
-        value: m.playedFailure === true ? "fail" : m.playedSuccess === true ? "success" : null,
+        value: m.playedFailure === true ? (game.board === "chaos" ? "anyFailure" : "fail")
+          : m.playedSuccess === true ? "success" : null,
       })) }];
   });
 }
 function historicalEvents(game, participants, roleName) {
-  if (classic(game.board)) return historicalClassicEvents(game, participants, roleName);
+  if (!/^knights(?:-|$)/.test(game.board)) return historicalTeamEvents(game, participants, roleName);
   const entity = e => e ? cleanPlayer({ ...e, roleId: e.role, role: roleName(e.role),
     name: participants.find(p => p.uid === e.uid)?.name || "" }) : null;
   return (game.funFacts?.events || []).flatMap((e, index) => {
@@ -173,7 +171,8 @@ function present(game, participants, uid, self, roleName) {
   const saved = game.replay;
   const initialFactions = { ...Object.fromEntries(Object.entries(require("./variants").roles).map(([id, r]) => [id, r[1]])),
     merlin: "good", percival: "good", servant: "good", reverse: "good",
-    assassin: "evil", mordred: "evil", morgana: "evil", minion: "evil", oberon: "evil" };
+    assassin: "evil", mordred: "evil", morgana: "evil", minion: "evil", oberon: "evil",
+    blueTraitor: "good", redTraitor: "evil" };
   const initialPlayers = saved?.initialPlayers || participants.map(p => {
     const roleId = game.funFacts?.initialRoles?.[p.uid];
     return cleanPlayer({ seat: p.seat, name: p.name, roleId,
@@ -184,7 +183,7 @@ function present(game, participants, uid, self, roleName) {
     final_action: "最终盘刀", quest_fail: "三次任务失败", five_rejections: "连续五次组队被否决" };
   const actor = t?.actor ? participants.find(p => p.uid === t.actor.uid) : null;
   const status = !saved ? "legacy" : saved.complete ? "complete" : "partial";
-  return { id: game.id, boardName: game.boardName, capacity: game.capacity,
+  return { id: game.id, board: game.board, boardName: game.boardName, capacity: game.capacity,
     startedAt: game.startedAt, endedAt: game.endedAt, winner: game.winner,
     excludedReason: game.excludedReason || null, status,
     message: status === "complete" ? "" : status === "partial" ? "本局在进行中启用复盘，仅展示已记录的过程。"
@@ -199,4 +198,4 @@ function present(game, participants, uid, self, roleName) {
       targetSeat: t?.target ?? game.scoringFacts?.target ?? null, hit: t?.hit ?? null,
       emptyWin: t?.emptyWin ?? null, corrected: (game.scoreRevision || 0) > 0 } };
 }
-module.exports = { supported, init, capture, observe, skillActions, skills, snapshot, present };
+module.exports = { init, capture, observe, skillActions, skills, snapshot, present };

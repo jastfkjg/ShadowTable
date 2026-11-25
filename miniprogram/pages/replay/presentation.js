@@ -12,6 +12,10 @@ const player = (p, selfSeat) => ({ ...p, isSelf: p.seat === selfSeat,
   roleLabel: p.role || "未记录", factionLabel: side(p.faction) });
 const actorFields = p => ({ actorSeat: p?.seat || null, actorLabel: p?.role || "身份未记录" });
 const statistic = (id, value, label, tone = "neutral", unit = "张") => ({ id, value, label, tone, unit });
+const questCards = {
+  success: { label: "成功", tone: "good" }, fail: { label: "失败", tone: "evil" },
+  thiefFail: { label: "盗贼失败", tone: "third" }, magic: { label: "魔法", tone: "accent" },
+};
 function actionRow(action, id) {
   const selected = action.targets || [], resolved = action.resolvedTargets || selected;
   const mapped = selected.map(p => p.seat).join(",") !== resolved.map(p => p.seat).join(",");
@@ -34,7 +38,7 @@ function actionRow(action, id) {
     detail, targetLabel, extraDetail: extra.join("；"), result, resultTone: "accent",
     tone: action.actor?.faction || "unknown", relatedSeats };
 }
-function event(raw, initialPlayers) {
+function event(raw, initialPlayers, board) {
   let title = "", badge = "", tone = "neutral", summary = "", footer = "";
   let rows = [], drawRows = [], relatedSeats = [], stats = [], settlements = [], teamLabel = "";
   if (raw.kind === "vote") {
@@ -51,16 +55,21 @@ function event(raw, initialPlayers) {
   } else if (raw.kind === "quest") {
     title = "任务结果"; badge = raw.success ? "任务成功" : "任务失败"; tone = raw.success ? "good" : "evil";
     teamLabel = seats(raw.team);
-    if (Number.isInteger(raw.fails)) {
-      stats = [statistic("success", raw.team.length - raw.fails, "成功票", "good"),
-        statistic("fail", raw.fails, "失败票", "evil")];
+    if (raw.counts) {
+      stats = Object.entries(questCards).map(([kind, card]) =>
+        statistic(kind, raw.counts[kind], kind === "fail" ? "普通失败票" : card.label + "票", card.tone));
+    } else if (Number.isInteger(raw.fails)) {
+      if (board !== "chaos") stats.push(statistic("success", raw.team.length - raw.fails, "成功票", "good"));
+      stats.push(statistic("fail", raw.fails, board === "chaos" ? "失败票合计" : "失败票", "evil"));
     }
     if (Number.isInteger(raw.threshold)) stats.push(statistic("threshold", raw.threshold, "失败门槛"));
     summary = stats.length ? stats.map(s => s.value + s.unit + s.label).join(" · ") : "任务队伍 " + teamLabel;
-    rows = (raw.cards || []).map((card, i) => ({ id: i,
-      headline: card.actor ? card.actor.seat + "号 " + (card.actor.name || card.actor.role || "") : "玩家未记录",
-      detail: (card.value === "success" ? "成功" : card.value === "fail" ? "失败" : "未记录") + (card.defaulted ? "（系统补票）" : ""),
-      tone: card.value === "fail" ? "evil" : card.value === "success" ? "good" : "neutral", relatedSeats: [card.actor?.seat].filter(Boolean) }));
+    rows = (raw.cards || []).map((card, i) => {
+      const face = card.value === "anyFailure" ? { label: "失败（种类未记录）", tone: "evil" } : questCards[card.value];
+      return { id: i, headline: card.actor ? card.actor.seat + "号 " + (card.actor.name || card.actor.role || "") : "玩家未记录",
+        detail: (face?.label || "未记录") + (card.defaulted ? "（系统补票）" : ""),
+        tone: face?.tone || "neutral", relatedSeats: [card.actor?.seat].filter(Boolean) };
+    });
     relatedSeats = raw.team || [];
   } else if (raw.kind === "conversion") {
     title = "阵营转换"; badge = raw.converted ? "转换" : "不转换"; tone = raw.converted ? "accent" : "neutral";
@@ -174,7 +183,7 @@ function trajectory(raw, seat) {
 }
 function presentReplay(raw, view = "global", expanded = []) {
   const selfSeat = raw.self.seat, initialPlayers = raw.initialPlayers.map(p => player(p, selfSeat));
-  const allEvents = displayEvents(raw.events).map(e => event(e, initialPlayers));
+  const allEvents = displayEvents(raw.events).map(e => event(e, initialPlayers, raw.board));
   const rounds = [];
   for (const e of allEvents) {
     const id = Number.isInteger(e.round) && e.round > 0 ? "round-" + e.round : "round-unknown";
@@ -215,6 +224,7 @@ function presentReplay(raw, view = "global", expanded = []) {
     scoreLabel: score.status === "scored" ? (score.total >= 0 ? "+" : "") + score.total : "未计分",
     score: { ...score, breakdown: (score.breakdown || []).map(a => ({ ...a, pointsLabel: (a.points >= 0 ? "+" : "") + a.points })) },
     goodCount: initialPlayers.filter(p => p.faction === "good").length, evilCount: initialPlayers.filter(p => p.faction === "evil").length,
+    thirdCount: initialPlayers.filter(p => p.faction === "third").length,
     unknownCount: initialPlayers.filter(p => p.faction === "unknown").length },
     initialPlayers: view === "mine" ? initialPlayers.filter(p => p.isSelf) : initialPlayers,
     finalPlayers: raw.finalPlayers.map(p => player(p, selfSeat)), rounds,
