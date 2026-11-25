@@ -48,7 +48,7 @@ async function main() {
       ...["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "share-dark", "share", "share-save-dark", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
       ...["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"].map(name => "/assets/" + name + ".svg"),
       ...["home-wordmark", "home-subtitle", "tab-table", "tab-table-active", "tab-me", "tab-me-active"].map(name => "/assets/" + name + ".png"),
-      ...["info", "heart", "sword", "swords", "shield", "shield-good", "spark", "medal", "users", "calendar", "list", "coin"].map(name => "/assets/record-" + name + ".svg"),
+      ...["cup", "info", "heart", "sword", "swords", "shield", "shield-good", "spark", "medal", "users", "calendar", "list", "coin"].map(name => "/assets/record-" + name + ".svg"),
       ...roleAssets.map(name => "/assets/roles/" + name + ".png"),
       ...["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"].map(name => "/assets/monthly-" + name + ".svg")]) assets.add(asset);
     for (const asset of assets) {

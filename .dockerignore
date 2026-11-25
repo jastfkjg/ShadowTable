@@ -50,6 +50,7 @@
 !miniprogram/assets/table-cards.svg
 !miniprogram/assets/chevron-left.svg
 !miniprogram/assets/record-calendar.svg
+!miniprogram/assets/record-cup.svg
 !miniprogram/assets/record-list.svg
 !miniprogram/assets/record-coin.svg
 !miniprogram/assets/monthly-report-background.jpg
@@ -115,6 +116,9 @@
 !miniprogram/pages/data-management/layout.wxss
 !miniprogram/pages/badges/
 !miniprogram/pages/badges/badges.wxss
+!miniprogram/pages/badges/rank-controller.js
+!miniprogram/pages/badges/ranks.wxss
+!miniprogram/pages/badges/player.wxss
 !miniprogram/pages/profile/
 !miniprogram/pages/profile/assets/
 !miniprogram/pages/profile/assets/avatars/
