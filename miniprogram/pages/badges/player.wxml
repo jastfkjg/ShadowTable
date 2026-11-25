@@ -1,3 +1,4 @@
+<import src="detail-sheet.wxml" />
 <app-nav title="玩家徽章" back="{{true}}" bindback="back" />
 <view class="page owned-page">
   <view wx:if="{{loading}}" class="muted" role="status">正在读取徽章…</view>
@@ -11,13 +12,14 @@
     <view wx:for="{{collection.groups}}" wx:key="title" wx:for-item="group">
       <view class="owned-heading"><text>{{group.title}}</text><text>{{group.items.length}} 枚</text></view>
       <view class="owned-grid">
-        <view class="owned-row" wx:for="{{group.items}}" wx:key="id">
+        <button class="owned-row" wx:for="{{group.items}}" wx:key="id" data-id="{{item.id}}" bindtap="showBadgeDetail" aria-haspopup="dialog" hover-class="none" aria-label="{{'查看'+item.title+'的徽章详情'}}">
           <image src="{{item.imageUrl}}" style="{{item.artStyle}}" mode="aspectFit" aria-hidden="true" />
           <view><view>{{item.title}}</view><text class="{{item.equipped?'worn':''}}">{{item.label}}</text></view>
-        </view>
+        </button>
       </view>
     </view>
     <view wx:if="{{!collection.count}}" class="muted owned-empty">{{collection.limited?'暂无公开的徽章':'暂无已拥有的徽章'}}</view>
   </block>
 </view>
+<template wx:if="{{selectedBadge}}" is="badgeDetailSheet" data="{{selectedBadge,readOnly:true,badgeDetailHeight}}" />
 <app-dialog id="app-dialog" />

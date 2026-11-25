@@ -1,3 +1,4 @@
+const { measureBadgeDetail } = require("./detail-layout");
 const dialog = require("../../dialog");
 const api = require('../../api');
 const { categories, presentCollection, rules } = require('../../badges');
@@ -43,15 +44,7 @@ Page({
     const selectedBadge = this.data.badgeCollection?.items.find(b => b.id === e.currentTarget.dataset.id);
     if (selectedBadge) this.setData({ selectedBadge, badgeDetailHeight: 0 }, () => this.measureBadgeDetail());
   },
-  measureBadgeDetail() {
-    if (!this.data.selectedBadge || typeof this.createSelectorQuery !== 'function') return;
-    const id = this.data.selectedBadge.id;
-    this.createSelectorQuery().select('.badge-detail-content').boundingClientRect(rect => {
-      if (!this.alive || this.data.badgePicker || this.data.selectedBadge?.id !== id || !rect?.height) return;
-      const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
-      this.setData({ badgeDetailHeight: Math.min(Math.ceil(rect.height), Math.floor(windowInfo.windowHeight * .9)) });
-    }).exec();
-  },
+  measureBadgeDetail,
   closeBadgeDetail() {
     if (!this.data.badgeManagerSaving) this.setData({ selectedBadge: null, badgeDetailHeight: 0, badgePicker: '', badgePickerChoice: null });
   },

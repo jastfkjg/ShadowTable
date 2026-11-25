@@ -8,7 +8,7 @@ const { settleMonthly } = require("./badge-awards");
 const definitions = new Map(catalogue.map((b) => [b.id, b]));
 const pageSize = 30;
 const categoryOf = (b) => (b.category === "趣味徽章" ? "fun" : "honor");
-const ranked = `WITH counts AS (SELECT uid, count(*) AS count FROM badge_earned WHERE category=? GROUP BY uid),
+const ranked = `WITH counts AS (SELECT uid, count(*) AS count FROM ranked_badges WHERE category=? GROUP BY uid),
   ranked AS (SELECT uid,count,rank() OVER(ORDER BY count DESC) AS rank FROM counts)
   SELECT p.public_id AS publicId, coalesce(nullif(f.nickname,''),
     (SELECT json_extract(m.snapshot,'$.name') FROM match_players m WHERE m.uid=p.uid ORDER BY ended DESC LIMIT 1),'新朋友') AS nickname,
@@ -22,23 +22,17 @@ class BadgeRanks {
     db.exec(`CREATE TABLE IF NOT EXISTS badge_rank_players(uid TEXT PRIMARY KEY,
         public_id TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
         honor_visible INTEGER NOT NULL DEFAULT 1, fun_visible INTEGER NOT NULL DEFAULT 1);
-      CREATE TABLE IF NOT EXISTS badge_earned(uid TEXT NOT NULL,badge_id TEXT NOT NULL,category TEXT NOT NULL,
-        best_rank INTEGER,PRIMARY KEY(uid,badge_id));
-      CREATE INDEX IF NOT EXISTS badge_earned_category ON badge_earned(category,uid);
-      CREATE TRIGGER IF NOT EXISTS badge_earned_player AFTER INSERT ON badge_earned BEGIN
-        INSERT OR IGNORE INTO badge_rank_players(uid) VALUES(NEW.uid); END;`);
-    this.insert =
-      db.prepare(`INSERT INTO badge_earned(uid,badge_id,category,best_rank) VALUES(?,?,?,?)
-      ON CONFLICT(uid,badge_id) DO UPDATE SET best_rank=excluded.best_rank
-      WHERE excluded.best_rank IS NOT NULL AND (best_rank IS NULL OR excluded.best_rank<best_rank)`);
-    // Both equipped and unequipped preferences were written only for badges actually owned.
-    for (const row of db
-      .prepare(
-        "SELECT uid,badge_id FROM badge_awards UNION SELECT uid,badge_id FROM badge_preferences",
-      )
-      .iterate())
+      CREATE TEMP TABLE ranked_badges(uid TEXT NOT NULL,badge_id TEXT NOT NULL,category TEXT NOT NULL,
+        permanent INTEGER NOT NULL,rank INTEGER,PRIMARY KEY(uid,badge_id)) WITHOUT ROWID;
+      CREATE INDEX temp.ranked_badges_category ON ranked_badges(category,uid);
+      CREATE TEMP TRIGGER ranked_badge_player AFTER INSERT ON ranked_badges BEGIN
+        INSERT OR IGNORE INTO badge_rank_players(uid) VALUES(NEW.uid); END;
+      CREATE TEMP TABLE badge_rank_snapshot(month_start INTEGER, revision INTEGER, version TEXT);`);
+    this.insert = db.prepare(`INSERT OR IGNORE INTO ranked_badges(uid,badge_id,category,permanent,rank)
+      VALUES(?,?,?,?,?)`);
+    // Permanent grants survive restarts. Recalculate monthly ownership from eligible games.
+    for (const row of db.prepare("SELECT uid,badge_id FROM badge_awards").iterate())
       this.record(row.uid, row.badge_id);
-    this.captureMonthly();
   }
   record(uid, id, rank = null) {
     if (!/^(wx|guest|dev):/.test(uid)) return;
@@ -48,13 +42,16 @@ class BadgeRanks {
         uid,
         id,
         categoryOf(b),
+        b.permanent ? 1 : 0,
         b.metric === "podium" && [1, 2, 3].includes(rank) ? rank : null,
       );
   }
-  captureMonthly() {
+  captureMonthly(now = this.store.clock()) {
     const { store } = this,
-      now = store.clock(),
       { start, end } = periodRange("month", now);
+    // Keep counts, medal grades and the pagination token on one snapshot.
+    store.db.exec("DELETE FROM ranked_badges WHERE permanent=0; DELETE FROM badge_rank_snapshot");
+    store.db.prepare("INSERT INTO badge_rank_snapshot VALUES(?,?,lower(hex(randomblob(16))))").run(start, store.leaderboardRevision);
     if (
       !store.db
         .prepare(
@@ -63,7 +60,7 @@ class BadgeRanks {
         .get(start, end)
     )
       return;
-    // Capture all winners at commit, even when nobody opens a collection before the lead changes.
+    // Every tied leader holds the title, including players outside the first page.
     const board = new Leaderboard(store);
     for (const id of ["points", "games", "overall"]) {
       for (const row of board.snapshot(id, "month", now).eligible) {
@@ -89,18 +86,30 @@ class BadgeRanks {
       if (definitions.get(metric)?.metric === "fun_" + metric)
         this.record(uid, metric);
   }
+  prepareRead() {
+    const store = this.store, now = store.clock();
+    settleMonthly(store, now);
+    const { start } = periodRange("month", now);
+    const snapshot = store.db.prepare("SELECT version FROM badge_rank_snapshot WHERE month_start=? AND revision=?");
+    const current = snapshot.get(start, store.leaderboardRevision);
+    if (current && !store.leaderboardDirty) return current.version;
+    if (store.inTransaction) this.captureMonthly(now);
+    else store.transaction(() => this.captureMonthly(now));
+    return snapshot.get(start, store.leaderboardRevision).version;
+  }
   list(uid, kind, params) {
     const offset = params.get("offset") || "0",
       version = params.get("version");
     if (!/^\d{1,9}$/.test(offset) || (+offset && version === null))
       throw new RuleError("榜单分页无效", 400);
-    settleMonthly(this.store);
+    const snapshotVersion = this.prepareRead();
     const db = this.store.db;
     const totals = db
       .prepare(
-        "SELECT count(*) AS version,count(DISTINCT uid) AS total FROM badge_earned WHERE category=?",
+        "SELECT count(*) AS version,count(DISTINCT uid) AS total FROM ranked_badges WHERE category=?",
       )
       .get(kind);
+    totals.version = snapshotVersion + "-" + totals.version;
     if (version !== null && version !== String(totals.version))
       throw new RuleError("榜单已更新，请刷新", 409);
     const rows = db
@@ -129,7 +138,7 @@ class BadgeRanks {
     };
   }
   detail(viewer, kind, publicId) {
-    settleMonthly(this.store);
+    this.prepareRead();
     const db = this.store.db;
     const account =
       publicId === "self"
@@ -146,7 +155,7 @@ class BadgeRanks {
       (isSelf || visible) && player
         ? db
             .prepare(
-              "SELECT badge_id AS id,best_rank AS rank FROM badge_earned WHERE uid=? AND category=? ORDER BY badge_id",
+              "SELECT badge_id AS id,rank FROM ranked_badges WHERE uid=? AND category=? ORDER BY badge_id",
             )
             .all(account.uid, kind)
         : [];

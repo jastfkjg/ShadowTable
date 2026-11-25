@@ -1,3 +1,4 @@
+@import "./badges.wxss";
 .br-page {
   --br-ink: #e5c68b;
   --br-line: #635b47;
@@ -252,7 +253,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-.br-tile {
+.br-page button.br-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
   padding: 10px;
   border: 1px solid #384952;
   border-radius: 12px;

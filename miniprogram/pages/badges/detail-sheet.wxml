@@ -1,0 +1,29 @@
+<template name="badgeDetailSheet">
+<view class="badge-backdrop" bindtap="closeBadgeDetail" catchtouchmove="blockScroll">
+  <view class="badge-detail" role="dialog" aria-modal="true" aria-label="{{selectedBadge.title}}" catchtap="blockScroll">
+    <scroll-view scroll-y="{{true}}" class="badge-detail-scroll" style="{{badgeDetailHeight ? 'height:'+badgeDetailHeight+'px' : ''}}">
+      <view class="badge-detail-content badge-detail-compact">
+        <view class="badge-detail-handle" aria-hidden="true"></view>
+        <button class="badge-detail-close" bindtap="closeBadgeDetail" aria-label="关闭徽章详情" disabled="{{badgeManagerSaving}}" hover-class="badge-pressed"><text aria-hidden="true">×</text></button>
+        <view class="badge-detail-art"><image class="badge-detail-image {{!readOnly && !selectedBadge.owned?'is-locked':''}}" style="{{selectedBadge.artStyle}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
+        <view class="badge-detail-title">{{selectedBadge.title}}</view>
+        <view class="badge-detail-meta">
+          <text>{{(selectedBadge.periodLabel || monthLabel) ? (selectedBadge.periodLabel || monthLabel)+' · ' : ''}}{{selectedBadge.kindLabel}} · {{selectedBadge.category}}</text>
+          <text wx:if="{{!readOnly}}" class="badge-detail-status {{selectedBadge.owned ? 'is-owned' : ''}}">{{selectedBadge.status}}</text>
+        </view>
+        <view class="badge-detail-criteria">
+          <view class="badge-caption">获取条件</view>
+          <view class="badge-detail-condition">{{selectedBadge.detailCondition}}</view>
+          <view wx:if="{{selectedBadge.detailNote}}" class="badge-caption">{{selectedBadge.detailNote}}</view>
+          <view class="badge-caption">{{selectedBadge.holdingRule}}</view>
+        </view>
+        <block wx:if="{{!readOnly}}">
+          <button wx:if="{{selectedBadge.owned && !selectedBadge.equipped && equippedCount >= maxEquipped}}" class="primary badge-detail-action" bindtap="openBadgeReplacement" disabled="{{badgeManagerSaving || badgeManagerLoading}}" hover-class="badge-pressed">替换佩戴</button>
+          <button wx:elif="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button>
+          <button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+</view>
+</template>

@@ -186,7 +186,6 @@ class Store {
     this.leaderboardDirty = false;
     try {
       const result = fn();
-      if (this.leaderboardDirty) this.badgeRanks?.captureMonthly();
       this.db.exec("COMMIT");
       if (this.leaderboardDirty) this.leaderboardRevision++;
       return result;
@@ -200,7 +199,7 @@ class Store {
   }
   invalidateLeaderboard() {
     if (this.inTransaction) this.leaderboardDirty = true;
-    else this.transaction(() => { this.leaderboardDirty = true; });
+    else this.leaderboardRevision++;
   }
   initializeLeaderboardProfile(uid) {
     if (!/^(wx|dev|test):/.test(uid)) return;

@@ -27,6 +27,7 @@ COPY --chown=node:node miniprogram/pages/me/me.wxss ./miniprogram/pages/me/
 COPY --chown=node:node miniprogram/room-confirmation.js miniprogram/room-confirmation.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/about.js miniprogram/about.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/assets/about-merlin.svg ./miniprogram/assets/
+COPY --chown=node:node miniprogram/assets/badge-category-*.svg ./miniprogram/assets/
 COPY --chown=node:node miniprogram/identity-vision.js miniprogram/identity-vision.wxss ./miniprogram/
 COPY --chown=node:node miniprogram/assets/roles/*.png ./miniprogram/assets/roles/
 COPY --chown=node:node miniprogram/assets/table-cards.svg ./miniprogram/assets/

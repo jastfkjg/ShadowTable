@@ -28,6 +28,10 @@ function metric(store, uid, id, count, opportunities = count) {
   store.invalidateLeaderboard();
 }
 const ids = (store, uid) => readBadges(store, uid).badges.map(b => b.id);
+function grantFixtureAward(store, uid, id) {
+  store.db.prepare('INSERT INTO badge_awards(uid,badge_id,campaign,granted_at) VALUES(?,?,?,?)').run(uid,id,'fixture',store.clock());
+  store.badgeRanks.record(uid,id);
+}
 function wear(store, uid, id, equipped) {
   const current = readBadges(store, uid);
   return store.transaction(() => saveBadge(store, uid, {id,equipped,version:current.version,periodStart:current.periodStart}));
@@ -313,29 +317,41 @@ test('空位保留且可指定佩戴位置，满额替换保留位置并校验�
   } finally { store.close(); }
 });
 
-test('徽章数量榜保存历次持有，分开计数、并列、跨月去重及独立隐藏', () => {
+test('荣誉榜按当前持有计数，称号易主后重排名次，永久徽章和独立隐私设置跨月保留', () => {
   const dir=mkdtempSync(join(tmpdir(),'badge-rank-history-'));
   let now=NOW, store=new Store(join(dir,'db.sqlite'),{clock:()=>now});
   const list=(kind,uid='wx:a')=>store.badgeRanks.list(uid,kind,new URLSearchParams());
   try {
-    game(store,'wx:a'); game(store,'wx:b');
+    game(store,'wx:a');
+    assert.deepEqual(store.badgeRanks.detail('wx:a','honor','self').badges.map(b=>b.id),['attendance','overall','points']);
+    grantFixtureAward(store,'wx:a','october_2026_crown');
+    game(store,'wx:b');
     const a=list('honor').me;
     assert.equal(a.count,3);
     assert.deepEqual(list('honor').rows.map(r=>r.rank),[1,2]);
     assert.equal(list('fun').me.count,1);
-    assert.deepEqual(store.badgeRanks.detail('wx:b','honor',a.publicId).badges.map(b=>b.id),['attendance','overall','points']);
+    assert.deepEqual(store.badgeRanks.detail('wx:b','honor',a.publicId).badges.map(b=>b.id),['october_2026_crown','overall','points']);
+    game(store,'wx:b',{points:4});
+    assert.equal(list('honor').me.rank,2);
+    assert.equal(list('honor').me.count,1);
+    assert.deepEqual(store.badgeRanks.detail('wx:b','honor',a.publicId).badges.map(b=>b.id),['october_2026_crown']);
     const profile=readProfile(store,'wx:a');
     saveProfile(store,'wx:a',{version:profile.version,nickname:'阿岚',leaderboardVisible:false});
     store.badgeRanks.setVisibility('wx:a','honor',{visible:false});
     const hidden=store.badgeRanks.detail('wx:b','honor',a.publicId);
     assert.deepEqual(hidden.badges,[]);
     assert.equal(hidden.player.nickname,'阿岚');
-    assert.equal(hidden.player.count,3);
+    assert.equal(hidden.player.count,1);
     assert.equal(hidden.visible,false);
     assert.doesNotMatch(JSON.stringify(hidden),/wx:a|points|overall/);
-    assert.equal(store.badgeRanks.detail('wx:a','honor','self').badges.length,3);
-    assert.equal(store.badgeRanks.detail('wx:b','fun',a.publicId).badges.length,1);
+    assert.equal(store.badgeRanks.detail('wx:a','honor','self').badges.length,1);
+    assert.equal(list('fun').me.rank,null);
+    assert.throws(()=>store.badgeRanks.detail('wx:b','fun',a.publicId), e=>e.status===404);
     now=NEXT;
+    assert.equal(list('honor').total,1);
+    assert.equal(list('honor').me.rank,1);
+    assert.equal(list('honor','wx:b').me.rank,null);
+    assert.deepEqual(store.badgeRanks.detail('wx:b','honor','self').badges,[]);
     game(store,'wx:b');
     assert.equal(list('fun','wx:b').me.count,1);
     require('../server/badge-awards').grantContributor(store,'guest:newcomer');
@@ -344,7 +360,7 @@ test('徽章数量榜保存历次持有，分开计数、并列、跨月去重�
     assert.throws(()=>store.transaction(()=>{store.badgeRanks.record('wx:a','seven_victors'); throw Error('rollback');}),/rollback/);
     store.close(); store=new Store(join(dir,'db.sqlite'),{clock:()=>now});
     assert.equal(list('honor').me.publicId,a.publicId);
-    assert.equal(list('honor').me.count,3);
+    assert.equal(list('honor').me.count,1);
     assert.equal(store.badgeRanks.detail('wx:b','honor',a.publicId).visible,false);
   } finally { store.close();rmSync(dir,{recursive:true,force:true}); }
 });
@@ -353,9 +369,9 @@ test('徽章数量榜不截断百名后的并列玩家，分页变更需重读�
   const store=new Store(':memory:',{clock:()=>NOW}), ranks=store.badgeRanks;
   try {
     store.transaction(()=>{
-      for(let i=0;i<108;i++) ranks.record('guest:'+i,'october_2026_crown');
-      ranks.record('guest:0','monthly_points_2026-11_1');
-      ranks.record('guest:0','monthly_points_2026-12_1');
+      for(let i=0;i<108;i++) grantFixtureAward(store,'guest:'+i,'october_2026_crown');
+      grantFixtureAward(store,'guest:0','monthly_points_2026-11_1');
+      grantFixtureAward(store,'guest:0','monthly_points_2026-12_1');
     });
     let page=ranks.list('guest:0','honor',new URLSearchParams());
     assert.equal(page.total,108); assert.equal(page.me.count,3);
@@ -366,7 +382,7 @@ test('徽章数量榜不截断百名后的并列玩家，分页变更需重读�
       seen.push(...page.rows);
     }
     assert.equal(new Set(seen.map(p=>p.publicId)).size,108);
-    ranks.record('wx:b','october_2026_silver');
+    grantFixtureAward(store,'wx:b','october_2026_silver');
     assert.throws(()=>ranks.list('guest:0','honor',new URLSearchParams({offset:30,version:page.version})),e=>e.status===409);
   } finally { store.close(); }
 });
@@ -376,7 +392,10 @@ test('快速切换榜单时忽略旧响应，默认荣誉榜且可独立读取�
   const view=require('../miniprogram/pages/badges/rank-controller').create({
     request:path=>new Promise(resolve=>pending.push({path,resolve})),update(){},
   });
-  const honor=view.load(), fun=view.select('fun');
+  const honor=view.load();
+  assert.equal(view.state.countLabel,'当前持有');
+  const fun=view.select('fun');
+  assert.equal(view.state.countLabel,'当前持有');
   assert.deepEqual(pending.map(r=>r.path),['/api/badge-ranks/honor','/api/badge-ranks/fun']);
   const empty={rows:[],me:{nickname:'我',count:0,rank:null},nextOffset:null,total:0};
   pending[1].resolve(empty); await fun;
@@ -384,16 +403,74 @@ test('快速切换榜单时忽略旧响应，默认荣誉榜且可独立读取�
   assert.equal(view.state.kind,'fun');assert.equal(view.state.board.total,0);
 });
 
-test('旧库有获章或佩戴证据的玩家首次升级即可上榜，无需本人登录',()=>{
+test('旧库重启后两榜保留永久奖章，忽略已经失效的历史称号和佩戴偏好',()=>{
   const dir=mkdtempSync(join(tmpdir(),'badge-rank-upgrade-')), file=join(dir,'db.sqlite');
   let store=new Store(file,{clock:()=>NEXT});
   try {
     store.db.prepare('INSERT INTO badge_preferences VALUES(?,?,?,?)').run('wx:past','games',NOW,0);
+    store.db.prepare('INSERT INTO badge_preferences VALUES(?,?,?,?)').run('wx:past','points',NOW,1);
+    store.db.exec(`CREATE TABLE badge_earned(uid TEXT,badge_id TEXT,category TEXT,best_rank INTEGER,PRIMARY KEY(uid,badge_id));
+      INSERT INTO badge_earned VALUES('wx:past','assassin_miss','fun',NULL),('wx:past','rate_overall','honor',1);`);
+    store.badgeRanks.setVisibility('wx:past','fun',{visible:false});
     store.db.prepare('INSERT INTO badge_awards(uid,badge_id,campaign,granted_at) VALUES(?,?,?,?)').run('guest:past','october_2026_book','2026-10-beta',NOW);
+    grantFixtureAward(store,'wx:past','monthly_points_2026-11_1');
     store.close();store=new Store(file,{clock:()=>NEXT});
     const { rows }=store.badgeRanks.list('wx:reader','fun',new URLSearchParams());
-    assert.equal(rows.length,2);
-    assert.deepEqual(rows.map(p=>p.rank),[1,1]);
-    assert.deepEqual(rows.flatMap(p=>store.badgeRanks.detail('wx:reader','fun',p.publicId).badges.map(b=>b.id)).sort(),['games','october_2026_book']);
+    assert.equal(rows.length,1);
+    assert.equal(rows[0].rank,1);
+    assert.deepEqual(store.badgeRanks.detail('wx:reader','fun',rows[0].publicId).badges.map(b=>b.id),['october_2026_book']);
+    const own=store.badgeRanks.detail('wx:past','fun','self');
+    assert.deepEqual(own.badges,[]);
+    assert.equal(own.visible,false);
+    const honor=store.badgeRanks.list('wx:past','honor',new URLSearchParams());
+    assert.equal(honor.total,1);
+    assert.equal(honor.me.count,1);
+    assert.deepEqual(store.badgeRanks.detail('wx:reader','honor',honor.me.publicId).badges.map(b=>b.id),['monthly_points_2026-11_1']);
   } finally {store.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('背锅侠和牌桌常青树易主、并列和跨月后，趣味榜名次、数量与收藏一致', () => {
+  let now = NOW;
+  const store = new Store(':memory:', { clock: () => now });
+  const ranks = store.badgeRanks, a = 'wx:a', b = 'wx:b';
+  const permanent = ['feedback_contributor', 'october_2026_book', 'october_2026_table'];
+  const bothTitles = ['assassin_miss', 'games'];
+  function check(uid, expected, rank) {
+    const page = ranks.list(uid, 'fun', new URLSearchParams());
+    const self = ranks.detail(uid, 'fun', 'self');
+    const owned = readBadges(store, uid).badges.filter(badge => badge.category === '趣味徽章');
+    assert.deepEqual(owned.map(badge => badge.id).sort(), [...expected].sort());
+    assert.deepEqual(self.badges.map(badge => badge.id), [...expected].sort());
+    assert.equal(self.player.count, expected.length);
+    assert.equal(page.me.count, expected.length);
+    assert.equal(page.me.rank, rank);
+    if (rank !== null) {
+      assert.deepEqual(page.rows.find(row => row.publicId === page.me.publicId), page.me);
+      assert.deepEqual(ranks.detail('wx:viewer', 'fun', page.me.publicId).badges, self.badges);
+    }
+    return page;
+  }
+  try {
+    for (const id of permanent) grantFixtureAward(store,a,id);
+    metric(store, a, 'assassin_miss', 1);
+    const before = check(a, [...bothTitles, ...permanent], 1);
+    metric(store, b, 'assassin_miss', 1);
+    check(a, [...bothTitles, ...permanent], 1);
+    check(b, bothTitles, 2);
+    metric(store, b, 'assassin_miss', 1);
+    check(a, permanent, 1);
+    check(b, bothTitles, 2);
+    // The same number of badges is now split across two players instead of one.
+    assert.throws(() => ranks.list(a, 'fun', new URLSearchParams({offset:30, version:before.version})), e=>e.status===409);
+    ranks.setVisibility(a, 'fun', {visible:false});
+    const hidden = ranks.detail(b, 'fun', before.me.publicId);
+    assert.deepEqual(hidden.badges, []);
+    assert.equal(hidden.player.count, 3);
+    assert.equal(ranks.detail(a, 'fun', 'self').badges.length, 3);
+    ranks.setVisibility(a, 'fun', {visible:true});
+    now = NEXT; // No new game or profile write at the month boundary.
+    assert.deepEqual(ranks.detail(b, 'fun', 'self').badges, []);
+    assert.equal(check(a, permanent, 1).total, 1);
+    check(b, [], null);
+  } finally { store.close(); }
 });

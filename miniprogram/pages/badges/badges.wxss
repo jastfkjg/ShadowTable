@@ -37,7 +37,15 @@
 .badge-collection-heading { margin: 17px 0 8px; }
 .badge-collection-title { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; }
 .badge-collection-total { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-.badge-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.badge-categories, .badge-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.badge-page .badge-categories button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  width: 100%; min-width: 0; min-height: 64px; padding: 4px; border: 0; background: transparent;
+  color: var(--muted); font-size: 14px; line-height: 1.4;
+}
+.badge-category-icon { display: block; width: 30px; height: 30px; flex: none; filter: grayscale(1); opacity: .86; }
+.badge-page .badge-categories .selected { color: var(--accent); font-weight: 600; }
+.badge-categories .selected .badge-category-icon { filter: none; opacity: 1; }
 .badge-page .badge-filters button { width: 100%; min-width: 0; flex-wrap: wrap; gap: 0 5px; padding: 5px 4px; border: 1px solid var(--badge-line); border-radius: 8px; background: var(--control-bg); color: var(--muted); font-size: 13px; }
 .badge-filters button > text, .badge-filters button > span { font-size: 12px; font-variant-numeric: tabular-nums; }
 .badge-page .badge-filters .selected { border-color: var(--badge-gold-line); background: var(--badge-gold-fill); color: var(--accent); font-weight: 600; }

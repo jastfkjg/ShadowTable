@@ -1,3 +1,4 @@
+<import src="detail-sheet.wxml" />
 <import src="../../loading-placeholder.wxml" />
 <app-nav title="徽章收藏" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page badge-page">
@@ -42,8 +43,11 @@
       <text class="badge-collection-title">徽章收藏</text>
       <text class="badge-collection-total">已拥有 {{badgeCollection.ownedCount}} / {{badgeCollection.totalCount}}</text>
     </view>
-    <view class="badge-filters" role="group" aria-label="徽章分类">
-      <button wx:for="{{badgeCollection.categories}}" wx:key="*this" class="{{badgeCollection.category===item?'selected':''}}" bindtap="chooseBadgeFilter" data-category="{{item}}" aria-pressed="{{badgeCollection.category===item}}" hover-class="badge-pressed">{{item}}</button>
+    <view class="badge-categories" role="group" aria-label="徽章分类">
+      <button wx:for="{{badgeCollection.categories}}" wx:key="*this" class="{{badgeCollection.category===item?'selected':''}}" bindtap="chooseBadgeFilter" data-category="{{item}}" aria-pressed="{{badgeCollection.category===item}}" hover-class="badge-pressed">
+        <image class="badge-category-icon" src="{{badgeCollection.categoryIcons[item]}}" mode="aspectFit" aria-hidden="true" />
+        <text>{{item}}</text>
+      </button>
     </view>
     <view class="badge-filters" role="group" aria-label="拥有状态">
       <button wx:for="{{badgeCollection.ownershipFilters}}" wx:key="id" class="{{badgeFilter===item.id?'selected':''}}" bindtap="chooseBadgeFilter" data-id="{{item.id}}" aria-pressed="{{badgeFilter===item.id}}" hover-class="badge-pressed">{{item.title}}<text>{{item.count}}</text></button>
@@ -69,31 +73,7 @@
     <view class="badge-caption badge-footer">点击徽章，查看详情与获取条件</view>
   </block>
 </view>
-<view wx:if="{{selectedBadge && !badgePicker}}" class="badge-backdrop" bindtap="closeBadgeDetail" catchtouchmove="blockScroll">
-  <view class="badge-detail" role="dialog" aria-modal="true" aria-label="{{selectedBadge.title}}" catchtap="blockScroll">
-    <scroll-view scroll-y="{{true}}" class="badge-detail-scroll" style="{{badgeDetailHeight ? 'height:'+badgeDetailHeight+'px' : ''}}">
-      <view class="badge-detail-content badge-detail-compact">
-        <view class="badge-detail-handle" aria-hidden="true"></view>
-        <button class="badge-detail-close" bindtap="closeBadgeDetail" aria-label="关闭徽章详情" disabled="{{badgeManagerSaving}}" hover-class="badge-pressed"><text aria-hidden="true">×</text></button>
-        <view class="badge-detail-art"><image class="badge-detail-image {{!selectedBadge.owned?'is-locked':''}}" style="{{selectedBadge.artStyle}}" src="{{selectedBadge.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
-        <view class="badge-detail-title">{{selectedBadge.title}}</view>
-        <view class="badge-detail-meta">
-          <text>{{selectedBadge.periodLabel || badgeCollection.monthLabel}} · {{selectedBadge.kindLabel}} · {{selectedBadge.category}}</text>
-          <text class="badge-detail-status {{selectedBadge.owned ? 'is-owned' : ''}}">{{selectedBadge.status}}</text>
-        </view>
-        <view class="badge-detail-criteria">
-          <view class="badge-caption">获取条件</view>
-          <view class="badge-detail-condition">{{selectedBadge.detailCondition}}</view>
-          <view wx:if="{{selectedBadge.detailNote}}" class="badge-caption">{{selectedBadge.detailNote}}</view>
-          <view class="badge-caption">{{selectedBadge.holdingRule}}</view>
-        </view>
-        <button wx:if="{{selectedBadge.owned && !selectedBadge.equipped && badgeCollection.equippedCount >= badgeCollection.maxEquipped}}" class="primary badge-detail-action" bindtap="openBadgeReplacement" disabled="{{badgeManagerSaving || badgeManagerLoading}}" hover-class="badge-pressed">替换佩戴</button>
-        <button wx:elif="{{selectedBadge.owned}}" class="{{selectedBadge.equipped?'secondary':'primary'}} badge-detail-action" bindtap="toggleOwnedBadge" data-id="{{selectedBadge.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" loading="{{badgeManagerSaving}}" hover-class="badge-pressed">{{selectedBadge.equipped?'摘下徽章':'佩戴徽章'}}</button>
-        <button wx:else class="secondary badge-detail-action" bindtap="closeBadgeDetail" hover-class="badge-pressed">知道了</button>
-      </view>
-    </scroll-view>
-  </view>
-</view>
+<template wx:if="{{selectedBadge && !badgePicker}}" is="badgeDetailSheet" data="{{selectedBadge,badgeDetailHeight,badgeManagerSaving,badgeManagerLoading,monthLabel:badgeCollection.monthLabel,equippedCount:badgeCollection.equippedCount,maxEquipped:badgeCollection.maxEquipped}}" />
 <view wx:if="{{badgePicker}}" class="badge-backdrop" bindtap="closeBadgePicker" catchtouchmove="blockScroll">
   <view class="badge-detail badge-picker-sheet" role="dialog" aria-modal="true" aria-label="{{badgePicker === 'add' ? '选择徽章' : '替换佩戴'}}" catchtap="blockScroll">
     <view class="badge-picker-header">

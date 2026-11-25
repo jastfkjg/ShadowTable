@@ -126,7 +126,8 @@
     for (const badge of badges) {
       const label = badge.equipped ? '名片佩戴' : badge.permanent ? badge.periodLabel || '永久' : badge.category;
       groups[badge.permanent ? 1 : 0].items.push({ id: badge.id, title: badge.title, imageUrl: badge.imageUrl,
-        artStyle: badge.artStyle, equipped: badge.equipped, label });
+        artStyle: badge.artStyle, permanent: !!badge.permanent, periodLabel: badge.periodLabel || '', category: badge.category,
+        ...badgeCriteria(badge), equipped: badge.equipped, label });
     }
     return { name: value.player.name, initial: Array.from(value.player.name || '友')[0],
       avatarUrl: value.player.avatarUrl ? assetUrl(value.player.avatarUrl) : '', limited: value.limited,
@@ -143,17 +144,25 @@
     kill_enemy: '仅统计有击杀技能的玩家。',
     kill_ally: '仅统计有击杀技能的玩家。',
   };
-  const categories = ['全部分类', '荣誉徽章', '趣味徽章'];
+  function badgeCriteria(b) {
+    const roleRecord = copy.roleRecords[b.id];
+    const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
+    return { condition, detailCondition: b.permanent || b.metric === 'monthlyGoal' ? condition : condition + '（含并列）', detailNote: roleRecord?.description || detailNotes[b.id] || (b.metric === 'podium' ? (b.rank ? '当前第' + b.rank + '名。' : '') + '金、银、铜边框对应前三名。胜率相同时按样本局数排序，两者相同则并列。' : '') || '', kindLabel: b.permanent ? '永久' : b.metric === 'monthlyGoal' ? '月度' : '月榜',
+      holdingRule: b.holdingRule || '榜首变动或跨月时重新计算' };
+  }
+  const categoryIcons = {
+    '全部分类': '/assets/badge-category-grid.svg',
+    '荣誉徽章': '/assets/record-medal.svg',
+    '趣味徽章': '/assets/badge-category-mask.svg',
+  };
+  const categories = Object.keys(categoryIcons);
   function presentCollection(value, filter = 'all', assetUrl = path => path, category = categories[0]) {
     const owned = new Map((value.badges || []).map(b => [b.id, b]));
     const placements = Array.from(owned.keys(), monthlyAward).filter(Boolean);
     const items = placements.concat(collectionCatalogue).map(base => {
       const b = rankedBadge(base, owned.get(base.id)?.rank);
-      const roleRecord = copy.roleRecords[b.id];
-      const condition = (b.condition || (!roleRecord && copy.labels[b.id] ? '本月' + copy.labels[b.id] + '次数第一' : b.description.split('。')[0])).replace(/。+$/, '');
-      return { ...b, artStyle: badgeArtStyle(b), imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
-      condition, detailCondition: b.permanent || b.metric === 'monthlyGoal' ? condition : condition + '（含并列）', detailNote: roleRecord?.description || detailNotes[b.id] || (b.metric === 'podium' ? (b.rank ? '当前第' + b.rank + '名。' : '') + '金、银、铜边框对应前三名。胜率相同时按样本局数排序，两者相同则并列。' : '') || '', kindLabel: b.permanent ? '永久' : b.metric === 'monthlyGoal' ? '月度' : '月榜',
-      periodLabel: b.periodLabel || value.monthLabel || '', holdingRule: b.holdingRule || '榜首变动或跨月时重新计算',
+      return { ...b, ...badgeCriteria(b), artStyle: badgeArtStyle(b), imageUrl: badgeImageUrl(b, assetUrl), owned: owned.has(b.id), equipped: !!owned.get(b.id)?.equipped, slotIndex: owned.get(b.id)?.slotIndex,
+      periodLabel: b.periodLabel || value.monthLabel || '',
       status: owned.has(b.id) ? (owned.get(b.id).equipped ? '已佩戴' : '已拥有') : '未拥有' }; });
     items.sort((a, b) => Number(b.owned) - Number(a.owned));
     const badges = (value.badges || []).map(b => items.find(item => item.id === b.id)).filter(Boolean), equipped = badges.filter(b => b.equipped);
@@ -168,7 +177,7 @@
     ];
     const emptyMessage = filter === 'owned' ? '暂无已拥有的徽章，点开徽章可查看获取条件。'
       : category === categories[0] ? '已拥有全部徽章。' : '已拥有此分类全部徽章。';
-    return { ...value, badges, items, category, categories, ownershipFilters, emptyMessage,
+    return { ...value, badges, items, category, categories, categoryIcons, ownershipFilters, emptyMessage,
       visibleBadges: categoryItems.filter(b => filter === 'owned' ? b.owned : filter === 'unowned' ? !b.owned : true),
       availableBadges: items.filter(b => b.owned && !b.equipped), equippedBadges: equipped,
       slots: Array.from({ length: MAX_EQUIPPED }, (_, i) => equipped.find(b => b.slotIndex === i) || { id: 'empty-' + i, empty: true, slotIndex: i }),
@@ -176,5 +185,5 @@
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
-  return { playerCollectionPath, presentPlayerCollection, catalogue, categories, rules, MAX_EQUIPPED, usesServerArt, rankedBadge, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
+  return { badgeCriteria, playerCollectionPath, presentPlayerCollection, catalogue, categories, rules, MAX_EQUIPPED, usesServerArt, rankedBadge, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };
 });
