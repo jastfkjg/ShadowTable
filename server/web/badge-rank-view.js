@@ -1,5 +1,5 @@
 "use strict";
-window.shadowtableBadgeRankView = function (s, esc) {
+window.shadowtableBadgeRankView = function (s, esc, renderDetail) {
   if (!s) return '<div class="br-status" role="status">正在读取徽章榜…</div>';
   const { board, detail, kind, label } = s;
   const chevron = '<i class="br-chevron" aria-hidden="true"></i>';
@@ -13,7 +13,7 @@ window.shadowtableBadgeRankView = function (s, esc) {
   let html =
     '<section class="br-page br-' +
     kind +
-    '"><header class="badge-web-header"><button class="badge-web-back" data-action="brBack" data-page="' +
+    '"' + (s.selectedBadge ? ' inert' : '') + '><header class="badge-web-header"><button class="badge-web-back" data-action="brBack" data-page="' +
     back +
     '" aria-label="返回' +
     (s.player ? "徽章榜" : "徽章收藏") +
@@ -31,12 +31,12 @@ window.shadowtableBadgeRankView = function (s, esc) {
     });
     html += `<div class="br-selector">
       <div class="br-choices" role="group" aria-label="切换徽章榜">${choices.join("")}</div>
-      <div class="br-selector-meta">累计获得${board ? " · " + board.total + " 位玩家上榜" : ""}</div>
+      <div class="br-selector-meta">${s.countLabel}${board ? " · " + board.total + " 位玩家上榜" : ""}</div>
     </div>`;
     if (board) {
       if (board.total)
         html +=
-          '<div class="br-columns"><span class="br-rank-label">名次</span><span class="br-player-label">玩家</span><span>已获得</span></div>';
+          '<div class="br-columns"><span class="br-rank-label">名次</span><span class="br-player-label">玩家</span><span>' + s.countLabel + '</span></div>';
       for (const p of board.rows)
         html +=
           '<button class="br-row ' +
@@ -55,7 +55,7 @@ window.shadowtableBadgeRankView = function (s, esc) {
           chevron +
           "</button>";
       if (!board.total)
-        html += '<div class="br-status">还没有玩家获得' + label + "</div>";
+        html += '<div class="br-status">暂无玩家持有' + label + "</div>";
       if (board.nextOffset !== null && !s.error)
         html +=
           '<button class="br-more" data-action="brMore"' +
@@ -83,7 +83,7 @@ window.shadowtableBadgeRankView = function (s, esc) {
       esc(p.nickname) +
       '</h2><div class="br-muted">' +
       (p.rank ? "第 " + p.rank + " 名 · " : "") +
-      "已获得 " +
+      s.countLabel + " " +
       p.count +
       " 枚" +
       label +
@@ -100,20 +100,20 @@ window.shadowtableBadgeRankView = function (s, esc) {
     if (!detail.isSelf && !detail.visible)
       html += '<div class="br-status">该玩家已隐藏徽章明细</div>';
     else if (!p.count)
-      html += '<div class="br-status">尚未获得' + label + "</div>";
+      html += '<div class="br-status">当前未持有' + label + "</div>";
     else
       html +=
         '<div class="br-grid">' +
         detail.badges
           .map(
             (b) =>
-              '<div class="br-tile"><img src="' +
+              '<button type="button" class="br-tile" aria-haspopup="dialog" data-action="brOpenBadge" data-id="' + esc(b.id) + '"><img src="' +
               esc(b.imageUrl) +
               '" alt=""><div>' +
               esc(b.title) +
               '</div><div class="br-muted">' +
               esc(b.periodLabel || (b.permanent ? "永久徽章" : "月度徽章")) +
-              "</div></div>",
+              "</div></button>",
           )
           .join("") +
         "</div>";
@@ -125,5 +125,5 @@ window.shadowtableBadgeRankView = function (s, esc) {
       '<div class="br-status" role="alert">' +
       esc(s.error) +
       '<button class="br-more" data-action="brReload">重新加载</button></div>';
-  return html + "</section>";
+  return html + "</section>" + (s.selectedBadge ? renderDetail(s.selectedBadge) : "");
 };

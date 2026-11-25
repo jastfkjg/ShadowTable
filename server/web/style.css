@@ -2090,7 +2090,6 @@ body:has(.public-history-backdrop) { overflow: hidden; }
 /* Monthly leader badges: artwork only in the player identity row. */
 .player-card-identity { flex-wrap: wrap; }
 .player-card-name { flex: 1 1 50px; }
-.player-card-badges { flex: 0 0 156px; width: 156px; max-width: 100%; white-space: nowrap; text-align: right; overflow-x: auto; scrollbar-width: thin; }
 button.player-badge-button { display: inline-flex; vertical-align: middle; width: 48px; height: 48px; min-height: 48px; padding: 2px; margin: 0 4px 0 0; border-radius: 8px; }
 .player-badge-button img { width: 44px; height: 44px; }
 /* Permanent badge art has more transparent padding than monthly badge art. */
@@ -2112,7 +2111,6 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 .player-badge-button img,.badge-manager-image,.player-badge-detail-heading img { object-fit: contain; }
 .badge-wear-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 70px); }
-.player-card-identity.is-long-name .player-card-badges { flex-basis: calc(100% - 68px); width: calc(100% - 68px); margin-left: 68px; }
 
 .badge-equipped-count { margin: 12px 0; color: var(--accent, #e6c27a); font-weight: 600; }
 
@@ -2142,8 +2140,10 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 
 .monthly-reset-stats>div:nth-child(2) .monthly-reset-value { font-size:22px; letter-spacing:-.5px; white-space:nowrap; }
 
-.player-card-collection { max-width: 100%; flex: 0 0 156px; text-align: right; }
-.player-card-collection .player-card-badges { width: 100%; }
-.player-card-identity.is-long-name .player-card-collection { margin-left: 68px; }
-.player-card-identity.is-long-name .player-card-collection .player-card-badges { width: 100%; margin-left: 0; }
-button.player-collection-link { width: auto; min-height: 32px; padding: 0 4px; margin: 0 0 0 auto; background: transparent; color: var(--accent); font-size: 13px; border: 0; }
+.player-card-collection { display: flex; align-items: center; flex: none; max-width: 100%; margin-left: auto; white-space: nowrap; }
+.player-card-collection button.player-badge-button { position: relative; width: 38px; min-height: 44px; height: 44px; padding: 3px; margin: 0; justify-content: center; }
+.player-card-collection .player-badge-button[aria-expanded="true"]::before { content: ""; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); width: 12px; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
+.player-card-collection .player-badge-button img { width: 32px; height: 32px; }
+button.player-collection-link { display: flex; align-items: center; justify-content: center; gap: 6px; width: auto; min-height: 44px; margin: 0; padding: 0 2px 0 6px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; }
+.player-badge-button + .player-collection-link::before { content: ""; width: 1px; height: 16px; margin-right: 2px; background: var(--border); }
+.player-collection-chevron { width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }

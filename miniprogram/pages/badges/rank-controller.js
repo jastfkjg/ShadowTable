@@ -14,6 +14,7 @@
   ) {
     let sequence = 0;
     const state = {
+      countLabel: "当前持有",
       choices: Object.entries(types).map(([kind, type]) => ({
         kind,
         title: type.label + "榜",
@@ -32,6 +33,7 @@
         label: type.label,
         board: null,
         detail: null,
+        selectedBadge: null,
         error: "",
         loading: true,
         saving: false,
@@ -49,7 +51,7 @@
       if (more && (state.loading || !board || board.nextOffset === null))
         return;
       const token = ++sequence;
-      patch({ loading: true, error: "", ...(player ? { detail: null } : {}) });
+      patch({ loading: true, error: "", ...(player ? { detail: null, selectedBadge: null } : {}) });
       const endpoint = "/api/badge-ranks/" + kind;
       const suffix = player
         ? "/" + player
@@ -114,6 +116,13 @@
       state,
       load,
       visibility,
+      openBadge(id) {
+        const detail = state.detail;
+        if (!detail || (!detail.visible && !detail.isSelf)) return;
+        const item = detail.badges.find(b => b.id === id);
+        if (item) patch({ selectedBadge: { ...item, ...badges.badgeCriteria(item) } });
+      },
+      closeBadge() { if (state.selectedBadge) patch({ selectedBadge: null }); },
       select(category) {
         if (!types[category] || state.kind === category) return;
         start(category, "");
@@ -121,7 +130,7 @@
       },
       pause() {
         sequence++;
-        patch({ loading: false, saving: false });
+        patch({ loading: false, saving: false, selectedBadge: null });
       },
     };
   }

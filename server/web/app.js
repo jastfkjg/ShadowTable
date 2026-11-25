@@ -1129,6 +1129,10 @@
   function closeBadgeDetail() {
     const id = state.selectedBadgeId, slot = state.badgePicker === 'add' ? state.badgePickerSlot : null;
     setState({ selectedBadgeId: '', badgePicker: '', badgePickerChoice: null });
+    if (state.page === 'player-badges') {
+      if (id) app.querySelector('[data-action="showCollectionBadge"][data-id="' + id + '"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (id) (app.querySelector('.badge-tile[data-id="' + id + '"]') || app.querySelector('.badge-slot-open[data-id="' + id + '"]'))?.focus({ preventScroll: true });
     else if (slot !== null) (app.querySelector('.badge-slot-open[data-slot="' + slot + '"]') || app.querySelector('.badge-slot.is-updated .badge-slot-open') || app.querySelector('.badge-manage'))?.focus({ preventScroll: true });
   }
@@ -1165,10 +1169,11 @@
       ? '<div class="badge-caption badge-equipment-note is-updated" role="status"><span class="badge-check" aria-hidden="true"></span><span>' + esc(updated.title) + '已佩戴到名片位置 ' + (updated.slotIndex + 1) + '</span></div>'
       : '<div class="badge-caption badge-equipment-note">' + (state.badgeManaging ? '摘下后可选择空位佩戴，调整展示顺序' : '徽章会展示在玩家名片上') + '</div>') +
       '</section><div class="badge-collection-heading"><h2 class="badge-collection-title">徽章收藏</h2><span class="badge-collection-total">已拥有 ' + c.ownedCount + ' / ' + c.totalCount + '</span></div>' +
-      '<div class="badge-filters" role="group" aria-label="徽章分类">';
+      '<div class="badge-categories" role="group" aria-label="徽章分类">';
     for (const category of c.categories) {
       const selected = c.category === category;
-      html += '<button type="button" class="' + (selected ? 'selected' : '') + '" data-action="badgeCategory" data-category="' + esc(category) + '" aria-pressed="' + selected + '">' + esc(category) + '</button>';
+      html += '<button type="button" class="' + (selected ? 'selected' : '') + '" data-action="badgeCategory" data-category="' + esc(category) + '" aria-pressed="' + selected + '">' +
+        '<img class="badge-category-icon" src="' + esc(c.categoryIcons[category]) + '" alt=""><span>' + esc(category) + '</span></button>';
     }
     html += '</div><div class="badge-filters" role="group" aria-label="拥有状态">';
     for (const { id, title, count } of c.ownershipFilters) html += '<button type="button" class="' + (state.badgeFilter === id ? 'selected' : '') + '" data-action="badgeFilter" data-id="' + id + '" aria-pressed="' + (state.badgeFilter === id) + '">' + title + '<span>' + count + '</span></button>';
@@ -1184,17 +1189,21 @@
     else if (badge) html += viewBadgeDetail(c, badge, busy);
     return html;
   }
-  function viewBadgeDetail(collection, badge, busy) {
-    const full = badge.owned && !badge.equipped && collection.equippedCount >= collection.maxEquipped;
-    return '<div class="badge-backdrop"><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content badge-detail-compact">' +
-      '<div class="badge-detail-handle" aria-hidden="true"></div><button type="button" class="badge-detail-close" data-action="closeBadgeDetail" aria-label="关闭徽章详情"' + (state.badgeManagerSaving ? ' disabled' : '') + '><span aria-hidden="true">×</span></button>' +
-      '<div class="badge-detail-art">' + badgeArt(badge, badge.owned ? 'badge-detail-image' : 'badge-detail-image is-locked') + '</div>' +
+  function viewBadgeDetail(collection, badge, busy, closeAction = 'closeBadgeDetail') {
+    const readOnly = !collection;
+    const full = !readOnly && badge.owned && !badge.equipped && collection.equippedCount >= collection.maxEquipped;
+    const metadata = [badge.periodLabel || collection?.monthLabel, badge.kindLabel, badge.category].filter(Boolean).join(' · ');
+    const status = readOnly ? '' : '<span class="badge-detail-status' + (badge.owned ? ' is-owned' : '') + '">' + esc(badge.status) + '</span>';
+    const action = readOnly ? '' : badge.owned ? btn((badge.equipped ? 'secondary' : 'primary') + ' badge-detail-action',full ? 'openBadgeReplacement' : 'toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : badge.equipped ? '摘下徽章' : full ? '替换佩戴' : '佩戴徽章',{id:badge.id},busy) : btn('secondary badge-detail-action','closeBadgeDetail','知道了');
+    return '<div class="badge-backdrop"' + (readOnly ? ' data-rank-dismiss="' + closeAction + '"' : '') + '><section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title"><div class="badge-detail-content badge-detail-compact">' +
+      '<div class="badge-detail-handle" aria-hidden="true"></div><button type="button" class="badge-detail-close" data-action="' + closeAction + '" aria-label="关闭徽章详情"' + (state.badgeManagerSaving ? ' disabled' : '') + '><span aria-hidden="true">×</span></button>' +
+      '<div class="badge-detail-art">' + badgeArt(badge, readOnly || badge.owned ? 'badge-detail-image' : 'badge-detail-image is-locked') + '</div>' +
       '<h2 class="badge-detail-title" id="badge-detail-title">' + esc(badge.title) + '</h2>' +
-      '<div class="badge-detail-meta"><span>' + esc((badge.periodLabel || collection.monthLabel) + ' · ' + badge.kindLabel + ' · ' + badge.category) + '</span><span class="badge-detail-status' + (badge.owned ? ' is-owned' : '') + '">' + esc(badge.status) + '</span></div>' +
+      '<div class="badge-detail-meta"><span>' + esc(metadata) + '</span>' + status + '</div>' +
       '<div class="badge-detail-criteria"><div class="badge-caption">获取条件</div><div class="badge-detail-condition">' + esc(badge.detailCondition) + '</div>' +
       (badge.detailNote ? '<div class="badge-caption">' + esc(badge.detailNote) + '</div>' : '') +
       '<div class="badge-caption">' + esc(badge.holdingRule) + '</div></div>' +
-      (badge.owned ? btn((badge.equipped ? 'secondary' : 'primary') + ' badge-detail-action',full ? 'openBadgeReplacement' : 'toggleOwnedBadge',state.badgeManagerSaving ? '正在保存…' : badge.equipped ? '摘下徽章' : full ? '替换佩戴' : '佩戴徽章',{id:badge.id},busy) : btn('secondary badge-detail-action','closeBadgeDetail','知道了')) +
+      action +
       '</div></section></div>';
   }
   function viewBadgePicker(collection, badge, busy) {
@@ -1248,7 +1257,7 @@
   async function loadPlayerCollection(route) {
     const sequence = ++collectionSequence, activeRoute = routeSequence;
     const active = () => sequence === collectionSequence && activeRoute === routeSequence && foreground;
-    setState({ playerCollection: null, collectionError: '' });
+    setState({ playerCollection: null, collectionError: '', selectedBadgeId: '' });
     try {
       const value = await request(route.path);
       if (active()) setState({ playerCollection: badgePresentation.presentPlayerCollection(value) });
@@ -1267,17 +1276,20 @@
       body = '<div class="owned-summary"><span class="owned-avatar">'+ avatar +'</span><div class="owned-name"><div>'+esc(c.name)+'的徽章</div><span>'+(c.limited?'已公开的徽章':'已拥有的徽章')+'</span></div><div class="owned-count"><span>'+c.count+'</span> 枚</div></div>';
       for (const group of c.groups) {
         body += '<section><h2 class="owned-heading"><span>'+group.title+'</span><span>'+group.items.length+' 枚</span></h2><div class="owned-grid">' +
-          group.items.map(b => '<div class="owned-row">'+badgeArt(b)+'<div>'+esc(b.title)+'<span class="'+(b.equipped?'worn':'')+'">'+esc(b.label)+'</span></div></div>').join('')+'</div></section>';
+          group.items.map(b => '<button type="button" class="owned-row" data-action="showCollectionBadge" data-id="'+esc(b.id)+'" aria-haspopup="dialog" aria-label="查看'+esc(b.title)+'的徽章详情">'+badgeArt(b)+'<div>'+esc(b.title)+'<span class="'+(b.equipped?'worn':'')+'">'+esc(b.label)+'</span></div></button>').join('')+'</div></section>';
       }
       if (!c.count) body += '<p class="muted">'+(c.limited?'暂无公开的徽章':'暂无已拥有的徽章')+'</p>';
     }
-    return '<div class="badge-page">'+header+'<div class="owned-page">'+body+'</div></div>';
+    const selected = state.selectedBadgeId && c?.groups.flatMap(group => group.items).find(b => b.id === state.selectedBadgeId);
+    return '<div class="badge-page"' + (selected ? ' inert' : '') + '>'+header+'<div class="owned-page">'+body+'</div></div>' +
+      (selected ? viewBadgeDetail(null, selected) : '');
   }
   function viewPlayerBadges(card) {
     const { badges = [], ownedBadgeCount } = card;
     if (!badges.length && !ownedBadgeCount) return '';
-    const icons = '<div class="player-card-badges" role="group" aria-label="佩戴的徽章，可横向滑动查看">' + badges.slice(0, 3).map(badge => '<button type="button" class="player-badge-button" data-action="showPlayerCardBadge" data-id="' + esc(badge.id) + '" aria-label="查看' + esc(badge.title) + '徽章" aria-expanded="' + (state.playerCardBadge?.id === badge.id) + '">' + badgeArt(badge) + '</button>').join('') + '</div>';
-    return '<div class="player-card-collection">' + icons + (ownedBadgeCount ? btn('player-collection-link','openPlayerCollection',(card.badgesLimited ? '公开 ' : '全部 ') + ownedBadgeCount + ' 枚 ›') : '') + '</div>';
+    const icons = badges.slice(0, 3).map(badge => '<button type="button" class="player-badge-button" data-action="showPlayerCardBadge" data-id="' + esc(badge.id) + '" aria-label="查看' + esc(badge.title) + '徽章" aria-expanded="' + (state.playerCardBadge?.id === badge.id) + '">' + badgeArt(badge) + '</button>').join('');
+    const countLink = ownedBadgeCount ? '<button type="button" class="player-collection-link" data-action="openPlayerCollection" aria-label="查看' + esc(card.name) + (card.badgesLimited ? '公开的' : '的全部') + ownedBadgeCount + '枚徽章">' + (card.badgesLimited ? '公开 ' : '共 ') + ownedBadgeCount + '<i class="player-collection-chevron" aria-hidden="true"></i></button>' : '';
+    return '<div class="player-card-collection">' + icons + countLink + '</div>';
   }
   function viewPlayerBadgeDetail() {
     const badge = state.playerCardBadge;
@@ -1735,6 +1747,7 @@
     } catch (e) {}
   }
   function mask() {
+    if (state.page === 'player-badges') state.selectedBadgeId = '';
     badgeNoticeCancel?.();
     if (grantNoticeOpen) modalCancel.onclick?.();
     closeRoomSwipe();
@@ -5284,7 +5297,7 @@ function roomListItems(rooms) {
       viewResultDialog() +
       (state.reconnecting ? '<div class="notice" role="status">' + (pending ? '正在确认提交结果，请勿重复提交' : '连接中断，正在重连；当前显示上次同步的内容') + btn('text-button','recoverConnection','立即重试',null,state.busy || state.loading) + '</div>' : '') +
       (state.notice ? '<div class="notice">' + esc(state.notice) + "</div>" : "") +
-      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'data-management' ? viewRecordClearing() : state.page === 'player-badges' ? viewPlayerCollection() : state.page === 'badge-ranks' ? window.shadowtableBadgeRankView(state.badgeRankView,esc) : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
+      (state.page === 'login' ? viewWebLogin() : state.page === 'me' ? viewMe() : state.page === 'data-management' ? viewRecordClearing() : state.page === 'player-badges' ? viewPlayerCollection() : state.page === 'badge-ranks' ? window.shadowtableBadgeRankView(state.badgeRankView, esc, badge => viewBadgeDetail(null, badge, false, 'brCloseBadge')) : state.page === 'badges' ? viewBadgeManager() : state.page === 'profile' ? viewProfileEditor() : state.page === 'matches' ? viewMatches() : state.page === 'stats' ? personalTitle('我的战绩','MY RECORDS') + viewStats() : state.page === 'leaderboard' ? viewLeaderboard() : state.page === 'monthly' ? viewMonthlyReport() : state.page === 'help' ? viewHelp() : state.page === 'table' ? (state.room ? viewRoom() : viewTableLoading()) : viewEntry()) +
       "</div>" + viewEntrySheet() + viewRoomRules() + viewRecordClearingConfirmation() +
       (state.page === 'table' ? viewHistorySheet() + viewHonorBallot() : '') + viewPlayerCard() + viewSettingsDialog() +
       viewBoardDetails() + viewErrorDialog() + (state.page === "me" && state.monthlyReset ? "" : viewNavigation()) + viewMonthlyReset();
@@ -5304,6 +5317,15 @@ function roomListItems(rooms) {
     },
     brSelect: el => { if (el.dataset.kind !== state.badgeRankView?.kind) return navigate('badge-ranks/'+el.dataset.kind,null,true); },
     brPlayer: el => navigate('badge-ranks/'+state.badgeRankView.kind+'/'+el.dataset.id),
+    brOpenBadge: el => {
+      badgeRankController?.openBadge(el.dataset.id);
+      app.querySelector('[data-action="brCloseBadge"]')?.focus({ preventScroll: true });
+    },
+    brCloseBadge: () => {
+      const id = state.badgeRankView?.selectedBadge?.id;
+      badgeRankController?.closeBadge();
+      if (id) app.querySelector('[data-action="brOpenBadge"][data-id="' + id + '"]')?.focus({ preventScroll: true });
+    },
     brMore: () => badgeRankController?.load(true),
     brReload: () => badgeRankController?.load(),
     brToggle: () => badgeRankController?.visibility(!state.badgeRankView.detail.visible),
@@ -5366,6 +5388,10 @@ function roomListItems(rooms) {
     badgeRules: () => confirm('徽章规则', badgePresentation.rules + '\n最多佩戴3枚，展示在玩家名片中；佩戴已满时可替换已佩戴的徽章。', false),
     toggleOwnedBadge: el => toggleOwnedBadge(el.dataset.id),
     openPlayerCollection,
+    showCollectionBadge: el => {
+      setState({ selectedBadgeId: el.dataset.id });
+      app.querySelector('.badge-detail-close')?.focus({ preventScroll: true });
+    },
     retryPlayerCollection: () => loadPlayerCollection(routeInfo(currentRoute)),
     backPlayerCollection: () => {
       if (window.history.state?.collectionOrigin) return window.history.back();
@@ -6117,11 +6143,14 @@ function roomListItems(rooms) {
       }
       return;
     }
-    if ((!state.selectedBadgeId && !state.badgePicker) || state.page !== 'badges' || !modal.hidden) return;
+    const rankedBadge = state.page === 'badge-ranks' && state.badgeRankView?.selectedBadge;
+    const collectionDetail = ['badges', 'player-badges'].includes(state.page) && (state.selectedBadgeId || state.badgePicker);
+    if (!modal.hidden || (!rankedBadge && !collectionDetail)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       if (state.badgeManagerSaving) return;
-      if (state.badgePicker) closeBadgePicker();
+      if (rankedBadge) ACTIONS.brCloseBadge();
+      else if (state.badgePicker) closeBadgePicker();
       else closeBadgeDetail();
     }
     if (event.key === 'Tab') {

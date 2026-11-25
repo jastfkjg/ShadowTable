@@ -288,11 +288,9 @@ button.player-card-close { flex-shrink: 0; width: 44px; min-height: 44px; paddin
 .player-card-display-name { font-size: 21px; line-height: 1.4; }
 .player-card-name .small { margin-top: 3px; line-height: 20px; }
 .player-card-sheet .small { font-size: 12px; }
-.player-card-badges { flex: 0 0 132px; width: 132px; }
 .player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 60px); }
-.player-card-identity.is-long-name .player-card-badges { flex-basis: 132px; width: 132px; margin-left: 60px; }
 .player-card-sheet button.player-badge-button { position: relative; width: 44px; min-height: 44px; height: 44px; margin: 0; padding: 4px; }
-.player-badge-button.is-selected::before { content: ''; position: absolute; inset: 3px; border: 1px solid var(--accent); border-radius: 50%; pointer-events: none; }
+.player-badge-button.is-selected::before { content: ''; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); width: 12px; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 .player-card-sheet .player-badge-button image { width: 32px; height: 32px; }
 .player-card-section-title { font-size: 14px; }
 .player-card-overview-title { border: 0; padding: 0 0 12px; }

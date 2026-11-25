@@ -1,3 +1,4 @@
+@import "./badges.wxss";
 .owned-page { max-width: 600px; margin: auto; padding: 20px 19px calc(32px + env(safe-area-inset-bottom)); }
 .owned-summary,.owned-heading,.owned-row,.owned-avatar { display: flex; align-items: center; }
 .owned-summary { gap: 12px; padding-bottom: 16px; border-bottom: 1px solid rgba(184,204,207,.15); }
@@ -10,7 +11,7 @@
 .owned-count text { font-family: Georgia,serif; font-size: 32px; color: var(--accent); }
 .owned-heading { justify-content: space-between; margin: 20px 0 4px; color: var(--accent); font-size: 15px; font-weight: 600; }
 .owned-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 12px; }
-.owned-row { gap: 9px; min-height: 66px; border-bottom: 1px solid rgba(184,204,207,.15); font-size: 14px; overflow-wrap: anywhere; }
+.owned-page button.owned-row { width: 100%; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); line-height: 1.5; font-weight: 400; text-align: left; justify-content: flex-start; gap: 9px; min-height: 66px; border-bottom: 1px solid rgba(184,204,207,.15); font-size: 14px; overflow-wrap: anywhere; }
 .owned-row image { width: 42px; height: 42px; flex-shrink: 0; }
 .owned-row text { display: block; margin-top: 3px; }
 .owned-row text.worn { color: var(--accent); }

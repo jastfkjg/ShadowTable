@@ -42,6 +42,7 @@
 !miniprogram/personality-storage.js
 !miniprogram/assets/
 !miniprogram/assets/about-merlin.svg
+!miniprogram/assets/badge-category-*.svg
 !miniprogram/assets/roles/
 !miniprogram/assets/roles/merlin.png
 !miniprogram/assets/roles/percival.png

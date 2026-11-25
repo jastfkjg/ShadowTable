@@ -98,6 +98,8 @@ for (const avatar of builtinAvatars)
   assets[avatar.path] = ["../../miniprogram" + avatar.path, "image/jpeg"];
 for (const role of require("../../miniprogram/role-portraits").assetNames)
   assets["/assets/roles/" + role + ".png"] = ["../../miniprogram/assets/roles/" + role + ".png", "image/png"];
+for (const name of ['grid', 'mask'])
+  assets['/assets/badge-category-' + name + '.svg'] = ['../../miniprogram/assets/badge-category-' + name + '.svg', 'image/svg+xml'];
 const { catalogue, usesServerArt, rankedBadge } = require('../../miniprogram/badges');
 const serverBadgeArt = new Set();
 for (const badge of catalogue) {
@@ -127,7 +129,7 @@ function serve(req, res, path) {
   let content = asset[0] === null
     ? "window.shadowtableBuiltinAvatars = " + JSON.stringify(builtinAvatars) + ";window.shadowtableAvatarStyles = " + JSON.stringify(avatarStyles) + ";"
     : readFileSync(join(__dirname, asset[0]));
-  if (["/home.css", "/room-sheets.css", "/me.css", "/personality/layout.css", "/player-badges.css"].includes(path)) content = webStyles(content);
+  if (["/home.css", "/room-sheets.css", "/me.css", "/personality/layout.css", "/player-badges.css", "/badge-ranks.css"].includes(path)) content = webStyles(content);
   if (path === "/personality/quiz.js") content = "window.shadowtablePersonalityQuiz = " + content.toString() + ";";
   if (path === "/avoidance.css") content = content.toString().replace(/(^|[\s>+~,])(view|text|image)(?=[\s.:#\[>+~,{])/gm, (_, before, tag) => before + webTags[tag]);
   res.setHeader("Content-Type", asset[1]);

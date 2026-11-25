@@ -1,7 +1,8 @@
+const { measureBadgeDetail } = require("./detail-layout");
 const api = require("../../api");
 const { create } = require("./rank-controller");
 Page({
-  data: { rank: null },
+  data: { rank: null, badgeDetailHeight: 0 },
   onLoad(options) {
     const kind = options.kind === "fun" ? "fun" : "honor";
     const player = /^(self|[a-f0-9]{32})$/.test(options.player || "")
@@ -14,20 +15,26 @@ Page({
           return api.request(...args);
         },
         assetUrl: api.assetUrl,
-        update: (rank) => this.setData({ rank }),
+        update: (rank) => {
+          const opened = rank.selectedBadge && rank.selectedBadge.id !== this.data.rank?.selectedBadge?.id;
+          this.setData({ rank, ...(opened ? { badgeDetailHeight: 0 } : {}) }, opened ? () => this.measureBadgeDetail() : undefined);
+        },
       },
       kind,
       player,
     );
   },
   onShow() {
+    this.alive = true;
     if (this.controller.state.player || !this.controller.state.board)
       return this.controller.load();
   },
   onHide() {
+    this.alive = false;
     this.controller.pause();
   },
   onUnload() {
+    this.alive = false;
     this.controller.pause();
   },
   async onPullDownRefresh() {
@@ -63,6 +70,11 @@ Page({
         id,
     });
   },
+  openBadge(e) { this.controller.openBadge(e.currentTarget.dataset.id); },
+  closeBadgeDetail() { this.controller.closeBadge(); },
+  measureBadgeDetail,
+  onResize() { this.measureBadgeDetail(); },
+  blockScroll() {},
   toggle(e) {
     return this.controller.visibility(e.detail.value);
   },

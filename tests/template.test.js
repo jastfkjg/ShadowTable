@@ -2491,3 +2491,26 @@ test('逆仆结束模板显示两刀步骤与核对目标，房主工具移除�
     assert.equal(byHandler(tree,'saveResult').attr.disabled,false);
   }
 });
+
+test('徽章榜卡片打开只读图文详情，隐藏的明细无法打开', async () => {
+  const { create } = require('../miniprogram/pages/badges/rank-controller');
+  const id = 'october_2026_silver';
+  const value = { player: { nickname: '元', count: 1 }, visible: true, isSelf: false, badges: [{ id }] };
+  const controller = create({ request: async () => value, update() {} }, 'honor', 'self');
+  const renderRank = () => factory('pages/badges/ranks.wxml')({ rank: controller.state });
+  await controller.load();
+  assert.equal(byHandler(renderRank(), 'openBadge').attr['data-id'], id);
+  controller.openBadge(id);
+  const panel = nodes(renderRank()).find(n => n.attr?.role === 'dialog');
+  const html = JSON.stringify(panel);
+  assert.match(html, /银盔骑士/);
+  assert.match(html, /2026年10月积分榜第2名/);
+  assert.doesNotMatch(html, /已佩戴|已拥有|摘下徽章|替换佩戴|toggleOwnedBadge|is-locked/);
+  assert.ok(byHandler(panel, 'closeBadgeDetail'));
+  controller.closeBadge();
+  assert.equal(controller.state.selectedBadge, null);
+  value.visible = false;
+  await controller.load();
+  controller.openBadge(id);
+  assert.equal(controller.state.selectedBadge, null);
+});

@@ -113,4 +113,10 @@ test("玩家收藏页展示当前和永久两组，佩戴标识、逐月纪念�
   const template = JSON.stringify(factory("pages/badges/player.wxml")({ collection }));
   for (const text of ["本月持有", "永久收藏", "名片佩戴", "共建者", "圣光正义"]) assert.ok(template.includes(text));
   assert.doesNotMatch(template, /调整佩戴|替换佩戴/);
+  const selected = factory("pages/badges/player.wxml")({ collection, selectedBadge: badge });
+  const findPanel = node => node?.attr?.role === 'dialog' ? node : node?.children?.map(findPanel).find(Boolean);
+  const panel = JSON.stringify(findPanel(selected));
+  assert.match(panel, /获取条件/);
+  assert.ok(panel.includes(badge.detailCondition));
+  assert.doesNotMatch(panel, /已佩戴|名片佩戴|替换佩戴|toggleOwnedBadge/);
 });

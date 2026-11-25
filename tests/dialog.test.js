@@ -129,3 +129,27 @@ test('趣味称号卡按主题区测量正文，右上角关闭后释放宿主',
   assert.equal(selectors[1],'.fun-info-hero'); assert.equal(host.data.bodyHeight,334);
   host.cancel(tap()); assert.equal((await job).cancel,true); assert.equal(host.data.dialog,null);
 });
+
+test('玩家徽章页仅为可见徽章打开只读详情，关闭后保留原收藏', () => {
+  const badges = require('../miniprogram/badges');
+  let page;
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'pages/badges/player.js'), 'utf8'), {
+    require: name => name === '../../badges' ? badges : name === './detail-layout' ? require('../miniprogram/pages/badges/detail-layout') : {},
+    Page: definition => { page = definition; },
+  });
+  page.setData = (patch, callback) => { Object.assign(page.data, patch); callback?.(); };
+  const ids = ['assassin_hit', 'october_2026_book'];
+  const collection = badges.presentPlayerCollection({ player: { name: '大V' }, badges: ids.map(id => ({ id })) });
+  page.data.collection = collection;
+  for (const id of ids) {
+    page.showBadgeDetail({ currentTarget: { dataset: { id } } });
+    const expected = badges.catalogue.find(b => b.id === id);
+    assert.equal(page.data.selectedBadge.title, expected.title);
+    assert.equal(page.data.selectedBadge.detailCondition, badges.badgeCriteria(expected).detailCondition);
+    page.closeBadgeDetail();
+    assert.equal(page.data.selectedBadge, null);
+    assert.equal(page.data.collection, collection);
+  }
+  page.showBadgeDetail({ currentTarget: { dataset: { id: 'points' } } });
+  assert.equal(page.data.selectedBadge, null);
+});

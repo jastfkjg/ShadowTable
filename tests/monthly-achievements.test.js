@@ -101,15 +101,20 @@ test('胜率用有效计分局，最低样本、金银铜、同名并列和红�
   assert.equal(find('wx:gold', 'rate_overall').rank, 1);
   assert.equal(find('wx:silver', 'rate_lancelot').rank, 2);
   assert.equal(find('dev:tie', 'rate_overall').rank, 2);
+  const honorDetail = (uid) => f.store.badgeRanks.detail(uid, 'honor', 'self').badges;
+  assert.equal(honorDetail('dev:tie').find(b => b.id === 'rate_overall').rank, 2);
   const silver = find('wx:silver', 'rate_overall');
   assert.match(presentPlayerBadge(silver).imageUrl, /-silver\.png$/);
   assert.equal(presentCollection({ badges: [silver] }).badges[0].imageUrl, silver.imageUrl);
   f.game([['dev:tie', 'loss', 'assassin', 'evil']]);
   const bronze = find('dev:tie', 'rate_overall');
   assert.equal(bronze.rank, 3);
+  assert.equal(honorDetail('dev:tie').find(b => b.id === 'rate_overall').rank, 3);
   assert.equal(bronze.title, silver.title);
   assert.match(bronze.imageUrl, /-bronze\.png$/);
   assert.ok(!find('dev:tie', 'rate_assassin'));
+  f.game([['dev:tie', 'loss'], ['wx:fourth', 'win']]);
+  assert.ok(!honorDetail('dev:tie').some(b => b.id === 'rate_overall'));
 });
 test('七种基础角色、七角色各胜及按全月对局去重的 80% 边界', (t) => {
   const f = fixture(t),
@@ -293,6 +298,8 @@ test('管理排除即时更新月度榜单，事务回滚和恢复都重新反�
   for (let i = 0; i < 9; i++) f.game(players);
   const match = f.game(players);
   assert.equal(f.badges('wx:a').find((b) => b.id === 'rate_overall').rank, 1);
+  const liveRanks = () => f.store.badgeRanks.detail('wx:a', 'honor', 'self').badges;
+  assert.equal(liveRanks().find(b => b.id === 'rate_overall').rank, 1);
   const exclude = () =>
     f.store.manageMatches({ action: 'exclude', matches: [{ id: match, revision: 0 }], reason: '测试' });
   assert.throws(
@@ -300,14 +307,19 @@ test('管理排除即时更新月度榜单，事务回滚和恢复都重新反�
       f.store.transaction(() => {
         exclude();
         assert.ok(!ids(f.badges('wx:a')).includes('rate_overall'));
+        assert.ok(!liveRanks().some(b => b.id === 'rate_overall'));
         throw Error('rollback');
       }),
     /rollback/,
   );
   assert.equal(f.badges('wx:a').find((b) => b.id === 'rate_overall').rank, 1);
+  assert.equal(liveRanks().find(b => b.id === 'rate_overall').rank, 1);
   f.store.transaction(exclude);
   assert.ok(!ids(f.badges('wx:a')).includes('rate_overall'));
   assert.ok(ids(f.badges('wx:a')).includes('ten_wins'));
+  const honor = liveRanks();
+  assert.ok(!honor.some(b => b.id === 'rate_overall'));
+  assert.ok(honor.some(b => b.id === 'ten_wins'));
   f.store.transaction(() =>
     f.store.manageMatches({ action: 'include', matches: [{ id: match, revision: 1 }], reason: '恢复' }),
   );
