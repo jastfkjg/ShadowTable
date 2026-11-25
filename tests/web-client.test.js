@@ -442,6 +442,16 @@ test('网页对局摘要与详情合并同一次终局刺杀', async () => {
   assert.match(html, /最终目标为本人（2 号）/);
   assert.doesNotMatch(html, /最终刀落到本人|终局记录/);
 });
+test('网页对局记录在每位同桌的昵称后显示当局角色', async () => {
+  const record = { id: 'match', endedAt: 1, seat: 2, role: '派西维尔', members: [
+    { seat: 1, name: '晚风', role: '莫甘娜' }, { seat: 2, name: '林间', role: '派西维尔' },
+  ] };
+  const c = client(async () => response({ records: [record], total: 1, hasMore: false }));
+  await c.applyRoute('#/matches');
+  const html = c.viewMatches();
+  assert.match(html, /晚风<\/span><span class="match-member-role">莫甘娜</);
+  assert.match(html, /class="match-member is-self"><span class="match-seat">2号<.*?林间<span class="match-self">（我）<\/span><\/span><span class="match-member-role">派西维尔</);
+});
 test('网页历史对局的称号摘要和事件均显示新版称号', async () => {
   const record = { boardName:'经典', capacity:6, endedAt:1, role:'梅林', winner:'good', outcome:'win',
     fun:{

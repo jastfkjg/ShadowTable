@@ -677,7 +677,7 @@ class Store {
       honorResult: game.excludedReason ? null : game.honorResult || null,
       score: player.score || { status: "legacy", total: null, breakdown: [], reason: "积分功能启用前的记录" },
       scoreEndReason: game.scorePolicy?.endReasons.find(reason => reason.id === game.scoringFacts?.reason)?.label || null,
-      members: this.matchParticipants(game).map(({ seat, name }) => ({ seat, name })),
+      members: this.matchParticipants(game).map(({ seat, name, role }) => ({ seat, name, role: role || "未知角色" })),
     };
   }
 

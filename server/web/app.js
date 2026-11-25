@@ -2395,7 +2395,16 @@ function roomListItems(rooms) {
     let html = '<div class="match-details"><div class="match-result"><span>' + (winner ? winner + '获胜' : '胜方未登记') + '</span><span class="match-source muted">' + ({manual:'房主登记',system:'系统判定'}[record.source] || '未判定') + '</span></div>';
     for (const [label, value] of [['不计入原因',record.excludedReason],['结束原因',record.scoreEndReason]]) if (value) html += '<div class="match-detail-row"><span>' + label + '</span><span>' + esc(value) + '</span></div>';
     html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun, record.role || '') + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures), true);
-    if (record.members?.length) html += '<details class="match-members-section"><summary class="match-members-toggle"><img class="match-members-icon" src="/assets/record-users.svg" alt="" /><span>同桌成员 <span class="match-member-count">' + record.members.length + '人</span></span></summary><div class="match-members">' + record.members.map(member => '<div class="match-member"><span class="match-seat">' + member.seat + '号</span><span class="match-member-name">' + esc(member.name) + (member.seat === record.seat ? '（我）' : '') + '</span></div>').join('') + '</div></details>';
+    if (record.members?.length) {
+      const members = record.members.map(member => {
+        const isSelf = member.seat === record.seat;
+        const name = esc(member.name) + (isSelf ? '<span class="match-self">（我）</span>' : '');
+        const role = member.role ? '<span class="match-member-role">' + esc(member.role) + '</span>' : '';
+        return '<div class="match-member' + (isSelf ? ' is-self' : '') + '"><span class="match-seat">' + esc(member.seat) + '号</span>'
+          + '<div class="match-member-info"><span class="match-member-name">' + name + '</span>' + role + '</div></div>';
+      }).join('');
+      html += '<details class="match-members-section"><summary class="match-members-toggle"><img class="match-members-icon" src="/assets/record-users.svg" alt="" /><span>同桌成员 <span class="match-member-count">' + record.members.length + '人</span></span></summary><div class="match-members">' + members + '</div></details>';
+    }
     return html + '</div>';
   }
   function honorAvatar(player) {
