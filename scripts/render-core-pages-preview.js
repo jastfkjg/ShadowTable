@@ -9,7 +9,7 @@ const { completed, onlineCompleted } = require("../tests/helpers/replay-fixtures
 const { presentReplay, trajectory } = require("../miniprogram/pages/replay/presentation");
 const { presentEntries } = require("../miniprogram/pages/scores/presentation");
 const createTable = require("../miniprogram/pages/table/controller");
-const { questRounds } = require("../miniprogram/public-history");
+const { questProgress } = require("../miniprogram/public-history");
 const roomSwipe = require("../miniprogram/room-swipe");
 const roomList = require("../miniprogram/room-list");
 const connectionFeedback = require("../miniprogram/connection-feedback");
@@ -284,7 +284,7 @@ function tableScene(source, uid, extra = {}) {
     seats:room.players.map(p=>({...p,occupied:true,mine:p.seat===room.me.seat,host:p.isHost,avatarInitial:p.name[0],inTeam:room.team.includes(p.seat)})),
     seatOccupiedCount:room.players.length,seatReadyCount:room.players.filter(p=>p.ready).length,
     operationProgressSegments:Array.from({length:room.operationProgress?.total || 0},(_,index)=>({index,completed:index<room.operationProgress.completed})),
-    history,historyLatest:history.at(-1),latestResult:history.at(-1),questTimeline:history,questRounds:questRounds(room,history),
+    history,historyLatest:history.at(-1),latestResult:history.at(-1),questTimeline:history,...questProgress(room,history),
     teamText:room.team.join('、'),actionEntryLabel:({quest:'提交任务牌',teamVote:'参与表决',identity:'查看身份'})[room.phase] || '完成本轮操作',...extra};
 }
 const tableSource = tableFixtures.setup();

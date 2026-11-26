@@ -32,6 +32,7 @@
 !miniprogram/result-registration.js
 !miniprogram/leaderboard-presentation.js
 !miniprogram/public-history.js
+!miniprogram/quest-team-sizes.js
 !miniprogram/room-swipe.js
 !miniprogram/room-list.js
 !miniprogram/room-list.wxss
@@ -93,6 +94,8 @@
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
+!miniprogram/pages/table/
+!miniprogram/pages/table/quest-track.wxss
 !miniprogram/pages/home/
 !miniprogram/pages/home/home.wxss
 !miniprogram/pages/home/room-sheets.wxss

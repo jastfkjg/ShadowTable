@@ -1,9 +1,8 @@
 /* Shared presentation state for public records. Never reads private identity data. */
 (function (root, factory) {
-  const value = factory();
-  if (typeof module === "object" && module.exports) module.exports = value;
-  else root.shadowtablePublicHistory = value;
-})(typeof window === "undefined" ? this : window, function () {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./quest-team-sizes"));
+  else root.shadowtablePublicHistory = factory(root.shadowtableQuestTeamSizes);
+})(typeof window === "undefined" ? this : window, function (teamSizes) {
   const filters = [
     { value: "all", label: "全部" }, { value: "vote", label: "投票" },
     { value: "quest", label: "任务" }, { value: "skill", label: "技能" },
@@ -13,16 +12,36 @@
     return {
       historyOpen: false, historyFilter: "all",
       historySeenKey: -1, historySnapshotKey: -1, historyNewSinceKey: -1,
-      historyUnreadCount: 0, historyExpandedRows: {}, historyFilters: filters,
+      historyUnreadCount: 0, historyExpandedRows: {}, historyFilters: [],
       historyScrollTarget: "", focusedHistoryKey: null, visibleHistory: [], historyLatest: null,
     };
   }
-  function category(source) {
+  function category(source, room) {
     if (["toolVote", "team"].includes(source.kind)) return "vote";
     if (["toolQuest", "quest"].includes(source.kind)) return "quest";
     if (source.kind === "variant" && (["conversion", "fairy"].includes(source.resultType) || /^(?:本轮(?:阵营转换|不转换)|仙女查验已完成)$/.test(source.text || ""))) return "other";
-    if (["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind)) return "skill";
+    if (room.knights && ["skillDetail", "skillResult", "variant", "toolReverse", "toolKnife", "assassination"].includes(source.kind)) return "skill";
     return "other";
+  }
+  function voteRecord(source, key) {
+    const team = (source.team || []).join("、");
+    const standard = source.kind === "team";
+    const text = standard
+      ? `第${source.round}轮 · ${source.leader}号组队 ${team}：${source.approved ? "通过" : "否决"}`
+      : "投票" + (source.approved ? "通过" : "未通过") + (source.earlyClosed ? " · 提前截止" : "");
+    const teamLabel = !standard && team ? team + " 号" : "";
+    const entry = { key, text, teamLabel, resultTeam: teamLabel };
+    if (!Array.isArray(source.votes)) return { ...entry, detail: source.detail || "" };
+    const voteGroups = [
+      { approve: true, label: "赞成", tone: "approve" },
+      { approve: false, label: "反对", tone: "reject" },
+      { approve: null, label: "弃权", tone: "abstain" },
+    ].map(({ approve, label, tone }) => {
+      const seatNumbers = source.votes.filter(v => v.approve === approve).map(v => v.seat).sort((a, b) => a - b);
+      return { label, tone, seatNumbers, count: seatNumbers.length };
+    }).filter(group => group.tone !== "abstain" || group.count);
+    const latestDetail = voteGroups.map(g => `${g.count}票${g.label}：${g.seatNumbers.join("，") || "无"}`).join("\n");
+    return { ...entry, voteGroups, latestDetail, detail: (teamLabel ? "队伍 " + team + "号\n" : "") + latestDetail };
   }
   function inspectionLabel(source) {
     if (source.kind !== "variant" || (source.resultType !== "fairy" && source.text !== "仙女查验已完成")) return "";
@@ -37,21 +56,26 @@
     if (source.kind !== "quest" && source.kind !== "toolQuest") return "";
     return isProtectedRound(room, source.round, source.threshold, source) ? "至少 2 张失败票才失败" : "";
   }
-  function questRounds(room, quests) {
-    if (room.phase === "lobby") return [];
-    const activeQuest = room.activity?.kind === "quest" ? room.activity : null;
+  function questProgress(room, quests, revealingQuest = null) {
+    if (room.phase === "lobby") return { questRounds: [] };
+    // A vote or proposal may also carry a team. Only a dispatched quest supplies an actual count.
+    const activeQuest = revealingQuest || (room.phase === "quest" ? { team: room.team, threshold: room.activity?.threshold } : null);
     const length = Math.max(5, quests.length + (activeQuest ? 1 : 0));
-    return Array.from({ length }, (_, index) => {
+    const questRounds = Array.from({ length }, (_, index) => {
       const number = index + 1;
       const entry = quests[index];
-      const source = entry ? room.history[entry.key] : null;
-      const threshold = source?.threshold ?? (index === quests.length ? activeQuest?.threshold : null);
-      const protectedRound = isProtectedRound(room, number, threshold, source);
+      const source = entry ? room.history[entry.key] : index === quests.length ? activeQuest : null;
+      const actualSize = Array.isArray(source?.team) ? source.team.length : 0;
+      const teamSize = actualSize || teamSizes[room.capacity]?.[index];
+      const sizeLabel = teamSize ? (actualSize ? "实上" : "应上") + teamSize + "人，" : "人数未记录，";
+      const protectedRound = source ? isProtectedRound(room, number, source.threshold, source)
+        : room.capacity >= 7 && number === 4;
       const result = entry?.questResult || "pending";
       const status = { success: "成功", failure: "失败", pending: "未结算" }[result];
-      return { number, key: entry?.key ?? null, result, protectedRound,
-        label: `第${number}次任务，${protectedRound ? "保护轮，" : ""}${status}${entry ? "，查看详情" : ""}` };
+      return { number, key: entry?.key ?? null, teamSize: teamSize ?? "—", result, protectedRound,
+        label: `第${number}次任务，${sizeLabel}${protectedRound ? "保护轮，" : ""}${status}${entry ? "，查看详情" : ""}` };
     });
+    return { questRounds };
   }
   function lastKey(history) { return history.length ? history[history.length - 1].key : -1; }
   function eventIcon(entry) {
@@ -85,7 +109,9 @@
         expanded: !!state.historyExpandedRows[entry.key],
         isNew: entry.key > state.historyNewSinceKey,
         hasDetails: !!(entry.teamLabel || entry.cards?.length || entry.voteGroups?.length || entry.resultRows?.length || entry.historyNote || entry.thresholdLabel || entry.detail),
-        ...(entry.voteGroups ? { voteGroups: entry.voteGroups.map(group => ({ ...group, seatNumbers: (group.seats.match(/\d+/g) || []).map(Number) })) } : {}),
+        ...(entry.voteGroups ? { voteGroups: entry.voteGroups.map(group => ({
+          ...group, seatNumbers: group.seatNumbers || (group.seats.match(/\d+/g) || []).map(Number),
+        })) } : {}),
         ...(entry.resultRows ? { resultRows: entry.resultRows.map(resultRow) } : {}),
       }));
   }
@@ -104,6 +130,7 @@
     if (key !== null) expanded[key] = true;
     const patch = {
       historyOpen: true, historyFilter: "all",
+      historyFilters: state.room?.knights ? filters : filters.filter(item => item.value !== "skill"),
       historySnapshotKey: lastKey(history), historySeenKey: lastKey(history),
       historyNewSinceKey: state.historySeenKey, historyUnreadCount: 0,
       historyExpandedRows: expanded, focusedHistoryKey: key, historyScrollTarget: "",
@@ -111,7 +138,7 @@
     return { ...patch, visibleHistory: rows({ ...state, ...patch }, history) };
   }
   function filter(state, value) {
-    if (!filters.some(item => item.value === value)) return {};
+    if (!state.historyFilters.some(item => item.value === value)) return {};
     const patch = { historyFilter: value, focusedHistoryKey: null, historyScrollTarget: "" };
     return { ...patch, visibleHistory: rows({ ...state, ...patch }, state.history || []) };
   }
@@ -120,5 +147,5 @@
     const patch = { historyExpandedRows: { ...state.historyExpandedRows, [key]: !state.historyExpandedRows[key] } };
     return { ...patch, visibleHistory: rows({ ...state, ...patch }, state.history || []) };
   }
-  return { initialData, category, inspectionLabel, questThresholdLabel, questRounds, sync, open, filter, toggleRow };
+  return { initialData, category, voteRecord, inspectionLabel, questThresholdLabel, questProgress, sync, open, filter, toggleRow };
 });

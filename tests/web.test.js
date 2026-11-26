@@ -241,9 +241,15 @@ test("网页共享小程序头像目录，所有预览可匿名加载，其他�
   assert.match((await a.raw('/assets/board-directory.svg')).headers['content-type'], /image\/svg\+xml/);
   assert.ok(home.text.indexOf('/public-history.js') < home.text.indexOf('/app.js'));
   const history = await a.raw('/public-history.js'), historyContext = { window: {} };
+  const teamSizes = await a.raw('/quest-team-sizes.js');
+  assert.ok(home.text.indexOf('/quest-team-sizes.js') < home.text.indexOf('/public-history.js'));
+  assert.equal(teamSizes.status, 200);
+  vm.runInNewContext(teamSizes.text, historyContext);
   assert.equal(history.status, 200);
   vm.runInNewContext(history.text, historyContext);
   assert.equal(historyContext.window.shadowtablePublicHistory.initialData().historyOpen, false);
+  const track = historyContext.window.shadowtablePublicHistory.questProgress({ phase: 'tools', capacity: 10 }, []);
+  assert.deepEqual(Array.from(track.questRounds, round => round.teamSize), [3, 4, 4, 5, 5]);
   const catalog = await a.raw('/builtin-avatars.js'), context = { window: {} };
   assert.equal(catalog.status, 200);
   assert.match(catalog.headers['content-type'], /javascript/);

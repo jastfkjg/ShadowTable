@@ -97,8 +97,8 @@
 <import src="../../honors.wxml" />
 <template is="honorBallot" data="{{honorDialog:honorDialog && !error,honorGroups,honorReady,honorSelected,honorRequired,honors,busy:busy || hasPendingRequest || !network}}" />
 <template name="tableResult">
-    <view wx:if="{{latestResult && (questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended')}}" class="latest-result" role="status" aria-label="最近操作结果">
-      <view class="result-summary-heading"><view class="table-result-label"><image src="/assets/home-clock.svg" aria-hidden="true" /><text class="small muted">最近结果</text></view><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
+    <view wx:if="{{latestResult && (questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended')}}" class="latest-result{{latestResult.voteGroups?' latest-vote-result':''}}" role="status" aria-label="最近操作结果">
+      <view wx:if="{{!latestResult.voteGroups}}" class="result-summary-heading"><view class="table-result-label"><image src="/assets/home-clock.svg" aria-hidden="true" /><text class="small muted">最近结果</text></view><button hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button></view>
       <view wx:if="{{latestResult.questResult}}" class="quest-reveal">
         <view wx:if="{{questTickets}}" class="quest-tickets" style="--quest-turn: {{questReveal.turnMs || 0}}ms; grid-template-columns: repeat({{questTickets.columns}}, minmax(0, 1fr)); max-width: {{questTickets.columns * 60 + (questTickets.columns - 1) * 6}}px;">
           <view wx:for="{{questTickets.cards}}" wx:key="index" class="quest-ticket" aria-label="{{'第'+(index+1)+'张，'+(index < shown ? item.label : '未翻开')}}">
@@ -112,10 +112,25 @@
         <view wx:else class="quest-reveal-footer quest-settled"><text class="quest-verdict {{latestResult.questResult}}">{{latestResult.questResult==='success'?'任务成功':'任务失败'}}</text><text wx:if="{{latestResult.teamLabel}}" class="quest-members">成员 {{latestResult.teamLabel}}</text></view>
       </view>
       <block wx:else>
-      <view class="latest-result-title result-heading"><text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text><text>{{latestResult.resultRows ? '技能最终结果' : latestResult.text}}</text><text wx:if="{{latestResult.resultTeam}}" class="result-team">队伍 {{latestResult.resultTeam}}</text></view>
+      <view class="latest-result-title result-heading">
+        <text wx:if="{{latestResult.resultTone}}" class="quest-result-icon {{latestResult.resultTone}}" aria-hidden="true">{{latestResult.resultTone==='success'?'✓':'×'}}</text>
+        <text>{{latestResult.resultRows ? '技能最终结果' : latestResult.text}}</text>
+        <button wx:if="{{latestResult.voteGroups}}" hover-class="none" class="history-toggle" bindtap="showLatestRecord">查看记录 ›</button>
+      </view>
+      <view wx:if="{{latestResult.resultTeam}}" class="vote-result-team"><image class="vote-result-team-icon" src="/assets/record-users.svg" aria-hidden="true" /><text>提名队伍</text><text class="vote-result-members">{{latestResult.resultTeam}}</text></view>
       <view wx:if="{{latestResult.resultRows}}">
         <view wx:if="{{latestResult.historyNote}}" class="latest-result-note small muted">{{latestResult.historyNote}}</view>
         <view class="history-result-rows"><view wx:for="{{latestResult.resultRows}}" wx:for-item="row" wx:key="label" class="history-result-line {{row.final?'is-final':''}}"><text class="history-result-label">{{row.label}}</text><text class="history-result-value">{{row.value}}</text></view></view>
+      </view>
+      <view wx:elif="{{latestResult.voteGroups}}" class="vote-result-groups">
+        <view wx:for="{{latestResult.voteGroups}}" wx:for-item="group" wx:key="tone" class="vote-result-row {{group.tone}}">
+          <text class="vote-result-label">{{group.label}}</text>
+          <view class="vote-result-seats">
+            <text wx:for="{{group.seatNumbers}}" wx:for-item="seat" wx:key="*this" class="vote-result-seat" aria-label="{{seat+'号'}}">{{seat}}</text>
+            <text wx:if="{{!group.count}}" class="vote-result-empty">无</text>
+          </view>
+          <text class="vote-result-count">{{group.count}} 票</text>
+        </view>
       </view>
       <view wx:elif="{{latestResult.latestDetail || latestResult.detail}}" class="history-detail">{{latestResult.latestDetail || latestResult.detail}}</view>
       </block>
@@ -561,7 +576,7 @@
         <view wx:if="{{secret.skillHistory.length}}" class="private-info identity-skill-history"><view class="label">技能记录</view><view wx:for="{{secret.skillHistory}}" wx:key="id" class="identity-skill-record"><text class="identity-skill-round small muted">第{{item.round}}轮</text><text class="identity-skill-text">{{item.text}}</text></view></view>
       </view>
     </block>
-    <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result && !questReveal ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?'result-first':'operation-first'}}">
+    <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result && !questReveal ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?(latestResult.voteGroups?'result-first vote-result-panel':'result-first'):'operation-first'}}">
       <template wx:if="{{!room.result || questTickets}}" is="tableResult" data="{{room, latestResult, questReveal, questTickets, shown:questReveal?questReveal.revealed:questTickets.cards.length}}" />
       <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, honorPendingExpanded, network, hasPendingRequest, busy, winnerLabel:room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':''}}" />
       <template wx:if="{{!room.result}}" is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
@@ -609,11 +624,12 @@
     </view>
     <view class="task-progress">
       <view wx:if="{{questRounds.length && room.phase!=='lobby'}}" class="quest-track">
-        <view wx:if="{{room.result && !questReveal}}" class="quest-track-title">任务记录</view>
         <view class="quest-rounds">
           <button wx:for="{{questRounds}}" wx:key="number" class="quest-round" hover-class="none" bindtap="showQuestRecord" disabled="{{item.key===null}}" data-key="{{item.key}}" aria-label="{{item.label}}">
-            <view aria-hidden="true" class="quest-disc {{item.result}} {{item.protectedRound?'protected':''}}"><view wx:if="{{item.result!=='pending'}}" class="quest-mark" /></view>
-            <text aria-hidden="true">{{item.number}}</text>
+            <view aria-hidden="true" class="quest-disc {{item.result}}{{item.protectedRound?' protected':''}}">
+              <text class="quest-size">{{item.teamSize}}</text>
+              <view wx:if="{{item.result!=='pending'}}" class="quest-mark" />
+            </view>
           </button>
         </view>
       </view>

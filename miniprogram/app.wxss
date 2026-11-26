@@ -1373,7 +1373,6 @@ button.lobby-connection { justify-content: flex-start; gap: 12rpx; width: 100%; 
 }
 
 .result-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; }
-.result-team { font-size: 28rpx; font-weight: 400; color: var(--muted); margin-left: auto; }
 .history-title { flex-wrap: wrap; }
 .history-meta { display: flex; justify-content: space-between; margin-bottom: 8rpx; }
 .action-team { margin: 16rpx 0 28rpx; font-size: 32rpx; font-weight: 600; color: var(--accent); }
@@ -1927,6 +1926,8 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 .badge-manager-empty { padding: 32rpx 0; }
 .player-card-identity.is-long-name .player-card-name { flex-basis: calc(100% - 140rpx); }
 @import "pages/table/presentation.wxss";
+@import "pages/table/quest-track.wxss";
+@import "pages/table/vote-result.wxss";
 @import "pages/table/game-dialogs.wxss";
 @import "pages/table/identity-card.wxss";
 

@@ -7,6 +7,7 @@ const scoring = require("./scoring");
 const fun = require("./fun");
 const replay = require("./replay");
 const avoidance = require("./avoidance");
+const TEAMS = require("../miniprogram/quest-team-sizes");
 const funCopy = require("../miniprogram/fun-copy");
 const KNIGHT_PHASES = ["skillPrepare", "skillTurn", "paladinTurn", "hunterTurn"];
 const SPECIAL_PHASES = [...KNIGHT_PHASES, "fairy"];
@@ -21,17 +22,6 @@ const COUNTS = {
   11: [7, 4],
   12: [7, 5],
   13: [8, 5],
-};
-const TEAMS = {
-  5: [2, 3, 2, 3, 3],
-  6: [2, 3, 4, 3, 4],
-  7: [2, 3, 3, 4, 4],
-  8: [3, 4, 4, 5, 5],
-  9: [3, 4, 4, 5, 5],
-  10: [3, 4, 4, 5, 5],
-  11: [3, 4, 5, 6, 6],
-  12: [3, 4, 5, 6, 6],
-  13: [3, 4, 5, 6, 6],
 };
 // 十二骑士系列板子共享技能、B牌、女巫、圣骑士等规则；10 人局仅 A 牌去红蓝兰斯洛特，
 // 11 人局去红兰斯洛特且蓝兰斯洛特对梅林可见；13 人局仅比 12 人局多一张忠臣。

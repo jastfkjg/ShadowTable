@@ -2417,7 +2417,7 @@ test('旧详情链接替换当前页到同一对局记录，跳转失败可重�
   missing.onLoad(); assert.match(missing.data.error, /不存在/);
 });
 
-test('加入面板先完成高度测量和入场，再聚焦昵称或房间码，首页代理保持同样顺序', t => {
+test('加入面板挂载后自动聚焦待填项，在键盘高度对应的测量完成后首次显示', t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   for (const home of [false, true]) for (const nicknameSetup of [false, true]) {
     const measurements = [], renders = [];
@@ -2437,46 +2437,44 @@ test('加入面板先完成高度测量和入场，再聚焦昵称或房间码�
     t.mock.timers.tick(1000);
     assert.equal(controller.data.entryFocusedField, '');
     renders.shift()();
-    measurements.shift()([{ width: 375, height: 740 }, { height: 86 }, { height: 240 }, { height: 134 }]);
+    const field = nicknameSetup ? 'nickname' : 'code';
+    assert.equal(controller.data.entryFocusedField, field);
+    controller.onResize();
+    assert.equal(measurements.length, 0);
+    p.entryInputFocus({ currentTarget: { dataset: { field } }, detail: { height: 0 } });
+    p.entryKeyboardChange({ detail: { height: 280 } });
+    while (renders.length) renders.shift()();
+    assert.equal(controller.data.entryMeasuring, true);
+    measurements.shift()([{ width: 375, height: 740 }, { height: 86 }, { height: 240 }, { height: 100 }]);
     assert.equal(controller.data.entryMeasuring, false);
-    assert.equal(controller.data.entryBodyHeight, 240);
+    assert.equal(controller.data.entryBodyHeight, 186);
+    assert.equal(controller.data.entryKeyboardHeight, 280);
     t.mock.timers.tick(1000);
-    assert.equal(controller.data.entryFocusedField, '');
-    renders.shift()();
-    t.mock.timers.tick(179);
-    assert.equal(controller.data.entryFocusedField, '');
-    t.mock.timers.tick(21);
-    assert.equal(controller.data.entryFocusedField, nicknameSetup ? 'nickname' : 'code');
+    assert.equal(measurements.length, 0);
     controller.onUnload();
   }
 });
 
-test('延迟聚焦不会在关闭、后台、卸载、换模式或用户手动结束输入后拉起键盘', t => {
+test('外接键盘或缺失高度事件时仍显示表单，关闭或切换时旧回调不会抢焦点', t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  for (const action of ['close', 'hide', 'unload', 'create', 'name', 'code', 'native-focus', 'paste', 'reset', 'reopen']) {
-    const { p } = page('lobby', apiBase, { wx: { getClipboardData(options) { options.success({ data: '062819' }); } } });
-    p.setData({ loading: false, name: '子龙', nicknameSetup: false });
-    const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
-    open('join');
-    t.mock.timers.tick(100);
-    if (action === 'close') p.closeEntry();
-    if (action === 'hide') { p.onHide(); p.foreground = true; }
-    if (action === 'unload') p.onUnload();
-    if (action === 'create') open('create');
-    if (action === 'name') p.editEntryName();
-    if (action === 'code') p.editEntryCode();
-    if (action === 'native-focus') p.entryInputFocus({ currentTarget: { dataset: { field: 'nickname' } }, detail: {} });
-    if (action === 'paste') p.pasteRoomCode();
-    if (action === 'reset') p.resetEntryFocus();
-    if (action === 'reopen') { p.closeEntry(); open('join'); }
-    if (['name', 'code', 'native-focus', 'paste'].includes(action))
-      p.entryInputBlur({ currentTarget: { dataset: { field: p.data.entryFocusedField } }, detail: { value: '子龙' } });
-    t.mock.timers.tick(100);
-    assert.equal(p.data.entryFocusedField, '', action);
-    t.mock.timers.tick(100);
-    assert.equal(p.data.entryFocusedField, action === 'reopen' ? 'code' : '', action);
-    p.onUnload();
-  }
+  const { p } = page('lobby', apiBase);
+  p.setData({ loading: false, name: '子龙', nicknameSetup: false });
+  const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
+  open('join');
+  assert.equal(p.data.entryFocusedField, 'code');
+  t.mock.timers.tick(500);
+  assert.equal(p.data.entryMeasuring, false);
+  assert.equal(p.data.entryKeyboardHeight, 0);
+  assert.equal(p.data.entryFocusedField, 'code');
+  p.closeEntry();
+  open('join');
+  t.mock.timers.tick(100);
+  p.closeEntry();
+  open('create');
+  t.mock.timers.tick(500);
+  assert.equal(p.data.entryFocusedField, '');
+  assert.equal(p.data.entryMeasuring, false);
+  p.onUnload();
 });
 
 test('相同原生焦点和键盘高度不重复测量或滚动，主动收起键盘后恢复面板高度', t => {
@@ -2532,7 +2530,7 @@ test('关闭重开后的旧渲染和键盘回调不会提前显示或聚焦新�
   t.mock.timers.tick(500);
   assert.equal(p.data.entryFocusedField, '');
   while (renders.length) renders.shift()();
-  t.mock.timers.tick(200);
+  t.mock.timers.tick(500);
   assert.equal(p.data.entryMeasuring, false);
   assert.equal(p.data.entryFocusedField, 'code');
   p.onUnload();
@@ -2546,8 +2544,6 @@ test('首页入口按需展开，关闭保留草稿且清理键盘；原生键�
   assert.equal(p.data.entrySheet, false);
   p.switchEntry({ currentTarget: { dataset: { mode: 'join' } } });
   assert.equal(p.data.entrySheet, true);
-  assert.equal(p.data.entryFocusedField, '');
-  t.mock.timers.tick(200);
   assert.equal(p.data.entryFocusedField, 'code');
   p.entryKeyboardChange({ detail: { height: 280 } });
   assert.equal(p.data.entryKeyboardHeight, 280);
@@ -2632,8 +2628,10 @@ test('粘贴只接受完整六码、保留前导零，关闭或切换面板后�
   p.setData({ loading: false, name: '子龙', nicknameSetup: false });
   const open = mode => p.switchEntry({ currentTarget: { dataset: { mode } } });
   open('join');
+  p.entryInputBlur({ currentTarget: { dataset: { field: 'code' } }, detail: { value: '' } });
   p.pasteRoomCode(); callbacks.pop().success({ data: ' 062819 ' });
   assert.equal(p.data.code, '062819');
+  assert.equal(p.data.entryFocusedField, '');
   p.pasteRoomCode(); callbacks.pop().success({ data: '1234567' });
   assert.match(p.data.entryCodeError, /完整/);
   assert.equal(p.data.code, '062819');
@@ -2812,8 +2810,8 @@ test('分享邀请自动打开加入面板，首页列表合并房主信息且�
   assert.equal(p.data.entrySheet, true);
   assert.equal(p.data.code, '062819');
   assert.equal(p.data.entryFocusedField, '');
-  t.mock.timers.tick(200);
-  assert.equal(p.data.entryFocusedField, 'code');
+  t.mock.timers.tick(1000);
+  assert.equal(p.data.entryFocusedField, '');
   assert.equal(p.data.memberRooms[0].compactRelation, '我是房主 · 1号');
   p.copyListedRoom({ currentTarget: { dataset: { code: '123456' } } });
   assert.deepEqual(copies, ['123456']);
@@ -3076,8 +3074,10 @@ test('原生弹层测量使用最新键盘高度，关闭后或切换模式后�
   p.setData({loading:false,name:'子龙',nicknameSetup:false});
   const open=mode=>p.switchEntry({currentTarget:{dataset:{mode}}});
   const rects=[{width:390,height:844},{height:86},{height:800},{height:100}];
+  p.setData({code:'062819'});
   open('join');
   const old=callbacks.pop();
+  p.editEntryCode();
   p.entryKeyboardChange({detail:{height:320}});
   callbacks.pop()(rects);
   assert.equal(p.data.entryBodyHeight,250);

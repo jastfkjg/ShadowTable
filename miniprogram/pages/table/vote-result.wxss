@@ -1,0 +1,70 @@
+.table-dynamics.vote-result-panel { padding: 10px 16px 12px; border-radius: 18px; }
+.vote-result-panel .latest-result.latest-vote-result { padding-bottom: 10px; }
+.latest-vote-result .latest-result-title {
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.3;
+}
+.latest-vote-result .quest-result-icon { flex: none; width: 20px; height: 20px; font-size: 14px; }
+.latest-vote-result button.history-toggle {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.vote-result-team {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.vote-result-team-icon { flex: none; width: 15px; height: 15px; }
+.vote-result-members { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); font-size: 13px; }
+.vote-result-groups { display: grid; gap: 5px; margin-top: 10px; }
+.vote-result-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 36px;
+  align-items: start;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: #2c3841;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.vote-result-row.approve { background: #243a37; color: var(--good); }
+.vote-result-row.reject { background: #343136; color: var(--evil); }
+.vote-result-label { font-weight: 600; }
+.vote-result-seats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  max-width: 206px;
+}
+.vote-result-seat {
+  border-radius: 5px;
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+.vote-result-empty { color: var(--muted); font-size: 13px; }
+.vote-result-count { text-align: right; white-space: nowrap; }
+.vote-result-panel.result-first .latest-vote-result + .phase-strip { padding-top: 9px; }
+.vote-result-panel .phase-strip .phase-heading { gap: 8px; }
+.vote-result-panel.result-first .phase-heading .table-symbol,
+.vote-result-panel .phase-symbol { flex: none; width: 23px; height: 23px; border-radius: 7px; }
+.vote-result-panel.result-first .phase-heading .table-symbol image,
+.vote-result-panel .phase-symbol img { width: 15px; height: 15px; }
+.vote-result-panel.result-first .phase-name { font-size: 13px; }
+.latest-vote-result + .phase-strip .phase-heading-copy { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }

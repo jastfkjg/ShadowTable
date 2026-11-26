@@ -2,9 +2,9 @@
 .entry-sheet view, .entry-sheet text, .entry-sheet scroll-view, .room-rules-sheet view, .room-rules-sheet text, .room-rules-sheet scroll-view { box-sizing:border-box; }
 .entry-backdrop { position:fixed; inset:0; z-index:900; background:var(--overlay-scrim); animation:room-sheet-scrim-in 160ms ease-out; }
 form.entry-panel.entry-sheet { --entry-divider:rgba(177,191,198,.13); position:absolute; left:0; right:0; width:100%; max-width:600px; max-height:var(--entry-available-height); margin:0 auto; padding:0; border:0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background:var(--surface); overflow:hidden; box-sizing:border-box; box-shadow:0 -1px 0 rgba(177,191,198,.16); animation:room-sheet-in 180ms ease-out; }
-/* Keep the backdrop interactive while measuring, then reveal both layers together. */
+/* Opacity keeps the mounted input focusable while waiting for the keyboard and measuring. */
 .entry-backdrop.is-measuring { background:transparent; animation:none; }
-.entry-backdrop.is-measuring form.entry-panel.entry-sheet { visibility:hidden; pointer-events:none; animation:none; }
+.entry-backdrop.is-measuring form.entry-panel.entry-sheet { opacity:0; pointer-events:none; animation:none; }
 /* Keep the flex layout on a view inside WeChat's native form wrapper. */
 .entry-sheet-layout { display:flex; flex-direction:column; max-height:var(--entry-available-height); }
 .is-create .entry-sheet-layout { height:var(--entry-available-height); }
@@ -48,9 +48,8 @@ form.entry-panel.entry-sheet { --entry-divider:rgba(177,191,198,.13); position:a
 .entry-code-field { position:relative; min-height:65px; padding:3px; border:0; border-radius:15px; background:var(--control-bg); }.entry-code-field.is-focused { box-shadow:inset 0 0 0 1px var(--accent); }
 .entry-code-slots { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; pointer-events:none; }.entry-code-slot { position:relative; display:flex; align-items:center; justify-content:center; min-width:0; min-height:59px; font-size:25px; font-weight:500; font-variant-numeric:tabular-nums; }.entry-code-slot:not(:last-child)::after { content:''; position:absolute; right:-3px; top:18px; bottom:18px; width:1px; background:var(--entry-divider); }.entry-code-dash { width:9px; height:2px; border-radius:2px; background:#536570; }
 .entry-code-caret { position:absolute; left:50%; top:50%; width:2px; height:1.1em; border-radius:1px; background:var(--accent); transform:translate(-50%,-50%); animation:entry-code-caret-blink 1s step-end infinite; pointer-events:none; }.entry-code-caret.is-complete { left:calc(50% + .45em); }
-/* Keep the native input and its iOS caret outside the clipped sheet. The visible
-   slots own the caret; the native input still owns keyboard, paste and form data. */
-.entry-code-field .room-input { position:absolute; left:-1000px; top:0; width:1px; height:1px; margin:0; padding:0; border:0; background:transparent; color:transparent; opacity:0; font-size:1px; }
+/* Anchor native focus inside the first slot so focusing it cannot scroll toward an offscreen input. */
+.entry-code-field .room-input { position:absolute; left:8.33%; top:50%; clip-path:inset(50%); caret-color:transparent; width:1px; height:1px; margin:0; padding:0; border:0; background:transparent; color:transparent; opacity:0; font-size:1px; }
 .entry-sheet .has-error { box-shadow:inset 0 0 0 1px var(--evil); }.entry-field-error, .entry-field-help { margin:9px 0 0; color:var(--muted); font-size:12px; line-height:1.6; overflow-wrap:anywhere; }.entry-field-error { color:var(--evil); }
 .entry-code-error { display:flex; align-items:flex-start; gap:9px; margin-top:10px; padding:11px 12px; border-radius:12px; background:rgba(242,182,174,.09); color:var(--evil); }
 .entry-code-error-icon { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:17px; height:17px; margin-top:2px; border:1.5px solid currentColor; border-radius:50%; font-size:12px; font-weight:600; line-height:1; }
