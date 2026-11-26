@@ -1138,6 +1138,12 @@ test("网页恢复后保留最近结果、弃权票和无需操作提示，进�
   assert.match(c.state.latestResult.text, /提前截止/);
   assert.equal(c.state.latestResult.voteGroups[2].label, "弃权");
   assert.equal(c.state.latestResult.voteGroups[2].count, 5);
+  const resultHtml = c.viewRoom();
+  assert.match(resultHtml, /class="latest-result-title result-heading">[^]*?提前截止<\/span><button[^>]*data-action="showLatestRecord"/);
+  assert.equal((resultHtml.match(/data-action="showLatestRecord"/g) || []).length, 1);
+  assert.match(resultHtml, /vote-result-row reject.*?vote-result-empty">无<.*?vote-result-count">0 票</s);
+  assert.match(resultHtml, /vote-result-row abstain.*?aria-label="6号">6<.*?vote-result-count">5 票</s);
+  assert.doesNotMatch(resultHtml, /提名队伍/);
   run("p1", "beginActivity", { kind: "quest", team: [2], threshold: 1 });
   await c.refresh();
   assert.match(c.state.latestResult.text, /提前截止/);
@@ -1407,12 +1413,13 @@ test("结果图标、记录时间与最近转换可见；座位可收起，记�
   assert.equal(c.state.history[0].timeLabel, "");
   let html = c.viewRoom();
   assert.match(html, /查看公开记录，共4条/);
-  assert.match(html, /aria-label="第1次任务，失败，查看详情" data-action="showQuestRecord" data-key="0"/);
+  assert.match(html, /aria-label="第1次任务，实上2人，失败，查看详情" data-action="showQuestRecord" data-key="0"/);
   assert.doesNotMatch(html, /id="history-record-/);
   assert.match(html, /data-action="openHistory"/);
   c.ACTIONS.openHistory();
   html = c.viewHistorySheet();
   assert.equal((html.match(/id="history-record-/g) || []).length, 4);
+  assert.doesNotMatch(html, /data-action="filterHistory" data-value="skill"/);
   assert.ok(html.indexOf('id="history-record-3"') < html.indexOf('id="history-record-0"'));
   c.ACTIONS.toggleSeats();
   assert.doesNotMatch(c.viewRoom(), /class="seats"/);
@@ -1487,7 +1494,9 @@ test("网页阶段集中待办，房主工具与任务进度优先，最近结�
   let html = c.viewRoom();
   assert.equal((html.match(/等待房主发起操作/g) || []).length, 1);
   assert.ok(html.indexOf('data-action="openTool"') < html.indexOf('data-action="toggleSeats"'));
-  assert.doesNotMatch(html, /任务进度/);
+  assert.doesNotMatch(html, /quest-track-heading|quest-track-count|quest-disc pending current/);
+  assert.match(html, /aria-label="第2次任务，应上3人，未结算" disabled/);
+  assert.deepEqual([...html.matchAll(/class="quest-size">([^<]+)/g)].map(m => m[1]), ["1", "3", "4", "3", "4"]);
   assert.match(html, /class="quest-track"[\s\S]*class="seat-section-title"><span>玩家<\/span><span class="seat-count">6人/);
   assert.equal((html.match(/class="quest-round"/g) || []).length, 5);
   c.ACTIONS.showLatestRecord();
@@ -1788,7 +1797,7 @@ test("网页隐藏轮次推进，时间与最新标记清晰展示，记录定�
 });
 
 test("网页转换和查验归其他，查验座位直接显示在记录和最近结果", async () => {
-  const room = dealtWebRoom({ history: [
+  const room = dealtWebRoom({ board: "knights", capacity: 12, knights: { round: 1 }, history: [
     { kind: "variant", text: "本轮阵营转换", resultType: "conversion" },
     { kind: "skillResult", text: "技能最终结果", detail: "无人出局" },
     { kind: "variant", text: "仙女查验已完成", number: 2 },

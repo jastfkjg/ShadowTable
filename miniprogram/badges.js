@@ -99,11 +99,17 @@
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.achievement || badge.permanent || ['good_shield', 'honor_svp'].includes(badge.id) || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
-  // The quill fills its canvas. Match the painted area of the other permanent badges.
-  function badgeArtStyle(badge, awardPopup = false) {
-    const frameScale = badge.permanent && !awardPopup ? 1.14 : 1;
-    const scale = frameScale * (badge.id === contributor.id ? 0.8 : 1);
-    return scale === 1 ? '' : 'transform:scale(' + Number(scale.toFixed(3)) + ')';
+  // Match the painted area inside each slot. The October thumbnails have extra
+  // transparent padding, while the round podium and milestone medals fill their frames.
+  const octoberArtScale = {
+    october_2026_crown: 1.2, october_2026_silver: 1.19, october_2026_stag: 1.2,
+    october_2026_table: 1.18, october_2026_book: 1.1,
+  };
+  const metricArtScale = { podium: 0.9, milestone: 0.9, monthly_points: 1 };
+  function badgeArtStyle(badge, imageUrl = badge.imageUrl) {
+    const thumbnailScale = imageUrl === badge.imageUrl && octoberArtScale[badge.id];
+    const scale = thumbnailScale || metricArtScale[badge.metric] || 0.95;
+    return 'transform:scale(' + scale + ')';
   }
   function rankedBadge(definition, rank) {
     if (definition.metric !== 'podium' || ![1,2,3].includes(rank)) return definition;

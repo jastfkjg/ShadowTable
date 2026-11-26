@@ -3,6 +3,63 @@ const assert = require('node:assert/strict');
 const historyUI = require('../miniprogram/public-history');
 
 const room = { code: '123456', game: 1, phase: 'tools' };
+test('任务上车人数按配置预告，发车、翻票和回看时取实际队伍', () => {
+  const history = [
+    { kind: 'toolVote', team: [4, 5] },
+    { kind: 'toolQuest', team: [1, 2, 3], threshold: 1 },
+    { kind: 'toolCanceled' },
+    { kind: 'toolQuest', team: [1, 3, 5], threshold: 1 },
+    { kind: 'toolQuest', team: [2, 3, 4, 5], threshold: 1 },
+  ];
+  const quests = [{ key: 1, questResult: 'success' }, { key: 3, questResult: 'failure' }, { key: 4, questResult: 'success' }];
+  const track = (phase, count, extra = {}, reveal = null) => historyUI.questProgress(
+    { phase, history, capacity: 10, flexible: true, ...extra }, quests.slice(0, count), reveal).questRounds;
+  const sizes = rounds => rounds.map(r => r.teamSize);
+
+  assert.deepEqual(track('lobby', 0), []);
+  assert.deepEqual(sizes(track('tools', 0)), [3, 4, 4, 5, 5]);
+  for (const phase of ['proposal', 'teamVote', 'teamResult', 'tools']) {
+    const rounds = track(phase, 1, { team: [1, 3, 5] });
+    assert.equal(rounds[1].teamSize, 4);
+    assert.equal(rounds[3].protectedRound, true);
+  }
+  const firstDispatch = track('quest', 1, { team: [1, 3, 5] });
+  assert.equal(firstDispatch[1].teamSize, 3);
+  assert.equal(firstDispatch[1].result, 'pending');
+  assert.equal(firstDispatch[1].key, null);
+  assert.match(firstDispatch[1].label, /实上3人/);
+  assert.deepEqual(sizes(track('tools', 2)), [3, 3, 4, 5, 5]);
+
+  const shield = { kind: 'toolQuest', number: 12, threshold: 2, team: [1, 2, 3, 4, 5] };
+  // A manual one-fail threshold overrides the fourth slot's default shield.
+  assert.equal(track('quest', 3, { team: shield.team, activity: { kind: 'quest', threshold: 1 } })[3].protectedRound, false);
+  const flipping = track('ended', 3, { team: [] }, shield)[3];
+  assert.equal(flipping.teamSize, 5);
+  assert.equal(flipping.protectedRound, true);
+  assert.equal(flipping.result, 'pending');
+  assert.equal(flipping.key, null);
+  for (const result of ['success', 'failure']) {
+    const room = { phase: 'ended', capacity: 10, flexible: true, history: [...history, shield] };
+    const rounds = historyUI.questProgress(room, [...quests, { key: 5, questResult: result }]).questRounds;
+    assert.deepEqual(sizes(rounds), [3, 3, 4, 5, 5]);
+    assert.equal(rounds[3].result, result);
+    assert.equal(rounds[3].protectedRound, true);
+    assert.equal(rounds[3].key, 5);
+  }
+});
+
+test('人数表适配各局人数，追加任务只在发车后增加节点', () => {
+  const { TEAMS } = require('../server/engine');
+  for (const [capacity, expected] of Object.entries(TEAMS)) {
+    const rounds = historyUI.questProgress({ capacity: Number(capacity), phase: 'identity' }, []).questRounds;
+    assert.deepEqual(rounds.map(r => r.teamSize), expected);
+    assert.equal(rounds[3].protectedRound, Number(capacity) >= 7);
+  }
+  const room = { phase: 'quest', capacity: 6, flexible: true, history: Array.from({ length: 5 }, () => ({ team: [1, 2] })), team: [1, 2, 3, 4] };
+  const quests = room.history.map((_, key) => ({ key, questResult: 'success' }));
+  assert.equal(historyUI.questProgress(room, quests).questRounds[5].teamSize, 4);
+  assert.equal(historyUI.questProgress({ ...room, phase: 'tools' }, quests).questRounds.length, 5);
+});
 test('公开任务详情只在保护轮说明失败票门槛', () => {
   const standard = { capacity: 8, flexible: false };
   const custom = { capacity: 8, flexible: true };
@@ -137,12 +194,27 @@ test('队伍标签只解析明确的公开座位列表；最新标记在筛选�
   assert.deepEqual(state.history.slice(0, 3), before);
 });
 
-test('转换、查验及旧记录归其他，技能结算和最终行动仍归技能', () => {
+test('公开记录按板子显示技能分类，技能尚未发动时也可筛选', () => {
+  const state = model();
+  for (const knights of [{ round: 1 }, null]) {
+    state.room = { ...room, knights };
+    Object.assign(state, historyUI.open(state));
+    const labels = state.historyFilters.map(item => item.label);
+    assert.deepEqual(labels, knights ? ['全部', '投票', '任务', '技能', '其他'] : ['全部', '投票', '任务', '其他']);
+    Object.assign(state, historyUI.filter(state, 'skill'));
+    assert.equal(state.historyFilter, knights ? 'skill' : 'all');
+  }
+});
+
+test('转换、查验及旧记录归其他，最终行动只在有技能的板子归技能', () => {
+  const knights = { ...room, knights: { round: 1 } };
   for (const text of ['本轮阵营转换', '本轮不转换', '仙女查验已完成'])
-    assert.equal(historyUI.category({ kind: 'variant', text }), 'other');
+    assert.equal(historyUI.category({ kind: 'variant', text }, knights), 'other');
   for (const resultType of ['conversion', 'fairy'])
-    assert.equal(historyUI.category({ kind: 'variant', resultType }), 'other');
-  assert.equal(historyUI.category({ kind: 'variant', text: '3号使用技能' }), 'skill');
+    assert.equal(historyUI.category({ kind: 'variant', resultType }, knights), 'other');
+  assert.equal(historyUI.category({ kind: 'variant', text: '3号使用技能' }, knights), 'skill');
   for (const kind of ['skillDetail', 'skillResult', 'toolReverse', 'toolKnife', 'assassination'])
-    assert.equal(historyUI.category({ kind }), 'skill');
+    assert.equal(historyUI.category({ kind }, knights), 'skill');
+  for (const kind of ['toolReverse', 'toolKnife', 'assassination'])
+    assert.equal(historyUI.category({ kind }, room), 'other');
 });

@@ -24,7 +24,7 @@ window.shadowtableBadgeRankView = function (s, esc, renderDetail) {
     const choices = s.choices.map((choice) => {
       const selected = choice.kind === kind;
       return `<button type="button" class="br-choice${selected ? " selected" : ""}" data-action="brSelect" data-kind="${esc(choice.kind)}" aria-pressed="${selected}">
-        <img class="br-choice-art" src="${esc(choice.art)}" alt="">
+        <img class="br-choice-art" style="${esc(choice.artStyle)}" src="${esc(choice.art)}" alt="">
         <span>${esc(choice.title)}</span>
         ${selected ? '<i class="br-choice-check" aria-hidden="true"></i>' : ""}
       </button>`;
@@ -107,7 +107,7 @@ window.shadowtableBadgeRankView = function (s, esc, renderDetail) {
         detail.badges
           .map(
             (b) =>
-              '<button type="button" class="br-tile" aria-haspopup="dialog" data-action="brOpenBadge" data-id="' + esc(b.id) + '"><img src="' +
+              '<button type="button" class="br-tile" aria-haspopup="dialog" data-action="brOpenBadge" data-id="' + esc(b.id) + '"><img style="' + esc(b.artStyle) + '" src="' +
               esc(b.imageUrl) +
               '" alt=""><div>' +
               esc(b.title) +

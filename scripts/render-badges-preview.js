@@ -1,7 +1,8 @@
 // Static visual fixtures rendered from the real mini-program templates.
 const fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
 const {wxmlToJs}=require('./miniprogram-compiler');
-const {catalogue,presentCollection}=require('../miniprogram/badges');
+const {catalogue: definitions,presentCollection,presentPlayerBadge}=require('../miniprogram/badges');
+const catalogue = definitions.map(badge => presentPlayerBadge(badge));
 const root = path.resolve(__dirname, '../miniprogram');
 const output = path.resolve(process.argv[2] || path.join(__dirname, '../output/playwright/badges'));
 const context={window:{},global:{},console};vm.createContext(context);
@@ -15,6 +16,7 @@ function html(n){
  if(n.tag==='wx-app-nav')return '<div class="preview-nav">'+html(factory('components/app-nav/app-nav.wxml')({...n.attr,statusBarHeight:34,navHeight:44,totalHeight:78}))+'<span class="preview-clock">9:41</span><div class="preview-capsule"><span>•••</span><i></i><b></b></div></div>';
  const tag=({'wx-text':'span','wx-button':'button','wx-image':'img'})[n.tag]||'div';
  const attrs=Object.entries(n.attr||{}).flatMap(([k,v])=>{
+  if(v==null)return [];
   if(k==='hidden'||k==='disabled')return v?[k]:[];
   if(k==='src'&&v.startsWith('/'))v='data:image/'+(v.endsWith('.svg')?'svg+xml':v.endsWith('.png')?'png':'jpeg')+';base64,'+fs.readFileSync(badgeAsset(v)).toString('base64');
   if(k==='style')v=String(v).replace(/(-?[\d.]+)rpx/g,'calc($1 * 100vw / 750)');
@@ -44,5 +46,5 @@ const navStyle='.preview-nav{position:relative}.preview-clock{position:absolute;
 for(const [name,data] of Object.entries({readme:{badgeCollection:readmeCollection,badgeFilter:'owned'},collection:{badgeCollection,badgeFilter:'all'},collectionManaging:{badgeCollection,badgeFilter:'all',badgeManaging:true},collectionEmpty:{badgeCollection:presentCollection({badges:[]}),badgeFilter:'all'},collectionDetail:{badgeCollection,badgeFilter:'all',selectedBadge:badgeCollection.items.find(b=>b.id==='games')},collectionFullDetail:{badgeCollection,badgeFilter:'all',selectedBadge:badgeCollection.items.find(b=>b.id==='merlin_evade')},collectionLockedDetail:{badgeCollection,badgeFilter:'all',selectedBadge:badgeCollection.items.find(b=>!b.owned)},standinCollection:{badgeCollection:standinCollection,badgeFilter:'all'},standinDetail:{badgeCollection:standinCollection,badgeFilter:'all',selectedBadge:standinCollection.items.find(b=>b.id==='good_shield')}})) {
   fs.writeFileSync(path.join(output,name+'.html'),'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>徽章收藏</title><style>button{font:inherit;border:0;width:100%}'+styles+css('components/app-nav/app-nav.wxss')+css('pages/badges/badges.wxss')+navStyle+'body{margin:0}img{object-fit:contain}</style>'+html(factory('pages/badges/badges.wxml')(data))+'<div class="preview-homebar"></div></html>');
 }
-fs.writeFileSync(path.join(output,'gallery.html'),'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>暗金荣誉 · 全部'+catalogue.length+'枚</title><style>body{background:#101c24;color:#f2eee5;font:16px -apple-system,"PingFang SC",sans-serif;padding:32px}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:24px;text-align:center}img{width:160px;height:160px}h1{font-size:24px}</style><h1>暗金荣誉 · 全部 '+catalogue.length+' 枚</h1><div class="grid">'+catalogue.map(b=>'<div><img src="data:image/png;base64,'+fs.readFileSync(badgeAsset(b.imageUrl)).toString('base64')+'"><div>'+esc(b.title)+'</div></div>').join('')+'</div></html>');
+fs.writeFileSync(path.join(output,'gallery.html'),'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>暗金荣誉 · 全部'+catalogue.length+'枚</title><style>body{background:#101c24;color:#f2eee5;font:16px -apple-system,"PingFang SC",sans-serif;padding:32px}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:24px;text-align:center}img{width:160px;height:160px}h1{font-size:24px}</style><h1>暗金荣誉 · 全部 '+catalogue.length+' 枚</h1><div class="grid">'+catalogue.map(b=>'<div><img style="'+esc(b.artStyle)+'" src="data:image/png;base64,'+fs.readFileSync(badgeAsset(b.imageUrl)).toString('base64')+'"><div>'+esc(b.title)+'</div></div>').join('')+'</div></html>');
 console.log(output);

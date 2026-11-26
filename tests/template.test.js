@@ -1512,6 +1512,26 @@ test("结果卡和表决展示队伍，座位可折叠，公开记录入口固�
   assert.equal(nodes(tree).filter(n => n.attr?.id?.startsWith("history-record-")).length, 0);
 });
 
+test("公开记录关闭时最近投票结果仍按票型、升序座号、总票数展示", () => {
+  const history = require("../miniprogram/public-history");
+  const room = { phase: "tools", flexible: true, capacity: 12, me: { seat: 1 }, team: [] };
+  const votes = Array.from({ length: 12 }, (_, i) => ({ seat: 12 - i, approve: 12 - i === 11 }));
+  const result = history.voteRecord({ kind: "toolVote", team: [2, 5, 11, 12], votes, approved: false }, 0);
+  const tree = render({ ...base, room, latestResult: result });
+  const rows = nodes(tree).filter(n => n.attr?.class?.startsWith("vote-result-row "));
+  assert.deepEqual(rows.map(row => Array.from(row.children, n => n.attr.class)), [
+    ["vote-result-label", "vote-result-seats", "vote-result-count"],
+    ["vote-result-label", "vote-result-seats", "vote-result-count"],
+  ]);
+  assert.deepEqual(rows.map(row => Array.from(row.children[1].children, n => Number(n.children[0]))),
+    [[11], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12]]);
+  assert.deepEqual(rows.map(row => row.children[2].children[0]), ["1 票", "11 票"]);
+  assert.match(JSON.stringify(tree), /2、5、11、12 号/);
+  const heading = nodes(tree).find(n => n.attr?.class === "latest-result-title result-heading");
+  assert.ok(byHandler(heading, "showLatestRecord"));
+  assert.equal(nodes(tree).filter(n => n.attr?.bindtap === "showLatestRecord").length, 1);
+});
+
 test("查验结果突出座位阵营，可临时遮盖且仅有一个永久关闭入口", () => {
   const tree = render({ ...base, fairyResult: { revision: 1, information: "6号查验结果：坏人（第1轮）", summary: "6号 · 坏人" }, fairyResultRevealed: true });
   const text = JSON.stringify(tree);
@@ -1524,17 +1544,22 @@ test("查验结果突出座位阵营，可临时遮盖且仅有一个永久关�
 
 test("牌桌阶段集中待办、结果可回看，任务进度与座位明确分区", () => {
   const room = { phase: "tools", phaseName: "等待房主发起操作", flexible: true, capacity: 12, me: { seat: 1 }, team: [] };
-  const data = { ...base, room, seatsExpanded: false, questSummary: { total: 1, success: 1, failure: 0 }, seatOccupiedCount: 12, questRounds: require("../miniprogram/public-history").questRounds({ ...room, history: [{ threshold: 2 }] }, [{ key: 0, questResult: "success" }]), latestResult: { text: "任务成功", detail: "成功1张" } };
+  const track = require("../miniprogram/public-history").questProgress({ ...room, history: [{ kind: "toolQuest", threshold: 2, team: [2, 4] }] }, [{ key: 0, questResult: "success" }]);
+  const data = { ...base, room, seatsExpanded: false, questSummary: { total: 1, success: 1, failure: 0 }, seatOccupiedCount: 12, ...track, latestResult: { text: "任务成功", detail: "成功1张" } };
   const tree = render(data), text = JSON.stringify(tree);
   assert.equal((text.match(/等待房主发起操作/g) || []).length, 1);
   assert.ok(byHandler(tree, "showLatestRecord"));
   const progress = nodes(tree).find(n => n.attr?.class === "task-progress");
-  assert.doesNotMatch(JSON.stringify(progress), /任务进度|12\/12/);
+  assert.doesNotMatch(JSON.stringify(progress), /12\/12/);
+  assert.doesNotMatch(JSON.stringify(progress), /quest-track-heading|quest-track-count|任务进度/);
   const rounds = nodes(progress).filter(n => n.attr?.class === "quest-round");
   assert.equal(rounds.length, 5);
   assert.equal(rounds[0].attr.disabled, false);
   assert.match(rounds[0].attr["aria-label"] || rounds[0].attr.ariaLabel, /保护轮，成功/);
   assert.ok(rounds.slice(1).every(n => n.attr.disabled));
+  assert.deepEqual(rounds.map(round => nodes(round).find(n => n.attr?.class === "quest-size").children.join("")), ["2", "4", "5", "6", "6"]);
+  assert.ok(nodes(rounds[0]).some(n => n.attr?.class === "quest-disc success protected"));
+  assert.ok(nodes(rounds[1]).some(n => n.attr?.class === "quest-disc pending"));
   assert.ok(JSON.stringify(progress).indexOf("quest-track") < JSON.stringify(progress).indexOf("seat-section-title"));
   assert.ok(byHandler(progress, "toggleSeats"));
   assert.ok(byHandler(progress, "showQuestRecord"));
@@ -1559,6 +1584,8 @@ test('公开记录抽屉独立滚动，保留最近结果卡和房主按钮，�
   const data = { ...base, ...historyUI.initialData(), room: { phase: 'tools', capacity: 12, team: [], me: { seat: 1 }, canUseTools: true },
     history: [record], historyLatest: record, latestResult: record };
   const closed = render(data), openedData = { ...data, ...historyUI.open(data, 4) }, opened = render(openedData);
+  const filters = nodes(opened).filter(n => n.attr?.bindtap === 'filterHistory');
+  assert.deepEqual(filters.map(n => n.attr['data-filter']), ['all', 'vote', 'quest', 'other']);
   const meta = nodes(opened).find(n => n.attr?.class === 'public-history-meta');
   assert.match(JSON.stringify(meta), /16:32/);
   assert.doesNotMatch(JSON.stringify(meta), /#/);

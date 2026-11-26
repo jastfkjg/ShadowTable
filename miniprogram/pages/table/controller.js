@@ -16,8 +16,8 @@ const roomSheet = require("../../room-sheet-presentation");
 const { portrait } = require("../../role-portraits");
 const { selectTab, switchHomeTab } = require("../../tab-navigation");
 const resultFlow = resultRegistration.flow;
-// The sheet enters over 180ms; allow one render frame before raising the keyboard.
-const ENTRY_FOCUS_DELAY = 200;
+// Hardware keyboards and some clients never report a positive keyboard height.
+const ENTRY_KEYBOARD_WAIT_MS = 450;
 function roomListItems(rooms) {
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
@@ -165,42 +165,11 @@ function factionTone(faction) {
   if (faction.includes("盗贼")) return "third";
   return "";
 }
-function voteSummary(votes) {
-  return (votes.some((v) => v.approve === null) ? [true, false, null] : [true, false])
-    .map((approve) => {
-      const seats = votes
-        .filter((v) => v.approve === approve)
-        .map((v) => v.seat)
-        .sort((a, b) => a - b);
-      return `${seats.length}票${approve === null ? "弃权" : approve ? "赞成" : "反对"}：${seats.length ? seats.join("，") : "无"}`;
-    })
-    .join("\n");
-}
 function toolHistory(h, key) {
   if (["skillDetail", "skillResult", "toolCutoff"].includes(h.kind))
     return { key, text: h.text, detail: h.detail || "" };
   if (h.kind === "variant") return { key, text: h.text, detail: "", inspectionLabel: publicHistory.inspectionLabel(h) };
-  if (h.kind === "toolVote")
-    return {
-      key,
-      text: "投票" + (h.approved ? "通过" : "未通过") + (h.earlyClosed ? " · 提前截止" : ""),
-      voteGroups: (h.votes.some((v) => v.approve === null) ? [true, false, null] : [true, false]).map((approve) => {
-        const seats = h.votes
-          .filter((v) => v.approve === approve)
-          .map((v) => v.seat)
-          .sort((a, b) => a - b);
-        return {
-          label: approve === null ? "弃权" : approve ? "赞成" : "反对",
-          count: seats.length,
-          seats: seats.length ? seats.join("、") + " 号" : "无",
-          tone: approve === null ? "abstain" : approve ? "approve" : "reject",
-        };
-      }),
-      teamLabel: h.team.length ? h.team.join("、") + " 号" : "",
-      detail:
-        (h.team.length ? `队伍 ${h.team.join("、")}号\n` : "") +
-        voteSummary(h.votes),
-    };
+  if (h.kind === "toolVote" || h.kind === "team") return publicHistory.voteRecord(h, key);
   if (h.kind === "toolQuest")
     return {
       key,
@@ -243,12 +212,12 @@ function toolHistory(h, key) {
     return { key, text: h.text || "未结算的操作已作废", detail: h.detail || "未公开或计入本次提交" };
   return null;
 }
-function tableHistoryView(state, room, history) {
+function tableHistoryView(state, room, history, revealingQuest = null) {
   const questTimeline = history.filter(h => h.questResult).map((h, i) => ({ ...h, number: i + 1 }));
   const success = questTimeline.filter(h => h.questResult === "success").length;
   return {
     history, ...publicHistory.sync(state, history, room), questTimeline,
-    questRounds: publicHistory.questRounds(room, questTimeline),
+    ...publicHistory.questProgress(room, questTimeline, revealingQuest),
     questSummary: { total: questTimeline.length, success, failure: questTimeline.length - success },
   };
 }
@@ -454,12 +423,12 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.syncProcessSheetLayout();
   },
   onUnload() {
+    this.clearEntryKeyboardWait();
     this.alive = false;
     this.foreground = false;
     clearTimeout(this.questRevealTimer);
     this.pendingQuestHistory = null;
     this.clearRoomFeedback();
-    this.cancelEntryAutoFocus();
     clearTimeout(this.timer);
     clearTimeout(this.connectionClockTimer);
     wx.offNetworkStatusChange(this.networkListener);
@@ -990,23 +959,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           key: i,
           questResult:
             h.kind === "quest" ? (h.success ? "success" : "failure") : "",
-          text:
-            h.kind === "team"
-              ? `第${h.round}轮 · ${h.leader}号组队 ${h.team.join("、")}：${h.approved ? "通过" : "否决"}`
-              : h.kind === "quest"
-                ? "任务结算"
-                : "最终行动",
-          detail:
-            h.kind === "team"
-              ? voteSummary(h.votes)
-              : h.kind === "quest"
-                ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败`
-                : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
+          text: h.kind === "quest" ? "任务结算" : "最终行动",
+          detail: h.kind === "quest"
+            ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败`
+            : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
         },
     );
     history.forEach((entry, i) => {
       const source = room.history[i];
-      entry.category = publicHistory.category(source);
+      entry.category = publicHistory.category(source, room);
       entry.recordLabel = `记录 ${i + 1}`;
       const time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : "";
@@ -1020,8 +981,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
         entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
-      entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
-      entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
+      entry.latestDetail = entry.inspectionLabel || entry.latestDetail || entry.detail;
       entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
     });
     history = history.filter(entry => !(room.history[entry.key].kind === "variant" && /^进入第\d+轮$/.test(entry.text)));
@@ -1037,7 +997,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     if (questReveal !== previousReveal) clearTimeout(this.questRevealTimer);
     this.pendingQuestHistory = questReveal ? history : null;
     const historyUpdate = tableHistoryView(this.data, room,
-      questReveal ? history.filter(entry => entry.key < questTickets.key) : history);
+      questReveal ? history.filter(entry => entry.key < questTickets.key) : history,
+      questReveal ? room.history[questTickets.key] : null);
     const honors = honorPresentation.present(room.honors, api.assetUrl, this.honorAvatarFailures || new Set());
     const honorState = honorPresentation.sync(this.data, honors, this.data.historyOpen || this.data.playerCard || this.data.resultDialog || !this.foreground);
     const identityProfileUpdate = {};
@@ -1483,10 +1444,15 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     this.dismissRoomSwipe();
     const mode = e.currentTarget.dataset.mode;
     if (!["join", "create"].includes(mode)) return;
-    this.cancelEntryAutoFocus();
     const revision = this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
     const hadKeyboard = !!(this.data.entryFocusedField || this.data.entryKeyboardHeight);
-    this.entryAutoFocusPending = mode === "join";
+    let field = "";
+    if (mode === "join" && !this.data.hasPendingRequest) {
+      if (this.data.nicknameSetup || !this.data.name.trim()) field = "nickname";
+      else if (!/^\d{6}$/.test(this.data.code)) field = "code";
+    }
+    this.clearEntryKeyboardWait();
+    this.entryAwaitingKeyboard = !!field;
     this.setData({
       entryMode: mode,
       entrySheet: true,
@@ -1499,29 +1465,24 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       error: "",
       notice: "",
     }, () => {
-      if (revision === this.entrySheetRevision) this.syncRoomSheetLayout("entry");
+      if (revision !== this.entrySheetRevision || !this.alive || !this.foreground || !this.data.entrySheet) return;
+      if (!this.entryAwaitingKeyboard) return this.syncRoomSheetLayout("entry");
+      this.entryKeyboardWaitTimer = setTimeout(() => {
+        if (revision !== this.entrySheetRevision) return;
+        this.clearEntryKeyboardWait();
+        this.syncRoomSheetLayout("entry");
+      }, ENTRY_KEYBOARD_WAIT_MS);
+      this.setData({ entryFocusedField: field });
     });
-    if (hadKeyboard) wx.hideKeyboard?.();
+    if (hadKeyboard && !field) wx.hideKeyboard?.();
   },
-  cancelEntryAutoFocus() {
-    clearTimeout(this.entryFocusTimer);
-    this.entryFocusTimer = null;
-    this.entryAutoFocusPending = false;
-  },
-  focusEntryAfterOpen(revision) {
-    if (!this.entryAutoFocusPending || revision !== this.entrySheetRevision || !this.alive || !this.foreground || !this.data.entrySheet) return;
-    clearTimeout(this.entryFocusTimer);
-    this.entryFocusTimer = setTimeout(() => {
-      this.entryFocusTimer = null;
-      if (!this.entryAutoFocusPending || revision !== this.entrySheetRevision) return;
-      this.entryAutoFocusPending = false;
-      if (!this.alive || !this.foreground || !this.data.entrySheet || this.data.entryMode !== "join" ||
-          this.data.entryFocusedField || this.data.busy || this.pending || this.data.hasPendingRequest) return;
-      this.setData({ entryFocusedField: this.data.nicknameSetup || !this.data.name.trim() ? "nickname" : "code" });
-    }, ENTRY_FOCUS_DELAY);
+  clearEntryKeyboardWait() {
+    clearTimeout(this.entryKeyboardWaitTimer);
+    this.entryKeyboardWaitTimer = null;
+    this.entryAwaitingKeyboard = false;
   },
   resetEntryFocus() {
-    this.cancelEntryAutoFocus();
+    this.clearEntryKeyboardWait();
     const revision = this.entrySheetRevision = (this.entrySheetRevision || 0) + 1;
     if (this.data.entryFocusedField || this.data.entryKeyboardHeight) {
       this.setData({ entryFocusedField: "", entryKeyboardHeight: 0, entryScrollTarget: "" }, () => {
@@ -1529,6 +1490,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       });
       // The submit button also calls this: native form values can wait for input blur.
       wx.hideKeyboard?.();
+    } else if (this.data.entryMeasuring) {
+      this.syncRoomSheetLayout("entry");
     }
   },
   closeEntry() {
@@ -1538,17 +1501,14 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   editEntryName() {
     if (!this.data.entrySheet || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
-    this.cancelEntryAutoFocus();
     this.setData({ entryFocusedField: "nickname", entryScrollTarget: "entry-name-block" });
   },
   editEntryCode() {
     if (!this.data.entrySheet || this.data.entryMode !== "join" || !this.foreground || this.data.busy || this.pending || this.data.hasPendingRequest) return;
-    this.cancelEntryAutoFocus();
     this.setData({ entryFocusedField: "code", entryScrollTarget: "entry-code-block" });
   },
   entryInputFocus(e) {
     if (!this.data.entrySheet || !this.foreground) return;
-    this.cancelEntryAutoFocus();
     const field = e.currentTarget.dataset.field;
     if (this.data.entryFocusedField !== field)
       this.setData({ entryFocusedField: field, entryScrollTarget: field === "code" ? "entry-code-block" : "entry-name-block" });
@@ -1565,7 +1525,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     const revision = this.entrySheetRevision;
     this.setData({ entryKeyboardHeight: height, entryScrollTarget: "" }, () => {
       if (!this.alive || !this.foreground || !this.data.entrySheet || revision !== this.entrySheetRevision || height !== this.data.entryKeyboardHeight) return;
-      if (this.data.entrySheet && this.foreground && this.data.entryFocusedField)
+      if (height > 0 && this.entryAwaitingKeyboard) this.clearEntryKeyboardWait();
+      if (this.data.entryFocusedField)
         this.setData({ entryScrollTarget: this.data.entryFocusedField === "code" ? "entry-code-block" : "entry-name-block" });
       this.syncRoomSheetLayout("entry");
     });
@@ -1573,7 +1534,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   entryAvatarError() { this.setData({ entryAvatarFailed: true }); },
   syncRoomSheetLayout(kind) {
     const entry = kind === "entry", openKey = entry ? "entrySheet" : "showRoomRules";
-    if (!this.data[openKey] || !this.foreground) return;
+    if (!this.data[openKey] || !this.foreground || (entry && this.entryAwaitingKeyboard)) return;
     this.sheetLayoutRevisions = this.sheetLayoutRevisions || {};
     const revision = this.sheetLayoutRevisions[kind] = (this.sheetLayoutRevisions[kind] || 0) + 1;
     const entryRevision = this.entrySheetRevision;
@@ -1582,11 +1543,8 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       const patch = {}, key = entry ? "entryBodyHeight" : "roomRulesBodyHeight";
       if (height !== null && this.data[key] !== height) patch[key] = height;
       const measuringKey = entry ? "entryMeasuring" : "roomRulesMeasuring";
-      const opening = this.data[measuringKey];
-      if (opening) patch[measuringKey] = false;
-      const rendered = () => { if (entry && opening) this.focusEntryAfterOpen(entryRevision); };
-      if (Object.keys(patch).length) this.setData(patch, rendered);
-      else rendered();
+      if (this.data[measuringKey]) patch[measuringKey] = false;
+      if (Object.keys(patch).length) this.setData(patch);
     };
     if (!wx.createSelectorQuery) { applyHeight(null); return; }
     const run = () => {
@@ -1635,14 +1593,13 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
   },
   pasteRoomCode() {
     if (this.data.busy || this.pending || !this.data.entrySheet) return;
-    this.cancelEntryAutoFocus();
     const revision = this.entrySheetRevision;
     wx.getClipboardData?.({
       success: ({ data }) => {
         if (!this.alive || !this.foreground || !this.data.entrySheet || revision !== this.entrySheetRevision || this.data.busy || this.pending) return;
         const code = String(data || "").trim();
         if (!/^\d{6}$/.test(code)) return this.setData({ entryCodeError: "请复制完整的 6 位数字房间码" }, () => this.syncRoomSheetLayout("entry"));
-        this.setData({ code, entryCodeError: "", entryError: "", entryFocusedField: "code" }, () => this.syncRoomSheetLayout("entry"));
+        this.setData({ code, entryCodeError: "", entryError: "" }, () => this.syncRoomSheetLayout("entry"));
       },
       fail: () => {
         if (this.alive && this.foreground && this.data.entrySheet && revision === this.entrySheetRevision && !this.data.busy && !this.pending)

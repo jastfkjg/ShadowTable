@@ -4,7 +4,8 @@
 })(typeof window === 'object' ? window : this, function (notices, catalogue) {
   function present(notice) {
     const badges = (notice?.badges || []).map(b => ({ ...b,
-      displayReason: b.condition, artStyle: catalogue.badgeArtStyle(b, true),
+      displayReason: b.condition, artStyle: catalogue.badgeArtStyle(b),
+      detailArtStyle: catalogue.badgeArtStyle(b, b.largeImageUrl || b.imageUrl),
     }));
     const contributor = badges.find(b => b.id === 'feedback_contributor');
     if (contributor) {

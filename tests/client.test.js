@@ -1834,6 +1834,8 @@ test("任务票按公开票数逐张翻，结尾停留后同步公布结果、�
   assert.equal(p.data.historyLatest, null);
   assert.equal(p.data.questTimeline.length, 0);
   assert.ok(p.data.questRounds.every(round => round.result === "pending"));
+  assert.equal(p.data.questRounds[0].teamSize, 5);
+  assert.equal(p.data.questRounds[0].protectedRound, true);
   p.showLatestRecord();
   assert.equal(p.data.visibleHistory.length, 0);
   p.closeHistory();
@@ -1857,6 +1859,7 @@ test("任务票按公开票数逐张翻，结尾停留后同步公布结果、�
   assert.equal(p.data.historyLatest.questResult, "success");
   assert.equal(p.data.questTimeline.length, 1);
   assert.equal(p.data.questRounds[0].result, "success");
+  assert.deepEqual(p.data.questRounds.map(r => r.teamSize), [5, 4, 5, 6, 6]);
   assert.equal(p.data.questRounds[0].protectedRound, true);
   assert.equal(p.data.historyUnreadCount, 1);
   assert.deepEqual(p.data.questTickets, tickets);
@@ -2504,7 +2507,7 @@ test("公开记录隐藏轮次推进，保留转换与最新结果的原记录�
 });
 
 test("小程序转换和查验归其他，最近查验显示座位并兼容旧记录", async () => {
-  const room = dealtRoom({ history: [
+  const room = dealtRoom({ board: "knights", capacity: 12, knights: { round: 1 }, history: [
     { kind: "variant", text: "本轮不转换", resultType: "conversion" },
     { kind: "skillResult", text: "技能最终结果", detail: "无人出局" },
     { kind: "variant", text: "仙女查验已完成", number: 2 },

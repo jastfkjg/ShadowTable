@@ -161,60 +161,11 @@
       }[c];
     });
   }
-  function voteSummary(votes) {
-    return (votes.some(function (v) { return v.approve === null; }) ? [true, false, null] : [true, false])
-      .map(function (approve) {
-        var seats = votes
-          .filter(function (v) {
-            return v.approve === approve;
-          })
-          .map(function (v) {
-            return v.seat;
-          })
-          .sort(function (a, b) {
-            return a - b;
-          });
-        return (
-          seats.length +
-          "票" +
-          (approve === null ? "弃权" : approve ? "赞成" : "反对") +
-          "：" +
-          (seats.length ? seats.join("，") : "无")
-        );
-      })
-      .join("\n");
-  }
   function toolHistory(h, key) {
     if (["skillDetail", "skillResult", "toolCutoff"].indexOf(h.kind) !== -1)
       return { key: key, text: h.text, detail: h.detail || "" };
     if (h.kind === "variant") return { key: key, text: h.text, detail: "", inspectionLabel: publicHistory.inspectionLabel(h) };
-    if (h.kind === "toolVote")
-      return {
-        key: key,
-        text: "投票" + (h.approved ? "通过" : "未通过") + (h.earlyClosed ? " · 提前截止" : ""),
-        voteGroups: (h.votes.some(function (v) { return v.approve === null; }) ? [true, false, null] : [true, false]).map(function (approve) {
-          var seats = h.votes
-            .filter(function (v) {
-              return v.approve === approve;
-            })
-            .map(function (v) {
-              return v.seat;
-            })
-            .sort(function (a, b) {
-              return a - b;
-            });
-          return {
-            label: approve === null ? "弃权" : approve ? "赞成" : "反对",
-            count: seats.length,
-            seats: seats.length ? seats.join("、") + " 号" : "无",
-            tone: approve === null ? "abstain" : approve ? "approve" : "reject",
-          };
-        }),
-        teamLabel: h.team.length ? h.team.join("、") + " 号" : "",
-        detail:
-          (h.team.length ? "队伍 " + h.team.join("、") + "号\n" : "") +
-          voteSummary(h.votes),
-      };
+    if (h.kind === "toolVote" || h.kind === "team") return publicHistory.voteRecord(h, key);
     if (h.kind === "toolQuest")
       return {
         key: key,
@@ -1143,8 +1094,7 @@
     app.querySelector('.badge-detail-action')?.focus({ preventScroll: true });
   }
   function badgeArt(badge, className = '') {
-    const style = badgePresentation.badgeArtStyle(badge);
-    return '<img' + (className ? ' class="' + className + '"' : '') + (style ? ' style="' + style + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
+    return '<img' + (className ? ' class="' + className + '"' : '') + ' style="' + esc(badge.artStyle || '') + '" src="' + esc(badge.imageUrl) + '" alt="" />';
   }
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter, undefined, state.badgeCategory) : null;
@@ -2113,40 +2063,16 @@ function roomListItems(rooms) {
           key: i,
           questResult:
             h.kind === "quest" ? (h.success ? "success" : "failure") : "",
-          text:
-            h.kind === "team"
-              ? "第" +
-                h.round +
-                "轮 · " +
-                h.leader +
-                "号组队 " +
-                h.team.join("、") +
-                "：" +
-                (h.approved ? "通过" : "否决")
-              : h.kind === "quest"
-                ? "任务结算"
-                : "最终行动",
-          detail:
-            h.kind === "team"
-              ? voteSummary(h.votes)
-              : h.kind === "quest"
-                ? "第" +
-                  h.round +
-                  "轮 · " +
-                  (h.success ? "任务成功" : "任务失败") +
-                  " · " +
-                  h.fails +
-                  "张失败"
-                : "最终目标 " +
-                  h.target +
-                  "号 · " +
-                  (h.hit ? "命中梅林" : "未命中梅林"),
+          text: h.kind === "quest" ? "任务结算" : "最终行动",
+          detail: h.kind === "quest"
+            ? `第${h.round}轮 · ${h.success ? "任务成功" : "任务失败"} · ${h.fails}张失败`
+            : `最终目标 ${h.target}号 · ${h.hit ? "命中梅林" : "未命中梅林"}`,
         }
       );
     });
     history.forEach(function (entry, i) {
       var source = room.history[i];
-      entry.category = publicHistory.category(source);
+      entry.category = publicHistory.category(source, room);
       entry.thresholdLabel = publicHistory.questThresholdLabel(room, source);
       var time = source.startedAt ? new Date(source.startedAt) : null;
       entry.timeLabel = time && !Number.isNaN(time.getTime()) ? String(time.getHours()).padStart(2, "0") + ":" + String(time.getMinutes()).padStart(2, "0") : "";
@@ -2159,8 +2085,7 @@ function roomListItems(rooms) {
           .map(function (row) { return { label: row[0], value: row[1].length ? row[1].join("、") + " 号" : "无", final: row[0] === "最终仍出局" }; });
         entry.detail = entry.resultRows.map(function (row) { return row.label + "：" + row.value; }).join("；");
       }
-      entry.latestDetail = entry.inspectionLabel || (entry.voteGroups ? voteSummary(source.votes) : entry.detail);
-      entry.resultTeam = entry.voteGroups ? entry.teamLabel : "";
+      entry.latestDetail = entry.inspectionLabel || entry.latestDetail || entry.detail;
     });
     patch.seatsExpanded = room.phase !== "lobby" && state.room?.code === room.code ? state.seatsExpanded : true;
     patch.operationProgressExpanded = !!room.canUseTools && !!room.operationProgress && state.room?.code === room.code && state.room?.stage === room.stage && state.operationProgressExpanded;
@@ -2919,7 +2844,7 @@ function roomListItems(rooms) {
       const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
         byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
       let playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
-      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || badge);
+      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || { ...badge, artStyle: badgePresentation.badgeArtStyle(badge) });
       playerCard = { ...playerCard, badges, ownedBadgeCount: result.player.ownedBadgeCount, badgesLimited: result.player.badgesLimited };
       setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
     } catch (e) {
@@ -4668,14 +4593,20 @@ function roomListItems(rooms) {
     var resultHtml = "";
     if (state.latestResult && ["tools", "ended"].includes(r.phase)) {
       var latest = state.latestResult;
-      resultHtml += '<div class="latest-result" role="status" aria-label="最近操作结果"><div class="result-summary-heading"><span class="small muted">最近结果</span>' + btn("history-toggle", "showLatestRecord", "查看记录 ›") + '</div><div class="latest-result-title result-heading">' + resultIcon(latest.resultTone) + '<span>' + esc(latest.resultRows ? "技能最终结果" : latest.text) + '</span>' + (latest.resultTeam ? '<span class="result-team">队伍 ' + esc(latest.resultTeam) + '</span>' : '') + '</div>';
+      const historyButton = btn("history-toggle", "showLatestRecord", "查看记录 ›");
+      resultHtml += '<div class="latest-result' + (latest.voteGroups ? ' latest-vote-result' : '') + '" role="status" aria-label="最近操作结果">';
+      if (!latest.voteGroups) resultHtml += '<div class="result-summary-heading"><span class="small muted">最近结果</span>' + historyButton + '</div>';
+      resultHtml += '<div class="latest-result-title result-heading">' + resultIcon(latest.resultTone) + '<span>' + esc(latest.resultRows ? "技能最终结果" : latest.text) + '</span>' + (latest.voteGroups ? historyButton : '') + '</div>';
+      if (latest.resultTeam) resultHtml += '<div class="vote-result-team"><img class="vote-result-team-icon" src="/assets/record-users.svg" alt=""><span>提名队伍</span><span class="vote-result-members">' + esc(latest.resultTeam) + '</span></div>';
       if (latest.resultRows) {
         if (latest.historyNote) resultHtml += '<div class="latest-result-note small muted">' + esc(latest.historyNote) + '</div>';
         resultHtml += '<div class="history-result-rows">' + latest.resultRows.map(function (row) { return '<div class="history-result-line' + (row.final ? ' is-final' : '') + '"><span class="history-result-label">' + esc(row.label) + '</span><span class="history-result-value">' + esc(row.value) + '</span></div>'; }).join('') + '</div>';
+      } else if (latest.voteGroups) {
+        resultHtml += '<div class="vote-result-groups">' + latest.voteGroups.map(viewVoteResultRow).join('') + '</div>';
       } else resultHtml += '<div class="history-detail">' + esc(latest.latestDetail || latest.detail) + '</div>';
       resultHtml += '</div>';
     }
-    if (r.phase !== "lobby") html += '<div class="table-dynamics ' + (operationFirst ? 'operation-first' : 'result-first') + '">' + resultHtml + phaseHtml + '</div>';
+    if (r.phase !== "lobby") html += '<div class="table-dynamics ' + (operationFirst ? 'operation-first' : 'result-first') + (resultHtml && state.latestResult.voteGroups ? ' vote-result-panel' : '') + '">' + resultHtml + phaseHtml + '</div>';
     if (r.recordNotice) html += '<div class="small muted">' + esc(r.recordNotice) + '</div>';
     let lobbyActionHtml = "";
     if (r.phase === "lobby") {
@@ -4742,13 +4673,14 @@ function roomListItems(rooms) {
     const occupied = state.seatOccupiedCount + '/' + r.capacity + ' 人';
     html += '<div class="task-progress">';
     if (!waiting) {
-      const rounds = publicHistory.questRounds(r, state.history.filter(h => h.questResult));
-      html += '<div class="quest-track">' + rounds.map(round =>
+      const { questRounds } = publicHistory.questProgress(r, state.history.filter(h => h.questResult));
+      html += '<div class="quest-track"><div class="quest-rounds">' + questRounds.map(round =>
         '<button type="button" class="quest-round" aria-label="' + esc(round.label) + '"' +
         (round.key === null ? ' disabled' : ' data-action="showQuestRecord" data-key="' + round.key + '"') + '>' +
         '<span aria-hidden="true" class="quest-disc ' + round.result + (round.protectedRound ? ' protected' : '') + '">' +
-        (round.key === null ? '' : '<span class="quest-mark"></span>') + '</span><span aria-hidden="true">' + round.number + '</span></button>'
-      ).join("") + '</div>';
+        '<span class="quest-size">' + round.teamSize + '</span>' +
+        (round.key === null ? '' : '<span class="quest-mark"></span>') + '</span></button>'
+      ).join("") + '</div></div>';
     }
     html += '<div class="section-title history-heading"><span class="seat-section-title"><span>玩家</span>' +
       (waiting ? '' : '<span class="seat-count">' + state.seatOccupiedCount + '人</span>') + '</span>' +
@@ -4874,6 +4806,13 @@ function roomListItems(rooms) {
         "</div>";
     if (r.phase !== 'lobby') html += '<div class="public-history-dock' + (r.canUseTools && r.hasActiveOperation && r.phase !== 'offlineFinal' ? ' with-host-actions' : '') + '">' + viewHistoryEntry() + viewHostBar() + '</div>';
     return html + lobbyActionHtml;
+  }
+  function viewVoteResultRow(group) {
+    const seats = group.seatNumbers.map(seat =>
+      '<span class="vote-result-seat" aria-label="' + esc(seat) + '号">' + esc(seat) + '</span>').join('');
+    return '<div class="vote-result-row ' + esc(group.tone) + '"><span class="vote-result-label">' + esc(group.label) +
+      '</span><div class="vote-result-seats">' + (seats || '<span class="vote-result-empty">无</span>') +
+      '</div><span class="vote-result-count">' + esc(group.count) + ' 票</span></div>';
   }
   function resultIcon(tone) {
     return tone ? '<span class="quest-result-icon ' + tone + '" aria-hidden="true">' + (tone === "success" ? "✓" : "×") + '</span>' : '';
