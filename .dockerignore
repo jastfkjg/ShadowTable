@@ -96,6 +96,7 @@
 !miniprogram/pages/
 !miniprogram/pages/table/
 !miniprogram/pages/table/quest-track.wxss
+!miniprogram/pages/table/vote-result.wxss
 !miniprogram/pages/home/
 !miniprogram/pages/home/home.wxss
 !miniprogram/pages/home/room-sheets.wxss
