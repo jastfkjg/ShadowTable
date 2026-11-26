@@ -5,7 +5,7 @@
     <view class="award-scroll-content">
       <block wx:if="{{awardDetail}}">
         <view class="award-eyebrow">{{awardDetail.periodLabel}} · {{awardDetail.category}}</view>
-        <view class="award-large-art"><image style="{{awardDetail.artStyle}}" src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
+        <view class="award-large-art"><image style="{{awardDetail.detailArtStyle}}" src="{{awardDetail.largeImageUrl || awardDetail.imageUrl}}" mode="aspectFit" aria-label="{{awardDetail.title}}" /></view>
         <view class="award-title">{{awardDetail.title}}</view><view class="award-reason">{{awardDetail.condition}}</view>
         <view wx:if="{{awardDetail.flavor}}" class="award-message">{{awardDetail.flavor}}</view><view class="award-hint">获得后永久保留</view>
       </block>

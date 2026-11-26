@@ -4,8 +4,8 @@
   else root.shadowtableBadgeRanks = factory(root.shadowtableBadges);
 })(typeof window === "object" ? window : this, function (badges) {
   const types = {
-    honor: { label: "荣誉徽章", art: "/assets/badges/october_2026_crown.png" },
-    fun: { label: "趣味徽章", art: "/assets/badges/good_shield.png" },
+    honor: { label: "荣誉徽章", badgeId: "october_2026_crown" },
+    fun: { label: "趣味徽章", badgeId: "good_shield" },
   };
   function create(
     { request, update, assetUrl = (path) => path },
@@ -15,11 +15,10 @@
     let sequence = 0;
     const state = {
       countLabel: "当前持有",
-      choices: Object.entries(types).map(([kind, type]) => ({
-        kind,
-        title: type.label + "榜",
-        art: assetUrl(type.art),
-      })),
+      choices: Object.entries(types).map(([kind, type]) => {
+        const badge = badges.presentPlayerBadge({ id: type.badgeId }, assetUrl);
+        return { kind, title: type.label + "榜", art: badge.imageUrl, artStyle: badge.artStyle };
+      }),
     };
     function patch(values) {
       Object.assign(state, values);

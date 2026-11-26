@@ -1130,8 +1130,7 @@
     app.querySelector('.badge-detail-action')?.focus({ preventScroll: true });
   }
   function badgeArt(badge, className = '') {
-    const style = badgePresentation.badgeArtStyle(badge);
-    return '<img' + (className ? ' class="' + className + '"' : '') + (style ? ' style="' + style + '"' : '') + ' src="' + esc(badge.imageUrl) + '" alt="" />';
+    return '<img' + (className ? ' class="' + className + '"' : '') + ' style="' + esc(badge.artStyle || '') + '" src="' + esc(badge.imageUrl) + '" alt="" />';
   }
   function viewBadgeManager() {
     const c = state.badgeCollection ? badgePresentation.presentCollection(state.badgeCollection, state.badgeFilter, undefined, state.badgeCategory) : null;
@@ -2906,7 +2905,7 @@ function roomListItems(rooms) {
       const stats = result.status === "available" ? { ...result.stats, rateLabel: rateLabel(result.stats.winRate),
         byFaction: result.stats.byFaction.map(row => ({ ...row, rateLabel: rateLabel(row.winRate) })) } : null;
       let playerCard = card.scope === 'leaderboard' ? { ...card, name: result.player.name, initial: Array.from(result.player.name || '友')[0], avatarUrl: result.player.avatarUrl || '' } : card;
-      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || badge);
+      const badges = (result.player.badges || []).map(badge => badgePresentation.presentPlayerBadge(badge) || { ...badge, artStyle: badgePresentation.badgeArtStyle(badge) });
       playerCard = { ...playerCard, badges, ownedBadgeCount: result.player.ownedBadgeCount, badgesLimited: result.player.badgesLimited };
       setState({ playerCard, playerCardStats: stats, playerCardStatus: result.status });
     } catch (e) {

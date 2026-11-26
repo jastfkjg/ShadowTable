@@ -61,6 +61,36 @@ test('87 枚固定徽章涵盖 78 枚月度及 9 枚永久荣誉，零数据不�
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
   } finally {store.close();}
 });
+test('各类徽章含名次边框与详情大图，在同一图框中的可见面积接近', async () => {
+  const { rankedBadge, monthlyAward, usesServerArt, badgeArtStyle } = require('../miniprogram/badges');
+  const { render } = require('../server/monthly-badge-art');
+  const samples = [];
+  async function measure(badge, url, source) {
+    const { data, info } = await sharp(source).extractChannel('alpha').raw().toBuffer({ resolveWithObject: true });
+    const paintedPixels = data.reduce((sum, alpha) => sum + alpha, 0) / 255;
+    const scale = Number(/^transform:scale\(([\d.]+)\)$/.exec(badgeArtStyle(badge, url))[1]);
+    // Compare linear sizes at equal aspect-fit dimensions, weighting translucent pixels by opacity.
+    samples.push({ url, size: scale * Math.sqrt(paintedPixels) / Math.max(info.width, info.height) });
+  }
+  for (const base of catalogue) {
+    const variants = base.metric === 'podium' ? [1, 2, 3].map(rank => rankedBadge(base, rank)) : [base];
+    for (const badge of variants) {
+      for (const url of [badge.imageUrl, badge.largeImageUrl].filter(Boolean)) {
+        const source = usesServerArt(badge)
+          ? join(__dirname, '../server/web/assets', url.split('/').pop())
+          : join(__dirname, '../miniprogram', url);
+        await measure(badge, url, source);
+      }
+    }
+  }
+  for (const rank of [1, 2, 3]) {
+    const badge = monthlyAward('monthly_points_2026-11_' + rank);
+    await measure(badge, badge.imageUrl, await render(badge.month, rank));
+  }
+  samples.sort((a, b) => a.size - b.size);
+  const smallest = samples[0], largest = samples.at(-1);
+  assert.ok(largest.size / smallest.size < 1.1, smallest.url + ' 与 ' + largest.url + ' 的视觉尺寸相差超过 10%');
+});
 test('角色徽章只取本月公开达成次数榜，支持并列、佩戴和跨月切换', () => {
   let now = Date.parse('2026-09-30T15:59:59Z');
   const store = new Store(':memory:', { clock: () => now });

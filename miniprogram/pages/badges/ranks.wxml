@@ -5,7 +5,7 @@
     <view class="br-selector">
       <view class="br-choices" role="group" aria-label="切换徽章榜">
         <button wx:for="{{rank.choices}}" wx:key="kind" class="br-choice {{rank.kind===item.kind?'selected':''}}" hover-class="badge-pressed" data-kind="{{item.kind}}" bindtap="select" aria-pressed="{{rank.kind===item.kind}}">
-          <image class="br-choice-art" src="{{item.art}}" mode="aspectFit" aria-hidden="true"/>
+          <image class="br-choice-art" style="{{item.artStyle}}" src="{{item.art}}" mode="aspectFit" aria-hidden="true"/>
           <text>{{item.title}}</text>
           <view wx:if="{{rank.kind===item.kind}}" class="br-choice-check" aria-hidden="true"></view>
         </button>
@@ -28,7 +28,7 @@
     <label wx:if="{{rank.detail.isSelf}}" class="br-privacy"><view><view>公开我的{{rank.label}}明细</view><view class="br-muted">关闭后，他人仍可看到名次和数量</view></view><switch checked="{{rank.detail.visible}}" disabled="{{rank.saving}}" bindchange="toggle" color="#b89c66" /></label>
     <view wx:if="{{!rank.detail.isSelf && !rank.detail.visible}}" class="br-status">该玩家已隐藏徽章明细</view>
     <view wx:elif="{{!rank.detail.badges.length}}" class="br-status">当前未持有{{rank.label}}</view>
-    <view wx:else class="br-grid"><button wx:for="{{rank.detail.badges}}" wx:key="id" class="br-tile" data-id="{{item.id}}" bindtap="openBadge" hover-class="badge-pressed" aria-label="{{'查看'+item.title+'详情'}}"><image src="{{item.imageUrl}}" mode="aspectFit"/><view>{{item.title}}</view><text class="br-muted">{{item.periodLabel || (item.permanent?'永久徽章':'月度徽章')}}</text></button></view>
+    <view wx:else class="br-grid"><button wx:for="{{rank.detail.badges}}" wx:key="id" class="br-tile" data-id="{{item.id}}" bindtap="openBadge" hover-class="badge-pressed" aria-label="{{'查看'+item.title+'详情'}}"><image style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit"/><view>{{item.title}}</view><text class="br-muted">{{item.periodLabel || (item.permanent?'永久徽章':'月度徽章')}}</text></button></view>
   </block>
   <view wx:if="{{rank.loading && !rank.board}}" class="br-status">正在读取…</view>
   <view wx:if="{{rank.error}}" class="br-status" role="alert">{{rank.error}}<button hover-class="badge-pressed" class="br-more" bindtap="retry">重新加载</button></view>
