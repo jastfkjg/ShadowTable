@@ -10,8 +10,8 @@ function surface() {
 function create() {
   return createGrantNotifier({
     account: () => wx.getStorageSync("session"),
-    read: () => api.request("/api/me/avoidance/notice"),
-    ack: through => api.request("/api/me/avoidance/notice", "POST", { through }),
+    read: () => api.request("/api/me/cards/notice"),
+    ack: through => api.request("/api/me/cards/notice", "POST", { through }),
     canShow() {
       const { host, controller, data } = surface();
       if (!host || !controller?.foreground || !controller.alive || !host.selectComponent?.("#app-dialog")) return false;

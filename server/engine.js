@@ -472,13 +472,13 @@ function start(room, flexible = false) {
   board(room.board, room.capacity);
   room.fairyEnabled = fairy.enabled(room);
   room.players.sort((a, b) => a.seat - b.seat);
-  const roles = avoidance.deal(room.players, roleDeck(room.board, room.capacity), room.avoidanceChoices, shuffle);
+  const roles = avoidance.deal(room.players, roleDeck(room.board, room.capacity), room.avoidanceChoices, shuffle, ROLES);
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
   room.avoidanceResults = { ...room.avoidanceUnavailable };
-  for (const [uid, role] of Object.entries(room.avoidanceChoices || {}))
-    if (room.players.some(p => p.uid === uid)) room.avoidanceResults[uid] = { role, status: room.roles[uid] === role ? "ineffective" : "effective" };
+  for (const [uid, choice] of Object.entries(room.avoidanceChoices || {}))
+    if (room.roles[uid]) room.avoidanceResults[uid] = avoidance.choiceResult(choice, room.roles[uid], ROLES);
   delete room.avoidanceChoices;
   delete room.avoidanceUnavailable;
   fun.init(room);
@@ -811,7 +811,9 @@ function privateView(room, uid) {
   const deal = room.matchId || [room.code, room.createdAt, room.game].join(":");
   const variant = createHash("sha256").update(JSON.stringify([deal, uid])).digest()[0] & 1;
   view.cardArt = `/assets/role-cards/${room.roles[uid]}-${variant ? "b" : "a"}.jpg`;
-  if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
+  const cardResult = room.avoidanceResults?.[uid];
+  if (cardResult?.faction) view.factionCard = cardResult;
+  else if (cardResult) view.avoidance = { ...cardResult, roleName: ROLES[cardResult.role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
   view.knightBCard = room.knights.players[uid].b === true;
@@ -1487,7 +1489,7 @@ function command(room, uid, input) {
 function applyCommand(room, uid, input) {
   const p = member(room, uid);
   requireRule(input && typeof input === "object", "请求格式错误");
-  if (input.type === "avoidance") requireRule(room.phase === "lobby", "身份已发放，无法修改回避角色", 409);
+  if (input.type === "avoidance") requireRule(room.phase === "lobby", "身份已发放，无法修改本局用卡", 409);
   requireRule(input.stage === room.stage, "阶段已变化，请刷新后重新操作", 409);
   const { type } = input;
   if (
@@ -1553,6 +1555,8 @@ function applyCommand(room, uid, input) {
         stage(next,"lobby");
       }
     }
+    // configure clears pending card choices on the validated copy.
+    if (!next.avoidanceChoices) delete room.avoidanceChoices;
     Object.assign(room, next);
     return;
   }
@@ -1803,11 +1807,17 @@ function applyCommand(room, uid, input) {
     return;
   }
   if (type === "avoidance") {
-    requireRule(p.seat !== null, "请先入座再使用回避卡");
-    requireRule(input.role === null || typeof input.role === "string" && roleDeck(room.board, room.capacity).includes(input.role), "请选择本局初始牌中的角色");
+    requireRule(p.seat !== null, "请先入座再使用本局用卡");
+    const deck = roleDeck(room.board, room.capacity);
+    if (input.faction !== undefined) {
+      requireRule(input.role === undefined, "每局限用一张卡");
+      requireRule(deck.some(role => ROLES[role][1] === input.faction), "请选择本局初始牌中的阵营");
+    } else {
+      requireRule(input.role === null || deck.includes(input.role), "请选择本局初始牌中的角色");
+    }
     room.avoidanceChoices ||= {};
     if (input.role === null) delete room.avoidanceChoices[uid];
-    else room.avoidanceChoices[uid] = input.role;
+    else room.avoidanceChoices[uid] = input.faction ? { faction: input.faction } : input.role;
     return;
   }
   if (type === "ready") {

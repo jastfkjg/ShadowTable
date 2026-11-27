@@ -1003,7 +1003,7 @@
     return '<div class="data-metrics">' + preview.metrics.map(row => '<div class="data-metric' + (row.accent ? ' is-accent' : '') + (row.negative ? ' is-negative' : '') + (row.compact ? ' is-compact' : '') + '"><div class="data-metric-value">' + esc(row.value) + (row.unit ? '<span class="data-metric-unit">' + esc(row.unit) + '</span>' : '') + '</div><span class="data-metric-label">' + esc(row.label) + '</span></div>').join('') + '</div><div class="data-card-caption">' + esc(preview.caption) + '</div>';
   }
   function viewClearingRetained() {
-    return '<div class="data-retained"><img class="data-retained-icon" src="/assets/record-shield.svg" alt="" /><div><div class="data-retained-title">同桌记录与已发放权益保留</div><div class="data-retained-copy">共享对局、永久徽章和回避卡不受影响</div></div></div>';
+    return '<div class="data-retained"><img class="data-retained-icon" src="/assets/record-shield.svg" alt="" /><div><div class="data-retained-title">同桌记录与已发放权益保留</div><div class="data-retained-copy">共享对局、永久徽章和两种用卡不受影响</div></div></div>';
   }
   const clearingWarning = '<span class="data-warning-icon" aria-hidden="true">!</span><span>清除后无法自行恢复</span>';
   function viewRecordClearing() {
@@ -1660,8 +1660,8 @@
   const grantNotifier = avoidancePresentation.createGrantNotifier({
     setTimeout, clearTimeout,
     account: () => storage.get('session'),
-    read: () => request('/api/me/avoidance/notice'),
-    ack: through => request('/api/me/avoidance/notice', 'POST', { through }),
+    read: () => request('/api/me/cards/notice'),
+    ack: through => request('/api/me/cards/notice', 'POST', { through }),
     canShow() {
       if (!alive || !foreground || !state.network || !modal.hidden || !badgeNoticeHost.hidden || pending || grantNoticeOpen || state.page !== 'table') return false;
       if (state.room?.phase !== 'lobby') return false;
@@ -2228,7 +2228,7 @@ function roomListItems(rooms) {
       } else {
         setState({ notice: "" });
         await refresh();
-        if (p.data.type === 'avoidance') toast(p.data.role === null ? '本局不使用回避卡' : '本局回避已保存，生效后才扣卡');
+        if (p.data.type === 'avoidance') toast(p.data.role === null ? '已取消本局用卡' : '本局选择已保存，生效后才扣卡');
       }
     } catch (e) {
       if (e.status && e.status < 500 && e.status !== 401 && e.status !== 429) {
@@ -2871,7 +2871,7 @@ function roomListItems(rooms) {
     try {
       const value = await request('/api/rooms/' + room.code + '/avoidance');
       if (!alive || !foreground || gen !== generation || !state.avoidanceOpen || state.room?.code !== value.code || state.room.stage !== value.stage || value.phase !== 'lobby') return;
-      setState({ avoidance: value, avoidanceLoading: false, avoidanceDraft: value.selected || '', avoidanceDraftName: value.options.find(o => o.id === value.selected)?.name || '', avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) });
+      setState({ ...avoidancePresentation.panel(value), avoidanceLoading: false });
       app.querySelector('.avoidance-close')?.focus({ preventScroll: true });
     } catch (error) { if (gen === generation && foreground) { closeAvoidance(); handleError(error); } }
   }
@@ -2883,18 +2883,45 @@ function roomListItems(rooms) {
   function viewAvoidance() {
     if (!state.avoidanceOpen || state.page !== 'table' || state.room?.phase !== 'lobby' || state.error || !modal.hidden) return '';
     const value = state.avoidance;
-    let body = '', footer = '';
-    if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
-    else {
-      const locked = !value?.editable || value.balance < 1 || state.busy || !!pending;
-      body = '<div class="avoidance-note">' + (value.balance < 1 ? '暂无回避卡' : !value.editable ? '当前无法使用回避卡' : '发牌前可随时修改，生效后才扣 1 张。') + '</div>';
-      body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
-      body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。</div>';
-      if (!value.editable || value.balance < 1) footer = btn('primary','closeAvoidance','知道了');
-      else if (value.selected && state.avoidanceDraft === value.selected) footer = btn('secondary','cancelAvoidance','不避开了（不扣卡）',null,locked || !state.network);
-      else footer = btn('primary','saveAvoidance',state.avoidanceDraft ? (value.selected ? '改成避开' : '避开') + state.avoidanceDraftName : '点一个角色',null,!state.avoidanceDraft || locked || !state.network);
+    const faction = value?.tab === 'faction', draft = state.avoidanceDraft;
+    let tabs = '', body = '', footer = '';
+    if (state.avoidanceLoading) {
+      body = '<div class="avoidance-note" role="status">正在读取本局用卡…</div>';
+      footer = btn('primary','closeAvoidance','知道了');
+    } else {
+      const balance = faction ? value.factionBalance : value.balance;
+      const locked = !value.editable || !balance || state.busy || !!pending;
+      tabs = '<div class="card-tabs">' + ['faction', 'avoidance'].map(tab => {
+        const active = tab === 'faction' ? faction : !faction;
+        const label = tab === 'faction' ? '阵营卡 ×' + (value.factionBalance || 0) : '回避卡 ×' + value.balance;
+        return '<button type="button" data-action="switchCardTab" data-tab="' + tab + '" class="' + (active ? 'active' : '') + '" aria-pressed="' + active + '">' + esc(label) + '</button>';
+      }).join('') + '</div>';
+      body = '<div class="card-question">' + (faction ? '这局想加入哪个阵营？' : '这局想避开哪个角色？') + '</div>';
+      if (!balance || !value.editable) body += '<div class="avoidance-note">' + (!balance ? (faction ? '暂无阵营卡，每完成 10 场有效正式对局可获得 1 张。' : '暂无回避卡') : '当前无法使用本局用卡') + '</div>';
+      if (faction) {
+        body += '<div class="faction-choices">' + value.factions.map(option => {
+          const chosen = draft === option.id;
+          return '<button type="button" class="faction-choice faction-' + option.id + (chosen ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + option.id + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '>'
+            + (chosen ? '<span class="card-check" aria-hidden="true">✓</span>' : '') + '<span class="faction-emblem" aria-hidden="true">'
+            + (option.icon ? '<img src="' + esc(option.icon) + '" alt="">' : '<span class="faction-diamond"></span>') + '</span>' + esc(option.name) + '</button>';
+        }).join('') + '</div>';
+        if (value.exampleText) body += '<div class="faction-examples">' + value.examples.map(o => '<img src="' + esc(o.portrait) + '" alt="">').join('') + '<span>' + esc(value.exampleText) + '</span></div>';
+      } else {
+        body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
+      }
+      if (draft && value.replaces) footer += '<div class="card-replace">确认后将替换「' + esc(value.replaces) + '」，原卡保留。</div>';
+      footer += '<div class="card-settlement">发牌时尽量满足选择，生效才扣 1 张。</div>';
+      const saved = faction ? value.selectedFaction : value.selected;
+      if (value.editable && saved && saved === draft) {
+        footer += btn('secondary','cancelAvoidance',faction ? '取消阵营选择（不扣卡）' : '不避开了（不扣卡）',null,state.busy || !!pending || !state.network);
+      } else if (!value.editable || !balance) {
+        footer += btn('primary','closeAvoidance','知道了');
+      } else {
+        const prefix = faction ? (value.replaces ? '改用阵营卡 · 选择' : '选择') : value.replaces ? '改用回避卡 · 避开' : saved ? '改成避开' : '避开';
+        footer += btn('primary','saveAvoidance',draft ? prefix + state.avoidanceDraftName : faction ? '选择一个阵营' : '点一个角色',null,!draft || locked || !state.network);
+      }
     }
-    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-icon"><img src="/assets/table-cards.svg" alt="" /></div><div class="avoidance-heading-copy"><div id="avoidance-title">这局想避开哪个角色？</div><span>' + ('回避卡 ×' + (value?.balance || 0) + ' · 仅你可见') + '</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭回避卡">×</button></div></div><div class="avoidance-body"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
+    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-copy"><div id="avoidance-title">本局用卡</div><span>每局限用 1 张 · 仅你可见</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭本局用卡">×</button></div>' + tabs + '</div><div class="avoidance-body' + (faction ? ' card-short-body' : '') + '"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
   }
   function ready() {
     cmd("ready", { ready: !state.room.me.ready });
@@ -2970,7 +2997,7 @@ function roomListItems(rooms) {
       setState({ dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         information: secret.information, skillStatus: secret.skillStatus,
-        avoidance: secret.avoidance,
+        avoidance: secret.factionCard || secret.avoidance,
       } });
       var close = app.querySelector && app.querySelector('.dealt-identity-dialog [data-action="closeDealtIdentity"]');
       if (close) close.focus({ preventScroll: true });
@@ -3219,7 +3246,7 @@ function roomListItems(rooms) {
             factionTone: factionTone(secret.faction),
             information: secret.information,
             skillStatus: secret.skillStatus,
-            avoidance: secret.avoidance,
+            avoidance: secret.factionCard || secret.avoidance,
           },
         });
       }
@@ -4602,7 +4629,7 @@ function roomListItems(rooms) {
     if (r.phase === "lobby") {
       const blocked = state.busy || !!pending || !state.network, card = r.me.avoidance;
       lobbyActionHtml = '<div class="web-lobby-action-bar"><div class="web-lobby-action-inner">' +
-        (r.me.seat !== null && card ? '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + esc('回避卡' + card.balance + '张，' + (card.selected ? '本局已选择角色' : '选择本局回避角色')) + '"' + (blocked ? ' disabled' : '') + '><span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /><span>×' + esc(card.balance) + '</span></span><span class="avoidance-entry-state">' + (card.selected ? '已选择' : '回避卡') + '</span></button>' : '') +
+        (r.me.seat !== null && card ? '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + (card.selected ? '本局用卡，已选 1 张' : '本局用卡') + '"' + (blocked ? ' disabled' : '') + '><span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /></span><span class="avoidance-entry-state">' + (card.selected ? '已选 1 张' : '本局用卡') + '</span></button>' : '') +
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
@@ -5549,13 +5576,21 @@ function roomListItems(rooms) {
     },
     ready: ready,
     openAvoidance, closeAvoidance,
-    chooseAvoidance: function (el) {
-      const value = state.avoidance, id = el.dataset.id;
-      if (!value?.editable || value.balance < 1 || state.busy || pending) return;
-      const option = value.options.find(o => o.id === id); if (!option) return;
-      setState({ avoidanceDraft: id, avoidanceDraftName: option.name, avoidanceGroups: avoidancePresentation.groups(value.options, id) });
+    switchCardTab: function (el) {
+      const value = state.avoidance, tab = el.dataset.tab;
+      if (!value?.options || tab === value.tab || state.busy || pending || !['faction','avoidance'].includes(tab)) return;
+      setState(avoidancePresentation.panel(value, tab));
+      app.querySelector('.card-tabs .active')?.focus({ preventScroll: true });
     },
-    saveAvoidance: function () { if (state.avoidance?.editable && state.avoidanceDraft && !state.avoidanceLoading) cmd('avoidance', { role: state.avoidanceDraft }); },
+    chooseAvoidance: function (el) {
+      if (state.busy || pending) return;
+      const patch = avoidancePresentation.choose(state.avoidance, el.dataset.id);
+      if (patch) setState(patch);
+    },
+    saveAvoidance: function () {
+      const value = state.avoidance, draft = state.avoidanceDraft;
+      if (value?.editable && draft && !state.avoidanceLoading) cmd('avoidance', value.tab === 'faction' ? { faction: draft } : { role: draft });
+    },
     cancelAvoidance: function () { if (state.avoidance?.editable) cmd('avoidance', { role: null }); },
     start: function () {
       confirmCommand(

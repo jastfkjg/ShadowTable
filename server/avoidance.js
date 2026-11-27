@@ -4,15 +4,19 @@ const fail = (ok, message, status = 400) => {
   if (!ok) throw new (require("./engine").RuleError)(message, status);
 };
 const eligible = uid => /^(wx|dev|guest):/.test(uid);
-const grantSources = "'admin','match_reward','loss_reward','win_reward'";
+const avoidanceGrants = "'admin','match_reward','loss_reward','win_reward'";
+const allCardGrants = avoidanceGrants + ",'faction_reward'";
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS avoidance_accounts(uid TEXT PRIMARY KEY, balance INTEGER NOT NULL CHECK(balance>=0));
     CREATE TABLE IF NOT EXISTS avoidance_ledger(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, balance INTEGER NOT NULL, source TEXT NOT NULL, note TEXT NOT NULL, match_id TEXT, created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS avoidance_ledger_user ON avoidance_ledger(uid,created DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS avoidance_spend_match ON avoidance_ledger(uid,match_id) WHERE source='spend';
+    CREATE UNIQUE INDEX IF NOT EXISTS faction_spend_match ON avoidance_ledger(uid,match_id) WHERE source='faction_spend';
     CREATE TABLE IF NOT EXISTS avoidance_grant_reads(uid TEXT NOT NULL, ledger_id TEXT NOT NULL, PRIMARY KEY(uid,ledger_id));`);
   store.transaction(() => {
+    if (!store.db.prepare("PRAGMA table_info(avoidance_accounts)").all().some(column => column.name === "faction_balance"))
+      store.db.exec("ALTER TABLE avoidance_accounts ADD COLUMN faction_balance INTEGER NOT NULL DEFAULT 0 CHECK(faction_balance>=0)");
     const known = store.db.prepare(`SELECT uid FROM profiles UNION SELECT uid FROM sessions UNION SELECT uid FROM match_players
       UNION SELECT json_extract(p.value,'$.uid') FROM rooms r,json_each(r.state,'$.players') p
       UNION SELECT json_extract(p.value,'$.uid') FROM rooms r,json_each(r.state,'$.spectators') p`).all();
@@ -21,31 +25,36 @@ function initialize(store) {
 }
 function ensureAccount(store, uid) {
   const insert = () => {
-    store.db.prepare("INSERT OR IGNORE INTO avoidance_accounts VALUES(?,0)").run(uid);
+    store.db.prepare("INSERT OR IGNORE INTO avoidance_accounts(uid,balance) VALUES(?,0)").run(uid);
   };
   if (store.db.prepare("SELECT 1 FROM avoidance_accounts WHERE uid=?").get(uid)) return;
   if (store.inTransaction) insert(); else store.transaction(insert);
 }
-function balance(store, uid) {
+function balance(store, uid, factionCard = false) {
   ensureAccount(store, uid);
-  return store.db.prepare("SELECT balance FROM avoidance_accounts WHERE uid=?").get(uid).balance;
+  const row = store.db.prepare("SELECT balance,faction_balance FROM avoidance_accounts WHERE uid=?").get(uid);
+  return factionCard ? row.faction_balance : row.balance;
 }
 function wallet(store, uid) {
-  return { ...grantNotice(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
+  return { ...grantNotice(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? AND source NOT IN ('faction_reward','faction_spend') ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
 }
-function grantNotice(store, uid) {
+function grantNotice(store, uid, includeFaction = false) {
+  const grantSources = includeFaction ? allCardGrants : avoidanceGrants;
   const rows = store.db.prepare(`SELECT l.id,l.delta,l.source,l.note FROM avoidance_ledger l
     LEFT JOIN avoidance_grant_reads r ON r.uid=l.uid AND r.ledger_id=l.id
     WHERE l.uid=? AND l.source IN (${grantSources}) AND l.delta>0 AND r.ledger_id IS NULL ORDER BY l.rowid`).all(uid);
   const sources = new Set(rows.map(row => row.source));
   const reasons = [...new Set(rows.filter(row => row.source === "admin").map(row => row.note.trim()).filter(Boolean))];
+  const factionAmount = rows.filter(row => row.source === "faction_reward").reduce((sum, row) => sum + row.delta, 0);
   return { balance: balance(store, uid), notice: rows.length ? {
     through: rows[rows.length - 1].id, amount: rows.reduce((n, row) => n + row.delta, 0), grants: rows.length,
+    ...(factionAmount ? { factionAmount } : {}),
     kind: sources.size === 1 ? ({ loss_reward: "loss", win_reward: "win" }[rows[0].source] || "generic") : "generic",
     ...(reasons.length ? { reasons } : {}),
   } : null };
 }
-function acknowledgeGrant(store, uid, input) {
+function acknowledgeGrant(store, uid, input, includeFaction = false) {
+  const grantSources = includeFaction ? allCardGrants : avoidanceGrants;
   fail(typeof input.through === "string" && /^[a-f0-9-]{36}$/.test(input.through), "通知编号无效");
   return store.transaction(() => {
     const row = store.db.prepare(`SELECT rowid FROM avoidance_ledger WHERE uid=? AND id=? AND source IN (${grantSources}) AND delta>0`).get(uid, input.through);
@@ -57,11 +66,18 @@ function acknowledgeGrant(store, uid, input) {
   });
 }
 
+function choiceResult(choice, role, roles) {
+  const faction = choice.faction;
+  const effective = faction ? roles[role][1] === faction : role !== choice;
+  return { ...(faction ? { faction } : { role: choice }), status: effective ? "effective" : "ineffective" };
+}
 // Count optimal completions over labelled card slots, then sample by their
 // counts. This maximizes fulfilled requests and gives every optimal deal equal
 // probability, including decks containing several copies of the same role.
-function deal(players, cards, choices, shuffle) {
+function deal(players, cards, choices, shuffle, roles) {
   if (!players.some(p => choices?.[p.uid])) return shuffle(cards);
+  const penalties = players.map(p => cards.map(role =>
+    choices[p.uid] && choiceResult(choices[p.uid], role, roles).status === "ineffective" ? 1 : 0));
   const n = cards.length, full = (1 << n) - 1, memo = new Map();
   function solve(mask, index) {
     if (mask === full) return { cost: 0, count: 1 };
@@ -69,7 +85,7 @@ function deal(players, cards, choices, shuffle) {
     let cost = Infinity, count = 0;
     for (let j = 0; j < n; j++) if (!(mask & (1 << j))) {
       const next = solve(mask | (1 << j), index + 1);
-      const value = next.cost + (choices?.[players[index].uid] === cards[j] ? 1 : 0);
+      const value = next.cost + penalties[index][j];
       if (value < cost) { cost = value; count = next.count; }
       else if (value === cost) count += next.count;
     }
@@ -80,7 +96,7 @@ function deal(players, cards, choices, shuffle) {
     const best = solve(mask, i); let pick = randomInt(best.count);
     for (let j = 0; j < n; j++) if (!(mask & (1 << j))) {
       const next = solve(mask | (1 << j), i + 1);
-      if (next.cost + (choices?.[players[i].uid] === cards[j] ? 1 : 0) !== best.cost) continue;
+      if (next.cost + penalties[i][j] !== best.cost) continue;
       if (pick < next.count) { result.push(cards[j]); mask |= 1 << j; break; }
       pick -= next.count;
     }
@@ -89,10 +105,10 @@ function deal(players, cards, choices, shuffle) {
 }
 function prepare(store, room) {
   room.avoidanceUnavailable = {};
-  for (const [uid, role] of Object.entries(room.avoidanceChoices || {})) {
+  for (const [uid, choice] of Object.entries(room.avoidanceChoices || {})) {
     if (!room.players.some(p => p.uid === uid)) { delete room.avoidanceChoices[uid]; continue; }
-    if (balance(store, uid) < 1) {
-      room.avoidanceUnavailable[uid] = { role, status: "unavailable" };
+    if (balance(store, uid, !!choice.faction) < 1) {
+      room.avoidanceUnavailable[uid] = { ...(choice.faction ? choice : { role: choice }), status: "unavailable" };
       delete room.avoidanceChoices[uid];
     }
   }
@@ -100,22 +116,26 @@ function prepare(store, room) {
 function settle(store, room) {
   for (const [uid, result] of Object.entries(room.avoidanceResults || {})) {
     if (result.status !== "effective") continue;
-    const changed = store.db.prepare("UPDATE avoidance_accounts SET balance=balance-1 WHERE uid=? AND balance>0").run(uid);
-    fail(changed.changes === 1, "回避卡余额已变化，请重新发放身份", 409);
+    const column = result.faction ? "faction_balance" : "balance";
+    const changed = store.db.prepare(`UPDATE avoidance_accounts SET ${column}=${column}-1 WHERE uid=? AND ${column}>0`).run(uid);
+    fail(changed.changes === 1, "用卡余额已变化，请重新发放身份", 409);
     store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
-      .run(randomUUID(), uid, -1, balance(store, uid), "spend", "本局回避生效", room.matchId, store.clock());
+      .run(randomUUID(), uid, -1, balance(store, uid, !!result.faction), result.faction ? "faction_spend" : "spend",
+        result.faction ? "本局阵营卡生效" : "本局回避生效", room.matchId, store.clock());
   }
 }
 function resultView(store, room, uid) {
   const result = room.avoidanceResults?.[uid];
   if (!result) return null;
-  return { ...result, roleName: require("./engine").roleName(result.role), balance: balance(store, uid) };
+  return { ...result, ...(result.role ? { roleName: require("./engine").roleName(result.role) } : {}), balance: balance(store, uid, !!result.faction) };
 }
 function roomView(store, room, uid) {
   const { publicView, avoidanceOptions } = require("./engine");
   const view = publicView(room, uid); // Check membership before reading private data.
+  const choice = room.phase === "lobby" ? room.avoidanceChoices?.[uid] : null;
   return { code: room.code, stage: room.stage, game: room.game, phase: room.phase,
-    balance: balance(store, uid), selected: room.phase === "lobby" ? room.avoidanceChoices?.[uid] || null : null,
+    balance: balance(store, uid), factionBalance: balance(store, uid, true),
+    selected: typeof choice === "string" ? choice : null, selectedFaction: choice?.faction || null,
     editable: room.phase === "lobby" && view.me.seat !== null,
     options: room.phase === "lobby" ? avoidanceOptions(room).map(o => ({ ...o, portrait: require("../miniprogram/role-portraits").portrait(o.name, o.faction).portrait })) : [] };
 }
@@ -157,4 +177,4 @@ function grant(store, input) {
   }
   return { batchId, recipients: targets.length, amount: input.amount };
 }
-module.exports = { initialize, eligible, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, deal, prepare, settle, resultView, roomView, players, grant };
+module.exports = { initialize, eligible, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, choiceResult, deal, prepare, settle, resultView, roomView, players, grant };

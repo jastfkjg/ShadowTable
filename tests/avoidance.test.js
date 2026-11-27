@@ -302,3 +302,66 @@ test("站起、移出和修改板子清除回避；所有板子仅提供初始�
   cmd("avoidance", { role: "merlin" }); cmd("stand"); assert.equal(room.avoidanceChoices["wx:host"], undefined);
   cmd("seat", { seat: 1 }); cmd("avoidance", { role: "merlin" }); cmd("configure", { board: "classic", capacity: 5 }); assert.equal(room.avoidanceChoices, undefined);
 });
+
+test("阵营请求与回避共用一个选择：验证余额和板子、并发用卡、隐私及仅成功扣卡", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens);
+  const options = async token => (await a.request(path + "/avoidance", token)).data;
+  const initial = await options(tokens[0]);
+  assert.equal(initial.factionBalance, 0);
+  assert.equal((await a.cmd(path, tokens[0], "avoidance", { faction: "evil" })).status, 400);
+  a.store.db.exec("UPDATE avoidance_accounts SET faction_balance=1");
+  const outsiderView = (await a.request(path, tokens[5])).data;
+  for (const token of tokens.slice(0, 3)) {
+    await a.cmd(path, token, "avoidance", { role: "merlin" });
+    assert.equal((await a.cmd(path, token, "avoidance", { faction: "third" })).status, 400);
+    assert.equal((await options(token)).selected, "merlin");
+    assert.equal((await a.cmd(path, token, "avoidance", { role: "assassin", faction: "evil" })).status, 400);
+    assert.equal((await a.cmd(path, token, "avoidance", { faction: "evil" })).status, 200);
+    const saved = await options(token);
+    assert.equal(saved.selected, null); assert.equal(saved.selectedFaction, "evil");
+  }
+  await a.cmd(path, tokens[3], "avoidance", { faction: "good" });
+  await a.cmd(path, tokens[3], "avoidance", { role: "merlin" });
+  assert.equal((await options(tokens[3])).selectedFaction, null);
+  await a.cmd(path, tokens[4], "avoidance", { faction: "good" });
+  await a.cmd(path, tokens[4], "avoidance", { role: null });
+  assert.equal((await options(tokens[4])).selectedFaction, null);
+  assert.deepEqual((await a.request(path, tokens[5])).data, outsiderView);
+  await a.ready(path, tokens);
+  const stage = (await options(tokens[0])).stage, id = randomUUID();
+  const body = { type: "start", stage, flexible: true };
+  for (let i = 0; i < 2; i++) assert.equal((await a.request(path + "/commands", tokens[0], body, id)).status, 200);
+  let fulfilled = 0;
+  for (const token of tokens.slice(0, 3)) {
+    const identity = (await a.request(path + "/private", token)).data;
+    const effective = identity.faction.includes("坏人");
+    assert.equal(identity.factionCard.faction, "evil");
+    assert.equal(identity.factionCard.status, effective ? "effective" : "ineffective");
+    assert.equal(identity.factionCard.balance, effective ? 0 : 1);
+    assert.equal(identity.avoidance, null); assert.equal((await options(token)).balance, 1);
+    if (effective) fulfilled++;
+  }
+  assert.equal(fulfilled, 2);
+  assert.equal((await options(tokens[3])).factionBalance, 1);
+  assert.equal((await options(tokens[3])).balance, 0);
+  assert.equal((await a.request(path + "/private", tokens[5])).data.factionCard, undefined);
+  assert.equal((await a.cmd(path, tokens[0], "avoidance", { faction: "good" })).status, 409);
+  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='faction_spend'").get().n, 2);
+});
+test("混沌契约的第三方由初始牌决定，换板清空选择", () => {
+  const room = engine.newRoom("444444", "host", "房主", "chaos", 12);
+  for (let i = 2; i <= 12; i++) engine.enter(room, "p" + i, "玩家" + i);
+  const act = (uid, type, fields) => engine.command(room, uid, { type, stage: room.stage, ...fields });
+  act("host", "avoidance", { faction: "third" });
+  act("host", "updateSettings", { board: "knights", capacity: 12, visible: false });
+  assert.equal(room.avoidanceChoices?.host, undefined);
+  assert.throws(() => act("host", "avoidance", { faction: "third" }), /阵营/);
+  act("host", "configure", { board: "chaos", capacity: 12 });
+  for (const p of room.players) {
+    act(p.uid, "avoidance", { faction: "third" });
+    act(p.uid, "ready", { ready: true });
+  }
+  act("host", "start", {});
+  const fulfilled = room.players.filter(p => engine.privateView(room, p.uid).factionCard.status === "effective");
+  assert.deepEqual(fulfilled.map(p => room.roles[p.uid]).sort(), ["blueThief", "redThief"]);
+});

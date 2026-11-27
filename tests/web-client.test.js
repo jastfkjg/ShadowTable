@@ -109,7 +109,7 @@ test('收卡弹窗未确认时房主发牌，收到新房间状态后立即收�
   const writes = [];
   const c = client(async (url, options = {}) => {
     if (options.method === 'POST') writes.push(url);
-    return response(url.includes('/avoidance/notice') ? { balance: 1, notice: { through: 'grant-1', amount: 1, grants: 1 } }
+    return response(url.includes('/cards/notice') ? { balance: 1, notice: { through: 'grant-1', amount: 1, grants: 1 } }
       : url.endsWith('/private') ? require('../server/engine').privateView(room, 'host') : publicView(room, 'host'));
   });
   c.state.loading = false; c.state.page = 'table'; c.state.room = publicView(room, 'host');

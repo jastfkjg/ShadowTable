@@ -2695,3 +2695,27 @@ test('换牌遇到断网、忙碌或待确认请求时仍可收起，恢复后�
     assert.equal(p.data.dealtIdentitySecret.role,'红猎人');
   }
 });
+
+test('本局用卡只在确认时替换，选项来自当前板子，关闭重开回到已保存的卡', async () => {
+  const value = { code: '123456', stage: 1, phase: 'lobby', balance: 2, factionBalance: 1,
+    selected: 'merlin', selectedFaction: null, editable: true, options: [
+      { id: 'merlin', name: '梅林', faction: 'good', count: 1 }, { id: 'assassin', name: '刺客', faction: 'evil', count: 1 },
+      { id: 'blueThief', name: '蓝盗贼', faction: 'third', count: 1 }, { id: 'redThief', name: '红盗贼', faction: 'third', count: 1 },
+    ] };
+  const p = page({ request: async () => value }); p.roomCode = value.code;
+  p.data.room = { code: value.code, phase: 'lobby', stage: 1, me: { seat: 1, ready: true } };
+  const commands = []; p.cmd = (...args) => commands.push(args);
+  const event = dataset => ({ currentTarget: { dataset } });
+  await p.openAvoidance(); assert.equal(p.data.avoidance.tab, 'avoidance');
+  p.switchCardTab(event({ tab: 'faction' })); p.chooseAvoidance(event({ id: 'third' }));
+  assert.deepEqual(p.data.avoidance.factions.map(o => o.id), ['good', 'evil', 'third']);
+  assert.match(p.data.avoidance.exampleText, /蓝盗贼、红盗贼/);
+  assert.equal(p.data.avoidance.replaces, '回避梅林');
+  p.closeAvoidance(); await p.openAvoidance();
+  assert.equal(p.data.avoidanceDraft, 'merlin'); assert.equal(commands.length, 0);
+  p.switchCardTab(event({ tab: 'faction' })); p.chooseAvoidance(event({ id: 'third' })); p.saveAvoidance();
+  assert.deepEqual(JSON.parse(JSON.stringify(commands)), [['avoidance', { faction: 'third' }, 'avoidance']]);
+  value.selected = null; value.selectedFaction = 'third'; p.closeAvoidance(); await p.openAvoidance();
+  assert.equal(p.data.avoidance.tab, 'faction'); assert.equal(p.data.avoidanceDraft, 'third');
+  p.cancelAvoidance(); assert.equal(commands[1][1].role, null);
+});

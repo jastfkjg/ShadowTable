@@ -1804,7 +1804,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
       } else {
         this.setData({ notice: "" });
         await this.refresh();
-        if (pending.data.type === "avoidance") this.showRoomFeedback(pending.data.role === null ? "本局不使用回避卡" : "本局回避已保存，生效后才扣卡");
+        if (pending.data.type === "avoidance") this.showRoomFeedback(pending.data.role === null ? "已取消本局用卡" : "本局选择已保存，生效后才扣卡");
         if (pending.after === "enter" && this.inviteCode && this.data.room?.phase === "lobby" && this.data.room.me.seat === null)
           this.setData({ notice: "座位已满，已以旁观者进入房间" });
       }
@@ -1978,19 +1978,25 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     try {
       const value = await api.request("/api/rooms/" + room.code + "/avoidance");
       if (!this.alive || !this.foreground || generation !== this.generation || !this.data.avoidanceOpen || this.data.room?.code !== value.code || this.data.room.stage !== value.stage || value.phase !== "lobby") return;
-      this.setData({ avoidance: value, avoidanceLoading: false, avoidanceDraft: value.selected || "",
-        avoidanceDraftName: value.options.find(o => o.id === value.selected)?.name || "",
-        avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) });
+      this.setData({ ...avoidancePresentation.panel(value), avoidanceLoading: false });
     } catch (error) { if (generation === this.generation && this.foreground) { this.closeAvoidance(); this.handleError(error); } }
   },
   closeAvoidance() { this.generation++; this.setData({ avoidanceOpen: false, avoidanceLoading: false, avoidance: null, avoidanceGroups: [], avoidanceDraft: "", avoidanceDraftName: "" }); },
-  chooseAvoidance(e) {
-    const value = this.data.avoidance, id = e.currentTarget.dataset.id;
-    if (!value?.editable || value.balance < 1 || this.data.busy || this.pending) return;
-    const option = value.options.find(o => o.id === id); if (!option) return;
-    this.setData({ avoidanceDraft: id, avoidanceDraftName: option.name, avoidanceGroups: avoidancePresentation.groups(value.options, id) });
+  switchCardTab(e) {
+    const tab = e.currentTarget.dataset.tab, value = this.data.avoidance;
+    if (!value?.options || tab === value.tab || this.data.busy || this.pending || !["faction", "avoidance"].includes(tab)) return;
+    this.setData(avoidancePresentation.panel(value, tab));
   },
-  saveAvoidance() { if (this.data.avoidance?.editable && this.data.avoidanceDraft && !this.data.avoidanceLoading) return this.cmd("avoidance", { role: this.data.avoidanceDraft }, "avoidance"); },
+  chooseAvoidance(e) {
+    if (this.data.busy || this.pending) return;
+    const patch = avoidancePresentation.choose(this.data.avoidance, e.currentTarget.dataset.id);
+    if (patch) this.setData(patch);
+  },
+  saveAvoidance() {
+    const value = this.data.avoidance, id = this.data.avoidanceDraft;
+    if (value?.editable && id && !this.data.avoidanceLoading)
+      return this.cmd("avoidance", value.tab === "faction" ? { faction: id } : { role: id }, "avoidance");
+  },
   cancelAvoidance() { if (this.data.avoidance?.editable) return this.cmd("avoidance", { role: null }, "avoidance"); },
   async confirm(title, content, confirmText = "确定", options = {}) {
     if (!this.alive || !this.foreground) return false;
@@ -2491,7 +2497,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
             information: secret.information,
             info: roomSheet.presentIdentityInformation(secret, this.data.seats),
             skillStatus: secret.skillStatus,
-            avoidance: avoidancePresentation.result(secret.avoidance),
+            avoidance: avoidancePresentation.result(secret.factionCard || secret.avoidance),
           },
         });
       }
@@ -2561,7 +2567,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         information: secret.information,
         info: roomSheet.presentIdentityInformation(secret, this.data.seats),
         vision: roomSheet.presentVision(secret.information, this.data.seats),
-        ...(change ? { skillStatus: secret.skillStatus || null } : { avoidance: avoidancePresentation.result(secret.avoidance) }),
+        ...(change ? { skillStatus: secret.skillStatus || null } : { avoidance: avoidancePresentation.result(secret.factionCard || secret.avoidance) }),
       } });
     } catch (e) {
       if (generation === this.generation && this.foreground) this.handleError(e);
@@ -2661,7 +2667,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
         this.data.room.stage === stage
       ) {
         secret.factionTone = factionTone(secret.faction);
-        secret.avoidance = avoidancePresentation.result(secret.avoidance);
+        secret.avoidance = avoidancePresentation.result(secret.factionCard || secret.avoidance);
         secret.portrait = portrait(secret.role, secret.factionTone).portrait;
         secret.info = roomSheet.presentIdentityInformation(secret, this.data.seats);
         secret.identityHistory = (secret.identityHistory || []).map(record => ({

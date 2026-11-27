@@ -130,18 +130,19 @@ test("重复归档、管理员删除后恢复、趣味重建和重启不会恢�
     assert.equal(store.playerScore("wx:me").points, 3);
   } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
-test("永久徽章、回避卡余额及累计奖励进度保留", () => {
+test("永久徽章、两种用卡余额及累计奖励保留", () => {
   const store = new Store(":memory:", { clock: () => NOW });
   try {
     game(store); require("../server/badge-awards").activate(store);
     require("../server/avoidance").ensureAccount(store, "wx:me");
-    store.db.prepare("UPDATE avoidance_accounts SET balance=5 WHERE uid='wx:me'").run();
-    store.db.prepare("INSERT INTO avoidance_reward_accounts VALUES('wx:me',4,2,2)").run();
+    store.db.prepare("UPDATE avoidance_accounts SET balance=5,faction_balance=2 WHERE uid='wx:me'").run();
+    store.db.prepare("INSERT INTO avoidance_reward_accounts(uid,wins,losses,issued,faction_issued) VALUES('wx:me',4,2,2,2)").run();
     const permanent = readBadges(store, "wx:me").badges.filter(b => b.permanent).map(b => b.id);
     const rewards = store.db.prepare("SELECT * FROM avoidance_reward_accounts WHERE uid='wx:me'").get();
     remove(store);
     assert.deepEqual(readBadges(store, "wx:me").badges.filter(b => b.permanent).map(b => b.id), permanent);
     assert.equal(require("../server/avoidance").balance(store, "wx:me"), 5);
+    assert.equal(require("../server/avoidance").balance(store, "wx:me", true), 2);
     assert.deepEqual(store.db.prepare("SELECT * FROM avoidance_reward_accounts WHERE uid='wx:me'").get(), rewards);
   } finally { store.close(); }
 });

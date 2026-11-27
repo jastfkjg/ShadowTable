@@ -311,8 +311,11 @@ function createApp({
         return send(200, recordShares.create(store, uid, await body(req)));
       }
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
-      if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
-      if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));
+      if (path === "/api/me/avoidance/notice" || path === "/api/me/cards/notice") {
+        const includeFaction = path === "/api/me/cards/notice";
+        if (req.method === "GET") return send(200, avoidance.grantNotice(store, uid, includeFaction));
+        if (req.method === "POST") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req), includeFaction));
+      }
       if (path === "/api/me/feedback") {
         if (req.method === "GET") return send(200, playerFeedback.list(store, uid, requestUrl.searchParams));
         check(req.method === "POST", "接口不存在", 404);
@@ -512,7 +515,11 @@ function createApp({
         }
         if (match[2] === "avoidance") return send(200, avoidance.roomView(store, room, uid));
         check(!match[2] || match[2] === "private", "接口不存在", 404);
-        if (match[2] === "private") return send(200, { ...privateView(room, uid), avoidance: avoidance.resultView(store, room, uid) });
+        if (match[2] === "private") {
+          const identity = privateView(room, uid);
+          const result = avoidance.resultView(store, room, uid);
+          return send(200, { ...identity, avoidance: result?.faction ? null : result, ...(result?.faction ? { factionCard: result } : {}) });
+        }
         // Authorize and build the existing allowlisted view before enriching presentation.
         const view = publicView(room, uid);
         view.me.avoidance = { balance: avoidance.balance(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
@@ -641,7 +648,8 @@ function createApp({
             room = store.get(room.code);
           } else {
             if (b.type === "rematch") { honors.closeForRoom(store, room); room = store.get(room.code); }
-            if (b.type === "avoidance" && b.role !== null && room.phase === "lobby") check(avoidance.balance(store, uid) > 0, "暂无回避卡");
+            if (b.type === "avoidance" && b.role !== null && room.phase === "lobby")
+              check(avoidance.balance(store, uid, b.faction !== undefined) > 0, b.faction !== undefined ? "暂无阵营卡" : "暂无回避卡");
             if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
             if (b.type === "start") {

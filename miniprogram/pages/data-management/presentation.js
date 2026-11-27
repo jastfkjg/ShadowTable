@@ -3,7 +3,7 @@
   else root.shadowtableRecordClearing = factory();
 })(typeof window === "undefined" ? this : window, function () {
   const scope = "清除个人对局记录、战绩、积分及明细、趣味统计，并重新计算排行榜、月报和月榜徽章。";
-  const retained = "同桌玩家的记录与共享对局过程仍保留。已发放的永久徽章、回避卡及累计奖励进度保留。";
+  const retained = "同桌玩家的记录与共享对局过程仍保留。已发放的永久徽章、两种用卡及累计奖励保留。";
   const timing = "按北京时间的对局结束月份清理，积分调整按发生月份清理。清除后无法自行恢复，之后的新对局继续正常累计。";
   function monthLabel(month) { return month ? Number(month.slice(0, 4)) + " 年 " + Number(month.slice(5)) + " 月" : ""; }
   const impacts = [

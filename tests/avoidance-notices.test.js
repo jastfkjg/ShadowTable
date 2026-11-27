@@ -112,3 +112,12 @@ test("小程序仅在房间准备阶段提醒收卡，首页、我的、结束�
   assert.equal(shown.variant, "avoidance-grant"); assert.equal(shown.lead, "活动赠卡"); assert.equal(shown.content, "使用提示");
   assert.equal(controller.grantNoticeOpen, false);
 });
+
+test("同次取得两种卡的提醒分别列出数量", () => {
+  const value = { notice: { amount: 3, factionAmount: 1, reasons: ["活动赠卡"] } };
+  assert.deepEqual(grantCopy(value), {
+    title: "收到本局用卡", lead: "阵营卡 ×1、回避卡 ×2\n\n活动赠卡",
+    content: "入座后点「本局用卡」选择初始阵营或回避角色。每局限用 1 张，生效才扣卡。",
+  });
+  assert.equal(grantCopy({ notice: { amount: 1, factionAmount: 1 } }).title, "收到阵营卡");
+});
