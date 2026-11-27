@@ -2499,3 +2499,21 @@ test('徽章榜卡片打开只读图文详情，隐藏的明细无法打开', as
   controller.openBadge(id);
   assert.equal(controller.state.selectedBadge, null);
 });
+
+test('趣味榜进入徽章查询后按名称选徽章，达成名单只显示获得者', async () => {
+  const board = factory('pages/leaderboard/leaderboard.wxml')({ metric: 'fun_merlin_evade', funSelected: true });
+  assert.ok(nodes(board).some(n => n.attr?.url === '/pages/badges/ranks?kind=lookup'));
+  const { create } = require('../miniprogram/pages/badges/rank-controller');
+  const render = state => factory('pages/badges/ranks.wxml')({ rank: state });
+  const directory = create({ request: async () => ({ ids: ['five_wins','ten_wins'] }), update() {} }, 'lookup');
+  await directory.load();
+  directory.search('五连');
+  assert.equal(byHandler(render(directory.state), 'openLookup').attr['data-id'], 'five_wins');
+  const result = create({ request: async () => ({ holdersOnly: true, total: 1, nextOffset: null,
+    rows: [{publicId: 'a', nickname: '玩家甲', rank: null, earned: true}] }), update() {} }, 'lookup', '', 'five_wins');
+  await result.load();
+  const list = render(result.state);
+  assert.match(JSON.stringify(list), /公开获得者/);
+  assert.match(JSON.stringify(list), /玩家甲/);
+  assert.ok(!nodes(list).some(n => n.attr?.class === 'br-place'));
+});

@@ -49,6 +49,35 @@ function fixture(t) {
   };
 }
 const ids = (badges) => badges.map((b) => b.id);
+test('计分胜负场分别取本月最高正次数，并列持有，收藏与分类榜一致', (t) => {
+  const f = fixture(t);
+  function check(uid, id, kind, expected) {
+    assert.equal(ids(f.badges(uid)).includes(id), expected, uid + ' / ' + id);
+    const ranked = f.store.badgeRanks.detail(uid, kind, 'self').badges;
+    assert.equal(ids(ranked).includes(id), expected, uid + ' / ' + kind);
+  }
+  const wins = (uid, expected) => check(uid, 'overall', 'honor', expected);
+  const losses = (uid, expected) => check(uid, 'headwind_navigator', 'fun', expected);
+  f.game([['wx:all-wins'], ['wx:busy'], ['dev:tie']]);
+  losses('wx:all-wins', false);
+  f.game([['wx:busy'], ['dev:tie'], ['wx:all-losses', 'loss']]);
+  f.game([['wx:busy', 'loss'], ['wx:all-losses', 'loss']]);
+  // Unscored results, undersized tables and the previous month's games cannot break either tie.
+  f.game([['dev:tie', 'win', 'merlin', 'good', false], ['wx:busy', 'loss', 'merlin', 'good', false]]);
+  f.game([['dev:tie'], ['wx:busy', 'loss']], { board: 'classic', capacity: 8 });
+  f.game([['dev:tie'], ['wx:busy', 'loss']], { endedAt: start - 1 });
+  wins('wx:all-wins', false);
+  wins('wx:busy', true);
+  wins('dev:tie', true);
+  losses('wx:busy', false);
+  losses('wx:all-losses', true);
+  f.game([['wx:busy', 'loss']]);
+  losses('wx:busy', true);
+  losses('wx:all-losses', true);
+  f.monthEnds();
+  wins('wx:busy', false);
+  losses('wx:all-losses', false);
+});
 test('个人最长序列、月界、达标后永久授予及重复归档', (t) => {
   const f = fixture(t),
     uid = 'wx:player';

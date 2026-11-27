@@ -19,7 +19,7 @@ function readBadges(store, uid, now = store.clock()) {
   const earned = /^(wx|dev|guest):/.test(uid) ? monthlyAchievements(store, now).get(uid)?.earned : null;
   for (const definition of catalogue) {
     if (definition.permanent) continue;
-    if (definition.achievement) {
+    if (definition.achievement || definition.metric === 'leader') {
       if (earned?.has(definition.id)) badges.push({ ...rankedBadge(definition, earned.get(definition.id)), equipped: false });
       continue;
     }

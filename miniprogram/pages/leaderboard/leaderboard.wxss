@@ -217,3 +217,8 @@ button.rank-details-close { width: 44px; min-width: 44px; min-height: 44px; heig
 }
 
 .rank-month-label { padding:0 4px; color:var(--accent); font-size:16px; font-weight:600; }
+
+.fun-rank-filters .badge-lookup-link {
+  display: flex; align-items: center; justify-content: flex-start; min-height: 44px;
+  margin: 0; padding: 0 8px; color: var(--accent, #e5c68b); font-size: 14px; background: transparent; border: 0;
+}

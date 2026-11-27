@@ -4,7 +4,7 @@ const { create } = require("./rank-controller");
 Page({
   data: { rank: null, badgeDetailHeight: 0 },
   onLoad(options) {
-    const kind = options.kind === "fun" ? "fun" : "honor";
+    const kind = ["lookup", "fun"].includes(options.kind) ? options.kind : "honor";
     const player = /^(self|[a-f0-9]{32})$/.test(options.player || "")
       ? options.player
       : "";
@@ -21,7 +21,8 @@ Page({
         },
       },
       kind,
-      player,
+      kind === "lookup" ? "" : player,
+      kind === "lookup" ? options.badge || "" : "",
     );
   },
   onShow() {
@@ -70,6 +71,10 @@ Page({
         id,
     });
   },
+  search(e) { this.controller.search(e.detail.value); },
+  openLookup(e) {
+    wx.navigateTo({ url: "/pages/badges/ranks?kind=lookup&badge=" + encodeURIComponent(e.currentTarget.dataset.id) });
+  },
   openBadge(e) { this.controller.openBadge(e.currentTarget.dataset.id); },
   closeBadgeDetail() { this.controller.closeBadge(); },
   measureBadgeDetail,
@@ -79,8 +84,10 @@ Page({
     return this.controller.visibility(e.detail.value);
   },
   back() {
+    const { lookup, badgeId } = this.controller.state;
+    const fallback = lookup ? (badgeId ? "/pages/badges/ranks?kind=lookup" : "/pages/leaderboard/leaderboard") : "/pages/badges/badges";
     wx.navigateBack({
-      fail: () => wx.redirectTo({ url: "/pages/badges/badges" }),
+      fail: () => wx.redirectTo({ url: fallback }),
     });
   },
 });

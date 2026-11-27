@@ -2482,7 +2482,9 @@ test('网页徽章管理按需显示摘下，详情精简说明且保留获取�
   assert.doesNotMatch(detail,/>徽章详情<|常驻牌桌|按北京时间本月|摘下后仍保留/);
   assert.match(detail,/secondary badge-detail-action/);
   c.ACTIONS.showBadgeDetail({dataset:{id:'overall'}});
-  assert.match(c.viewBadgeManager(),/按原始胜率排序，胜率相同时比较有效局数/);
+  assert.match(c.viewBadgeManager(),/当月获得计分局胜场最多的玩家（含并列）/);
+  c.ACTIONS.showBadgeDetail({dataset:{id:'headwind_navigator'}});
+  assert.match(c.viewBadgeManager(),/当月获得计分局负场最多的玩家（含并列）/);
 });
 
 test('网页满额替换先选择再确认，返回详情取消选择，保存后标出原名片位置', async () => {

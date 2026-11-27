@@ -12,7 +12,7 @@ const eligibleRole = (def, role) => {
   if (def.group === "kill") return !!fun.combatType(role);
   return fun.combatType(role) === def.group;
 };
-const METRICS = { points: 1, games: 1, overall: 1, good: 1, evil: 1 };
+const METRICS = { points: 1, games: 1, overall: 10, good: 10, evil: 10 };
 const PAGE_SIZE = 20, MAX_ROWS = 100, CACHE_MS = 30000;
 const SCORED_MATCH_JOIN = "JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid AND s.status='scored'";
 function markTies(rows) {
@@ -130,7 +130,7 @@ class Leaderboard {
     if (metric === "points") ownStats.points = own?.points || 0;
     // Profiles without games do not appear in the aggregation.
     const visible = readProfile(this.store, uid).leaderboardVisible;
-    const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : "ranked";
+    const status = !/^(wx|dev):/.test(uid) ? "unsupported" : !visible ? "hidden" : !ownStats.total ? "no_games" : ownStats.total < METRICS[metric] ? "not_enough" : "ranked";
     const end = Math.min(MAX_ROWS, snapshot.eligible.length), nextOffset = offset + PAGE_SIZE;
     const present = row => ({
       publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null,

@@ -52,10 +52,10 @@ test('旧版 55 枚徽章逐枚对应荣誉或趣味分类，已获得的积分�
   assert.equal(honor.ownershipFilters.find(f => f.id === 'owned').count, 1);
   assert.equal(honor.slots[0].id, 'feedback_contributor');
 });
-test('87 枚固定徽章涵盖 78 枚月度及 9 枚永久荣誉，零数据不颁发', () => {
+test('88 枚固定徽章涵盖 79 枚月度及 9 枚永久收藏，零数据不颁发', () => {
   const store = new Store(':memory:',{clock:()=>NOW});
   try {
-    assert.equal(catalogue.length,87);assert.equal(new Set(catalogue.map(b=>b.id)).size,87);
+    assert.equal(catalogue.length,88);assert.equal(new Set(catalogue.map(b=>b.id)).size,88);
     assert.equal(catalogue.filter(b=>b.permanent).length,9);
     for (const id of [...Object.keys(honors), ...roleIds]) assert.ok(catalogue.some(b=>b.id===id));
     for(const uid of ['wx:new','dev:new','guest:new','test:new'])assert.deepEqual(ids(store,uid),[]);
@@ -182,7 +182,7 @@ test('趣味次数榜以完整快照颁发，超过100名的并列第一不遗�
     assert.ok(ids(store,'wx:champion').includes('merlin_evade'));
   } finally {store.close();}
 });
-test('胜率使用真实比例与局数规则；公开设置和删除对局立即更新资格', () => {
+test('常胜将军按计分胜场数颁发，公开设置和排除对局立即更新资格', () => {
   const store=new Store(':memory:',{clock:()=>NOW});
   try {
     game(store,'wx:a');const extra=game(store,'wx:a');game(store,'wx:b');

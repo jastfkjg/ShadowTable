@@ -1,7 +1,23 @@
 <import src="detail-sheet.wxml" />
-<app-nav title="{{rank.player ? rank.label : '徽章榜'}}" back="{{true}}" backLabel="{{rank.player ? '返回徽章榜' : '返回徽章收藏'}}" bindback="back" />
+<app-nav title="{{rank.lookup ? '查徽章' : rank.player ? rank.label : '徽章榜'}}" back="{{true}}" backLabel="{{rank.lookup ? (rank.badgeId ? '返回徽章查询' : '返回排行榜') : rank.player ? '返回徽章榜' : '返回徽章收藏'}}" bindback="back" />
 <view wx:if="{{rank}}" class="br-page br-{{rank.kind}}">
-  <block wx:if="{{!rank.player}}">
+  <block wx:if="{{rank.lookup}}">
+    <block wx:if="{{!rank.badgeId}}">
+      <label class="br-search"><text>徽章名称</text><input class="input" placeholder="搜索徽章名称或月份" value="{{rank.query}}" bindinput="search" /></label>
+      <button wx:for="{{rank.matches}}" wx:key="id" class="br-lookup-item" bindtap="openLookup" data-id="{{item.id}}" hover-class="badge-pressed"><image class="br-lookup-art" src="{{item.imageUrl}}" mode="aspectFit" lazy-load aria-hidden="true"/><text class="br-name">{{item.title}}</text><text class="br-muted">{{item.scope}}</text><view class="br-chevron"></view></button>
+      <view wx:if="{{!rank.loading && !rank.error && !rank.matches.length}}" class="br-status">没有找到徽章，试试更短的名称。</view>
+    </block>
+    <block wx:else>
+      <view wx:if="{{rank.badge}}" class="br-person"><image class="br-lookup-art" src="{{rank.badge.imageUrl}}" mode="aspectFit" aria-hidden="true"/><view><view class="br-person-name">{{rank.badge.title}}</view><view class="br-muted">{{rank.badge.scope}} · {{rank.badge.condition}}</view></view></view>
+      <block wx:if="{{rank.board}}">
+        <view class="br-selector-meta">{{rank.board.holdersOnly?'公开获得者':'公开排名'}} · {{rank.board.total}} 人</view>
+        <view wx:for="{{rank.board.rows}}" wx:key="publicId" class="br-lookup-item"><text wx:if="{{item.rank}}" class="br-place">{{item.rank}}</text><image wx:if="{{item.avatarUrl}}" class="br-avatar" src="{{item.avatarUrl}}" mode="aspectFill" aria-hidden="true"/><text wx:else class="br-avatar">{{item.initial}}</text><text class="br-name">{{item.nickname}}</text><text wx:if="{{item.earned && !rank.board.holdersOnly}}" class="br-muted">已获得</text><text wx:if="{{item.unit}}" class="br-number">{{item.value}} <text>{{item.unit}}</text></text></view>
+        <view wx:if="{{!rank.board.total}}" class="br-status">{{rank.board.holdersOnly?'暂无公开获得者':'暂无符合条件的公开玩家'}}</view>
+        <button wx:if="{{rank.board.nextOffset!==null && !rank.error}}" class="br-more" bindtap="more" disabled="{{rank.loading}}" hover-class="badge-pressed">{{rank.loading?'加载中…':'查看更多玩家'}}</button>
+      </block>
+    </block>
+  </block>
+  <block wx:elif="{{!rank.player}}">
     <view class="br-selector">
       <view class="br-choices" role="group" aria-label="切换徽章榜">
         <button wx:for="{{rank.choices}}" wx:key="kind" class="br-choice {{rank.kind===item.kind?'selected':''}}" hover-class="badge-pressed" data-kind="{{item.kind}}" bindtap="select" aria-pressed="{{rank.kind===item.kind}}">

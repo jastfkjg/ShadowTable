@@ -15,11 +15,13 @@
     <button wx:for="{{groups}}" wx:key="id" class="rank-metric {{item.id}} {{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))?'selected':''}}" bindtap="chooseGroup" data-id="{{item.id}}" disabled="{{(item.id==='points' && !pointsAvailable) || (item.id==='fun' && !funAvailable)}}" aria-pressed="{{metric===item.id || (item.id==='fun' && funSelected) || (item.id==='overall' && (metric==='good' || metric==='evil'))}}" hover-class="rank-pressed"><view class="rank-metric-label"><image wx:if="{{item.id==='points' && metric==='points'}}" class="rank-metric-icon" src="/assets/record-cup.svg" aria-hidden="true" /><text>{{item.label}}</text><view class="rank-metric-indicator" aria-hidden="true"></view></view></button>
   </view>
   <view wx:if="{{metric==='overall' || metric==='good' || metric==='evil'}}" class="rank-rates" aria-label="胜率阵营"><button wx:for="{{rateMetrics}}" wx:key="id" class="{{metric===item.id?'selected':''}}" bindtap="chooseMetric" data-id="{{item.id}}" aria-pressed="{{metric===item.id}}" hover-class="none">{{item.label}}</button></view>
+  <view wx:if="{{board.eligibilityLabel && metric===board.metric}}" class="small muted">{{board.eligibilityLabel}}</view>
   <view wx:if="{{funSelected}}" class="fun-rank-filters">
     <button class="disclosure-button fun-metric-toggle" bindtap="toggleMetrics" aria-expanded="{{metricsExpanded}}" aria-label="选择趣味指标" hover-class="none">
       <view class="fun-metric-current"><block wx:for="{{funOptions}}" wx:key="key"><view wx:if="{{metric===item.key}}"><view class="fun-option-heading"><text class="fun-metric-name">{{item.title}}</text></view><view class="fun-metric-description">{{item.conditionLabel || item.label}}</view></view></block></view>
       <view class="fun-filter-chevron" aria-hidden="true"></view>
     </button>
+    <navigator class="badge-lookup-link" url="/pages/badges/ranks?kind=lookup" hover-class="rank-pressed">查徽章 ›</navigator>
     <view class="fun-sort-row">
       <view class="fun-sort" aria-label="排序方式">
         <button bindtap="chooseFunSort" data-id="count" class="{{funSort==='count'?'selected':''}}" aria-pressed="{{funSort==='count'}}" hover-class="none">{{board.currentFunOption.group==='honor'?'获奖次数':'次数'}}</button>

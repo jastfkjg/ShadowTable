@@ -291,7 +291,7 @@ function createApp({
         const ownDataRead = req.method === "GET" && ([
           "/api/me/profile", "/api/me/stats", "/api/me/matches",
           "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard", "/api/monthly-report", "/api/me/avoidance",
-        ].includes(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
+        ].includes(path) || /^\/api\/leaderboard\/badges(?:\/[a-z0-9_-]+)?$/.test(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
         const ownProfileWrite = req.method === "POST" && [
           "/api/me/profile", "/api/me/leaderboard-visibility",
         ].includes(path);
@@ -332,6 +332,11 @@ function createApp({
       }
       const uploadStatus = path.match(/^\/api\/me\/avatar-uploads\/([a-f0-9-]{36})$/);
       if (req.method === "GET" && uploadStatus) return send(200, require("./avatar-uploads").readUpload(store, uid, uploadStatus[1]));
+      const lookup = path.match(/^\/api\/leaderboard\/badges(?:\/([a-z0-9_-]+))?$/);
+      if (req.method === 'GET' && lookup) {
+        res.setHeader('Cache-Control', 'no-store');
+        return send(200, require('./badge-lookup').read(store, leaderboard, lookup[1], requestUrl.searchParams, clock()));
+      }
       const badgeRank = path.match(/^\/api\/badge-ranks\/(honor|fun)(?:\/(self|[0-9a-f]{32}))?$/);
       if (badgeRank) {
         const [, kind, player] = badgeRank;

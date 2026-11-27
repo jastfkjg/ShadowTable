@@ -671,6 +671,8 @@
     const collection = /^#\/player-badges\/(leaderboard|\d{6})\/([a-f0-9-]+)$/.exec(hash || '');
     if (collection && badgePresentation.playerCollectionPath(collection[1], collection[2]))
       return { page: 'player-badges', path: badgePresentation.playerCollectionPath(collection[1], collection[2]), scope: collection[1] };
+    const lookup = /^#\/badge-ranks\/lookup(?:\/([a-z0-9_-]+))?$/.exec(hash || '');
+    if (lookup) return { page: 'badge-ranks', kind: 'lookup', badgeId: lookup[1] || '' };
     const badgeRank = /^#\/badge-ranks(?:\/(honor|fun)(?:\/(self|[a-f0-9]{32}))?)?$/.exec(hash || '');
     if (badgeRank) return { page:'badge-ranks', kind:badgeRank[1] || 'honor', player:badgeRank[2] || '' };
     var name = (hash || '').replace(/^#\//, '');
@@ -741,7 +743,7 @@
       else if (route.page === 'badge-ranks') {
         badgeRankController = window.shadowtableBadgeRanks.create({ request, update:view => {
           if (alive && sequence === routeSequence) setState({ badgeRankView:view });
-        } },route.kind,route.player);
+        } },route.kind,route.player,route.badgeId);
         await badgeRankController.load();
       }
       else if (route.page === 'badges') await loadBadgeManager();
@@ -1384,6 +1386,7 @@
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
     }).join('') + '</div>';
     if (['overall','good','evil'].includes(metric)) html += '<div class="rank-rates" role="group" aria-label="胜率阵营">' + rankMetrics.filter(item => ['overall','good','evil'].includes(item[0])).map(item => '<button type="button" class="' + (metric === item[0] ? 'selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
+    if (board?.eligibilityLabel && metric === board.metric) html += '<div class="small muted">' + esc(board.eligibilityLabel) + '</div>';
     if (metric.startsWith('fun_')) html += viewFunRankFilters(board);
     if (state.rankLoading && !board) html += '<div class="rank-share-status small muted" role="status">正在读取榜单…</div>';
     if (state.rankNotice) html += '<div role="status" class="rank-notice small muted">' + esc(state.rankNotice) + '</div>';
@@ -2463,7 +2466,7 @@ function roomListItems(rooms) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
     const rateLabel = option?.rateLabel || board?.rateLabel || '成功率';
     const identity = board?.roleOptions?.find(item => item.id === state.rankFunRole)?.label || option?.roleLabel;
-    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-option-heading"><span class="fun-metric-name">' + esc(option?.title || '选择指标') + '</span>' + (identity ? '<span class="fun-identity">' + esc(identity) + '</span>' : '') + '</span><span class="fun-metric-description">' + esc(option?.conditionLabel || option?.label || '') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + (board?.countOnly ? ['count'] : ['count','rate']).map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? board?.metric?.startsWith('fun_honor_') ? '获奖次数' : '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
+    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-option-heading"><span class="fun-metric-name">' + esc(option?.title || '选择指标') + '</span>' + (identity ? '<span class="fun-identity">' + esc(identity) + '</span>' : '') + '</span><span class="fun-metric-description">' + esc(option?.conditionLabel || option?.label || '') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><button class="badge-lookup-link" data-action="navigate" data-page="badge-ranks/lookup">查徽章 ›</button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + (board?.countOnly ? ['count'] : ['count','rate']).map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? board?.metric?.startsWith('fun_honor_') ? '获奖次数' : '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
     if (board?.roleOptions?.length) html += '<label class="fun-role-filter"><span class="fun-filter-label">技能身份</span><select class="fun-picker" data-change="funRankRole" aria-label="技能身份">' + [{ id: '', label: '全部身份' }, ...board.roleOptions].map(item => '<option value="' + esc(item.id) + '"' + (item.id === state.rankFunRole ? ' selected' : '') + '>' + esc(item.label) + '</option>').join('') + '</select></label>';
     return html + '</div>';
   }
@@ -5761,6 +5764,7 @@ function roomListItems(rooms) {
     },
   };
   var INPUTS = {
+    badgeLookup: el => badgeRankController?.search(el.value),
     boardDetailSearch: function (el) { setState({ boardDetailQuery: el.value }); },
     profileName: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.nickname = el.value; state.profileNicknameError = ''; state.profileError = ''; profileDirty(); } },
     roomNote: function (el) { state.roomNoteDraft = el.value; },

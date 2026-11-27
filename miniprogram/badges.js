@@ -8,7 +8,7 @@
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
-    { id: 'overall', title: '常胜将军', description: '本月总胜率榜第一。以原始胜率排名，胜率相同时按有效局数排序，两者相同则并列。', metric: 'overall' },
+    { id: 'overall', title: '常胜将军', description: '当月获得计分局胜场最多的玩家。', metric: 'leader' },
   ];
   const funMonthly = Object.entries({ ...copy.honors, ...copy.roleRecords }).map(([id, honor]) => ({
     id, title: honor.title, metric: 'fun_' + id,
@@ -40,6 +40,7 @@
   };
   const achievements = [
     ['win_streak', '长胜王徽', 'leader', '荣誉徽章', '当月最长连胜局数排名第一（至少两局）'],
+    ['headwind_navigator', '逆风领航员', 'leader', '趣味徽章', '当月获得计分局负场最多的玩家'],
     ['alternating_streak', '神鬼莫测', 'leader', '荣誉徽章', '当月胜负交替的最长连续局数排名第一（至少两局）'],
     ['loss_streak', '鬼神之勇', 'leader', '趣味徽章', '当月最长连败局数排名第一（至少两局）'],
     ['servant_trio', '三忠会审', 'leader', '荣誉徽章', '首轮任务车由三名忠臣完成，当月上车达成次数最多'],
@@ -140,7 +141,8 @@
       count: badges.length, groups: groups.filter(g => g.items.length) };
   }
   const detailNotes = {
-    overall: '按原始胜率排序，胜率相同时比较有效局数。',
+    overall: '统计 9 人及以上的有效计分局，单局积分为零也计入。',
+    headwind_navigator: '统计 9 人及以上的有效计分局，单局积分为零也计入。',
     survival_revive: '统计十二骑士中实际发生的复活。',
     survival_knifed: '统计十二骑士中实际承受的轮内刀和最终刀，无论是否生效或复活。',
     percival_bust: '仅统计派西维尔玩家。',

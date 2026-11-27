@@ -62,7 +62,7 @@ class BadgeRanks {
       return;
     // Every tied leader holds the title, including players outside the first page.
     const board = new Leaderboard(store);
-    for (const id of ["points", "games", "overall"]) {
+    for (const id of ["points", "games"]) {
       for (const row of board.snapshot(id, "month", now).eligible) {
         if (row.rank !== 1) break;
         this.record(row.uid, id);
