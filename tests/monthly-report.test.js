@@ -121,7 +121,7 @@ test("前三名保留超过100人的并列，生成单张长图，公开投影�
     const report = read(reports);
     assert.equal(report.mainBoards[0].rows.length, 105); assert.ok(report.mainBoards[0].rows.every(row => row.rank === 1 && row.tied));
     const pages = cardRenderer.cards({ ...report, uid: "secret", matches: [{ secret: "should-not-export" }] });
-    assert.equal(pages.length, 1); assert.ok(cardRenderer.dimensions(pages[0]).height > 15000);
+    assert.equal(pages.length, 1); assert.equal(cardRenderer.layout(pages[0]).sections[0].box.lanes[0].tiles.length, 105);
     assert.ok(cardRenderer.renderDimensions(pages[0]).height <= 8192);
     assert.equal(pages.flatMap(page => page.sections).filter(section => section.title.startsWith("积分榜")).flatMap(section => section.rows).length, 105);
     assert.doesNotMatch(JSON.stringify(pages), /secret|should-not-export|uid|publicId|matches/);
@@ -168,8 +168,42 @@ test("月报HTTP鉴权、查询白名单，静态共享模块可在网页加载"
       const portrait = await get("/assets/roles/" + role + ".png", false);
       assert.equal(portrait.status, 200); assert.equal(portrait.headers.get("content-type"), "image/png");
     }
-    const artwork = await get("/assets/monthly-report-background.jpg", false);
-    assert.equal(artwork.status, 200); assert.equal(artwork.headers.get("content-type"), "image/jpeg");
-    assert.ok((await artwork.arrayBuffer()).byteLength > 1000);
+    for (const image of ["monthly-report-background.jpg", "room-share-background.jpg"]) {
+      const artwork = await get("/assets/" + image, false);
+      assert.equal(artwork.status, 200); assert.equal(artwork.headers.get("content-type"), "image/jpeg");
+      assert.ok((await artwork.arrayBuffer()).byteLength > 1000);
+    }
   } finally { await new Promise(resolve => app.server.close(resolve)); app.store.close(); }
+});
+
+test("炉边来信的票选、角色、生存和连胜按所选月份与公开资格统计", () => {
+  const store = new Store(":memory:");
+  try {
+    for (const uid of ["wx:a", "wx:b", "wx:hidden"]) profile(store, uid, uid !== "wx:hidden");
+    const entries = ["wx:a", "wx:b", "wx:hidden"].map(uid => ({ uid, points: 2 }));
+    const reports = new MonthlyReport(store);
+    match(store, entries, presentation.monthRange("2026-09").start - 1);
+    const first = match(store, entries, SEPTEMBER);
+    match(store, entries.map(p => ({...p, outcome:"loss"})), SEPTEMBER + 1, 8);
+    const second = match(store, entries, SEPTEMBER + 2);
+    for (const uid of entries.map(p => p.uid)) {
+      for (const metric of ["honor_mvp","lancelot_both","survival_revive","survival_knifed"]) funRecord(store, first, uid, metric, 1, 1);
+    }
+    funRecord(store, second, "wx:a", "honor_svp", 1, 1);
+    const response = read(reports), report = presentation.presentReport(response);
+    assert.equal(response.spotlights.length, 6);
+    for (const b of response.spotlights) {
+      assert.equal(b.rows.length, b.id === "honor_svp" ? 1 : 2);
+      assert.ok(b.rows.every(p => p.rank === 1 && p.tied === (b.rows.length > 1)));
+    }
+    const streak = response.spotlights.find(b => b.id === "win_streak");
+    assert.deepEqual(streak.rows.map(r => r.count), [2,2]);
+    assert.deepEqual(report.groups.find(group => group.title === "玩家票选").boards.map(b => b.rows.length), [2,1]);
+    const [poster] = cardRenderer.cards(response);
+    assert.deepEqual(poster.sections.map(s => s.id), ["points","games","honor_mvp","honor_svp","win_streak","lancelot_both","survival_revive","survival_knifed"]);
+    assert.deepEqual(cardRenderer.cards(response, "featured"), [poster]);
+    assert.doesNotMatch(JSON.stringify(poster), /hidden|undefined%|null%/);
+    profile(store, "wx:b", false);
+    assert.ok(read(reports).spotlights.every(b => b.rows.every(r => r.nickname === "a")));
+  } finally { store.close(); }
 });

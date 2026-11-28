@@ -584,7 +584,7 @@
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
     resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyCategory: 'overall', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
+    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyPoster: null,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -714,7 +714,7 @@
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
-      ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
+      ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyPoster: null, monthlyLoading: true, monthlyError: '' } : {}),
       monthlyReset: null, resetSaving: false, resetError: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
@@ -985,7 +985,7 @@
       clearingPending = null;
       if (account !== clearingAccount()) return;
       ++statsSequence; statsRequestRoute = -1; ++monthlySequence; ++badgeManagerSequence;
-      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyImages: [], badgeCollection: null, playerCard: null,
+      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyPoster: null, badgeCollection: null, playerCard: null,
         clearingPreview: null, clearingConfirming: false, clearingConfirmation: null, clearingNotice: recordClearing.monthLabel(submission.body.month) + ' 的个人战绩已清除' });
     } catch (e) {
       if (e.status && e.status < 500 && ![401, 429].includes(e.status)) clearingPending = null;
@@ -1419,81 +1419,80 @@
     }
     return html + '</section>';
   }
-  async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt()) {
+  async function renderMonthlyPoster(report) {
+    const card = monthlyCard.cardFromReport(report);
+    const images = new Map(await Promise.all(monthlyCard.imagePaths(card).map(path => new Promise(resolve => {
+      const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
+      const timer = setTimeout(() => done(null), 3000);
+      image.onload = () => done(image.width && image.height ? image : null);
+      image.onerror = () => done(null);
+      image.src = path;
+    }))));
+    const canvas = document.createElement('canvas');
+    const { width, height, scale } = monthlyCard.renderDimensions(card);
+    Object.assign(canvas, { width, height });
+    const context = canvas.getContext('2d');
+    context.save();
+    try { if (scale !== 1) context.scale(scale, scale); monthlyCard.drawCard(context, card, images); }
+    finally { context.restore(); }
+    const src = canvas.toDataURL('image/png');
+    if (!src.startsWith('data:image/png')) throw new Error('图片生成失败，请重试。');
+    return { src, width, height, asOf: card.asOf, description: monthlyCard.describe(card), targets: monthlyCard.playerTargets(card, report) };
+  }
+  async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt(), forShare = false) {
     const sequence = ++monthlySequence, route = routeSequence;
-    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', monthlyReport: null, monthlyImages: [], monthlySharing: false });
+    const active = () => sequence === monthlySequence && route === routeSequence && state.page === 'monthly' && foreground;
+    const previous = state.monthlyReport?.month === month ? state.monthlyReport : null;
+    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', ...(previous ? {} : { monthlyReport: null, monthlyPoster: null }) });
     try {
       const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
-      if (sequence !== monthlySequence || route !== routeSequence || state.page !== 'monthly' || !foreground) return;
-      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyLoading: false });
+      if (!active()) return;
+      const report = monthlyPresentation.presentReport(response);
+      let poster = null;
+      if (report.canShare) {
+        if (state.monthlyPoster && previous?.version === report.version && (forShare || state.monthlyPoster.asOf === report.asOfLabel)) {
+          poster = state.monthlyPoster;
+        } else {
+          setState({ monthlyReport: report, monthlyPoster: null });
+          poster = await renderMonthlyPoster(report);
+        }
+      }
+      if (!active()) return;
+      setState({ monthlyReport: report, monthlyPoster: poster, monthlyLoading: false });
+      return poster;
     } catch (error) {
-      if (sequence === monthlySequence && route === routeSequence && state.page === 'monthly') setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message });
+      if (active()) setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message,
+        ...(error.status && error.status < 500 && error.status !== 429 ? { monthlyReport: null, monthlyPoster: null } : {}) });
     }
-  }
-  function viewMonthlyBoard(board) {
-    if (!board.rows.length) return '';
-    return '<section class="monthly-board" aria-label="' + esc(board.title) + '"><header class="monthly-board-header"><img class="monthly-heading-icon" src="' + esc(board.iconPath) + '" alt=""><div class="monthly-heading-copy"><h2 class="monthly-section-title">' + esc(board.title) + '</h2><p class="monthly-caption monthly-board-caption">' + esc(board.subtitle) + '</p></div><span class="monthly-top-label">前三名</span></header><ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row' + (row.rank === 1 ? ' monthly-row-first' : '') + '" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank monthly-rank-' + row.rank + '" aria-hidden="true"><img src="/assets/monthly-laurel-' + row.rank + '.svg" alt=""><span>' + esc(row.rankLabel) + '</span></span><span class="monthly-avatar" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name-line"><span class="monthly-name">' + esc(row.nickname) + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol></section>';
   }
   function viewMonthlyReport() {
-    const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt(), category = state.monthlyCategory;
-    let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page' + (report?.canShare ? ' monthly-has-share' : '') + '"><header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt=""><div class="monthly-hero-content"><label class="monthly-month-picker"><span class="monthly-year">' + esc(month.slice(0, 4)) + ' 年</span><span class="monthly-month-line"><span class="monthly-month-number">' + Number(month.slice(5)) + '</span><span class="monthly-month-unit">月</span><span class="monthly-picker-arrow" aria-hidden="true"></span></span><input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label>' + (report ? '<div class="monthly-preview-status"><span class="monthly-status-dot' + (report.status === 'preview' ? '' : ' monthly-status-complete') + '" aria-hidden="true"></span>' + (report.status === 'preview' ? '本月实时更新' : '完整月报') + '</div>' : '') + '</div></header>';
-    if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
+    const report = state.monthlyReport, poster = state.monthlyPoster, month = state.monthlyMonth || monthlyPresentation.monthAt();
+    let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page"><div class="monthly-tools"><label class="monthly-picker">' + esc(month) + '<span aria-hidden="true">⌄</span><input type="month" aria-label="选择月报月份" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth"></label>' +
+      (report ? btn('monthly-rules-link', 'monthlyRules', '统计口径') : '') + '</div>';
+    if (state.monthlyLoading && !poster) html += '<div class="monthly-message" role="status">正在生成月度战报…</div>';
     if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
-    if (!report || state.monthlyLoading) return html + '</section>';
-    html += '<div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '<button type="button" data-action="monthlyRules" aria-label="查看月报统计说明"><img src="/assets/record-info.svg" alt=""></button></div>';
-    if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
-    else {
-      html += '<div class="monthly-tabs" role="tablist" aria-label="月报类别">' + [['overall', '综合榜单'], ['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" id="monthly-tab-' + id + '" role="tab" data-action="monthlyEdition" data-value="' + id + '" aria-selected="' + (id === category) + '" aria-controls="monthly-board-panel" class="' + (id === category ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
-      const boards = category === 'overall' ? [...report.coreBoards, ...report.extraBoards] : monthlyPresentation.detailBoards(report, 'count', !!state.monthlyEntertainment);
-      html += '<div class="monthly-boards" id="monthly-board-panel" role="tabpanel" aria-labelledby="monthly-tab-' + category + '">' + boards.map(viewMonthlyBoard).join('') + '</div>';
-      html += '<div class="monthly-share-bar"><div class="monthly-share-inner"><button type="button" class="monthly-share" data-action="monthlyShare"' + (state.monthlySharing || state.monthlyLoading || state.monthlyError ? ' disabled' : '') + '><img src="/assets/share-dark.svg" alt="">' + (state.monthlySharing ? '正在生成图片…' : '生成月报分享图') + '</button></div></div>';
-      if (state.monthlyImages?.length) {
-        html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[0] + '" alt="' + esc(report.monthLabel + '月度战报完整长图') + '"></div>';
-        html += btn('secondary', 'monthlyDownload', '保存长图') + '</div>';
-      }
-    }
+    if (poster) {
+      const targets = poster.targets.map(item => '<foreignObject x="' + item.x + '%" y="' + item.y + '%" width="' + item.width + '%" height="' + item.height + '%"><button xmlns="http://www.w3.org/1999/xhtml" type="button" class="monthly-player" data-action="monthlyPlayer" data-id="' + esc(item.publicId) + '" aria-label="' + esc(item.label) + '"></button></foreignObject>').join('');
+      html += '<div class="monthly-poster"><img class="monthly-poster-image" src="' + poster.src + '" width="' + poster.width + '" height="' + poster.height + '" alt="' + esc(poster.description) + '"><svg class="monthly-targets" xmlns="http://www.w3.org/2000/svg" aria-label="查看上榜玩家战绩">' + targets + '</svg></div>';
+      html += '<div class="monthly-share-bar">' + btn('monthly-share', 'monthlyShare', '生成分享图', null, !!(state.monthlyLoading || state.monthlyError)) + '</div>';
+    } else if (report && !report.canShare && !state.monthlyLoading && !state.monthlyError) html += '<div class="monthly-message">这个月还没有有效对局</div>';
     return html + '</section>';
   }
   async function shareMonthlyReport() {
-    if (!state.monthlyReport?.canShare || state.monthlySharing || state.monthlyLoading || state.monthlyError) return;
-    const route = routeSequence, sequence = monthlySequence, month = state.monthlyMonth;
-    const active = () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly' && foreground;
-    setState({ monthlySharing: true, monthlyImages: [], monthlyError: '' });
-    try {
-      const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
-      if (!active()) return;
-      const cards = monthlyCard.cards(response);
-      const paths = [...new Set(cards.flatMap(card => monthlyCard.imagePaths(card)))];
-      const avatars = new Map(await Promise.all(paths.map(path => new Promise(resolve => {
-        const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
-        const timer = setTimeout(() => done(null), 3000);
-        image.onload = () => done(image.width && image.height ? image : null); image.onerror = () => done(null); image.src = path;
-      }))));
-      if (!active()) return;
-      const images = cards.map(card => {
-        const canvas = document.createElement('canvas'), { width, height, scale } = monthlyCard.renderDimensions(card);
-        Object.assign(canvas, { width, height });
-        const context = canvas.getContext('2d'); context.save();
-        try { if (scale !== 1) context.scale(scale, scale); monthlyCard.drawCard(context, card, avatars); }
-        finally { context.restore(); }
-        return canvas.toDataURL('image/png');
-      });
-      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyImages: images });
-      app.querySelector('.monthly-image-result')?.scrollIntoView({ block: 'start' });
-    } catch (error) { if (active()) setState({ monthlyError: error.message }); }
-    finally { if (route === routeSequence && sequence === monthlySequence) setState({ monthlySharing: false }); }
+    if (!state.monthlyPoster || state.monthlyLoading || state.monthlyError) return;
+    const month = state.monthlyMonth;
+    const poster = await loadMonthlyReport(month, true);
+    if (!poster || poster !== state.monthlyPoster || state.page !== 'monthly' || !foreground) return;
+    const link = document.createElement('a');
+    link.href = poster.src;
+    link.download = '桌边助手-月度战报-' + month + '.png';
+    document.body.appendChild(link); link.click(); link.remove();
   }
   function openMonthlyPlayer(id) {
-    const row = [...(state.monthlyReport?.mainBoards || []), ...(state.monthlyReport?.funBoards || [])].flatMap(board => board.rows).find(row => row.publicId === id);
+    const row = (state.monthlyReport?.groups || []).flatMap(group => group.boards).flatMap(board => board.rows).find(row => row.publicId === id);
     if (!row || state.page !== 'monthly' || state.monthlyLoading || !foreground) return;
     const route = routeSequence, sequence = monthlySequence;
     return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '', initial: row.initial }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats', () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly');
-  }
-  function downloadMonthlyImage() {
-    const path = state.monthlyImages?.[0];
-    if (!path) return;
-    const link = document.createElement('a'); link.href = path; link.download = '桌边助手-月度战报-' + state.monthlyMonth + '.png';
-    document.body.appendChild(link); link.click(); link.remove();
   }
   function viewHelp() {
     return (state.helpFromLobby ? btn('text-button page-back', 'navigate', '‹ 返回对局', { page: 'lobby' }) : '') + personalTitle('帮助与规则', '', !state.helpFromLobby) + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
@@ -1670,7 +1669,9 @@
     update(value) {
       const patch = {};
       if (state.profile?.avoidance && state.profile.avoidance.balance !== value.balance) patch.profile = { ...state.profile, avoidance: { ...state.profile.avoidance, balance: value.balance } };
-      if (state.room?.me?.avoidance && state.room.me.avoidance.balance !== value.balance) patch.room = { ...state.room, me: { ...state.room.me, avoidance: { ...state.room.me.avoidance, balance: value.balance } } };
+      const card = state.room?.me?.avoidance;
+      if (card && value.totalBalance != null && (card.balance !== value.balance || card.totalBalance !== value.totalBalance))
+        patch.room = { ...state.room, me: { ...state.room.me, avoidance: { ...card, balance: value.balance, totalBalance: value.totalBalance } } };
       if (Object.keys(patch).length) setState(patch);
     },
     async show(value) {
@@ -1931,6 +1932,7 @@ function roomListItems(rooms) {
     var room;
     try {
       room = await request("/api/rooms/" + code);
+      if (avoidancePresentation.needsCardTotal(room)) room = await avoidancePresentation.roomWithCardTotal(room, request);
     } catch (e) {
       if (!alive || code !== roomCode || sequence !== refreshSequence) return;
       if (e.status === 404 || e.status === 403 || e.status === 410) {
@@ -4628,8 +4630,16 @@ function roomListItems(rooms) {
     let lobbyActionHtml = "";
     if (r.phase === "lobby") {
       const blocked = state.busy || !!pending || !state.network, card = r.me.avoidance;
+      let cardEntry = "";
+      if (r.me.seat !== null && card) {
+        const hasCount = Number.isSafeInteger(card.totalBalance);
+        const label = '用卡' + (hasCount ? '，共 ' + card.totalBalance + ' 张' : '，张数待同步') + (card.selected ? '，本局已选' : '');
+        cardEntry = '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + label + '"' + (blocked ? ' disabled' : '') + '>' +
+          '<span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /><span>' + (hasCount ? '×' + card.totalBalance : '…') + '</span></span>' +
+          '<span class="avoidance-entry-state">' + (card.selected ? '✓ 已选' : '用卡') + '</span></button>';
+      }
       lobbyActionHtml = '<div class="web-lobby-action-bar"><div class="web-lobby-action-inner">' +
-        (r.me.seat !== null && card ? '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + (card.selected ? '本局用卡，已选 1 张' : '本局用卡') + '"' + (blocked ? ' disabled' : '') + '><span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /></span><span class="avoidance-entry-state">' + (card.selected ? '已选 1 张' : '本局用卡') + '</span></button>' : '') +
+        cardEntry +
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
@@ -5294,10 +5304,8 @@ function roomListItems(rooms) {
     clearingRules() { setState({ clearingRulesExpanded: !state.clearingRulesExpanded }); },
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
-    monthlyEdition: el => { if (['overall', 'honors', 'fun'].includes(el.dataset.value)) setState({ monthlyCategory: el.dataset.value, monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
     monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
     monthlyShare: shareMonthlyReport,
-    monthlyDownload: downloadMonthlyImage,
     toggleIdentityHelp, openIdentityRoleHelp, closeIdentityRoleHelp, openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,

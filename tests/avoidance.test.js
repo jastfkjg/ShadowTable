@@ -207,6 +207,54 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
   const raw = (await a.request("/api/me/avoidance", tokens[0])).data;
   assert.ok(raw.history.some(h => h.note === "全员福利"));
 });
+test("卡片管理支持两卡分别定向或全员发放，按卡种记录余额、通知和审计", async t => {
+  const a = await setup(t);
+  const one = await a.login("card-one"), two = await a.login("card-two");
+  const uid = "wx:" + createHash("sha256").update("card-one").digest("hex");
+  a.store.addSession("test-session", "test:room:actor");
+  const admin = data => a.request("/api/admin/cards", null, data, undefined, true);
+  const input = { scope: "player", uid, amount: 2, reason: "指定赠卡", requestId: randomUUID() };
+  assert.equal((await admin({ ...input, cardType: "faction" })).status, 401);
+  await a.adminLogin();
+  for (const cardType of [undefined, null, "other"]) assert.equal((await admin({ ...input, cardType })).status, 400);
+  const all = { scope: "all", amount: 1, reason: "全员赠卡", expectedCount: 2 };
+  assert.equal((await admin({ ...all, cardType: "faction", expectedCount: 3, requestId: randomUUID() })).status, 409);
+  for (const cardType of ["faction", "avoidance"]) {
+    for (const fields of [input, all]) {
+      const data = { ...fields, cardType, requestId: randomUUID() };
+      const first = await admin(data);
+      assert.equal(first.status, 200);
+      assert.equal(first.data.cardType, cardType);
+      assert.equal(first.data.recipients, fields.scope === "all" ? 2 : 1);
+      assert.deepEqual((await admin(data)).data, first.data);
+      assert.equal((await admin({ ...data, cardType: cardType === "faction" ? "avoidance" : "faction" })).status, 409);
+    }
+    const players = (await admin()).data.players;
+    assert.equal(players.length, 2);
+    for (const p of players) {
+      const expected = p.uid === uid ? 3 : 1;
+      assert.equal(p.factionBalance, expected);
+      assert.equal(p.balance, cardType === "avoidance" ? expected : 0);
+    }
+  }
+  assert.deepEqual(avoidance.entryBalances(a.store, "test:room:actor"), { balance: 0, totalBalance: 0 });
+  const audits = a.store.db.prepare("SELECT action,details FROM admin_audit WHERE action LIKE 'grant-%' ORDER BY id").all();
+  assert.deepEqual(audits.map(row => [row.action, JSON.parse(row.details).scope]), [
+    ["grant-faction", "player"], ["grant-faction", "all"], ["grant-avoidance", "player"], ["grant-avoidance", "all"],
+  ]);
+  const notice = "/api/me/cards/notice", legacy = "/api/me/avoidance/notice";
+  assert.equal((await a.request(notice, two)).data.notice.factionAmount, 1);
+  const received = (await a.request(notice, one)).data;
+  assert.equal(received.totalBalance, 6); assert.equal(received.notice.amount, 6); assert.equal(received.notice.factionAmount, 3);
+  const wallet = (await a.request("/api/me/avoidance", one)).data;
+  assert.equal(wallet.balance, 3); assert.equal(wallet.history.length, 2); assert.equal(wallet.notice.amount, 3);
+  assert.equal((await a.request(legacy, one, { through: wallet.notice.through })).status, 200);
+  const remaining = (await a.request(notice, one)).data.notice;
+  assert.equal(remaining.amount, 3); assert.equal(remaining.factionAmount, 3);
+  assert.deepEqual(remaining.reasons, ["指定赠卡", "全员赠卡"]);
+  assert.equal((await a.request(notice, one, { through: remaining.through })).status, 200);
+  assert.equal((await a.request(notice, one)).data.notice, null);
+});
 test("发放原因可省略、留空或仅空格，仍保留流水、审计和幂等保护", async t => {
   const a = await setup(t), token = await a.login("optional-reason"); await a.adminLogin();
   const uid = (await a.admin()).data.players[0].uid;
@@ -311,6 +359,8 @@ test("阵营请求与回避共用一个选择：验证余额和板子、并发�
   assert.equal((await a.cmd(path, tokens[0], "avoidance", { faction: "evil" })).status, 400);
   a.store.db.exec("UPDATE avoidance_accounts SET faction_balance=1");
   const outsiderView = (await a.request(path, tokens[5])).data;
+  assert.deepEqual(outsiderView.me.avoidance, { balance: 1, totalBalance: 2, selected: false });
+  assert.equal((await a.request("/api/me/cards/notice", tokens[5])).data.totalBalance, 2);
   for (const token of tokens.slice(0, 3)) {
     await a.cmd(path, token, "avoidance", { role: "merlin" });
     assert.equal((await a.cmd(path, token, "avoidance", { faction: "third" })).status, 400);
@@ -319,6 +369,7 @@ test("阵营请求与回避共用一个选择：验证余额和板子、并发�
     assert.equal((await a.cmd(path, token, "avoidance", { faction: "evil" })).status, 200);
     const saved = await options(token);
     assert.equal(saved.selected, null); assert.equal(saved.selectedFaction, "evil");
+    assert.deepEqual((await a.request(path, token)).data.me.avoidance, { balance: 1, totalBalance: 2, selected: true });
   }
   await a.cmd(path, tokens[3], "avoidance", { faction: "good" });
   await a.cmd(path, tokens[3], "avoidance", { role: "merlin" });
@@ -338,6 +389,7 @@ test("阵营请求与回避共用一个选择：验证余额和板子、并发�
     assert.equal(identity.factionCard.faction, "evil");
     assert.equal(identity.factionCard.status, effective ? "effective" : "ineffective");
     assert.equal(identity.factionCard.balance, effective ? 0 : 1);
+    assert.equal((await a.request("/api/me/cards/notice", token)).data.totalBalance, effective ? 1 : 2);
     assert.equal(identity.avoidance, null); assert.equal((await options(token)).balance, 1);
     if (effective) fulfilled++;
   }

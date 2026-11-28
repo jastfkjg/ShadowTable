@@ -276,7 +276,7 @@ for (const [name, data] of Object.entries(homeScenes)) {
 // guards. Sample stats are illustrative; game choices come from privateView.
 function tableScene(source, uid, extra = {}) {
   const room = publicView(source, uid);
-  if (room.phase === 'lobby' && room.me.seat !== null) room.me.avoidance = { balance: 0, selected: false };
+  if (room.phase === 'lobby' && room.me.seat !== null) room.me.avoidance = { balance: 0, totalBalance: 0, selected: false };
   const history = room.history.map((h, key) => ({ ...h, key })).filter(h => h.kind === 'toolQuest').map((h, i) => ({...h,number:i+1,
     questResult:h.success?'success':'failure',resultTone:h.success?'success':'failure',
     text:h.success?'任务成功':'任务失败',latestDetail:h.team.join('、')+'号 · '+h.fails+'张失败票',timeLabel:'17:29'}));

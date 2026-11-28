@@ -5,63 +5,64 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { createRequire } = require("node:module");
 const { monthlyFixture } = require("./helpers/monthly-fixtures");
-const { monthRange } = require("../miniprogram/monthly-report");
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function page(file, api, wx = {}, renderer) {
+function page(file, api, wx = {}, renderer, pages = []) {
   const filename = path.resolve(__dirname, "../miniprogram/" + file), realRequire = createRequire(filename);
   let definition;
-  vm.runInNewContext(fs.readFileSync(filename, "utf8"), { Date, wx, Page: value => definition = value,
+  vm.runInNewContext(fs.readFileSync(filename, "utf8"), { Date, wx, getCurrentPages: () => pages, Page: value => definition = value,
     require: name => name === "../../api" ? api : name === "../../share-image" && renderer ? { renderImage: renderer } : realRequire(name) });
   return { ...definition, data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
 }
-test("月报分类保留所有并列玩家与门槛，切换后分享版式和规则弹层保持一致", async () => {
-  const response = monthlyFixture(), links = [];
+test("首页完整长图与分享页复用同一文件，版本变化时先替换首页", async () => {
+  const response = monthlyFixture(), links = [], rendered = [];
   response.mainBoards[0].rows.push({ ...response.mainBoards[0].rows[2], publicId: "tie-3", tied: true });
-  response.mainBoards[0].rows[2].tied = true;
-  const original = JSON.stringify(response);
-  const p = page("pages/monthly/monthly.js", { login: async () => {}, request: async () => response }, { navigateTo: options => { links.push(options.url); options.complete(); } });
-  p.onLoad({ month: "2026-09" }); await p.onShow();
-  assert.equal(p.data.category, "overall"); assert.equal(p.data.report.coreBoards[0].rows.length, 4);
-  assert.equal(p.data.report.mainBoards.find(b => b.id === "overall").threshold, 10);
-  p.chooseCategory({ currentTarget: { dataset: { id: "honors" } } });
-  assert.ok(p.data.detailBoards.every(board => board.positive && board.sort === "count"));
-  p.chooseCategory({ currentTarget: { dataset: { id: "fun" } } }); p.share(); assert.equal(links.at(-1), "/pages/share/share?kind=monthly&month=2026-09");
-  p.chooseCategory({ currentTarget: { dataset: { id: "overall" } } }); p.share(); assert.equal(links.at(-1), links[0]);
-  p.openRules(); assert.equal(p.data.rulesExpanded, true); p.onHide(); assert.equal(p.data.rulesExpanded, false);
-  assert.equal(p.data.report.funBoards.find(board => board.metric === "merlin_evade").portrait, "/assets/roles/merlin.png");
-  assert.equal(JSON.stringify(response), original);
+  const api = { login: async () => {}, request: async () => response };
+  const wx = { navigateTo(options) { links.push(options.url); options.complete(); } };
+  const home = page("pages/monthly/monthly.js", api, wx, async (_, card) => { rendered.push(card); return "wxfile://report-" + rendered.length; });
+  home.onLoad({ month: response.month });
+  await home.onShow(); await home.onReady();
+  assert.equal(home.data.imagePath, "wxfile://report-1");
+  assert.equal(rendered[0].sections[0].rows.length, 4);
+  assert.ok(home.data.targets.some(t => t.publicId === "tie-3"));
+  assert.ok(home.data.targets.every(t => t.width > 0 && t.y + t.height <= 100));
+  const forbidden = () => { throw Error("首页生成的文件应直接沿用"); };
+  const share = page("pages/share/share.js", { login: forbidden }, {}, forbidden, [home, {}]);
+  await home.share(); assert.equal(links[0], "/pages/share/share?kind=monthly&month=" + response.month);
+  await share.onLoad({ kind: "monthly", month: response.month }); await share.onReady();
+  assert.equal(share.data.imagePath, home.data.imagePath); assert.equal(rendered.length, 1);
+  response.version++; response.mainBoards[0].rows.pop();
+  await home.share();
+  assert.equal(home.takeSharePoster(response.month).path, "wxfile://report-2");
+  assert.equal(home.data.imagePath, "wxfile://report-2"); assert.ok(!home.data.targets.some(t => t.publicId === "tie-3"));
+  home.openRules(); assert.equal(home.data.rulesExpanded, true); home.onHide(); assert.equal(home.data.rulesExpanded, false);
+  home.onUnload(); share.onUnload();
 });
-test("月报切换月份和回前台拒绝旧响应，失败能重试，各分类分享保留所选月份", async () => {
-  const pending = [], urls = [], response = monthlyFixture(), links = [];
-  const api = { login: async () => {}, request: url => { urls.push(url); return new Promise((resolve, reject) => pending.push({ resolve, reject })); } };
-  const p = page("pages/monthly/monthly.js", api, { navigateTo: options => { links.push(options.url); options.complete(); } });
-  p.onLoad({ month: "2026-09" });
-  const first = p.onShow(); await tick();
-  const second = p.load("2026-08"); await tick();
-  assert.equal(p.data.monthYear, "2026"); assert.equal(p.data.monthNumber, "8");
-  pending[1].resolve({ ...response, month: "2026-08", ...{ periodStart: monthRange("2026-08").start, periodEnd: monthRange("2026-08").end } }); await second;
-  pending[0].resolve(response); await first;
-  assert.equal(p.data.report.month, "2026-08"); assert.equal(p.data.month, "2026-08");
-  assert.equal(p.data.monthNumber, "8");
-  p.chooseEdition({ currentTarget: { dataset: { id: "fun" } } }); p.share();
-  assert.equal(links[0], "/pages/share/share?kind=monthly&month=2026-08");
-  const failure = p.load(); await tick(); pending[2].reject(Object.assign(new Error("missing"), { status: 404 })); await failure;
-  assert.match(p.data.error, /尚未开放/); p.share(); assert.equal(links.length, 1);
-  const retry = p.retry(); await tick(); p.onHide(); pending[3].resolve(response); await retry;
-  assert.equal(p.data.report, null);
-  const show = p.onShow(); await tick(); pending[4].resolve({ ...response, month: "2026-08" }); await show;
-  assert.equal(p.data.error, ""); assert.equal(p.data.report.month, "2026-08");
-  assert.ok(urls.every(url => url.startsWith("/api/monthly-report?month=")));
+test("月份切换、后台旧响应和网络失败均无法导出过期图片", async () => {
+  const pending = [], response = monthlyFixture();
+  const api = { login: async () => {}, request: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) };
+  const p = page("pages/monthly/monthly.js", api, {}, async (_, card) => "wxfile://" + card.month);
+  p.onLoad({month:response.month}); p.onReady();
+  const a=p.onShow(); await tick(); const b=p.load("2026-08"); await tick();
+  pending[1].resolve({...response,month:"2026-08"}); await b;
+  pending[0].resolve(response); await a;
+  assert.equal(p.data.imagePath,"wxfile://2026.08");
+  const check=p.share(); await tick(); pending[2].reject(new Error("网络超时")); await check;
+  assert.equal(p.data.imagePath,"wxfile://2026.08"); assert.equal(p.takeSharePoster("2026-08"),null);
+  const hidden=p.load(response.month); await tick(); assert.equal(p.data.imagePath,""); p.onHide(); pending[3].resolve(response); await hidden;
+  assert.equal(p.data.report,null);
+  const retry=p.onShow(); await tick(); pending[4].resolve(response); await retry; assert.equal(p.data.imagePath,"wxfile://2026.09");
   p.onUnload();
 });
-test("同月回前台刷新和短暂网络失败保留已展示战报，切换月份清除旧月份内容", async () => {
-  let finish, fail=false;
-  const response=monthlyFixture(),p=page("pages/monthly/monthly.js",{login:async()=>{},request:()=>new Promise((resolve,reject)=>{finish=()=>fail?reject(Error("请求超时")):resolve(response);})});
-  p.onLoad({month:response.month});const first=p.onShow();await tick();finish();await first;
-  const shown=p.data.report,details=p.data.detailBoards;
-  const updating=p.onShow();await tick();assert.equal(p.data.report,shown);assert.equal(p.data.detailBoards,details);
-  fail=true;finish();await updating;assert.equal(p.data.report,shown);assert.equal(p.data.loading,false);
-  const next=p.load("2026-08");await tick();assert.equal(p.data.report,null);finish();await next;p.onUnload();
+test("同时生成两个月份时串行使用原生画布并丢弃先前月份的文件", async () => {
+  const response=monthlyFixture(), jobs=[];
+  const p=page("pages/monthly/monthly.js",{ login:async()=>{}, request:async url=>({...response,month:url.split("=").pop()}) },{},
+    (_,card)=>new Promise(resolve=>jobs.push({month:card.month,resolve})));
+  p.onLoad({month:response.month}); p.onReady();
+  const first=p.onShow(); await tick(); const second=p.load("2026-08"); await tick();
+  assert.equal(jobs.length,1); jobs[0].resolve("wxfile://old"); await first; await tick();
+  assert.equal(jobs[1].month,"2026.08"); assert.equal(p.data.imagePath,"");
+  jobs[1].resolve("wxfile://new"); await second; assert.equal(p.data.imagePath,"wxfile://new");
+  p.onUnload();
 });
 test("月报分享页只读取月报，所有榜单生成一张长图，预览保存发送使用同一张图", async () => {
   const response = monthlyFixture();
@@ -91,9 +92,9 @@ test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会�
   const context = new Proxy({ measureText: value => ({ width: Array.from(value).length * Number(/(\d+)px/.exec(context.font)?.[1] || 30) * .8 }), fillText: (value, x, y) => positions.push({ value, x, y }) }, { get(target, key) { return key in target ? target[key] : () => {}; } });
   renderer.drawCard(context, card);
   assert.ok(positions.every(({ x, y }) => x >= 0 && x <= size.width && y > 0 && y < size.height));
-  assert.ok(positions.map(row => row.value).join("").includes("一个很长很长的玩家昵称🙂用于检查不会覆盖积分"));
-  assert.ok(positions.some(({ value }) => value === "-123456789"));
-  assert.ok(positions.some(({ value }) => value === "分"));
+  assert.ok(positions.map(row => row.value).join("").includes(response.mainBoards[0].rows[0].nickname));
+  assert.ok(positions.some(({ value }) => value === "-123456789分"));
+  assert.ok(positions.some(({ value }) => value === "炉边来信"));
   assert.ok(size.height > 1920);
 });
 test("空榜单从月报摘要、完整榜单和分享图同时隐藏，零分记录仍保留", () => {
@@ -143,10 +144,10 @@ test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重�
   response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));
   const pages = renderer.cards(response);
   assert.equal(pages.length, 1);
-  assert.ok(renderer.dimensions(pages[0]).height > 15000);
+  assert.ok(renderer.dimensions(pages[0]).height > renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
-  assert.equal(pages[0].sections.filter(section=>section.showGroupTitle).length,2);
+  assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
   assert.equal(pages[0].sections.filter(section=>section.id==="merlin_evade").length,1);
   const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
@@ -163,19 +164,19 @@ test("原生月报等待本地背景与远程头像，头像失败仍绘制背�
   const filename = path.resolve(__dirname, "../miniprogram/share-image.js"), realRequire = createRequire(filename), module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(filename, "utf8"), { module, wx, setTimeout, clearTimeout, require: name => name === "./api" ? { assetUrl: path => "https://example.test" + path } : realRequire(name) });
   const rendering = module.exports.renderImage({ alive: true }, card); await tick();
-  assert.equal(loaded.length, 4); assert.equal(exported, undefined);
+  assert.equal(loaded.length, 2); assert.equal(exported, undefined);
   const background = loaded.find(image => image.path === renderer.BACKGROUND_PATH);
   assert.ok(background); loaded.find(image => image.path.endsWith(avatarPath)).onerror();
   assert.equal(exported, undefined);
   loaded.filter(image=>image!==background&&!image.path.endsWith(avatarPath)).forEach(image=>image.onload());
   background.onload();
   assert.equal(await rendering, "wxfile://monthly-artwork");
-  assert.equal(drawn.filter(image => image === background).length, 2);
-  assert.ok(labels.includes("北")); assert.equal(exported.destHeight, renderer.dimensions(card).height);
+  assert.equal(drawn.filter(image => image === background).length, 1);
+  assert.ok(labels.includes("北辰")); assert.equal(exported.destHeight, renderer.dimensions(card).height);
 });
 test("超长月报按比例控制原生画布尺寸，仍只导出一张包含末尾荣誉的 PNG", async () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
-  response.mainBoards[0].rows=Array.from({length:105},(_,i)=>({...response.mainBoards[0].rows[0],nickname:"并列玩家"+i,rank:1,tied:true}));
+  response.mainBoards[0].rows=Array.from({length:450},(_,i)=>({...response.mainBoards[0].rows[0],nickname:"并列玩家"+i,rank:1,tied:true}));
   const [card]=renderer.cards(response),images=[],labels=[],scales=[],exports=[];
   const context=new Proxy({fillText:value=>labels.push(value),scale:(...args)=>scales.push(args)},{get:(target,key)=>key in target?target[key]:()=>{}});
   const canvas={getContext:()=>context,createImage(){const image={set src(value){images.push(this);}};return image;}};
@@ -194,5 +195,5 @@ test("超长月报按比例控制原生画布尺寸，仍只导出一张包含�
   assert.ok(capturedWidth>=canvas.width,"导出必须包含右侧成绩，不能用位图宽度裁切显示画布");
   assert.ok(capturedHeight>=canvas.height,"导出必须包含末尾娱乐榜和页脚");
   assert.ok(scales[0][0]>0&&scales[0][0]<1);assert.equal(scales[0][0],scales[0][1]);
-  assert.ok(labels.includes("并列玩家104"));assert.ok(labels.includes("绝对防御"));
+  assert.ok(labels.includes("并列玩家449"));assert.equal(renderer.layout(card).sections[0].box.lanes[0].tiles.length,450);assert.ok(labels.includes("绝对防御"));
 });

@@ -5,7 +5,8 @@ const fail = (ok, message, status = 400) => {
 };
 const eligible = uid => /^(wx|dev|guest):/.test(uid);
 const avoidanceGrants = "'admin','match_reward','loss_reward','win_reward'";
-const allCardGrants = avoidanceGrants + ",'faction_reward'";
+const factionGrants = "'faction_reward','faction_admin'";
+const allCardGrants = avoidanceGrants + "," + factionGrants;
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS avoidance_accounts(uid TEXT PRIMARY KEY, balance INTEGER NOT NULL CHECK(balance>=0));
@@ -30,13 +31,20 @@ function ensureAccount(store, uid) {
   if (store.db.prepare("SELECT 1 FROM avoidance_accounts WHERE uid=?").get(uid)) return;
   if (store.inTransaction) insert(); else store.transaction(insert);
 }
-function balance(store, uid, factionCard = false) {
+function balances(store, uid) {
   ensureAccount(store, uid);
-  const row = store.db.prepare("SELECT balance,faction_balance FROM avoidance_accounts WHERE uid=?").get(uid);
-  return factionCard ? row.faction_balance : row.balance;
+  return store.db.prepare("SELECT balance,faction_balance AS factionBalance FROM avoidance_accounts WHERE uid=?").get(uid);
+}
+function balance(store, uid, factionCard = false) {
+  const cards = balances(store, uid);
+  return factionCard ? cards.factionBalance : cards.balance;
+}
+function entryBalances(store, uid) {
+  const cards = balances(store, uid);
+  return { balance: cards.balance, totalBalance: cards.balance + cards.factionBalance };
 }
 function wallet(store, uid) {
-  return { ...grantNotice(store, uid), history: store.db.prepare("SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? AND source NOT IN ('faction_reward','faction_spend') ORDER BY created DESC,rowid DESC LIMIT 30").all(uid) };
+  return { ...grantNotice(store, uid), history: store.db.prepare(`SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? AND source NOT IN (${factionGrants},'faction_spend') ORDER BY created DESC,rowid DESC LIMIT 30`).all(uid) };
 }
 function grantNotice(store, uid, includeFaction = false) {
   const grantSources = includeFaction ? allCardGrants : avoidanceGrants;
@@ -44,9 +52,10 @@ function grantNotice(store, uid, includeFaction = false) {
     LEFT JOIN avoidance_grant_reads r ON r.uid=l.uid AND r.ledger_id=l.id
     WHERE l.uid=? AND l.source IN (${grantSources}) AND l.delta>0 AND r.ledger_id IS NULL ORDER BY l.rowid`).all(uid);
   const sources = new Set(rows.map(row => row.source));
-  const reasons = [...new Set(rows.filter(row => row.source === "admin").map(row => row.note.trim()).filter(Boolean))];
-  const factionAmount = rows.filter(row => row.source === "faction_reward").reduce((sum, row) => sum + row.delta, 0);
-  return { balance: balance(store, uid), notice: rows.length ? {
+  const reasons = [...new Set(rows.filter(row => row.source === "admin" || row.source === "faction_admin").map(row => row.note.trim()).filter(Boolean))];
+  const factionAmount = rows.filter(row => row.source === "faction_reward" || row.source === "faction_admin").reduce((sum, row) => sum + row.delta, 0);
+  const counts = includeFaction ? entryBalances(store, uid) : { balance: balance(store, uid) };
+  return { ...counts, notice: rows.length ? {
     through: rows[rows.length - 1].id, amount: rows.reduce((n, row) => n + row.delta, 0), grants: rows.length,
     ...(factionAmount ? { factionAmount } : {}),
     kind: sources.size === 1 ? ({ loss_reward: "loss", win_reward: "win" }[rows[0].source] || "generic") : "generic",
@@ -134,7 +143,7 @@ function roomView(store, room, uid) {
   const view = publicView(room, uid); // Check membership before reading private data.
   const choice = room.phase === "lobby" ? room.avoidanceChoices?.[uid] : null;
   return { code: room.code, stage: room.stage, game: room.game, phase: room.phase,
-    balance: balance(store, uid), factionBalance: balance(store, uid, true),
+    ...balances(store, uid),
     selected: typeof choice === "string" ? choice : null, selectedFaction: choice?.faction || null,
     editable: room.phase === "lobby" && view.me.seat !== null,
     options: room.phase === "lobby" ? avoidanceOptions(room).map(o => ({ ...o, portrait: require("../miniprogram/role-portraits").portrait(o.name, o.faction).portrait })) : [] };
@@ -143,7 +152,7 @@ function roomView(store, room, uid) {
 function players(store, query = "", offset = 0) {
   fail(typeof query === "string" && query.length <= 200, "搜索内容最多200字");
   fail(Number.isSafeInteger(offset) && offset >= 0, "分页参数无效");
-  const sql = `SELECT a.uid,a.balance,coalesce(nullif(f.nickname,''),
+  const sql = `SELECT a.uid,a.balance,a.faction_balance AS factionBalance,coalesce(nullif(f.nickname,''),
     (SELECT json_extract(p.snapshot,'$.name') FROM match_players p WHERE p.uid=a.uid ORDER BY p.ended DESC LIMIT 1),
     (SELECT json_extract(p.value,'$.name') FROM rooms r,json_each(r.state,'$.players') p WHERE json_extract(p.value,'$.uid')=a.uid LIMIT 1),'未设置昵称') AS name
     FROM avoidance_accounts a LEFT JOIN profiles f ON f.uid=a.uid WHERE (a.uid LIKE 'wx:%' OR a.uid LIKE 'dev:%' OR a.uid LIKE 'guest:%')`;
@@ -153,6 +162,8 @@ function players(store, query = "", offset = 0) {
 }
 function grant(store, input) {
   fail(store.inTransaction, "发放需要在事务中执行");
+  const { cardType = "avoidance" } = input;
+  fail(["avoidance", "faction"].includes(cardType), "请选择有效的卡片类型");
   fail(["player", "all"].includes(input.scope), "请选择发放范围");
   fail(Number.isSafeInteger(input.amount) && input.amount >= 1 && input.amount <= 100, "每人发放数量须为1至100张整数");
   fail(input.reason === undefined || typeof input.reason === "string" && input.reason.length <= 200, "发放原因最多200字");
@@ -168,13 +179,15 @@ function grant(store, input) {
   }
   fail(targets.length > 0, "暂无可发放的玩家");
   const batchId = randomUUID(), created = store.clock();
+  const faction = cardType === "faction";
+  const update = store.db.prepare(`UPDATE avoidance_accounts SET ${faction ? "faction_balance" : "balance"}=? WHERE uid=?`);
+  const record = store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)");
   for (const { uid } of targets) {
-    const after = balance(store, uid) + input.amount;
-    fail(Number.isSafeInteger(after), "回避卡数量超出有效范围");
-    store.db.prepare("UPDATE avoidance_accounts SET balance=? WHERE uid=?").run(after, uid);
-    store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
-      .run(randomUUID(), uid, input.amount, after, "admin", reason, null, created);
+    const after = balance(store, uid, faction) + input.amount;
+    fail(Number.isSafeInteger(after), "卡片数量超出有效范围");
+    update.run(after, uid);
+    record.run(randomUUID(), uid, input.amount, after, faction ? "faction_admin" : "admin", reason, null, created);
   }
-  return { batchId, recipients: targets.length, amount: input.amount };
+  return { batchId, recipients: targets.length, amount: input.amount, cardType };
 }
-module.exports = { initialize, eligible, ensureAccount, balance, wallet, grantNotice, acknowledgeGrant, choiceResult, deal, prepare, settle, resultView, roomView, players, grant };
+module.exports = { initialize, eligible, ensureAccount, balance, entryBalances, wallet, grantNotice, acknowledgeGrant, choiceResult, deal, prepare, settle, resultView, roomView, players, grant };

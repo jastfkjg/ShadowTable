@@ -4,6 +4,22 @@
 })(typeof window !== "undefined" ? window : this, function () {
   const factionNames = { good: "好人阵营", evil: "坏人阵营", third: "第三方阵营" };
   const factionIcons = { good: "/assets/record-shield-good.svg", evil: "/assets/faction-mask-evil.svg" };
+  function needsCardTotal(room) {
+    const card = room.me?.avoidance;
+    return room.phase === "lobby" && room.me?.seat != null && card && card.totalBalance == null;
+  }
+  async function roomWithCardTotal(room, request) {
+    // Older room summaries only count avoidance cards. The private card sheet
+    // includes factionBalance on every server that supports faction cards.
+    try {
+      const detail = await request("/api/rooms/" + room.code + "/avoidance");
+      if (detail.code === room.code && detail.stage === room.stage && detail.phase === "lobby" && Number.isSafeInteger(detail.balance)) {
+        const totalBalance = detail.balance + (detail.factionBalance ?? 0);
+        return { ...room, me: { ...room.me, avoidance: { ...room.me.avoidance, balance: detail.balance, totalBalance } } };
+      }
+    } catch (_) { /* The table stays usable and the next poll retries the count. */ }
+    return room;
+  }
   function groups(options, selected) {
     return ["good", "evil", "third"].map(faction => ({ faction,
       label: factionNames[faction],
@@ -56,7 +72,7 @@
       const avoidanceAmount = value.notice.amount - factionAmount;
       const summary = "阵营卡 ×" + factionAmount + (avoidanceAmount ? "、回避卡 ×" + avoidanceAmount : "");
       return { title: avoidanceAmount ? "收到本局用卡" : "收到阵营卡", lead: [summary, ...new Set(reasons)].join("\n\n"),
-        content: "入座后点「本局用卡」选择初始阵营或回避角色。每局限用 1 张，生效才扣卡。" };
+        content: "入座后点「用卡」选择初始阵营或回避角色。每局限用 1 张，生效才扣卡。" };
     }
     // Keep combined/migrated grants neutral; the win message describes one card.
     const lead = kind === "loss" ? "加油，下局试试避开不想玩的角色！"
@@ -99,5 +115,5 @@
       check,
     };
   }
-  return { groups, panel, choose, result, grantCopy, grantMessage, createGrantNotifier };
+  return { needsCardTotal, roomWithCardTotal, groups, panel, choose, result, grantCopy, grantMessage, createGrantNotifier };
 });

@@ -346,20 +346,24 @@ function createAdmin({ store, origin, key, body, limit }) {
       fail(/^(0|[1-9]\d{0,6})$/.test(offset),"页码无效");
       send(200,store.searchScorePlayers(search,Number(offset)));return true;
     }
-    if (path === "/api/admin/avoidance" && req.method === "GET") {
+    const cardManagement = path === "/api/admin/cards" || path === "/api/admin/avoidance";
+    if (cardManagement && req.method === "GET") {
       const query = new URL(req.url, origin).searchParams;
       send(200, require("../avoidance").players(store, (query.get("q") || "").trim(), Number(query.get("offset") || 0))); return true;
     }
-    if (path === "/api/admin/avoidance" && req.method === "POST") {
+    if (cardManagement && req.method === "POST") {
       const input = await body(req);
       fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId), "缺少合法请求编号");
+      if (path === "/api/admin/cards") fail(input.cardType !== undefined, "请选择卡片类型");
+      else fail(input.cardType === undefined || input.cardType === "avoidance", "此入口仅支持回避卡");
       const actor = "admin:avoidance", fingerprint = digest(JSON.stringify([path, input])).toString("hex");
       const result = store.transaction(() => {
         const cached = store.receipt(actor, input.requestId);
         if (cached) { fail(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409); return JSON.parse(cached.result); }
         const result = require("../avoidance").grant(store, input);
+        const faction = result.cardType === "faction";
         store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
-          .run("grant-avoidance", "", (input.reason || "").trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: "发放回避卡" }));
+          .run(faction ? "grant-faction" : "grant-avoidance", "", (input.reason || "").trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: faction ? "发放阵营卡" : "发放回避卡" }));
         store.addReceipt(actor, input.requestId, fingerprint, result); return result;
       });
       send(200, result); return true;

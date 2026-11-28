@@ -19,10 +19,20 @@ Page({
     this.setData({ imageMenu: typeof wx.showShareImageMenu === "function" && (!wx.canIUse || wx.canIUse("showShareImageMenu")) });
     try { this.selection = cards.parseSelection(options); }
     catch (error) { this.setData({ loading: false, error: error.message }); return; }
-    if (this.selection.kind === "monthly") this.setData({ pageTitle: "分享月报", monthly: true });
+    if (this.selection.kind === "monthly") {
+      this.setData({ pageTitle: "分享月报", monthly: true });
+      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+      const source = pages[pages.length - 2];
+      const poster = source?.takeSharePoster?.(this.selection.month);
+      if (poster) {
+        this.card = poster.card;
+        this.setData({ loading: false, description: cards.describe(poster.card), imagePath: poster.path });
+        return;
+      }
+    }
     return this.load();
   },
-  onReady() { this.canvasReady = true; if (this.card) return this.render(); },
+  onReady() { this.canvasReady = true; if (this.card && !this.data.imagePath) return this.render(); },
   onUnload() { this.alive = false; this.sequence = (this.sequence || 0) + 1; this.card = null; },
   async load() {
     if (!this.selection || this.fetching || this.data.rendering || this.data.acting) return;

@@ -27,33 +27,34 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   const box=monthly.layout(pages[0]),last=box.sections[box.sections.length-1];
   assert.equal(monthly.dimensions(pages[0]).width,1080);
   assert.ok(last.top+last.box.height<=box.footerTop,"all content clears the footer");
-  assert.ok(box.height-(last.top+last.box.height)<540,"the footer does not add a page of empty space");
-  assert.equal(box.sections.filter(s=>s.groupTop!==null).length,2);
-  assert.deepEqual(box.sections.filter(s=>s.groupTop!==null).map(s=>s.groupNumber),[2,3]);
+  assert.ok(box.height/(1080/480)-(last.top+last.box.height)<540,"the footer does not add a page of empty space");
+  assert.ok(box.sections.every(s=> s.box.lanes.flatMap(l=>l.tiles).length===s.section.rows.length));
+  assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
   const labels=trace(pages[0]).map(t=>t.value);
-  assert.equal(labels.filter(label=>label==="月度战报").length,2); // One header and one footer.
+  assert.equal(labels.filter(label=>label==="炉边来信").length,1);
   assert.doesNotMatch(shares.describe(pages[0]),/第 .* 张|续/);
   const sample=monthly.cards(shareMonthlyFixture());
   assert.deepEqual(sample[0].sections.map(s=>s.id),["points","games","merlin_evade","assassin_hit","percival_green"]);
   assert.equal(sample[0].sections[0].rows.filter(row=>row.tied).length,2);
-  assert.equal(sample[0].sections.find(s=>s.type==="honor").rows[0].rate,100);
-  assert.ok(monthly.imagePaths(sample[0]).includes("/assets/roles/merlin.png"));
+  assert.ok(sample[0].sections.filter(s => s.type === "honor").every(s => s.rows.every(row => row.secondary === "")));
+  assert.ok(monthly.imagePaths(sample[0]).includes("/assets/room-share-background.jpg"));
   const sparse=shareMonthlyFixture(); sparse.mainBoards.slice(1).forEach(board=>board.rows=[]); sparse.featuredIds=[];
   assert.ok(monthly.dimensions(monthly.cards(sparse)[0]).height<monthly.dimensions(sample[0]).height,"short reports shrink with their content");
 });
 
-test("月报长昵称、大负数、零分均完整呈现，娱乐榜保留发生率口径", () => {
+test("积分卡显示昵称、总分和计分局数，趣味与娱乐榜只画上榜次数", () => {
   const report=shareMonthlyFixture(),name="与梅林一起守护圆桌的长昵称玩家😀".repeat(3);
-  Object.assign(report.mainBoards[0].rows[0],{nickname:name,points:-123456789,tied:true});
-  report.mainBoards[0].rows[1].points=0;
+  Object.assign(report.mainBoards[0].rows[0],{nickname:name,points:-123456789,adjustmentPoints:-34,tied:true});
+  Object.assign(report.mainBoards[0].rows[1],{points:0,adjustmentPoints:36});
   const pages=monthly.cards(report),texts=pages.flatMap(trace);
-  assert.ok(texts.map(t=>t.value).join("").includes(name));
-  assert.ok(texts.some(t=>t.value==="-123456789"&&t.maxWidth>200));
-  assert.ok(texts.some(t=>t.value==="0"));
+  assert.ok(texts.map(t=>t.value).join("").includes(name)); assert.ok(monthly.describe(pages[0]).includes(name));
+  assert.ok(texts.some(t=>t.value==="6 场计分局")); assert.doesNotMatch(texts.map(t=>t.value).join(""),/调整/);
+  assert.ok(texts.some(t=>t.value==="-123456789分"&&t.maxWidth>0));
+  assert.ok(texts.some(t=>t.value==="0分"));
   assert.equal(pages.length,1);
   const complete=monthly.cards(monthlyFixture());
-  assert.ok(complete.flatMap(trace).some(t=>/^发生率 .*% · \d+ 次机会$/.test(t.value)));
-  assert.ok(complete.flatMap(trace).some(t=>/^成功率 /.test(t.value)));
+  assert.doesNotMatch(complete.flatMap(trace).map(t=>t.value).join(""), /成功率|发生率|次机会/);
+  assert.ok(complete.flatMap(trace).some(t => t.value === "73.3%"));
   assert.doesNotMatch(complete.flatMap(trace).map(t=>t.value).join(""),/娱乐版/);
 });
 
@@ -68,21 +69,23 @@ test("完整月报不受精选和三项上限限制，所有有记录的荣誉�
   assert.deepEqual(monthly.cards(report,true),[card]);
   report.mainBoards.forEach(b=>b.rows=[]);report.funBoards.filter(b=>b.positive).forEach(b=>b.rows=[]);
   const onlyEntertainment=monthly.layout(monthly.cards(report)[0]);
-  assert.equal(onlyEntertainment.mainGroupTop,null);
-  assert.deepEqual(onlyEntertainment.sections.filter(s=>s.groupTop!==null).map(s=>s.groupNumber),[1]);
+  assert.ok(onlyEntertainment.sections.every(s=>s.section.groupTitle==="娱乐榜"));
+  assert.deepEqual(onlyEntertainment.sections.map(s=>s.chapter).filter(Boolean),["娱乐榜"]);
 });
 
-test("荣誉长昵称和大次数完整绘制，成功率与机会数合并且大数值不覆盖文字", () => {
+test("并列荣誉的长昵称换行完整绘制，在头像区域内与次数分开排列", () => {
   const report=monthlyFixture(),board=report.funBoards.find(b=>b.id===report.featuredIds[0]);
   Object.assign(board.rows[0],{nickname:"圆桌旁的长昵称玩家".repeat(5),count:123456789,opportunities:370370367,rate:33.3,tied:true});
   const card=monthly.cards(report)[0],texts=trace(card);
-  const drawn=texts.find(t=>t.value==="123456789");
-  const section=monthly.layout(card).sections.find(s=>s.section.id===board.metric),row=section.box.rows[0];
-  const metadata=texts.filter(t=>row.secondary.includes(t.value));
+  const drawn=texts.find(t=>t.value==="123456789次");
+  const section=monthly.layout(card).sections.find(s=>s.section.id===board.metric);
+  const tile=section.box.lanes[0].tiles[0];
   assert.ok(texts.map(t=>t.value).join("").includes(board.rows[0].nickname));
-  assert.equal(row.secondary.join(""),"成功率 33.3% · 370370367 次机会");
-  assert.ok(drawn.maxWidth>500);
-  assert.ok(metadata.every(t=>t.y+Number(t.font.match(/([\d.]+)px/)[1])<drawn.y));
+  assert.equal(tile.nameLines.join(""),board.rows[0].nickname);
+  assert.deepEqual(tile.sampleLines,[]);
+  assert.ok(section.box.heading + tile.y + tile.textTop + tile.nameLines.length * 18 <= section.box.height);
+  assert.ok(drawn.maxWidth>0);
+  assert.ok(section.box.heading + tile.y + tile.diameter < section.box.height);
   assert.doesNotMatch(texts.map(t=>t.value).join(""),/发给好友|保存图片|点图放大/);
 });
 

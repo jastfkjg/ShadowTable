@@ -23,7 +23,9 @@ function create() {
     update(value) {
       const { controller, data } = surface();
       if (data.profile?.avoidance) controller.setData({ profile: { ...data.profile, avoidance: { ...data.profile.avoidance, balance: value.balance } } });
-      if (data.room?.me?.avoidance && data.room.me.avoidance.balance !== value.balance) controller.setData({ room: { ...data.room, me: { ...data.room.me, avoidance: { ...data.room.me.avoidance, balance: value.balance } } } });
+      const card = data.room?.me?.avoidance;
+      if (card && value.totalBalance != null && (card.balance !== value.balance || card.totalBalance !== value.totalBalance))
+        controller.setData({ room: { ...data.room, me: { ...data.room.me, avoidance: { ...card, balance: value.balance, totalBalance: value.totalBalance } } } });
     },
     async show(value) {
       const { host, controller } = surface(), shared = host.selectComponent("#app-dialog");

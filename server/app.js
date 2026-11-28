@@ -522,7 +522,7 @@ function createApp({
         }
         // Authorize and build the existing allowlisted view before enriching presentation.
         const view = publicView(room, uid);
-        view.me.avoidance = { balance: avoidance.balance(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
+        view.me.avoidance = { ...avoidance.entryBalances(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
         view.honors = honors.view(store, room, uid);
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));

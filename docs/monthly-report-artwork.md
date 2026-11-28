@@ -1,6 +1,6 @@
 # 月报背景美术素材
 
-使用 Codex 内置 imagegen，以用户提供的月报概念图为参考生成无文字背景。项目文件：`miniprogram/assets/monthly-report-background.jpg`，941×1672，约 135 KiB。使用系统图片工具转换为 JPEG，原图保留。
+早期月报的无文字背景由 Codex 内置 imagegen 参考用户提供的概念图生成，保存在 `miniprogram/assets/monthly-report-background.jpg`。图片经 JPEG 压缩，分辨率为 941×1672，约 91 KiB。目前月报首页和分享图共用的「炉边来信」长图使用项目已有的 `miniprogram/assets/room-share-background.jpg` 小法师插画。
 
 生成图：`/Users/zilong/.codex/generated_images/01a12bec-23b1-73a3-91a4-ebc46df1c877/exec-bf568d13-9959-4df4-a7e9-ef49ade7ae0d.png`。
 

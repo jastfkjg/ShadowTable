@@ -82,7 +82,7 @@ test('网页收卡通过主题弹窗展示，未确认不读，身份或操作�
   const c = client(async (url, options = {}) => {
     calls.push([url, options]);
     if (options.method === 'POST') { notice = null; return response({ acknowledged: true }); }
-    return response({ balance: 4, notice });
+    return response({ balance: 4, totalBalance: 6, notice });
   });
   c.state.loading = false; c.state.page = 'table'; c.state.room = { phase: 'lobby', me: { avoidance: { balance: 2 } } };
   c.setConfirm(async (...args) => { dialogs.push(args); return accepted; });
@@ -97,6 +97,7 @@ test('网页收卡通过主题弹窗展示，未确认不读，身份或操作�
     assert.match(dialogs[0][1], /生效才扣卡/); assert.equal(dialogs[0][4].amount, 2); assert.equal(dialogs[0][4].lead, '感谢参加聚会！');
     assert.doesNotMatch(dialogs[0][1], /管理员|发放/); assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 0);
     assert.equal(c.state.room.me.avoidance.balance, 4);
+    assert.equal(c.state.room.me.avoidance.totalBalance, 6);
     accepted = true; await c.grantNotifier.check();
     assert.equal(calls.filter(([, options]) => options.method === 'POST').length, 1);
     await c.grantNotifier.check(); assert.equal(dialogs.length, 2);
@@ -2296,59 +2297,35 @@ test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背�
   c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
 });
 
-test('网页月报分类保留完整榜单，切换后统一分享入口并隐藏空榜', () => {
-  const report = require('../tests/helpers/monthly-fixtures').monthlyFixture();
-  report.mainBoards[1].rows = [];
-  report.funBoards.filter(board => board.metric === 'assassin_hit').forEach(board => { board.rows = []; });
-  report.mainBoards[0].rows[0].nickname = '<img src=x onerror=alert(1)>';
+test('月报首页直接显示完整图片，仅保留生成分享图；空月隐藏图片和分享', () => {
+  const report = require('./helpers/monthly-fixtures').monthlyFixture();
   const c = client(async () => response({}));
   c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
   c.state.monthlyMonth = report.month;
+  c.state.monthlyPoster = { src:'data:image/png;base64,demo', width:1080, height:3200, description:'本月完整榜单',
+    targets:[{ publicId:'demo', label:'<示例玩家>', x:5, y:10, width:8, height:2 }] };
   const html = c.viewMonthlyReport();
-  assert.doesNotMatch(html, /好人胜率榜|坏人胜率榜|战绩榜|职业刺客|暂无满足|<img src=x/);
-  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
-  assert.doesNotMatch(html, /查看完整月报|收起完整月报|monthly-honor-row/);
-  assert.match(html, /monthly-avatar/);
-  assert.match(html, /桌边常驻王/);
-  assert.match(html, /生成月报分享图/);
-  assert.doesNotMatch(html, /class="monthly-board" aria-label="闪身步大神"/);
-  c.ACTIONS.monthlyEdition({ dataset: { value: 'honors' } });
-  const honors = c.viewMonthlyReport();
-  assert.equal((honors.match(/class="monthly-board" aria-label="闪身步大神"/g) || []).length, 1);
-  assert.match(honors, /成功率 80% · 10 次机会/);
-  assert.doesNotMatch(honors, /class="monthly-board" aria-label="积分榜"/);
-  c.ACTIONS.monthlyEdition({ dataset: { value: 'fun' } });
-  assert.match(c.viewMonthlyReport(), /背锅侠/);
-  assert.match(c.viewMonthlyReport(), /生成月报分享图/);
-  assert.doesNotMatch(c.viewMonthlyReport(), /生成娱乐版/);
-  assert.equal(c.state.monthlyEntertainment, true);
-  c.ACTIONS.monthlyEdition({ dataset: { value: 'overall' } });
-  assert.equal(c.state.monthlyEntertainment, false);
-  assert.match(c.viewMonthlyReport(), /class="monthly-board" aria-label="积分榜"/);
-  for (const board of [...report.mainBoards, ...report.funBoards]) board.rows = [];
-  c.state.monthlyReport = require('../miniprogram/monthly-report').presentReport(report);
-  const empty = c.viewMonthlyReport();
-  assert.doesNotMatch(empty, /monthly-featured-heading|monthly-details-toggle|monthly-honor-row|暂无/);
-  assert.match(empty, /有效对局/);
+  assert.match(html,/class="monthly-poster-image"/); assert.match(html,/&lt;示例玩家&gt;/);
+  assert.match(html,/生成分享图/); assert.doesNotMatch(html,/精选|展开|完整长图<|保存长图|<示例玩家>/);
+  c.state.monthlyPoster = null; c.state.monthlyReport.canShare = false;
+  const empty = c.viewMonthlyReport(); assert.match(empty,/没有有效对局/); assert.doesNotMatch(empty,/生成分享图|monthly-poster-image/);
 });
-
-test('网页月报只导出一张完整长图，预览和下载无分页入口', async()=>{
-  const report=require('./helpers/monthly-fixtures').monthlyFixture(),rendered=[],downloads=[],labels=[];
+test('网页首次打开即绘制末榜，分享复用首页 PNG，公开版本变化时同步替换', async () => {
+  const report=require('./helpers/monthly-fixtures').monthlyFixture(), downloads=[], labels=[];
+  let canvases=0;
   const ctx=new Proxy({fillText:value=>labels.push(value)},{get:(target,key)=>key in target?target[key]:()=>{}});
   const c=client(async()=>response(report),undefined,undefined,{Image:class{constructor(){this.width=64;this.height=64;}set src(value){this.onload();}}});
-  c.document.createElement=tag=>tag==='canvas'?{getContext:()=>ctx,toDataURL(){rendered.push({width:this.width,height:this.height});return 'data:image/png;base64,long-poster';}}:{click(){downloads.push({href:this.href,name:this.download});},remove(){}};
+  c.document.createElement=tag=>tag==='canvas'?{getContext:()=>ctx,toDataURL:()=> 'data:image/png;base64,poster'+(++canvases)}:{click(){downloads.push({href:this.href,name:this.download});},remove(){}};
   c.document.body={appendChild(){}};
-  Object.assign(c.state,{page:'monthly',monthlyMonth:report.month,monthlyReport:require('../miniprogram/monthly-report').presentReport(report)});
-  for(const category of ['overall','honors','fun']) {
-    c.ACTIONS.monthlyEdition({dataset:{value:category}});labels.length=0;
-    const before=rendered.length;await c.ACTIONS.monthlyShare();
-    assert.equal(c.state.monthlyError,'');assert.equal(rendered.length,before+1);assert.ok(rendered.at(-1).height>1920);
-    assert.equal(c.state.monthlyImages.length,1);assert.ok(labels.includes('绝对防御'));assert.ok(labels.includes('背锅侠'));
-    assert.doesNotMatch(labels.join(''),/娱乐版/);
-  }
-  assert.doesNotMatch(c.viewMonthlyReport(),/上一张|下一张|自动分图|第1张/);
-  assert.match(c.viewMonthlyReport(),/保存长图/);
-  c.ACTIONS.monthlyDownload();assert.deepEqual(downloads,[{href:'data:image/png;base64,long-poster',name:'桌边助手-月度战报-2026-09.png'}]);
+  Object.assign(c.state,{page:'monthly',monthlyMonth:report.month});
+  await c.ACTIONS.monthlyRetry();
+  assert.equal(c.state.monthlyError,''); assert.ok(labels.includes('背锅侠')); assert.ok(labels.includes('炉边来信'));
+  const first=c.state.monthlyPoster.src; await c.ACTIONS.monthlyShare();
+  assert.equal(canvases,1); assert.deepEqual(downloads,[{href:first,name:'桌边助手-月度战报-2026-09.png'}]);
+  report.version++; await c.ACTIONS.monthlyShare();
+  assert.equal(canvases,2); assert.notEqual(c.state.monthlyPoster.src,first); assert.equal(downloads[1].href,c.state.monthlyPoster.src);
+  report.overview.games=0; await c.ACTIONS.monthlyShare();
+  assert.equal(c.state.monthlyPoster,null); assert.equal(downloads.length,2);
 });
 
 test('网页最佳玩家票选不限时，支持房主未投名单、选择修改与全部并列获奖卡片', async()=>{
@@ -2593,16 +2570,42 @@ test('网页版回避卡单选、确认、只读和私密结果遮盖，与小�
     assert.doesNotMatch(c.viewActionDialog(), /已回避|已消耗.*回避卡/);
   } finally { c.stop(); }
 });
+test('网页旧房间接口的用卡明细失败后可重试，旧通知不会清空卡数', async () => {
+  const room = publicView(newRoom('123456', 'host', '房主', 'classic', 6), 'host');
+  room.me.avoidance = { balance: 2, selected: false };
+  let ready = false;
+  const c = client(async url => {
+    if (url === '/api/me/cards/notice') return response({ balance: 2, notice: null });
+    if (url === '/api/rooms/123456') return response(room);
+    assert.equal(url, '/api/rooms/123456/avoidance');
+    if (!ready) throw Error('timeout');
+    return response({ code: room.code, stage: room.stage, phase: 'lobby', balance: 2, factionBalance: 1 });
+  });
+  try {
+    c.state.page = 'table'; c.state.loading = false;
+    await c.refresh();
+    assert.match(c.viewRoom(), /aria-label="用卡，张数待同步"/);
+    ready = true;
+    await c.refresh();
+    await c.grantNotifier.start();
+    assert.match(c.viewRoom(), /aria-label="用卡，共 3 张"/);
+    assert.match(c.viewRoom(), />×3</);
+  } finally { c.grantNotifier.stop(); c.stop(); }
+});
+
 test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入口', () => {
   const c = client(async () => response({})); c.state.page = 'table';
-  c.state.room = { code: '123456', stage: 1, phase: 'lobby', players: [], team: [], history: [], me: { seat: 1, ready: true, avoidance: { balance: 0 } } };
+  c.state.room = { code: '123456', stage: 1, phase: 'lobby', players: [], team: [], history: [], me: { seat: 1, ready: true, avoidance: { balance: 0, totalBalance: 0 } } };
   try {
     c.state.avoidanceOpen = true; c.state.avoidance = { balance: 0, editable: false };
     const html = c.viewAvoidance();
     assert.match(html, /class="avoidance-note">暂无回避卡<\/div>/);
     assert.doesNotMatch(html, /取消准备后|当前无法使用回避卡/);
     c.ACTIONS.closeAvoidance();
-    assert.match(c.viewRoom(), /data-action="openAvoidance"/);
+    assert.match(c.viewRoom(), /data-action="openAvoidance" aria-label="用卡，共 0 张">/);
+    assert.match(c.viewRoom(), />×0<\/span><\/span><span class="avoidance-entry-state">用卡</);
+    c.state.room.me.avoidance = { balance: 3, totalBalance: 4, selected: true };
+    assert.match(c.viewRoom(), />×4<\/span><\/span><span class="avoidance-entry-state">✓ 已选</);
     let actions = c.viewRoom().split('<div class="web-lobby-action-inner">')[1];
     assert.ok(actions.indexOf('data-action="openAvoidance"') < actions.indexOf('data-action="ready"'));
     assert.match(actions, /取消准备/);
@@ -2638,13 +2641,13 @@ test('网页 A 概览打开 C 确认面板，取消不提交，失败重试保�
   c.ACTIONS.clearPersonalRecords(); assert.equal(posts.length, 0);
   assert.match(c.viewRecordClearingConfirmation(), /role="dialog"|核对清理范围|2026 年 10 月|暂不清理/);
   c.ACTIONS.closeRecordClearingConfirmation(); assert.equal(c.viewRecordClearingConfirmation(), '');
-  c.state.stats = { total: 8 }; c.state.monthlyImages = ['old-poster'];
+  c.state.stats = { total: 8 }; c.state.monthlyPoster = {src:'old-poster'};
   c.ACTIONS.clearPersonalRecords(); await c.ACTIONS.confirmPersonalRecordClearing();
   assert.match(c.viewRecordClearingConfirmation(), /重试并核对结果|网络未确认/);
   await c.CHANGES.clearingMonth({ value: '2026-09' }); assert.equal(c.state.clearingMonth, '2026-10');
   c.ACTIONS.closeRecordClearingConfirmation(); c.ACTIONS.clearPersonalRecords();
   await c.ACTIONS.confirmPersonalRecordClearing(); assert.deepEqual(posts[0], posts[1]);
-  assert.equal(c.state.stats, null); assert.equal(c.state.monthlyImages.length, 0); assert.equal(c.state.clearingConfirming, false);
+  assert.equal(c.state.stats, null); assert.equal(c.state.monthlyPoster, null); assert.equal(c.state.clearingConfirming, false);
   assert.match(c.state.clearingNotice, /已清除/); assert.doesNotMatch(c.viewRecordClearing(), /data-action="clearPersonalRecords"/);
 });
 test('网页清理冲突关闭面板并重新预览；离开和后台丢弃未提交确认', async () => {

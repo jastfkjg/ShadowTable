@@ -5,7 +5,7 @@ const { RANK_MIN_PLAYERS } = require("./match-management");
 const fun = require("./fun");
 const { honors } = require("../miniprogram/fun-copy");
 const { monthAt, monthRange } = require("../miniprogram/monthly-report");
-const RULES_VERSION = "monthly-2026-11-v3";
+const RULES_VERSION = "monthly-2026-11-v4";
 const WIN_THRESHOLD = 10, FUN_RATE_THRESHOLD = 5;
 function rankTop(rows, compare) {
   rows.sort((a, b) => compare(a, b) || a.publicId.localeCompare(b.publicId));
@@ -89,6 +89,29 @@ class MonthlyReport {
         ...rankTop(rows.filter(row => sort === "count" ? row.count >= 1 : row.opportunities >= FUN_RATE_THRESHOLD).map(row => ({ ...row })), sort === "count" ? (a, b) => b.count - a.count : ratioCompare("count", "opportunities")) }));
     });
     const priority = ["merlin_evade", "assassin_hit", "defense_ally", "percival_green", "kill_enemy"];
+    const spotlights = [
+      ["honor_mvp", "玩家票选", "获选胜方最佳的局数", "局"],
+      ["honor_svp", "玩家票选", "获选败方最佳的局数", "局"],
+      ["lancelot_both", "角色与牌桌高光", "同局以蓝方参加成功任务，又以红方亲手出失败牌", "局"],
+      ["survival_revive", "角色与牌桌高光", "十二骑士 · 实际复活次数", "次"],
+      ["survival_knifed", "角色与牌桌高光", "十二骑士 · 承受轮内刀或最终刀的次数", "次"],
+    ].map(([id, group, subtitle, unit]) => ({
+      id, title: fun.metrics[id].honorTitle, group, subtitle, unit, countOnly: true, threshold: 1,
+      ...rankTop(funRows.filter(row => row.metric === id && row.count > 0)
+        .map(row => ({ ...identity(row), count: row.count })), (a, b) => b.count - a.count),
+    }));
+    const runs = new Map();
+    for (const row of db.prepare(`SELECT p.uid,p.outcome FROM leaderboard_match_players p JOIN profiles f ON f.uid=p.uid
+      WHERE ${valid} AND ${publicPlayers} ORDER BY p.uid,p.ended,p.match_id`).all(start, end)) {
+      const run = runs.get(row.uid) || { current: 0, best: 0 };
+      run.current = row.outcome === "win" ? run.current + 1 : 0;
+      run.best = Math.max(run.best, run.current);
+      runs.set(row.uid, run);
+    }
+    spotlights.splice(2, 0, { id: "win_streak", title: "月内最长连胜", group: "角色与牌桌高光",
+      subtitle: "本月连续获胜的有效对局 · 至少 2 局", unit: "局", countOnly: true, threshold: 2,
+      ...rankTop(aggregates.filter(row => runs.get(row.uid)?.best >= 2)
+        .map(row => ({ ...identity(row), count: runs.get(row.uid).best })), (a, b) => b.count - a.count) });
     const featuredIds = priority.map(id => funBoards.find(board => board.id === id + ":count" && board.rows.length)).filter(Boolean).slice(0, 3).map(board => board.id);
     const highlights = [];
     const describeWinner = board => board.rows[0] && (board.rows.filter(row => row.rank === 1).length > 1 ? board.rows[0].nickname + "等 " + board.rows.filter(row => row.rank === 1).length + " 人并列" : board.rows[0].nickname);
@@ -99,7 +122,7 @@ class MonthlyReport {
     if (!highlights.length && mainBoards[2].rows.length) highlights.push(describeWinner(mainBoards[2]) + "本月参赛 " + mainBoards[2].rows[0].total + " 局。");
     return { month, currentMonth: monthAt(now), firstMonth: first == null ? monthAt(now) : monthAt(first),
       periodStart: start, periodEnd: end, timezone: "Asia/Shanghai", status: now < end ? "preview" : "complete",
-      rulesVersion: RULES_VERSION, minPlayers: RANK_MIN_PLAYERS, overview: { ...overview }, mainBoards, funBoards, featuredIds, highlights };
+      rulesVersion: RULES_VERSION, minPlayers: RANK_MIN_PLAYERS, overview: { ...overview }, mainBoards, funBoards, spotlights, featuredIds, highlights };
   }
   read(params, now = Date.now()) {
     const month = parseMonth(params, now), old = this.cache.get(month);

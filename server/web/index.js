@@ -74,6 +74,7 @@ const assets = {
   "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
   "/poster-canvas.js": ["../../miniprogram/poster-canvas.js", "text/javascript; charset=utf-8"],
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
+  "/assets/room-share-background.jpg": ["../../miniprogram/assets/room-share-background.jpg", "image/jpeg"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])

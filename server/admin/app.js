@@ -11,6 +11,7 @@ const labels = {
   "correct-result": "更正对局结果",
   "adjust-player-score": "调整玩家积分",
   "grant-avoidance": "发放回避卡",
+  "grant-faction": "发放阵营卡",
   "adjust-match-scores": "调整本局积分",
   "match-delete": "删除对局记录",
   "match-restore": "恢复对局记录",

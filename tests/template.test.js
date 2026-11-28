@@ -2518,13 +2518,13 @@ test('趣味榜进入徽章查询后按名称选徽章，达成名单只显示�
   assert.ok(!nodes(list).some(n => n.attr?.class === 'br-place'));
 });
 
-test('本局用卡按板子显示阵营，换卡说明与保存按钮一致，底栏仅显示本人是否已选', () => {
+test('本局用卡按板子显示阵营，底栏显示本人总张数与选择状态', () => {
   const cards = require('../miniprogram/avoidance');
   const engine = require('../server/engine');
   for (const [board, capacity, expected] of [['classic', 6, 2], ['chaos', 12, 3]]) {
     const room = engine.newRoom('123456', 'host', '房主', board, capacity);
     const me = engine.publicView(room, 'host');
-    me.me.avoidance = { balance: 3, selected: true };
+    me.me.avoidance = { balance: 3, totalBalance: 4, selected: true };
     const options = engine.avoidanceOptions(room);
     const value = { options, selected: 'merlin', balance: 3, factionBalance: 1, editable: true };
     const tree = renderTable({ ...base, room: me, avoidanceOpen: true, ...cards.panel(value, 'faction', board === 'chaos' ? 'third' : 'good') });
@@ -2534,6 +2534,16 @@ test('本局用卡按板子显示阵营，换卡说明与保存按钮一致，�
     assert.doesNotMatch(content, /下一张|距下|已完成\s*\d+\s*\/\s*10/);
     assert.match(content, /确认后将替换「回避梅林」/);
     assert.match(byHandler(tree, 'saveAvoidance').children.join(''), /改用阵营卡 · 选择/);
-    assert.doesNotMatch(JSON.stringify(byHandler(tree, 'openAvoidance')), /梅林|第三方/);
+    const entry = byHandler(tree, 'openAvoidance');
+    assert.equal(entry.attr.ariaLabel, '用卡，共 4 张，本局已选');
+    assert.match(JSON.stringify(entry.children), /×4/);
+    assert.match(JSON.stringify(entry.children), /✓ 已选/);
+    assert.doesNotMatch(JSON.stringify(entry), /梅林|第三方/);
+    me.me.avoidance = { balance: 0, totalBalance: 0, selected: false };
+    const empty = byHandler(renderTable({ ...base, room: me }), 'openAvoidance');
+    assert.equal(empty.attr.ariaLabel, '用卡，共 0 张');
+    assert.equal(empty.attr.disabled, false);
+    assert.match(JSON.stringify(empty.children), /×0/);
+    assert.equal(empty.children.at(-1).children.join(''), '用卡');
   }
 });

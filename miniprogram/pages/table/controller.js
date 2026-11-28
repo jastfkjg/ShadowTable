@@ -839,6 +839,7 @@ module.exports = function createTablePage({ lobby = false } = {}) { return {
     try {
       const query = this.inviteCode === code && this.inviteInstance != null ? "?instance=" + encodeURIComponent(this.inviteInstance) : "";
       room = funCopy.response(await api.request("/api/rooms/" + code + query));
+      if (avoidancePresentation.needsCardTotal(room)) room = await avoidancePresentation.roomWithCardTotal(room, api.request);
     } catch (e) {
       if (
         !this.alive ||

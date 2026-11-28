@@ -2696,6 +2696,31 @@ test('换牌遇到断网、忙碌或待确认请求时仍可收起，恢复后�
   }
 });
 
+test('小程序进桌兼容旧接口的用卡张数，当前接口直接使用总数', async () => {
+  const { newRoom, publicView } = require('../server/engine');
+  const room = publicView(newRoom('123456', 'host', '房主', 'classic', 6), 'host');
+  const path = '/api/rooms/' + room.code;
+  for (const [card, detail, expected] of [
+    [{ balance: 3 }, { balance: 3 }, 3],
+    [{ balance: 0 }, { balance: 0 }, 0],
+    [{ balance: 0 }, { balance: 0, factionBalance: 2 }, 2],
+    [{ balance: 3 }, { balance: 3, factionBalance: 1 }, 4],
+    [{ balance: 3, totalBalance: 4 }, null, 4],
+  ]) {
+    const calls = [];
+    const p = page({ request: async url => {
+      calls.push(url);
+      if (url === path) return { ...room, me: { ...room.me, avoidance: { ...card, selected: true } } };
+      return { code: room.code, stage: room.stage, phase: 'lobby', ...detail };
+    } });
+    p.roomCode = room.code;
+    await p.refresh();
+    assert.equal(p.data.room.me.avoidance.totalBalance, expected);
+    assert.equal(p.data.room.me.avoidance.selected, true);
+    assert.deepEqual(calls, detail ? [path, path + '/avoidance'] : [path]);
+  }
+});
+
 test('本局用卡只在确认时替换，选项来自当前板子，关闭重开回到已保存的卡', async () => {
   const value = { code: '123456', stage: 1, phase: 'lobby', balance: 2, factionBalance: 1,
     selected: 'merlin', selectedFaction: null, editable: true, options: [
