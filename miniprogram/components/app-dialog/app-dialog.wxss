@@ -54,4 +54,11 @@
 @media(max-width:350px) { .app-dialog.is-quest-settlement { padding:22px 20px; }.is-quest-settlement .app-dialog-title { font-size:19px; }.is-quest-settlement .app-dialog-message { font-size:13px; }.is-quest-settlement .app-dialog-actions { gap:10px; } }
 @media(max-height:380px) { .app-dialog-backdrop.is-quest-settlement-backdrop { padding:16px; }.app-dialog.is-quest-settlement { padding:20px; }.is-quest-settlement .app-dialog-actions { margin-top:20px; } }
 
+.room-password-heading { display: flex; width: 100%; align-items: center; gap: 12px; }
+.room-password-heading .app-dialog-title { flex: 1; min-width: 0; }
+.app-dialog.is-covered { display: none; }
+.room-password-heading .room-password-help-toggle { display: flex; flex: 0 0 44px; align-items: center; justify-content: center; box-sizing: border-box; width: 44px; height: 44px; padding: 0; margin: 0 -11px 0 0; background: transparent; }
+.room-password-help-toggle image { width: 22px; height: 22px; }
+.room-password-help-toggle::after { border: 0; }
+.room-password-help { margin-top: 16px; }
 .room-password-input { margin: 16rpx 0; min-height: 88rpx; padding: 0 20rpx; border: 1px solid currentColor; border-radius: 12rpx; }

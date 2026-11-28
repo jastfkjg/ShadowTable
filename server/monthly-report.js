@@ -1,12 +1,26 @@
 "use strict";
 const { createHash } = require("node:crypto");
-const { RuleError } = require("./engine");
+const { RuleError, roleIds, roleName } = require("./engine");
 const { RANK_MIN_PLAYERS } = require("./match-management");
 const fun = require("./fun");
-const { honors } = require("../miniprogram/fun-copy");
+const { honors, roleRecords, compareDisplayIds } = require("../miniprogram/fun-copy");
+const { catalogue } = require("../miniprogram/badges");
+const entertainmentIds = new Set(catalogue.filter(badge => badge.category === "趣味徽章").map(badge => badge.id));
 const { monthAt, monthRange } = require("../miniprogram/monthly-report");
-const RULES_VERSION = "monthly-2026-11-v4";
+const RULES_VERSION = "monthly-2026-11-v6";
 const WIN_THRESHOLD = 10, FUN_RATE_THRESHOLD = 5;
+// One signature title per role, drawn from the existing achievement catalogue.
+const signatures = new Map(Object.entries({
+  reverse: "reverse_guard", morgana: "morgana_with_percival", merlin: "merlin_evade",
+  percival: "percival_green", servant: "servant_all_green", assassin: "assassin_hit",
+  mordred: "mordred_last_bust", oberon: "oberon_two_busts",
+  blueLancelot: "lancelot_blue_betrayal", redLancelot: "lancelot_red_redemption",
+}));
+const reportRoles = [...new Set([...signatures.keys(), ...roleIds])];
+const rolesByName = new Map(roleIds.map(id => [roleName(id), id]));
+for (const [name, id] of [["忠臣","servant"], ["爪牙","minion"], ["派西","percival"],
+  ["加雷斯","gareth"], ["加赫雷斯","gaheris"], ["蓝刀客·兰斯洛特","blueLancelot"], ["红刀客·兰斯洛特","redLancelot"]]) rolesByName.set(name, id);
+const roleSet = new Set(roleIds);
 function rankTop(rows, compare) {
   rows.sort((a, b) => compare(a, b) || a.publicId.localeCompare(b.publicId));
   let rank = 0;
@@ -26,6 +40,25 @@ function ratioCompare(numerator, denominator) {
 }
 const identity = row => ({ publicId: row.public_id, nickname: row.nickname || "新朋友", avatarUrl: row.avatar_hash ? "/api/avatars/" + row.avatar_hash : null });
 const percent = (count, total) => total ? Math.round(count / total * 1000) / 10 : null;
+function monthlyRoleTitles(funBoards, appearances, publicProfiles) {
+  const definitions = { ...honors, ...roleRecords };
+  // Shared metrics (for example, 守卫／魔术师) cannot identify a winner for a single role.
+  const earned = Map.groupBy(funBoards.filter(b => b.sort === "count" && b.rows.length),
+    b => rolesByName.get(definitions[b.metric]?.roleLabel));
+  return reportRoles.map(role => {
+    const name = role === "servant" ? "忠臣" : roleName(role);
+    const signature = signatures.get(role), definition = definitions[signature];
+    const choices = earned.get(role) || [];
+    const board = choices.find(b => b.metric === signature) || choices.find(b => b.positive) || choices[0];
+    const entry = { role: name, signature, title: definition?.title || "角色常驻王", condition: definition?.description || "以该角色结算的公开有效局数最多" };
+    if (board) return { ...entry, boardId: board.id };
+    const counts = appearances.get(role);
+    if (!counts?.size) return entry;
+    const standings = rankTop(Array.from(counts, ([uid, count]) => ({ ...identity(publicProfiles.get(uid)), count })), (a, b) => b.count - a.count);
+    return { ...entry, appearance: { id: "appearance_" + role, title: name + "常驻王", subtitle: "按角色出场局数",
+      unit: "局", countOnly: true, threshold: 1, eligibleCount: standings.eligibleCount, rows: standings.rows.filter(r => r.rank === 1) } };
+  });
+}
 function parseMonth(params, now) {
   for (const key of params.keys()) if (key !== "month" || params.getAll(key).length !== 1) throw new RuleError("月报参数无效", 400);
   const month = params.get("month") ?? monthAt(now);
@@ -79,8 +112,11 @@ class MonthlyReport {
       f.public_id,f.nickname,f.avatar_hash FROM match_fun_stats s
       JOIN leaderboard_match_players p ON p.match_id=s.match_id AND p.uid=s.uid JOIN profiles f ON f.uid=s.uid
       WHERE ${valid} AND ${publicPlayers} GROUP BY s.metric,s.uid`).all(start, end);
+    const rowsByMetric = Map.groupBy(funRows, row => row.metric);
+    const countStandings = id => rankTop((rowsByMetric.get(id) || []).filter(row => row.count > 0)
+      .map(row => ({ ...identity(row), count: row.count })), (a, b) => b.count - a.count);
     const funBoards = Object.values(fun.metrics).filter(def => honors[def.id] && !def.countOnly).flatMap(def => {
-      const rows = funRows.filter(row => row.metric === def.id).map(row => ({ ...identity(row),
+      const rows = (rowsByMetric.get(def.id) || []).map(row => ({ ...identity(row),
         count: row.count, opportunities: row.opportunities, rate: percent(row.count, row.opportunities), knownGames: row.knownGames, unknownGames: row.unknownGames }));
       return ["count", "rate"].map(sort => ({ id: def.id + ":" + sort, metric: def.id, title: honors[def.id].title, description: honors[def.id].description,
         label: def.label, positive: def.positive, sort, rateLabel: def.rateLabel, unit: sort === "count" ? def.unit : "%",
@@ -97,21 +133,38 @@ class MonthlyReport {
       ["survival_knifed", "角色与牌桌高光", "十二骑士 · 承受轮内刀或最终刀的次数", "次"],
     ].map(([id, group, subtitle, unit]) => ({
       id, title: fun.metrics[id].honorTitle, group, subtitle, unit, countOnly: true, threshold: 1,
-      ...rankTop(funRows.filter(row => row.metric === id && row.count > 0)
-        .map(row => ({ ...identity(row), count: row.count })), (a, b) => b.count - a.count),
+      ...countStandings(id),
     }));
-    const runs = new Map();
-    for (const row of db.prepare(`SELECT p.uid,p.outcome FROM leaderboard_match_players p JOIN profiles f ON f.uid=p.uid
+    const spotlightIds = new Set(spotlights.map(board => board.id));
+    for (const id of Object.keys(roleRecords).sort(compareDisplayIds)) {
+      if (spotlightIds.has(id)) continue;
+      const standings = countStandings(id);
+      if (!standings.rows.length) continue;
+      const record = roleRecords[id];
+      funBoards.push({ id: id + ":count", metric: id, title: record.title, description: record.description,
+        label: record.title, subtitle: "按达成局数", positive: !entertainmentIds.has(id),
+        sort: "count", countOnly: true, unit: fun.metrics[id].unit, threshold: 1, ...standings });
+    }
+    const runs = new Map(), appearances = new Map();
+    for (const row of db.prepare(`SELECT p.uid,p.outcome, json_extract(p.snapshot,'$.roleId') AS roleKey,
+      json_extract(p.snapshot,'$.role') AS roleName FROM leaderboard_match_players p JOIN profiles f ON f.uid=p.uid
       WHERE ${valid} AND ${publicPlayers} ORDER BY p.uid,p.ended,p.match_id`).all(start, end)) {
       const run = runs.get(row.uid) || { current: 0, best: 0 };
       run.current = row.outcome === "win" ? run.current + 1 : 0;
       run.best = Math.max(run.best, run.current);
       runs.set(row.uid, run);
+      const role = roleSet.has(row.roleKey) ? row.roleKey : rolesByName.get(row.roleName);
+      if (role) {
+        if (!appearances.has(role)) appearances.set(role, new Map());
+        const counts = appearances.get(role);
+        counts.set(row.uid, (counts.get(row.uid) || 0) + 1);
+      }
     }
     spotlights.splice(2, 0, { id: "win_streak", title: "月内最长连胜", group: "角色与牌桌高光",
       subtitle: "本月连续获胜的有效对局 · 至少 2 局", unit: "局", countOnly: true, threshold: 2,
       ...rankTop(aggregates.filter(row => runs.get(row.uid)?.best >= 2)
         .map(row => ({ ...identity(row), count: runs.get(row.uid).best })), (a, b) => b.count - a.count) });
+    const roleTitles = monthlyRoleTitles(funBoards, appearances, new Map(aggregates.map(row => [row.uid, row])));
     const featuredIds = priority.map(id => funBoards.find(board => board.id === id + ":count" && board.rows.length)).filter(Boolean).slice(0, 3).map(board => board.id);
     const highlights = [];
     const describeWinner = board => board.rows[0] && (board.rows.filter(row => row.rank === 1).length > 1 ? board.rows[0].nickname + "等 " + board.rows.filter(row => row.rank === 1).length + " 人并列" : board.rows[0].nickname);
@@ -122,7 +175,7 @@ class MonthlyReport {
     if (!highlights.length && mainBoards[2].rows.length) highlights.push(describeWinner(mainBoards[2]) + "本月参赛 " + mainBoards[2].rows[0].total + " 局。");
     return { month, currentMonth: monthAt(now), firstMonth: first == null ? monthAt(now) : monthAt(first),
       periodStart: start, periodEnd: end, timezone: "Asia/Shanghai", status: now < end ? "preview" : "complete",
-      rulesVersion: RULES_VERSION, minPlayers: RANK_MIN_PLAYERS, overview: { ...overview }, mainBoards, funBoards, spotlights, featuredIds, highlights };
+      rulesVersion: RULES_VERSION, minPlayers: RANK_MIN_PLAYERS, overview: { ...overview }, mainBoards, funBoards, spotlights, roleTitles, featuredIds, highlights };
   }
   read(params, now = Date.now()) {
     const month = parseMonth(params, now), old = this.cache.get(month);

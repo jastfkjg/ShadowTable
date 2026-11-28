@@ -30,3 +30,12 @@ html:has(.monthly-roster-backdrop) { overflow:hidden; }
 .monthly-share-bar { position:fixed; z-index:30; bottom:0; left:0; right:0; padding:10px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--bg); }
 button.monthly-share { width:100%; max-width:488px; margin:0 auto; min-height:44px; border-radius:9px; color:var(--bg); background:var(--accent); font-weight:600; }
 html:has(.monthly-page) { scroll-padding-top:56px; scroll-padding-bottom:calc(80px + env(safe-area-inset-bottom)); }
+
+.monthly-role-index { padding:8px 5% 20px; color:var(--text); }
+.monthly-role-index-title { display:flex; align-items:center; gap:10px; margin:0 0 8px; color:var(--accent); font:600 20px/1.4 "Songti SC",serif; }
+.monthly-role-index-title::after { content:""; height:1px; flex:1; background:#35454c; }
+.monthly-role-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:20px; }
+.monthly-role-entry,.monthly-role-other { border-top:1px solid #32434c; padding:10px 0; }
+.monthly-role-label,.monthly-role-note { display:block; font-size:12px; line-height:1.5; color:var(--muted); }
+.monthly-role-name { display:flex; align-items:center; gap:5px; margin:2px 0 4px; font-size:15px; font-weight:600; }
+.monthly-role-badge { width:20px; height:20px; flex:none; }

@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { wxmlToJs } = require("./compile-miniprogram");
-const { homeData, posterScript, placeholder } = require("./monthly-poster-preview");
+const { homeData, posterScript, placeholder, urls } = require("./monthly-poster-preview");
 const { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(process.argv[2] || path.join(__dirname, "../output/playwright/monthly"));
@@ -19,7 +19,7 @@ function html(node) {
   const attrs = Object.entries(node.attr || {}).flatMap(([key, value]) => {
     if (key === "disabled") return value ? ["disabled"] : [];
     if (key.startsWith("aria")) key = key.replace(/[A-Z]/g, c => "-" + c.toLowerCase());
-    if (key === "src" && String(value).startsWith("/")) value = "/miniprogram" + value;
+    if (key === "src" && String(value).startsWith("/")) value = urls[value] || "/miniprogram" + value;
     if (key === "style") value = String(value).replace(/(-?[\d.]+)rpx/g, "calc($1 * 100vw / 750)");
     return ["id", "class", "src", "role", "style"].includes(key) || key.startsWith("aria-") ? [`${key}="${safe(value)}"`] : [];
   }).join(" ");

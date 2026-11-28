@@ -5,9 +5,11 @@ const renderer = require("../miniprogram/monthly-report-card");
 const monthly = require("../miniprogram/monthly-report");
 const avatars = require("../miniprogram/builtin-avatars");
 const root = path.resolve(__dirname, "../miniprogram");
-const library = ["fun-copy.js", "monthly-report.js", "poster-canvas.js", "monthly-report-card.js"]
+const library = ["fun-copy.js", "badges.js", "monthly-report.js", "poster-canvas.js", "monthly-report-card.js"]
   .map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const urls = Object.fromEntries(avatars.map(item => ["/api/avatars/" + item.hash, "/miniprogram" + item.path]));
+const { catalogue, usesServerArt } = require("../miniprogram/badges");
+for (const badge of catalogue.filter(usesServerArt)) urls[badge.imageUrl] = "/server/web/assets/" + path.basename(badge.imageUrl);
 urls[renderer.BACKGROUND_PATH] = "/miniprogram" + renderer.BACKGROUND_PATH;
 const placeholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 function homeData(response) {
@@ -32,4 +34,4 @@ function posterScript(response, selector) {
     window.monthlyCard=card; window.monthlyLayout=renderer.layout(card); window.posterReady=true;
   })().catch(error=>{console.error(error);window.posterError=error.message;});</script>`;
 }
-module.exports = { homeData, posterScript, placeholder };
+module.exports = { homeData, posterScript, placeholder, urls };

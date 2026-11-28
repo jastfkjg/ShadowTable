@@ -505,6 +505,7 @@ test("自动保存后核对发现房主已变更，撤销设置权限", async ()
 
 test('徽章开关取消和验密失败时恢复关闭，重新输入可开启，关闭无需密码', async () => {
   const r = { ...room(), phase: 'lobby', badgeSettings: { enabled: false, editable: true } };
+  let errors = 0;
   const writes = [], answers = [{ confirm: false }, { confirm: true, password: 'bad' }, { confirm: true, password: 'right' }];
   const p = page({
     login: async () => {}, requestId: () => 'save-badge',
@@ -514,13 +515,21 @@ test('徽章开关取消和验密失败时恢复关闭，重新输入可开启�
       if (data.badgeEnabled && data.settingsPassword !== 'right') throw Object.assign(Error('房间设置密码错误'), { status: 400 });
       r.badgeSettings.enabled = data.badgeEnabled;
     },
-  }, { showModal: options => { assert.equal(options.variant, 'room-password'); options.success(answers.shift()); } });
+  }, { showModal: options => {
+    if (options.variant === 'room-password') return options.success(answers.shift());
+    assert.equal(options.title, '开启失败');
+    assert.equal(options.content, '房间设置密码错误');
+    assert.equal(options.showCancel, false);
+    errors++;
+    options.success({ confirm: true });
+  } });
   await p.load();
   const toggle = value => p.toggleBadges({ detail: { value } });
   await toggle(true);
   assert.equal(writes.length, 0);
   await toggle(true);
-  assert.match(p.data.error, /密码错误/);
+  assert.equal(errors, 1);
+  assert.equal(p.data.error, '');
   assert.equal(p.data.badgeEnabled, false);
   assert.equal(p.data.pendingSave, false);
   await toggle(true);

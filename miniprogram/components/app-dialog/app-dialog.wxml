@@ -1,7 +1,7 @@
 <view wx:if="{{dialog}}" class="app-dialog-backdrop {{dialog.variant==='room-confirm'?'is-room-confirm-backdrop':dialog.variant==='quest-settlement'?'is-quest-settlement-backdrop':''}}" catchtouchmove="blockScroll" catchtap="blockScroll">
   <block wx:if="{{dialog.variant==='badge-awards'}}"><include src="./awards.wxml" /></block>
   <block wx:elif="{{dialog.variant==='fun-record'}}"><include src="./fun.wxml" /></block>
-  <view wx:else class="app-dialog {{dialog.variant==='about'?'is-about':dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':dialog.variant==='quest-settlement'?'is-quest-settlement':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
+  <view wx:else class="app-dialog {{passwordHelpOpen?'is-covered':''}} {{dialog.variant==='about'?'is-about':dialog.variant==='avoidance-grant'?'is-avoidance-grant':dialog.variant==='room-confirm'?'is-room-confirm':dialog.variant==='quest-settlement'?'is-quest-settlement':''}}" role="dialog" aria-modal="true" aria-label="{{dialog.title}}" catchtap="blockScroll">
     <view wx:if="{{dialog.variant==='about'}}" class="app-about-header">
       <view class="app-about-emblem" aria-hidden="true"><image src="{{dialog.contextIcon}}" mode="aspectFit" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>
@@ -11,6 +11,10 @@
     <view wx:elif="{{dialog.variant==='avoidance-grant'}}" class="app-dialog-grant-header">
       <view class="app-dialog-grant-icon" aria-hidden="true"><image src="{{dialog.contextIcon}}" /></view>
       <view class="app-dialog-title">{{dialog.title}}</view>
+    </view>
+    <view wx:elif="{{dialog.variant==='room-password'}}" class="room-password-heading">
+      <view class="app-dialog-title">{{dialog.title}}</view>
+      <button class="room-password-help-toggle" size="mini" hover-class="app-dialog-pressed" bindtap="openPasswordHelp" aria-label="开启说明"><image src="/assets/home-help.svg" aria-hidden="true" /></button>
     </view>
     <view wx:else class="app-dialog-title">{{dialog.title}}</view>
     <view wx:if="{{dialog.contextValue}}" class="app-dialog-context">
@@ -26,10 +30,18 @@
       <view wx:elif="{{dialog.variant==='quest-settlement'}}" class="app-dialog-message"><view>{{dialog.lead}}</view><view class="app-dialog-quest-rule"><text wx:for="{{dialog.ruleParts}}" wx:key="text" class="app-dialog-rule-{{item.tone}}">{{item.text}}</text></view></view>
       <view wx:else class="app-dialog-message"><block wx:if="{{dialog.emphasis}}"><text>{{dialog.contentBefore}}</text><text class="app-dialog-emphasis">{{dialog.emphasis}}</text><text>{{dialog.contentAfter}}</text></block><block wx:else>{{dialog.content}}</block></view>
     </scroll-view>
-    <input wx:if="{{dialog.variant==='room-password'}}" class="room-password-input" password focus maxlength="128" placeholder="房间设置密码" aria-label="房间设置密码" bindinput="passwordInput" confirm-type="done" bindconfirm="confirm" data-id="{{dialog.id}}" />
+    <input wx:if="{{dialog.variant==='room-password'}}" class="room-password-input" password maxlength="128" placeholder="房间设置密码" aria-label="房间设置密码" bindinput="passwordInput" confirm-type="done" bindconfirm="confirm" data-id="{{dialog.id}}" />
     <view class="app-dialog-actions">
       <button wx:if="{{dialog.showCancel}}" class="app-dialog-cancel" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.cancelText}}</button>
       <button class="app-dialog-confirm {{dialog.danger?'is-danger':''}}" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.confirmText}}</button>
+    </view>
+  </view>
+  <view wx:if="{{passwordHelpOpen}}" class="app-dialog" role="dialog" aria-modal="true" aria-label="开启说明" catchtap="blockScroll">
+    <view class="app-dialog-title">开启说明</view>
+    <view class="app-dialog-message room-password-help">徽章获取和本局计分仅限内部玩家开启。想参加我们的线下桌游活动，欢迎咨询近期场次。</view>
+    <view class="app-dialog-actions">
+      <button class="app-dialog-cancel" hover-class="app-dialog-pressed" bindtap="closePasswordHelp">知道了</button>
+      <button class="app-dialog-confirm" hover-class="app-dialog-pressed" open-type="contact">咨询活动安排</button>
     </view>
   </view>
 </view>

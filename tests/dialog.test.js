@@ -62,6 +62,26 @@ test('查看活动徽章后的迟到按钮不会修改下一项弹窗动作', as
   host.viewAwardCollection(tap());assert.equal((await next).action,'badges');
 });
 
+test('开启说明单独显示，关闭后保留密码，查看说明不会提交或取消', async () => {
+  const { host, tap } = component();
+  const first = host.show({ variant: 'room-password', title: '开启徽章获取' });
+  assert.equal(host.data.passwordHelpOpen, false);
+  host.passwordInput({ detail: { value: 'test-password' } });
+  host.openPasswordHelp();
+  host.confirm(tap());
+  host.cancel(tap());
+  assert.equal(host.data.dialog.variant, 'room-password');
+  assert.equal(host.data.passwordHelpOpen, true);
+  host.closePasswordHelp();
+  assert.equal(host.data.passwordHelpOpen, false);
+  host.confirm(tap());
+  assert.equal((await first).password, 'test-password');
+  const next = host.show({ variant: 'room-password', title: '开启本局计分' });
+  assert.equal(host.data.passwordHelpOpen, false);
+  host.cancel(tap());
+  assert.equal((await next).cancel, true);
+});
+
 test('长内容按可用空间滚动，过期的测量不覆盖新弹窗', async () => {
   const {host,tap}=component(),callbacks=[];
   host.createSelectorQuery=()=>{const q={select(){return q},boundingClientRect(){return q},exec(cb){callbacks.push(cb)}};return q;};

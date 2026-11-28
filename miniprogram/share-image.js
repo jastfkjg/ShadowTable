@@ -1,6 +1,9 @@
 const api = require("./api");
 const { renderDimensions, drawCard, imagePaths } = require("./share-card");
 
+const { catalogue, usesServerArt } = require("./badges");
+const hostedBadges = new Set(catalogue.filter(usesServerArt).map(badge => badge.imageUrl));
+
 function canvasFor(page, selector) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("画布暂时不可用，请重试。")), 5000);
@@ -20,7 +23,10 @@ function avatarFor(canvas, path) {
     const timer = setTimeout(() => done(null), 3000);
     image.onload = () => done(image.width && image.height ? image : null);
     image.onerror = () => done(null);
-    try { image.src = path.startsWith("/assets/") || /^https?:\/\//.test(path) ? path : api.assetUrl(path); } catch { done(null); }
+    try {
+      const local = path.startsWith("/assets/") && !hostedBadges.has(path);
+      image.src = local || /^https?:\/\//.test(path) ? path : api.assetUrl(path);
+    } catch { done(null); }
   });
 }
 async function renderImage(page, card, options = {}) {

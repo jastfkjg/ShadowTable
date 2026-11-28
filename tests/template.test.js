@@ -2299,13 +2299,15 @@ test('对局记录合并同一次终局刺杀，轮内受刀及累计指标分�
   assert.equal(onlyReceived.eventGroups[0].compact, true);
 });
 
-test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情不含冗余说明', () => {
+test('徽章收藏通过佩戴位进入详情摘下徽章，详情保留获取条件', () => {
   const {catalogue,presentCollection}=require('../miniprogram/badges');
   const badgeCollection=presentCollection({badges:[{...catalogue.find(b=>b.id==='games'),equipped:true}],periodStart:Date.UTC(2026,8,30,16)});
   const render=factory('pages/badges/badges.wxml'),data={badgeCollection,badgeFilter:'all'};
-  assert.equal(byHandler(render(data),'toggleOwnedBadge'),undefined);
-  assert.ok(byHandler(render(data),'manageBadges'));
-  assert.ok(byHandler(render({...data,badgeManaging:true}),'toggleOwnedBadge'));
+  const overview=render(data);
+  assert.equal(byHandler(overview,'toggleOwnedBadge'),undefined);
+  assert.doesNotMatch(JSON.stringify(overview),/调整佩戴/);
+  assert.match(JSON.stringify(overview),/点徽章可查看或摘下/);
+  assert.equal(byHandler(overview,'showBadgeDetail').attr['data-id'],'games');
   const detail=render({...data,selectedBadge:badgeCollection.items.find(b=>b.id==='games')});
   const text=JSON.stringify(detail);
   assert.match(text,/获取条件/);
@@ -2313,6 +2315,7 @@ test('徽章收藏默认紧凑展示，管理时才出现摘下按钮，详情�
   assert.match(text,/榜首变动或跨月时重新计算/);
   assert.doesNotMatch(text,/常驻牌桌|按北京时间本月|摘下后仍保留/);
   assert.match(byHandler(detail,'toggleOwnedBadge').attr.class,/secondary/);
+  assert.match(text,/摘下徽章/);
   const locked=render({...data,selectedBadge:badgeCollection.items.find(b=>!b.owned)});
   assert.equal(byHandler(locked,'toggleOwnedBadge'),undefined);
   const permanent=render({...data,selectedBadge:badgeCollection.items.find(b=>b.id==='october_2026_book')});

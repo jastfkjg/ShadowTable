@@ -200,6 +200,7 @@
       slots: Array.from({ length: MAX_EQUIPPED }, (_, i) => equipped.find(b => b.slotIndex === i) || { id: 'empty-' + i, empty: true, slotIndex: i }),
       ownedCount: badges.length, totalCount: items.length, unownedCount: items.length - badges.length,
       equippedCount: equipped.length, maxEquipped: MAX_EQUIPPED,
+      equipmentNote: equipped.length ? '展示在玩家名片上，点徽章可查看或摘下' : '佩戴后的徽章会展示在玩家名片上',
       monthLabel: month.getUTCFullYear() + '年' + String(month.getUTCMonth() + 1).padStart(2, '0') + '月' };
   }
   return { badgeCriteria, playerCollectionPath, presentPlayerCollection, catalogue, categories, rules, MAX_EQUIPPED, usesServerArt, rankedBadge, badgeImageUrl, badgeArtStyle, presentPlayerBadge, presentCollection, awardDefinition, monthlyAward };

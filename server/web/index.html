@@ -24,6 +24,7 @@
     <script src="/builtin-avatars.js" defer></script>
     <script src="/role-portraits.js" defer></script>
     <script src="/fun-copy.js" defer></script>
+    <script src="/badges.js" defer></script>
     <script src="/result-registration.js" defer></script>
     <script src="/honors.js" defer></script>
     <link rel="stylesheet" href="/honors.css" />
@@ -39,7 +40,6 @@
     <script src="/room-list.js" defer></script>
     <script src="/room-confirmation.js" defer></script>
     <script src="/about.js" defer></script>
-    <script src="/badges.js" defer></script>
     <script src="/rank-picker.js" defer></script>
     <link rel="stylesheet" href="/rank-picker.css" />
     <script src="/badge-ranks.js" defer></script>
@@ -69,13 +69,15 @@
     <div id="modal" class="dialog-backdrop" hidden>
       <div class="error-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-about-subtitle modal-room-context modal-message">
         <div class="app-about-emblem" id="modal-about-emblem" aria-hidden="true" hidden><img src="/assets/about-merlin.svg" alt="" /></div>
-        <div class="dialog-title" id="modal-title"></div>
+        <div class="modal-heading"><div class="dialog-title" id="modal-title"></div>
+          <button id="modal-password-help-toggle" type="button" aria-label="开启说明" title="开启说明" aria-haspopup="dialog" aria-controls="modal-password-help" hidden><img src="/assets/home-help.svg" alt="" /></button>
+        </div>
         <div class="app-about-subtitle" id="modal-about-subtitle" hidden></div>
         <div class="app-about-divider" id="modal-about-divider" aria-hidden="true" hidden></div>
         <div id="modal-room-context" class="dialog-room-context" hidden><img src="/assets/home-table-blue.svg" alt="" /><span>房间</span><span id="modal-room-code" class="dialog-room-code"></span><span id="modal-room-status" class="dialog-room-status"></span></div>
         <div class="dialog-grant-context" id="modal-grant-context" hidden><span>本次获得</span><span class="dialog-grant-amount" id="modal-grant-amount"></span></div>
         <div class="dialog-message" id="modal-message"></div>
-        <input id="modal-password" class="input" type="password" aria-label="房间设置密码" autocomplete="off" maxlength="128" required hidden />
+        <input id="modal-password" class="input" type="password" placeholder="房间设置密码" aria-label="房间设置密码" autocomplete="off" maxlength="128" required hidden />
         <div class="dialog-actions">
           <button type="button" class="secondary" id="modal-cancel">取消</button>
           <button type="button" class="primary" id="modal-ok">确定</button>
@@ -83,5 +85,10 @@
       </div>
       <section id="modal-fun-record" class="fun-info" role="dialog" aria-modal="true" aria-labelledby="fun-info-title" hidden></section>
     </div>
+    <dialog id="modal-password-help" class="error-dialog" aria-labelledby="password-help-title" aria-describedby="password-help-message">
+      <div id="password-help-title" class="dialog-title">开启说明</div>
+      <p id="password-help-message" class="dialog-message">徽章获取和本局计分仅限内部人员开启。如有需要，请在发牌前联系工作人员。</p>
+      <form method="dialog" class="dialog-actions"><button type="submit" class="primary" autofocus>知道了</button></form>
+    </dialog>
   </body>
 </html>

@@ -720,7 +720,7 @@ button.leave-button[disabled]:not([type]) {
   margin: 32rpx 0 0;
   background: #35272b;
   color: #f2b6ae;
-  border: 1rpx solid #ab7774;
+  border: 1px solid #ab7774;
   font-weight: 600;
 }
 .brand {

@@ -26,7 +26,7 @@ Component({
       this.dialogTabBar = pages[pages.length - 1]?.getTabBar?.();
       this.dialogTabBar?.setData({ dialogVisible: true });
       const id = this.dialogSequence = (this.dialogSequence || 0) + 1;
-      this.setData({ dialog: { ...present(this.currentDialog.options), id }, bodyHeight: 0, awardDetail: null }, () => this.measureBody());
+      this.setData({ dialog: { ...present(this.currentDialog.options), id }, bodyHeight: 0, awardDetail: null, passwordHelpOpen: false }, () => this.measureBody());
     },
     measureBody() {
       if (this.data.dialog?.variant === 'badge-awards' && this.createSelectorQuery) {
@@ -59,7 +59,7 @@ Component({
       });
     },
     finish(confirm, id) {
-      if (!this.currentDialog || id !== this.data.dialog?.id) return;
+      if (!this.currentDialog || this.data.passwordHelpOpen || id !== this.data.dialog?.id) return;
       const job = this.currentDialog;
       this.currentDialog = null;
       this.setData({ dialog: null });
@@ -86,6 +86,12 @@ Component({
       this.setData({ dialog: null });
       this.releaseTabBar();
       for (const job of jobs) this.deliver(job, false);
+    },
+    openPasswordHelp() {
+      if (this.data.dialog?.variant === "room-password") this.setData({ passwordHelpOpen: true });
+    },
+    closePasswordHelp() {
+      this.setData({ passwordHelpOpen: false });
     },
     passwordInput(e) {
       if (this.currentDialog?.options.variant === "room-password") this.currentDialog.password = e.detail.value;

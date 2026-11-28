@@ -14,21 +14,14 @@
   <block wx:if="{{badgeCollection}}">
     <view class="badge-equipment">
       <view class="badge-section-heading">
-        <view><text>名片佩戴</text><text class="badge-equipped-count">{{badgeCollection.equippedCount}} / {{badgeCollection.maxEquipped}}</text></view>
-        <button class="disclosure-button badge-manage" bindtap="manageBadges" disabled="{{badgeManagerSaving || badgeManagerLoading || !badgeCollection.ownedCount}}" aria-expanded="{{badgeManaging}}" hover-class="none">
-          <text>{{badgeManaging ? '完成' : '调整佩戴'}}</text>
-          <view wx:if="{{!badgeManaging}}" class="badge-chevron" aria-hidden="true"></view>
-        </button>
+        <text>名片佩戴</text><text class="badge-equipped-count">{{badgeCollection.equippedCount}} / {{badgeCollection.maxEquipped}}</text>
       </view>
       <view class="badge-slots">
         <view wx:for="{{badgeCollection.slots}}" wx:key="id" class="badge-slot {{badgePlaced.id === item.id ? 'is-updated' : ''}}">
-          <block wx:if="{{!item.empty}}">
-            <button class="badge-slot-open" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{'查看'+item.title}}" hover-class="badge-pressed">
-              <view class="badge-slot-medallion"><image class="badge-slot-image" style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
-              <text class="badge-slot-title">{{item.title}}</text>
-            </button>
-            <button wx:if="{{badgeManaging}}" class="badge-remove" bindtap="toggleOwnedBadge" data-id="{{item.id}}" disabled="{{badgeManagerSaving || badgeManagerLoading}}" aria-label="{{'摘下'+item.title}}" hover-class="badge-pressed">摘下</button>
-          </block>
+          <button wx:if="{{!item.empty}}" class="badge-slot-open" bindtap="showBadgeDetail" data-id="{{item.id}}" aria-label="{{'查看'+item.title}}" hover-class="badge-pressed">
+            <view class="badge-slot-medallion"><image class="badge-slot-image" style="{{item.artStyle}}" src="{{item.imageUrl}}" mode="aspectFit" aria-hidden="true" /></view>
+            <text class="badge-slot-title">{{item.title}}</text>
+          </button>
           <button wx:else class="badge-slot-open badge-slot-empty" bindtap="openBadgePicker" data-slot="{{item.slotIndex}}" aria-label="{{'选择徽章佩戴到第'+(item.slotIndex+1)+'个位置'}}" hover-class="badge-pressed">
             <view class="badge-empty-ring" aria-hidden="true">＋</view><text class="badge-slot-title">待佩戴</text>
           </button>
@@ -37,7 +30,7 @@
       <view wx:if="{{badgePlaced}}" class="badge-caption badge-equipment-note is-updated" role="status" aria-live="polite">
         <view class="badge-check" aria-hidden="true"></view><text>{{badgePlaced.title}}已佩戴到名片位置 {{badgePlaced.slotIndex + 1}}</text>
       </view>
-      <view wx:else class="badge-caption badge-equipment-note">{{badgeManaging ? '摘下后可选择空位佩戴，调整展示顺序' : '徽章会展示在玩家名片上'}}</view>
+      <view wx:else class="badge-caption badge-equipment-note">{{badgeCollection.equipmentNote}}</view>
     </view>
     <view class="badge-collection-heading">
       <text class="badge-collection-title">徽章收藏</text>

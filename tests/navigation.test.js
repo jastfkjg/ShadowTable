@@ -3184,11 +3184,10 @@ test('徽章详情按内容测量高度并适配窗口，忽略关闭后的测�
   let measure;
   p.createSelectorQuery=()=>({select:()=>({boundingClientRect:callback=>{measure=callback;return {exec(){}};}})});
   const open=()=>p.showBadgeDetail({currentTarget:{dataset:{id:catalogue[1].id}}});
-  p.manageBadges();assert.equal(p.data.badgeManaging,true);
   open();measure({height:420});assert.equal(p.data.badgeDetailHeight,420);
   p.onResize();measure({height:900});assert.equal(p.data.badgeDetailHeight,540);
   open();const stale=measure;p.closeBadgeDetail();stale({height:420});assert.equal(p.data.badgeDetailHeight,0);
-  p.onHide();assert.equal(p.data.badgeManaging,false);
+  open();p.onHide();assert.equal(p.data.selectedBadge,null);
 });
 
 test('小程序 A 概览与 C 确认面板分开，取消不提交，网络未确认重用原请求', async () => {

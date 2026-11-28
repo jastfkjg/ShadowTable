@@ -169,7 +169,7 @@ Page({
       this.setData({ [field]: false, busy: true, error: "" });
       const answer = await dialog.show({ variant: "room-password",
         title: kind === "score" ? "开启本局计分" : "开启徽章获取",
-        content: "请输入管理员设置的房间设置密码。", confirmText: "开启" });
+        confirmText: "开启" });
       if (!this.alive) return;
       this.setData({ busy: false });
       if (!answer.confirm || !this.foreground || this.original !== original) return;
@@ -234,16 +234,20 @@ Page({
       if (e.status && e.status < 500 && ![429, 401].includes(e.status))
         this.pending = null;
       if (this.alive) {
-        if (!this.pending && typeof pending.data.settingsPassword === "string") {
+        const passwordSave = typeof pending.data.settingsPassword === "string";
+        const showPasswordError = passwordSave && e.status === 400;
+        if (!this.pending && passwordSave) {
           this.setData({ badgeEnabled: !!this.original.badgeSettings?.enabled, scoreEnabled: !!this.original.scoreSettings?.enabled });
           this.updateDirty();
         }
         this.setData({
-          error: e.message,
+          error: showPasswordError ? "" : e.message,
           pendingSave: !!this.pending,
           authorized: e.status === 403 ? false : this.data.authorized,
         });
-        if (e.status === 409) {
+        if (showPasswordError) {
+          await dialog.show({ title: "开启失败", content: e.message, showCancel: false });
+        } else if (e.status === 409) {
           this.setData({ busy: false });
           await this.load();
           this.setData({ error: "房间状态已变化，已刷新设置，请重新修改。" });

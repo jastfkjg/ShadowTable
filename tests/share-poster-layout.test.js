@@ -29,7 +29,7 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.ok(last.top+last.box.height<=box.footerTop,"all content clears the footer");
   assert.ok(box.height/(1080/480)-(last.top+last.box.height)<540,"the footer does not add a page of empty space");
   assert.ok(box.sections.every(s=> s.box.lanes.reduce((n,l)=>n+(l.folded?l.members.length:l.tiles.length),0)===s.section.rows.length));
-  assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
+  assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
   const labels=trace(pages[0]).map(t=>t.value);
   assert.equal(labels.filter(label=>label==="炉边来信").length,1);
   assert.doesNotMatch(shares.describe(pages[0]),/第 .* 张|续/);
@@ -42,7 +42,7 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.ok(monthly.dimensions(monthly.cards(sparse)[0]).height<monthly.dimensions(sample[0]).height,"short reports shrink with their content");
 });
 
-test("大并列在任意名次只生成一个热区，双席和阵营榜按实际排名定位，隐藏头像不下载", () => {
+test("大并列保留名单入口，只下载可见头像，展开后后续名次点击位置随之移动", () => {
   const response = monthlyFixture(), present = require("../miniprogram/monthly-report").presentReport;
   const board = response.funBoards[0], secretAvatar = "/api/avatars/" + "d".repeat(64);
   const crowd = Array.from({ length: 14 }, (_, i) => ({ ...board.rows[2], nickname: "并列" + i,
@@ -51,21 +51,114 @@ test("大并列在任意名次只生成一个热区，双席和阵营榜按实�
   response.mainBoards[3].rows = response.mainBoards[4].rows = response.mainBoards[1].rows;
   let report = present(response), card = monthly.cardFromReport(report);
   const sections = monthly.layout(card).sections, {box} = sections.find(s => s.section.id === board.metric);
-  assert.ok(box.pair); assert.equal(box.lanes[0].top, box.lanes[1].top);
-  assert.ok(box.lanes[1].x > box.lanes[0].x && box.lanes[2].top >= box.lanes[1].height);
-  const [good, evil] = sections.filter(s => s.box.rate);
+  assert.ok(box.compact); assert.equal(box.lanes[0].x, box.lanes[1].x);
+  assert.ok(box.lanes[1].top >= box.lanes[0].height && box.lanes[2].top >= box.lanes[1].top + box.lanes[1].height);
+  const [overall, games, good, evil] = sections.filter(s => s.box.compact);
+  assert.equal(overall.top, games.top); assert.ok(games.x > overall.x && good.top > overall.top);
   assert.equal(good.top, evil.top); assert.ok(good.x + good.box.width < evil.x);
   assert.ok(!monthly.imagePaths(card).includes(secretAvatar));
   assert.equal(monthly.rosterFor(report, board.metric, 3).members.length, 14);
   const targets = monthly.playerTargets(card, report).filter(t => t.key.startsWith(board.metric + "/"));
   assert.equal(targets.length, 3); assert.equal(targets[2].rank, 3);
+  assert.ok(targets[2].x > 0 && targets[2].width > 10 && targets[2].x + targets[2].width < 50);
+  assert.ok(trace(card).some(t => t.value === "各"));
   assert.ok(trace(card).some(t => t.value === "14 位玩家"));
   board.rows = [...crowd.map(r => ({...r,rank:1})), {...board.rows[1],rank:2}];
   report = present(response); card = monthly.cardFromReport(report);
   const other = monthly.playerTargets(card, report).filter(t => t.key.startsWith(board.metric + "/"));
-  assert.equal(other.length, 2); assert.equal(other[0].rank, 1);
-  assert.equal(other[1].publicId, board.rows.at(-1).publicId);
+  assert.deepEqual(other.map(t => t.rank || t.publicId), [1, "tied-0", board.rows.at(-1).publicId]);
+  assert.ok(other[1].y >= other[0].y + other[0].height - .00002);
+  assert.ok(other[2].y > other[1].y + other[1].height);
+  assert.ok(monthly.imagePaths(card).includes(secretAvatar));
 });
+test("跨章节连续配对且分别标注章节，长标题不影响首行数据对齐，最后奇数项分列名次", () => {
+  const [card] = monthly.cards(monthlyFixture());
+  const sample = card.sections.find(s => s.type === "honor");
+  const groups = ["玩家票选", "角色与牌桌高光", "趣味荣誉", "娱乐榜"];
+  card.sections = groups.flatMap(groupTitle => [0, 1, 2].map((id) => ({
+    ...sample, id: groupTitle + id, groupTitle, title: id === 1 ? "这是一项需要换行的称号".repeat(2) : "称号",
+  })));
+  const { sections } = monthly.layout(card);
+  assert.deepEqual(sections.map(s => s.chapter).filter(Boolean), groups);
+  for (let i = 0; i < sections.length; i += 2) {
+    const [left, right] = sections.slice(i, i + 2);
+    assert.ok(right.rightPanel && !left.rightPanel);
+    assert.equal(left.top, right.top); assert.ok(left.x + left.box.width < right.x);
+    assert.equal(left.box.heading, right.box.heading);
+    if (left.section.groupTitle !== right.section.groupTitle) {
+      assert.equal(left.caption, left.section.groupTitle); assert.equal(right.caption, right.section.groupTitle);
+    }
+  }
+  card.sections.pop();
+  const last = monthly.layout(card).sections.at(-1);
+  assert.ok(last.box.divider);
+  assert.ok(last.box.lanes[0].x < last.box.lanes.at(-1).x);
+  assert.deepEqual(last.box.lanes.map(l => l.rank), [1, 2, 3]);
+});
+
+test("称号徽章紧接标题末行，胜率榜使用对应胜率徽章，未知称号留空", () => {
+  const [card] = monthly.cards(monthlyFixture());
+  const honor = card.sections.find(s => s.id === "merlin_evade");
+  honor.title = "梅林".repeat(19);
+  card.sections.push({ ...honor, id: "unknown", title: "未设徽章" });
+  const sections = monthly.layout(card).sections;
+  const {box, x, top} = sections.find(s => s.section === honor);
+  assert.ok(box.title.length > 1);
+  assert.equal(sections.find(s => s.section.id === "overall").box.badge, "/assets/badges/rate_overall.png");
+  assert.equal(sections.at(-1).box.badge, undefined);
+  const art = new Map(monthly.imagePaths(card).filter(p => p.startsWith("/assets/badges/"))
+    .map(path => [path, {path, width: 128, height: 128}]));
+  const draws = [];
+  const ctx = new Proxy({
+    measureText(text) { return {width: canvas.width(text, Number(this.font.match(/([\d.]+)px/)[1]))}; },
+    drawImage(image, ...bounds) { draws.push({path: image.path, bounds}); },
+  }, {get: (obj, key) => key in obj ? obj[key] : () => {}});
+  monthly.drawCard(ctx, card, art);
+  assert.deepEqual(draws.map(d => d.path), sections.map(s => s.box.badge).filter(Boolean));
+  const [left, badgeTop, width, height] = draws.find(d => d.path === box.badge).bounds;
+  const titleEnd = x + canvas.width(box.title.at(-1), box.titleSize);
+  assert.ok(left > titleEnd && left - titleEnd < 10);
+  assert.ok(badgeTop > top + 27 && left + width < x + box.width && width === height && width < 30);
+});
+
+test("唯一称号只有一个名次时称号在左、成员在右，三人共享一份成绩", () => {
+  const response = monthlyFixture(), board = response.funBoards.find(b => b.id === "merlin_evade:count");
+  board.rows = board.rows.map(r => ({ ...r, rank: 1, tied: true, count: 2 }));
+  const [card] = monthly.cards(response), section = card.sections.find(s => s.id === board.metric);
+  card.sections = [section];
+  const box = monthly.layout(card).sections[0].box, group = box.lanes[0], text = trace(card);
+  assert.ok(group.x > box.width && box.divider);
+  assert.equal(text.filter(t => t.value === "并列第一").length, 1);
+  assert.equal(text.filter(t => t.value === "各").length, 1);
+  assert.deepEqual(group.tiles.map(t => t.row.name), board.rows.map(r => r.nickname));
+});
+
+test("图中四人并列利用另一栏空位展开，长名单保留总数，长昵称按实际高度计入", () => {
+  const response = monthlyFixture(), present = require("../miniprogram/monthly-report").presentReport;
+  const board = response.funBoards[0], sample = board.rows[0];
+  const other = response.funBoards.find(b => b.id === "assassin_hit:count");
+  other.rows = [...other.rows.slice(0, 2), ...[0, 1, 2].map(i => ({...sample, rank:3, tied:true, publicId:"right-"+i}))];
+  const players = Array.from({length:14}, (_, i) => ({ ...sample, nickname: "玩家" + i, publicId: "p" + i,
+    avatarUrl: "/api/avatars/" + i.toString(16).padStart(64, "0"), rank:1, tied:true }));
+  const check = (rows, visible) => {
+    board.rows = rows;
+    const report = present(response), card = monthly.cardFromReport(report);
+    const {box} = monthly.layout(card).sections.find(s => s.section.id === board.metric), lane = box.lanes[0];
+    assert.deepEqual(lane.tiles.map(t => t.row.name), rows.slice(0,visible).map(r => r.nickname));
+    assert.equal(monthly.rosterFor(report, board.metric, 1).members.length, rows.length);
+    const targets = monthly.playerTargets(card, report).filter(t => t.key.startsWith(board.metric + "/"));
+    assert.deepEqual(targets.slice(1).map(t => t.publicId), rows.slice(0,visible).map(r => r.publicId));
+    assert.equal(targets[0].rank, 1);
+    const paths = monthly.imagePaths(card);
+    for (const [i,r] of rows.entries()) assert.equal(paths.includes(r.avatarUrl), i < visible);
+    assert.ok(lane.top + lane.height <= box.height - box.heading);
+    return box.height;
+  };
+  const height = check(players.slice(0,4), 4);
+  assert.equal(check(players, 4), height);
+  assert.equal(check([players[0], {...players[1], nickname:"这是一段很长的昵称".repeat(25)}, ...players.slice(2)], 1), height);
+});
+
 test("中央领奖台与可点击头像一一对应，并列第三名保留各自的计分局数", () => {
   const report = require("../miniprogram/monthly-report").presentReport(shareMonthlyFixture());
   const card = monthly.cardFromReport(report), { box } = monthly.layout(card).sections[0];
