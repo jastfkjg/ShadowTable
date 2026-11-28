@@ -1608,7 +1608,7 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
   for(const file of templates) {
     const source=fs.readFileSync(path.join(root,file),'utf8');
     for(const [tag] of source.matchAll(/<button\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      assert.match(tag,/hover-class="(?:none|me-pressed|stats-pressed|stats-role-pressed|rank-pressed|rank-row-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed|app-dialog-pressed)"/,file+': '+tag);
+      assert.match(tag,/hover-class="(?:none|me-pressed|stats-pressed|stats-role-pressed|rank-pressed|rank-row-pressed|badge-pressed|transfer-option-hover|ledger-pressed|room-invite-pressed|room-swipe-pressed|entry-option-pressed|app-dialog-pressed|fb-pressed)"/,file+': '+tag);
       if(tag.includes('aria-expanded=')) {
         disclosures++;
         assert.match(tag,/hover-class="none"/);
@@ -1617,6 +1617,8 @@ test('深色界面的按钮显式控制按压态，展开按钮禁用原生浅�
     }
   }
   assert.ok(disclosures>=10);
+  const feedbackStyles=fs.readFileSync(path.join(root,'pages/feedback/layout.wxss'),'utf8');
+  assert.match(feedbackStyles,/\.fb-pressed\s*\{\s*opacity:\s*\.78;/);
   const styles=fs.readFileSync(path.join(root,'app.wxss'),'utf8');
   assert.match(styles,/button\.disclosure-button:not\(\[disabled\]\):active\s*\{\s*opacity:\s*1;/);
   const homeStyles=fs.readFileSync(path.join(root,'pages/home/home.wxss'),'utf8')+fs.readFileSync(path.join(root,'pages/home/room-sheets.wxss'),'utf8');
