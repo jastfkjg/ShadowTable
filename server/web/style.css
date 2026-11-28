@@ -1013,6 +1013,29 @@ button.leave-button {
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
+.modal-heading:has(#modal-password-help-toggle:not([hidden])) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.modal-heading:has(#modal-password-help-toggle:not([hidden])) .dialog-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+#modal-password-help-toggle {
+  flex: none;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin-right: -11px;
+}
+#modal-password-help-toggle img { width: 22px; height: 22px; }
+#modal-password-help { width: calc(100% - 32px); margin: auto; color: var(--text); }
+#modal-password-help::backdrop { background: rgba(8, 14, 18, 0.68); }
+#modal-message:empty { display: none; }
 .dialog-message {
   margin: 0 0 16px;
   color: var(--muted);

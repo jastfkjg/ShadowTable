@@ -33,7 +33,7 @@ test("原生导出使用独立画布和同款渲染器，绝对头像 URL 不重
   let exported;
   const wx={createSelectorQuery(){const q={in(){return q},select(value){selected.push(value);return q},fields(){return q},exec(callback){callback([{node:canvas}]);}};return q;},canvasToTempFilePath(options){exported=options;options.success({tempFilePath:"wxfile://native-report"});}};
   const module={exports:{}};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../miniprogram/share-image.js"),"utf8"),{module,wx,setTimeout,clearTimeout,require:name=>name==="./api"?{assetUrl:value=>"https://test.invalid"+value}:{}});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../miniprogram/share-image.js"),"utf8"),{module,wx,setTimeout,clearTimeout,require:name=>name==="./api"?{assetUrl:value=>"https://test.invalid"+value}:require("../miniprogram/"+name)});
   const card={...present(stats),avatar:"https://cdn.test.invalid/avatar.png"};
   assert.equal(await module.exports.renderImage({alive:true},card,{renderer:report,selector:"#shared-report-canvas"}),"wxfile://native-report");
   assert.deepEqual(selected,["#shared-report-canvas"]);assert.ok(urls.includes(card.avatar));

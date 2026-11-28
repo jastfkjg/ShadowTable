@@ -21,5 +21,9 @@
 .fb-choice .fb-well image { width: 23px; height: 23px; }
 .fb-choice .fb-choice-title { font-size: 17px; line-height: 1.45; }
 .fb-choice .fb-muted { font-size: 13px; line-height: 1.5; }
+button.fb-contact[size="mini"] {
+  display: flex; width: 100%; margin: 16px 0 0; padding: 17px 16px;
+  text-align: left; font-weight: 400; color: var(--text);
+}
 .fb-chevron { flex: none; }
 .fb-history { margin-top: 20px; }

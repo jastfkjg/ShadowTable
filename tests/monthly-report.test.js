@@ -113,6 +113,72 @@ test("趣味榜仅使用已知机会，次数和比例分开，完整分享同�
     assert.equal(shared[0].edition,undefined);
   } finally { store.close(); }
 });
+test("角色达成按已知局数进入对应称号榜，按月和公开范围统计，双面骑士只列一次", () => {
+  const store = new Store(":memory:");
+  try {
+    const reports = new MonthlyReport(store);
+    const users = ["wx:a", "wx:b", "wx:hidden"];
+    for (const uid of users) profile(store, uid, uid !== "wx:hidden");
+    const players = users.map(uid => ({ uid }));
+    const first = match(store, players), second = match(store, players);
+    const small = match(store, players, SEPTEMBER, 8), otherMonth = match(store, players, NOW);
+    for (const uid of users) {
+      for (const metric of ["merlin_all_rides", "reverse_wrong_side", "lancelot_both"]) funRecord(store, first, uid, metric, 1, 1);
+    }
+    funRecord(store, second, "wx:b", "merlin_all_rides", 1, 1);
+    funRecord(store, second, "wx:a", "merlin_all_rides", 1, 1, "unknown");
+    funRecord(store, small, "wx:a", "merlin_all_rides", 1, 1);
+    funRecord(store, otherMonth, "wx:a", "merlin_all_rides", 1, 1);
+    funRecord(store, first, "wx:a", "reverse_guard", 0, 1);
+    const response = read(reports), report = presentation.presentReport(response);
+    const representatives = report.groups.find(g => g.title === "本月角色称号").boards;
+    const positive = representatives.find(b => b.metric === "merlin_all_rides");
+    const entertainment = representatives.find(b => b.metric === "reverse_wrong_side");
+    assert.deepEqual(positive.rows.map(r => [r.nickname, r.value, r.rank]), [["b", "2", 1], ["a", "1", 2]]);
+    assert.equal(positive.unit, "局"); assert.equal(entertainment.title, "站错队");
+    assert.equal(entertainment.rows.length, 2); assert.ok(entertainment.rows.every(r => r.tied && r.rank === 1));
+    assert.ok(!response.funBoards.some(b => b.metric === "merlin_all_rides" && b.sort === "rate"));
+    const [card] = cardRenderer.cards(response);
+    assert.equal(card.sections.filter(s => s.id === "lancelot_both").length, 1);
+    assert.ok(!card.sections.some(s => s.id === "reverse_guard"));
+    assert.ok(cardRenderer.imagePaths(card).includes("/assets/badges/reverse_wrong_side.png"));
+  } finally { store.close(); }
+});
+
+test("所有角色有代表称号，当月只分享公开有成绩的角色，旧身份名称并入同一榜", () => {
+  const store = new Store(":memory:");
+  try {
+    const reports = new MonthlyReport(store);
+    for (const uid of ["wx:a","wx:b","wx:c","wx:hidden"]) profile(store, uid, uid !== "wx:hidden");
+    const first = match(store, [
+      {uid:"wx:a", roleId:"reverse", role:"逆仆"}, {uid:"wx:b",role:"莫甘娜"},
+      {uid:"wx:c",roleId:"magician",role:"魔术师"}, {uid:"wx:hidden",role:"女巫"},
+    ]);
+    funRecord(store, first, "wx:a", "reverse_guard", 1, 1);
+    funRecord(store, first, "wx:a", "reverse_wrong_side", 1, 1);
+    match(store,[{uid:"wx:a",roleId:"morgana",role:"莫甘娜"},{uid:"wx:b",role:"未知角色"}]);
+    match(store,[{uid:"wx:a",role:"女巫"}], SEPTEMBER, 8);
+    match(store,[{uid:"wx:c",role:"女巫"}], NOW);
+    const response = read(reports), report = presentation.presentReport(response, p => "https://example.test"+p);
+    assert.equal(new Set(response.roleTitles.map(r=>r.role)).size, require("../server/engine").roleIds.length);
+    const [card] = cardRenderer.cards(response);
+    const shown = card.sections.filter(s=>s.groupTitle==="本月角色称号");
+    assert.deepEqual(shown.map(s=>s.id), ["reverse_guard","appearance_morgana","appearance_magician"]);
+    assert.deepEqual(shown[1].rows.map(r=>r.name).sort(), ["a","b"]);
+    assert.ok(shown[1].rows.every(r=>r.rank===1 && r.tied && r.value==="1"));
+    assert.ok(card.sections.some(s=>s.id==="reverse_wrong_side"));
+    assert.equal(card.sections.filter(s=>s.id==="reverse_guard").length,1);
+    const pending = report.pendingTitles.find(r=>r.role==="莫甘娜");
+    assert.equal(pending.title,"梅林二号"); assert.match(pending.badge,/example.test.*morgana_with_percival/);
+    assert.ok(report.pendingAppearances.includes("女巫"));
+    assert.doesNotMatch(JSON.stringify(card), /梅林二号|女巫|未知角色|wx:/);
+    profile(store,"wx:b",false);
+    const next = read(reports);
+    assert.ok(next.version > response.version);
+    assert.deepEqual(next.roleTitles.find(r=>r.role==="莫甘娜").appearance.rows.map(r=>r.nickname), ["a"]);
+  } finally { store.close(); }
+});
+
 test("前三名保留超过100人的并列，生成单张长图，公开投影不携带原始数据", () => {
   const store = new Store(":memory:");
   try {
@@ -201,7 +267,7 @@ test("炉边来信的票选、角色、生存和连胜按所选月份与公开�
     assert.deepEqual(streak.rows.map(r => r.count), [2,2]);
     assert.deepEqual(report.groups.find(group => group.title === "玩家票选").boards.map(b => b.rows.length), [2,1]);
     const [poster] = cardRenderer.cards(response);
-    assert.deepEqual(poster.sections.map(s => s.id), ["points","games","honor_mvp","honor_svp","win_streak","lancelot_both","survival_revive","survival_knifed"]);
+    assert.deepEqual(poster.sections.map(s => s.id), ["points","games","honor_mvp","honor_svp","win_streak","lancelot_both","survival_revive","survival_knifed","appearance_servant"]);
     assert.deepEqual(cardRenderer.cards(response, "featured"), [poster]);
     assert.doesNotMatch(JSON.stringify(poster), /hidden|undefined%|null%/);
     profile(store, "wx:b", false);

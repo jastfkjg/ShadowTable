@@ -15,6 +15,20 @@
   </view>
   <view wx:if="{{loading && !imagePath && !connectionVisible}}" class="monthly-message" role="status">正在生成月度战报…</view>
   <view wx:elif="{{report && !report.canShare && !loading && !error}}" class="monthly-message">这个月还没有有效对局</view>
+  <view wx:if="{{imagePath && (report.pendingTitles.length || report.pendingAppearances)}}" class="monthly-role-index">
+    <view class="monthly-role-index-title">待达成角色称号</view>
+    <view wx:if="{{report.pendingTitles.length}}" class="monthly-role-grid">
+      <view wx:for="{{report.pendingTitles}}" wx:key="role" class="monthly-role-entry">
+        <text class="monthly-role-label">{{item.role}}</text>
+        <view class="monthly-role-name">{{item.title}}<image wx:if="{{item.badge}}" src="{{item.badge}}" mode="aspectFit" class="monthly-role-badge" aria-hidden="true" /></view>
+        <text class="monthly-role-note">{{item.condition}}</text>
+      </view>
+    </view>
+    <view wx:if="{{report.pendingAppearances}}" class="monthly-role-other">
+      <view class="monthly-role-name">角色常驻王</view>
+      <text class="monthly-role-note">以下角色本月暂无公开出场记录。{{report.pendingAppearances}}</text>
+    </view>
+  </view>
   <view wx:if="{{imagePath}}" class="monthly-share-bar">
     <button class="monthly-share" bindtap="share" disabled="{{shareOpening || loading || error}}" hover-class="none">生成分享图</button>
   </view>

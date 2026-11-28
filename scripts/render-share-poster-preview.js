@@ -24,12 +24,12 @@ const scenes = {
   games:[cards.leaderboardCard(profile,{...board,metric:"games",nearby:[],me:{...board.me,rank:1,total:9,wins:3,winRate:33.3}})],
   rate:[cards.leaderboardCard(profile,{...board,metric:"fun_merlin_evade",fun:true,title:"闪身步大神",metricLabel:"成功躲刀",unit:"%",sort:"rate",mode:"classic",nearby:[],me:{...board.me,rate:100,count:5,opportunities:5,knownGames:5}})],
 };
-let source = ["fun-copy.js","monthly-report.js","poster-canvas.js","monthly-report-card.js","leaderboard-share-card.js"].map(file=>fs.readFileSync(path.join(root,file),"utf8")).join("\n");
+let source = ["fun-copy.js", "badges.js","monthly-report.js","poster-canvas.js","monthly-report-card.js","leaderboard-share-card.js"].map(file=>fs.readFileSync(path.join(root,file),"utf8")).join("\n");
 source += "\n{const module={exports:{}};" + fs.readFileSync(path.join(root,"share-card.js"),"utf8")
   .replace('require("./fun-copy")',"window.shadowtableFunCopy")
   .replace('require("./monthly-report-card")',"window.shadowtableMonthlyCard")
   .replace('require("./leaderboard-share-card")',"window.shadowtableLeaderboardCard") + "\nwindow.shareCards=module.exports;}";
-const urls = Object.fromEntries(require("../miniprogram/builtin-avatars").map(item=>["/api/avatars/"+item.hash,"/miniprogram"+item.path]));
+const { urls } = require("./monthly-poster-preview");
 fs.mkdirSync(output,{recursive:true});
 const body = `<script>${source}</script><script>(async()=>{const scenes=${JSON.stringify(scenes)},renderer=window.shareCards,urls=${JSON.stringify(urls)};window.posterScenes=scenes;const selected=new URLSearchParams(location.search).get('scene');
 const images=new Map(await Promise.all([...new Set(Object.values(scenes).flat().flatMap(card=>renderer.imagePaths(card)))].map(key=>new Promise(resolve=>{const image=new Image();image.onload=()=>resolve([key,image]);image.onerror=()=>{console.error('Missing poster image',key);resolve([key,null])};image.src=urls[key]||(key.startsWith('/assets/')?'/miniprogram'+key:key)}))));

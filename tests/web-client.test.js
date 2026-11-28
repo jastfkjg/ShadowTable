@@ -1335,6 +1335,31 @@ test('网页房主计分开关自动保存，板子与人数默认值及发牌�
   assert.match(c.viewSettingsDialog(),/data-change="settingsScoring" disabled/);
   await c.CHANGES.settingsScoring({checked:true});assert.equal(writes.length,count);assert.equal(room.scoreEnabled,false);
 });
+test('网页徽章和计分验密失败时弹出错误消息，开关恢复关闭', async () => {
+  const room = newRoom('123456', 'host', '房主');
+  const message = '房间设置密码错误，请重新输入';
+  const c = client(async (path, options) => options?.method === 'POST'
+    ? { status: 400, json: async () => ({ error: message }) }
+    : response(path === '/api/boards' ? { boards: BOARDS } : publicView(room, 'host')));
+  const errors = [];
+  c.setConfirm(async (title, content, showCancel) => {
+    if (title !== '开启失败') return 'wrong';
+    errors.push(content);
+    assert.equal(showCancel, false);
+    return true;
+  });
+  c.state.showRoomSettings = true;
+  c.state.settings = { busy: false };
+  await c.loadSettings();
+  for (const change of [c.CHANGES.settingsBadges, c.CHANGES.settingsScoring]) {
+    await change({ checked: true });
+    assert.equal(c.state.settings.badgeEnabled, false);
+    assert.equal(c.state.settings.scoreEnabled, false);
+    assert.equal(c.state.settings.error, '');
+  }
+  assert.deepEqual(errors, [message, message]);
+});
+
 test("网页人数、板子及开关更改即保存，成功后保留表单且无底部保存按钮", async () => {
   const r = newRoom("123456", "host", "房主", "classic", 7);
   const writes = [];
@@ -2485,18 +2510,21 @@ test('网页月初提醒只在我的页出现，确认失败可重试且服务�
   await c.applyRoute('#/me'); assert.equal(c.state.monthlyReset, null);
 });
 
-test('网页徽章管理按需显示摘下，详情精简说明且保留获取条件', () => {
+test('网页佩戴位进入详情摘下徽章，详情保留获取条件', () => {
   const {catalogue}=require('../miniprogram/badges');
   const c=client(async()=>response({}));
   Object.assign(c.state,{page:'badges',badgeFilter:'all',badgeCollection:{badges:[{...catalogue[1],equipped:true}],periodStart:1}});
-  assert.doesNotMatch(c.viewBadgeManager(),/class="badge-remove"/);
-  c.ACTIONS.badgeManage();assert.match(c.viewBadgeManager(),/class="badge-remove"/);
-  c.ACTIONS.badgeManage();c.ACTIONS.showBadgeDetail({dataset:{id:catalogue[1].id}});
+  const overview=c.viewBadgeManager();
+  assert.doesNotMatch(overview,/调整佩戴|data-action="toggleOwnedBadge"/);
+  assert.match(overview,/点徽章可查看或摘下/);
+  assert.match(overview,/class="badge-slot-open" data-action="showBadgeDetail"/);
+  c.ACTIONS.showBadgeDetail({dataset:{id:catalogue[1].id}});
   const detail=c.viewBadgeManager().split('class="badge-detail"')[1];
   assert.match(detail,/获取条件/);assert.match(detail,/本月场次榜第一（含并列）/);
   assert.match(detail,/榜首变动或跨月时重新计算/);
   assert.doesNotMatch(detail,/>徽章详情<|常驻牌桌|按北京时间本月|摘下后仍保留/);
   assert.match(detail,/secondary badge-detail-action/);
+  assert.match(detail,/摘下徽章/);
   c.ACTIONS.showBadgeDetail({dataset:{id:'overall'}});
   assert.match(c.viewBadgeManager(),/当月获得计分局胜场最多的玩家（含并列）/);
   c.ACTIONS.showBadgeDetail({dataset:{id:'headwind_navigator'}});

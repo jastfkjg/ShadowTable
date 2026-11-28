@@ -41,9 +41,9 @@ Page({
       await api.login();
       const response = await api.request("/api/monthly-report?month=" + encodeURIComponent(month));
       if (!this.current(sequence)) return;
-      const report = monthly.presentReport(response);
-      const { monthLabel, canShare, rules } = report;
-      this.setData({ report: { month, monthLabel, canShare, rules }, maxMonth: report.currentMonth,
+      const report = monthly.presentReport(response, api.assetUrl);
+      const { monthLabel, canShare, rules, pendingTitles, pendingAppearances } = report;
+      this.setData({ report: { month, monthLabel, canShare, rules, pendingTitles, pendingAppearances }, maxMonth: report.currentMonth,
         minMonth: report.firstMonth < month ? report.firstMonth : month });
       if (!canShare) { this.clearPoster(); this.setData({ loading: false }); return; }
       if (this.poster?.version === response.version && this.poster?.month === month &&

@@ -539,7 +539,7 @@
     hasPendingRequest: false,
     notice: "",
     room: null,
-    badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
+    badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: "",
     playerCard: null, playerCardStats: null, playerCardLoading: false, playerCardError: "", playerCardStatus: "", playerCardBadge: null,
     boards: [],
     availableBoards: [],
@@ -715,7 +715,7 @@
     setState({ page: route.page, monthlyRoster: null, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', entrySheet: false, entryError: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
-      badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
+      badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
       ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyPoster: null, monthlyLoading: true, monthlyError: '' } : {}),
       monthlyReset: null, resetSaving: false, resetError: '',
@@ -1055,7 +1055,7 @@
     if (state.badgeManagerSaving) return;
     const sequence = ++badgeManagerSequence, route = routeSequence;
     const active = () => alive && state.page === 'badges' && sequence === badgeManagerSequence && route === routeSequence;
-    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '', badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false });
+    setState({ badgeManagerLoading: true, badgeManagerError: '', selectedBadgeId: '', badgePicker: '', badgePickerChoice: null, badgePlaced: null });
     try {
       const value = await request('/api/me/badges');
       if (active()) setState({ badgeCollection: value });
@@ -1093,7 +1093,7 @@
       return;
     }
     if (id) (app.querySelector('.badge-tile[data-id="' + id + '"]') || app.querySelector('.badge-slot-open[data-id="' + id + '"]'))?.focus({ preventScroll: true });
-    else if (slot !== null) (app.querySelector('.badge-slot-open[data-slot="' + slot + '"]') || app.querySelector('.badge-slot.is-updated .badge-slot-open') || app.querySelector('.badge-manage'))?.focus({ preventScroll: true });
+    else if (slot !== null) app.querySelector('.badge-slot-open[data-slot="' + slot + '"]')?.focus({ preventScroll: true });
   }
   function closeBadgePicker() {
     if (state.badgeManagerSaving) return;
@@ -1116,16 +1116,13 @@
     if (state.badgeManagerError) html += '<div class="inline-error" role="alert">' + esc(state.badgeManagerError) + btn('secondary','loadBadgeManager','刷新徽章',null,busy) + '</div>';
     if (!c) return html + '</div>';
     const updated = state.badgePlaced;
-    html += '<section class="badge-equipment" aria-label="名片佩戴"><div class="badge-section-heading"><div><span>名片佩戴</span><span class="badge-equipped-count">' + c.equippedCount + ' / ' + c.maxEquipped + '</span></div>' +
-      '<button type="button" class="badge-manage" data-action="badgeManage" aria-expanded="' + !!state.badgeManaging + '"' + (busy || !c.ownedCount ? ' disabled' : '') + '>' +
-      (state.badgeManaging ? '完成' : '调整佩戴<span class="badge-chevron" aria-hidden="true"></span>') + '</button></div><div class="badge-slots">';
+    html += '<section class="badge-equipment" aria-label="名片佩戴"><div class="badge-section-heading"><span>名片佩戴</span><span class="badge-equipped-count">' + c.equippedCount + ' / ' + c.maxEquipped + '</span></div><div class="badge-slots">';
     for (const b of c.slots) html += '<div class="badge-slot' + (b.id === updated?.id ? ' is-updated' : '') + '">' + (b.empty
       ? '<button type="button" class="badge-slot-open badge-slot-empty" data-action="openBadgePicker" data-slot="' + b.slotIndex + '" aria-label="选择徽章佩戴到第' + (b.slotIndex + 1) + '个位置"><span class="badge-empty-ring" aria-hidden="true">＋</span><span class="badge-slot-title">待佩戴</span></button>'
-      : '<button type="button" class="badge-slot-open" data-action="showBadgeDetail" data-id="' + esc(b.id) + '" aria-label="查看' + esc(b.title) + '"><span class="badge-slot-medallion">' + badgeArt(b, 'badge-slot-image') + '</span><span class="badge-slot-title">' + esc(b.title) + '</span></button>' +
-      (state.badgeManaging ? '<button type="button" class="badge-remove" data-action="toggleOwnedBadge" data-id="' + esc(b.id) + '" aria-label="摘下' + esc(b.title) + '"' + (busy ? ' disabled' : '') + '>摘下</button>' : '')) + '</div>';
+      : '<button type="button" class="badge-slot-open" data-action="showBadgeDetail" data-slot="' + b.slotIndex + '" data-id="' + esc(b.id) + '" aria-label="查看' + esc(b.title) + '"><span class="badge-slot-medallion">' + badgeArt(b, 'badge-slot-image') + '</span><span class="badge-slot-title">' + esc(b.title) + '</span></button>') + '</div>';
     html += '</div>' + (updated
       ? '<div class="badge-caption badge-equipment-note is-updated" role="status"><span class="badge-check" aria-hidden="true"></span><span>' + esc(updated.title) + '已佩戴到名片位置 ' + (updated.slotIndex + 1) + '</span></div>'
-      : '<div class="badge-caption badge-equipment-note">' + (state.badgeManaging ? '摘下后可选择空位佩戴，调整展示顺序' : '徽章会展示在玩家名片上') + '</div>') +
+      : '<div class="badge-caption badge-equipment-note">' + esc(c.equipmentNote) + '</div>') +
       '</section><div class="badge-collection-heading"><h2 class="badge-collection-title">徽章收藏</h2><span class="badge-collection-total">已拥有 ' + c.ownedCount + ' / ' + c.totalCount + '</span></div>' +
       '<div class="badge-categories" role="group" aria-label="徽章分类">';
     for (const category of c.categories) {
@@ -1522,6 +1519,17 @@
       '<div class="monthly-roster-title">' + esc(roster.title) + '</div><div class="monthly-roster-heading"><span class="monthly-roster-place">' + esc(roster.place) + '</span>' + esc(roster.result) +
       '</div><div class="monthly-roster-total">' + roster.members.length + ' 位玩家</div><div class="monthly-roster-scroll"><div class="monthly-roster-grid">' + members + '</div></div></section></div>';
   }
+  function monthlyRoleIndex(report) {
+    const titles = report?.pendingTitles || [], others = report?.pendingAppearances;
+    if (!titles.length && !others) return '';
+    let html = '<section class="monthly-role-index"><h2 class="monthly-role-index-title">待达成角色称号</h2>';
+    if (titles.length) html += '<div class="monthly-role-grid">' + titles.map(t =>
+      '<div class="monthly-role-entry"><span class="monthly-role-label">' + esc(t.role) + '</span><div class="monthly-role-name">' +
+      esc(t.title) + (t.badge ? '<img class="monthly-role-badge" src="' + esc(t.badge) + '" alt="">' : '') +
+      '</div><span class="monthly-role-note">' + esc(t.condition) + '</span></div>').join('') + '</div>';
+    if (others) html += '<div class="monthly-role-other"><div class="monthly-role-name">角色常驻王</div><span class="monthly-role-note">以下角色本月暂无公开出场记录。' + esc(others) + '</span></div>';
+    return html + '</section>';
+  }
   function viewMonthlyReport() {
     const report = state.monthlyReport, poster = state.monthlyPoster, month = state.monthlyMonth || monthlyPresentation.monthAt();
     let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page">';
@@ -1537,6 +1545,7 @@
           action + ' aria-label="' + esc(item.label) + '">' + (item.boardId ? '<span class="monthly-count-arrow" aria-hidden="true"></span>' : '') + '</button></foreignObject>';
       }).join('');
       html += '<div class="monthly-poster"><img class="monthly-poster-image" src="' + poster.src + '" width="' + poster.width + '" height="' + poster.height + '" alt="' + esc(poster.description) + '"><svg class="monthly-targets" xmlns="http://www.w3.org/2000/svg" aria-label="查看上榜玩家战绩">' + targets + '</svg></div>';
+      html += monthlyRoleIndex(report);
       html += '<div class="monthly-share-bar">' + btn('monthly-share', 'monthlyShare', '生成分享图', null, !!(state.monthlyLoading || state.monthlyError)) + '</div>';
     } else if (report && !report.canShare && !state.monthlyLoading && !state.monthlyError) html += '<div class="monthly-message">这个月还没有有效对局</div>';
     html += '</div></section>';
@@ -1603,6 +1612,8 @@
   function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false, info = null) {
     const about = info?.variant === 'about' ? info : null;
     const password = info?.variant === 'room-password' ? document.getElementById('modal-password') : null;
+    const helpToggle = password && document.getElementById("modal-password-help-toggle");
+    const helpDialog = password && document.getElementById("modal-password-help");
     if (info && !about && !password) return showFunRecord(info);
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
@@ -1640,15 +1651,21 @@
       modalOk.textContent = confirmLabel || "确定";
       modalCancel.hidden = showCancel === false;
       modal.hidden = false;
-      if (password) { password.value = ""; password.hidden = false; password.focus(); }
+      if (password) {
+        helpToggle.hidden = false;
+        helpToggle.onclick = () => helpDialog.showModal();
+        password.value = "";
+        password.hidden = false;
+        helpToggle.focus();
+      }
       else (showCancel === false ? modalOk : modalCancel).focus();
       function onKey(event) {
         if (event.key === "Escape" && (showCancel !== false || about)) { event.preventDefault(); done(false); }
         else if (password && event.key === "Enter" && document.activeElement === password) { event.preventDefault(); done(true); }
         else if (password && event.key === "Tab") {
           event.preventDefault();
-          const controls = [password, modalCancel, modalOk], index = controls.indexOf(document.activeElement);
-          controls[(index + (event.shiftKey ? 2 : 1)) % 3].focus();
+          const controls = [helpToggle, password, modalCancel, modalOk], index = controls.indexOf(document.activeElement);
+          controls[(index + controls.length + (event.shiftKey ? -1 : 1)) % controls.length].focus();
         }
         else if (event.key === "Tab") { event.preventDefault(); (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus(); }
       }
@@ -1659,6 +1676,9 @@
           if (val) val = password.value;
           password.value = "";
           password.hidden = true;
+          if (helpDialog.open) helpDialog.close();
+          helpToggle.hidden = true;
+          helpToggle.onclick = null;
         }
         modal.hidden = true;
         modal.removeEventListener("keydown", onKey);
@@ -3844,7 +3864,7 @@ function roomListItems(rooms) {
     let password;
     if (enabled) {
       setSettings({ busy: true, error: "" });
-      password = await confirm(kind === "score" ? "开启本局计分" : "开启徽章获取", "请输入管理员设置的房间设置密码。",
+      password = await confirm(kind === "score" ? "开启本局计分" : "开启徽章获取", "",
         true, "开启", null, null, false, { variant: "room-password" });
       if (state.settings !== s) return;
       setSettings({ busy: false });
@@ -3880,13 +3900,17 @@ function roomListItems(rooms) {
       if (e.status && e.status < 500 && ![401, 429].includes(e.status) && settingsSavePending === saved)
         settingsSavePending = null;
       if (!alive || state.settings !== s) return;
-      if (!settingsSavePending && typeof saved.data.settingsPassword === "string") {
+      const passwordSave = typeof saved.data.settingsPassword === "string";
+      const showPasswordError = passwordSave && e.status === 400;
+      if (!settingsSavePending && passwordSave) {
         setSettings({ badgeEnabled: !!settingsOriginal.badgeSettings?.enabled, scoreEnabled: !!settingsOriginal.scoreSettings?.enabled });
         updateSettingsDirty();
       }
-      setSettings({ error: e.message, pendingSave: settingsSavePending === saved,
+      setSettings({ error: showPasswordError ? "" : e.message, pendingSave: settingsSavePending === saved,
         authorized: e.status === 403 ? false : s.authorized });
-      if (e.status === 409) {
+      if (showPasswordError && state.showRoomSettings) {
+        await confirm("开启失败", e.message, false, "知道了");
+      } else if (e.status === 409) {
         await loadSettings(true);
         setSettings({ error: "房间状态已变化，已刷新设置，请重新修改。" });
       }
@@ -5118,11 +5142,11 @@ function roomListItems(rooms) {
       html += "</div>";
       if (room.recordSettings) html += '<div class="settings-section-title">对局用途</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>仅测试，不计战绩</span><span class="settings-caption">保留对局记录，不计入胜率、积分和趣味统计。' + (room.recordSettings.editable ? '发牌后固定' : '本局设置已固定') + '</span></span><input type="checkbox" aria-label="仅测试，不计战绩" data-change="settingsRecordPurpose"' + (s.recordPurpose === "test" ? ' checked' : '') + (settingsLocked() || !room.recordSettings.editable ? ' disabled' : '') + ' /></label></div>';
       if (room.badgeSettings) html += '<div class="settings-section-title">徽章</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>徽章获取</span><span class="settings-caption">' +
-        (s.badgeEnabled ? '本局计入徽章进度' : '本局不计入徽章进度') + ' · ' + (room.badgeSettings.editable ? (s.badgeEnabled ? '发牌后固定' : '开启需要密码') : '本局设置已固定') +
+        (s.badgeEnabled ? '本局计入徽章进度' : '本局不计入徽章进度') + ' · ' + (room.badgeSettings.editable ? (s.badgeEnabled ? '发牌后固定' : '仅限内部人员开启') : '本局设置已固定') +
         '</span></span><input type="checkbox" aria-label="徽章获取" data-change="settingsBadges"' + (s.badgeEnabled ? ' checked' : '') +
         (settingsLocked() || !room.badgeSettings.editable ? ' disabled' : '') + ' /></label></div>';
       if (room.scoreSettings) html += '<div class="settings-section-title">积分</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>本局计分</span><span class="settings-caption">' +
-        esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : room.scoreSettings.editable ? '开启需要密码' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
+        esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : room.scoreSettings.editable ? '仅限内部人员开启' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
         '</span></span><input type="checkbox" aria-label="本局计分" data-change="settingsScoring"' + (s.scoreEnabled ? ' checked' : '') +
         (settingsLocked() || !room.scoreSettings.editable ? ' disabled' : '') + ' /></label></div>';
       html += '<div class="settings-section-title">湖中仙女</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>启用湖中仙女</span><span class="settings-caption">' +
@@ -5459,7 +5483,6 @@ function roomListItems(rooms) {
         ? toggleOwnedBadge(badgePickerChoice.id, undefined, badgePickerSlot)
         : toggleOwnedBadge(selectedBadgeId, badgePickerChoice.id);
     },
-    badgeManage: () => { if (!state.badgeManagerLoading && !state.badgeManagerSaving) setState({ badgeManaging: !state.badgeManaging }); },
     badgeCategory: el => {
       if (!badgePresentation.categories.includes(el.dataset.category)) return;
       setState({ badgeCategory: el.dataset.category });

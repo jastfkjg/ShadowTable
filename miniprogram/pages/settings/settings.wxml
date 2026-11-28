@@ -28,11 +28,11 @@
         <switch checked="{{recordPurpose==='test'}}" bindchange="toggleRecordPurpose" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.recordSettings.editable}}" aria-label="不计战绩" />
       </view>
       <view wx:if="{{room.badgeSettings}}" class="settings-row settings-rule">
-        <view class="settings-row-content"><view>徽章获取</view><view class="settings-caption">{{badgeEnabled?'本局计入徽章进度':'本局不计入徽章进度'}} · {{room.badgeSettings.editable?(badgeEnabled?'发牌后固定':'开启需要密码'):'本局设置已固定'}}</view></view>
+        <view class="settings-row-content"><view>徽章获取</view><view class="settings-caption">{{badgeEnabled?'本局计入徽章进度':'本局不计入徽章进度'}} · {{room.badgeSettings.editable?(badgeEnabled?'发牌后固定':'仅限内部人员开启'):'本局设置已固定'}}</view></view>
         <switch checked="{{badgeEnabled}}" bindchange="toggleBadges" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.badgeSettings.editable}}" aria-label="徽章获取" />
       </view>
       <view wx:if="{{room.scoreSettings}}" class="settings-row settings-rule">
-        <view class="settings-row-content"><view>本局计分</view><view class="settings-caption">{{room.scoreSettings.unavailableReason || (scoreEnabled?'已开启':room.scoreSettings.editable?'开启需要密码':'已关闭')}} · {{room.scoreSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
+        <view class="settings-row-content"><view>本局计分</view><view class="settings-caption">{{room.scoreSettings.unavailableReason || (scoreEnabled?'已开启':room.scoreSettings.editable?'仅限内部人员开启':'已关闭')}} · {{room.scoreSettings.editable?'发牌后固定':'本局设置已固定'}}</view></view>
         <switch checked="{{scoreEnabled}}" bindchange="toggleScoring" color="#c3a361" disabled="{{busy || refreshing || pendingSave || pendingTransfer || pendingKick || !room.scoreSettings.editable}}" aria-label="本局计分" />
       </view>
       <view class="settings-row settings-rule">

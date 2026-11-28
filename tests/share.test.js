@@ -255,7 +255,7 @@ test("原生 Canvas 按内容高度导出 PNG，头像失败使用昵称回退",
     canvasToTempFilePath(options) { exported = options; options.success({ tempFilePath: "wxfile://native" }); } };
   const mod = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../miniprogram/share-image.js"), "utf8"), { module: mod, wx, setTimeout, clearTimeout,
-    require: name => name === "./api" ? { assetUrl: value => "https://example.test" + value } : cards });
+    require: name => name === "./api" ? { assetUrl: value => "https://example.test" + value } : require("../miniprogram/" + name) });
   const card = cards.statsCard({ ...fixtures.profile, avatarUrl: "/api/avatars/" + "a".repeat(64) }, fixtures.stats, fixtures.now);
   assert.equal(await mod.exports.renderImage({ alive: true }, card), "wxfile://native");
   assert.equal(canvas.width, 1080); assert.equal(canvas.height, cards.dimensions(card).height);
@@ -323,7 +323,7 @@ test("分享画布等待所有头像加载并去重，绘制附近玩家头像�
     canvasToTempFilePath(options) { exported=options; options.success({tempFilePath:"wxfile://avatars"}); } };
   const mod = {exports:{}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../miniprogram/share-image.js"), "utf8"), { module:mod, wx, setTimeout, clearTimeout,
-    require: name => name === "./api" ? {assetUrl:value=>"https://example.test"+value} : cards });
+    require: name => name === "./api" ? {assetUrl:value=>"https://example.test"+value} : require("../miniprogram/" + name) });
   const rendering = mod.exports.renderImage({alive:true}, card);
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(images.length, 4); assert.equal(exported, undefined);

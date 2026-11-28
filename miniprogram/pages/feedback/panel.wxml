@@ -14,6 +14,11 @@
         <view class="fb-chevron" aria-hidden="true"></view>
       </navigator>
     </view>
+    <button size="mini" class="fb-choices fb-choice fb-contact" open-type="contact" hover-class="fb-pressed" aria-label="联系我们，打开微信客服">
+      <view class="fb-well contact"><image src="./contact.svg" mode="aspectFit" aria-hidden="true" /></view>
+      <view class="fb-copy"><view class="fb-choice-title">联系我们</view><view class="fb-muted">通过微信客服一对一咨询</view></view>
+      <view class="fb-chevron" aria-hidden="true"></view>
+    </button>
   </view>
   <view wx:else id="fb-history" role="tabpanel" aria-labelledby="fb-tab-history" class="fb-history">
     <view wx:if="{{submitted}}" class="fb-receipt" role="status">

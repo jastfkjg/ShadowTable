@@ -163,18 +163,20 @@ test("月报及分享长图统一识别榜单数据里的旧称号", () => {
   assert.equal(board.subtitle, "梅林 · 按局数 · 隐身乘客");
   const section = renderer.cards(response)[0].sections.find(section => section.id === old.metric);
   assert.equal(section.title, "隐身乘客");
-  assert.equal(section.subtitle, "梅林 · 隐身乘客");
+  assert.equal(section.subtitle, "梅林");
   assert.equal(old.title, "灯下黑梅林");
 });
-test("大量并列保留完整数据，分享长图只排一行摘要", () => {
+test("大量并列保留完整数据，分享长图按同排空间展示名单摘要", () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
   response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));
   const pages = renderer.cards(response);
   assert.equal(pages.length, 1);
-  assert.ok(renderer.dimensions(pages[0]).height < renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
+  const folded = renderer.layout(pages[0]).sections.find(s => s.section.id === "merlin_evade").box.lanes;
+  assert.equal(folded.length, 1); assert.ok(folded[0].folded);
+  assert.ok(renderer.dimensions(pages[0]).height <= renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
-  assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
+  assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
   assert.equal(pages[0].sections.filter(section=>section.id==="merlin_evade").length,1);
   const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);
@@ -191,7 +193,9 @@ test("原生月报等待本地背景与远程头像，头像失败仍绘制背�
   const filename = path.resolve(__dirname, "../miniprogram/share-image.js"), realRequire = createRequire(filename), module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(filename, "utf8"), { module, wx, setTimeout, clearTimeout, require: name => name === "./api" ? { assetUrl: path => "https://example.test" + path } : realRequire(name) });
   const rendering = module.exports.renderImage({ alive: true }, card); await tick();
-  assert.equal(loaded.length, 2); assert.equal(exported, undefined);
+  assert.equal(loaded.length, renderer.imagePaths(card).length); assert.equal(exported, undefined);
+  assert.ok(loaded.some(image => image.path === "https://example.test/assets/badges/rate_overall.png"));
+  assert.ok(loaded.some(image => image.path === "/assets/badges/merlin_evade.png"));
   const background = loaded.find(image => image.path === renderer.BACKGROUND_PATH);
   assert.ok(background); loaded.find(image => image.path.endsWith(avatarPath)).onerror();
   assert.equal(exported, undefined);

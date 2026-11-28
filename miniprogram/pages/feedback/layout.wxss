@@ -7,7 +7,7 @@
 .fb-chevron { width:7px; height:7px; margin-right:4px; border:solid var(--muted); border-width:1.5px 1.5px 0 0; transform:rotate(45deg); }
 .fb-well { width:46px; height:46px; border-radius:13px; display:flex; align-items:center; justify-content:center; }
 .fb-well image { width:25px; height:25px; }
-.fb-well.issue { background:#3b372d; }.fb-well.idea { background:#284039; }.fb-well.other { background:#38354b; }
+.fb-well.issue { background:#3b372d; }.fb-well.idea,.fb-well.contact { background:#284039; }.fb-well.other { background:#38354b; }
 .fb-pressed { opacity:.78; }
 .fb-empty { text-align:center; color:var(--muted); padding:48px 12px; }
 .fb-empty button { margin-top:18px; }
