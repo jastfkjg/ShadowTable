@@ -336,3 +336,29 @@ test("真实HTTP开局与结算自动发奖，重试不重发，原有通知接�
   assert.equal(lobby.me.avoidance.balance, 1);
   assert.equal((await cmd("avoidance", { role: "merlin" })).status, 200);
 });
+
+test("阵营卡按上线后每十场有效参赛局发放；与胜负奖励同局到账且重复归档、更正均不重发", t => {
+  const store = memory(t);
+  const oldOpen = start(store);
+  store.db.prepare("UPDATE avoidance_reward_matches SET faction_eligible=0 WHERE match_id=?").run(oldOpen.matchId);
+  finish(store, oldOpen);
+  play(store, "loss", { purpose: "test" }); play(store, "none");
+  for (let i = 0; i < 9; i++) play(store, i < 5 ? "win" : "loss");
+  assert.equal(avoidance.balance(store, uid, true), 0);
+  const previous = avoidance.grantNotice(store, uid);
+  avoidance.acknowledgeGrant(store, uid, previous.notice);
+  const tenth = play(store); // One pre-upgrade loss + five new losses also reaches a loss-card milestone.
+  const notice = avoidance.grantNotice(store, uid, true).notice;
+  assert.equal(notice.amount, 2); assert.equal(notice.factionAmount, 1);
+  const legacy = avoidance.grantNotice(store, uid).notice;
+  assert.equal(legacy.amount, 1); avoidance.acknowledgeGrant(store, uid, legacy);
+  assert.equal(avoidance.grantNotice(store, uid, true).notice.amount, 1);
+  avoidance.acknowledgeGrant(store, uid, notice, true);
+  assert.equal(avoidance.grantNotice(store, uid, true).notice, null);
+  store.archiveMatch(tenth.matchRecord);
+  manage(store, "exclude", tenth); manage(store, "include", tenth);
+  assert.equal(avoidance.balance(store, uid, true), 1);
+  for (let i = 0; i < 10; i++) play(store, "win");
+  assert.equal(avoidance.balance(store, uid, true), 2);
+  assert.equal(avoidance.balance(store, "wx:watcher", true), 0);
+});

@@ -15,6 +15,18 @@
           <view wx:for="{{scoringRules.table.columns}}" wx:key="id" wx:for-index="scoreIndex" class="help-score-cell help-score-number {{row.scores[scoreIndex] === 0 ? 'is-zero' : ''}}">{{row.scores[scoreIndex] > 0 ? '+' : ''}}{{row.scores[scoreIndex]}}</view>
         </view>
       </view>
+      <view wx:for="{{scoringRules.boardSections}}" wx:key="id" wx:for-item="board" class="help-board-rules">
+        <button hover-class="none" class="disclosure-button help-faq-toggle" bindtap="toggleBoardScore" data-id="{{board.id}}" aria-expanded="{{!!boardScoreExpanded[board.id]}}" aria-controls="{{'score-rules-'+board.id}}">
+          <text>{{board.title}}计分规则</text><view class="help-chevron {{boardScoreExpanded[board.id] ? 'up' : ''}}" aria-hidden="true" />
+        </button>
+        <view wx:if="{{boardScoreExpanded[board.id]}}" id="{{'score-rules-'+board.id}}" class="help-faq-body">
+          <view class="help-copy">{{board.note}}</view>
+          <view wx:for="{{board.scenarios}}" wx:key="id" wx:for-item="scenario" class="help-board-score-row">
+            <view class="help-step-title">{{scenario.label}}</view>
+            <view class="help-board-score-values"><view wx:for="{{scenario.scores}}" wx:key="label">{{item.label}} <text>{{item.points>0?'+':''}}{{item.points}}</text></view></view>
+          </view>
+        </view>
+      </view>
       <view class="help-heading help-score-heading">额外加分</view>
       <view class="help-score-bonuses">
         <view wx:for="{{scoringRules.bonuses}}" wx:key="id" class="help-score-bonus {{item.id === 'shield' ? 'is-shield' : ''}}">
@@ -88,7 +100,7 @@
       <view wx:for="{{references}}" wx:key="id" wx:for-item="reference" class="help-section">
         <button hover-class="none" class="disclosure-button help-toggle" bindtap="toggleReference" data-id="{{reference.id}}" data-index="{{reference.index}}" aria-expanded="{{reference.expanded}}" aria-controls="{{'help-reference-'+reference.id}}"><image class="help-reference-icon" src="{{'/assets/'+reference.icon+'.svg'}}" aria-hidden="true" /><view class="help-toggle-copy"><view class="help-heading">{{reference.title}}</view><view class="help-caption">{{reference.subtitle}}</view></view><view class="help-chevron {{reference.expanded ? 'up' : ''}}" aria-hidden="true" /></button>
         <view wx:if="{{reference.expanded}}" class="help-answers {{reference.id === 'scoring' ? 'help-score-answers' : reference.id === 'boards' ? '' : 'help-reading-answers'}}" id="{{'help-reference-'+reference.id}}">
-          <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible}}" />
+          <template wx:if="{{reference.id === 'scoring'}}" is="help-scoring" data="{{scoringRules,boardScoreExpanded,scoringLoading,scoringError,connectionVisible}}" />
           <block wx:elif="{{reference.id === 'boards'}}">
             <view wx:if="{{loadingBoards && !connectionVisible}}" class="help-copy" role="status">正在加载板子介绍…</view>
             <view wx:elif="{{boardError && !connectionVisible}}" class="help-board-error"><view class="help-copy" role="alert">{{boardError}}</view><button hover-class="none" class="secondary" bindtap="loadBoards">重新加载板子介绍</button></view>
@@ -103,7 +115,7 @@
     </view>
     <view class="help-footnote">线下讨论，线上辅助记录与操作。</view>
   </block>
-  <template wx:else is="help-scoring" data="{{scoringRules,scoringLoading,scoringError,connectionVisible,scoringOnly}}" />
+  <template wx:else is="help-scoring" data="{{scoringRules,boardScoreExpanded,scoringLoading,scoringError,connectionVisible,scoringOnly}}" />
   <button wx:if="{{!singlePage}}" hover-class="none" class="secondary help-share-rule" open-type="share">{{scoringOnly ? '分享计分规则' : '分享新手指南'}}</button>
 </view>
 <app-dialog id="app-dialog" />

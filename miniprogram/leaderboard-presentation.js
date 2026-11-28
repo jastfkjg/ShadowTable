@@ -27,6 +27,10 @@
     return rows.map(row => ({ ...row, tied: !!row.tied || ranks.get(row.rank) > 1 }));
   }
   const percent = n => Number.isFinite(n) ? n.toFixed(1).replace(/\.0$/, "") : "—";
+  function eligibilityLabel(board) {
+    const scope = { overall: "有效对局", good: "好人阵营有效对局", evil: "坏人阵营有效对局" }[board.metric];
+    return scope ? "当前周期满 " + (board.threshold ?? 10) + " 场" + scope + "可上榜" : "";
+  }
   function presentRules(board, selected, ruleLines) {
     const points = board.metric === "points", games = board.metric === "games";
     const summary = board.period === "recent"
@@ -49,7 +53,7 @@
           main: [{ text: points ? "按积分从高到低排名" : games ? "只统计已登记胜负的有效对局" : "按未舍入的胜率排序" }],
           lines: points ? ["计入有效计分局成绩及积分调整。", "积分相同，排名并列。"]
             : games ? ["有效局数相同，排名并列。"] : ["胜率相同时局数多者优先；两者相同则并列。"] },
-        { id: "eligibility", title: "谁可以上榜", main: [{ text: "至少有 " }, { text: "1 场", emphasis: true }, { text: points ? "有效计分局" : "当前统计范围内的有效对局" }],
+        { id: "eligibility", title: "谁可以上榜", main: points || games ? [{ text: "至少有 " }, { text: "1 场", emphasis: true }, { text: points ? "有效计分局" : "当前统计范围内的有效对局" }] : [{ text: eligibilityLabel(board), emphasis: true }],
           lines: ["并开启「在排行榜公开展示」。"], note: "未登记胜负或已终止的对局不计入榜单。" }, display];
     return { ruleSummary: summary, ruleSections: sections.map((section, index) => ({ ...section, number: "0" + (index + 1) })) };
   }
@@ -103,17 +107,17 @@
       if (points && board.period === "month") ruleLines.push("积分仅当月有效，每月 1 日北京时间零点清零，上月积分不结转。历史对局仍保留在战绩和月报中。");
       ruleLines.push(points ? "积分包含有效计分局成绩和积分调整；至少有 1 场有效计分局才参与排名。积分相同则并列。"
         : games ? "只统计已登记胜负的有效对局；有效局数相同则并列。"
-        : "至少有 1 场当前统计范围内的有效对局才参与排名。按未舍入胜率排序，胜率相同时局数多者优先，两者相同则并列。",
+        : eligibilityLabel(board) + "。按未舍入胜率排序，胜率相同时局数多者优先，两者相同则并列。",
         "未登记胜负或已终止的对局不计入榜单。");
     }
     ruleLines.push("仅展示已开启公开展示的玩家。榜单最多展示前 " + (board.maxRows || 100) + " 位玩家，我的排名仍按全部上榜玩家计算。");
     const rows = markTies(board.rows).map(describe), count = board.eligibleCount ?? rows.length;
     const endLabel = count > rows.length ? "已展示前 " + rows.length + " 位 · 共 " + count + " 位玩家上榜" : "已展示全部 " + count + " 位上榜玩家";
-    return { ...board, periodLabel: periodLabels[board.period], dateLabel, countOnly, rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
+    return { ...board, eligibilityLabel: eligibilityLabel(board), periodLabel: periodLabels[board.period], dateLabel, countOnly, rows, metricLabel, rateLabel, valueHeading: games ? "有效局数" : metricLabel,
       currentFunOption: selected || null, rateThreshold, ruleLines, ...presentRules(board, selected, ruleLines), endLabel,
       participantLabel: "共 " + count + " 人上榜", compactEndLabel: count > rows.length ? "已展示前 " + rows.length + " 位" : "已显示全部",
       emptyTitle: recent ? dateLabel ? "当天暂无公开排名" : "暂无计分对局" : board.fun ? "暂无记录" : "暂无公开排名",
-      emptyHint: recent && !dateLabel ? "完成有效计分对局后，这里会显示当天的积分榜。" : board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : "完成有效对局并开启公开展示后，即可参与排名。",
+      emptyHint: recent && !dateLabel ? "完成有效计分对局后，这里会显示当天的积分榜。" : board.fun ? (board.sort === "rate" ? "满足有效机会要求且已公开的玩家将出现在这里。" : "有对应记录且已公开的玩家将出现在这里。") : eligibilityLabel(board) || "完成有效对局并开启公开展示后，即可参与排名。",
       me: { ...me, statusLabel, placeLabel: me.rank ? "第 " + me.rank + " 名" : me.status === "hidden" ? "未公开" : "未上榜" } };
   }
   function filterFunOptions(options = [], category = "all") {

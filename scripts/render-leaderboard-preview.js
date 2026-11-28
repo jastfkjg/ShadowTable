@@ -5,6 +5,7 @@ const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { wxmlToJs } = require('./miniprogram-compiler');
 const presentation = require('../miniprogram/leaderboard-presentation');
+const picker = require('../miniprogram/pages/leaderboard/picker');
 const { presentLeaderboard } = require('../miniprogram/leaderboard');
 const root = path.resolve(__dirname, '../miniprogram');
 const output = path.resolve(__dirname, '../output/playwright/leaderboard');
@@ -21,7 +22,7 @@ function html(node) {
   if(typeof node==='string'||typeof node==='number')return safe(node);
   if(node.tag==='wx-app-nav')return '<div class="preview-nav">'+html(factory('components/app-nav/app-nav.wxml')({...node.attr,statusBarHeight:44,navHeight:44,totalHeight:88}))+'<span class="preview-clock">13:56</span><div class="preview-capsule">•••<i></i><b>⊙</b></div></div>';
   if(node.tag==='wx-switch')return '<input type="checkbox" role="switch" aria-label="在排行榜公开展示" '+(node.attr.checked?'checked ':'')+(node.attr.disabled?'disabled':'')+'>';
-  const tag=({'wx-text':'span','wx-button':'button','wx-image':'img','wx-label':'label'})[node.tag]||'div';
+  const tag=({'wx-text':'span','wx-button':'button','wx-image':'img','wx-label':'label','wx-input':'input'})[node.tag]||'div';
   const attrs=Object.entries(node.attr||{}).flatMap(([key,value])=>{
     if(key==='disabled')return value?['disabled']:[];
     if(key==='src'&&value.startsWith('/')) {
@@ -30,9 +31,9 @@ function html(node) {
     }
     if(key.startsWith('aria'))key=key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
     if(key==='style')value=String(value).replace(/(-?[\d.]+)rpx/g,'calc($1 * 100vw / 750)');
-    return ['class','src','style','role','aria-label','aria-pressed','aria-expanded','aria-hidden'].includes(key)?[`${key}="${safe(value)}"`]:[];
+    return ['class','src','style','role','placeholder','value','aria-label','aria-pressed','aria-expanded','aria-hidden'].includes(key)?[`${key}="${safe(value)}"`]:[];
   }).join(' ');
-  return `<${tag} ${attrs}>${(node.children||[]).map(html).join('')}${tag==='img'?'':`</${tag}>`}`;
+  return `<${tag} ${attrs}>${(node.children||[]).map(html).join('')}${['img','input'].includes(tag)?'':`</${tag}>`}`;
 }
 const defs=require('../server/fun').publicMetrics();
 const rows=Array.from({length:7},(_,i)=>({publicId:'p'+i,nickname:i?'新朋友':'子龙',isSelf:i===0,rank:i?2:1,tied:i>0,total:i?2:3,wins:i<2?2:1,winRate:i===0?66.7:i===1?100:50,points:i?24:36}));
@@ -40,8 +41,10 @@ const base={period:'all',availableFunMetrics:defs,availableMetrics:['points','ga
 const shield={...base,metric:'fun_defense_ally',fun:true,title:'绝对防御',metricLabel:'保护友方次数',sort:'count',unit:'次',rows:[{...rows[0],count:1,opportunities:1,knownGames:1,rate:100}],me:{...rows[0],status:'ranked',count:1,opportunities:1,knownGames:1,rate:100},eligibleCount:1};
 function scene(response,extra={}) {
   const board=presentLeaderboard(response),options=presentation.funOptions(defs),option=options.find(item=>item.key===response.metric)||options[0];
+  const session=picker.create({options,metric:option.key,update() {}});
+  if(extra.funCategory)session.category(extra.funCategory);
   return {...definition.data,loading:false,funAvailable:true,board,metric:response.metric,period:response.period,funSelected:!!response.fun,funSort:response.sort||'count',funOptions:options,
-    funCategory:'all',pendingFunMetric:option.key,pendingFunOption:option,filteredFunOptions:options,funOptionsCanScroll:true,...extra};
+    ...session.view(),funOptionsCanScroll:true,...extra};
 }
 const scenes=Object.fromEntries(['points','games','overall','good','evil'].map(metric=>[metric,scene({...base,metric,period:metric==='points'?'month':base.period})]));
 const recentPoints={...base,metric:'points',period:'recent',periodStart:Date.parse('2026-11-09T16:00:00Z')};
@@ -60,13 +63,13 @@ scenes['ally-rules']=scene(ally,{rulesExpanded:true});
 scenes.honor=scene({...ally,metric:'fun_honor_mvp',countOnly:true});
 scenes['honor-rules']=scene({...ally,metric:'fun_honor_mvp',countOnly:true},{rulesExpanded:true});
 scenes.fun=scene(shield);scenes.sheet=scene(shield,{metricsExpanded:true});
-scenes.good=scene(shield,{metricsExpanded:true,funCategory:'good',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'good')});
+scenes.good=scene(shield,{metricsExpanded:true,funCategory:'good'});
 const standin={...shield,metric:'fun_good_shield',title:'金牌替身',metricLabel:'成功挡刀次数'};
 scenes.standin=scene(standin);
-scenes['standin-good']=scene(standin,{metricsExpanded:true,funCategory:'good',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'good')});
+scenes['standin-good']=scene(standin,{metricsExpanded:true,funCategory:'good'});
 scenes['standin-rules']=scene(standin,{rulesExpanded:true});
-scenes.evil=scene(shield,{metricsExpanded:true,funCategory:'evil',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'evil'),funOptionsCanScroll:false});
-scenes.other=scene(shield,{metricsExpanded:true,funCategory:'other',filteredFunOptions:presentation.filterFunOptions(presentation.funOptions(defs),'other'),funOptionsCanScroll:false});
+scenes.evil=scene(shield,{metricsExpanded:true,funCategory:'evil',funOptionsCanScroll:false});
+scenes.other=scene(shield,{metricsExpanded:true,funCategory:'other',funOptionsCanScroll:false});
 scenes.rules=scene({...base,metric:'overall'},{rulesExpanded:true});
 scenes.mine=scene(shield,{mineExpanded:true});
 const minePoints={...base,metric:'points',period:'month',me:{...rows[0],rank:2,points:35,status:'ranked'}};

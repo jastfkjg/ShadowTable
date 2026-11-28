@@ -3,11 +3,18 @@ const { randomUUID } = require("node:crypto");
 const avoidance = require("./avoidance");
 const { RuleError } = require("./engine");
 const lossesPerCard = 2, winsPerCard = 4;
+const matchesPerFactionCard = 10;
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS avoidance_reward_matches(match_id TEXT PRIMARY KEY, started INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS avoidance_reward_accounts(uid TEXT PRIMARY KEY,
       wins INTEGER NOT NULL CHECK(wins>=0), losses INTEGER NOT NULL CHECK(losses>=0), issued INTEGER NOT NULL CHECK(issued>=0));`);
+  store.transaction(() => {
+    if (!store.db.prepare("PRAGMA table_info(avoidance_reward_matches)").all().some(column => column.name === "faction_eligible"))
+      store.db.exec("ALTER TABLE avoidance_reward_matches ADD COLUMN faction_eligible INTEGER NOT NULL DEFAULT 0");
+    if (!store.db.prepare("PRAGMA table_info(avoidance_reward_accounts)").all().some(column => column.name === "faction_issued"))
+      store.db.exec("ALTER TABLE avoidance_reward_accounts ADD COLUMN faction_issued INTEGER NOT NULL DEFAULT 0");
+  });
 }
 
 function registerStart(store, room) {
@@ -15,8 +22,8 @@ function registerStart(store, room) {
   if (room.recordPurpose === "test") return;
   // Only the successful start command registers a game. Never infer eligibility
   // from its end time or backfill existing rooms/archives when the server starts.
-  store.db.prepare(`INSERT OR IGNORE INTO avoidance_reward_matches(match_id,started)
-    SELECT ?,? WHERE NOT EXISTS(SELECT 1 FROM matches WHERE id=?)`)
+  store.db.prepare(`INSERT OR IGNORE INTO avoidance_reward_matches(match_id,started,faction_eligible)
+    SELECT ?,?,1 WHERE NOT EXISTS(SELECT 1 FROM matches WHERE id=?)`)
     .run(room.matchId, room.startedAt, room.matchId);
 }
 
@@ -26,17 +33,19 @@ function reconcile(store, matchIds) {
   const affected = store.db.prepare(`SELECT DISTINCT p.uid FROM match_players p
     JOIN avoidance_reward_matches r ON r.match_id=p.match_id
     WHERE p.match_id IN (${matchIds.map(() => "?").join(",")})`).all(...matchIds);
-  const totals = store.db.prepare(`SELECT coalesce(sum(p.outcome='win'),0) AS wins, coalesce(sum(p.outcome='loss'),0) AS losses
+  const totals = store.db.prepare(`SELECT coalesce(sum(p.outcome='win'),0) AS wins, coalesce(sum(p.outcome='loss'),0) AS losses,
+      coalesce(sum(r.faction_eligible),0) AS faction_matches
     FROM match_players p JOIN avoidance_reward_matches r ON r.match_id=p.match_id
     JOIN matches m ON m.id=p.match_id LEFT JOIN match_controls c ON c.match_id=p.match_id
     WHERE p.uid=? AND p.outcome IN ('win','loss') AND coalesce(c.state,'active')='active'
       AND coalesce(json_extract(m.snapshot,'$.recordPurpose'),'normal')='normal'
       AND json_extract(m.snapshot,'$.excludedReason') IS NULL
-      AND json_extract(m.snapshot,'$.winner') IN ('good','evil','third')`);
+      AND json_extract(m.snapshot,'$.winner') IN ('good','evil','third','fourth','redTraitor','blueTraitor')`);
   for (const { uid } of affected) {
     if (!avoidance.eligible(uid)) continue;
-    const { wins, losses } = totals.get(uid);
-    const previous = store.db.prepare("SELECT wins,losses,issued FROM avoidance_reward_accounts WHERE uid=?").get(uid) || { wins: 0, losses: 0, issued: 0 };
+    const { wins, losses, faction_matches } = totals.get(uid);
+    const previous = store.db.prepare("SELECT wins,losses,issued,faction_issued FROM avoidance_reward_accounts WHERE uid=?").get(uid)
+      || { wins: 0, losses: 0, issued: 0, faction_issued: 0 };
     const { issued } = previous;
     const earned = Math.floor(losses / lossesPerCard) + Math.floor(wins / winsPerCard);
     // Corrections never claw back issued cards (which may already be spent).
@@ -51,8 +60,17 @@ function reconcile(store, matchIds) {
       store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
         .run(randomUUID(), uid, amount, after, source, "胜负累计奖励：失利每2场、胜利每4场", matchIds[0], store.clock());
     }
-    store.db.prepare(`INSERT INTO avoidance_reward_accounts VALUES(?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
-      wins=excluded.wins,losses=excluded.losses,issued=excluded.issued`).run(uid, wins, losses, Math.max(issued, earned));
+    const earnedFaction = Math.floor(faction_matches / matchesPerFactionCard);
+    if (earnedFaction > previous.faction_issued) {
+      const amount = earnedFaction - previous.faction_issued, after = avoidance.balance(store, uid, true) + amount;
+      if (!Number.isSafeInteger(after)) throw new RuleError("阵营卡数量超出有效范围");
+      store.db.prepare("UPDATE avoidance_accounts SET faction_balance=? WHERE uid=?").run(after, uid);
+      store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
+        .run(randomUUID(), uid, amount, after, "faction_reward", "累计完成 10 场正式对局", matchIds[0], store.clock());
+    }
+    store.db.prepare(`INSERT INTO avoidance_reward_accounts(uid,wins,losses,issued,faction_issued) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
+      wins=excluded.wins,losses=excluded.losses,issued=excluded.issued,faction_issued=excluded.faction_issued`)
+      .run(uid, wins, losses, Math.max(issued, earned), Math.max(previous.faction_issued, earnedFaction));
   }
 }
 

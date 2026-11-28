@@ -10,8 +10,8 @@ function surface() {
 function create() {
   return createGrantNotifier({
     account: () => wx.getStorageSync("session"),
-    read: () => api.request("/api/me/avoidance/notice"),
-    ack: through => api.request("/api/me/avoidance/notice", "POST", { through }),
+    read: () => api.request("/api/me/cards/notice"),
+    ack: through => api.request("/api/me/cards/notice", "POST", { through }),
     canShow() {
       const { host, controller, data } = surface();
       if (!host || !controller?.foreground || !controller.alive || !host.selectComponent?.("#app-dialog")) return false;
@@ -23,7 +23,9 @@ function create() {
     update(value) {
       const { controller, data } = surface();
       if (data.profile?.avoidance) controller.setData({ profile: { ...data.profile, avoidance: { ...data.profile.avoidance, balance: value.balance } } });
-      if (data.room?.me?.avoidance && data.room.me.avoidance.balance !== value.balance) controller.setData({ room: { ...data.room, me: { ...data.room.me, avoidance: { ...data.room.me.avoidance, balance: value.balance } } } });
+      const card = data.room?.me?.avoidance;
+      if (card && value.totalBalance != null && (card.balance !== value.balance || card.totalBalance !== value.totalBalance))
+        controller.setData({ room: { ...data.room, me: { ...data.room.me, avoidance: { ...card, balance: value.balance, totalBalance: value.totalBalance } } } });
     },
     async show(value) {
       const { host, controller } = surface(), shared = host.selectComponent("#app-dialog");

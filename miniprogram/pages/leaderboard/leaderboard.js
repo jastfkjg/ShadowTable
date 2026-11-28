@@ -1,6 +1,7 @@
 const api = require("../../api");
 const { initialPlayerCardData, playerCardMethods } = require("../../player-card");
 const { groups, metrics, presentLeaderboard, isPointsUnavailable } = require("../../leaderboard");
+const picker = require("./picker");
 const rankPresentation = require("../../leaderboard-presentation");
 const { backToMe } = require("../../profile");
 const { boardSelection, queryString, leaderboardShareError } = require("../../share-card");
@@ -8,7 +9,11 @@ Page({
   data: { ...initialPlayerCardData, mineExpanded: false, metricsExpanded: false, rulesExpanded: false, funCategories: rankPresentation.categories, funCategory: "all", pendingFunMetric: "", pendingFunOption: null, filteredFunOptions: [], funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: false, groups, metrics, rateMetrics: metrics.filter(item => ["overall","good","evil"].includes(item.id)), metric: "points", funSelected: false, funAvailable: false, funMode: "all", funSort: "count", funMetrics: [], funOptions: [], pointsAvailable: true, period: "month", loading: true, loadingMore: false, error: "", moreError: false, notice: "", board: null, shareNotice: "", shareOpening: false, visible: false, visibilitySaving: false, visibilityError: "" },
   ...playerCardMethods(api),
   onLoad() { this.alive = true; this.foreground = true; },
-  onShow() { this.foreground = true; return this.collectionReturn ? this.restoreCollectionCard() : this.load(); },
+  onShow() {
+    this.foreground = true;
+    if (this.returnToPicker) { this.returnToPicker = false; return; }
+    return this.collectionReturn ? this.restoreCollectionCard() : this.load();
+  },
   onResize() { this.syncPlayerCardLayout(); if (this.data.metricsExpanded) this.measureFunOptions(this.data.funOptionsScrollTarget); },
   onHide() { this.foreground = false; this.closePlayerCard(); },
   openRankPlayerCard(e) {
@@ -126,41 +131,54 @@ Page({
     if (this.data.metricsExpanded) { this.setData({ metricsExpanded: false }); return; }
     if (this.data.loading || !this.data.funOptions.length) return;
     this.closePlayerCard();
-    const option = this.data.funOptions.find(item => item.key === this.data.metric) || this.data.funOptions[0];
+    const session = picker.create({ options: this.data.funOptions, metric: this.data.metric, assetUrl: api.assetUrl,
+      request: path => api.request(path), update: (view, resetScroll) => {
+        if (this.alive && this.data.metricsExpanded && this.picker === session) this.showPicker(view, resetScroll);
+      } });
+    this.picker = session;
+    this.setData({ metricsExpanded: true, mineExpanded: false, rulesExpanded: false });
+    const view = session.view();
+    this.showPicker(view, true, view.pendingFunMetric);
+  },
+  showPicker(view, resetScroll, scrollKey) {
+    if (!resetScroll) {
+      const { pendingFunMetric, pendingFunOption, pickerAction } = view;
+      this.setData({ pendingFunMetric, pendingFunOption, pickerAction });
+      return;
+    }
     this.funOptionsOffset = 0;
-    this.setData({ metricsExpanded: true, mineExpanded: false, rulesExpanded: false, pendingFunMetric: option.key,
-      pendingFunOption: option, funCategory: "all", filteredFunOptions: this.data.funOptions,
-      funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: true });
-    this.measureFunOptions("fun-option-" + option.key);
+    this.setData({ ...view, funOptionsScrollTop: 0, funOptionsScrollTarget: "",
+      funOptionsCanScroll: view.filteredFunOptions.length > 2 });
+    const key = scrollKey || view.filteredFunOptions[0]?.key;
+    this.measureFunOptions(key ? "fun-option-" + key : "");
   },
-  chooseFunCategory(e) {
-    const category = e.currentTarget.dataset.id;
-    if (!rankPresentation.categories.some(item => item.id === category)) return;
-    this.funOptionsOffset = 0;
-    const filteredFunOptions = rankPresentation.filterFunOptions(this.data.funOptions, category);
-    this.setData({ funCategory: category, filteredFunOptions,
-      funOptionsScrollTop: 0, funOptionsScrollTarget: "", funOptionsCanScroll: true });
-    this.measureFunOptions(filteredFunOptions[0] ? "fun-option-" + filteredFunOptions[0].key : "");
-  },
-  previewFunMetric(e) {
-    const option = this.data.filteredFunOptions.find(item => item.key === e.currentTarget.dataset.id);
-    if (option) this.setData({ pendingFunMetric: option.key, pendingFunOption: option });
-  },
+  choosePickerMode(e) { return this.picker.switchMode(e.currentTarget.dataset.id); },
+  searchPicker(e) { this.picker.search(e.detail.value); },
+  retryPickerBadges() { return this.picker.loadBadges(); },
+  chooseFunCategory(e) { this.picker.category(e.currentTarget.dataset.id); },
+  previewFunMetric(e) { this.picker.select(e.currentTarget.dataset.id); },
   confirmFunMetric() {
-    if (this.data.loading || !this.data.metricsExpanded) return;
-    return this.chooseFunMetric({ currentTarget: { dataset: { id: this.data.pendingFunMetric } } });
+    const { metricsExpanded, pendingFunMetric, pickerMode, loading } = this.data;
+    if (loading || !metricsExpanded || !pendingFunMetric) return;
+    if (pickerMode === "badges") {
+      if (this.returnToPicker) return;
+      this.returnToPicker = true;
+      return wx.navigateTo({ url: "/pages/badges/ranks?kind=lookup&badge=" + encodeURIComponent(pendingFunMetric),
+        fail: () => { this.returnToPicker = false; wx.showToast({ title: "徽章榜暂时无法打开", icon: "none" }); } });
+    }
+    return this.chooseFunMetric({ currentTarget: { dataset: { id: pendingFunMetric } } });
   },
   measureFunOptions(scrollTarget) {
     if (!wx.createSelectorQuery) return;
-    const category = this.data.funCategory;
+    const revision = this.pickerMeasure = (this.pickerMeasure || 0) + 1;
     const measure = () => {
-      if (!this.alive || !this.data.metricsExpanded || this.data.funCategory !== category) return;
+      if (!this.alive || !this.data.metricsExpanded || this.pickerMeasure !== revision) return;
       this.setData({ funOptionsScrollTarget: scrollTarget });
       wx.createSelectorQuery().in(this)
       .select(".fun-metric-options").boundingClientRect()
       .select(".fun-options-content").boundingClientRect()
       .exec(rects => {
-        if (!this.alive || !this.data.metricsExpanded || this.data.funCategory !== category || !rects[0] || !rects[1]) return;
+        if (!this.alive || !this.data.metricsExpanded || this.pickerMeasure !== revision || !rects[0] || !rects[1]) return;
         this.funOptionsHeight = rects[0].height;
         this.updateFunOptionsHint(rects[1].height);
       });

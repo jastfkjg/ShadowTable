@@ -40,6 +40,8 @@
     <script src="/room-confirmation.js" defer></script>
     <script src="/about.js" defer></script>
     <script src="/badges.js" defer></script>
+    <script src="/rank-picker.js" defer></script>
+    <link rel="stylesheet" href="/rank-picker.css" />
     <script src="/badge-ranks.js" defer></script>
     <script src="/badge-rank-view.js" defer></script>
     <link rel="stylesheet" href="/player-badges.css" />
@@ -74,6 +76,7 @@
         <div id="modal-room-context" class="dialog-room-context" hidden><img src="/assets/home-table-blue.svg" alt="" /><span>房间</span><span id="modal-room-code" class="dialog-room-code"></span><span id="modal-room-status" class="dialog-room-status"></span></div>
         <div class="dialog-grant-context" id="modal-grant-context" hidden><span>本次获得</span><span class="dialog-grant-amount" id="modal-grant-amount"></span></div>
         <div class="dialog-message" id="modal-message"></div>
+        <input id="modal-password" class="input" type="password" aria-label="房间设置密码" autocomplete="off" maxlength="128" required hidden />
         <div class="dialog-actions">
           <button type="button" class="secondary" id="modal-cancel">取消</button>
           <button type="button" class="primary" id="modal-ok">确定</button>

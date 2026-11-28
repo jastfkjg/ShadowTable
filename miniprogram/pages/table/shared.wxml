@@ -428,6 +428,14 @@
             <button wx:if="{{resultStep==='target'}}" class="secondary score-empty-target {{resultTarget===0?'is-selected':''}}" bindtap="pickScoreTarget" data-seat="0" aria-pressed="{{resultTarget===0}}" hover-class="none">空刀</button>
           </view>
         </block>
+        <block wx:if="{{resultStep==='board'}}">
+          <view wx:for="{{resultBoardFields}}" wx:for-item="field" wx:key="id" class="score-board-field">
+            <view class="score-section-title">{{field.label}}</view>
+            <view class="score-reasons">
+              <button wx:for="{{field.options}}" wx:key="value" class="secondary score-choice {{item.value===field.selected.value?'is-selected':''}}" bindtap="pickBoardChoice" data-field="{{field.id}}" data-value="{{item.value}}" aria-pressed="{{item.value===field.selected.value}}" hover-class="none"><view class="score-choice-mark" aria-hidden="true"></view><text class="score-choice-title">{{item.label}}</text></button>
+            </view>
+          </view>
+        </block>
         <block wx:if="{{resultStep==='review'}}">
           <view class="result-review"><view wx:for="{{resultSummary}}" wx:key="label" class="result-review-row"><text class="small muted">{{item.label}}</text><text>{{item.value}}</text></view></view>
           <view class="result-review-note">{{resultNotice}}</view>
@@ -578,7 +586,7 @@
     </block>
     <view wx:if="{{room.phase!=='lobby'}}" class="table-dynamics {{room.result && !questReveal ? 'is-final '+(room.result.winner==='good'?'result-good':room.result.winner==='evil'?'result-evil':'result-neutral') : questTickets || room.phase==='tools' || room.phase==='questResult' || room.phase==='ended'?(latestResult.voteGroups?'result-first vote-result-panel':'result-first'):'operation-first'}}">
       <template wx:if="{{!room.result || questTickets}}" is="tableResult" data="{{room, latestResult, questReveal, questTickets, shown:questReveal?questReveal.revealed:questTickets.cards.length}}" />
-      <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, honorPendingExpanded, network, hasPendingRequest, busy, winnerLabel:room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':''}}" />
+      <template wx:if="{{room.result && !questReveal}}" is="tableFinalResult" data="{{room, honors, honorPendingExpanded, network, hasPendingRequest, busy, winnerLabel:room.winnerLabel || (room.result.winner==='good'?'好人获胜':room.result.winner==='evil'?'坏人获胜':room.result.winner==='third'?'盗贼阵营获胜':'')}}" />
       <template wx:if="{{!room.result}}" is="tablePhase" data="{{room, teamText, actionEntryLabel, hasPendingRequest, busy, actionLoading, actionDialog, network}}" />
     </view>
     <view wx:if="{{!room.result && room.recordNotice}}" class="small muted">{{room.recordNotice}}</view>
@@ -681,7 +689,13 @@
     <block wx:if="{{room.phase==='lobby'}}">
       <view class="lobby-action-bar">
         <view class="lobby-action-inner">
-          <button wx:if="{{room.me.seat!==null && room.me.avoidance}}" class="avoidance-entry" bindtap="openAvoidance" disabled="{{busy || hasPendingRequest || !network}}" hover-class="none" aria-label="{{'回避卡'+room.me.avoidance.balance+'张，'+(room.me.avoidance.selected?'本局已选择角色':'选择本局回避角色')}}"><view class="avoidance-entry-line"><image src="/assets/table-cards.svg" aria-hidden="true" /><text>×{{room.me.avoidance.balance}}</text></view><text class="avoidance-entry-state">{{room.me.avoidance.selected?'已选择':'回避卡'}}</text></button>
+          <button wx:if="{{room.me.seat!==null && room.me.avoidance}}" class="avoidance-entry" bindtap="openAvoidance" disabled="{{busy || hasPendingRequest || !network}}" hover-class="none" aria-label="{{'用卡'+(room.me.avoidance.totalBalance!=null?'，共 '+room.me.avoidance.totalBalance+' 张':'，张数待同步')+(room.me.avoidance.selected?'，本局已选':'')}}">
+            <view class="avoidance-entry-line">
+              <image src="/assets/table-cards.svg" aria-hidden="true" />
+              <text>{{room.me.avoidance.totalBalance!=null?'×'+room.me.avoidance.totalBalance:'…'}}</text>
+            </view>
+            <text class="avoidance-entry-state">{{room.me.avoidance.selected?'✓ 已选':'用卡'}}</text>
+          </button>
           <button wx:if="{{room.me.seat!==null}}" hover-class="none" class="{{room.me.ready?'secondary lobby-cancel':'primary lobby-ready-button'}}" bindtap="ready" disabled="{{hasPendingRequest || busy || !network}}" loading="{{busy && busyAction==='ready'}}">{{room.me.ready?'取消准备':'准备'}}</button>
           <text wx:else class="lobby-spectator-hint">{{seatOccupiedCount < room.capacity?'选择空位入座':'座位已满，正在围观'}}</text>
           <button hover-class="none" wx:if="{{room.me.isHost}}" class="{{canStart?'primary is-startable':'secondary'}} lobby-start" bindtap="start" disabled="{{hasPendingRequest || busy || !network || !canStart}}" aria-label="{{canStart?'发放身份':'发放身份，'+startHint}}">发放身份</button>

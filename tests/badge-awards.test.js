@@ -57,7 +57,7 @@ test('升级前已回复的反馈仍可采纳，重启和跨月保留徽章与�
   assert.equal(feedback.accept(store, id).awarded, false);
   assert.equal(awards.notice(store, uid).notice, null);
 });
-test('北京时间月初冻结上月公开积分前三，含并列，每月单独获得并可佩戴', () => {
+test('北京时间月初冻结上月公开积分名次，含并列，每月单独获得并可佩戴', () => {
   let now = DECEMBER - 1;
   const store = new Store(':memory:', { clock: () => now });
   try {
@@ -83,14 +83,15 @@ test('北京时间月初冻结上月公开积分前三，含并列，每月单�
     assert.equal(presentation.present(notice).eyebrow, '2026年11月 · 积分月榜');
     assert.equal(presentation.present(notice).title, '月榜荣誉已送达');
     assert.deepEqual(players.slice(1).map(uid => ids(store, uid)),
-      [['monthly_points_2026-11_2'], ['monthly_points_2026-11_3'], ['monthly_points_2026-11_3'], [], []]);
+      [['monthly_points_2026-11_2'], ['monthly_points_2026-11_3'], ['monthly_points_2026-11_3'], ['monthly_points_2026-11_4-12'], []]);
     awards.acknowledge(store, 'wx:gold', { through: notice.through });
     assert.equal(awards.notice(store, 'wx:gold').notice, null);
     game(store, 'wx:fourth', { points: 100, endedAt: DECEMBER - 1 });
     game(store, 'wx:gold', { points: 99 });
     hidden(store, 'wx:silver');
     assert.deepEqual(ids(store, 'wx:silver'), ['monthly_points_2026-11_2']);
-    assert.deepEqual(ids(store, 'wx:fourth'), []);
+    assert.equal(awards.notice(store, 'wx:fourth').notice.badges[0].rank, 5);
+    assert.deepEqual(ids(store, 'wx:fourth'), ['monthly_points_2026-11_4-12']);
 
     now = Date.parse('2027-02-02T12:00:00+08:00');
     assert.equal(awards.notice(store, 'wx:gold').notice.badges[0].id, 'monthly_points_2026-12_1');
@@ -105,6 +106,47 @@ test('北京时间月初冻结上月公开积分前三，含并列，每月单�
     }));
     assert.equal(saved.badges.find(b => b.id === badge.id).equipped, !old.equipped);
   } finally { store.close(); }
+});
+
+test('第4至12名每月共获同一枚趣味徽章，并列第12名全部计入，跨年按榜单月份独立收藏', t => {
+  let now = DECEMBER - 1;
+  const store = new Store(':memory:', { clock: () => now });
+  t.after(() => store.close());
+  const uid = i => 'wx:seat-' + i;
+  function playMonth() {
+    for (let i = 1; i <= 14; i++) game(store, uid(i), { points: 30 - (i === 13 ? 12 : i) });
+  }
+  const november = 'monthly_points_2026-11_4-12';
+  playMonth();
+  assert.equal(awards.notice(store, uid(4)).notice, null);
+  now = DECEMBER;
+  awards.settleMonthly(store);
+  const lookup = require('../server/badge-lookup').read;
+  assert.ok(lookup(store, null, new URLSearchParams(), now).ids.includes(november));
+  assert.deepEqual(lookup(store, november, new URLSearchParams(), now).rows.map(b => b.rank), [4,5,6,7,8,9,10,11,12,12]);
+  for (const [player, rank] of [[4,4],[12,12],[13,12]]) {
+    const notice = awards.notice(store, uid(player)).notice;
+    assert.equal(notice.badges.length, 1);
+    const badge = notice.badges[0];
+    assert.deepEqual([badge.id, badge.title, badge.category, badge.rank, badge.grantedAt],
+      [november, '圆桌有席', '趣味徽章', rank, DECEMBER]);
+    assert.equal(presentation.present(notice).hero.displayReason, '2026年11月积分月榜第' + rank + '名');
+    assert.equal(store.badgeRanks.list(uid(player), 'fun', new URLSearchParams()).me.count, 1);
+  }
+  assert.deepEqual(ids(store, uid(14)), []);
+  playMonth();
+  now = Date.parse('2027-01-01T00:00:00+08:00');
+  awards.settleMonthly(store);
+  awards.settleMonthly(store);
+  const state = readBadges(store, uid(4));
+  const fun = require('../miniprogram/badges').presentCollection(state, 'owned', undefined, '趣味徽章');
+  assert.deepEqual(fun.visibleBadges.map(b => [b.id,b.rank,b.permanent]),
+    [['monthly_points_2026-12_4-12',4,true],[november,4,true]]);
+  const saved = store.transaction(() => saveBadge(store, uid(4), {
+    id: november, equipped: false, version: state.version, periodStart: state.periodStart,
+  }));
+  assert.equal(saved.badges.find(b => b.id === november).equipped, false);
+  assert.equal(saved.badges.find(b => b.id === 'monthly_points_2026-12_4-12').equipped, true);
 });
 
 test('定时结算在北京时间月初发奖，无需先有人登录', t => {
@@ -137,7 +179,9 @@ test('首月徽章使用同源 PNG，调整年月只改变飘带内的日期', a
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const url = '/assets/badges/monthly-points/2026-11/1.png';
+  const cupUrl = url.replace('/1.png', '/4-12.png');
   assert.notEqual((await request(url)).status, 200);
+  assert.notEqual((await request(cupUrl)).status, 200);
   const noticePath = '/api/me/badges/notice';
   assert.equal((await (await request(noticePath)).json()).notice, null);
   now++;
@@ -147,6 +191,9 @@ test('首月徽章使用同源 PNG，调整年月只改变飘带内的日期', a
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/png');
   const november = Buffer.from(await res.arrayBuffer());
+  const cup = await request(cupUrl);
+  assert.equal(cup.headers.get('content-type'), 'image/png');
+  const cupNovember = Buffer.from(await cup.arrayBuffer());
   assert.equal((await request(noticePath, { through: notice.through })).status, 200);
   assert.equal((await (await request(noticePath)).json()).notice, null);
   now = Date.parse('2027-01-01T00:00:00+08:00');
@@ -156,6 +203,17 @@ test('首月徽章使用同源 PNG，调整年月只改变飘带内的日期', a
   assert.notDeepEqual(november, december);
   assert.deepEqual(await sharp(november).extract(region).raw().toBuffer(),
     await sharp(december).extract(region).raw().toBuffer());
+  const cupDecember = Buffer.from(await (await request(cupUrl.replace('2026-11', '2026-12'))).arrayBuffer());
+  const pixels = buf => sharp(buf).ensureAlpha().raw().toBuffer();
+  const first = await pixels(cupNovember), second = await pixels(cupDecember);
+  let changed = 0;
+  for (let pos = 0; pos < first.length; pos += 4) {
+    if (first.readUInt32BE(pos) === second.readUInt32BE(pos)) continue;
+    const x = (pos / 4) % 512, y = Math.floor(pos / 4 / 512);
+    assert.ok(x >= 188 && x <= 324 && y >= 420 && y < 462);
+    changed++;
+  }
+  assert.ok(changed > 0);
 });
 
 test('发布冻结公开积分前三，含并列；后续得分、隐藏及重启不会重新评奖', () => {

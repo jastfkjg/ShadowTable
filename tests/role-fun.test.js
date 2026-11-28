@@ -14,6 +14,7 @@ const metric = (room, player, id) => publicView(room, player.uid).myFun.metrics.
 
 function deal(board, capacity) {
   const room = newRoom("123456", "wx:1", "房主", board, capacity);
+  room.badgeEnabled = true;
   for (let i = 2; i <= capacity; i++) enter(room, `wx:${i}`, `玩家${i}`);
   room.players.forEach(player => player.ready = true);
   run(room, "start", { flexible: true });

@@ -194,6 +194,15 @@ function createAdmin({ store, origin, key, body, limit }) {
     }
     const session = authenticate(req, res);
     limit("admin:" + session.hash, 600);
+    if (path === "/api/admin/room-password" && req.method === "POST") {
+      const { password } = await body(req);
+      store.transaction(() => {
+        require("../room-password").set(store, password);
+        audit("set-room-password");
+      });
+      send(200, { ok: true });
+      return true;
+    }
     if (path === "/api/admin/feedback" && req.method === "GET") {
       send(200, playerFeedback.list(store, null, new URL(req.url, origin).searchParams));
       return true;
@@ -314,6 +323,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         const saved=JSON.parse(row.snapshot);
         return {id:row.id,boardName:saved.boardName,endedAt:saved.endedAt,winner:saved.winner,revision:saved.scoreRevision || 0,
           correctionKind:saved.scorePolicy && !saved.scoreEligibilityReason ? "score" : "fun", needsActor:fun.modeFor(saved.board)==="knights" && !!saved.funFacts,
+          boardChoices:saved.scoringFacts?.choices,
           options:saved.scorePolicy && !saved.scoreEligibilityReason ? scoring.optionsFor(saved.board, saved.scorePolicy) : saved.funFacts && saved.excludedReason!=="对局终止" ? fun.settlementOptions(saved.board) : [],
           players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name,alive:player.alive ?? true};})};
       });
@@ -346,20 +356,24 @@ function createAdmin({ store, origin, key, body, limit }) {
       fail(/^(0|[1-9]\d{0,6})$/.test(offset),"页码无效");
       send(200,store.searchScorePlayers(search,Number(offset)));return true;
     }
-    if (path === "/api/admin/avoidance" && req.method === "GET") {
+    const cardManagement = path === "/api/admin/cards" || path === "/api/admin/avoidance";
+    if (cardManagement && req.method === "GET") {
       const query = new URL(req.url, origin).searchParams;
       send(200, require("../avoidance").players(store, (query.get("q") || "").trim(), Number(query.get("offset") || 0))); return true;
     }
-    if (path === "/api/admin/avoidance" && req.method === "POST") {
+    if (cardManagement && req.method === "POST") {
       const input = await body(req);
       fail(typeof input.requestId === "string" && /^[a-f0-9-]{36}$/.test(input.requestId), "缺少合法请求编号");
+      if (path === "/api/admin/cards") fail(input.cardType !== undefined, "请选择卡片类型");
+      else fail(input.cardType === undefined || input.cardType === "avoidance", "此入口仅支持回避卡");
       const actor = "admin:avoidance", fingerprint = digest(JSON.stringify([path, input])).toString("hex");
       const result = store.transaction(() => {
         const cached = store.receipt(actor, input.requestId);
         if (cached) { fail(cached.fingerprint === fingerprint, "请求编号已用于其他操作", 409); return JSON.parse(cached.result); }
         const result = require("../avoidance").grant(store, input);
+        const faction = result.cardType === "faction";
         store.db.prepare("INSERT INTO admin_audit(action,code,reason,created,details) VALUES(?,?,?,?,?)")
-          .run("grant-avoidance", "", (input.reason || "").trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: "发放回避卡" }));
+          .run(faction ? "grant-faction" : "grant-avoidance", "", (input.reason || "").trim(), store.clock(), JSON.stringify({ ...result, scope: input.scope, uid: input.scope === "player" ? input.uid : null, administrator: session.hash, label: faction ? "发放阵营卡" : "发放回避卡" }));
         store.addReceipt(actor, input.requestId, fingerprint, result); return result;
       });
       send(200, result); return true;

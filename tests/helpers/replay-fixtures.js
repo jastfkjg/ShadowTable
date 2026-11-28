@@ -7,6 +7,7 @@ const metadata = { ...variants.roles, merlin: [roleName("merlin"), "good"], perc
 function run(room, type, extra = {}, uid = room.host) { command(room, uid, { type, stage: room.stage, ...extra }); }
 function setup({ code = "123456", names = ["岚", "小鹿", "阿川", "白石", "子龙", "七月", "安", "可乐", "林", "海", "月北", "南风"] } = {}) {
   const room = newRoom(code, "wx:replay-1", names[0], "knights", 12);
+  room.scoreEnabled = true;
   for (let i = 2; i <= 12; i++) enter(room, "wx:replay-" + i, names[i - 1]);
   enter(room, "spectator", "围观");
   room.players.forEach(p => p.ready = true);

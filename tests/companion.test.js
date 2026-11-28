@@ -172,7 +172,8 @@ test("陪测账号经HTTP完成任务和刺杀，不替真人提交", async () =
         ...extra,
       });
     assert.equal((await view()).me.ready, false);
-    await command("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true });
+    require("../server/room-password").set(a.app.store, "test-password");
+    await command("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true, settingsPassword: "test-password" });
     await panel.refresh();
     await panel.batch("ready");
     await command("ready", { ready: true });

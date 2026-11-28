@@ -9,7 +9,8 @@ const { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats } = requi
 const { Leaderboard } = require("./leaderboard");
 const { MonthlyReport } = require("./monthly-report");
 const { readMonthlyReset, acknowledgeMonthlyReset } = require("./monthly-reset");
-const { publicRules: scoreRules } = require("./scoring");
+const roomPassword = require("./room-password");
+const { enabled: scoringEnabled, publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const honors = require("./honors");
 const avoidance = require("./avoidance");
@@ -299,7 +300,7 @@ function createApp({
         const ownDataRead = req.method === "GET" && ([
           "/api/me/profile", "/api/me/stats", "/api/me/matches",
           "/api/me/score-adjustments", "/api/me/score-ledger", "/api/me/rooms", "/api/leaderboard", "/api/monthly-report", "/api/me/avoidance",
-        ].includes(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
+        ].includes(path) || /^\/api\/leaderboard\/badges(?:\/[a-z0-9_-]+)?$/.test(path) || /^\/api\/me\/matches\/[^/]+$/.test(path));
         const ownProfileWrite = req.method === "POST" && [
           "/api/me/profile", "/api/me/leaderboard-visibility",
         ].includes(path);
@@ -332,8 +333,11 @@ function createApp({
         return send(200, recordShares.create(store, uid, await body(req)));
       }
       if (req.method === "GET" && path === "/api/me/avoidance") return send(200, avoidance.wallet(store, uid));
-      if (req.method === "GET" && path === "/api/me/avoidance/notice") return send(200, avoidance.grantNotice(store, uid));
-      if (req.method === "POST" && path === "/api/me/avoidance/notice") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req)));
+      if (path === "/api/me/avoidance/notice" || path === "/api/me/cards/notice") {
+        const includeFaction = path === "/api/me/cards/notice";
+        if (req.method === "GET") return send(200, avoidance.grantNotice(store, uid, includeFaction));
+        if (req.method === "POST") return send(200, avoidance.acknowledgeGrant(store, uid, await body(req), includeFaction));
+      }
       if (path === "/api/me/feedback") {
         if (req.method === "GET") return send(200, playerFeedback.list(store, uid, requestUrl.searchParams));
         check(req.method === "POST", "接口不存在", 404);
@@ -353,6 +357,11 @@ function createApp({
       }
       const uploadStatus = path.match(/^\/api\/me\/avatar-uploads\/([a-f0-9-]{36})$/);
       if (req.method === "GET" && uploadStatus) return send(200, require("./avatar-uploads").readUpload(store, uid, uploadStatus[1]));
+      const lookup = path.match(/^\/api\/leaderboard\/badges(?:\/([a-z0-9_-]+))?$/);
+      if (req.method === 'GET' && lookup) {
+        res.setHeader('Cache-Control', 'no-store');
+        return send(200, require('./badge-lookup').read(store, lookup[1], requestUrl.searchParams, clock()));
+      }
       const badgeRank = path.match(/^\/api\/badge-ranks\/(honor|fun)(?:\/(self|[0-9a-f]{32}))?$/);
       if (badgeRank) {
         const [, kind, player] = badgeRank;
@@ -528,10 +537,14 @@ function createApp({
         }
         if (match[2] === "avoidance") return send(200, avoidance.roomView(store, room, uid));
         check(!match[2] || match[2] === "private", "接口不存在", 404);
-        if (match[2] === "private") return send(200, { ...privateView(room, uid), avoidance: avoidance.resultView(store, room, uid) });
+        if (match[2] === "private") {
+          const identity = privateView(room, uid);
+          const result = avoidance.resultView(store, room, uid);
+          return send(200, { ...identity, avoidance: result?.faction ? null : result, ...(result?.faction ? { factionCard: result } : {}) });
+        }
         // Authorize and build the existing allowlisted view before enriching presentation.
         const view = publicView(room, uid);
-        view.me.avoidance = { balance: avoidance.balance(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
+        view.me.avoidance = { ...avoidance.entryBalances(store, uid), selected: room.phase === "lobby" && !!room.avoidanceChoices?.[uid] };
         view.honors = honors.view(store, room, uid);
         const avatars = readAvatarUrls(store, room.players.map(p => p.uid));
         const avatarBySeat = new Map(room.players.map(p => [p.seat, avatars.get(p.uid) || null]));
@@ -549,7 +562,7 @@ function createApp({
         "接口不存在",
         404,
       );
-      const b = await body(req, path === "/api/me/rooms/cleanup" ? 65536 : 8192),
+      const { settingsPassword, ...b } = await body(req, path === "/api/me/rooms/cleanup" ? 65536 : 8192),
         id = req.headers["idempotency-key"];
       check(
         typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id),
@@ -657,12 +670,22 @@ function createApp({
             room = store.get(room.code);
           } else {
             if (b.type === "rematch") { honors.closeForRoom(store, room); room = store.get(room.code); }
-            if (b.type === "avoidance" && b.role !== null && room.phase === "lobby") check(avoidance.balance(store, uid) > 0, "暂无回避卡");
+            if (b.type === "avoidance" && b.role !== null && room.phase === "lobby")
+              check(avoidance.balance(store, uid, b.faction !== undefined) > 0, b.faction !== undefined ? "暂无阵营卡" : "暂无回避卡");
             if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
+            if (b.type === "updateSettings" && (
+              room.badgeEnabled && !auditBefore.badgeEnabled ||
+              room.scoreEnabled && (!scoringEnabled(auditBefore) || room.board !== auditBefore.board || room.capacity !== auditBefore.capacity)
+            )) {
+              limit("room-password:" + uid, 12);
+              roomPassword.verify(store, settingsPassword);
+            }
             if (b.type === "start") {
               avoidance.settle(store, room);
               avoidanceRewards.registerStart(store, room);
+            } else if (["finishTools", "closeOffline"].includes(b.type) && room.phase === "ended" && room.result.winner === null) {
+              avoidance.refundUnrecordedMatch(store, room);
             }
           }
           if (!details) details = actionDetails(room, uid, match[2], b);

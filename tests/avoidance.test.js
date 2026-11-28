@@ -157,8 +157,80 @@ test("全员回避梅林只失败1人，成功才扣，重复发牌不多扣，�
   assert.equal((await a.cmd(path, tokens[0], "start")).status, 400);
   await a.cmd(path, tokens[0], "terminate");
   assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='spend'").get().n, 5);
+  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='refund'").get().n, 0);
   await a.cmd(path, tokens[0], "rematch");
   for (const token of tokens) assert.equal((await a.request(path + "/avoidance", token)).data.selected, null);
+});
+test("房主不计战绩结算只退本局实际扣卡，并与归档和结束回执一起提交", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens), code = path.split("/").pop();
+  const db = a.store.db, host = tokens[0];
+  const balances = () => db.prepare("SELECT uid,balance,faction_balance FROM avoidance_accounts ORDER BY uid").all();
+  const refunds = () => db.prepare("SELECT source,match_id,delta FROM avoidance_ledger WHERE source IN ('refund','faction_refund') ORDER BY source").all();
+  const act = async (token, type, fields) => assert.equal((await a.cmd(path, token, type, fields)).status, 200);
+  a.store.transaction(() => avoidance.grant(a.store, { cardType: "faction", scope: "all", expectedCount: 6, amount: 1 }));
+
+  // A recorded game on the same table has its own debit, even when scoring is off.
+  await act(tokens[4], "avoidance", { role: "merlin" });
+  await a.ready(path, tokens); await act(host, "start", { flexible: true });
+  await act(host, "finishTools", { winner: "good" });
+  assert.equal((await a.request(path + "/avoidance", tokens[4])).data.balance, 0);
+  assert.equal(refunds().length, 0);
+  await act(host, "rematch");
+  for (const token of tokens.slice(0, 3)) await act(token, "avoidance", { faction: "evil" });
+  await act(tokens[3], "avoidance", { role: "merlin" });
+  const original = balances();
+  await a.ready(path, tokens); await act(host, "start", { flexible: true });
+  const running = a.store.get(code), rolePlayer = running.players.find(p => p.seat === 4).uid;
+  assert.equal(Object.values(running.avoidanceResults).filter(r => r.status === "effective").length, 3);
+  // A concurrent gift stays in this player's wallet after the debit is reversed.
+  a.store.transaction(() => avoidance.grant(a.store, { scope: "player", uid: rolePlayer, amount: 2 }));
+  original.find(p => p.uid === rolePlayer).balance += 2;
+  const beforeEnd = balances(), body = { type: "finishTools", winner: null, replace: true, stage: running.stage }, id = randomUUID();
+  assert.equal((await a.request(path + "/commands", tokens[1], body)).status, 403);
+  const save = a.store.save;
+  try {
+    a.store.save = () => { throw Error("模拟归档失败"); };
+    assert.equal((await a.request(path + "/commands", host, body, id)).status, 500);
+  } finally { a.store.save = save; }
+  assert.equal(a.store.get(code).stage, running.stage);
+  assert.deepEqual(balances(), beforeEnd); assert.equal(refunds().length, 0);
+
+  const finish = () => a.request(path + "/commands", host, body, id);
+  for (const res of await Promise.all([finish(), finish()])) assert.equal(res.status, 200);
+  const ended = a.store.get(code);
+  assert.equal(ended.phase, "ended"); assert.equal(ended.matchRecord.winner, null);
+  a.store.transaction(() => avoidance.refundUnrecordedMatch(a.store, ended));
+  assert.deepEqual(balances(), original);
+  assert.deepEqual(refunds().map(r => r.source), ["faction_refund", "faction_refund", "refund"]);
+  assert.ok(refunds().every(r => r.match_id === running.matchId && r.delta === 1));
+  for (const token of tokens) {
+    const secret = (await a.request(path + "/private", token)).data;
+    const card = secret.factionCard || secret.avoidance;
+    if (card) assert.equal(!!card.refunded, card.status === "effective");
+    const wallet = (await a.request("/api/me/avoidance", token)).data;
+    assert.ok(wallet.history.every(row => row.source !== "faction_refund"));
+  }
+  await act(host, "rematch");
+  assert.deepEqual(balances(), original);
+});
+test("旧版线下结算同样按最终结果退卡，仅完成线下操作并继续游戏时仍保留扣卡", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens), host = tokens[0];
+  assert.equal((await a.cmd(path, host, "configure", { board: "shadow-assist", capacity: 12 })).status, 200);
+  for (let i = 6; i < 12; i++) {
+    tokens.push(await a.login("offline" + i));
+    assert.equal((await a.request(path + "/join", tokens[i], { name: "玩家" + i })).status, 200);
+  }
+  for (const keepPlaying of [false, true]) {
+    assert.equal((await a.cmd(path, host, "avoidance", { role: "merlin" })).status, 200);
+    await a.ready(path, tokens);
+    assert.equal((await a.cmd(path, host, "start")).status, 200);
+    assert.equal((await a.cmd(path, host, "offline")).status, 200);
+    assert.equal((await a.cmd(path, host, "closeOffline", { winner: null, keepPlaying })).status, 200);
+    const view = (await a.request(path, host)).data;
+    assert.equal(view.phase, keepPlaying ? "tools" : "ended");
+    assert.equal(view.me.avoidance.balance, keepPlaying ? 0 : 1);
+    if (!keepPlaying) assert.equal((await a.cmd(path, host, "rematch")).status, 200);
+  }
 });
 test("另一房间先耗尽余额时不重复扣卡，本房间发牌成功并私密说明未生效", async t => {
   const a = await setup(t), tokens = await tokensFor(a), first = await a.room(tokens), second = await a.room(tokens);
@@ -206,6 +278,54 @@ test("管理员定向及全员发放有权限校验、人数确认、审计与�
   assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action='grant-avoidance'").get().n, 2);
   const raw = (await a.request("/api/me/avoidance", tokens[0])).data;
   assert.ok(raw.history.some(h => h.note === "全员福利"));
+});
+test("卡片管理支持两卡分别定向或全员发放，按卡种记录余额、通知和审计", async t => {
+  const a = await setup(t);
+  const one = await a.login("card-one"), two = await a.login("card-two");
+  const uid = "wx:" + createHash("sha256").update("card-one").digest("hex");
+  a.store.addSession("test-session", "test:room:actor");
+  const admin = data => a.request("/api/admin/cards", null, data, undefined, true);
+  const input = { scope: "player", uid, amount: 2, reason: "指定赠卡", requestId: randomUUID() };
+  assert.equal((await admin({ ...input, cardType: "faction" })).status, 401);
+  await a.adminLogin();
+  for (const cardType of [undefined, null, "other"]) assert.equal((await admin({ ...input, cardType })).status, 400);
+  const all = { scope: "all", amount: 1, reason: "全员赠卡", expectedCount: 2 };
+  assert.equal((await admin({ ...all, cardType: "faction", expectedCount: 3, requestId: randomUUID() })).status, 409);
+  for (const cardType of ["faction", "avoidance"]) {
+    for (const fields of [input, all]) {
+      const data = { ...fields, cardType, requestId: randomUUID() };
+      const first = await admin(data);
+      assert.equal(first.status, 200);
+      assert.equal(first.data.cardType, cardType);
+      assert.equal(first.data.recipients, fields.scope === "all" ? 2 : 1);
+      assert.deepEqual((await admin(data)).data, first.data);
+      assert.equal((await admin({ ...data, cardType: cardType === "faction" ? "avoidance" : "faction" })).status, 409);
+    }
+    const players = (await admin()).data.players;
+    assert.equal(players.length, 2);
+    for (const p of players) {
+      const expected = p.uid === uid ? 3 : 1;
+      assert.equal(p.factionBalance, expected);
+      assert.equal(p.balance, cardType === "avoidance" ? expected : 0);
+    }
+  }
+  assert.deepEqual(avoidance.entryBalances(a.store, "test:room:actor"), { balance: 0, totalBalance: 0 });
+  const audits = a.store.db.prepare("SELECT action,details FROM admin_audit WHERE action LIKE 'grant-%' ORDER BY id").all();
+  assert.deepEqual(audits.map(row => [row.action, JSON.parse(row.details).scope]), [
+    ["grant-faction", "player"], ["grant-faction", "all"], ["grant-avoidance", "player"], ["grant-avoidance", "all"],
+  ]);
+  const notice = "/api/me/cards/notice", legacy = "/api/me/avoidance/notice";
+  assert.equal((await a.request(notice, two)).data.notice.factionAmount, 1);
+  const received = (await a.request(notice, one)).data;
+  assert.equal(received.totalBalance, 6); assert.equal(received.notice.amount, 6); assert.equal(received.notice.factionAmount, 3);
+  const wallet = (await a.request("/api/me/avoidance", one)).data;
+  assert.equal(wallet.balance, 3); assert.equal(wallet.history.length, 2); assert.equal(wallet.notice.amount, 3);
+  assert.equal((await a.request(legacy, one, { through: wallet.notice.through })).status, 200);
+  const remaining = (await a.request(notice, one)).data.notice;
+  assert.equal(remaining.amount, 3); assert.equal(remaining.factionAmount, 3);
+  assert.deepEqual(remaining.reasons, ["指定赠卡", "全员赠卡"]);
+  assert.equal((await a.request(notice, one, { through: remaining.through })).status, 200);
+  assert.equal((await a.request(notice, one)).data.notice, null);
 });
 test("发放原因可省略、留空或仅空格，仍保留流水、审计和幂等保护", async t => {
   const a = await setup(t), token = await a.login("optional-reason"); await a.adminLogin();
@@ -301,4 +421,71 @@ test("站起、移出和修改板子清除回避；所有板子仅提供初始�
   const cmd = (type, extra) => engine.command(room, "wx:host", { stage: room.stage, type, ...extra });
   cmd("avoidance", { role: "merlin" }); cmd("stand"); assert.equal(room.avoidanceChoices["wx:host"], undefined);
   cmd("seat", { seat: 1 }); cmd("avoidance", { role: "merlin" }); cmd("configure", { board: "classic", capacity: 5 }); assert.equal(room.avoidanceChoices, undefined);
+});
+
+test("阵营请求与回避共用一个选择：验证余额和板子、并发用卡、隐私及仅成功扣卡", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens);
+  const options = async token => (await a.request(path + "/avoidance", token)).data;
+  const initial = await options(tokens[0]);
+  assert.equal(initial.factionBalance, 0);
+  assert.equal((await a.cmd(path, tokens[0], "avoidance", { faction: "evil" })).status, 400);
+  a.store.db.exec("UPDATE avoidance_accounts SET faction_balance=1");
+  const outsiderView = (await a.request(path, tokens[5])).data;
+  assert.deepEqual(outsiderView.me.avoidance, { balance: 1, totalBalance: 2, selected: false });
+  assert.equal((await a.request("/api/me/cards/notice", tokens[5])).data.totalBalance, 2);
+  for (const token of tokens.slice(0, 3)) {
+    await a.cmd(path, token, "avoidance", { role: "merlin" });
+    assert.equal((await a.cmd(path, token, "avoidance", { faction: "third" })).status, 400);
+    assert.equal((await options(token)).selected, "merlin");
+    assert.equal((await a.cmd(path, token, "avoidance", { role: "assassin", faction: "evil" })).status, 400);
+    assert.equal((await a.cmd(path, token, "avoidance", { faction: "evil" })).status, 200);
+    const saved = await options(token);
+    assert.equal(saved.selected, null); assert.equal(saved.selectedFaction, "evil");
+    assert.deepEqual((await a.request(path, token)).data.me.avoidance, { balance: 1, totalBalance: 2, selected: true });
+  }
+  await a.cmd(path, tokens[3], "avoidance", { faction: "good" });
+  await a.cmd(path, tokens[3], "avoidance", { role: "merlin" });
+  assert.equal((await options(tokens[3])).selectedFaction, null);
+  await a.cmd(path, tokens[4], "avoidance", { faction: "good" });
+  await a.cmd(path, tokens[4], "avoidance", { role: null });
+  assert.equal((await options(tokens[4])).selectedFaction, null);
+  assert.deepEqual((await a.request(path, tokens[5])).data, outsiderView);
+  await a.ready(path, tokens);
+  const stage = (await options(tokens[0])).stage, id = randomUUID();
+  const body = { type: "start", stage, flexible: true };
+  for (let i = 0; i < 2; i++) assert.equal((await a.request(path + "/commands", tokens[0], body, id)).status, 200);
+  let fulfilled = 0;
+  for (const token of tokens.slice(0, 3)) {
+    const identity = (await a.request(path + "/private", token)).data;
+    const effective = identity.faction.includes("坏人");
+    assert.equal(identity.factionCard.faction, "evil");
+    assert.equal(identity.factionCard.status, effective ? "effective" : "ineffective");
+    assert.equal(identity.factionCard.balance, effective ? 0 : 1);
+    assert.equal((await a.request("/api/me/cards/notice", token)).data.totalBalance, effective ? 1 : 2);
+    assert.equal(identity.avoidance, null); assert.equal((await options(token)).balance, 1);
+    if (effective) fulfilled++;
+  }
+  assert.equal(fulfilled, 2);
+  assert.equal((await options(tokens[3])).factionBalance, 1);
+  assert.equal((await options(tokens[3])).balance, 0);
+  assert.equal((await a.request(path + "/private", tokens[5])).data.factionCard, undefined);
+  assert.equal((await a.cmd(path, tokens[0], "avoidance", { faction: "good" })).status, 409);
+  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='faction_spend'").get().n, 2);
+});
+test("混沌契约的第三方由初始牌决定，换板清空选择", () => {
+  const room = engine.newRoom("444444", "host", "房主", "chaos", 12);
+  for (let i = 2; i <= 12; i++) engine.enter(room, "p" + i, "玩家" + i);
+  const act = (uid, type, fields) => engine.command(room, uid, { type, stage: room.stage, ...fields });
+  act("host", "avoidance", { faction: "third" });
+  act("host", "updateSettings", { board: "knights", capacity: 12, visible: false });
+  assert.equal(room.avoidanceChoices?.host, undefined);
+  assert.throws(() => act("host", "avoidance", { faction: "third" }), /阵营/);
+  act("host", "configure", { board: "chaos", capacity: 12 });
+  for (const p of room.players) {
+    act(p.uid, "avoidance", { faction: "third" });
+    act(p.uid, "ready", { ready: true });
+  }
+  act("host", "start", {});
+  const fulfilled = room.players.filter(p => engine.privateView(room, p.uid).factionCard.status === "effective");
+  assert.deepEqual(fulfilled.map(p => room.roles[p.uid]).sort(), ["blueThief", "redThief"]);
 });

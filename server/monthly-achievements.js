@@ -2,18 +2,10 @@
 const { periodRange, compareWinRate } = require('./leaderboard');
 const { roleIds, roleName } = require('./engine');
 const { questFacts } = require('./role-fun');
+const { RANK_MIN_PLAYERS } = require('./match-management');
 const roleByName = new Map(roleIds.map((id) => [roleName(id), id]));
 const basicRoles = ['merlin', 'percival', 'servant', 'mordred', 'morgana', 'assassin', 'oberon'];
-const leaders = [
-  'win_streak',
-  'alternating_streak',
-  'loss_streak',
-  'servant_trio',
-  'evil_trio',
-  'triple_sabotage',
-  'lake_blessed',
-  'lake_seer',
-];
+const rankingBadges = require('../miniprogram/badges').catalogue.filter(b => b.metric === 'leader' || b.metric === 'podium');
 const cache = new WeakMap();
 
 function stats() {
@@ -138,6 +130,9 @@ function countGame(players, game, byUid) {
       game.replay?.initialPlayers?.find((x) => x.seat === p.seat)?.roleId ||
       (game.board?.startsWith('knights') ? null : p.roleId || roleByName.get(p.role));
     finishGame(s, p, drawn === 'redSwordsman' ? 'oberon' : drawn);
+    if (p.scored && game.capacity >= RANK_MIN_PLAYERS) {
+      increment(s, p.outcome === 'win' ? 'overall' : 'headwind_navigator');
+    }
     if (firstTrio && first.team.includes(p.seat)) {
       if (members.every((m) => m.role === 'servant')) increment(s, 'servant_trio');
       if (members.every((m) => m.faction === 'evil')) increment(s, 'evil_trio');
@@ -161,26 +156,32 @@ function countGame(players, game, byUid) {
     if (!complete) s.aligned = 0;
   }
 }
-function awardRanks(byUid) {
-  const publicPlayers = [...byUid].filter(([uid, s]) => /^(wx|dev):/.test(uid) && s.visible).map(([, s]) => s);
-  for (const id of leaders) {
-    const best = publicPlayers.reduce((max, s) => Math.max(max, s.counts[id] || 0), 0);
-    if (best) for (const s of publicPlayers) if (s.counts[id] === best) s.earned.set(id, 1);
+function achievementStandings(byUid, badge) {
+  const rows = [];
+  const rate = badge.metric === 'podium', key = rate && badge.id.slice(5);
+  for (const [uid, stats] of byUid) {
+    if (!stats.visible || !/^(wx|dev):/.test(uid)) continue;
+    if (rate) {
+      const sample = stats.rates.get(key);
+      const minimum = ['overall', 'good', 'evil'].includes(key) ? 1 : 3;
+      if (stats.rates.get('overall')?.total >= 10 && sample?.total >= minimum) rows.push({ uid, ...sample });
+    } else if (stats.counts[badge.id]) {
+      rows.push({ uid, count: stats.counts[badge.id] });
+    }
   }
-  for (const key of ['overall', 'good', 'evil', ...basicRoles, 'reverse', 'lancelot']) {
-    const rows = publicPlayers
-      .filter(
-        (s) =>
-          s.rates.get('overall')?.total >= 10 &&
-          (s.rates.get(key)?.total || 0) >= (['overall', 'good', 'evil'].includes(key) ? 1 : 3),
-      )
-      .map((s) => ({ s, ...s.rates.get(key) }));
-    rows.sort(compareWinRate);
-    let rank = 0;
-    for (const [i, row] of rows.entries()) {
-      if (!i || compareWinRate(row, rows[i - 1])) rank = i + 1;
-      if (rank > 3) break;
-      row.s.earned.set('rate_' + key, rank);
+  const compare = rate ? compareWinRate : (a, b) => b.count - a.count;
+  rows.sort(compare);
+  for (const [i, row] of rows.entries()) {
+    row.rank = i && compare(row, rows[i - 1]) === 0 ? rows[i - 1].rank : i + 1;
+  }
+  return rows;
+}
+function awardRanks(byUid) {
+  for (const badge of rankingBadges) {
+    const places = badge.metric === 'leader' ? 1 : 3;
+    for (const row of achievementStandings(byUid, badge)) {
+      if (row.rank > places) break;
+      byUid.get(row.uid).earned.set(badge.id, row.rank);
     }
   }
 }
@@ -195,7 +196,7 @@ function monthlyAchievements(store, now) {
     json_extract(p.snapshot,'$.seat') AS seat, json_extract(p.snapshot,'$.roleId') AS roleId,
     json_extract(p.snapshot,'$.role') AS role, p.outcome IN ('win','loss') AS valid,
     s.status='scored' AS scored, f.leaderboard_visible AND f.public_id IS NOT NULL AS visible
-    FROM visible_match_players p LEFT JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
+    FROM badge_match_players p LEFT JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
     LEFT JOIN profiles f ON f.uid=p.uid WHERE p.ended>=? AND p.ended<? ORDER BY p.ended,p.match_id`,
     )
     .all(start, end);
@@ -213,7 +214,7 @@ function monthlyAchievements(store, now) {
     JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid
     LEFT JOIN match_controls c ON c.match_id=s.match_id
     WHERE s.ended>=? AND s.ended<? AND s.status='scored' AND p.outcome IN ('win','loss')
-    AND coalesce(c.state,'active')='active'`,
+    AND NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=s.match_id) AND coalesce(c.state,'active')='active'`,
     )
     .get(start, end).n;
   for (const [id, players] of groups) {
@@ -232,4 +233,4 @@ function monthlyAchievements(store, now) {
   if (!store.inTransaction) cache.set(store, { start, revision: store.leaderboardRevision, byUid });
   return byUid;
 }
-module.exports = { monthlyAchievements };
+module.exports = { monthlyAchievements, achievementStandings };

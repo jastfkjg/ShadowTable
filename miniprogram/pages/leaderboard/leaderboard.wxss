@@ -1,3 +1,4 @@
+@import "./picker.wxss";
 .leaderboard-page { --rank-line: rgba(177,191,198,.13); --rank-selected: rgba(229,198,139,.12); max-width: 600px; padding: 12px 16px calc(136px + env(safe-area-inset-bottom)); }
 .leaderboard-page.has-wide-rank { padding-bottom: calc(192px + env(safe-area-inset-bottom)); }
 .rank-toolbar, .rank-tools, .rank-period { display: flex; align-items: center; }

@@ -1,4 +1,5 @@
 // Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
+const { factionNames } = require("./role-portraits");
 const funCopy = require("./fun-copy");
 const monthlyCards = require("./monthly-report-card");
 const leaderboardCards = require("./leaderboard-share-card");
@@ -37,7 +38,7 @@ function record(row) {
   return { total: row.total, wins: row.wins, losses: row.total - row.wins, ratio: row.wins / row.total, rate: percent(row.wins / row.total * 100) };
 }
 function breakdown(stats) {
-  const labels = { good: "好人", evil: "坏人", third: "第三阵营", unknown: "未知阵营" };
+  const labels = { ...factionNames, third: "第三阵营", unknown: "未知阵营" };
   const factions = Object.keys(labels).flatMap(id => {
     const summary = record(stats.byFaction?.find(row => row.faction === id) || {});
     return summary ? [{ id, label: labels[id], ...summary }] : [];
@@ -137,7 +138,7 @@ function parseSelection(options) {
   if (options.kind === "stats") return { kind: "stats" };
   if (options.kind === "funSummary") return { kind: "funSummary" };
   // Old entertainment links now open the same complete monthly report.
-  if (options.kind === "monthly" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") && [undefined, "fun"].includes(options.edition))
+  if (options.kind === "monthly" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(options.month || "") && [undefined, "fun", "featured"].includes(options.edition))
     return { kind: "monthly", month: options.month };
   if (options.kind === "fun" && /^(classic|knights|other|voted):[a-z]+$/.test(card || "") && /^[a-z_]+$/.test(options.metric || ""))
     return { kind: "fun", card, metric: options.metric };

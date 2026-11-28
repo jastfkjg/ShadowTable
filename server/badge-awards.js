@@ -10,8 +10,8 @@ const START = Date.parse('2026-09-30T16:00:00Z');
 const END = Date.parse('2026-10-31T16:00:00Z');
 const rankedIds = ['october_2026_crown', 'october_2026_silver', 'october_2026_stag'];
 const transaction = (store, fn) => store.inTransaction ? fn() : store.transaction(fn);
-const pointsPodium = (board, now) => board.snapshot('points', 'month', now).eligible
-  .filter(row => row.rank <= 3).map(({ uid, rank, points }) => ({ uid, rank, points }));
+const rankedPoints = (board, now, maxRank) => board.snapshot('points', 'month', now).eligible
+  .filter(row => row.rank <= maxRank).map(({ uid, rank, points }) => ({ uid, rank, points }));
 
 function initialize(store) {
   store.db.exec(`CREATE TABLE IF NOT EXISTS badge_campaigns(
@@ -29,7 +29,7 @@ function grant(store, uid, id, { rank = null, points = null, campaign = CAMPAIGN
     .run(uid, id, campaign, grantedAt, rank, points);
   if (result.changes) store.db.prepare(`INSERT INTO badge_versions(uid,version) VALUES(?,1)
     ON CONFLICT(uid) DO UPDATE SET version=version+1`).run(uid);
-  if (result.changes) store.badgeRanks?.record(uid, id);
+  if (result.changes) store.badgeRanks?.record(uid, id, rank);
   return result.changes > 0;
 }
 function grantContributor(store, uid) {
@@ -39,7 +39,7 @@ function grantContributor(store, uid) {
 // or personal record removal cannot revoke an already earned milestone.
 function reconcileMilestones(store, uids) {
   const candidates = uids || store.db.prepare("SELECT DISTINCT uid FROM match_players").all().map(row => row.uid);
-  const outcomes = store.db.prepare(`SELECT outcome FROM visible_match_players
+  const outcomes = store.db.prepare(`SELECT outcome FROM badge_match_players
     WHERE uid=? AND outcome IN ('win','loss') ORDER BY ended,match_id`);
   const existing = store.db.prepare("SELECT badge_id FROM badge_awards WHERE uid=? AND campaign='milestones'");
   for (const uid of new Set(candidates)) {
@@ -68,6 +68,7 @@ function reconcileParticipants(store, uid = null) {
       LEFT JOIN match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
       WHERE p.ended>=? AND p.ended<? AND p.ended<=?
         AND coalesce(c.state,'active')='active'
+        AND NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=p.match_id)
         AND coalesce(json_extract(m.snapshot,'$.recordPurpose'),'normal')='normal'
         AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%' OR p.uid LIKE 'guest:%')
         ${uid === null ? '' : 'AND p.uid=?'} GROUP BY p.uid`)
@@ -85,7 +86,7 @@ function activate(store) {
   if (store.clock() < START) return null;
   return transaction(store, () => {
     if (!store.db.prepare('SELECT 1 FROM badge_campaigns WHERE id=?').get(CAMPAIGN)) {
-      const rows = pointsPodium(new Leaderboard(store), Math.min(store.clock(), END - 1));
+      const rows = rankedPoints(new Leaderboard(store, { badgesOnly: true }), Math.min(store.clock(), END - 1), 3);
       store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)').run(CAMPAIGN, store.clock(), JSON.stringify(rows));
       for (const { uid, rank, points } of rows) grant(store, uid, rankedIds[rank - 1], { rank, points });
     }
@@ -110,14 +111,14 @@ function settleMonthly(store, now = store.clock()) {
   transaction(store, () => {
     const last = lastSettled.get(first, latest)?.id;
     let month = last ? monthAt(monthRange(last.slice(-7)).end) : FIRST_MONTH;
-    const board = new Leaderboard(store);
+    const board = new Leaderboard(store, { badgesOnly: true });
     const freeze = store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)');
     while (month <= lastClosedMonth) {
       const { end } = monthRange(month), campaign = monthlyCampaign(month);
-      const rows = pointsPodium(board, end - 1);
+      const rows = rankedPoints(board, end - 1, 12);
       freeze.run(campaign, now, JSON.stringify(rows));
       for (const { uid, rank, points } of rows)
-        grant(store, uid, `monthly_points_${month}_${rank}`, { rank, points, campaign, grantedAt: end });
+        grant(store, uid, `monthly_points_${month}_${rank <= 3 ? rank : '4-12'}`, { rank, points, campaign, grantedAt: end });
       month = monthAt(end);
     }
   });
@@ -141,8 +142,8 @@ function startMonthlyAwards(store, logger = console) {
 function notice(store, uid) {
   settleMonthly(store);
   reconcileParticipants(store, uid);
-  const rows = store.db.prepare('SELECT id,badge_id,granted_at,campaign FROM badge_awards WHERE uid=? AND seen=0 ORDER BY id').all(uid);
-  const badges = rows.map(row => ({ ...awardDefinition(row.badge_id), grantedAt: row.granted_at }));
+  const rows = store.db.prepare('SELECT id,badge_id,rank_at_grant,granted_at,campaign FROM badge_awards WHERE uid=? AND seen=0 ORDER BY id').all(uid);
+  const badges = rows.map(row => ({ ...awardDefinition(row.badge_id, row.rank_at_grant), grantedAt: row.granted_at }));
   badges.sort((a,b) => (b.month || '').localeCompare(a.month || '') || (a.rank || 4) - (b.rank || 4));
   return { notice: badges.length ? { through: rows.at(-1).id, badges, campaign: rows.at(-1).campaign } : null };
 }

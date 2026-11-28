@@ -10,7 +10,7 @@
 <template name="clearingRetained">
   <view class="data-retained">
     <image class="data-retained-icon" src="/assets/record-shield.svg" aria-hidden="true" />
-    <view><view class="data-retained-title">同桌记录与已发放权益保留</view><view class="data-retained-copy">共享对局、永久徽章和回避卡不受影响</view></view>
+    <view><view class="data-retained-title">同桌记录与已发放权益保留</view><view class="data-retained-copy">共享对局、永久徽章和两种用卡不受影响</view></view>
   </view>
 </template>
 <view aria-hidden="{{confirming}}">

@@ -4,11 +4,12 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
+  const placementRule = '每月1日按北京时间结算上月徽章积分排名。前三名获得对应的永久荣誉徽章，第4至12名获得永久趣味徽章「圆桌有席」，均含并列。';
+  const rules = '新对局仅在房间开启「徽章获取」后计入徽章进度和排名。月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。' + placementRule + '活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
-    { id: 'overall', title: '常胜将军', description: '本月总胜率榜第一。以原始胜率排名，胜率相同时按有效局数排序，两者相同则并列。', metric: 'overall' },
+    { id: 'overall', title: '常胜将军', description: '当月获得计分局胜场最多的玩家。', metric: 'leader' },
   ];
   const funMonthly = Object.entries({ ...copy.honors, ...copy.roleRecords }).map(([id, honor]) => ({
     id, title: honor.title, metric: 'fun_' + id,
@@ -40,6 +41,7 @@
   };
   const achievements = [
     ['win_streak', '长胜王徽', 'leader', '荣誉徽章', '当月最长连胜局数排名第一（至少两局）'],
+    ['headwind_navigator', '逆风领航员', 'leader', '趣味徽章', '当月获得计分局负场最多的玩家'],
     ['alternating_streak', '神鬼莫测', 'leader', '荣誉徽章', '当月胜负交替的最长连续局数排名第一（至少两局）'],
     ['loss_streak', '鬼神之勇', 'leader', '趣味徽章', '当月最长连败局数排名第一（至少两局）'],
     ['servant_trio', '三忠会审', 'leader', '荣誉徽章', '首轮任务车由三名忠臣完成，当月上车达成次数最多'],
@@ -85,17 +87,21 @@
   const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, seasonal, permanent);
   const placementTitles = ['交剑王冠', '持枪骑士', '铜铸城钥'];
   function monthlyAward(id) {
-    const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3])$/.exec(id);
+    const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3]|4-12)$/.exec(id);
     if (!match) return null;
     const [, month, place] = match;
-    const rank = Number(place), periodLabel = month.replace('-', '年') + '月';
-    const condition = periodLabel + '积分月榜第' + rank + '名';
-    return { id, month, rank, periodLabel, title: placementTitles[rank - 1], condition,
-      description: condition, category: '荣誉徽章', metric: 'monthly_points', permanent: true,
-      imageUrl: '/assets/badges/monthly-points/' + month + '/' + rank + '.png',
-      holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月公开积分月榜。前三名（含并列）获得对应名次的永久徽章。' };
+    const shared = place === '4-12', rank = shared ? null : Number(place);
+    const periodLabel = month.replace('-', '年') + '月';
+    const condition = periodLabel + '积分月榜第' + (shared ? '4至12' : place) + '名';
+    return { id, month, rank, periodLabel, title: shared ? '圆桌有席' : placementTitles[rank - 1], condition,
+      description: condition, category: shared ? '趣味徽章' : '荣誉徽章', metric: 'monthly_points', permanent: true,
+      imageUrl: '/assets/badges/monthly-points/' + month + '/' + place + '.png',
+      holdingRule: '获得后永久保留', rules: placementRule + '新对局须同时开启计分和徽章获取。' };
   }
-  const awardDefinition = id => monthlyAward(id) || permanent.find(b => b.id === id);
+  function awardDefinition(id, rank) {
+    const placement = monthlyAward(id);
+    return placement ? rankedBadge(placement, rank) : permanent.find(b => b.id === id);
+  }
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.achievement || badge.permanent || ['good_shield', 'honor_svp'].includes(badge.id) || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
@@ -112,6 +118,10 @@
     return 'transform:scale(' + scale + ')';
   }
   function rankedBadge(definition, rank) {
+    if (definition.metric === 'monthly_points' && !definition.rank && Number.isInteger(rank) && rank >= 4 && rank <= 12) {
+      const condition = definition.periodLabel + '积分月榜第' + rank + '名';
+      return { ...definition, rank, condition, description: condition };
+    }
     if (definition.metric !== 'podium' || ![1,2,3].includes(rank)) return definition;
     return { ...definition, rank, imageUrl: definition.imageUrl.replace('.png', ['', '-silver', '-bronze'][rank - 1] + '.png') };
   }
@@ -140,7 +150,8 @@
       count: badges.length, groups: groups.filter(g => g.items.length) };
   }
   const detailNotes = {
-    overall: '按原始胜率排序，胜率相同时比较有效局数。',
+    overall: '统计 9 人及以上的有效计分局，单局积分为零也计入。',
+    headwind_navigator: '统计 9 人及以上的有效计分局，单局积分为零也计入。',
     survival_revive: '统计十二骑士中实际发生的复活。',
     survival_knifed: '统计十二骑士中实际承受的轮内刀和最终刀，无论是否生效或复活。',
     percival_bust: '仅统计派西维尔玩家。',

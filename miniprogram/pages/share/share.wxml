@@ -6,7 +6,7 @@
 <view class="{{monthly?'monthly-share-shell':''}}">
 <app-nav title="{{pageTitle || '分享成绩'}}" back="{{true}}" backLabel="返回" bindback="back" />
 <view class="page share-page {{monthly?'monthly-share-page':''}}">
-  <view wx:if="{{monthly && imagePath}}" class="share-preview-heading"><text>完整长图</text><button class="share-zoom-hint" bindtap="preview" aria-label="放大查看完整月报" hover-class="none"><image src="/assets/share-zoom.svg" aria-hidden="true" /><text>点图放大</text></button></view>
+  <view wx:if="{{monthly && imagePath}}" class="share-preview-heading"><text>完整长图</text><button class="share-zoom-hint" bindtap="preview" aria-label="放大查看月报" hover-class="none"><image src="/assets/share-zoom.svg" aria-hidden="true" /><text>点图放大</text></button></view>
   <scroll-view wx:if="{{monthly}}" class="share-scroll" scroll-y="{{true}}"><template is="share-content" data="{{loading,rendering,imagePath,error,description,acting}}" /></scroll-view>
   <template wx:else is="share-content" data="{{loading,rendering,imagePath,error,description,acting}}" />
   <view class="share-footer">

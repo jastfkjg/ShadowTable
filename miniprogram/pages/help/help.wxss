@@ -128,3 +128,7 @@ button.help-board-link { min-height: 44px; width: 100%; min-width: 0; margin: 0;
 .help-score-scope .help-heading { margin-bottom: 8px; }
 @media (max-width: 350px) { .help-page { padding-left: 14px; padding-right: 14px; } .help-title { font-size: 20px; } .help-intro-art { width: 54px; height: 76px; } .help-step-body { margin-left: 0; } .help-answers { padding-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .help-chevron, button.help-faq-toggle { transition: none; } }
+.help-board-rules { margin-top: 10px; }
+.help-board-score-row { border-bottom: 1px solid var(--help-line); padding: 14px 0; }
+.help-board-score-values { display: flex; flex-wrap: wrap; gap: 5px 14px; color: var(--muted); font-size: 14px; }
+.help-board-score-values text { color: var(--accent); font-weight: 600; }

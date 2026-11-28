@@ -8,9 +8,11 @@ const labels = {
   rematch: "同房重开",
   delete: "删除房间",
   login: "管理员登录",
+  "set-room-password": "修改房间设置密码",
   "correct-result": "更正对局结果",
   "adjust-player-score": "调整玩家积分",
   "grant-avoidance": "发放回避卡",
+  "grant-faction": "发放阵营卡",
   "adjust-match-scores": "调整本局积分",
   "match-delete": "删除对局记录",
   "match-restore": "恢复对局记录",
@@ -47,6 +49,8 @@ function showSession(on) {
   $("dashboard").hidden = !on;
   $("logout").hidden = !on;
   if (!on) {
+    $("room-password").value = "";
+    $("room-password-status").textContent = "";
     $("rooms").replaceChildren();
     $("audit").replaceChildren();
     window.FeedbackInbox?.clear();
@@ -54,6 +58,22 @@ function showSession(on) {
     window.AvoidanceAdmin?.clear();
   }
 }
+$("room-password-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const input = $("room-password"), button = $("room-password-save"), status = $("room-password-status");
+  if (button.disabled) return;
+  button.disabled = input.disabled = true;
+  status.textContent = "正在保存…";
+  try {
+    await api("room-password", { password: input.value });
+    input.value = "";
+    status.textContent = "房间设置密码已保存";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = input.disabled = false;
+  }
+});
 function el(tag, text, cls) {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -734,6 +754,23 @@ function selectOptions(id, options) {
 function correctionMatch() { return correctionMatches.find(match=>match.id===$('correction-match').value); }
 function updateCorrectionTarget() {
   const match=correctionMatch(), selected=match?.options.find(option=>option.id===$('correction-result').value);
+  const fields = (selected?.boardFields || []).map(field => {
+    const row = el('div');
+    row.className = 'score-field';
+    const id = 'correction-board-' + field.id, label = el('label',field.label), select = el('select');
+    label.htmlFor = id;
+    select.id = id;
+    select.required = true;
+    for (const choice of [{value:'',label:'请选择'}, ...field.options]) {
+      const option = el('option',choice.label);
+      option.value = choice.value;
+      select.append(option);
+    }
+    select.value = match.boardChoices?.[field.id] || '';
+    row.append(label,select);
+    return row;
+  });
+  $('correction-board-fields').replaceChildren(...fields);
   $('correction-target-row').hidden=!selected?.requiresTarget;
   $('correction-reverse-row').hidden=!(selected?.requiresTarget && match?.needsReverseTarget);
   $('correction-target').required=!!selected?.requiresTarget;
@@ -767,7 +804,7 @@ async function loadCorrectionMatches() {
   $('correction-status').textContent='正在查找对局…';
   try {
     const result=await api('matches?code='+encodeURIComponent(code));correctionMatches=result.matches;
-    selectOptions('correction-match',[{value:'',label:correctionMatches.length?'请选择对局':'暂无已归档对局'},...correctionMatches.map(match=>({value:match.id,label:new Date(match.endedAt).toLocaleString('zh-CN')+' · '+match.boardName+' · '+({good:'好人胜',evil:'坏人胜',third:'第三方胜'})[match.winner]}))]);
+    selectOptions('correction-match',[{value:'',label:correctionMatches.length?'请选择对局':'暂无已归档对局'},...correctionMatches.map(match=>({value:match.id,label:new Date(match.endedAt).toLocaleString('zh-CN')+' · '+match.boardName+' · '+({good:'好人胜',evil:'坏人胜',third:'第三方胜',fourth:'捣蛋鬼胜',redTraitor:'红内奸胜',blueTraitor:'蓝内奸胜'})[match.winner]}))]);
     if(correctionMatches.some(match=>match.id===selected))$('correction-match').value=selected;
     else if(correctionMatches.length)$('correction-match').value=correctionMatches[0].id;
     $('correction-results').hidden=!correctionMatches.length;
@@ -790,6 +827,7 @@ $('correction-form').addEventListener('submit',async event=>{
     if(!await (window.AdminUI ? window.AdminUI.confirm({title:'更正对局结果',description,danger:true}) : window.confirm(description))) return;
     if(correctionBusy || correctionLoading || scoreBusy || scoreWritePending || matchScoreLoading || correctionMatch()!==match) return;
     correctionPending={id:match.id,data:{requestId:crypto.randomUUID(),revision:match.revision,[match.correctionKind === "fun" ? "funReason" : "scoreReason"]:option.id,
+      ...(option.boardFields?.length ? {boardChoices:Object.fromEntries(option.boardFields.map(field=>[field.id,$('correction-board-'+field.id).value]))} : {}),
       ...(option.requiresTarget ? {[match.correctionKind === "fun" ? "funTarget" : "scoreTarget"]:Number($('correction-target').value), ...(match.needsReverseTarget && $('correction-reverse').value ? {reverseTarget:Number($('correction-reverse').value)} : {}), ...(match.needsActor && $('correction-actor').value ? {funActor:Number($('correction-actor').value)} : {})} : {})}};
   }
   correctionBusy=true;lockScoreControls();$('correction-status').textContent='正在更正对局结果…';
@@ -814,6 +852,7 @@ let scoreBusy=false, scoreWritePending=null, matchScoreSequence=0, matchScoreLoa
 const scoreControls=['score-player-query','score-player-find','score-player','score-player-prev','score-player-next','player-score-mode','player-score-points','player-score-history-more','correction-load','correction-code','correction-match','correction-result','correction-target','correction-reverse','correction-actor','score-tab-player','score-tab-match'];
 function lockScoreControls() {
   const locked=scoreBusy || !!scoreWritePending || correctionBusy || !!correctionPending || correctionLoading || matchScoreLoading;
+  $('correction-board-fields').querySelectorAll('select').forEach(select => select.disabled=locked);
   for(const id of scoreControls) $(id).disabled=locked;
   $('score-player').disabled=locked || !scorePlayers.length;
   $('score-player-prev').disabled=locked || !scorePlayerOffset;

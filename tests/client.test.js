@@ -2695,3 +2695,73 @@ test('换牌遇到断网、忙碌或待确认请求时仍可收起，恢复后�
     assert.equal(p.data.dealtIdentitySecret.role,'红猎人');
   }
 });
+
+test('小程序进桌兼容旧接口的用卡张数，当前接口直接使用总数', async () => {
+  const { newRoom, publicView } = require('../server/engine');
+  const room = publicView(newRoom('123456', 'host', '房主', 'classic', 6), 'host');
+  const path = '/api/rooms/' + room.code;
+  for (const [card, detail, expected] of [
+    [{ balance: 3 }, { balance: 3 }, 3],
+    [{ balance: 0 }, { balance: 0 }, 0],
+    [{ balance: 0 }, { balance: 0, factionBalance: 2 }, 2],
+    [{ balance: 3 }, { balance: 3, factionBalance: 1 }, 4],
+    [{ balance: 3, totalBalance: 4 }, null, 4],
+  ]) {
+    const calls = [];
+    const p = page({ request: async url => {
+      calls.push(url);
+      if (url === path) return { ...room, me: { ...room.me, avoidance: { ...card, selected: true } } };
+      return { code: room.code, stage: room.stage, phase: 'lobby', ...detail };
+    } });
+    p.roomCode = room.code;
+    await p.refresh();
+    assert.equal(p.data.room.me.avoidance.totalBalance, expected);
+    assert.equal(p.data.room.me.avoidance.selected, true);
+    assert.deepEqual(calls, detail ? [path, path + '/avoidance'] : [path]);
+  }
+});
+
+test('本局用卡只在确认时替换，选项来自当前板子，关闭重开回到已保存的卡', async () => {
+  const value = { code: '123456', stage: 1, phase: 'lobby', balance: 2, factionBalance: 1,
+    selected: 'merlin', selectedFaction: null, editable: true, options: [
+      { id: 'merlin', name: '梅林', faction: 'good', count: 1 }, { id: 'assassin', name: '刺客', faction: 'evil', count: 1 },
+      { id: 'blueThief', name: '蓝盗贼', faction: 'third', count: 1 }, { id: 'redThief', name: '红盗贼', faction: 'third', count: 1 },
+    ] };
+  const p = page({ request: async () => value }); p.roomCode = value.code;
+  p.data.room = { code: value.code, phase: 'lobby', stage: 1, me: { seat: 1, ready: true } };
+  const commands = []; p.cmd = (...args) => commands.push(args);
+  const event = dataset => ({ currentTarget: { dataset } });
+  await p.openAvoidance(); assert.equal(p.data.avoidance.tab, 'avoidance');
+  p.switchCardTab(event({ tab: 'faction' })); p.chooseAvoidance(event({ id: 'third' }));
+  assert.deepEqual(p.data.avoidance.factions.map(o => o.id), ['good', 'evil', 'third']);
+  assert.match(p.data.avoidance.exampleText, /蓝盗贼、红盗贼/);
+  assert.equal(p.data.avoidance.replaces, '回避梅林');
+  p.closeAvoidance(); await p.openAvoidance();
+  assert.equal(p.data.avoidanceDraft, 'merlin'); assert.equal(commands.length, 0);
+  p.switchCardTab(event({ tab: 'faction' })); p.chooseAvoidance(event({ id: 'third' })); p.saveAvoidance();
+  assert.deepEqual(JSON.parse(JSON.stringify(commands)), [['avoidance', { faction: 'third' }, 'avoidance']]);
+  value.selected = null; value.selectedFaction = 'third'; p.closeAvoidance(); await p.openAvoidance();
+  assert.equal(p.data.avoidance.tab, 'faction'); assert.equal(p.data.avoidanceDraft, 'third');
+  p.cancelAvoidance(); assert.equal(commands[1][1].role, null);
+});
+
+test('小程序内奸计分表单提交带刀方与房主确认的独赢条件', async () => {
+  const scoring = require('../server/scoring'), p = page({});
+  p.data.room = { code:'123456', stage:'shadow-finish', canUseTools:true, players:[{seat:1,name:'甲'}],
+    scoreSettlement:scoring.optionsFor('shadow-assist',scoring.policy()), settlementRequiresActor:false };
+  let sent;
+  p.cmd = async (type, input) => { sent = input; };
+  const choose = (method, dataset) => p[method]({currentTarget:{dataset}});
+  p.finishTools();
+  choose('pickScoreReason',{id:'assassination'}); p.nextResult();
+  choose('pickScoreTarget',{seat:1}); p.nextResult();
+  assert.equal(p.data.resultStep,'board');
+  choose('pickBoardChoice',{field:'knife',value:'traitor'}); p.nextResult();
+  assert.equal(p.data.resultStep,'board');
+  choose('pickBoardChoice',{field:'blueSolo',value:'yes'}); p.nextResult();
+  assert.equal(p.data.resultStep,'review');
+  p.confirm = async () => true;
+  await p.saveResult();
+  assert.deepEqual({...sent.boardChoices},{knife:'traitor',blueSolo:'yes'});
+  assert.equal(sent.scoreTarget,1);
+});

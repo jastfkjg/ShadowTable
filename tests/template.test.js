@@ -497,7 +497,7 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   for(const category of presentation.categories) {
     const filtered=presentation.filterFunOptions(options,category.id);
     const tree=renderRank({...data,metricsExpanded:true,funCategory:category.id,filteredFunOptions:filtered});
-    assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标'));
+    assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标或徽章'));
     const choices=nodes(tree).filter(n=>n.attr?.bindtap==='previewFunMetric');
     assert.equal(choices.length,filtered.length);
     assert.ok(choices.every(n=>n.tag==='wx-button'));
@@ -2540,4 +2540,80 @@ test('徽章榜卡片打开只读图文详情，隐藏的明细无法打开', as
   await controller.load();
   controller.openBadge(id);
   assert.equal(controller.state.selectedBadge, null);
+});
+
+test('趣味榜进入徽章查询后按名称选徽章，达成名单只显示获得者', async () => {
+  const board = factory('pages/leaderboard/leaderboard.wxml')({ metric: 'fun_merlin_evade', funSelected: true });
+  assert.ok(byHandler(board, 'toggleMetrics'));
+  assert.ok(!nodes(board).some(n => n.attr?.url?.includes('kind=lookup')));
+  const picker = require('../miniprogram/pages/leaderboard/picker').create({
+    options: [], metric: '', request: async () => ({ ids: ['five_wins', 'ten_wins'] }), update() {},
+  });
+  await picker.switchMode('badges');
+  picker.search('五连');
+  const sheet = factory('pages/leaderboard/leaderboard.wxml')({ metricsExpanded: true, ...picker.view() });
+  assert.equal(nodes(sheet).filter(n => n.attr?.bindtap === 'choosePickerMode').length, 2);
+  assert.equal(nodes(sheet).find(n => n.attr?.bindinput === 'searchPicker').attr.placeholder, '搜索徽章名称');
+  assert.equal(byHandler(sheet, 'previewFunMetric').attr['data-id'], 'five_wins');
+  assert.match(JSON.stringify(byHandler(sheet, 'confirmFunMetric')), /查看获得者/);
+  const { create } = require('../miniprogram/pages/badges/rank-controller');
+  const render = state => factory('pages/badges/ranks.wxml')({ rank: state });
+  const directory = create({ request: async () => ({ ids: ['five_wins','ten_wins'] }), update() {} }, 'lookup');
+  await directory.load();
+  directory.search('五连');
+  assert.equal(byHandler(render(directory.state), 'openLookup').attr['data-id'], 'five_wins');
+  const result = create({ request: async () => ({ holdersOnly: true, total: 1, nextOffset: null,
+    rows: [{publicId: 'a', nickname: '玩家甲', rank: null, earned: true}] }), update() {} }, 'lookup', '', 'five_wins');
+  await result.load();
+  const list = render(result.state);
+  assert.match(JSON.stringify(list), /公开获得者/);
+  assert.match(JSON.stringify(list), /玩家甲/);
+  assert.ok(!nodes(list).some(n => n.attr?.class === 'br-place'));
+});
+
+test('本局用卡按板子显示阵营，底栏显示本人总张数与选择状态', () => {
+  const cards = require('../miniprogram/avoidance');
+  const engine = require('../server/engine');
+  for (const [board, capacity, expected] of [['classic', 6, 2], ['chaos', 12, 3]]) {
+    const room = engine.newRoom('123456', 'host', '房主', board, capacity);
+    const me = engine.publicView(room, 'host');
+    me.me.avoidance = { balance: 3, totalBalance: 4, selected: true };
+    const options = engine.avoidanceOptions(room);
+    const value = { options, selected: 'merlin', balance: 3, factionBalance: 1, editable: true };
+    const noFaction = renderTable({ ...base, room: me, avoidanceOpen: true, ...cards.panel({ ...value, factionBalance: 0 }, 'faction') });
+    assert.equal(nodes(noFaction).find(n => n.attr?.class === 'avoidance-note').children.join(''), '暂无阵营卡');
+    const tree = renderTable({ ...base, room: me, avoidanceOpen: true, ...cards.panel(value, 'faction', board === 'chaos' ? 'third' : 'good') });
+    const choices = nodes(tree).filter(n => n.attr?.bindtap === 'chooseAvoidance');
+    assert.equal(choices.length, expected);
+    const content = JSON.stringify(tree);
+    assert.doesNotMatch(content, /下一张|距下|已完成\s*\d+\s*\/\s*10/);
+    assert.match(content, /确认后将替换「回避梅林」/);
+    assert.match(byHandler(tree, 'saveAvoidance').children.join(''), /改用阵营卡 · 选择/);
+    const entry = byHandler(tree, 'openAvoidance');
+    assert.equal(entry.attr.ariaLabel, '用卡，共 4 张，本局已选');
+    assert.match(JSON.stringify(entry.children), /×4/);
+    assert.match(JSON.stringify(entry.children), /✓ 已选/);
+    assert.doesNotMatch(JSON.stringify(entry), /梅林|第三方/);
+    me.me.avoidance = { balance: 0, totalBalance: 0, selected: false };
+    const empty = byHandler(renderTable({ ...base, room: me }), 'openAvoidance');
+    assert.equal(empty.attr.ariaLabel, '用卡，共 0 张');
+    assert.equal(empty.attr.disabled, false);
+    assert.match(JSON.stringify(empty.children), /×0/);
+    assert.equal(empty.children.at(-1).children.join(''), '用卡');
+  }
+});
+
+test('两块计分表默认收起，可分别展开，在帮助和单独规则页显示相同分值', () => {
+  const renderHelp = factory('pages/help/help.wxml'), scoringRules = require('../server/scoring').publicRules();
+  for (const scoringOnly of [true,false]) {
+    const data = { scoringOnly, scoringRules, references:[{id:'scoring',expanded:true}], boardScoreExpanded:{} };
+    for (const [shadow,chaos] of [[false,false],[true,false],[false,true],[true,true]]) {
+      const tree = renderHelp({...data,boardScoreExpanded:{'shadow-assist':shadow,chaos}});
+      const buttons = nodes(tree).filter(node => node.attr?.bindtap === 'toggleBoardScore');
+      assert.deepEqual(buttons.map(b => b.attr['aria-expanded'] ?? b.attr.ariaExpanded),[shadow,chaos]);
+      const content = JSON.stringify(tree);
+      assert.equal(content.includes('三绿车 · 红内奸带刀 · 刺中梅林'),shadow);
+      assert.equal(content.includes('三绿车 · 盗贼获胜 · 第四方捣蛋鬼挡刀'),chaos);
+    }
+  }
 });

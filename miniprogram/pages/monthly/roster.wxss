@@ -1,0 +1,18 @@
+.monthly-count-arrow { position:absolute; right:1px; top:50%; width:5px; height:5px; border:solid var(--accent); border-width:1px 1px 0 0; transform:translateY(-50%) rotate(45deg); pointer-events:none; }
+.monthly-roster-backdrop { position:fixed; inset:0; z-index:112; display:flex; justify-content:center; align-items:flex-end; background:var(--overlay-scrim,rgba(5,12,17,.68)); }
+.monthly-roster-sheet { position:relative; box-sizing:border-box; display:flex; flex-direction:column; min-height:0; width:100%; max-width:520px; max-height:85vh; padding:9px 20px calc(16px + env(safe-area-inset-bottom)); border-radius:18px 18px 0 0; border-top:1px solid var(--border); background:var(--surface); color:var(--text); }
+.monthly-roster-grip { flex:none; width:33px; height:3px; border-radius:3px; background:var(--border); margin:0 auto 14px; }
+button.monthly-roster-close { position:absolute; top:11px; right:9px; display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; margin:0; background:transparent; border:0; font:400 25px/1 sans-serif; color:var(--muted); }
+.monthly-roster-title { color:var(--accent); font-size:13px; padding-right:38px; }
+.monthly-roster-heading { display:flex; align-items:baseline; gap:12px; margin:4px 0; font-size:13px; color:var(--muted); }
+.monthly-roster-place { font:600 25px/1.35 "Songti SC","STSong",serif; color:var(--text); }
+.monthly-roster-total { padding-bottom:12px; font-size:12px; color:var(--muted); }
+.monthly-roster-scroll { flex:0 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; border-top:1px solid var(--border); }
+.monthly-roster-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:14px; padding-top:6px; }
+button.monthly-roster-person { display:flex; align-items:center; justify-content:flex-start; min-width:0; width:100%; min-height:44px; gap:8px; padding:4px 0; margin:0; background:transparent; border:0; color:var(--text); font-size:14px; line-height:1.4; text-align:left; overflow-wrap:anywhere; word-break:break-word; }
+.monthly-roster-sample { display:block; color:var(--muted); font-size:11px; }
+.monthly-roster-avatar { display:block; flex:none; position:relative; width:27px; height:27px; overflow:hidden; border-radius:6px; background:#30444f; }
+.monthly-roster-avatar::before,.monthly-roster-avatar::after { content:""; position:absolute; background:var(--muted); border-radius:50%; width:8px; height:8px; left:10px; top:5px; }
+.monthly-roster-avatar::after { border-radius:4px; width:16px; height:7px; left:6px; top:15px; }
+.monthly-roster-image { display:block; position:relative; z-index:1; width:100%; height:100%; object-fit:cover; background:var(--surface); }
+button.monthly-roster-person:active { background:var(--bg); }

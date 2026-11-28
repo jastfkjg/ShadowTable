@@ -582,9 +582,9 @@
     statsOpen: false, stats: null, statsTab: "records", funFilter: "all", statsLoading: false, statsError: "",
     monthlyReset: null, resetSaving: false, resetError: '',
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
-    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankFunCategory: 'all', rankPendingMetric: '', rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
-    resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyCategory: 'overall', monthlyEntertainment: false, monthlySharing: false, monthlyImages: [],
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankPickerView: null, rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
+    resultDialog: false, resultChoice: "", resultBoardChoices: {}, resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
+    monthlyMonth: '', monthlyReport: null, monthlyRoster: null, monthlyLoading: false, monthlyError: '', monthlyPoster: null,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -671,6 +671,8 @@
     const collection = /^#\/player-badges\/(leaderboard|\d{6})\/([a-f0-9-]+)$/.exec(hash || '');
     if (collection && badgePresentation.playerCollectionPath(collection[1], collection[2]))
       return { page: 'player-badges', path: badgePresentation.playerCollectionPath(collection[1], collection[2]), scope: collection[1] };
+    const lookup = /^#\/badge-ranks\/lookup(?:\/([a-z0-9_-]+))?$/.exec(hash || '');
+    if (lookup) return { page: 'badge-ranks', kind: 'lookup', badgeId: lookup[1] || '' };
     const badgeRank = /^#\/badge-ranks(?:\/(honor|fun)(?:\/(self|[a-f0-9]{32}))?)?$/.exec(hash || '');
     if (badgeRank) return { page:'badge-ranks', kind:badgeRank[1] || 'honor', player:badgeRank[2] || '' };
     var name = (hash || '').replace(/^#\//, '');
@@ -698,6 +700,9 @@
     if (state.page === 'login' && routeInfo(hash).page !== 'login' && !await cancelWebLogin()) return;
     const restore = state.page === 'player-badges' && collectionOrigin?.hash === hash ? collectionOrigin : null;
     const sequence = ++routeSequence, route = routeInfo(hash);
+    const restorePicker = route.page === 'leaderboard' && currentRoute === rankPickerDetailHash && !!rankPicker;
+    rankPickerDetailHash = state.page === 'leaderboard' && state.rankMetricsExpanded && route.kind === 'lookup' && route.badgeId ? hash : '';
+    if (!restorePicker && !rankPickerDetailHash) rankPicker = null;
     collectionOrigin = route.page === 'player-badges' ? window.history.state?.collectionOrigin || null : null;
     if (restore && route.page === 'monthly') route.month = restore.month;
     ++monthlySequence;
@@ -707,14 +712,14 @@
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
     if(route.page==='matches'){scoreAdjustmentRecords=[];scoreAdjustmentTotal=0;scoreAdjustmentMore=false;scoreAdjustmentError='';}
-    setState({ page: route.page, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+    setState({ page: route.page, monthlyRoster: null, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', entrySheet: false, entryError: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
       profileDirty: false, profileDraft: route.page === 'profile' && state.profile ? profileDraft(state.profile) : null,
-      ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyImages: [], monthlyLoading: true, monthlyError: '' } : {}),
+      ...(route.page === 'monthly' ? { monthlyMonth: route.month, monthlyReport: null, monthlyPoster: null, monthlyLoading: true, monthlyError: '' } : {}),
       monthlyReset: null, resetSaving: false, resetError: '',
-    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
+    rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: restorePicker, profileLoading: route.page === 'profile', profileError: '', profileConflict: false, profileEditingNickname: false, profileNicknameError: '', statsOpen: route.page === 'stats', ...(route.page === 'stats' ? { statsTab: route.tab || 'records' } : {}), ...(route.page === 'matches' ? { matchScored: !!route.scored, matchFun: route.fun || null, matches: [], matchesTotal: 0, matchesMore: false } : {}) });
     window.scrollTo(0, 0);
     const heading = app.querySelector('[data-page-heading]');
     if (heading) heading.focus({ preventScroll: true });
@@ -736,12 +741,15 @@
       } else if (route.page === 'me') await Promise.all([loadProfile(), loadStats(), loadRooms().catch(() => {}), loadPersonalitySummary()]);
       else if (route.page === 'profile') await loadProfile(true);
       else if (route.page === 'stats') await loadStats();
-      else if (route.page === 'leaderboard' && !(restore && state.rankBoard)) await loadLeaderboard();
+      else if (route.page === 'leaderboard' && restorePicker) {
+        app.querySelector('.rank-metrics-sheet .rank-confirm')?.focus({ preventScroll: true });
+        app.querySelector('.fun-metric-options .selected')?.scrollIntoView({ block: 'nearest' });
+      } else if (route.page === 'leaderboard' && !(restore && state.rankBoard)) await loadLeaderboard();
       else if (route.page === 'player-badges') await loadPlayerCollection(route);
       else if (route.page === 'badge-ranks') {
         badgeRankController = window.shadowtableBadgeRanks.create({ request, update:view => {
-          if (alive && sequence === routeSequence) setState({ badgeRankView:view });
-        } },route.kind,route.player);
+          if (alive && sequence === routeSequence) setState({ badgeRankView: { ...view, fromLeaderboard: window.history.state?.badgeParent === '#/leaderboard' } });
+        } },route.kind,route.player,route.badgeId);
         await badgeRankController.load();
       }
       else if (route.page === 'badges') await loadBadgeManager();
@@ -996,7 +1004,7 @@
       clearingPending = null;
       if (account !== clearingAccount()) return;
       ++statsSequence; statsRequestRoute = -1; ++monthlySequence; ++badgeManagerSequence;
-      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyImages: [], badgeCollection: null, playerCard: null,
+      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyPoster: null, monthlyRoster: null, badgeCollection: null, playerCard: null,
         clearingPreview: null, clearingConfirming: false, clearingConfirmation: null, clearingNotice: recordClearing.monthLabel(submission.body.month) + ' 的个人战绩已清除' });
     } catch (e) {
       if (e.status && e.status < 500 && ![401, 429].includes(e.status)) clearingPending = null;
@@ -1014,7 +1022,7 @@
     return '<div class="data-metrics">' + preview.metrics.map(row => '<div class="data-metric' + (row.accent ? ' is-accent' : '') + (row.negative ? ' is-negative' : '') + (row.compact ? ' is-compact' : '') + '"><div class="data-metric-value">' + esc(row.value) + (row.unit ? '<span class="data-metric-unit">' + esc(row.unit) + '</span>' : '') + '</div><span class="data-metric-label">' + esc(row.label) + '</span></div>').join('') + '</div><div class="data-card-caption">' + esc(preview.caption) + '</div>';
   }
   function viewClearingRetained() {
-    return '<div class="data-retained"><img class="data-retained-icon" src="/assets/record-shield.svg" alt="" /><div><div class="data-retained-title">同桌记录与已发放权益保留</div><div class="data-retained-copy">共享对局、永久徽章和回避卡不受影响</div></div></div>';
+    return '<div class="data-retained"><img class="data-retained-icon" src="/assets/record-shield.svg" alt="" /><div><div class="data-retained-title">同桌记录与已发放权益保留</div><div class="data-retained-copy">共享对局、永久徽章和两种用卡不受影响</div></div></div>';
   }
   const clearingWarning = '<span class="data-warning-icon" aria-hidden="true">!</span><span>清除后无法自行恢复</span>';
   function viewRecordClearing() {
@@ -1286,6 +1294,7 @@
   }
   const rankGroups = [['points','积分'],['games','局数'],['overall','胜率'],['fun','趣味']];
   const rankMetrics = [['points','积分'],['games','局数'],['overall','总胜率'],['good','好人胜率'],['evil','坏人胜率']];
+  var rankPicker, rankPickerDetailHash = '';
   var rankSequence = 0, rankFailedSelection = null, rankVisibilityPending = null, rankVisibilityTarget = false;
   async function loadLeaderboard(more = false, selection = {}) {
     if (more && (state.rankLoading || state.rankMoreLoading || !state.rankBoard?.hasMore)) return;
@@ -1360,15 +1369,28 @@
     return '<div class="dialog-backdrop rank-sheet-backdrop" data-rank-dismiss="' + action + '"><section class="rank-sheet ' + kind + '" role="dialog" aria-modal="true" aria-label="' + label + '"><div class="rank-sheet-handle" aria-hidden="true"></div><div class="rank-sheet-header"><h2 class="rank-sheet-title">' + title + '</h2>' + close + '</div>';
   }
   function viewRankMetricSheet() {
-    const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
-    const filtered = rankPresentation.filterFunOptions(options, state.rankFunCategory);
-    const pending = options.find(item => item.key === state.rankPendingMetric);
-    let html = rankSheetStart('rank-metrics-sheet', '选择趣味指标', 'rankToggleMetrics');
-    html += '<div class="fun-categories" role="group" aria-label="指标分类">' + rankPresentation.categories.map(item => '<button type="button" data-action="funRankCategory" data-value="' + item.id + '" class="' + (item.id === state.rankFunCategory ? 'selected' : '') + '" aria-pressed="' + (item.id === state.rankFunCategory) + '">' + item.label + '</button>').join('') + '</div><div class="fun-options-count">共 ' + options.length + ' 项' + (state.rankFunCategory === 'all' ? '' : ' · 当前分类 ' + filtered.length + ' 项') + '</div><div class="fun-metric-options' + (filtered.length <= 2 ? ' is-compact' : '') + '">';
-    html += filtered.map(item => '<button type="button" class="fun-metric-option ' + (item.key === state.rankPendingMetric ? 'selected' : '') + '" data-action="funRankPreview" data-value="' + esc(item.key) + '" aria-label="' + esc(item.accessibilityLabel) + '" aria-pressed="' + (item.key === state.rankPendingMetric) + '"><span class="fun-option-copy"><span class="fun-option-heading"><span class="fun-option-title">' + esc(item.title) + '</span>' + (item.roleLabel ? '<span class="fun-identity">' + esc(item.roleLabel) + '</span>' : '') + '</span><span class="fun-option-label">' + esc(item.conditionLabel || item.label) + '</span></span><span class="fun-option-radio" aria-hidden="true">' + (item.key === state.rankPendingMetric ? '<span class="fun-option-check"></span>' : '') + '</span></button>').join('');
-    if (!filtered.length) html += '<p class="small muted">当前暂无此类指标</p>';
-    html += '</div><div class="fun-scroll-hint"><span data-fun-scroll-hint hidden>下滑查看更多</span></div><div class="rank-sheet-footer">' + (pending ? '<div class="rank-sheet-note">已选：' + esc(pending.title) + (pending.roleLabel ? ' · ' + esc(pending.roleLabel) : '') + '</div>' : '') + btn('rank-confirm','funRankConfirm','查看榜单',null,!pending || state.rankLoading) + '</div></section></div>';
-    return html;
+    const v = state.rankPickerView, pending = v.pendingFunOption, badgeMode = v.pickerMode === 'badges';
+    function choices(items, active, action, cls = 'rank-picker-category') {
+      return items.map(({ id, label }) => `<button type="button" class="${cls} ${id === active ? 'selected' : ''}" data-action="${action}" data-value="${id}" aria-pressed="${id === active}">${label}</button>`).join('');
+    }
+    const rows = v.filteredFunOptions.map(item => {
+      const selected = item.key === v.pendingFunMetric;
+      return `<button type="button" class="fun-metric-option ${selected ? 'selected' : ''}" data-action="funRankPreview" data-value="${esc(item.key)}" aria-label="${esc(item.accessibilityLabel)}" aria-pressed="${selected}">
+        ${item.imageUrl ? '<img class="rank-picker-art" src="' + esc(item.imageUrl) + '" alt="" loading="lazy">' : ''}
+        <span class="fun-option-copy"><span class="fun-option-heading"><span class="fun-option-title">${esc(item.title)}</span>${item.roleLabel ? '<span class="fun-identity">' + esc(item.roleLabel) + '</span>' : ''}</span>
+        <span class="fun-option-label">${esc(item.conditionLabel || item.label)}</span></span><span class="fun-option-radio" aria-hidden="true">${selected ? '<span class="fun-option-check"></span>' : ''}</span></button>`;
+    }).join('');
+    const message = v.pickerLoading ? '正在读取徽章…' : v.pickerError || (badgeMode ? '没有找到匹配的徽章' : '没有找到匹配的趣味指标');
+    return `<div class="dialog-backdrop rank-sheet-backdrop" data-rank-dismiss="rankToggleMetrics"><section class="rank-sheet rank-metrics-sheet" role="dialog" aria-modal="true" aria-label="选择趣味指标或徽章">
+      <div class="rank-sheet-handle" aria-hidden="true"></div><div class="rank-sheet-header">
+      <div class="rank-picker-modes" role="group" aria-label="查询模式">${choices(v.pickerModes, v.pickerMode, 'rankPickerMode', 'rank-picker-mode')}</div>${btn('rank-sheet-close', 'rankToggleMetrics', '关闭')}</div>
+      <label class="rank-picker-search"><img class="rank-picker-search-icon" src="/assets/board-search.svg" alt=""><input class="rank-picker-input" type="search" maxlength="100" data-input="rankPickerSearch" placeholder="${v.pickerPlaceholder}" aria-label="${v.pickerPlaceholder}" value="${esc(v.pickerQuery)}"></label>
+      <div class="fun-categories" role="group" aria-label="分类">${choices(v.funCategories, v.funCategory, 'funRankCategory')}</div>
+      <div class="fun-options-count" role="status">${v.pickerLoading || v.pickerError ? '' : v.pickerCount}</div>
+      <div class="fun-metric-options">${rows || '<div class="small muted rank-category-empty" role="status">' + esc(message) + (v.pickerError ? btn('secondary', 'rankPickerRetry', '重试') : '') + '</div>'}</div>
+      <div class="fun-scroll-hint"><span data-fun-scroll-hint hidden>下滑查看更多</span></div><div class="rank-sheet-footer">
+      ${pending ? '<div class="rank-sheet-note">已选　<strong class="rank-picker-selected">' + esc(pending.title) + '</strong>' + (pending.roleLabel ? ' · ' + esc(pending.roleLabel) + (badgeMode ? '徽章' : '') : '') + '</div>' : ''}
+      ${btn('rank-confirm','funRankConfirm',v.pickerAction,null,!pending || state.rankLoading)}</div></section></div>`;
   }
   function updateFunOptionsScrollHint() {
     const list = app.querySelector('.fun-metric-options'), hint = app.querySelector('[data-fun-scroll-hint]');
@@ -1397,6 +1419,7 @@
       return '<button type="button" class="rank-metric ' + item[0] + (selected ? ' selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + selected + '"' + (item[0] === 'points' && !state.rankPointsAvailable || item[0] === 'fun' && !state.rankFunMetrics.length ? ' disabled' : '') + '><span class="rank-metric-label">' + item[1] + '<span class="rank-metric-indicator" aria-hidden="true"></span></span></button>';
     }).join('') + '</div>';
     if (['overall','good','evil'].includes(metric)) html += '<div class="rank-rates" role="group" aria-label="胜率阵营">' + rankMetrics.filter(item => ['overall','good','evil'].includes(item[0])).map(item => '<button type="button" class="' + (metric === item[0] ? 'selected' : '') + '" data-action="rankMetric" data-value="' + item[0] + '" aria-pressed="' + (metric === item[0]) + '">' + item[1] + '</button>').join('') + '</div>';
+    if (board?.eligibilityLabel && metric === board.metric) html += '<div class="small muted">' + esc(board.eligibilityLabel) + '</div>';
     if (metric.startsWith('fun_')) html += viewFunRankFilters(board);
     if (state.rankLoading && !board) html += '<div class="rank-share-status small muted" role="status">正在读取榜单…</div>';
     if (state.rankNotice) html += '<div role="status" class="rank-notice small muted">' + esc(state.rankNotice) + '</div>';
@@ -1429,81 +1452,112 @@
     }
     return html + '</section>';
   }
-  async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt()) {
+  async function renderMonthlyPoster(report) {
+    const card = monthlyCard.cardFromReport(report);
+    const images = new Map(await Promise.all(monthlyCard.imagePaths(card).map(path => new Promise(resolve => {
+      const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
+      const timer = setTimeout(() => done(null), 3000);
+      image.onload = () => done(image.width && image.height ? image : null);
+      image.onerror = () => done(null);
+      image.src = path;
+    }))));
+    const canvas = document.createElement('canvas');
+    const { width, height, scale } = monthlyCard.renderDimensions(card);
+    Object.assign(canvas, { width, height });
+    const context = canvas.getContext('2d');
+    context.save();
+    try { if (scale !== 1) context.scale(scale, scale); monthlyCard.drawCard(context, card, images); }
+    finally { context.restore(); }
+    const src = canvas.toDataURL('image/png');
+    if (!src.startsWith('data:image/png')) throw new Error('图片生成失败，请重试。');
+    return { src, width, height, asOf: card.asOf, description: monthlyCard.describe(card), targets: monthlyCard.playerTargets(card, report) };
+  }
+  async function loadMonthlyReport(month = state.monthlyMonth || monthlyPresentation.monthAt(), forShare = false) {
     const sequence = ++monthlySequence, route = routeSequence;
-    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', monthlyReport: null, monthlyImages: [], monthlySharing: false });
+    const active = () => sequence === monthlySequence && route === routeSequence && state.page === 'monthly' && foreground;
+    const previous = state.monthlyReport?.month === month ? state.monthlyReport : null;
+    setState({ monthlyMonth: month, monthlyRoster: null, monthlyLoading: true, monthlyError: '', ...(previous ? {} : { monthlyReport: null, monthlyPoster: null }) });
     try {
       const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
-      if (sequence !== monthlySequence || route !== routeSequence || state.page !== 'monthly' || !foreground) return;
-      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyLoading: false });
+      if (!active()) return;
+      const report = monthlyPresentation.presentReport(response);
+      let poster = null;
+      if (report.canShare) {
+        if (state.monthlyPoster && previous?.version === report.version && (forShare || state.monthlyPoster.asOf === report.asOfLabel)) {
+          poster = state.monthlyPoster;
+        } else {
+          setState({ monthlyReport: report, monthlyPoster: null });
+          poster = await renderMonthlyPoster(report);
+        }
+      }
+      if (!active()) return;
+      setState({ monthlyReport: report, monthlyPoster: poster, monthlyLoading: false });
+      return poster;
     } catch (error) {
-      if (sequence === monthlySequence && route === routeSequence && state.page === 'monthly') setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message });
+      if (active()) setState({ monthlyLoading: false, monthlyError: error.status === 404 ? '当前服务尚未开放月度战报，请更新服务端后重试。' : error.message,
+        ...(error.status && error.status < 500 && error.status !== 429 ? { monthlyReport: null, monthlyPoster: null } : {}) });
     }
   }
-  function viewMonthlyBoard(board) {
-    if (!board.rows.length) return '';
-    return '<section class="monthly-board" aria-label="' + esc(board.title) + '"><header class="monthly-board-header"><img class="monthly-heading-icon" src="' + esc(board.iconPath) + '" alt=""><div class="monthly-heading-copy"><h2 class="monthly-section-title">' + esc(board.title) + '</h2><p class="monthly-caption monthly-board-caption">' + esc(board.subtitle) + '</p></div><span class="monthly-top-label">前三名</span></header><ol class="monthly-list">' + board.rows.map(row => '<li><button type="button" class="monthly-row' + (row.rank === 1 ? ' monthly-row-first' : '') + '" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="' + esc((row.tied ? '并列' : '') + '第' + row.rank + '名，' + row.nickname + '，' + row.value + board.unit + '，查看玩家战绩') + '"><span class="monthly-rank monthly-rank-' + row.rank + '" aria-hidden="true"><img src="/assets/monthly-laurel-' + row.rank + '.svg" alt=""><span>' + esc(row.rankLabel) + '</span></span><span class="monthly-avatar" aria-hidden="true">' + (row.avatarUrl ? '<img src="' + esc(row.avatarUrl) + '" alt="">' : esc(row.initial)) + '</span><span class="monthly-identity"><span class="monthly-name-line"><span class="monthly-name">' + esc(row.nickname) + '</span>' + (row.tied ? '<span class="monthly-tied">并列</span>' : '') + '</span><span class="monthly-caption">' + esc(row.secondaryLabel) + '</span></span><span class="monthly-value' + (row.valueCompact ? ' monthly-compact' : '') + '">' + esc(row.value) + '<span class="monthly-unit">' + esc(board.unit) + '</span></span></button></li>').join('') + '</ol></section>';
+  function openMonthlyRoster(el) {
+    if (!state.monthlyPoster || state.monthlyLoading || state.monthlyError || !foreground) return;
+    const { board, rank } = el.dataset;
+    const roster = monthlyCard.rosterFor(state.monthlyReport, board, rank);
+    if (!roster) return;
+    setState({ monthlyRoster: { ...roster, board, rank } });
+    app.querySelector('.monthly-roster-close')?.focus({ preventScroll: true });
+  }
+  function closeMonthlyRoster() {
+    const roster = state.monthlyRoster;
+    if (!roster) return;
+    setState({ monthlyRoster: null });
+    Array.from(app.querySelectorAll('[data-action="monthlyRoster"]')).find(el =>
+      el.dataset.board === roster.board && el.dataset.rank === roster.rank)?.focus({ preventScroll: true });
+  }
+  function viewMonthlyRoster(roster) {
+    const members = roster.members.map(row => '<button type="button" class="monthly-roster-person" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="查看' + esc(row.name) + '的战绩"><span class="monthly-roster-avatar">' +
+      (row.avatar ? '<img class="monthly-roster-image" loading="lazy" src="' + esc(row.avatar) + '" alt="">' : '') + '</span><span>' + esc(row.name) +
+      (row.sample ? '<small class="monthly-roster-sample">' + esc(row.sample) + '</small>' : '') + '</span></button>').join('');
+    return '<div class="monthly-roster-backdrop" data-rank-dismiss="monthlyRosterClose"><section class="monthly-roster-sheet" role="dialog" aria-modal="true" aria-label="' + esc(roster.title + '，' + roster.place) + '">' +
+      '<div class="monthly-roster-grip" aria-hidden="true"></div><button type="button" class="monthly-roster-close" data-action="monthlyRosterClose" aria-label="关闭名单">×</button>' +
+      '<div class="monthly-roster-title">' + esc(roster.title) + '</div><div class="monthly-roster-heading"><span class="monthly-roster-place">' + esc(roster.place) + '</span>' + esc(roster.result) +
+      '</div><div class="monthly-roster-total">' + roster.members.length + ' 位玩家</div><div class="monthly-roster-scroll"><div class="monthly-roster-grid">' + members + '</div></div></section></div>';
   }
   function viewMonthlyReport() {
-    const report = state.monthlyReport, month = state.monthlyMonth || monthlyPresentation.monthAt(), category = state.monthlyCategory;
-    let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page' + (report?.canShare ? ' monthly-has-share' : '') + '"><header class="monthly-hero"><img class="monthly-hero-art" src="/assets/monthly-report-background.jpg" alt=""><div class="monthly-hero-content"><label class="monthly-month-picker"><span class="monthly-year">' + esc(month.slice(0, 4)) + ' 年</span><span class="monthly-month-line"><span class="monthly-month-number">' + Number(month.slice(5)) + '</span><span class="monthly-month-unit">月</span><span class="monthly-picker-arrow" aria-hidden="true"></span></span><input type="month" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth" aria-label="选择月报月份"></label>' + (report ? '<div class="monthly-preview-status"><span class="monthly-status-dot' + (report.status === 'preview' ? '' : ' monthly-status-complete') + '" aria-hidden="true"></span>' + (report.status === 'preview' ? '本月实时更新' : '完整月报') + '</div>' : '') + '</div></header>';
-    if (state.monthlyLoading) html += '<div class="status" role="status">正在生成月度战报…</div>';
+    const report = state.monthlyReport, poster = state.monthlyPoster, month = state.monthlyMonth || monthlyPresentation.monthAt();
+    let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page">';
     if (state.monthlyError) html += '<div class="inline-error" role="alert">' + esc(state.monthlyError) + btn('secondary', 'monthlyRetry', '重试', null, state.monthlyLoading) + '</div>';
-    if (!report || state.monthlyLoading) return html + '</section>';
-    html += '<div class="monthly-overview">' + [[report.overview.games, '有效对局'], [report.overview.players, '参赛玩家']].map(([value, label]) => '<div><span class="monthly-overview-value">' + value + '</span><span class="monthly-caption">' + label + '</span></div>').join('') + '<button type="button" data-action="monthlyRules" aria-label="查看月报统计说明"><img src="/assets/record-info.svg" alt=""></button></div>';
-    if (!report.canShare) html += '<div class="monthly-empty">这个月还没有有效对局<p class="monthly-caption">换一个月份，或完成对局后再来看看。</p></div>';
-    else {
-      html += '<div class="monthly-tabs" role="tablist" aria-label="月报类别">' + [['overall', '综合榜单'], ['honors', '趣味荣誉'], ['fun', '娱乐榜']].map(([id, label]) => '<button type="button" id="monthly-tab-' + id + '" role="tab" data-action="monthlyEdition" data-value="' + id + '" aria-selected="' + (id === category) + '" aria-controls="monthly-board-panel" class="' + (id === category ? 'selected' : '') + '">' + label + '</button>').join('') + '</div>';
-      const boards = category === 'overall' ? [...report.coreBoards, ...report.extraBoards] : monthlyPresentation.detailBoards(report, 'count', !!state.monthlyEntertainment);
-      html += '<div class="monthly-boards" id="monthly-board-panel" role="tabpanel" aria-labelledby="monthly-tab-' + category + '">' + boards.map(viewMonthlyBoard).join('') + '</div>';
-      html += '<div class="monthly-share-bar"><div class="monthly-share-inner"><button type="button" class="monthly-share" data-action="monthlyShare"' + (state.monthlySharing || state.monthlyLoading || state.monthlyError ? ' disabled' : '') + '><img src="/assets/share-dark.svg" alt="">' + (state.monthlySharing ? '正在生成图片…' : '生成月报分享图') + '</button></div></div>';
-      if (state.monthlyImages?.length) {
-        html += '<div class="monthly-image-result"><div class="monthly-image-scroll" tabindex="0" aria-label="月报分享长图，可上下滚动查看"><img class="monthly-image-preview" src="' + state.monthlyImages[0] + '" alt="' + esc(report.monthLabel + '月度战报完整长图') + '"></div>';
-        html += btn('secondary', 'monthlyDownload', '保存长图') + '</div>';
-      }
-    }
-    return html + '</section>';
+    html += '<div class="monthly-stage"><div class="monthly-tools' + (poster ? ' monthly-cover-tools' : '') + '"><label class="monthly-picker monthly-month-control">' + (poster ? '' : esc(month)) + '<span class="monthly-arrow" aria-hidden="true"></span><input type="month" aria-label="选择月报月份" value="' + esc(month) + '" max="' + monthlyPresentation.monthAt() + '" min="' + esc(report && report.firstMonth < month ? report.firstMonth : month) + '" data-change="monthlyMonth"></label>' +
+      (report ? '<button type="button" class="monthly-rules-link" data-action="monthlyRules" aria-label="统计口径">' + (poster ? '<span class="monthly-info">i</span>' : '统计口径') + '</button>' : '') + '</div>';
+    if (state.monthlyLoading && !poster) html += '<div class="monthly-message" role="status">正在生成月度战报…</div>';
+    if (poster) {
+      const targets = poster.targets.map(item => {
+        const action = item.boardId ? 'data-action="monthlyRoster" data-board="' + esc(item.boardId) + '" data-rank="' + esc(item.rank) + '"' :
+          'data-action="monthlyPlayer" data-id="' + esc(item.publicId) + '"';
+        return '<foreignObject x="' + item.x + '%" y="' + item.y + '%" width="' + item.width + '%" height="' + item.height + '%"><button xmlns="http://www.w3.org/1999/xhtml" type="button" class="monthly-player" ' +
+          action + ' aria-label="' + esc(item.label) + '">' + (item.boardId ? '<span class="monthly-count-arrow" aria-hidden="true"></span>' : '') + '</button></foreignObject>';
+      }).join('');
+      html += '<div class="monthly-poster"><img class="monthly-poster-image" src="' + poster.src + '" width="' + poster.width + '" height="' + poster.height + '" alt="' + esc(poster.description) + '"><svg class="monthly-targets" xmlns="http://www.w3.org/2000/svg" aria-label="查看上榜玩家战绩">' + targets + '</svg></div>';
+      html += '<div class="monthly-share-bar">' + btn('monthly-share', 'monthlyShare', '生成分享图', null, !!(state.monthlyLoading || state.monthlyError)) + '</div>';
+    } else if (report && !report.canShare && !state.monthlyLoading && !state.monthlyError) html += '<div class="monthly-message">这个月还没有有效对局</div>';
+    html += '</div></section>';
+    return state.monthlyRoster ? '<div inert>' + html + '</div>' + viewMonthlyRoster(state.monthlyRoster) : html;
   }
   async function shareMonthlyReport() {
-    if (!state.monthlyReport?.canShare || state.monthlySharing || state.monthlyLoading || state.monthlyError) return;
-    const route = routeSequence, sequence = monthlySequence, month = state.monthlyMonth;
-    const active = () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly' && foreground;
-    setState({ monthlySharing: true, monthlyImages: [], monthlyError: '' });
-    try {
-      const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
-      if (!active()) return;
-      const cards = monthlyCard.cards(response);
-      const paths = [...new Set(cards.flatMap(card => monthlyCard.imagePaths(card)))];
-      const avatars = new Map(await Promise.all(paths.map(path => new Promise(resolve => {
-        const image = new Image(), done = value => { clearTimeout(timer); image.onload = image.onerror = null; resolve([path, value]); };
-        const timer = setTimeout(() => done(null), 3000);
-        image.onload = () => done(image.width && image.height ? image : null); image.onerror = () => done(null); image.src = path;
-      }))));
-      if (!active()) return;
-      const images = cards.map(card => {
-        const canvas = document.createElement('canvas'), { width, height, scale } = monthlyCard.renderDimensions(card);
-        Object.assign(canvas, { width, height });
-        const context = canvas.getContext('2d'); context.save();
-        try { if (scale !== 1) context.scale(scale, scale); monthlyCard.drawCard(context, card, avatars); }
-        finally { context.restore(); }
-        return canvas.toDataURL('image/png');
-      });
-      setState({ monthlyReport: monthlyPresentation.presentReport(response), monthlyImages: images });
-      app.querySelector('.monthly-image-result')?.scrollIntoView({ block: 'start' });
-    } catch (error) { if (active()) setState({ monthlyError: error.message }); }
-    finally { if (route === routeSequence && sequence === monthlySequence) setState({ monthlySharing: false }); }
+    if (!state.monthlyPoster || state.monthlyLoading || state.monthlyError) return;
+    const month = state.monthlyMonth;
+    const poster = await loadMonthlyReport(month, true);
+    if (!poster || poster !== state.monthlyPoster || state.page !== 'monthly' || !foreground) return;
+    const link = document.createElement('a');
+    link.href = poster.src;
+    link.download = '桌边助手-月度战报-' + month + '.png';
+    document.body.appendChild(link); link.click(); link.remove();
   }
   function openMonthlyPlayer(id) {
-    const row = [...(state.monthlyReport?.mainBoards || []), ...(state.monthlyReport?.funBoards || [])].flatMap(board => board.rows).find(row => row.publicId === id);
+    const row = (state.monthlyReport?.groups || []).flatMap(group => group.boards).flatMap(board => board.rows).find(row => row.publicId === id);
     if (!row || state.page !== 'monthly' || state.monthlyLoading || !foreground) return;
+    if (state.monthlyRoster) closeMonthlyRoster();
     const route = routeSequence, sequence = monthlySequence;
     return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '', initial: row.initial }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats', () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly');
-  }
-  function downloadMonthlyImage() {
-    const path = state.monthlyImages?.[0];
-    if (!path) return;
-    const link = document.createElement('a'); link.href = path; link.download = '桌边助手-月度战报-' + state.monthlyMonth + '.png';
-    document.body.appendChild(link); link.click(); link.remove();
   }
   function viewHelp() {
     return (state.helpFromLobby ? btn('text-button page-back', 'navigate', '‹ 返回对局', { page: 'lobby' }) : '') + personalTitle('帮助与规则', '', !state.helpFromLobby) + '<div class="personal-section"><h2 class="page-subtitle">从一张牌桌开始</h2><p>在「对局」创建房间，或输入朋友分享的6位房间码。全员入座并准备后，由房主开始发牌。</p><h2 class="page-subtitle">秘密只给自己看</h2><p>主动查看身份与视野；离开牌桌或切到后台后会遮盖。返回对局列表不会退出座位。</p><h2 class="page-subtitle">跟随现场节奏</h2><p>房主按需发起投票、任务和技能。操作收齐后自动结算，板子具体玩法可在创建页或牌桌的配置说明中查看。</p><h2 class="page-subtitle">记下每一局</h2><p>结束时由房主登记胜方。终止局和未登记胜负的局不计入胜率；陪测完成并登记胜负的对局正常计入；战绩按最终阵营归属。重开或解散牌桌不会删除已归档的战绩。</p><h2 class="page-subtitle">趣味记录与荣誉榜</h2><p>从「我的」进入趣味记录，点次数可回查对应对局。关闭积分也会记录；结束时请房主登记实际原因和刺杀目标，场上没有刺客时还需登记实际带刀人。好人挡刀会记录次数及成功率，比例按终局面对最终非空刀的有效机会计算。缺失过程保留未知。趣味排行跨板子汇总，可切换三炸车、被刺、歪刀、刀客刀中友方和骑士决斗友方等指标；次数与比例均可排名，反向指标的比例显示发生率；比例榜有有效机会即可参与，沿用公开展示开关。</p></div>' + viewScoreRules();
@@ -1548,7 +1602,8 @@
   }
   function confirm(title, content, showCancel, confirmLabel, receipt, roomContext, danger = false, info = null) {
     const about = info?.variant === 'about' ? info : null;
-    if (info && !about) return showFunRecord(info);
+    const password = info?.variant === 'room-password' ? document.getElementById('modal-password') : null;
+    if (info && !about && !password) return showFunRecord(info);
     if (!modal.hidden) return Promise.resolve(false);
     return new Promise(function (resolve) {
       var opener = document.activeElement;
@@ -1585,13 +1640,26 @@
       modalOk.textContent = confirmLabel || "确定";
       modalCancel.hidden = showCancel === false;
       modal.hidden = false;
-      (showCancel === false ? modalOk : modalCancel).focus();
+      if (password) { password.value = ""; password.hidden = false; password.focus(); }
+      else (showCancel === false ? modalOk : modalCancel).focus();
       function onKey(event) {
         if (event.key === "Escape" && (showCancel !== false || about)) { event.preventDefault(); done(false); }
+        else if (password && event.key === "Enter" && document.activeElement === password) { event.preventDefault(); done(true); }
+        else if (password && event.key === "Tab") {
+          event.preventDefault();
+          const controls = [password, modalCancel, modalOk], index = controls.indexOf(document.activeElement);
+          controls[(index + (event.shiftKey ? 2 : 1)) % 3].focus();
+        }
         else if (event.key === "Tab") { event.preventDefault(); (showCancel === false || document.activeElement === modalCancel ? modalOk : modalCancel).focus(); }
       }
       modal.addEventListener("keydown", onKey);
       function done(val) {
+        if (password) {
+          if (val && !password.reportValidity()) return;
+          if (val) val = password.value;
+          password.value = "";
+          password.hidden = true;
+        }
         modal.hidden = true;
         modal.removeEventListener("keydown", onKey);
         if (opener && opener.isConnected) opener.focus();
@@ -1670,8 +1738,8 @@
   const grantNotifier = avoidancePresentation.createGrantNotifier({
     setTimeout, clearTimeout,
     account: () => storage.get('session'),
-    read: () => request('/api/me/avoidance/notice'),
-    ack: through => request('/api/me/avoidance/notice', 'POST', { through }),
+    read: () => request('/api/me/cards/notice'),
+    ack: through => request('/api/me/cards/notice', 'POST', { through }),
     canShow() {
       if (!alive || !foreground || !state.network || !modal.hidden || !badgeNoticeHost.hidden || pending || grantNoticeOpen || state.page !== 'table') return false;
       if (state.room?.phase !== 'lobby') return false;
@@ -1680,7 +1748,9 @@
     update(value) {
       const patch = {};
       if (state.profile?.avoidance && state.profile.avoidance.balance !== value.balance) patch.profile = { ...state.profile, avoidance: { ...state.profile.avoidance, balance: value.balance } };
-      if (state.room?.me?.avoidance && state.room.me.avoidance.balance !== value.balance) patch.room = { ...state.room, me: { ...state.room.me, avoidance: { ...state.room.me.avoidance, balance: value.balance } } };
+      const card = state.room?.me?.avoidance;
+      if (card && value.totalBalance != null && (card.balance !== value.balance || card.totalBalance !== value.totalBalance))
+        patch.room = { ...state.room, me: { ...state.room.me, avoidance: { ...card, balance: value.balance, totalBalance: value.totalBalance } } };
       if (Object.keys(patch).length) setState(patch);
     },
     async show(value) {
@@ -1941,6 +2011,7 @@ function roomListItems(rooms) {
     var room;
     try {
       room = await request("/api/rooms/" + code);
+      if (avoidancePresentation.needsCardTotal(room)) room = await avoidancePresentation.roomWithCardTotal(room, request);
     } catch (e) {
       if (!alive || code !== roomCode || sequence !== refreshSequence) return;
       if (e.status === 404 || e.status === 403 || e.status === 410) {
@@ -2238,7 +2309,7 @@ function roomListItems(rooms) {
       } else {
         setState({ notice: "" });
         await refresh();
-        if (p.data.type === 'avoidance') toast(p.data.role === null ? '本局不使用回避卡' : '本局回避已保存，生效后才扣卡');
+        if (p.data.type === 'avoidance') toast(p.data.role === null ? '已取消本局用卡' : '本局选择已保存，生效后才扣卡');
       }
     } catch (e) {
       if (e.status && e.status < 500 && e.status !== 401 && e.status !== 429) {
@@ -2297,7 +2368,7 @@ function roomListItems(rooms) {
     var option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = state.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? {reverseTarget:state.resultReverseTarget} : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.boardFields?.length ? { boardChoices:state.resultBoardChoices } : {}), ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? {reverseTarget:state.resultReverseTarget} : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(state), stage = room.stage;
     resultConfirming = true;
     try {
@@ -2343,6 +2414,13 @@ function roomListItems(rooms) {
         html += '<div class="score-reasons" role="group" aria-label="登记方式">' + reasons.map(reason => '<button type="button" class="secondary score-choice '+(state.resultReason===reason.id?'is-selected':'')+'" data-action="pickScoreReason" data-id="'+esc(reason.id)+'" aria-pressed="'+(state.resultReason===reason.id)+'">'+mark+'<span class="score-choice-title">'+esc(reason.label)+'</span></button>').join('')+excluded+'</div>';
       } else {
         html += '<div class="score-option-heading"><strong>仅登记胜方</strong><span>不计积分</span></div><div class="score-winners" role="group" aria-label="仅登记胜方">'+(room.winnerOptions || []).map(option => '<button type="button" class="secondary score-choice '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>').join('')+'</div>'+(reasons.length?'':excluded);
+      }
+    } else if (step === 'board') {
+      for (const field of flow.resultBoardFields) {
+        html += '<div class="score-board-field"><h3 class="score-section-title">'+esc(field.label)+'</h3><div class="score-reasons">'+field.options.map(option => {
+          const selected = field.selected?.value === option.value;
+          return '<button class="secondary score-choice '+(selected?'is-selected':'')+'" data-action="pickBoardChoice" data-field="'+esc(field.id)+'" data-value="'+esc(option.value)+'" aria-pressed="'+selected+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>';
+        }).join('')+'</div></div>';
       }
     } else if (step === 'actor' || step === 'reverse' || step === 'target') {
       const reverse = step === 'reverse', actor = step === 'actor';
@@ -2406,7 +2484,7 @@ function roomListItems(rooms) {
     return html + '</div></section>';
   }
   function viewMatchDetails(record) {
-    const winner = ({good:'好人',evil:'坏人',third:'盗贼'})[record.winner];
+    const winner = rolePortraits.factionNames[record.winner];
     let html = '<div class="match-details"><div class="match-result"><span>' + (winner ? winner + '获胜' : '胜方未登记') + '</span><span class="match-source muted">' + ({manual:'房主登记',system:'系统判定'}[record.source] || '未判定') + '</span></div>';
     for (const [label, value] of [['不计入原因',record.excludedReason],['结束原因',record.scoreEndReason]]) if (value) html += '<div class="match-detail-row"><span>' + label + '</span><span>' + esc(value) + '</span></div>';
     html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun, record.role || '') + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures), true);
@@ -2476,7 +2554,7 @@ function roomListItems(rooms) {
     const option = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).find(item => item.key === state.rankMetric);
     const rateLabel = option?.rateLabel || board?.rateLabel || '成功率';
     const identity = board?.roleOptions?.find(item => item.id === state.rankFunRole)?.label || option?.roleLabel;
-    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标"><span class="fun-metric-current"><span class="fun-option-heading"><span class="fun-metric-name">' + esc(option?.title || '选择指标') + '</span>' + (identity ? '<span class="fun-identity">' + esc(identity) + '</span>' : '') + '</span><span class="fun-metric-description">' + esc(option?.conditionLabel || option?.label || '') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + (board?.countOnly ? ['count'] : ['count','rate']).map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? board?.metric?.startsWith('fun_honor_') ? '获奖次数' : '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
+    let html = '<div class="fun-rank-filters"><button type="button" class="fun-metric-toggle" data-action="rankToggleMetrics" aria-expanded="' + !!state.rankMetricsExpanded + '" aria-label="选择趣味指标或徽章"><span class="fun-metric-current"><span class="fun-option-heading"><span class="fun-metric-name">' + esc(option?.title || '选择指标') + '</span>' + (identity ? '<span class="fun-identity">' + esc(identity) + '</span>' : '') + '</span><span class="fun-metric-description">' + esc(option?.conditionLabel || option?.label || '') + '</span></span><span class="fun-filter-chevron" aria-hidden="true"></span></button><div class="fun-sort-row"><div class="fun-sort" role="group" aria-label="排序方式">' + (board?.countOnly ? ['count'] : ['count','rate']).map(sort => '<button type="button" class="' + (sort === state.rankFunSort ? 'selected' : '') + '" data-action="funRankSort" data-value="' + sort + '" aria-pressed="' + (sort === state.rankFunSort) + '">按' + (sort === 'count' ? board?.metric?.startsWith('fun_honor_') ? '获奖次数' : '次数' : esc(rateLabel)) + '</button>').join('') + '</div><span class="fun-sort-direction">由高到低</span></div>';
     if (board?.roleOptions?.length) html += '<label class="fun-role-filter"><span class="fun-filter-label">技能身份</span><select class="fun-picker" data-change="funRankRole" aria-label="技能身份">' + [{ id: '', label: '全部身份' }, ...board.roleOptions].map(item => '<option value="' + esc(item.id) + '"' + (item.id === state.rankFunRole ? ' selected' : '') + '>' + esc(item.label) + '</option>').join('') + '</select></label>';
     return html + '</div>';
   }
@@ -2527,7 +2605,13 @@ function roomListItems(rooms) {
       html += '<div class="score-rules-table"><table><caption class="sr-only">角色与三种结局的基础积分对照表</caption><thead><tr><th scope="col">角色 / 阵营</th>';
       html += rules.table.columns.map(column => '<th scope="col">' + esc(column.label) + '<span class="score-rules-caption">' + esc(column.caption) + '</span></th>').join('') + '</tr></thead><tbody>';
       html += rules.table.rows.map(row => '<tr><th scope="row" class="score-rules-role ' + esc(row.faction) + '">' + esc(row.label) + '</th>' + row.scores.map(points => '<td class="' + (points === 0 ? 'is-zero' : '') + '">' + (points > 0 ? '+' : '') + esc(points) + '</td>').join('') + '</tr>').join('');
-      html += '</tbody></table></div><h3>额外加分</h3>' + rules.bonuses.map(bonus => '<div class="score-rules-bonus ' + (bonus.id === 'shield' ? 'is-shield' : '') + '"><h4>' + esc(bonus.label) + '<span>' + (bonus.points > 0 ? '+' : '') + esc(bonus.points) + ' 分</span></h4><p class="muted">' + esc(bonus.text) + '</p></div>').join('');
+      html += '</tbody></table></div>';
+      for (const board of rules.boardSections || []) {
+        html += '<details class="score-board-rules"><summary>'+esc(board.title)+'计分规则</summary><p class="muted">'+esc(board.note)+'</p>'+board.scenarios.map(row =>
+          '<div class="score-board-row"><strong>'+esc(row.label)+'</strong><div class="score-board-values">'+row.scores.map(score =>
+            '<span>'+esc(score.label)+' <b>'+(score.points>0?'+':'')+esc(score.points)+'</b></span>').join('')+'</div></div>').join('')+'</details>';
+      }
+      html += '<h3>额外加分</h3>' + rules.bonuses.map(bonus => '<div class="score-rules-bonus ' + (bonus.id === 'shield' ? 'is-shield' : '') + '"><h4>' + esc(bonus.label) + '<span>' + (bonus.points > 0 ? '+' : '') + esc(bonus.points) + ' 分</span></h4><p class="muted">' + esc(bonus.text) + '</p></div>').join('');
     } else html += rules.items.map(item => '<p><strong>' + esc(item.label) + '</strong><br><span class="muted">' + esc(item.text) + '</span></p>').join('');
     return html + '<h3>计分范围</h3><p class="muted">' + esc(rules.scopeLabel) + '</p><h3>补充说明</h3>' + rules.notes.map(note => '<p class="small muted">' + esc(note) + '</p>').join('') + '</section>';
   }
@@ -2881,7 +2965,7 @@ function roomListItems(rooms) {
     try {
       const value = await request('/api/rooms/' + room.code + '/avoidance');
       if (!alive || !foreground || gen !== generation || !state.avoidanceOpen || state.room?.code !== value.code || state.room.stage !== value.stage || value.phase !== 'lobby') return;
-      setState({ avoidance: value, avoidanceLoading: false, avoidanceDraft: value.selected || '', avoidanceDraftName: value.options.find(o => o.id === value.selected)?.name || '', avoidanceGroups: avoidancePresentation.groups(value.options, value.selected) });
+      setState({ ...avoidancePresentation.panel(value), avoidanceLoading: false });
       app.querySelector('.avoidance-close')?.focus({ preventScroll: true });
     } catch (error) { if (gen === generation && foreground) { closeAvoidance(); handleError(error); } }
   }
@@ -2893,18 +2977,45 @@ function roomListItems(rooms) {
   function viewAvoidance() {
     if (!state.avoidanceOpen || state.page !== 'table' || state.room?.phase !== 'lobby' || state.error || !modal.hidden) return '';
     const value = state.avoidance;
-    let body = '', footer = '';
-    if (state.avoidanceLoading) body = '<div class="avoidance-note" role="status">正在读取回避卡…</div>';
-    else {
-      const locked = !value?.editable || value.balance < 1 || state.busy || !!pending;
-      body = '<div class="avoidance-note">' + (value.balance < 1 ? '暂无回避卡' : !value.editable ? '当前无法使用回避卡' : '发牌前可随时修改，生效后才扣 1 张。') + '</div>';
-      body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
-      body += '<div class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。</div>';
-      if (!value.editable || value.balance < 1) footer = btn('primary','closeAvoidance','知道了');
-      else if (value.selected && state.avoidanceDraft === value.selected) footer = btn('secondary','cancelAvoidance','不避开了（不扣卡）',null,locked || !state.network);
-      else footer = btn('primary','saveAvoidance',state.avoidanceDraft ? (value.selected ? '改成避开' : '避开') + state.avoidanceDraftName : '点一个角色',null,!state.avoidanceDraft || locked || !state.network);
+    const faction = value?.tab === 'faction', draft = state.avoidanceDraft;
+    let tabs = '', body = '', footer = '';
+    if (state.avoidanceLoading) {
+      body = '<div class="avoidance-note" role="status">正在读取本局用卡…</div>';
+      footer = btn('primary','closeAvoidance','知道了');
+    } else {
+      const balance = faction ? value.factionBalance : value.balance;
+      const locked = !value.editable || !balance || state.busy || !!pending;
+      tabs = '<div class="card-tabs">' + ['faction', 'avoidance'].map(tab => {
+        const active = tab === 'faction' ? faction : !faction;
+        const label = tab === 'faction' ? '阵营卡 ×' + (value.factionBalance || 0) : '回避卡 ×' + value.balance;
+        return '<button type="button" data-action="switchCardTab" data-tab="' + tab + '" class="' + (active ? 'active' : '') + '" aria-pressed="' + active + '">' + esc(label) + '</button>';
+      }).join('') + '</div>';
+      body = '<div class="card-question">' + (faction ? '这局想加入哪个阵营？' : '这局想避开哪个角色？') + '</div>';
+      if (!balance || !value.editable) body += '<div class="avoidance-note">' + (!balance ? (faction ? '暂无阵营卡' : '暂无回避卡') : '当前无法使用本局用卡') + '</div>';
+      if (faction) {
+        body += '<div class="faction-choices">' + value.factions.map(option => {
+          const chosen = draft === option.id;
+          return '<button type="button" class="faction-choice faction-' + option.id + (chosen ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + option.id + '" aria-pressed="' + chosen + '"' + (locked ? ' disabled' : '') + '>'
+            + (chosen ? '<span class="card-check" aria-hidden="true">✓</span>' : '') + '<span class="faction-emblem" aria-hidden="true">'
+            + (option.icon ? '<img src="' + esc(option.icon) + '" alt="">' : '<span class="faction-diamond"></span>') + '</span>' + esc(option.name) + '</button>';
+        }).join('') + '</div>';
+        if (value.exampleText) body += '<div class="faction-examples">' + value.examples.map(o => '<img src="' + esc(o.portrait) + '" alt="">').join('') + '<span>' + esc(value.exampleText) + '</span></div>';
+      } else {
+        body += (state.avoidanceGroups || []).map(group => '<div class="avoidance-group"><div class="avoidance-faction faction-' + group.faction + '">' + group.label + '</div><div class="avoidance-grid">' + group.entries.map(role => '<button type="button" class="avoidance-role' + (role.selected ? ' is-selected' : '') + '" data-action="chooseAvoidance" data-id="' + esc(role.id) + '" aria-pressed="' + role.selected + '"' + (locked ? ' disabled' : '') + '><span class="avoidance-choice-mark" aria-hidden="true">' + (role.selected ? '✓' : '') + '</span><img src="' + esc(role.portrait) + '" alt="" /><div>' + esc(role.name) + '<span> ' + esc(role.countLabel) + '</span></div></button>').join('') + '</div></div>').join('');
+      }
+      if (draft && value.replaces) footer += '<div class="card-replace">确认后将替换「' + esc(value.replaces) + '」，原卡保留。</div>';
+      footer += '<div class="card-settlement">发牌时尽量满足选择，生效才扣 1 张。</div>';
+      const saved = faction ? value.selectedFaction : value.selected;
+      if (value.editable && saved && saved === draft) {
+        footer += btn('secondary','cancelAvoidance',faction ? '取消阵营选择（不扣卡）' : '不避开了（不扣卡）',null,state.busy || !!pending || !state.network);
+      } else if (!value.editable || !balance) {
+        footer += btn('primary','closeAvoidance','知道了');
+      } else {
+        const prefix = faction ? (value.replaces ? '改用阵营卡 · 选择' : '选择') : value.replaces ? '改用回避卡 · 避开' : saved ? '改成避开' : '避开';
+        footer += btn('primary','saveAvoidance',draft ? prefix + state.avoidanceDraftName : faction ? '选择一个阵营' : '点一个角色',null,!draft || locked || !state.network);
+      }
     }
-    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-icon"><img src="/assets/table-cards.svg" alt="" /></div><div class="avoidance-heading-copy"><div id="avoidance-title">这局想避开哪个角色？</div><span>' + ('回避卡 ×' + (value?.balance || 0) + ' · 仅你可见') + '</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭回避卡">×</button></div></div><div class="avoidance-body"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
+    return '<div class="avoidance-backdrop" data-avoidance-backdrop><section class="avoidance-sheet" role="dialog" aria-modal="true" aria-labelledby="avoidance-title"><div class="avoidance-top"><div class="avoidance-handle" aria-hidden="true"></div><div class="avoidance-heading"><div class="avoidance-heading-copy"><div id="avoidance-title">本局用卡</div><span>每局限用 1 张 · 仅你可见</span></div><button type="button" class="avoidance-close" data-action="closeAvoidance" aria-label="关闭本局用卡">×</button></div>' + tabs + '</div><div class="avoidance-body' + (faction ? ' card-short-body' : '') + '"><div class="avoidance-fields">' + body + '</div></div><div class="avoidance-footer">' + footer + '</div></section></div>';
   }
   function ready() {
     cmd("ready", { ready: !state.room.me.ready });
@@ -2980,7 +3091,7 @@ function roomListItems(rooms) {
       setState({ dealtIdentitySecret: {
         role: secret.role, faction: secret.faction, factionTone: factionTone(secret.faction),
         information: secret.information, skillStatus: secret.skillStatus,
-        avoidance: secret.avoidance,
+        avoidance: secret.factionCard || secret.avoidance,
       } });
       var close = app.querySelector && app.querySelector('.dealt-identity-dialog [data-action="closeDealtIdentity"]');
       if (close) close.focus({ preventScroll: true });
@@ -3229,7 +3340,7 @@ function roomListItems(rooms) {
             factionTone: factionTone(secret.faction),
             information: secret.information,
             skillStatus: secret.skillStatus,
-            avoidance: secret.avoidance,
+            avoidance: secret.factionCard || secret.avoidance,
           },
         });
       }
@@ -3610,6 +3721,7 @@ function roomListItems(rooms) {
       visible: false,
       fairyEnabled: false,
       scoreEnabled: false,
+      badgeEnabled: false,
       recordPurpose: "normal",
       dirty: false,
       pendingKick: !!settingsKickPending && settingsKickPending.code === roomCode,
@@ -3675,6 +3787,7 @@ function roomListItems(rooms) {
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
         scoreEnabled: room.scoreSettings?.enabled === true,
+        badgeEnabled: room.badgeSettings?.enabled === true,
         recordPurpose: room.recordSettings?.purpose || "normal",
         dirty: false,
       });
@@ -3696,14 +3809,9 @@ function roomListItems(rooms) {
         return b.id === boardId;
       })[0] || choices[0];
     if (!selected) return;
-    var scoreSettings = s.room?.scoreSettings;
     setSettings({
       fairyEnabled: capacity !== s.capacity ? capacity >= 8 : s.fairyEnabled,
-      scoreEnabled: scoreSettings && (capacity !== s.capacity || selected.id !== s.boardId)
-        ? scoreSettings.defaultEnabledBoards
-          ? scoreSettings.defaultEnabledBoards[selected.id]?.includes(capacity) === true
-          : capacity >= scoreSettings.defaultEnabledMinPlayers
-        : s.scoreEnabled,
+      scoreEnabled: capacity === s.capacity && selected.id === s.boardId && s.scoreEnabled,
       capacity: capacity,
       boardId: selected.id,
       choices: choices,
@@ -3718,6 +3826,7 @@ function roomListItems(rooms) {
       dirty:
         !!r &&
         (s.fairyEnabled !== (r.fairyEnabled === true) ||
+          !!r.badgeSettings && s.badgeEnabled !== r.badgeSettings.enabled ||
           !!r.scoreSettings && s.scoreEnabled !== r.scoreSettings.enabled ||
           !!r.recordSettings && s.recordPurpose !== r.recordSettings.purpose ||
           s.capacity !== r.capacity ||
@@ -3729,13 +3838,31 @@ function roomListItems(rooms) {
     var s = state.settings;
     return !s || s.loading || s.busy || s.pendingKick || s.pendingSave || !s.authorized;
   }
-  async function settingsSave() {
+  async function toggleProtectedSetting(kind, enabled) {
+    const s = state.settings, original = settingsOriginal;
+    if (settingsLocked() || !s.room?.[kind + "Settings"]?.editable) return;
+    let password;
+    if (enabled) {
+      setSettings({ busy: true, error: "" });
+      password = await confirm(kind === "score" ? "开启本局计分" : "开启徽章获取", "请输入管理员设置的房间设置密码。",
+        true, "开启", null, null, false, { variant: "room-password" });
+      if (state.settings !== s) return;
+      setSettings({ busy: false });
+      if (typeof password !== "string" || !alive || !foreground || !state.showRoomSettings || settingsOriginal !== original) return;
+    }
+    setSettings({ [kind + "Enabled"]: enabled });
+    updateSettingsDirty();
+    return settingsSave(password);
+  }
+  async function settingsSave(password) {
     var s = state.settings;
     if (!s || s.busy || s.pendingKick || !s.authorized || (!s.dirty && !s.pendingSave)) return;
     if (!settingsSavePending || settingsSavePending.code !== roomCode) {
       settingsSavePending = { id: requestId(), code: roomCode, data: {
         type: "updateSettings", stage: settingsOriginal.stage,
         board: s.boardId, capacity: s.capacity, visible: s.visible, fairyEnabled: s.fairyEnabled,
+        ...(typeof password === "string" ? { settingsPassword: password } : {}),
+        ...(settingsOriginal.badgeSettings ? { badgeEnabled: s.badgeEnabled } : {}),
         ...(settingsOriginal.scoreSettings ? { scoreEnabled: s.scoreEnabled } : {}),
         ...(settingsOriginal.recordSettings ? { recordPurpose: s.recordPurpose } : {}),
       } };
@@ -3753,6 +3880,10 @@ function roomListItems(rooms) {
       if (e.status && e.status < 500 && ![401, 429].includes(e.status) && settingsSavePending === saved)
         settingsSavePending = null;
       if (!alive || state.settings !== s) return;
+      if (!settingsSavePending && typeof saved.data.settingsPassword === "string") {
+        setSettings({ badgeEnabled: !!settingsOriginal.badgeSettings?.enabled, scoreEnabled: !!settingsOriginal.scoreSettings?.enabled });
+        updateSettingsDirty();
+      }
       setSettings({ error: e.message, pendingSave: settingsSavePending === saved,
         authorized: e.status === 403 ? false : s.authorized });
       if (e.status === 409) {
@@ -3790,7 +3921,7 @@ function roomListItems(rooms) {
     var s = state.settings;
     var requestData = settingsKickPending;
     if (!s || s.busy || !requestData || requestData.code !== roomCode) return;
-    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled, scoreEnabled: s.scoreEnabled, recordPurpose: s.recordPurpose } : null;
+    var draft = s.dirty ? { capacity: s.capacity, boardId: s.boardId, visible: s.visible, fairyEnabled: s.fairyEnabled, scoreEnabled: s.scoreEnabled, badgeEnabled: s.badgeEnabled, recordPurpose: s.recordPurpose } : null;
     setSettings({ busy: true, pendingKick: true, error: "" });
     try {
       await login();
@@ -3802,7 +3933,7 @@ function roomListItems(rooms) {
       if (state.settings === s && s.authorized && draft) {
         setSettings({ visible: draft.visible });
         updateSettingsChoices(draft.capacity, draft.boardId);
-        setSettings({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, recordPurpose: draft.recordPurpose });
+        setSettings({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, badgeEnabled: draft.badgeEnabled, recordPurpose: draft.recordPurpose });
         updateSettingsDirty();
       }
       if (foreground) toast("玩家已移出");
@@ -4611,8 +4742,16 @@ function roomListItems(rooms) {
     let lobbyActionHtml = "";
     if (r.phase === "lobby") {
       const blocked = state.busy || !!pending || !state.network, card = r.me.avoidance;
+      let cardEntry = "";
+      if (r.me.seat !== null && card) {
+        const hasCount = Number.isSafeInteger(card.totalBalance);
+        const label = '用卡' + (hasCount ? '，共 ' + card.totalBalance + ' 张' : '，张数待同步') + (card.selected ? '，本局已选' : '');
+        cardEntry = '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + label + '"' + (blocked ? ' disabled' : '') + '>' +
+          '<span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /><span>' + (hasCount ? '×' + card.totalBalance : '…') + '</span></span>' +
+          '<span class="avoidance-entry-state">' + (card.selected ? '✓ 已选' : '用卡') + '</span></button>';
+      }
       lobbyActionHtml = '<div class="web-lobby-action-bar"><div class="web-lobby-action-inner">' +
-        (r.me.seat !== null && card ? '<button type="button" class="web-avoidance-entry" data-action="openAvoidance" aria-label="' + esc('回避卡' + card.balance + '张，' + (card.selected ? '本局已选择角色' : '选择本局回避角色')) + '"' + (blocked ? ' disabled' : '') + '><span class="avoidance-entry-line"><img src="/assets/table-cards.svg" alt="" /><span>×' + esc(card.balance) + '</span></span><span class="avoidance-entry-state">' + (card.selected ? '已选择' : '回避卡') + '</span></button>' : '') +
+        cardEntry +
         (r.me.seat !== null ? btn(r.me.ready ? 'secondary' : 'primary', 'ready', r.me.ready ? '取消准备' : '准备', null, blocked) : '<span class="web-lobby-spectator-hint">' + (r.players.length < r.capacity ? '选择空位入座' : '座位已满，正在围观') + '</span>') +
         (r.me.isHost ? '<button type="button" class="' + (state.canStart ? 'primary' : 'secondary') + '" data-action="start" aria-label="' + esc(state.canStart ? '发放身份' : '发放身份，' + (state.startHint || '等待所有玩家准备')) + '"' + (blocked || !state.canStart ? ' disabled' : '') + '>发放身份</button>' : '') + '</div></div>';
     }
@@ -4762,7 +4901,7 @@ function roomListItems(rooms) {
             ? "好人获胜"
             : r.result.winner === "evil"
               ? "坏人获胜"
-              : r.result.winner === "third" ? "盗贼阵营获胜" : (r.flexible || r.assisted || r.offlineAssassination) && r.phase === "ended"
+              : r.winnerLabel ? esc(r.winnerLabel) : r.result.winner === "third" ? "盗贼阵营获胜" : (r.flexible || r.assisted || r.offlineAssassination) && r.phase === "ended"
                 ? "以线下结算为准"
                 : "不判胜负";
         html +=
@@ -4915,7 +5054,7 @@ function roomListItems(rooms) {
       '<div class="dialog-backdrop"><div class="error-dialog" role="dialog" aria-modal="true">' +
       '<div class="dialog-title">房间设置</div>';
     if (s.loading) html += '<div class="muted settings-loading">正在加载房间设置…</div>';
-    else if (s.error)
+    else if (s.error && (!s.authorized || s.pendingSave || s.dirty || s.pendingKick))
       html +=
         '<div class="settings-error">' +
         esc(s.error) +
@@ -4925,6 +5064,7 @@ function roomListItems(rooms) {
         "</div>";
     else if (s.authorized && s.room) {
       var room = s.room;
+      if (s.error) html += '<div class="settings-error" role="alert">' + esc(s.error) + '</div>';
       html +=
         '<div class="settings-header"><div class="settings-eyebrow">房间 ' +
         esc(room.code) +
@@ -4977,8 +5117,12 @@ function roomListItems(rooms) {
       }
       html += "</div>";
       if (room.recordSettings) html += '<div class="settings-section-title">对局用途</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>仅测试，不计战绩</span><span class="settings-caption">保留对局记录，不计入胜率、积分和趣味统计。' + (room.recordSettings.editable ? '发牌后固定' : '本局设置已固定') + '</span></span><input type="checkbox" aria-label="仅测试，不计战绩" data-change="settingsRecordPurpose"' + (s.recordPurpose === "test" ? ' checked' : '') + (settingsLocked() || !room.recordSettings.editable ? ' disabled' : '') + ' /></label></div>';
+      if (room.badgeSettings) html += '<div class="settings-section-title">徽章</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>徽章获取</span><span class="settings-caption">' +
+        (s.badgeEnabled ? '本局计入徽章进度' : '本局不计入徽章进度') + ' · ' + (room.badgeSettings.editable ? (s.badgeEnabled ? '发牌后固定' : '开启需要密码') : '本局设置已固定') +
+        '</span></span><input type="checkbox" aria-label="徽章获取" data-change="settingsBadges"' + (s.badgeEnabled ? ' checked' : '') +
+        (settingsLocked() || !room.badgeSettings.editable ? ' disabled' : '') + ' /></label></div>';
       if (room.scoreSettings) html += '<div class="settings-section-title">积分</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>本局计分</span><span class="settings-caption">' +
-        esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
+        esc(room.scoreSettings.unavailableReason || (s.scoreEnabled ? '已开启' : room.scoreSettings.editable ? '开启需要密码' : '已关闭')) + ' · ' + (room.scoreSettings.editable ? '发牌后固定' : '本局设置已固定') +
         '</span></span><input type="checkbox" aria-label="本局计分" data-change="settingsScoring"' + (s.scoreEnabled ? ' checked' : '') +
         (settingsLocked() || !room.scoreSettings.editable ? ' disabled' : '') + ' /></label></div>';
       html += '<div class="settings-section-title">湖中仙女</div><div class="settings-section"><label class="settings-row fairy-setting"><span><span>启用湖中仙女</span><span class="settings-caption">' +
@@ -5275,12 +5419,12 @@ function roomListItems(rooms) {
     closeRecordClearingConfirmation,
     clearingSheetContent() {},
     clearingRules() { setState({ clearingRulesExpanded: !state.clearingRulesExpanded }); },
+    monthlyRoster: openMonthlyRoster,
+    monthlyRosterClose: closeMonthlyRoster,
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
-    monthlyEdition: el => { if (['overall', 'honors', 'fun'].includes(el.dataset.value)) setState({ monthlyCategory: el.dataset.value, monthlyEntertainment: el.dataset.value === 'fun', monthlyImages: [] }); },
     monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
     monthlyShare: shareMonthlyReport,
-    monthlyDownload: downloadMonthlyImage,
     toggleIdentityHelp, openIdentityRoleHelp, closeIdentityRoleHelp, openIdentityHistory, closeIdentityHistory, toggleIdentityHistory, hideIdentityHistory,
     startWebLogin, continueAsGuest,
     loadBadgeManager,
@@ -5361,27 +5505,31 @@ function roomListItems(rooms) {
     rankToggleRules: () => toggleRankSheet('rankRulesExpanded', '[data-action="rankToggleRules"]'),
     rankToggleMetrics: () => {
       if (!state.rankMetricsExpanded) {
-        const options = rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true});
-        const option = options.find(item => item.key === state.rankMetric) || options[0];
-        if (!option || state.rankLoading) return;
-        state.rankPendingMetric = option.key; state.rankFunCategory = 'all';
+        if (!state.rankFunMetrics.length || state.rankLoading) return;
+        const session = window.shadowtableRankPicker.create({ options: state.rankFunMetrics, metric: state.rankMetric, request,
+          update: (view, resetScroll) => {
+            if (!state.rankMetricsExpanded || rankPicker !== session) return;
+            setState({ rankPickerView: view });
+            const list = app.querySelector('.fun-metric-options');
+            if (resetScroll && list) list.scrollTop = 0;
+            updateFunOptionsScrollHint();
+          } });
+        rankPicker = session;
+        state.rankPickerView = session.view();
       }
       toggleRankSheet('rankMetricsExpanded', '.fun-metric-toggle');
+      if (!state.rankMetricsExpanded) rankPicker = null;
       app.querySelector('.fun-metric-options .selected')?.scrollIntoView({block:'nearest'});
       updateFunOptionsScrollHint();
     },
-    funRankCategory: el => {
-      if (!rankPresentation.categories.some(item => item.id === el.dataset.value)) return;
-      setState({ rankFunCategory: el.dataset.value });
-      const list = app.querySelector('.fun-metric-options');
-      if (list) list.scrollTop = 0;
-      updateFunOptionsScrollHint();
-    },
-    funRankPreview: el => { if (rankPresentation.filterFunOptions(rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}), state.rankFunCategory).some(item => item.key === el.dataset.value)) setState({ rankPendingMetric: el.dataset.value }); },
+    rankPickerMode: el => rankPicker?.switchMode(el.dataset.value),
+    rankPickerRetry: () => rankPicker?.loadBadges(),
+    funRankCategory: el => rankPicker?.category(el.dataset.value),
+    funRankPreview: el => rankPicker?.select(el.dataset.value),
     funRankConfirm: async () => {
-      if (!state.rankMetricsExpanded || state.rankLoading) return;
-      const metric = state.rankPendingMetric;
-      if (!rankPresentation.funOptions(state.rankFunMetrics, {includeFinal:true}).some(item => item.key === metric)) return;
+      const view = state.rankPickerView, metric = view?.pendingFunMetric;
+      if (!state.rankMetricsExpanded || state.rankLoading || !metric) return;
+      if (view.pickerMode === 'badges') return navigate('badge-ranks/lookup/' + encodeURIComponent(metric));
       toggleRankSheet('rankMetricsExpanded', '.fun-metric-toggle');
       if (metric !== state.rankMetric) await loadLeaderboard(false, {rankMetric:metric,rankFunMode:'all',rankFunRole:''});
       app.querySelector('.fun-metric-toggle')?.focus({preventScroll:true});
@@ -5559,13 +5707,21 @@ function roomListItems(rooms) {
     },
     ready: ready,
     openAvoidance, closeAvoidance,
-    chooseAvoidance: function (el) {
-      const value = state.avoidance, id = el.dataset.id;
-      if (!value?.editable || value.balance < 1 || state.busy || pending) return;
-      const option = value.options.find(o => o.id === id); if (!option) return;
-      setState({ avoidanceDraft: id, avoidanceDraftName: option.name, avoidanceGroups: avoidancePresentation.groups(value.options, id) });
+    switchCardTab: function (el) {
+      const value = state.avoidance, tab = el.dataset.tab;
+      if (!value?.options || tab === value.tab || state.busy || pending || !['faction','avoidance'].includes(tab)) return;
+      setState(avoidancePresentation.panel(value, tab));
+      app.querySelector('.card-tabs .active')?.focus({ preventScroll: true });
     },
-    saveAvoidance: function () { if (state.avoidance?.editable && state.avoidanceDraft && !state.avoidanceLoading) cmd('avoidance', { role: state.avoidanceDraft }); },
+    chooseAvoidance: function (el) {
+      if (state.busy || pending) return;
+      const patch = avoidancePresentation.choose(state.avoidance, el.dataset.id);
+      if (patch) setState(patch);
+    },
+    saveAvoidance: function () {
+      const value = state.avoidance, draft = state.avoidanceDraft;
+      if (value?.editable && draft && !state.avoidanceLoading) cmd('avoidance', value.tab === 'faction' ? { faction: draft } : { role: draft });
+    },
     cancelAvoidance: function () { if (state.avoidance?.editable) cmd('avoidance', { role: null }); },
     start: function () {
       confirmCommand(
@@ -5635,7 +5791,7 @@ function roomListItems(rooms) {
     finishTools: function () {
       if (!state.room?.canUseTools || state.busy || pending) return;
       resultStage = state.room.stage;
-      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
+      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultBoardChoices: {}, resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
       var first = app.querySelector('.result-dialog button');
       if (first) first.focus();
     },
@@ -5659,9 +5815,10 @@ function roomListItems(rooms) {
       if (el.dataset.value !== 'none' && !state.room?.winnerOptions?.some(item=>item.value===el.dataset.value)) return;
       updateResult({resultOther:el.dataset.value!=='none',resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
+    pickBoardChoice: el => updateResult({resultBoardChoices:{...state.resultBoardChoices, [el.dataset.field]:el.dataset.value}}),
     pickScoreReason: el => {
       const reason=resultRegistration.reasons(state.room).find(item=>item.id===el.dataset.id);
-      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultReverseTarget:null,resultActor:null});
+      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultBoardChoices:{},resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
     pickFunActor: el => {
       const seat=Number(el.dataset.seat);
@@ -5759,13 +5916,8 @@ function roomListItems(rooms) {
       updateSettingsDirty();
       return settingsSave();
     },
-    settingsScoring: function (el) {
-      const s = state.settings;
-      if (settingsLocked() || !s.room?.scoreSettings?.editable) return;
-      setSettings({ scoreEnabled: el.checked });
-      updateSettingsDirty();
-      return settingsSave();
-    },
+    settingsScoring: el => toggleProtectedSetting("score", el.checked),
+    settingsBadges: el => toggleProtectedSetting("badge", el.checked),
     settingsVisibility: function (el) {
       if (settingsLocked()) return;
       setSettings({ visible: el.checked });
@@ -5774,6 +5926,8 @@ function roomListItems(rooms) {
     },
   };
   var INPUTS = {
+    rankPickerSearch: el => rankPicker?.search(el.value),
+    badgeLookup: el => badgeRankController?.search(el.value),
     boardDetailSearch: function (el) { setState({ boardDetailQuery: el.value }); },
     profileName: el => { if (state.profileDraft && !state.profileSaving && !profilePending) { state.profileDraft.nickname = el.value; state.profileNicknameError = ''; state.profileError = ''; profileDirty(); } },
     roomNote: function (el) { state.roomNoteDraft = el.value; },
@@ -5805,6 +5959,7 @@ function roomListItems(rooms) {
       setState({ homeWordmarkFailed: true });
     if (e.target?.classList?.contains?.('home-subtitle-wordmark') && !state.homeSubtitleFailed)
       setState({ homeSubtitleFailed: true });
+    if (e.target?.classList?.contains?.("monthly-roster-image")) e.target.hidden = true;
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
     if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
@@ -5929,10 +6084,21 @@ function roomListItems(rooms) {
       buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
     }
   });
+  document.addEventListener("keydown", event => {
+    if (!state.monthlyRoster) return;
+    if (event.key === "Escape") { event.preventDefault(); closeMonthlyRoster(); }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(app.querySelectorAll('.monthly-roster-sheet button'));
+    if (!controls.length) return;
+    event.preventDefault();
+    const index = controls.indexOf(document.activeElement);
+    controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus();
+  });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden && state.clearingConfirming) setState({ clearingConfirming: false, clearingConfirmation: null });
     if (document.hidden) {
       foreground = false;
+      if (state.monthlyRoster) setState({ monthlyRoster: null });
       grantNotifier.stop(); badgeNotifier.stop(); badgeNoticeCancel?.();
       if (grantNoticeOpen) modalCancel.onclick?.();
       clearTimeout(webLoginTimer);

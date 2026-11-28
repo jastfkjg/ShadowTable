@@ -478,7 +478,7 @@ if (typeof document !== "undefined") {
     $("result-target-field").hidden = !reason?.requiresTarget;
     setOptions("result-target", '<option value="">选择实际刺杀目标</option><option value="0">空刀</option>' +
       players.filter(player => !needsActor || player.seat !== resultDraft.actor).map(player => `<option value="${player.seat}">${player.seat}号 · ${escape(player.name)}</option>`).join(""), resultDraft.target);
-    $("result-notice").textContent = resultDraft.choice === "none" ? "本局不计战绩、积分和趣味统计。"
+    $("result-notice").textContent = resultDraft.choice === "none" ? "本局不计战绩、积分和趣味统计。" + (room.unrecordedCardNotice || "")
       : reason ? selection.scoring ? "按本局规则结算积分，并保存胜负与趣味记录。" : "保存胜负与趣味记录，本局不计积分。"
       : winner ? "仅保存胜负，不计积分；缺失的趣味结果保留未知。" : "选择后核对结果，再确认结束本局。";
     $("result-active-notice").hidden = !room.hasActiveOperation;

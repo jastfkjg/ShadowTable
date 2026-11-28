@@ -12,7 +12,7 @@ function page(api, wxOverrides = {}) {
     ),
     {
       require: name => name === '../../dialog'
-        ? { show: options => (wxOverrides.showModal || (o => o.success({ confirm: true })))(options) }
+        ? { show: options => new Promise(resolve => (wxOverrides.showModal || (o => o.success({ confirm: true, password: "test-password" })))({ ...options, success: answer => { options.success?.(answer); resolve(answer); } })) }
         : api,
       Page: (p) => (definition = p),
       wx: {
@@ -56,18 +56,18 @@ test('计分开关自动保存且按服务端板子与人数应用默认值，�
   await p.load();assert.equal(p.data.scoreEnabled,false);
   await p.toggleScoring({detail:{value:true}});assert.equal(writes[0].scoreEnabled,true);assert.equal(p.data.dirty,false);
   await p.pickCapacity({detail:{value:p.data.capacities.indexOf(12)}});assert.equal(p.data.scoreEnabled,false);assert.equal(writes.at(-1).scoreEnabled,false);
-  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,false);
   await p.toggleScoring({detail:{value:false}});assert.equal(p.data.scoreEnabled,false);
   await p.load();assert.equal(p.data.scoreEnabled,false);
   await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='classic-court')}});assert.equal(p.data.scoreEnabled,false);
   await p.toggleScoring({detail:{value:true}});assert.equal(p.data.scoreEnabled,true);
   await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='chaos')}});assert.equal(p.data.scoreEnabled,false);
-  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights')}});assert.equal(p.data.scoreEnabled,false);
   await p.pickCapacity({detail:{value:p.data.capacities.indexOf(10)}});assert.equal(p.data.scoreEnabled,false);
-  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-10')}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-10')}});assert.equal(p.data.scoreEnabled,false);
   await p.pickCapacity({detail:{value:p.data.capacities.indexOf(11)}});assert.equal(p.data.scoreEnabled,false);
-  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-11')}});assert.equal(p.data.scoreEnabled,true);
-  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(13)}});assert.equal(p.data.scoreEnabled,true);
+  await p.pickBoard({detail:{value:p.data.choices.findIndex(board=>board.id==='knights-11')}});assert.equal(p.data.scoreEnabled,false);
+  await p.pickCapacity({detail:{value:p.data.capacities.indexOf(13)}});assert.equal(p.data.scoreEnabled,false);
   await p.pickCapacity({detail:{value:p.data.capacities.indexOf(6)}});assert.equal(p.data.scoreEnabled,false);
   r.phase='tools';r.scoreSettings.editable=false;await p.load();const count=writes.length;
   await p.toggleScoring({detail:{value:true}});assert.equal(writes.length,count);
@@ -501,4 +501,31 @@ test("自动保存后核对发现房主已变更，撤销设置权限", async ()
   await p.toggleVisibility({ detail: { value: true } });
   assert.equal(p.data.authorized, false);
   assert.equal(p.data.busy, false);
+});
+
+test('徽章开关取消和验密失败时恢复关闭，重新输入可开启，关闭无需密码', async () => {
+  const r = { ...room(), phase: 'lobby', badgeSettings: { enabled: false, editable: true } };
+  const writes = [], answers = [{ confirm: false }, { confirm: true, password: 'bad' }, { confirm: true, password: 'right' }];
+  const p = page({
+    login: async () => {}, requestId: () => 'save-badge',
+    request: async (url, method, data) => {
+      if (method !== 'POST') return url === '/api/boards' ? { boards: BOARDS } : structuredClone(r);
+      writes.push(data);
+      if (data.badgeEnabled && data.settingsPassword !== 'right') throw Object.assign(Error('房间设置密码错误'), { status: 400 });
+      r.badgeSettings.enabled = data.badgeEnabled;
+    },
+  }, { showModal: options => { assert.equal(options.variant, 'room-password'); options.success(answers.shift()); } });
+  await p.load();
+  const toggle = value => p.toggleBadges({ detail: { value } });
+  await toggle(true);
+  assert.equal(writes.length, 0);
+  await toggle(true);
+  assert.match(p.data.error, /密码错误/);
+  assert.equal(p.data.badgeEnabled, false);
+  assert.equal(p.data.pendingSave, false);
+  await toggle(true);
+  assert.equal(p.data.badgeEnabled, true);
+  await toggle(false);
+  assert.equal(p.data.badgeEnabled, false);
+  assert.equal('settingsPassword' in writes.at(-1), false);
 });

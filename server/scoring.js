@@ -1,4 +1,6 @@
 "use strict";
+const variant = require("./variant-scoring");
+const RuleError = require("./rule-error");
 const configured = require("./scoring-rules.json");
 const { createHash } = require("node:crypto");
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -6,13 +8,11 @@ const conditionKeys = new Set(["faction", "outcome", "roleId", "roleIdNot", "rea
 function validateRules(rules) {
   if (!rules.version || !rules.title || !rules.scopeLabel || !rules.boards || !Array.isArray(rules.awards)
     || !Array.isArray(rules.endReasons)) throw Error("积分规则配置不完整");
-  if (!rules.defaultEnabledBoards || typeof rules.defaultEnabledBoards !== "object" || Array.isArray(rules.defaultEnabledBoards)
-    || Object.entries(rules.defaultEnabledBoards).some(([board, counts]) => !Array.isArray(counts) || !counts.length
-      || counts.some(count => !Number.isSafeInteger(count) || !rules.boards[board]?.includes(count)))) throw Error("积分默认板子配置无效");
   if (rules.targetModes && Object.values(rules.targetModes).some(mode => mode !== "living_merlin")) throw Error("积分刺杀判定配置无效");
   if (rules.reverseBoards && (typeof rules.reverseBoards !== "object" || Array.isArray(rules.reverseBoards)
     || Object.entries(rules.reverseBoards).some(([board, counts]) => !Array.isArray(counts) || !counts.length
       || counts.some(count => !rules.boards[board]?.includes(count))))) throw Error("逆仆计分配置无效");
+  variant.validate(rules.boardScores, rules.boards);
   if (rules.notes && (!Array.isArray(rules.notes) || rules.notes.some(note => typeof note !== "string"))) throw Error("积分说明配置无效");
   const ids = new Set();
   for (const award of rules.awards) {
@@ -38,11 +38,10 @@ function policy() {
   rules.fingerprint = createHash("sha256").update(JSON.stringify(configured)).digest("hex");
   return rules;
 }
-function defaultEnabled(board, capacity) { return configured.defaultEnabledBoards[board]?.includes(capacity) === true; }
 function enabled(room) {
   if (typeof room.scoreEnabled === "boolean") return room.scoreEnabled;
   // Existing games keep the scoring behavior they had when dealt.
-  return room.phase !== "lobby" && !!room.scorePolicy || defaultEnabled(room.board, room.capacity);
+  return room.phase !== "lobby" && !!room.scorePolicy;
 }
 function scopeExclusion(room, rules) {
   if (!rules) return "积分功能启用前开局";
@@ -55,7 +54,7 @@ function exclusion(room, rules = room.scorePolicy) {
 function settings(room) {
   const rules = room.phase === "lobby" ? configured : room.scorePolicy;
   return { enabled: enabled(room), editable: room.phase === "lobby",
-    defaultEnabledBoards: clone(configured.defaultEnabledBoards),
+    defaultEnabledBoards: {},
     unavailableReason: scopeExclusion(room, rules) };
 }
 function settlementOptions(room) {
@@ -79,12 +78,15 @@ function reverseSettlementError(game, reason, correction = false) {
   return null;
 }
 function settlementFaction(player, game) {
+  if (game.scorePolicy?.boardScores?.[game.board] && game.scoringFacts?.board === game.board) return variant.faction(player, game.scoringFacts);
   if (!(usesReverseRules(game) || isReverseBoard(game) && Object.hasOwn(game, "reverseStrike")) || player.roleId !== "reverse") return player.faction;
   const reason = game.scoringFacts?.reason || game.funFacts?.terminal?.reason;
   return reason === "assassination" && game.reverseStrike?.hit ? "evil" : "good";
 }
 function optionsFor(board, rules) {
-  return clone(rules.endReasons.filter(reason => !reason.boards || reason.boards.includes(board)));
+  const options = clone(rules.endReasons.filter(reason => !reason.boards || reason.boards.includes(board)));
+  if (!rules.boardScores?.[board]) return options;
+  return options.map(option => ({ ...option, boardFields: variant.registrationFields(board, !!option.requiresTarget) }));
 }
 function validTarget(target, players, board, rules) {
   return Number.isInteger(target) && (target === 0 || players.some(player => player.seat === target
@@ -97,15 +99,24 @@ function resolveWinner(option, target, players, board, rules) {
     : players.some(player => player.seat === target && player.roleId === "merlin" && (!livingMode || player.alive !== false));
   return hit ? "evil" : "good";
 }
+function resolveSettlement(option, input, players, board, rules) {
+  if (option.requiresTarget && !validTarget(input.scoreTarget, players, board, rules)) throw new RuleError("请选择实际在场刺杀目标或空刀");
+  const winner = resolveWinner(option, input.scoreTarget, players, board, rules);
+  const facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
+  return rules.boardScores?.[board] ? variant.settle(board, option, input, players, facts, winner) : { winner, facts };
+}
 function scorePlayer(player, facts, rules, excludedReason, honorResult = null) {
   if (excludedReason) return { status: "excluded", total: 0, breakdown: [], reason: excludedReason, ruleVersion: rules?.version || null };
   const honorKey = player.outcome === "win" ? "mvp" : "svp";
   const honor = honorResult?.status === "settled" && honorResult[honorKey]?.some(winner => winner.seat === player.seat) ? honorKey : null;
   const context = { ...player, reason: facts.reason, isTarget: player.seat === facts.target && player.alive !== false, honor };
-  const breakdown = rules.awards.filter(award => Object.entries(award.when).every(([key, value]) =>
+  const boardRule = rules.boardScores?.[facts.board];
+  const awards = boardRule ? rules.awards.filter(award => award.when.honor) : rules.awards;
+  const breakdown = awards.filter(award => Object.entries(award.when).every(([key, value]) =>
     key === "roleIdNot" ? ![].concat(value).includes(context.roleId)
       : Array.isArray(value) ? value.includes(context[key]) : context[key] === value))
     .filter(award => award.points !== 0).map(({ id, label, points }) => ({ id, label, points }));
+  if (boardRule) breakdown.unshift(variant.baseAward(player, facts, boardRule));
   return { status: "scored", total: breakdown.reduce((sum, item) => sum + item.points, 0), breakdown,
     ruleVersion: rules.version, ruleFingerprint: rules.fingerprint };
 }
@@ -129,13 +140,14 @@ function publicRules(rules = policy()) {
     { seat: 2, roleId: row.id, faction: row.faction, outcome: row.faction === column.winner ? "win" : "loss" },
     { reason: column.reason, target: 1 }, rules, null).total) }));
   const bonusDescriptions = {
-    shield: "蓝队获胜时，被最终刺杀的其他好人额外加分，梅林、派西除外。空刀或刺到红队不加分。",
+    shield: "基础积分表适用的板子中，蓝队获胜时，被最终刺杀的其他好人额外加分，梅林、派西除外。空刀或刺到红队不加分。",
     honor_mvp: "有效计分局中，胜方公投最佳额外加分。",
     honor_svp: "有效计分局中，败方公投最佳额外加分。",
   };
   return { title: rules.title, scopeLabel: rules.scopeLabel, version: rules.version,
     table: { columns: columns.map(({ id, label, caption }) => ({ id, label, caption })), rows,
       note: "前两列适用：蓝队3蓝车，或红队提前起刀。表内为每人基础积分，额外奖励另计。" },
+    boardSections: variant.sections(rules),
     bonuses: rules.awards.filter(award => Object.hasOwn(bonusDescriptions, award.id)).map(award => ({
       id: award.id, label: award.label, points: award.points, text: bonusDescriptions[award.id],
     })),
@@ -146,7 +158,7 @@ function publicRules(rules = policy()) {
       }).join(" · ") || "所有计分玩家";
       return { id: award.id, label: award.label, text: `${details}：${award.points >= 0 ? "+" : ""}${award.points} 分` };
     }),
-    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", "房主可在准备阶段开启或关闭计分；更换板子或人数时应用默认值，同房重开保留选择。发牌后固定。", "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
+    notes: ["计分项目满足条件时叠加；0分对局也计入计分局数。", "房主可在准备阶段开启或关闭计分；更换板子或人数时应用默认值，同房重开默认关闭计分。发牌后固定。", "从积分功能启用后新开的对局开始；规则在开局时固定，单局计分记录保留；积分仅当月有效，每月 1 日北京时间零点清零。",
       "测试房间及有陪测参与的对局中，真实玩家和开发账号正常计分；陪测账号不保存个人战绩、积分及趣味记录。终止及缺少计分依据的对局不计积分。", ...(rules.notes || [])] };
 }
-module.exports = { policy, defaultEnabled, enabled, settings, exclusion, settlementOptions, usesReverseRules, isReverseBoard, reverseSettlementError, settlementFaction, optionsFor, validTarget, resolveWinner, scorePlayer, publicRules, validateRules };
+module.exports = { policy, enabled, settings, exclusion, settlementOptions, usesReverseRules, isReverseBoard, reverseSettlementError, settlementFaction, optionsFor, validTarget, resolveWinner, resolveSettlement, scorePlayer, publicRules, validateRules };

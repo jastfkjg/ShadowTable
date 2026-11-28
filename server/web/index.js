@@ -23,6 +23,8 @@ const assets = {
   "/record-clearing.js": ["../../miniprogram/pages/data-management/presentation.js", "text/javascript; charset=utf-8"],
   "/record-clearing-layout.css": ["../../miniprogram/pages/data-management/layout.wxss", "text/css; charset=utf-8"],
   "/record-clearing.css": ["record-clearing.css", "text/css; charset=utf-8"],
+  "/rank-picker.js": ["../../miniprogram/pages/leaderboard/picker.js", "text/javascript; charset=utf-8"],
+  "/rank-picker.css": ["../../miniprogram/pages/leaderboard/picker.wxss", "text/css; charset=utf-8"],
   "/badge-ranks.js": ["../../miniprogram/pages/badges/rank-controller.js", "text/javascript; charset=utf-8"],
   "/badge-rank-view.js": ["badge-rank-view.js", "text/javascript; charset=utf-8"],
   "/player-badges.css": ["../../miniprogram/pages/badges/player.wxss", "text/css; charset=utf-8"],
@@ -73,6 +75,7 @@ const assets = {
   "/monthly-report.js": ["../../miniprogram/monthly-report.js", "text/javascript; charset=utf-8"],
   "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
   "/poster-canvas.js": ["../../miniprogram/poster-canvas.js", "text/javascript; charset=utf-8"],
+  "/monthly-roster.css": ["../../miniprogram/pages/monthly/roster.wxss", "text/css; charset=utf-8"],
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
   "/personality": ["personality.html", "text/html; charset=utf-8"],
   "/personality/web.js": ["personality.js", "text/javascript; charset=utf-8"],
@@ -87,11 +90,12 @@ const assets = {
   "/personality/storage.js": ["../../miniprogram/personality-storage.js", "text/javascript; charset=utf-8"],
   "/personality/poster.js": ["../../miniprogram/pages/personality/poster.js", "text/javascript; charset=utf-8"],
   "/pages/personality/assets/miniprogram-qrcode.jpg": ["../../miniprogram/pages/personality/assets/miniprogram-qrcode.jpg", "image/jpeg"],
+  "/assets/room-share-background.jpg": ["../../miniprogram/assets/room-share-background.jpg", "image/jpeg"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],
 };
 for (const name of ["crown", "sword", "moon", "shield", "star", "laurel-1", "laurel-2", "laurel-3"])
   assets["/assets/monthly-" + name + ".svg"] = ["../../miniprogram/assets/monthly-" + name + ".svg", "image/svg+xml"];
-for (const name of ["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "record-more", "share-dark", "share", "share-save-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
+for (const name of ["faction-mask-evil", "home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "record-more", "share-dark", "share", "share-save-dark", "room-menu-remove", "room-menu-leave", "room-menu-delete"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];
 for (const name of ["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"])
   assets["/assets/" + name + ".svg"] = ["../../miniprogram/assets/" + name + ".svg", "image/svg+xml"];

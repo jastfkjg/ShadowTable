@@ -5,25 +5,51 @@
 </template>
 <template name="avoidanceSelection">
   <view wx:if="{{avoidanceOpen && !error}}" class="avoidance-backdrop" catchtap="closeAvoidance" catchtouchmove="blockScroll">
-    <view class="avoidance-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="选择本局回避角色">
-      <view class="avoidance-top"><view class="avoidance-handle" aria-hidden="true" /><view class="avoidance-heading"><view class="avoidance-heading-icon"><image src="/assets/table-cards.svg" aria-hidden="true" /></view><view class="avoidance-heading-copy"><view>这局想避开哪个角色？</view><text>回避卡 ×{{avoidance.balance}} · 仅你可见</text></view><button class="avoidance-close" bindtap="closeAvoidance" aria-label="关闭回避卡" hover-class="none">×</button></view></view>
-      <scroll-view class="avoidance-body" scroll-y enhanced show-scrollbar="{{false}}"><view class="avoidance-fields">
-        <view wx:if="{{avoidanceLoading}}" class="avoidance-note" role="status">正在读取回避卡…</view>
-        <block wx:else>
-          <view class="avoidance-note">{{avoidance.balance<1?'暂无回避卡':!avoidance.editable?'当前无法使用回避卡':'发牌前可随时修改，生效后才扣 1 张。'}}</view>
-          <view wx:for="{{avoidanceGroups}}" wx:key="faction" class="avoidance-group">
-            <view class="avoidance-faction faction-{{item.faction}}">{{item.label}}</view>
-            <view class="avoidance-grid"><button wx:for="{{item.entries}}" wx:for-item="role" wx:key="id" class="avoidance-role {{role.selected?'is-selected':''}}" bindtap="chooseAvoidance" data-id="{{role.id}}" disabled="{{!avoidance.editable || avoidance.balance<1 || busy || hasPendingRequest}}" aria-pressed="{{role.selected}}" aria-label="{{'回避'+role.name}}" hover-class="entry-option-pressed"><view class="avoidance-choice-mark" aria-hidden="true">{{role.selected?'✓':''}}</view><image src="{{role.portrait}}" mode="aspectFit" aria-hidden="true" /><view>{{role.name}}<text wx:if="{{role.countLabel}}"> {{role.countLabel}}</text></view></button></view>
-          </view>
-          <view class="avoidance-footnote">多人回避冲突时可能不生效，未生效不扣卡。</view>
-        </block>
-      </view></scroll-view>
+    <view class="avoidance-sheet" catchtap="blockScroll" role="dialog" aria-modal="true" aria-label="本局用卡">
+      <view class="avoidance-top">
+        <view class="avoidance-handle" aria-hidden="true" />
+        <view class="avoidance-heading">
+          <view class="avoidance-heading-copy"><view>本局用卡</view><text>每局限用 1 张 · 仅你可见</text></view>
+          <button class="avoidance-close" bindtap="closeAvoidance" aria-label="关闭本局用卡" hover-class="none">×</button>
+        </view>
+        <view wx:if="{{!avoidanceLoading}}" class="card-tabs">
+          <button hover-class="entry-option-pressed" data-tab="faction" bindtap="switchCardTab" class="{{avoidance.tab==='faction'?'active':''}}" aria-pressed="{{avoidance.tab==='faction'}}">阵营卡 ×{{avoidance.factionBalance || 0}}</button>
+          <button hover-class="entry-option-pressed" data-tab="avoidance" bindtap="switchCardTab" class="{{avoidance.tab!=='faction'?'active':''}}" aria-pressed="{{avoidance.tab!=='faction'}}">回避卡 ×{{avoidance.balance}}</button>
+        </view>
+      </view>
+      <scroll-view class="avoidance-body {{avoidance.tab==='faction'?'card-short-body':''}}" scroll-y enhanced show-scrollbar="{{false}}">
+        <view class="avoidance-fields">
+          <view wx:if="{{avoidanceLoading}}" class="avoidance-note" role="status">正在读取本局用卡…</view>
+          <block wx:elif="{{avoidance.tab==='faction'}}">
+            <view class="card-question">这局想加入哪个阵营？</view>
+            <view wx:if="{{!avoidance.factionBalance}}" class="avoidance-note">暂无阵营卡</view>
+            <view class="faction-choices">
+              <button hover-class="entry-option-pressed" wx:for="{{avoidance.factions}}" wx:key="id" class="faction-choice faction-{{item.id}} {{avoidanceDraft===item.id?'is-selected':''}}" bindtap="chooseAvoidance" data-id="{{item.id}}" aria-pressed="{{avoidanceDraft===item.id}}" disabled="{{!avoidance.editable || !avoidance.factionBalance || busy || hasPendingRequest}}">
+                <view wx:if="{{avoidanceDraft===item.id}}" class="card-check" aria-hidden="true">✓</view>
+                <view class="faction-emblem" aria-hidden="true"><image wx:if="{{item.icon}}" src="{{item.icon}}" /><view wx:else class="faction-diamond" /></view>
+                <text>{{item.name}}</text>
+              </button>
+            </view>
+            <view wx:if="{{avoidance.exampleText}}" class="faction-examples"><image wx:for="{{avoidance.examples}}" wx:key="id" src="{{item.portrait}}" aria-hidden="true" /><text>{{avoidance.exampleText}}</text></view>
+          </block>
+          <block wx:else>
+            <view class="card-question">这局想避开哪个角色？</view>
+            <view wx:if="{{!avoidance.balance || !avoidance.editable}}" class="avoidance-note">{{!avoidance.balance?'暂无回避卡':'当前无法使用回避卡'}}</view>
+            <view wx:for="{{avoidanceGroups}}" wx:key="faction" class="avoidance-group">
+              <view class="avoidance-faction faction-{{item.faction}}">{{item.label}}</view>
+              <view class="avoidance-grid"><button wx:for="{{item.entries}}" wx:for-item="role" wx:key="id" class="avoidance-role {{role.selected?'is-selected':''}}" bindtap="chooseAvoidance" data-id="{{role.id}}" disabled="{{!avoidance.editable || avoidance.balance<1 || busy || hasPendingRequest}}" aria-pressed="{{role.selected}}" aria-label="{{'回避'+role.name}}" hover-class="entry-option-pressed"><view class="avoidance-choice-mark" aria-hidden="true">{{role.selected?'✓':''}}</view><image src="{{role.portrait}}" mode="aspectFit" aria-hidden="true" /><view>{{role.name}}<text wx:if="{{role.countLabel}}"> {{role.countLabel}}</text></view></button></view>
+            </view>
+          </block>
+        </view>
+      </scroll-view>
       <view class="avoidance-footer">
-        <block wx:if="{{avoidance.editable && avoidance.balance>0}}">
-          <button wx:if="{{avoidance.selected && avoidanceDraft===avoidance.selected}}" class="secondary" bindtap="cancelAvoidance" disabled="{{avoidanceLoading || busy || hasPendingRequest || !network}}" hover-class="none">不避开了（不扣卡）</button>
-          <button wx:else class="primary" bindtap="saveAvoidance" disabled="{{avoidanceLoading || !avoidanceDraft || busy || hasPendingRequest || !network}}" hover-class="none">{{avoidanceDraft ? (avoidance.selected ? '改成避开' : '避开') + avoidanceDraftName : '点一个角色'}}</button>
+        <view wx:if="{{avoidance.replaces && avoidanceDraft}}" class="card-replace">确认后将替换「{{avoidance.replaces}}」，原卡保留。</view>
+        <view wx:if="{{!avoidanceLoading}}" class="card-settlement">发牌时尽量满足选择，生效才扣 1 张。</view>
+        <block wx:if="{{avoidance.editable && (avoidance.tab==='faction'?avoidance.selectedFaction && avoidanceDraft===avoidance.selectedFaction:avoidance.selected && avoidanceDraft===avoidance.selected)}}">
+          <button hover-class="entry-option-pressed" class="secondary" bindtap="cancelAvoidance" disabled="{{busy || hasPendingRequest || !network}}">{{avoidance.tab==='faction'?'取消阵营选择（不扣卡）':'不避开了（不扣卡）'}}</button>
         </block>
-        <button wx:else class="primary" bindtap="closeAvoidance" hover-class="none">知道了</button>
+        <button hover-class="entry-option-pressed" wx:elif="{{avoidance.editable && (avoidance.tab==='faction'?avoidance.factionBalance:avoidance.balance)>0}}" class="primary" bindtap="saveAvoidance" disabled="{{avoidanceLoading || !avoidanceDraft || busy || hasPendingRequest || !network}}">{{avoidance.tab==='faction'?(avoidanceDraft?(avoidance.replaces?'改用阵营卡 · 选择':'选择')+avoidanceDraftName:'选择一个阵营'):(avoidanceDraft?(avoidance.replaces?'改用回避卡 · 避开':avoidance.selected?'改成避开':'避开')+avoidanceDraftName:'点一个角色')}}</button>
+        <button hover-class="entry-option-pressed" wx:else class="primary" bindtap="closeAvoidance">知道了</button>
       </view>
     </view>
   </view>

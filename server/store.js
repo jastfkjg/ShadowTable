@@ -5,6 +5,7 @@ const { dirname } = require("node:path");
 const { randomUUID, createHash } = require("node:crypto");
 const { roomSummary, RuleError, roleName } = require("./engine");
 const { ROOM_IDLE_DAYS, roomActivityCutoff } = require("./retention");
+const { factionLabels } = require("../miniprogram/role-portraits");
 const scoring = require("./scoring");
 const fun = require("./fun");
 const funCopy = require("../miniprogram/fun-copy");
@@ -70,6 +71,22 @@ class Store {
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS room_settings_password(
+      id INTEGER PRIMARY KEY CHECK(id=1), salt BLOB NOT NULL, digest BLOB NOT NULL)`);
+    this.transaction(() => {
+      const update = this.db.prepare("UPDATE rooms SET state=? WHERE code=?");
+      for (const row of this.db.prepare("SELECT code,state FROM rooms WHERE json_type(state,'$.badgeEnabled') IS NULL").all()) {
+        const room = JSON.parse(row.state);
+        // Dealt games finish under the old rules. A waiting table must confirm the new rules before dealing.
+        room.badgeEnabled = room.phase !== "lobby";
+        if (room.phase === "lobby") {
+          room.scoreEnabled = false;
+          room.stage = randomUUID();
+          room.players.forEach(player => (player.ready = false));
+        }
+        update.run(JSON.stringify(room), row.code);
+      }
+    });
     require("./feedback").initialize(this.db);
     require("./avatar-uploads").initialize(this.db);
     management.initialize(this);
@@ -338,7 +355,7 @@ class Store {
     };
     const total = this.db.prepare(`SELECT ${counts} FROM visible_match_players WHERE uid=?`).get(uid);
     const byFaction = this.db.prepare(`SELECT faction, ${counts} FROM visible_match_players WHERE uid=? GROUP BY faction ORDER BY faction`).all(uid)
-      .map(row => ({ faction: row.faction, label: { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" }[row.faction], ...summary(row) }));
+      .map(row => ({ faction: row.faction, label: factionLabels[row.faction], ...summary(row) }));
     return { ...summary(total), byFaction, scoreTotal: this.playerScore(uid).points };
   }
   statsFor(uid) {
@@ -389,13 +406,14 @@ class Store {
     if (!option) throw new RuleError("计分结束原因无效");
     const players = this.matchParticipants(match);
     if (!players.length || players.some(player => !player.roleId || player.faction === "unknown")) throw new RuleError("身份信息不完整，不能更正计分");
-    if (option.requiresTarget && !scoring.validTarget(input.scoreTarget, players, match.board, match.scorePolicy)) throw new RuleError("请选择实际在场刺杀目标或空刀");
+    const boardChoices = { ...match.scoringFacts?.choices, ...input.boardChoices };
+    const settlement = scoring.resolveSettlement(option, { ...input, boardChoices }, players, match.board, match.scorePolicy);
     const beforeReverse = match.reverseStrike;
     correctReverseTarget(match, option.id, input.reverseTarget, players);
     const before = {winner:match.winner, facts:match.scoringFacts, revision:match.scoreRevision || 0};
     if (scoring.isReverseBoard(match)) before.reverseStrike = beforeReverse || null;
-    match.winner = scoring.resolveWinner(option, input.scoreTarget, players, match.board, match.scorePolicy);
-    match.scoringFacts = {reason:option.id,...(option.requiresTarget ? {target:input.scoreTarget} : {})};
+    match.winner = settlement.winner;
+    match.scoringFacts = settlement.facts;
     let factionChanged = false;
     for (const player of players) {
       const faction = scoring.settlementFaction(player, match);

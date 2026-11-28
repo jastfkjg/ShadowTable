@@ -26,6 +26,7 @@
       <view wx:elif="{{dialog.variant==='quest-settlement'}}" class="app-dialog-message"><view>{{dialog.lead}}</view><view class="app-dialog-quest-rule"><text wx:for="{{dialog.ruleParts}}" wx:key="text" class="app-dialog-rule-{{item.tone}}">{{item.text}}</text></view></view>
       <view wx:else class="app-dialog-message"><block wx:if="{{dialog.emphasis}}"><text>{{dialog.contentBefore}}</text><text class="app-dialog-emphasis">{{dialog.emphasis}}</text><text>{{dialog.contentAfter}}</text></block><block wx:else>{{dialog.content}}</block></view>
     </scroll-view>
+    <input wx:if="{{dialog.variant==='room-password'}}" class="room-password-input" password focus maxlength="128" placeholder="房间设置密码" aria-label="房间设置密码" bindinput="passwordInput" confirm-type="done" bindconfirm="confirm" data-id="{{dialog.id}}" />
     <view class="app-dialog-actions">
       <button wx:if="{{dialog.showCancel}}" class="app-dialog-cancel" bindtap="cancel" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.cancelText}}</button>
       <button class="app-dialog-confirm {{dialog.danger?'is-danger':''}}" bindtap="confirm" data-id="{{dialog.id}}" hover-class="app-dialog-pressed">{{dialog.confirmText}}</button>

@@ -129,7 +129,7 @@
         title,
         el(
           "p",
-          `${date(record.endedAt)} · 房间 ${record.code} · 第 ${record.game} 局 · ${{ good: "好人胜", evil: "坏人胜", third: "第三方胜" }[record.winner] || "未登记胜负"}`,
+          `${date(record.endedAt)} · 房间 ${record.code} · 第 ${record.game} 局 · ${{ good: "好人胜", evil: "坏人胜", third: "第三方胜", fourth: "捣蛋鬼胜", redTraitor: "红内奸胜", blueTraitor: "蓝内奸胜" }[record.winner] || "未登记胜负"}`,
           "record-meta",
         ),
       );

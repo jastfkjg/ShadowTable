@@ -23,11 +23,11 @@
     const monthly = badges.find(b => b.month);
     const ranked = monthly || badges.find(b => b.rank), hero = ranked || (badges.length === 1 ? badges[0] : null);
     const eyebrow = monthly
-      ? (badges.every(b => b.month === monthly.month) ? monthly.periodLabel + ' · 积分月榜' : '积分月榜 · 荣誉徽章')
+      ? (badges.every(b => b.month === monthly.month) ? monthly.periodLabel + ' · 积分月榜' : '积分月榜 · 永久徽章')
       : '2026年10月 · 内测纪念';
     return { badges, count: badges.length, hero, ranked: !!ranked,
       secondary: ranked ? badges.filter(b => b.id !== ranked.id) : hero ? [] : badges,
-      eyebrow, title: monthly ? '月榜荣誉已送达' : ranked ? '十月荣誉已送达' : '感谢你，与我们同席',
+      eyebrow, title: monthly ? (monthly.category === '趣味徽章' ? '月榜纪念章已送达' : '月榜荣誉已送达') : ranked ? '十月荣誉已送达' : '感谢你，与我们同席',
       message: ranked ? '' : badges.length > 1 ? '你的名字，留在了十月的故事里。' : '这个十月，因为相聚而值得纪念。',
     };
   }

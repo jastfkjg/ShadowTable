@@ -43,6 +43,7 @@
 !miniprogram/personality-storage.js
 !miniprogram/assets/
 !miniprogram/assets/about-merlin.svg
+!miniprogram/assets/faction-mask-evil.svg
 !miniprogram/assets/badge-category-*.svg
 !miniprogram/assets/roles/
 !miniprogram/assets/roles/merlin.png
@@ -57,6 +58,7 @@
 !miniprogram/assets/record-coin.svg
 !miniprogram/assets/monthly-report-background.jpg
 !miniprogram/assets/identity-card-back.jpg
+!miniprogram/assets/room-share-background.jpg
 !miniprogram/assets/monthly-*.svg
 !miniprogram/assets/board-search.svg
 !miniprogram/assets/board-directory.svg
@@ -98,6 +100,11 @@
 !miniprogram/assets/badges/
 !miniprogram/assets/badges/**
 !miniprogram/pages/
+!miniprogram/pages/leaderboard/
+!miniprogram/pages/leaderboard/picker.js
+!miniprogram/pages/leaderboard/picker.wxss
+!miniprogram/pages/monthly/
+!miniprogram/pages/monthly/roster.wxss
 !miniprogram/pages/table/
 !miniprogram/pages/table/quest-track.wxss
 !miniprogram/pages/table/vote-result.wxss

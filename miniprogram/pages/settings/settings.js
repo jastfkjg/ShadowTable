@@ -18,6 +18,7 @@ Page({
     visible: false,
     fairyEnabled: false,
     scoreEnabled: false,
+    badgeEnabled: false,
     recordPurpose: "normal",
     dirty: false,
     transferPlayers: [],
@@ -76,6 +77,7 @@ Page({
         visible: room.showSkillDetails === true,
         fairyEnabled: room.fairyEnabled === true,
         scoreEnabled: room.scoreSettings?.enabled === true,
+        badgeEnabled: room.badgeSettings?.enabled === true,
         recordPurpose: room.recordSettings?.purpose || "normal",
         dirty: false,
       });
@@ -92,14 +94,9 @@ Page({
       (b) => b.available && b.counts.includes(capacity),
     );
     const selected = choices.find((b) => b.id === boardId) || choices[0];
-    const scoreSettings = this.data.room?.scoreSettings;
     this.setData({
       fairyEnabled: capacity !== this.data.capacity ? capacity >= 8 : this.data.fairyEnabled,
-      scoreEnabled: scoreSettings && (capacity !== this.data.capacity || selected.id !== this.data.boardId)
-        ? scoreSettings.defaultEnabledBoards
-          ? scoreSettings.defaultEnabledBoards[selected.id]?.includes(capacity) === true
-          : capacity >= scoreSettings.defaultEnabledMinPlayers
-        : this.data.scoreEnabled,
+      scoreEnabled: capacity === this.data.capacity && selected.id === this.data.boardId && this.data.scoreEnabled,
       capacity,
       boardId: selected.id,
       choices,
@@ -121,6 +118,7 @@ Page({
       dirty:
         !!r &&
         (this.data.fairyEnabled !== (r.fairyEnabled === true) ||
+          !!r.badgeSettings && this.data.badgeEnabled !== r.badgeSettings.enabled ||
           !!r.scoreSettings && this.data.scoreEnabled !== r.scoreSettings.enabled ||
           !!r.recordSettings && this.data.recordPurpose !== r.recordSettings.purpose ||
           this.data.capacity !== r.capacity ||
@@ -157,10 +155,29 @@ Page({
     return this.save();
   },
   toggleScoring(e) {
-    if (this.settingsLocked() || !this.data.room?.scoreSettings?.editable) return;
-    this.setData({ scoreEnabled: e.detail.value });
+    return this.toggleProtected("score", e.detail.value);
+  },
+  toggleBadges(e) {
+    return this.toggleProtected("badge", e.detail.value);
+  },
+  async toggleProtected(kind, enabled) {
+    if (this.settingsLocked() || !this.data.room?.[kind + "Settings"]?.editable) return;
+    const field = kind + "Enabled";
+    let password;
+    if (enabled) {
+      const original = this.original;
+      this.setData({ [field]: false, busy: true, error: "" });
+      const answer = await dialog.show({ variant: "room-password",
+        title: kind === "score" ? "开启本局计分" : "开启徽章获取",
+        content: "请输入管理员设置的房间设置密码。", confirmText: "开启" });
+      if (!this.alive) return;
+      this.setData({ busy: false });
+      if (!answer.confirm || !this.foreground || this.original !== original) return;
+      password = answer.password;
+    }
+    this.setData({ [field]: enabled });
     this.updateDirty();
-    return this.save();
+    return this.save(password);
   },
   toggleVisibility(e) {
     if (this.settingsLocked()) return;
@@ -168,7 +185,7 @@ Page({
     this.updateDirty();
     return this.save();
   },
-  async save() {
+  async save(password) {
     if (
       this.data.busy ||
       this.data.refreshing ||
@@ -188,6 +205,8 @@ Page({
         capacity: this.data.capacity,
         visible: this.data.visible,
         fairyEnabled: this.data.fairyEnabled,
+        ...(typeof password === "string" ? { settingsPassword: password } : {}),
+        ...(this.original.badgeSettings ? { badgeEnabled: this.data.badgeEnabled } : {}),
         ...(this.original.scoreSettings ? { scoreEnabled: this.data.scoreEnabled } : {}),
         ...(this.original.recordSettings ? { recordPurpose: this.data.recordPurpose } : {}),
       },
@@ -215,6 +234,10 @@ Page({
       if (e.status && e.status < 500 && ![429, 401].includes(e.status))
         this.pending = null;
       if (this.alive) {
+        if (!this.pending && typeof pending.data.settingsPassword === "string") {
+          this.setData({ badgeEnabled: !!this.original.badgeSettings?.enabled, scoreEnabled: !!this.original.scoreSettings?.enabled });
+          this.updateDirty();
+        }
         this.setData({
           error: e.message,
           pendingSave: !!this.pending,
@@ -364,6 +387,7 @@ Page({
           visible: this.data.visible,
           fairyEnabled: this.data.fairyEnabled,
           scoreEnabled: this.data.scoreEnabled,
+          badgeEnabled: this.data.badgeEnabled,
           recordPurpose: this.data.recordPurpose,
         }
       : null;
@@ -383,7 +407,7 @@ Page({
       if (this.data.authorized && draft) {
         this.setData({ visible: draft.visible });
         this.updateChoices(draft.capacity, draft.boardId);
-        this.setData({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, recordPurpose: draft.recordPurpose });
+        this.setData({ fairyEnabled: draft.fairyEnabled, scoreEnabled: draft.scoreEnabled, badgeEnabled: draft.badgeEnabled, recordPurpose: draft.recordPurpose });
         this.updateDirty();
       }
       if (this.foreground && this.data.authorized)

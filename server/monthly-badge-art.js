@@ -48,7 +48,7 @@ function render(month, rank) {
   return cache.get(key);
 }
 
-const route = /^\/assets\/badges\/monthly-points\/(\d{4}-(?:0[1-9]|1[0-2]))\/([1-3])\.png$/;
+const route = /^\/assets\/badges\/monthly-points\/(\d{4}-(?:0[1-9]|1[0-2]))\/([1-3]|4-12)\.png$/;
 async function serve(req, res, path, now) {
   const match = route.exec(path);
   if (req.method !== 'GET' || !match) return false;

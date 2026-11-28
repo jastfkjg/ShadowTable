@@ -1,5 +1,4 @@
-const { portrait } = require("../../role-portraits");
-const factions = { good: "好人", evil: "坏人", third: "盗贼", unknown: "未知" };
+const { portrait, factionNames: factions } = require("../../role-portraits");
 const actions = { knife: "出刀", duel: "决斗", detonate: "主动自爆并开枪", passiveGun: "预选被动枪",
   gun: "开枪", guard: "守护", substitute: "指定替死", swap: "换号", inspect: "查验", reflect: "反伤" };
 const effects = { eliminated: "目标出局", disarmed: "目标失去刀", guarded: "被守护挡下", reflected: "被反伤",

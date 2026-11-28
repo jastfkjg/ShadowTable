@@ -1,33 +1,40 @@
-<import src="../../loading-placeholder.wxml" />
-<template name="monthly-board">
-  <view wx:if="{{board.rows.length}}" class="monthly-board">
-    <view class="monthly-board-header"><image class="monthly-heading-icon {{board.portrait?'monthly-role-art':''}}" src="{{board.portrait || board.iconPath}}" mode="aspectFit" aria-hidden="true" /><view class="monthly-heading-copy"><view class="monthly-section-title">{{board.title}}</view><view class="monthly-caption monthly-board-caption">{{board.subtitle}}</view></view><text class="monthly-top-label">前三名</text></view>
-    <button wx:for="{{board.rows}}" wx:key="publicId" class="monthly-row {{item.rank===1?'monthly-row-first':''}}" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" hover-class="none" aria-label="{{(item.tied?'并列':'')+'第'+item.rank+'名，'+item.nickname+'，'+item.value+board.unit+'，查看玩家战绩'}}">
-      <view class="monthly-rank monthly-rank-{{item.rank}}" aria-hidden="true"><image src="/assets/monthly-laurel-{{item.rank}}.svg" mode="aspectFit" /><text>{{item.rankLabel}}</text></view>
-      <view class="monthly-avatar" aria-hidden="true"><image wx:if="{{item.avatarSrc}}" src="{{item.avatarSrc}}" mode="aspectFill" /><text wx:else>{{item.initial}}</text></view>
-      <view class="monthly-identity"><view class="monthly-name-line"><text class="monthly-name">{{item.nickname}}</text><text wx:if="{{item.tied}}" class="monthly-tied">并列</text></view><text class="monthly-caption">{{item.secondaryLabel}}</text></view>
-      <view class="monthly-value {{item.valueCompact?'monthly-compact':''}}">{{item.value}}<text class="monthly-unit">{{board.unit}}</text></view>
-    </button>
-  </view>
-</template>
 <app-nav title="月度战报" back="{{true}}" backLabel="返回我的" bindback="back" />
-<view class="page monthly-page {{report.canShare?'monthly-has-share':''}}">
-  <view class="monthly-hero"><image class="monthly-hero-art" src="/assets/monthly-report-background.jpg" mode="widthFix" aria-hidden="true" /><view class="monthly-hero-content"><picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="选择月报月份，{{monthYear}}年{{monthNumber}}月"><view class="monthly-month-picker"><text class="monthly-year">{{monthYear}} 年</text><view class="monthly-month-line"><text class="monthly-month-number">{{monthNumber}}</text><text class="monthly-month-unit">月</text><view class="monthly-picker-arrow" aria-hidden="true" /></view></view></picker><view wx:if="{{report}}" class="monthly-preview-status"><view class="monthly-status-dot {{report.status==='preview'?'':'monthly-status-complete'}}" aria-hidden="true" />{{report.status==='preview'?'本月实时更新':'完整月报'}}</view></view></view>
-  <template wx:if="{{loading && !report}}" is="loadingPlaceholder" data="{{kind:'metrics'}}" />
-  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert"><text>{{error}}</text><button class="secondary" bindtap="retry" disabled="{{loading}}" hover-class="none">重试</button></view>
-  <block wx:if="{{report}}">
-    <view class="monthly-overview"><view><text class="monthly-overview-value">{{report.overview.games}}</text><text class="monthly-caption">有效对局</text></view><view><text class="monthly-overview-value">{{report.overview.players}}</text><text class="monthly-caption">参赛玩家</text></view><button hover-class="none" bindtap="openRules" aria-label="查看月报统计说明"><image src="/assets/record-info.svg" aria-hidden="true" /></button></view>
-    <view wx:if="{{!report.canShare}}" class="monthly-empty"><view>这个月还没有有效对局</view><text class="monthly-caption">换一个月份，或完成对局后再来看看。</text></view>
-    <block wx:else>
-      <view class="monthly-tabs" style="top: {{navTop}}px;" role="tablist" aria-label="月报类别"><button bindtap="chooseCategory" data-id="overall" class="{{category === 'overall'?'selected':''}}" role="tab" aria-selected="{{category === 'overall'}}" aria-controls="monthly-board-panel" hover-class="none">综合榜单</button><button bindtap="chooseCategory" data-id="honors" class="{{category === 'honors'?'selected':''}}" role="tab" aria-selected="{{category === 'honors'}}" aria-controls="monthly-board-panel" hover-class="none">趣味荣誉</button><button bindtap="chooseCategory" data-id="fun" class="{{category === 'fun'?'selected':''}}" role="tab" aria-selected="{{category === 'fun'}}" aria-controls="monthly-board-panel" hover-class="none">娱乐榜</button></view>
-      <view class="monthly-boards" id="monthly-board-panel" role="tabpanel" aria-label="{{category==='overall'?'综合榜单':entertainment?'娱乐榜':'趣味荣誉'}}">
-        <block wx:if="{{category === 'overall'}}"><block wx:for="{{report.coreBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block><block wx:for="{{report.extraBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block><view wx:if="{{!report.coreBoards.length && !report.extraBoards.length}}" class="monthly-category-empty">暂无达到入榜条件的综合榜单。</view></block>
-        <block wx:else><view class="monthly-category-note"><image src="{{entertainment?'/assets/record-spark.svg':'/assets/record-medal.svg'}}" aria-hidden="true" /><text>{{entertainment?'另一种值得记录的桌边趣事':'那些值得记住的高光时刻'}}</text></view><block wx:for="{{detailBoards}}" wx:key="id"><template is="monthly-board" data="{{board:item}}" /></block><view wx:if="{{!detailBoards.length}}" class="monthly-category-empty">这个月暂无{{entertainment?'娱乐榜':'趣味荣誉'}}记录。</view></block>
-      </view>
-      <view class="monthly-share-bar"><view class="monthly-share-inner"><button class="monthly-share" bindtap="share" loading="{{shareOpening}}" disabled="{{shareOpening || loading || error}}" hover-class="none"><image src="/assets/share-dark.svg" aria-hidden="true" />生成月报分享图</button></view></view>
-    </block>
-  </block>
+<view class="page monthly-page">
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert">{{error}}<button class="secondary" bindtap="retry" hover-class="none">重试</button></view>
+  <view class="monthly-stage">
+    <view class="monthly-tools {{imagePath ? 'monthly-cover-tools' : ''}}">
+      <picker class="monthly-month-control" mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="{{'选择月报月份，'+month}}">
+        <view class="monthly-picker"><text wx:if="{{!imagePath}}">{{month}}</text><view class="monthly-arrow" /></view>
+      </picker>
+      <button wx:if="{{report}}" class="monthly-rules-link" bindtap="openRules" hover-class="none" aria-label="统计口径"><text wx:if="{{imagePath}}" class="monthly-info">i</text><text wx:else>统计口径</text></button>
+    </view>
+    <view wx:if="{{imagePath}}" class="monthly-poster">
+      <image class="monthly-poster-image" src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" binderror="imageError" aria-label="{{description}}" />
+      <button wx:for="{{targets}}" wx:key="key" class="monthly-player" hover-class="none" data-id="{{item.publicId}}" data-board="{{item.boardId}}" data-rank="{{item.rank}}" bindtap="openMonthlyTarget" aria-label="{{item.label}}" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.width}}%;height:{{item.height}}%"><view wx:if="{{item.boardId}}" class="monthly-count-arrow" aria-hidden="true" /></button>
+    </view>
+  </view>
+  <view wx:if="{{loading && !imagePath && !connectionVisible}}" class="monthly-message" role="status">正在生成月度战报…</view>
+  <view wx:elif="{{report && !report.canShare && !loading && !error}}" class="monthly-message">这个月还没有有效对局</view>
+  <view wx:if="{{imagePath}}" class="monthly-share-bar">
+    <button class="monthly-share" bindtap="share" disabled="{{shareOpening || loading || error}}" hover-class="none">生成分享图</button>
+  </view>
 </view>
+<canvas type="2d" id="share-canvas" class="monthly-canvas" aria-hidden="true" />
 <view wx:if="{{rulesExpanded && report}}" class="monthly-rules-backdrop" catchtap="closeRules" catchtouchmove="blockScroll"><view class="monthly-rules-sheet" style="max-height: calc(100vh - {{navTop}}px - 16px);" role="dialog" aria-modal="true" aria-label="月报统计口径" catchtap="blockScroll"><view class="monthly-sheet-handle" aria-hidden="true" /><view class="monthly-rules-heading"><image src="/assets/record-info.svg" aria-hidden="true" /><view>统计口径<text>{{report.monthLabel}}</text></view><button bindtap="closeRules" hover-class="none" aria-label="关闭统计说明">×</button></view><scroll-view scroll-y class="monthly-rules-body"><view wx:for="{{report.rules}}" wx:key="*this" class="monthly-rule"><text>{{index+1}}</text><view>{{item}}</view></view></scroll-view><view class="monthly-rules-footer"><button bindtap="closeRules" hover-class="none">知道了</button></view></view></view>
+<view wx:if="{{roster}}" class="monthly-roster-backdrop" catchtap="closeRoster" catchtouchmove="blockScroll">
+  <view class="monthly-roster-sheet" style="max-height:calc(100vh - {{navTop}}px - 16px)" role="dialog" aria-modal="true" aria-label="{{roster.title+'，'+roster.place}}" catchtap="blockScroll">
+    <view class="monthly-roster-grip" aria-hidden="true" />
+    <button class="monthly-roster-close" aria-label="关闭名单" bindtap="closeRoster" hover-class="none">×</button>
+    <text class="monthly-roster-title">{{roster.title}}</text>
+    <view class="monthly-roster-heading"><text class="monthly-roster-place">{{roster.place}}</text><text>{{roster.result}}</text></view>
+    <text class="monthly-roster-total">{{roster.members.length}} 位玩家</text>
+    <scroll-view scroll-y class="monthly-roster-scroll"><view class="monthly-roster-grid">
+      <button wx:for="{{roster.members}}" wx:key="publicId" class="monthly-roster-person" hover-class="none" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" aria-label="{{'查看'+item.name+'的战绩'}}">
+        <view class="monthly-roster-avatar"><image wx:if="{{item.avatar}}" class="monthly-roster-image" src="{{item.avatar}}" mode="aspectFill" lazy-load data-src="{{item.avatar}}" data-index="{{index}}" binderror="rosterAvatarError" /></view>
+        <view>{{item.name}}<text wx:if="{{item.sample}}" class="monthly-roster-sample">{{item.sample}}</text></view>
+      </button>
+    </view></scroll-view>
+  </view>
+</view>
 <include src="../../player-card.wxml" />
 <app-dialog id="app-dialog" />

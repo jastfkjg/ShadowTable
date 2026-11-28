@@ -36,7 +36,6 @@ test('红蓝兰斯11／12人支持计分但默认关闭，使用单刀表单且�
     assert.throws(() => finish(room, 'assassination', capacity + 1), /目标/);
     assert.deepEqual(room, before);
   }
-  assert.equal(scoring.settings(newRoom('123456', 'wx:1', '房主', 'chaos', 12)).unavailableReason, '本板子暂未参与计分');
 });
 
 test('未转换、转换一次及转换回原阵营的兰斯按终局阵营计分，角色奖励仍仅适用梅林派西', () => {

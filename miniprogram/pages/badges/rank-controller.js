@@ -11,9 +11,19 @@
     { request, update, assetUrl = (path) => path },
     kind = "honor",
     player = "",
+    badgeId = "",
   ) {
     let sequence = 0;
+    const lookup = kind === "lookup";
+    let catalogue = [];
+    const lookupBadge = id => {
+      const badge = badges.presentPlayerBadge({ id }, assetUrl);
+      if (!badge) return null;
+      return { id, title: badge.title, imageUrl: badge.imageUrl, condition: badges.badgeCriteria(badge).detailCondition,
+        scope: badge.periodLabel || (badge.permanent ? "永久" : "本月"), achievement: !!badge.achievement };
+    };
     const state = {
+      lookup, badgeId, badge: lookup && badgeId ? lookupBadge(badgeId) : null, query: "", matches: [],
       countLabel: "当前持有",
       choices: Object.entries(types).map(([kind, type]) => {
         const badge = badges.presentPlayerBadge({ id: type.badgeId }, assetUrl);
@@ -51,7 +61,7 @@
         return;
       const token = ++sequence;
       patch({ loading: true, error: "", ...(player ? { detail: null, selectedBadge: null } : {}) });
-      const endpoint = "/api/badge-ranks/" + kind;
+      const endpoint = lookup ? "/api/leaderboard/badges" + (badgeId ? "/" + encodeURIComponent(badgeId) : "") : "/api/badge-ranks/" + kind;
       const suffix = player
         ? "/" + player
         : more
@@ -60,7 +70,10 @@
       try {
         const value = await request(endpoint + suffix);
         if (token !== sequence) return;
-        if (player) {
+        if (lookup && !badgeId) {
+          catalogue = value.ids.map(lookupBadge).filter(Boolean).sort((a, b) => Number(b.achievement) - Number(a.achievement));
+          search(state.query);
+        } else if (player) {
           patch({
             detail: {
               ...value,
@@ -76,7 +89,7 @@
             board: {
               ...value,
               rows: more ? board.rows.concat(rows) : rows,
-              me: present(value.me),
+              ...(value.me ? { me: present(value.me) } : {}),
             },
           });
         }
@@ -110,11 +123,16 @@
         if (token === sequence) patch({ saving: false });
       }
     }
+    function search(query) {
+      const term = query.trim().toLowerCase();
+      patch({ query, matches: catalogue.filter(b => (b.title + b.scope + b.id).toLowerCase().includes(term)) });
+    }
     start(kind, player);
     return {
       state,
       load,
       visibility,
+      search,
       openBadge(id) {
         const detail = state.detail;
         if (!detail || (!detail.visible && !detail.isSelf)) return;

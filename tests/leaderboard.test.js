@@ -45,7 +45,8 @@ test('8 人及以下历史对局不计入榜单或徽章，9 人局计入并保�
     for (const period of ['month', 'all']) for (const metric of ['games', 'overall', 'good']) {
       const result = query(board, uid, `metric=${metric}&period=${period}&nearby=1`);
       assert.equal(result.minPlayers, 9);
-      assert.deepEqual(result.rows.map(row => [row.isSelf, row.total, row.wins]), [[true, 1, 1]]);
+      assert.deepEqual(result.rows.map(row => [row.isSelf, row.total, row.wins]), metric === 'games' ? [[true, 1, 1]] : []);
+      assert.equal(result.me.total, 1);
       assert.deepEqual(result.nearby, result.rows);
     }
     const points = query(board, uid, 'metric=points');
@@ -110,7 +111,7 @@ test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可�
     assert.equal(limitedCard.ownedBadgeCount,limited.badges.length); assert.equal(limitedCard.badgesLimited,true);
     assert.deepEqual((await get(collectionPath,owner)).data.badges,collection.data.badges);
     app.store.badgeRanks.setVisibility(owner,'fun',{visible:true});
-    assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','overall','alternating_streak']);
+    assert.deepEqual(card.data.player.badges.map(b=>b.id),['games','alternating_streak']);
     assert.equal(card.data.stats.total,5);assert.equal(card.data.stats.wins,3);assert.equal(card.data.stats.winRate,60);
     assert.equal(card.data.stats.byFaction.length,2);
     assert.deepEqual(Object.keys(card.data.stats).sort(),['byFaction','scoreTotal','total','winRate','wins']);
@@ -131,14 +132,14 @@ test('排行榜战绩卡鉴权、汇总全部历史，关闭榜单展示仍可�
     }
   } finally {await new Promise(resolve=>app.server.close(resolve));app.store.close();}
 });
-test('微信、开发账号首局自动上榜，陪测和游客不参与五榜且不公开牌桌昵称', () => {
+test('微信、开发账号满足门槛后自动上榜，陪测和游客不参与五榜且不公开牌桌昵称', () => {
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store), uids=['wx:new','dev:new','guest:new','test:new'];
     const original=readProfile(store,'wx:new');
     const empty=query(board,'guest:viewer');
     assert.equal(empty.rows.length,0);
-    for(const faction of ['good','evil']) store.transaction(()=>store.archiveMatch({
+    for(let i=0;i<10;i++) for(const faction of ['good','evil']) store.transaction(()=>store.archiveMatch({
       id:randomUUID(),board:'classic',capacity:9,endedAt:NOW-1000,players:uids.map(uid=>({
         uid,name:'不应公开的牌桌昵称',faction,outcome:'win',score:{status:'scored',total:3,breakdown:[]},
       })),
@@ -222,7 +223,7 @@ test('开发账号默认公开并参与四榜，关闭后隐藏；游客仍不�
     assert.equal(query(board,'dev:me').me.status,'no_games');
     assert.equal(readProfile(store,'dev:me').leaderboardVisible,true);
     store.transaction(()=>saveProfile(store,'dev:me',{nickname:'开发玩家',version:0}));
-    games(store,'dev:me',1,1);games(store,'dev:me',1,0,{faction:'evil'});
+    games(store,'dev:me',10,10);games(store,'dev:me',10,0,{faction:'evil'});
     for(const metric of ['games','overall','good','evil']) {
       const result=query(board,'dev:me','metric='+metric);
       assert.equal(result.me.status,'ranked');assert.equal(result.me.rank,1);
@@ -230,7 +231,7 @@ test('开发账号默认公开并参与四榜，关闭后隐藏；游客仍不�
     }
     profile(store,'dev:me',false);
     assert.equal(query(board,'dev:me').rows.length,0);
-    assert.equal(query(board,'dev:me').me.total,2);
+    assert.equal(query(board,'dev:me').me.total,20);
     assert.equal(readProfile(store,'guest:me').leaderboardVisible,false);
     assert.throws(()=>profile(store,'guest:me',true),/微信、开发或陪测账号/);
   } finally {store.close();}
@@ -250,7 +251,7 @@ test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来�
     const good = query(board,'wx:me','metric=good');
     assert.equal(good.me.total,12); assert.equal(good.me.winRate,66.7); assert.equal(good.rows.length,1);
     const evil = query(board,'wx:me','metric=evil');
-    assert.equal(evil.me.total,9); assert.equal(evil.me.status,'ranked'); assert.equal(evil.me.remaining,0); assert.equal(evil.me.rank,1);
+    assert.equal(evil.me.total,9); assert.equal(evil.me.status,'not_enough'); assert.equal(evil.me.remaining,1); assert.equal(evil.me.rank,null);
     assert.equal(query(board,'wx:hidden').me.status,'hidden');
     assert.equal(query(board,'guest:guest').me.status,'unsupported');
     profile(store,'wx:new'); assert.equal(query(board,'wx:new').me.status,'no_games');
@@ -260,24 +261,31 @@ test('四榜复用有效归档：最终阵营、第三阵营、手动/系统来�
     assert.match(all.rows[0].publicId,/^[\da-f-]{36}$/);
   } finally { store.close(); }
 });
-test('首局即可进入总胜率和对应阵营榜，零局不生成胜率', () => {
+test('总胜率和阵营胜率第十局上榜，零胜也参与，局数榜首局可见', () => {
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store);
-    profile(store,'wx:good'); profile(store,'wx:evil');
-    games(store,'wx:good',1,0); games(store,'wx:evil',1,1,{faction:'evil'});
-    for (const [uid,faction,rate] of [['wx:good','good',0],['wx:evil','evil',100]]) {
-      for (const metric of ['games','overall',faction]) {
+    for (const [uid,faction,wins] of [['wx:good','good',0],['wx:evil','evil',9]]) {
+      games(store,uid,9,wins,{faction});
+      assert.equal(query(board,uid,'metric=games').me.status,'ranked');
+      for (const metric of ['overall',faction]) {
+        const result=query(board,uid,'metric='+metric+'&nearby=1');
+        assert.equal(result.threshold,10); assert.equal(result.me.status,'not_enough');
+        assert.equal(result.me.remaining,1); assert.equal(result.me.rank,null);
+        assert.ok(!result.rows.some(row => row.isSelf)); assert.deepEqual(result.nearby,[]);
+      }
+      games(store,uid,1,wins ? 1 : 0,{faction});
+      for (const metric of ['overall',faction]) {
         const result=query(board,uid,'metric='+metric);
-        assert.equal(result.threshold,1); assert.equal(result.me.status,'ranked');
-        assert.equal(result.me.total,1); assert.equal(result.me.winRate,rate);
+        assert.equal(result.me.status,'ranked'); assert.equal(result.me.total,10);
+        assert.ok(result.rows.some(row => row.isSelf)); assert.equal(result.me.winRate,wins ? 100 : 0);
       }
       const other=query(board,uid,'metric='+(faction==='good'?'evil':'good'));
-      assert.equal(other.me.status,'no_games'); assert.equal(other.me.rank,null); assert.equal(other.me.winRate,null);
+      assert.equal(other.me.status,'no_games'); assert.equal(other.me.winRate,null);
     }
   } finally {store.close();}
 });
-test('一局可上榜、零胜率、原始比例排序、样本量优先与并列跳号', () => {
+test('胜率门槛、零胜率、原始比例排序、样本量优先与并列跳号', () => {
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store);
@@ -285,16 +293,16 @@ test('一局可上榜、零胜率、原始比例排序、样本量优先与并�
     games(store,'wx:a',30,20); games(store,'wx:b',60,40); games(store,'wx:c',60,40);
     games(store,'wx:d',1000,667); games(store,'wx:zero',20,0); games(store,'wx:short',1,1);
     const ranked = query(board,'wx:a','metric=overall');
-    assert.deepEqual(ranked.rows.map(r=>r.rank),[1,2,3,3,5,6]);
-    assert.equal(ranked.rows[1].nickname,'d'); assert.equal(ranked.rows[4].nickname,'a');
-    assert.equal(ranked.rows[1].winRate,ranked.rows[4].winRate);
-    assert.equal(ranked.rows[5].winRate,0); assert.equal(query(board,'wx:short','metric=overall').me.remaining,0);
+    assert.deepEqual(ranked.rows.map(r=>r.rank),[1,2,2,4,5]);
+    assert.equal(ranked.rows[0].nickname,'d'); assert.equal(ranked.rows[3].nickname,'a');
+    assert.equal(ranked.rows[0].winRate,ranked.rows[3].winRate);
+    assert.equal(ranked.rows[4].winRate,0); assert.equal(query(board,'wx:short','metric=overall').me.remaining,9);
     const count = query(board,'wx:me','metric=games');
     assert.deepEqual(count.rows.map(r=>r.rank),[1,2,2,4,5,6]);
-    games(store,'wx:short',1,1); assert.equal(query(board,'wx:short','metric=overall').me.rank,1);
+    games(store,'wx:short',9,9); assert.equal(query(board,'wx:short','metric=overall').me.rank,1);
   } finally { store.close(); }
 });
-test('本月按上海时区结束时间取半开区间，月初缓存切换，一局月榜也有排名', () => {
+test('本月按上海时区结束时间取半开区间，月初缓存切换，胜率门槛在周期内计算', () => {
   const store = new Store(':memory:');
   try {
     const board = new Leaderboard(store), {start,end} = periodRange('month',NOW);
@@ -304,7 +312,8 @@ test('本月按上海时区结束时间取半开区间，月初缓存切换，�
     games(store,'wx:me',20,20,{endedAt:start-1}); games(store,'wx:me',1,1,{endedAt:start});
     games(store,'wx:me',1,0,{endedAt:end-1}); games(store,'wx:me',1,1,{endedAt:end});
     const month=query(board,'wx:me','metric=overall&period=month');
-    assert.equal(month.me.total,2); assert.equal(month.me.status,'ranked'); assert.equal(month.me.remaining,0);
+    assert.equal(month.me.total,2); assert.equal(month.me.status,'not_enough'); assert.equal(month.me.remaining,8);
+    assert.equal(query(board,'wx:me','metric=overall&period=all').me.status,'ranked');
     assert.equal(query(board,'wx:me','metric=overall&period=all').me.total,23);
     const last = board.read('wx:me',new URLSearchParams('period=month'),end-1);
     const next = board.read('wx:me',new URLSearchParams('period=month'),end);
@@ -453,7 +462,7 @@ test('附近排名人数不足五人时只返回实际公开参榜者，阵营�
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store);
-    games(store,'wx:good',2,1);games(store,'wx:evil',1,1,{faction:'evil'});
+    games(store,'wx:good',10,5);games(store,'wx:evil',1,1,{faction:'evil'});
     const all=query(board,'wx:good','metric=games&nearby=1');
     assert.equal(all.nearby.length,2);assert.equal(all.nearby[0].isSelf,true);
     const good=query(board,'wx:good','metric=good&nearby=1');
@@ -552,8 +561,8 @@ test('并列标记来自完整榜单，分页边界的单条记录也能正确�
   const store=new Store(':memory:');
   try {
     const board=new Leaderboard(store);
-    for(let i=0;i<21;i++){profile(store,'wx:tie-'+i);games(store,'wx:tie-'+i,1,1);}
-    profile(store,'wx:first');games(store,'wx:first',2,2);
+    for(let i=0;i<21;i++){profile(store,'wx:tie-'+i);games(store,'wx:tie-'+i,10,10);}
+    profile(store,'wx:first');games(store,'wx:first',11,11);
     for(const metric of ['games','overall','good']) {
       const first=query(board,'wx:first','metric='+metric);
       assert.equal(first.rows[0].rank,1);assert.equal(first.rows[0].tied,false);

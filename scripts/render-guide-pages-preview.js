@@ -6,7 +6,8 @@ const { wxmlToJs } = require("./miniprogram-compiler");
 const { BOARDS } = require("../server/engine"), detail = require("../server/board-info");
 const presentation = require("../miniprogram/board-detail"), { decorateBoard } = require("../miniprogram/board-detail-art");
 const { boardMetadata } = require("../miniprogram/rule-discovery");
-const monthly = require("../miniprogram/monthly-report"), { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
+const { homeData, posterScript } = require("./monthly-poster-preview");
+const { monthlyFixture } = require("../tests/helpers/monthly-fixtures");
 const root = path.resolve(__dirname, "../miniprogram"), output = path.resolve(__dirname, "../output/playwright/guide-pages-implemented");
 const context = { window: {}, global: {}, console }; vm.createContext(context);
 const factory = vm.runInContext("(function(global){" + wxmlToJs(root) + "})(global)", context);
@@ -76,16 +77,14 @@ async function main() {
   fixture.mainBoards[1].rows = [];
   fixture.mainBoards[2].rows = [["子龙", 9, 3, 1], ["玉虚宫", 8, 4, 2], ["wyc", 8, 5, 2]].map(([nickname, total, wins, rank], i) => ({ publicId: "games-" + i, nickname, total, wins, rank, tied: rank === 2, avatarUrl: null }));
   fixture.funBoards = fixture.funBoards.filter(board => board.sort === "count").map(board => ({ ...board, rows: board.rows.slice(0, 2).map((row, i) => ({ ...row, nickname: i ? "阿伟" : "子龙", count: 1, opportunities: i ? 1 : 2, rate: i ? 100 : 50, rank: 1, tied: true })) }));
-  const report = monthly.presentReport(fixture);
-  for (const board of report.funBoards) if (board.metric.startsWith("merlin_")) board.portrait = "/assets/roles/merlin.png";
-  const monthlyBase = { month: report.month, report, category: "overall", loading: false, error: "", entertainment: false, detailBoards: monthly.detailBoards(report), navTop: 68 };
-  scenes.monthly = ["monthly", monthlyBase];
-  scenes.honors = ["monthly", { ...monthlyBase, category: "honors" }];
-  scenes.entertainment = ["monthly", { ...monthlyBase, category: "fun", entertainment: true, detailBoards: monthly.detailBoards(report, "count", true) }];
-  scenes["monthly-rules"] = ["monthly", { ...monthlyBase, rulesExpanded: true }];
-  scenes["monthly-empty"] = ["monthly", { ...monthlyBase, report: monthly.presentReport({ ...fixture, overview: { games: 0, players: 0 }, mainBoards: [], funBoards: [] }) }];
-  scenes["monthly-error"] = ["monthly", { ...monthlyBase, report: null, error: "网络连接失败，请重试。" }];
-  scenes["monthly-long"] = ["monthly", { ...monthlyBase, report: { ...report, coreBoards: [{ ...report.coreBoards[0], rows: [{ ...report.coreBoards[0].rows[0], nickname: "非常非常长的玩家昵称用于检查换行", value: "-123456789", valueCompact: true }] }] } }];
+  const monthlyBase = homeData(fixture);
+  scenes.monthly = ["monthly", monthlyBase, fixture];
+  scenes["monthly-rules"] = ["monthly", { ...monthlyBase, rulesExpanded:true }, fixture];
+  scenes["monthly-empty"] = ["monthly", homeData({ ...fixture, overview:{ games:0, players:0 } })];
+  scenes["monthly-error"] = ["monthly", { month:fixture.month, loading:false, error:"网络连接失败，请重试。" }];
+  const long = structuredClone(fixture);
+  Object.assign(long.mainBoards[0].rows[0], { points:-123456789, nickname:"非常非常长的玩家昵称用于检查换行" });
+  scenes["monthly-long"] = ["monthly", homeData(long), long];
   for (const source of BOARDS.filter(board => board.available)) for (const capacity of source.counts) {
     const board = decorateBoard(presentation.presentBoard({ ...source, detail: detail[source.id] }, capacity));
     const data = { loading: false, error: "", board, metadata: boardMetadata(source, board), canCreate: true, singlePage: false, navTop: 68, query: "", selectedGroup: board.groups[0]?.id || "", tab: board.defaultTab, chapters: board.chapters, currentChapter: 0, visibleRoles: presentation.visibleRoles(board, board.groups[0]?.id || "") };
@@ -97,10 +96,10 @@ async function main() {
   scenes.directory = ["board-details", { ...boardBase, directoryExpanded: true }];
   scenes["role-expanded"] = ["board-details", { ...boardBase, visibleRoles: presentation.visibleRoles(boardBase.board, "b-good", "", { "0:0": true }) }];
   const common = css("app.wxss") + css("components/app-nav/app-nav.wxss");
-  for (const [id, [name, data]] of Object.entries(scenes)) {
-    fs.writeFileSync(path.join(output, id + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"><title>${safe(id)} · 实际小程序模板</title><style>body{margin:0}button{font:inherit;border:0;width:100%}input{border:0;background:none}img{object-fit:contain}.directory-list,.monthly-rules-body{overflow-y:auto}${common + css("pages/" + name + "/" + name + ".wxss")}</style>${html(factory("pages/" + name + "/" + name + ".wxml")(data))}</html>`);
+  for (const [id, [name, data, poster]] of Object.entries(scenes)) {
+    fs.writeFileSync(path.join(output, id + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" href="data:,"><title>${safe(id)} · 实际小程序模板</title><style>body{margin:0}button{font:inherit;border:0;width:100%}input{border:0;background:none}img{object-fit:contain}.directory-list,.monthly-rules-body{overflow-y:auto}${common + css("pages/" + name + "/" + name + ".wxss")}</style>${html(factory("pages/" + name + "/" + name + ".wxml")(data))}${poster ? posterScript(poster,".monthly-poster-image") : ""}</html>`);
   }
-  const mainScreens = ["help", "monthly", "classic-6", "knights-12"], detailScreens = ["host", "honors", "knights-rules", "directory"];
+  const mainScreens = ["help", "monthly", "classic-6", "knights-12"], detailScreens = ["host", "monthly-rules", "knights-rules", "directory"];
   for (const [id, names] of [["overview", mainScreens], ["details", detailScreens]]) fs.writeFileSync(path.join(output, id + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>已实现 · ${id}</title><style>body{margin:0;padding:30px 44px;background:#0b141a;color:#f2eee5;font:14px -apple-system,'PingFang SC',sans-serif}h1{font-size:25px;margin:0 0 9px}p{color:#b1bfc6;margin:0 0 24px;font-size:12px}.screens{display:flex;gap:24px}section{width:390px}h2{font-size:13px;font-weight:500;margin:0 0 12px}iframe{display:block;width:390px;height:844px;border:1px solid #34434e;border-radius:25px;box-sizing:border-box}</style><h1>使用帮助、月度战报与板子详情 · 已实现</h1><p>实际 WXML / WXSS 布局投影 · 保留现有规则与统计口径</p><div class="screens">${names.map(name => `<section><h2>${safe(name)}</h2><iframe src="${name}.html" title="${name}"></iframe></section>`).join("")}</div>`);
   fs.writeFileSync(path.join(output, "scenes.json"), JSON.stringify(Object.keys(scenes)));
   console.log("Production page projections: " + output);

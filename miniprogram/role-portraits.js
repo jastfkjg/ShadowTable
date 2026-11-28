@@ -22,7 +22,8 @@ const portraits = {
 };
 // Also retain the generic swordsman used by profession-only fun records.
 const assetNames = Array.from(new Set([...Object.values(portraits), "swordsman"]));
-const factionLabels = { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" };
+const factionNames = { good: "好人", evil: "坏人", third: "盗贼", fourth: "捣蛋鬼", blueTraitor: "蓝内奸", redTraitor: "红内奸", unknown: "未知" };
+const factionLabels = { fourth: "第四方捣蛋鬼", blueTraitor: "蓝内奸独立阵营", redTraitor: "红内奸独立阵营", good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" };
 function portrait(role, faction) {
   const name = String(role || "未知角色");
   const lookup = name.trim().replace(/\s*·\s*/g, "·");
@@ -36,5 +37,5 @@ function portrait(role, faction) {
     factionLabel: factionLabels[faction] || factionLabels.unknown,
   };
 }
-return { portrait, assetNames };
+return { portrait, assetNames, factionNames, factionLabels };
 });

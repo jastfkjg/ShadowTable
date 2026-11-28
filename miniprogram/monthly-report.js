@@ -23,10 +23,11 @@
     const rankingSubtitle = funCopy.currentTitleScope(board.rankingSubtitle || board.subtitle);
     const countUnit = board.sort === "rate" ? (/^percival_/.test(board.metric) ? "局" : "次") : board.unit;
     const rows = board.rows.map(row => {
-      const value = board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
+      const value = board.countOnly ? row.count : board.sort ? board.sort === "rate" ? row.rate : row.count : board.id === "points" ? row.points : board.id === "games" ? row.total : row.winRate;
       return { ...row, rankLabel: pad(row.rank), initial: Array.from(row.nickname || "友")[0], value: String(value), valueCompact: String(value).length > 6,
-        secondaryLabel: board.sort ? (board.sort === "count" ? board.rateLabel + " " + row.rate + "%" : label + " " + row.count + " " + countUnit) + " · " + row.opportunities + " 次机会"
-          : board.id === "points" ? row.scoredGames + " 场计分局" + (row.adjustmentPoints ? " · 调整 " + (row.adjustmentPoints > 0 ? "+" : "") + row.adjustmentPoints + " 分" : "")
+        secondaryLabel: board.id === "points" ? row.scoredGames + " 场计分局"
+          : board.sort === "rate" ? label + " " + row.count + " " + countUnit + " · " + row.opportunities + " 次机会"
+          : board.countOnly || board.sort === "count" ? ""
           : row.wins + " 胜 / " + row.total + " 局" };
     });
     const icon = board.id === "points" ? "crown" : board.metric?.includes("shield") || board.metric?.startsWith("defense_") || board.id === "good" ? "shield" : board.metric?.includes("assassin") ? "moon" : "sword";
@@ -39,7 +40,16 @@
     const mainBoards = report.mainBoards.map(presentBoard), funBoards = report.funBoards.map(presentBoard);
     const featured = report.featuredIds.map(id => funBoards.find(board => board.id === id)).filter(board => board?.rows.length);
     const range = monthRange(report.month);
-    return { ...report, mainBoards, funBoards, featured, coreBoards: mainBoards.slice(0, 2).filter(board => board.rows.length), extraBoards: mainBoards.slice(2).filter(board => board.rows.length),
+    const spotlights = (report.spotlights || []).map(presentBoard);
+    const groups = [
+      { title: "综合榜单", boards: mainBoards },
+      { title: "玩家票选", boards: spotlights.filter(board => board.group === "玩家票选") },
+      { title: "角色与牌桌高光", boards: spotlights.filter(board => board.group === "角色与牌桌高光") },
+      { title: "趣味荣誉", boards: detailBoards({ funBoards }) },
+      { title: "娱乐榜", boards: detailBoards({ funBoards }, "count", true) },
+    ].map(group => ({ ...group, boards: group.boards.filter(board => board.rows.length) })).filter(group => group.boards.length);
+    return { ...report, mainBoards, funBoards, spotlights, groups,
+      featured, coreBoards: mainBoards.slice(0, 2).filter(board => board.rows.length), extraBoards: mainBoards.slice(2).filter(board => board.rows.length),
       hasFunBoards: funBoards.some(board => board.rows.length), hasDetails: mainBoards.slice(2).some(board => board.rows.length) || funBoards.some(board => board.rows.length),
       monthLabel: report.month.replace("-", " 年 ") + " 月", monthTitle: report.month.replace("-", "."),
       statusLabel: report.status === "preview" ? "本月实时预览" : "完整月报",
@@ -49,8 +59,9 @@
       rules: ["按北京时间自然月和对局结束时间统计。概览包含所有有效参赛记录，榜单仅展示已公开的微信、开发账号。",
         ...(report.minPlayers ? ["月报榜单只统计 " + report.minPlayers + " 人及以上的有效对局。"] : []),
         "活跃天数按有有效对局结算的自然日去重；同一对局和同一玩家分别去重统计。",
-        "积分含本月有效计分局及本月积分调整，至少一场计分局才参与。总胜率和阵营胜率荣誉均至少 10 局；现有排行榜门槛保持原规则。",
+        "积分含本月有效计分局及本月积分调整，至少一场计分局才参与。总胜率和阵营胜率荣誉均至少 10 局。",
         "趣味次数榜至少一条对应记录，比例榜至少 5 次有效机会；缺失记录不当作零次。",
+        "MVP、SVP 按实际获奖局数排名。双面骑士按达成局数，十二骑士的复活和被刀按实际次数。月内最长连胜仅统计本月符合榜单条件的对局，至少两连胜。",
         "金牌替身适用于终局时存活的非梅林好人，包含派西维尔；最终刀落到本人时计一次，空刀不形成挡刀机会。",
         "绝对防御、卧龙凤雏适用于蓝守卫、魔术师。守卫实际挡下伤害、魔术师换号使原攻击目标实际避开伤害时计一次，按该目标在技能发生时的阵营区分友方与对方。",
         "职业杀手、痛击队友适用身份：" + funCopy.honors.kill_enemy.roleDetail + "。只统计刀、枪、决斗造成的实际出局，最终刺杀单独统计。",

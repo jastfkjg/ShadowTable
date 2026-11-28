@@ -1,9 +1,11 @@
 "use strict";
 const { randomInt, randomUUID, createHash } = require("node:crypto");
+const { factionNames, factionLabels } = require("../miniprogram/role-portraits");
 const variants = require("./variants");
 const knights = require("./knights");
 const fairy = require("./fairy");
 const scoring = require("./scoring");
+const RuleError = require("./rule-error");
 const fun = require("./fun");
 const replay = require("./replay");
 const avoidance = require("./avoidance");
@@ -142,12 +144,6 @@ const PHASES = {
   ended: "对局结束",
   terminated: "对局已终止",
 };
-class RuleError extends Error {
-  constructor(message, status = 400) {
-    super(message);
-    this.status = status;
-  }
-}
 function requireRule(ok, message, status) {
   if (!ok) throw new RuleError(message, status);
 }
@@ -200,7 +196,8 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     host: uid,
     board: boardId,
     capacity,
-    scoreEnabled: scoring.defaultEnabled(boardId, capacity),
+    scoreEnabled: false,
+    badgeEnabled: false,
     recordPurpose: "normal",
     fairyEnabled: capacity >= 8,
     phase: "lobby",
@@ -249,6 +246,7 @@ function end(room, winner, reason, source = "system", facts = null) {
     requireRule(!error, error);
   }
   room.result = { winner, reason, source };
+  if (source === "manual" && winner === null) room.result.reason += "本局扣除的卡片已退还给原玩家。";
   room.scoringFacts = facts;
   if (room.fun) room.fun.terminal = fun.terminal(room, facts || room.fun.pendingTerminal, ROLES, source);
   stage(room, "ended");
@@ -271,6 +269,7 @@ function archiveResult(room) {
     id: room.matchId || randomUUID(), code: room.code, game: room.game,
     board: room.board, boardName: boardName(room), capacity: room.capacity,
     startedAt: room.startedAt || null, endedAt: Date.now(),
+    badgeEnabled: room.badgeEnabled === true,
     recordPurpose: room.recordPurpose || "normal",
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
@@ -423,6 +422,8 @@ for (const b of BOARDS) {
     );
 }
 function clearGame(room) {
+  room.scoreEnabled = false;
+  room.badgeEnabled = false;
   room.fairyEnabled = fairy.enabled(room);
   for (const key of [
     "roles",
@@ -472,13 +473,13 @@ function start(room, flexible = false) {
   board(room.board, room.capacity);
   room.fairyEnabled = fairy.enabled(room);
   room.players.sort((a, b) => a.seat - b.seat);
-  const roles = avoidance.deal(room.players, roleDeck(room.board, room.capacity), room.avoidanceChoices, shuffle);
+  const roles = avoidance.deal(room.players, roleDeck(room.board, room.capacity), room.avoidanceChoices, shuffle, ROLES);
   room.roles = Object.fromEntries(
     room.players.map((p, i) => [p.uid, roles[i]]),
   );
   room.avoidanceResults = { ...room.avoidanceUnavailable };
-  for (const [uid, role] of Object.entries(room.avoidanceChoices || {}))
-    if (room.players.some(p => p.uid === uid)) room.avoidanceResults[uid] = { role, status: room.roles[uid] === role ? "ineffective" : "effective" };
+  for (const [uid, choice] of Object.entries(room.avoidanceChoices || {}))
+    if (room.roles[uid]) room.avoidanceResults[uid] = avoidance.choiceResult(choice, room.roles[uid], ROLES);
   delete room.avoidanceChoices;
   delete room.avoidanceUnavailable;
   fun.init(room);
@@ -520,7 +521,8 @@ function faction(room, uid) {
   if (room.knights) return knights.side(room, uid, ROLES);
   if (room.lancelot?.players[uid]) return room.lancelot.players[uid].faction;
   if (uid === room.convertedReverse) return "evil";
-  return ROLES[room.roles[uid]][1];
+  if (!room.scoringFacts?.board) return ROLES[room.roles[uid]][1];
+  return scoring.settlementFaction({ seat: room.players.find(player => player.uid === uid)?.seat, roleId: room.roles[uid], faction: ROLES[room.roles[uid]][1] }, room);
 }
 function questChoices(room, uid) {
   const role = room.roles[uid];
@@ -760,8 +762,7 @@ function privateIdentity(room, uid) {
         }
       : null,
     role: name,
-    faction:
-      side === "good" ? "好人阵营" : side === "third" ? "盗贼阵营" : "坏人阵营",
+    faction: factionLabels[side],
     information,
     outcome: room.result?.winner
       ? room.result.winner === side
@@ -811,7 +812,9 @@ function privateView(room, uid) {
   const deal = room.matchId || [room.code, room.createdAt, room.game].join(":");
   const variant = createHash("sha256").update(JSON.stringify([deal, uid])).digest()[0] & 1;
   view.cardArt = `/assets/role-cards/${room.roles[uid]}-${variant ? "b" : "a"}.jpg`;
-  if (room.avoidanceResults?.[uid]) view.avoidance = { ...room.avoidanceResults[uid], roleName: ROLES[room.avoidanceResults[uid].role]?.[0] };
+  const cardResult = room.avoidanceResults?.[uid];
+  if (cardResult?.faction) view.factionCard = cardResult;
+  else if (cardResult) view.avoidance = { ...cardResult, roleName: ROLES[cardResult.role]?.[0] };
   view.action = actionSpec(room, uid);
   if (!room.knights) return view;
   view.knightBCard = room.knights.players[uid].b === true;
@@ -1364,6 +1367,7 @@ function publicView(room, uid) {
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
+    unrecordedCardNotice: "本局已扣的回避卡和阵营卡将退还给对应玩家。",
     scoreSettlement: registrationOptions(scoring.settlementOptions(room)),
     reverseSettlement: scoring.isReverseBoard(room),
     funSettlement: registrationOptions(fun.settlementOptions(room.board)),
@@ -1371,6 +1375,7 @@ function publicView(room, uid) {
     recordSettings: {purpose:room.recordPurpose || "normal",editable:room.phase === "lobby"},
     recordNotice,
     scoreSettings: scoring.settings(room),
+    badgeSettings: { enabled: room.badgeEnabled === true, editable: room.phase === "lobby" },
     scoreNotice: excludedRecord || room.recordPurpose === "test" && managedState !== "active" ? "本局不计积分" : room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     myFun: excludedRecord ? null : funCopy.story(room.matchRecord?.players.find(player => player.uid === uid)?.fun) || null,
@@ -1452,6 +1457,7 @@ function publicView(room, uid) {
         )),
     ),
     result: room.result || null,
+    winnerLabel: room.result?.winner ? (room.result.winner === "third" ? "盗贼阵营" : factionNames[room.result.winner]) + "获胜" : "",
     proposalSubmitted: !!room.proposalSubmitted,
     needsSubmission: p.seat !== null && (room.flexible
       ? !!actionSpec(room, uid)
@@ -1487,7 +1493,7 @@ function command(room, uid, input) {
 function applyCommand(room, uid, input) {
   const p = member(room, uid);
   requireRule(input && typeof input === "object", "请求格式错误");
-  if (input.type === "avoidance") requireRule(room.phase === "lobby", "身份已发放，无法修改回避角色", 409);
+  if (input.type === "avoidance") requireRule(room.phase === "lobby", "身份已发放，无法修改本局用卡", 409);
   requireRule(input.stage === room.stage, "阶段已变化，请刷新后重新操作", 409);
   const { type } = input;
   if (
@@ -1544,6 +1550,15 @@ function applyCommand(room, uid, input) {
         stage(next, "lobby");
       }
     }
+    if (input.badgeEnabled !== undefined) {
+      requireRule(typeof input.badgeEnabled === "boolean", "徽章设置无效");
+      if (input.badgeEnabled !== (next.badgeEnabled === true)) {
+        requireRule(next.phase === "lobby", "徽章开关只能在发牌前修改", 409);
+        next.badgeEnabled = input.badgeEnabled;
+        next.players.forEach(player => (player.ready = false));
+        stage(next, "lobby");
+      }
+    }
     if (input.recordPurpose !== undefined) {
       requireRule(["normal","test"].includes(input.recordPurpose), "对局用途无效");
       if (input.recordPurpose !== (next.recordPurpose || "normal")) {
@@ -1553,6 +1568,8 @@ function applyCommand(room, uid, input) {
         stage(next,"lobby");
       }
     }
+    // configure clears pending card choices on the validated copy.
+    if (!next.avoidanceChoices) delete room.avoidanceChoices;
     Object.assign(room, next);
     return;
   }
@@ -1675,12 +1692,7 @@ function applyCommand(room, uid, input) {
       const option = scoring.settlementOptions(next).find(item => item.id === input.scoreReason);
       requireRule(option, "计分结束原因无效，请重新选择");
       const players = next.players.map(player => ({ seat: player.seat, roleId: next.roles[player.uid], alive: next.knights?.players[player.uid].alive ?? true }));
-      if (option.requiresTarget) {
-        requireRule(scoring.validTarget(input.scoreTarget, players, next.board, next.scorePolicy), "请选择实际在场刺杀目标或空刀");
-      }
-      // Resolve hidden identity only as part of ending the game; no preview oracle.
-      winner = scoring.resolveWinner(option, input.scoreTarget, players, next.board, next.scorePolicy);
-      facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
+      ({ winner, facts } = scoring.resolveSettlement(option, input, players, next.board, next.scorePolicy));
     } else if (input.funReason !== undefined) {
       const option = fun.settlementOptions(next.board).find(item => item.id === input.funReason);
       requireRule(option, "趣味结束原因无效");
@@ -1716,7 +1728,9 @@ function applyCommand(room, uid, input) {
     }
     const finalFacts = facts || next.fun?.pendingTerminal;
     const assassin = next.players.find(player => next.roles[player.uid] === "assassin" && next.knights?.players[player.uid].alive !== false);
-    if (assassin && ["assassination", "early_assassination"].includes(finalFacts?.reason)) {
+    if (facts?.board) {
+      requireRule(input.funActor === undefined, "此板子按线下结果登记带刀方");
+    } else if (assassin && ["assassination", "early_assassination"].includes(finalFacts?.reason)) {
       requireRule(input.funActor === undefined || input.funActor === assassin.seat, "场上有刺客，无需另选带刀人");
       finalFacts.actor = assassin.seat;
     } else if (input.funActor !== undefined) {
@@ -1803,11 +1817,17 @@ function applyCommand(room, uid, input) {
     return;
   }
   if (type === "avoidance") {
-    requireRule(p.seat !== null, "请先入座再使用回避卡");
-    requireRule(input.role === null || typeof input.role === "string" && roleDeck(room.board, room.capacity).includes(input.role), "请选择本局初始牌中的角色");
+    requireRule(p.seat !== null, "请先入座再使用本局用卡");
+    const deck = roleDeck(room.board, room.capacity);
+    if (input.faction !== undefined) {
+      requireRule(input.role === undefined, "每局限用一张卡");
+      requireRule(deck.some(role => ROLES[role][1] === input.faction), "请选择本局初始牌中的阵营");
+    } else {
+      requireRule(input.role === null || deck.includes(input.role), "请选择本局初始牌中的角色");
+    }
     room.avoidanceChoices ||= {};
     if (input.role === null) delete room.avoidanceChoices[uid];
-    else room.avoidanceChoices[uid] = input.role;
+    else room.avoidanceChoices[uid] = input.faction ? { faction: input.faction } : input.role;
     return;
   }
   if (type === "ready") {
@@ -1828,7 +1848,7 @@ function applyCommand(room, uid, input) {
       room.fairyEnabled = input.capacity >= 8;
     }
     if (room.board !== input.board || room.capacity !== input.capacity)
-      room.scoreEnabled = scoring.defaultEnabled(input.board, input.capacity);
+      room.scoreEnabled = false;
     room.board = input.board;
     room.capacity = input.capacity;
     delete room.avoidanceChoices;

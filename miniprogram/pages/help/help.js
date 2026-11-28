@@ -23,6 +23,7 @@ Page({
   data: {
     singlePage: false,
     scoringOnly: false,
+    boardScoreExpanded: {},
     scoringExpanded: false,
     boards: [],
     boardsExpanded: false,
@@ -119,6 +120,10 @@ Page({
       if (this.alive) this.setData({ loadingBoards: false });
       if (this.alive) this.refreshReferences();
     }
+  },
+  toggleBoardScore(e) {
+    const { id } = e.currentTarget.dataset;
+    this.setData({ boardScoreExpanded: { ...this.data.boardScoreExpanded, [id]: !this.data.boardScoreExpanded[id] } });
   },
   async loadScoreRules() {
     this.setData({ scoringLoading: true, scoringError: "" });
