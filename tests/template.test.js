@@ -2560,3 +2560,18 @@ test('本局用卡按板子显示阵营，底栏显示本人总张数与选择�
     assert.equal(empty.children.at(-1).children.join(''), '用卡');
   }
 });
+
+test('两块计分表默认收起，可分别展开，在帮助和单独规则页显示相同分值', () => {
+  const renderHelp = factory('pages/help/help.wxml'), scoringRules = require('../server/scoring').publicRules();
+  for (const scoringOnly of [true,false]) {
+    const data = { scoringOnly, scoringRules, references:[{id:'scoring',expanded:true}], boardScoreExpanded:{} };
+    for (const [shadow,chaos] of [[false,false],[true,false],[false,true],[true,true]]) {
+      const tree = renderHelp({...data,boardScoreExpanded:{'shadow-assist':shadow,chaos}});
+      const buttons = nodes(tree).filter(node => node.attr?.bindtap === 'toggleBoardScore');
+      assert.deepEqual(buttons.map(b => b.attr['aria-expanded'] ?? b.attr.ariaExpanded),[shadow,chaos]);
+      const content = JSON.stringify(tree);
+      assert.equal(content.includes('三绿车 · 红内奸带刀 · 刺中梅林'),shadow);
+      assert.equal(content.includes('三绿车 · 盗贼获胜 · 第四方捣蛋鬼挡刀'),chaos);
+    }
+  }
+});

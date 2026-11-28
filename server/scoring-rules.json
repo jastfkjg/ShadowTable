@@ -1,9 +1,39 @@
 {
-  "version": "avalon-2026-11-v17",
+  "version": "avalon-2026-11-v18",
   "defaultEnabledBoards": {},
   "title": "阿瓦隆积分规则",
-  "scopeLabel": "经典基础 5–10、12 人、9／11 人逆仆、11／12 人红蓝兰斯及十二骑士 10–13 人；其他扩展板暂不计积分",
-  "boards": { "classic": [5, 6, 7, 8, 9], "classic-11": [11], "lancelot": [11, 12], "classic-court": [9, 10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13] },
+  "scopeLabel": "经典基础 5–10、12 人、9／11 人逆仆、11／12 人红蓝兰斯、十二骑士 10–13 人，以及 12 人内奸（影中执刃）与混沌契约；其他扩展板暂不计积分",
+  "boards": { "classic": [5, 6, 7, 8, 9], "classic-11": [11], "lancelot": [11, 12], "classic-court": [9, 10, 12], "knights-10": [10], "knights-11": [11], "knights": [12], "knights-13": [13], "shadow-assist": [12], "chaos": [12] },
+  "boardScores": {
+    "shadow-assist": {
+      "title": "内奸（影中执刃）",
+      "note": "三绿车按实际带刀方和刺杀目标计分。蓝内奸被刺中即按挡刀行计分。房主确认其至少上过两次车且在决胜轮车上，才记独赢。表内已含挡刀分。",
+      "groups": { "merlinPercival": "梅林／派西", "good": "其他好人", "blueTraitor": "蓝内奸", "redTraitor": "红内奸", "evil": "其他坏人" },
+      "scenarios": {
+        "red": { "label": "三红车", "points": { "merlinPercival": 1, "good": 1, "blueTraitor": 1, "redTraitor": 8, "evil": 9 } },
+        "evil_miss": { "label": "三绿车 · 坏人带刀 · 梅林躲刀", "points": { "merlinPercival": 12, "good": 9, "blueTraitor": 9, "redTraitor": 1, "evil": 2 } },
+        "evil_shield": { "label": "三绿车 · 坏人带刀 · 刺中蓝内奸", "points": { "merlinPercival": 11, "good": 8, "blueTraitor": 12, "redTraitor": 1, "evil": 2 } },
+        "traitor_miss": { "label": "三绿车 · 红内奸带刀 · 梅林躲刀", "points": { "merlinPercival": 12, "good": 9, "blueTraitor": 9, "redTraitor": 3, "evil": 1 } },
+        "traitor_shield": { "label": "三绿车 · 红内奸带刀 · 刺中蓝内奸", "points": { "merlinPercival": 11, "good": 8, "blueTraitor": 12, "redTraitor": 3, "evil": 1 } },
+        "evil_hit": { "label": "三绿车 · 坏人带刀 · 刺中梅林", "points": { "merlinPercival": 2, "good": 3, "blueTraitor": 3, "redTraitor": 1, "evil": 9 } },
+        "traitor_hit": { "label": "三绿车 · 红内奸带刀 · 刺中梅林", "points": { "merlinPercival": 2, "good": 3, "blueTraitor": 3, "redTraitor": 12, "evil": 3 } }
+      }
+    },
+    "chaos": {
+      "title": "混沌契约",
+      "note": "两名盗贼各按第三方计分。捣蛋鬼随其所属的好人、坏人或盗贼阵营计分。成为第四方并为梅林挡刀时，按对应的挡刀行计分。",
+      "groups": { "merlinPercival": "梅林／派西", "good": "其他好人", "evil": "坏人", "third": "盗贼", "fourth": "第四方捣蛋鬼" },
+      "scenarios": {
+        "red": { "label": "三红车", "points": { "merlinPercival": 2, "good": 2, "evil": 9, "third": 1 } },
+        "win_miss": { "label": "三绿车 · 盗贼获胜 · 梅林躲刀", "points": { "merlinPercival": 3, "good": 2, "evil": 1, "third": 12 } },
+        "win_shield": { "label": "三绿车 · 盗贼获胜 · 第四方捣蛋鬼挡刀", "points": { "merlinPercival": 3, "good": 2, "evil": 1, "third": 12, "fourth": 4 } },
+        "win_hit": { "label": "三绿车 · 盗贼获胜 · 刺中梅林", "points": { "merlinPercival": 1, "good": 2, "evil": 3, "third": 12 } },
+        "loss_miss": { "label": "三绿车 · 盗贼失败 · 梅林躲刀", "points": { "merlinPercival": 12, "good": 9, "evil": 2, "third": 1 } },
+        "loss_shield": { "label": "三绿车 · 盗贼失败 · 第四方捣蛋鬼挡刀", "points": { "merlinPercival": 8, "good": 7, "evil": 2, "third": 1, "fourth": 9 } },
+        "loss_hit": { "label": "三绿车 · 盗贼失败 · 刺中梅林", "points": { "merlinPercival": 2, "good": 3, "evil": 9, "third": 1 } }
+      }
+    }
+  },
   "reverseBoards": { "classic": [9], "classic-11": [11] },
   "targetModes": { "knights-10": "living_merlin", "knights-11": "living_merlin", "knights": "living_merlin", "knights-13": "living_merlin" },
   "notes": ["红蓝兰斯 11、12 人支持计分，默认关闭，须在发牌前开启。两名兰斯按结束时的当前阵营计分，角色名称保留；转入好人阵营的兰斯可获得三绿及最终挡刀奖励，转入坏人阵营后不再获得好人奖励。沿用现有分值及 MVP／SVP 奖励，不增加转换奖励或提前盘刀。", "9、11 人逆仆支持计分，默认关闭，须在发牌前开启。三绿后由房主在结束本局中依次填写逆仆刀、梅林刀目标，确认后统一结算；其他玩家无需确认。逆仆刀目标与命中不向其他玩家公开。", "逆仆未被命中按好人计分，被命中后按坏人计分；三次任务失败或连续五次否决时，逆仆按好人失败计分。第一段刀逆仆不发挡刀奖励，最终刺梅林才适用挡刀奖励。", "所有对局默认关闭计分。房主可在发牌前输入房间设置密码开启。", "十二骑士按结束时的角色与阵营计分；出局玩家保留最后阵营。", "十二骑士空刀：场上无存活梅林则红队胜，仍有存活梅林则蓝队胜。提前起刀与3蓝车后的刺杀使用相同计分规则。", "连续五次组队被否决，与红队3红车采用相同计分规则。", "有效计分局的公投 MVP、SVP 各额外获得 1 分；沿用现有票选门槛，并列最高票每人均获奖，未达投票人数不加分。奖励计入本局所属月份，关闭计分的对局不发积分。"],

@@ -121,7 +121,8 @@ test("前三名保留超过100人的并列，生成单张长图，公开投影�
     const report = read(reports);
     assert.equal(report.mainBoards[0].rows.length, 105); assert.ok(report.mainBoards[0].rows.every(row => row.rank === 1 && row.tied));
     const pages = cardRenderer.cards({ ...report, uid: "secret", matches: [{ secret: "should-not-export" }] });
-    assert.equal(pages.length, 1); assert.equal(cardRenderer.layout(pages[0]).sections[0].box.lanes[0].tiles.length, 105);
+    assert.equal(pages.length, 1); assert.equal(cardRenderer.layout(pages[0]).sections[0].box.lanes[0].tiles.length, 0);
+    assert.match(cardRenderer.describe(pages[0]), /105 位玩家/);
     assert.ok(cardRenderer.renderDimensions(pages[0]).height <= 8192);
     assert.equal(pages.flatMap(page => page.sections).filter(section => section.title.startsWith("积分榜")).flatMap(section => section.rows).length, 105);
     assert.doesNotMatch(JSON.stringify(pages), /secret|should-not-export|uid|publicId|matches/);

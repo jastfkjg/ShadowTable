@@ -37,6 +37,33 @@ test("首页完整长图与分享页复用同一文件，版本变化时先替�
   home.openRules(); assert.equal(home.data.rulesExpanded, true); home.onHide(); assert.equal(home.data.rulesExpanded, false);
   home.onUnload(); share.onUnload();
 });
+test("并列摘要打开该月完整名单，三人直接展示，四人收起，切月清除名单", async () => {
+  const response = monthlyFixture(), board = response.funBoards.find(b => b.id === "merlin_evade:count");
+  const third = board.rows[2], avatar = "/api/avatars/" + "a".repeat(64);
+  board.rows = [...board.rows.slice(0, 2), ...Array.from({length: 4}, (_, i) => ({
+    ...third, tied: true, publicId: "group-" + i, nickname: "并列玩家" + i, avatarUrl: i === 3 ? avatar : "",
+  }))];
+  const api = { login: async () => {}, request: async () => response, assetUrl: src => "https://test.invalid" + src };
+  const home = page("pages/monthly/monthly.js", api, {}, async () => "wxfile://ties");
+  home.onLoad({ month: response.month }); home.onReady(); await home.onShow();
+  const target = home.data.targets.find(t => t.boardId === "merlin_evade");
+  assert.equal(target.rank, 3);
+  const tap = { currentTarget: { dataset: { board: target.boardId, rank: target.rank } } };
+  home.openMonthlyTarget(tap);
+  assert.equal(home.data.roster.title, board.title);
+  assert.equal(home.data.roster.place, "并列第三");
+  assert.equal(home.data.roster.members.length, 4);
+  assert.equal(home.data.roster.members[3].avatar, api.assetUrl(avatar));
+  assert.doesNotMatch(home.data.description, /并列玩家3/);
+  assert.ok(!home.data.targets.some(t => t.publicId === "group-3"));
+  response.month = "2026-08"; response.version++; board.rows.pop();
+  await home.load(response.month);
+  assert.equal(home.data.roster, null);
+  assert.ok(home.data.targets.some(t => t.publicId === "group-2"));
+  assert.ok(!home.data.targets.some(t => t.boardId === "merlin_evade"));
+  home.openMonthlyTarget(tap); assert.equal(home.data.roster, null);
+  home.onUnload();
+});
 test("月份切换、后台旧响应和网络失败均无法导出过期图片", async () => {
   const pending = [], response = monthlyFixture();
   const api = { login: async () => {}, request: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) };
@@ -139,12 +166,12 @@ test("月报及分享长图统一识别榜单数据里的旧称号", () => {
   assert.equal(section.subtitle, "梅林 · 隐身乘客");
   assert.equal(old.title, "灯下黑梅林");
 });
-test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重复且全部内容计入高度", () => {
+test("大量并列保留完整数据，分享长图只排一行摘要", () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
   response.funBoards.find(board => board.id === response.featuredIds[0]).rows = Array.from({ length: 105 }, (_, index) => ({ ...response.funBoards[0].rows[0], nickname: "并列玩家" + index, publicId: "tie-" + index, rank: 1, tied: true }));
   const pages = renderer.cards(response);
   assert.equal(pages.length, 1);
-  assert.ok(renderer.dimensions(pages[0]).height > renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
+  assert.ok(renderer.dimensions(pages[0]).height < renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
   assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
@@ -177,6 +204,9 @@ test("原生月报等待本地背景与远程头像，头像失败仍绘制背�
 test("超长月报按比例控制原生画布尺寸，仍只导出一张包含末尾荣誉的 PNG", async () => {
   const renderer = require("../miniprogram/monthly-report-card"), response = monthlyFixture();
   response.mainBoards[0].rows=Array.from({length:450},(_,i)=>({...response.mainBoards[0].rows[0],nickname:"并列玩家"+i,rank:1,tied:true}));
+  // Keep exercising the canvas size cap with many distinct boards, independently of tie folding.
+  const extra = response.funBoards.find(board => board.id === "merlin_evade:count");
+  for (let i = 0; i < 30; i++) response.funBoards.push({ ...extra, id: "extra" + i + ":count", metric: "extra" + i });
   const [card]=renderer.cards(response),images=[],labels=[],scales=[],exports=[];
   const context=new Proxy({fillText:value=>labels.push(value),scale:(...args)=>scales.push(args)},{get:(target,key)=>key in target?target[key]:()=>{}});
   const canvas={getContext:()=>context,createImage(){const image={set src(value){images.push(this);}};return image;}};
@@ -195,5 +225,5 @@ test("超长月报按比例控制原生画布尺寸，仍只导出一张包含�
   assert.ok(capturedWidth>=canvas.width,"导出必须包含右侧成绩，不能用位图宽度裁切显示画布");
   assert.ok(capturedHeight>=canvas.height,"导出必须包含末尾娱乐榜和页脚");
   assert.ok(scales[0][0]>0&&scales[0][0]<1);assert.equal(scales[0][0],scales[0][1]);
-  assert.ok(labels.includes("并列玩家449"));assert.equal(renderer.layout(card).sections[0].box.lanes[0].tiles.length,450);assert.ok(labels.includes("绝对防御"));
+  assert.ok(!labels.includes("并列玩家449"));assert.ok(labels.includes("450 位玩家"));assert.equal(renderer.layout(card).sections[0].box.lanes[0].tiles.length,0);assert.ok(labels.includes("绝对防御"));
 });

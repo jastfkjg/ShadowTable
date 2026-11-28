@@ -583,8 +583,8 @@
     monthlyReset: null, resetSaving: false, resetError: '',
     clearingMonths: [], clearingMonth: '', clearingPreview: null, clearingLoading: false, clearingSaving: false, clearingConfirming: false, clearingConfirmation: null, clearingRulesExpanded: false, clearingError: '', clearingNotice: '',
     rankMineExpanded: false, rankRulesExpanded: false, rankMetricsExpanded: false, rankPickerView: null, rankMetric: 'points', rankFunMode: 'all', rankFunSort: 'count', rankFunRole: '', rankFunMetrics: [], rankPointsAvailable: true, rankPeriod: 'month', rankBoard: null, rankLoading: false, rankMoreLoading: false, rankError: '', rankMoreError: false, rankNotice: '', rankVisible: false, rankVisibilitySaving: false, rankVisibilityError: '',
-    resultDialog: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
-    monthlyMonth: '', monthlyReport: null, monthlyLoading: false, monthlyError: '', monthlyPoster: null,
+    resultDialog: false, resultChoice: "", resultBoardChoices: {}, resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false,
+    monthlyMonth: '', monthlyReport: null, monthlyRoster: null, monthlyLoading: false, monthlyError: '', monthlyPoster: null,
     matches: [], matchesTotal: 0, matchesMore: false, matchesLoading: false, matchesError: "", matchScored: false, matchFun: null, scoringRules: null, scoringError: "",
     memberRooms: [],
     roomListFilter: "all",
@@ -712,7 +712,7 @@
     clearTimeout(timer); refreshSequence++; mask();
     roomCode = null; profilePending = null;
     if(route.page==='matches'){scoreAdjustmentRecords=[];scoreAdjustmentTotal=0;scoreAdjustmentMore=false;scoreAdjustmentError='';}
-    setState({ page: route.page, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
+    setState({ page: route.page, monthlyRoster: null, playerCollection: null, collectionError: '', badgeRankView:null, helpFromLobby: route.fromLobby, clearingConfirming: false, clearingConfirmation: null, monthlyReset: null, resetError: '', room: route.page === 'table' && state.room?.code === route.code ? state.room : null,
       ...(route.code ? { code: route.code } : {}), error: '', notice: '', entrySheet: false, entryError: '', showRoomSettings: false, showRoomRules: false,
       settings: null, roomMenu: null, noteRoom: null, toolType: '', resultDialog: false, showBoardDetails: false,
       badgeFilter: 'all', badgeCategory: undefined, badgePicker: '', badgePickerChoice: null, badgePlaced: null, badgeManaging: false, selectedBadgeId: '', badgeCollection: null, badgeManagerLoading: false, badgeManagerSaving: false, badgeManagerError: '',
@@ -991,7 +991,7 @@
       clearingPending = null;
       if (account !== clearingAccount()) return;
       ++statsSequence; statsRequestRoute = -1; ++monthlySequence; ++badgeManagerSequence;
-      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyPoster: null, badgeCollection: null, playerCard: null,
+      setState({ stats: null, statsLoading: false, matches: [], rankBoard: null, monthlyReport: null, monthlyPoster: null, monthlyRoster: null, badgeCollection: null, playerCard: null,
         clearingPreview: null, clearingConfirming: false, clearingConfirmation: null, clearingNotice: recordClearing.monthLabel(submission.body.month) + ' 的个人战绩已清除' });
     } catch (e) {
       if (e.status && e.status < 500 && ![401, 429].includes(e.status)) clearingPending = null;
@@ -1463,7 +1463,7 @@
     const sequence = ++monthlySequence, route = routeSequence;
     const active = () => sequence === monthlySequence && route === routeSequence && state.page === 'monthly' && foreground;
     const previous = state.monthlyReport?.month === month ? state.monthlyReport : null;
-    setState({ monthlyMonth: month, monthlyLoading: true, monthlyError: '', ...(previous ? {} : { monthlyReport: null, monthlyPoster: null }) });
+    setState({ monthlyMonth: month, monthlyRoster: null, monthlyLoading: true, monthlyError: '', ...(previous ? {} : { monthlyReport: null, monthlyPoster: null }) });
     try {
       const response = await request('/api/monthly-report?month=' + encodeURIComponent(month));
       if (!active()) return;
@@ -1485,6 +1485,30 @@
         ...(error.status && error.status < 500 && error.status !== 429 ? { monthlyReport: null, monthlyPoster: null } : {}) });
     }
   }
+  function openMonthlyRoster(el) {
+    if (!state.monthlyPoster || state.monthlyLoading || state.monthlyError || !foreground) return;
+    const { board, rank } = el.dataset;
+    const roster = monthlyCard.rosterFor(state.monthlyReport, board, rank);
+    if (!roster) return;
+    setState({ monthlyRoster: { ...roster, board, rank } });
+    app.querySelector('.monthly-roster-close')?.focus({ preventScroll: true });
+  }
+  function closeMonthlyRoster() {
+    const roster = state.monthlyRoster;
+    if (!roster) return;
+    setState({ monthlyRoster: null });
+    Array.from(app.querySelectorAll('[data-action="monthlyRoster"]')).find(el =>
+      el.dataset.board === roster.board && el.dataset.rank === roster.rank)?.focus({ preventScroll: true });
+  }
+  function viewMonthlyRoster(roster) {
+    const members = roster.members.map(row => '<button type="button" class="monthly-roster-person" data-action="monthlyPlayer" data-id="' + esc(row.publicId) + '" aria-label="查看' + esc(row.name) + '的战绩"><span class="monthly-roster-avatar">' +
+      (row.avatar ? '<img class="monthly-roster-image" loading="lazy" src="' + esc(row.avatar) + '" alt="">' : '') + '</span><span>' + esc(row.name) +
+      (row.sample ? '<small class="monthly-roster-sample">' + esc(row.sample) + '</small>' : '') + '</span></button>').join('');
+    return '<div class="monthly-roster-backdrop" data-rank-dismiss="monthlyRosterClose"><section class="monthly-roster-sheet" role="dialog" aria-modal="true" aria-label="' + esc(roster.title + '，' + roster.place) + '">' +
+      '<div class="monthly-roster-grip" aria-hidden="true"></div><button type="button" class="monthly-roster-close" data-action="monthlyRosterClose" aria-label="关闭名单">×</button>' +
+      '<div class="monthly-roster-title">' + esc(roster.title) + '</div><div class="monthly-roster-heading"><span class="monthly-roster-place">' + esc(roster.place) + '</span>' + esc(roster.result) +
+      '</div><div class="monthly-roster-total">' + roster.members.length + ' 位玩家</div><div class="monthly-roster-scroll"><div class="monthly-roster-grid">' + members + '</div></div></section></div>';
+  }
   function viewMonthlyReport() {
     const report = state.monthlyReport, poster = state.monthlyPoster, month = state.monthlyMonth || monthlyPresentation.monthAt();
     let html = '<header class="monthly-web-header"><button type="button" class="monthly-web-back" data-action="navigate" data-page="me" aria-label="返回我的"><img src="/assets/chevron-left.svg" alt=""></button><h1 tabindex="-1" data-page-heading>月度战报</h1></header><section class="monthly-page">';
@@ -1493,11 +1517,17 @@
       (report ? '<button type="button" class="monthly-rules-link" data-action="monthlyRules" aria-label="统计口径">' + (poster ? '<span class="monthly-info">i</span>' : '统计口径') + '</button>' : '') + '</div>';
     if (state.monthlyLoading && !poster) html += '<div class="monthly-message" role="status">正在生成月度战报…</div>';
     if (poster) {
-      const targets = poster.targets.map(item => '<foreignObject x="' + item.x + '%" y="' + item.y + '%" width="' + item.width + '%" height="' + item.height + '%"><button xmlns="http://www.w3.org/1999/xhtml" type="button" class="monthly-player" data-action="monthlyPlayer" data-id="' + esc(item.publicId) + '" aria-label="' + esc(item.label) + '"></button></foreignObject>').join('');
+      const targets = poster.targets.map(item => {
+        const action = item.boardId ? 'data-action="monthlyRoster" data-board="' + esc(item.boardId) + '" data-rank="' + esc(item.rank) + '"' :
+          'data-action="monthlyPlayer" data-id="' + esc(item.publicId) + '"';
+        return '<foreignObject x="' + item.x + '%" y="' + item.y + '%" width="' + item.width + '%" height="' + item.height + '%"><button xmlns="http://www.w3.org/1999/xhtml" type="button" class="monthly-player" ' +
+          action + ' aria-label="' + esc(item.label) + '">' + (item.boardId ? '<span class="monthly-count-arrow" aria-hidden="true"></span>' : '') + '</button></foreignObject>';
+      }).join('');
       html += '<div class="monthly-poster"><img class="monthly-poster-image" src="' + poster.src + '" width="' + poster.width + '" height="' + poster.height + '" alt="' + esc(poster.description) + '"><svg class="monthly-targets" xmlns="http://www.w3.org/2000/svg" aria-label="查看上榜玩家战绩">' + targets + '</svg></div>';
       html += '<div class="monthly-share-bar">' + btn('monthly-share', 'monthlyShare', '生成分享图', null, !!(state.monthlyLoading || state.monthlyError)) + '</div>';
     } else if (report && !report.canShare && !state.monthlyLoading && !state.monthlyError) html += '<div class="monthly-message">这个月还没有有效对局</div>';
-    return html + '</div></section>';
+    html += '</div></section>';
+    return state.monthlyRoster ? '<div inert>' + html + '</div>' + viewMonthlyRoster(state.monthlyRoster) : html;
   }
   async function shareMonthlyReport() {
     if (!state.monthlyPoster || state.monthlyLoading || state.monthlyError) return;
@@ -1512,6 +1542,7 @@
   function openMonthlyPlayer(id) {
     const row = (state.monthlyReport?.groups || []).flatMap(group => group.boards).flatMap(board => board.rows).find(row => row.publicId === id);
     if (!row || state.page !== 'monthly' || state.monthlyLoading || !foreground) return;
+    if (state.monthlyRoster) closeMonthlyRoster();
     const route = routeSequence, sequence = monthlySequence;
     return loadPlayerCard({ scope: 'leaderboard', id, name: row.nickname, avatarUrl: row.avatarUrl || '', initial: row.initial }, '/api/leaderboard/players/' + encodeURIComponent(id) + '/stats', () => route === routeSequence && sequence === monthlySequence && state.page === 'monthly');
   }
@@ -2324,7 +2355,7 @@ function roomListItems(rooms) {
     var option = (room.winnerOptions || []).find(o => o.value === choice);
     if (!reason && choice !== "none" && !option) return;
     const target = state.resultTarget;
-    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? {reverseTarget:state.resultReverseTarget} : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
+    const details = reason ? { [scoring ? "scoreReason" : "funReason"]: reason.id, ...(reason.boardFields?.length ? { boardChoices:state.resultBoardChoices } : {}), ...(reason.requiresTarget ? { [scoring ? "scoreTarget" : "funTarget"]: target, ...(reason.requiresReverseTarget ? {reverseTarget:state.resultReverseTarget} : {}), ...((room.settlementRequiresActor ?? (room.knights && room.funSettlement)) ? {funActor:state.resultActor} : {}) } : {}) } : { winner: choice === "none" ? null : choice };
     const flow = resultFlow(state), stage = room.stage;
     resultConfirming = true;
     try {
@@ -2370,6 +2401,13 @@ function roomListItems(rooms) {
         html += '<div class="score-reasons" role="group" aria-label="登记方式">' + reasons.map(reason => '<button type="button" class="secondary score-choice '+(state.resultReason===reason.id?'is-selected':'')+'" data-action="pickScoreReason" data-id="'+esc(reason.id)+'" aria-pressed="'+(state.resultReason===reason.id)+'">'+mark+'<span class="score-choice-title">'+esc(reason.label)+'</span></button>').join('')+excluded+'</div>';
       } else {
         html += '<div class="score-option-heading"><strong>仅登记胜方</strong><span>不计积分</span></div><div class="score-winners" role="group" aria-label="仅登记胜方">'+(room.winnerOptions || []).map(option => '<button type="button" class="secondary score-choice '+(state.resultChoice===option.value?'is-selected':'')+'" data-action="pickResult" data-value="'+esc(option.value)+'" aria-pressed="'+(state.resultChoice===option.value)+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>').join('')+'</div>'+(reasons.length?'':excluded);
+      }
+    } else if (step === 'board') {
+      for (const field of flow.resultBoardFields) {
+        html += '<div class="score-board-field"><h3 class="score-section-title">'+esc(field.label)+'</h3><div class="score-reasons">'+field.options.map(option => {
+          const selected = field.selected?.value === option.value;
+          return '<button class="secondary score-choice '+(selected?'is-selected':'')+'" data-action="pickBoardChoice" data-field="'+esc(field.id)+'" data-value="'+esc(option.value)+'" aria-pressed="'+selected+'">'+mark+'<span class="score-choice-title">'+esc(option.label)+'</span></button>';
+        }).join('')+'</div></div>';
       }
     } else if (step === 'actor' || step === 'reverse' || step === 'target') {
       const reverse = step === 'reverse', actor = step === 'actor';
@@ -2433,7 +2471,7 @@ function roomListItems(rooms) {
     return html + '</div></section>';
   }
   function viewMatchDetails(record) {
-    const winner = ({good:'好人',evil:'坏人',third:'盗贼'})[record.winner];
+    const winner = rolePortraits.factionNames[record.winner];
     let html = '<div class="match-details"><div class="match-result"><span>' + (winner ? winner + '获胜' : '胜方未登记') + '</span><span class="match-source muted">' + ({manual:'房主登记',system:'系统判定'}[record.source] || '未判定') + '</span></div>';
     for (const [label, value] of [['不计入原因',record.excludedReason],['结束原因',record.scoreEndReason]]) if (value) html += '<div class="match-detail-row"><span>' + label + '</span><span>' + esc(value) + '</span></div>';
     html += viewScoreBreakdown(record.score, true) + viewFunStory(record.fun, record.role || '') + viewHonors(honorPresentation.present(record.honorResult, undefined, honorAvatarFailures), true);
@@ -2554,7 +2592,13 @@ function roomListItems(rooms) {
       html += '<div class="score-rules-table"><table><caption class="sr-only">角色与三种结局的基础积分对照表</caption><thead><tr><th scope="col">角色 / 阵营</th>';
       html += rules.table.columns.map(column => '<th scope="col">' + esc(column.label) + '<span class="score-rules-caption">' + esc(column.caption) + '</span></th>').join('') + '</tr></thead><tbody>';
       html += rules.table.rows.map(row => '<tr><th scope="row" class="score-rules-role ' + esc(row.faction) + '">' + esc(row.label) + '</th>' + row.scores.map(points => '<td class="' + (points === 0 ? 'is-zero' : '') + '">' + (points > 0 ? '+' : '') + esc(points) + '</td>').join('') + '</tr>').join('');
-      html += '</tbody></table></div><h3>额外加分</h3>' + rules.bonuses.map(bonus => '<div class="score-rules-bonus ' + (bonus.id === 'shield' ? 'is-shield' : '') + '"><h4>' + esc(bonus.label) + '<span>' + (bonus.points > 0 ? '+' : '') + esc(bonus.points) + ' 分</span></h4><p class="muted">' + esc(bonus.text) + '</p></div>').join('');
+      html += '</tbody></table></div>';
+      for (const board of rules.boardSections || []) {
+        html += '<details class="score-board-rules"><summary>'+esc(board.title)+'计分规则</summary><p class="muted">'+esc(board.note)+'</p>'+board.scenarios.map(row =>
+          '<div class="score-board-row"><strong>'+esc(row.label)+'</strong><div class="score-board-values">'+row.scores.map(score =>
+            '<span>'+esc(score.label)+' <b>'+(score.points>0?'+':'')+esc(score.points)+'</b></span>').join('')+'</div></div>').join('')+'</details>';
+      }
+      html += '<h3>额外加分</h3>' + rules.bonuses.map(bonus => '<div class="score-rules-bonus ' + (bonus.id === 'shield' ? 'is-shield' : '') + '"><h4>' + esc(bonus.label) + '<span>' + (bonus.points > 0 ? '+' : '') + esc(bonus.points) + ' 分</span></h4><p class="muted">' + esc(bonus.text) + '</p></div>').join('');
     } else html += rules.items.map(item => '<p><strong>' + esc(item.label) + '</strong><br><span class="muted">' + esc(item.text) + '</span></p>').join('');
     return html + '<h3>计分范围</h3><p class="muted">' + esc(rules.scopeLabel) + '</p><h3>补充说明</h3>' + rules.notes.map(note => '<p class="small muted">' + esc(note) + '</p>').join('') + '</section>';
   }
@@ -4844,7 +4888,7 @@ function roomListItems(rooms) {
             ? "好人获胜"
             : r.result.winner === "evil"
               ? "坏人获胜"
-              : r.result.winner === "third" ? "盗贼阵营获胜" : (r.flexible || r.assisted || r.offlineAssassination) && r.phase === "ended"
+              : r.winnerLabel ? esc(r.winnerLabel) : r.result.winner === "third" ? "盗贼阵营获胜" : (r.flexible || r.assisted || r.offlineAssassination) && r.phase === "ended"
                 ? "以线下结算为准"
                 : "不判胜负";
         html +=
@@ -5362,6 +5406,8 @@ function roomListItems(rooms) {
     closeRecordClearingConfirmation,
     clearingSheetContent() {},
     clearingRules() { setState({ clearingRulesExpanded: !state.clearingRulesExpanded }); },
+    monthlyRoster: openMonthlyRoster,
+    monthlyRosterClose: closeMonthlyRoster,
     monthlyPlayer: el => openMonthlyPlayer(el.dataset.id),
     monthlyRetry: () => loadMonthlyReport(),
     monthlyRules: () => { if (state.monthlyReport) return confirm('月报统计口径', state.monthlyReport.rules.join('\n\n'), false, '知道了'); },
@@ -5732,7 +5778,7 @@ function roomListItems(rooms) {
     finishTools: function () {
       if (!state.room?.canUseTools || state.busy || pending) return;
       resultStage = state.room.stage;
-      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
+      updateResult({ resultDialog: true, resultStep: "reason", resultOther: false, resultChoice: "", resultBoardChoices: {}, resultReason: "", resultTarget: null, resultReverseTarget: null, resultActor: null, resultRequiresTarget: false, resultReasonDraft: null, resultChoiceDraft: "" });
       var first = app.querySelector('.result-dialog button');
       if (first) first.focus();
     },
@@ -5756,9 +5802,10 @@ function roomListItems(rooms) {
       if (el.dataset.value !== 'none' && !state.room?.winnerOptions?.some(item=>item.value===el.dataset.value)) return;
       updateResult({resultOther:el.dataset.value!=='none',resultChoice:el.dataset.value,resultReason:'',resultRequiresTarget:false,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
+    pickBoardChoice: el => updateResult({resultBoardChoices:{...state.resultBoardChoices, [el.dataset.field]:el.dataset.value}}),
     pickScoreReason: el => {
       const reason=resultRegistration.reasons(state.room).find(item=>item.id===el.dataset.id);
-      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultReverseTarget:null,resultActor:null});
+      if (reason && reason.id !== state.resultReason) updateResult({resultOther:false,resultReason:reason.id,resultBoardChoices:{},resultChoice:'',resultRequiresTarget:!!reason.requiresTarget,resultTarget:null,resultReverseTarget:null,resultActor:null});
     },
     pickFunActor: el => {
       const seat=Number(el.dataset.seat);
@@ -5899,6 +5946,7 @@ function roomListItems(rooms) {
       setState({ homeWordmarkFailed: true });
     if (e.target?.classList?.contains?.('home-subtitle-wordmark') && !state.homeSubtitleFailed)
       setState({ homeSubtitleFailed: true });
+    if (e.target?.classList?.contains?.("monthly-roster-image")) e.target.hidden = true;
     if (e.target?.dataset?.seatAvatarUrl) seatAvatarError(e.target);
     if (e.target?.dataset?.rankAvatarId && state.rankBoard) {
       const id = e.target.dataset.rankAvatarId, src = e.target.getAttribute('src');
@@ -6023,10 +6071,21 @@ function roomListItems(rooms) {
       buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
     }
   });
+  document.addEventListener("keydown", event => {
+    if (!state.monthlyRoster) return;
+    if (event.key === "Escape") { event.preventDefault(); closeMonthlyRoster(); }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(app.querySelectorAll('.monthly-roster-sheet button'));
+    if (!controls.length) return;
+    event.preventDefault();
+    const index = controls.indexOf(document.activeElement);
+    controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus();
+  });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden && state.clearingConfirming) setState({ clearingConfirming: false, clearingConfirmation: null });
     if (document.hidden) {
       foreground = false;
+      if (state.monthlyRoster) setState({ monthlyRoster: null });
       grantNotifier.stop(); badgeNotifier.stop(); badgeNoticeCancel?.();
       if (grantNoticeOpen) modalCancel.onclick?.();
       clearTimeout(webLoginTimer);

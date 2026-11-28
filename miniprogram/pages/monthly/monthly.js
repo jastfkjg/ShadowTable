@@ -7,7 +7,7 @@ const { backToMe } = require("../../profile");
 
 Page({
   data: { ...initialPlayerCardData, month: "", maxMonth: monthly.monthAt(), minMonth: "2000-01", report: null,
-    imagePath: "", targets: [], description: "", loading: true, error: "", shareOpening: false, rulesExpanded: false, navTop: 64 },
+    imagePath: "", targets: [], description: "", loading: true, error: "", shareOpening: false, rulesExpanded: false, roster: null, navTop: 64 },
   ...playerCardMethods(api),
   onLoad(options = {}) {
     this.alive = true;
@@ -23,20 +23,20 @@ Page({
     if (this.pendingPoster) return this.paint(this.pendingPoster);
   },
   onShow() { this.foreground = true; return this.collectionReturn ? this.restoreCollectionCard() : this.load(); },
-  onHide() { this.foreground = false; this.closePlayerCard(); this.closeRules(); },
+  onHide() { this.foreground = false; this.closePlayerCard(); this.closeRules(); this.closeRoster(); },
   onUnload() { this.alive = false; ++this.sequence; this.poster = this.pendingPoster = this.sharePoster = null; this.closePlayerCard(); },
   async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },
   current(sequence) { return this.alive && this.foreground && sequence === this.sequence; },
   clearPoster() {
     this.poster = this.pendingPoster = this.sharePoster = null;
-    this.players = null;
-    this.setData({ imagePath: "", description: "", targets: [] });
+    this.players = this.posterReport = null;
+    this.setData({ imagePath: "", description: "", targets: [], roster: null });
   },
   async load(month = this.data.month, forShare = false) {
     const sequence = ++this.sequence;
     this.closePlayerCard();
     if (this.data.report?.month !== month) { this.clearPoster(); this.setData({ report: null }); }
-    this.setData({ month, loading: true, error: "", rulesExpanded: false });
+    this.setData({ month, loading: true, error: "", rulesExpanded: false, roster: null });
     try {
       await api.login();
       const response = await api.request("/api/monthly-report?month=" + encodeURIComponent(month));
@@ -52,6 +52,7 @@ Page({
       }
       this.clearPoster();
       const card = monthlyCard.cardFromReport(report);
+      this.posterReport = report;
       this.players = new Map(report.groups.flatMap(group => group.boards.flatMap(board => board.rows.map(row => [row.publicId, row]))));
       this.pendingPoster = { card, targets:monthlyCard.playerTargets(card, report), month, version: response.version, sequence };
       if (this.canvasReady) return await this.paint(this.pendingPoster);
@@ -113,9 +114,24 @@ Page({
     this.sharePoster = null;
     return poster?.month === month ? poster : null;
   },
+  openMonthlyTarget(e) {
+    const { id, board, rank } = e.currentTarget.dataset;
+    if (id) return this.openMonthlyPlayer(e);
+    if (!board || !this.poster || this.data.loading || this.data.error || !this.foreground) return;
+    const roster = monthlyCard.rosterFor(this.posterReport, board, rank);
+    if (roster) this.setData({ roster: { ...roster, members: roster.members.map(row => ({
+      ...row, avatar: row.avatar ? api.assetUrl(row.avatar) : "",
+    })) } });
+  },
+  closeRoster() { if (this.data.roster) this.setData({ roster: null }); },
+  rosterAvatarError(e) {
+    const { index, src } = e.currentTarget.dataset;
+    if (this.data.roster?.members[index]?.avatar === src) this.setData({ ["roster.members[" + index + "].avatar"]: "" });
+  },
   openMonthlyPlayer(e) {
     const id = e.currentTarget.dataset.id, row = this.players?.get(id);
     if (!row || this.data.loading || !this.foreground) return;
+    this.closeRoster();
     return this.loadPlayerCard({ scope: "leaderboard", id, name: row.nickname, avatarUrl: row.avatarUrl ? api.assetUrl(row.avatarUrl) : "", initial: row.initial },
       "/api/leaderboard/players/" + encodeURIComponent(id) + "/stats", () => this.data.report?.month === this.data.month);
   },

@@ -28,7 +28,7 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.equal(monthly.dimensions(pages[0]).width,1080);
   assert.ok(last.top+last.box.height<=box.footerTop,"all content clears the footer");
   assert.ok(box.height/(1080/480)-(last.top+last.box.height)<540,"the footer does not add a page of empty space");
-  assert.ok(box.sections.every(s=> s.box.lanes.flatMap(l=>l.tiles).length===s.section.rows.length));
+  assert.ok(box.sections.every(s=> s.box.lanes.reduce((n,l)=>n+(l.folded?l.members.length:l.tiles.length),0)===s.section.rows.length));
   assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
   const labels=trace(pages[0]).map(t=>t.value);
   assert.equal(labels.filter(label=>label==="炉边来信").length,1);
@@ -42,6 +42,30 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.ok(monthly.dimensions(monthly.cards(sparse)[0]).height<monthly.dimensions(sample[0]).height,"short reports shrink with their content");
 });
 
+test("大并列在任意名次只生成一个热区，双席和阵营榜按实际排名定位，隐藏头像不下载", () => {
+  const response = monthlyFixture(), present = require("../miniprogram/monthly-report").presentReport;
+  const board = response.funBoards[0], secretAvatar = "/api/avatars/" + "d".repeat(64);
+  const crowd = Array.from({ length: 14 }, (_, i) => ({ ...board.rows[2], nickname: "并列" + i,
+    publicId: "tied-" + i, avatarUrl: secretAvatar, tied: true }));
+  board.rows = [...board.rows.slice(0, 2), ...crowd];
+  response.mainBoards[3].rows = response.mainBoards[4].rows = response.mainBoards[1].rows;
+  let report = present(response), card = monthly.cardFromReport(report);
+  const sections = monthly.layout(card).sections, {box} = sections.find(s => s.section.id === board.metric);
+  assert.ok(box.pair); assert.equal(box.lanes[0].top, box.lanes[1].top);
+  assert.ok(box.lanes[1].x > box.lanes[0].x && box.lanes[2].top >= box.lanes[1].height);
+  const [good, evil] = sections.filter(s => s.box.rate);
+  assert.equal(good.top, evil.top); assert.ok(good.x + good.box.width < evil.x);
+  assert.ok(!monthly.imagePaths(card).includes(secretAvatar));
+  assert.equal(monthly.rosterFor(report, board.metric, 3).members.length, 14);
+  const targets = monthly.playerTargets(card, report).filter(t => t.key.startsWith(board.metric + "/"));
+  assert.equal(targets.length, 3); assert.equal(targets[2].rank, 3);
+  assert.ok(trace(card).some(t => t.value === "14 位玩家"));
+  board.rows = [...crowd.map(r => ({...r,rank:1})), {...board.rows[1],rank:2}];
+  report = present(response); card = monthly.cardFromReport(report);
+  const other = monthly.playerTargets(card, report).filter(t => t.key.startsWith(board.metric + "/"));
+  assert.equal(other.length, 2); assert.equal(other[0].rank, 1);
+  assert.equal(other[1].publicId, board.rows.at(-1).publicId);
+});
 test("中央领奖台与可点击头像一一对应，并列第三名保留各自的计分局数", () => {
   const report = require("../miniprogram/monthly-report").presentReport(shareMonthlyFixture());
   const card = monthly.cardFromReport(report), { box } = monthly.layout(card).sections[0];

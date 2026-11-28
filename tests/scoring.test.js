@@ -300,7 +300,7 @@ test('v13 新分值不改写 v11/v12 开局与历史快照，管理员更正仍�
       assert.equal(store.matchFor('wx:4',old.matchId).score.total,3+shield);
       assert.equal(store.matchFor('wx:4',old.matchId).score.ruleVersion,'avalon-2026-10-'+version);
     }
-    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-11-v17');
+    const fresh=deal();assert.equal(fresh.scorePolicy.version,'avalon-2026-11-v18');
     assert.deepEqual(finish(fresh),[12,12,15,9,1,1]);
     assert.deepEqual(fresh.matchRecord.players[2].score.breakdown,[
       {id:'good_win',label:'好人获胜',points:9},

@@ -1,9 +1,11 @@
 "use strict";
 const { randomInt, randomUUID, createHash } = require("node:crypto");
+const { factionNames, factionLabels } = require("../miniprogram/role-portraits");
 const variants = require("./variants");
 const knights = require("./knights");
 const fairy = require("./fairy");
 const scoring = require("./scoring");
+const RuleError = require("./rule-error");
 const fun = require("./fun");
 const replay = require("./replay");
 const avoidance = require("./avoidance");
@@ -142,12 +144,6 @@ const PHASES = {
   ended: "对局结束",
   terminated: "对局已终止",
 };
-class RuleError extends Error {
-  constructor(message, status = 400) {
-    super(message);
-    this.status = status;
-  }
-}
 function requireRule(ok, message, status) {
   if (!ok) throw new RuleError(message, status);
 }
@@ -525,7 +521,8 @@ function faction(room, uid) {
   if (room.knights) return knights.side(room, uid, ROLES);
   if (room.lancelot?.players[uid]) return room.lancelot.players[uid].faction;
   if (uid === room.convertedReverse) return "evil";
-  return ROLES[room.roles[uid]][1];
+  if (!room.scoringFacts?.board) return ROLES[room.roles[uid]][1];
+  return scoring.settlementFaction({ seat: room.players.find(player => player.uid === uid)?.seat, roleId: room.roles[uid], faction: ROLES[room.roles[uid]][1] }, room);
 }
 function questChoices(room, uid) {
   const role = room.roles[uid];
@@ -765,8 +762,7 @@ function privateIdentity(room, uid) {
         }
       : null,
     role: name,
-    faction:
-      side === "good" ? "好人阵营" : side === "third" ? "盗贼阵营" : "坏人阵营",
+    faction: factionLabels[side],
     information,
     outcome: room.result?.winner
       ? room.result.winner === side
@@ -1461,6 +1457,7 @@ function publicView(room, uid) {
         )),
     ),
     result: room.result || null,
+    winnerLabel: room.result?.winner ? (room.result.winner === "third" ? "盗贼阵营" : factionNames[room.result.winner]) + "获胜" : "",
     proposalSubmitted: !!room.proposalSubmitted,
     needsSubmission: p.seat !== null && (room.flexible
       ? !!actionSpec(room, uid)
@@ -1695,12 +1692,7 @@ function applyCommand(room, uid, input) {
       const option = scoring.settlementOptions(next).find(item => item.id === input.scoreReason);
       requireRule(option, "计分结束原因无效，请重新选择");
       const players = next.players.map(player => ({ seat: player.seat, roleId: next.roles[player.uid], alive: next.knights?.players[player.uid].alive ?? true }));
-      if (option.requiresTarget) {
-        requireRule(scoring.validTarget(input.scoreTarget, players, next.board, next.scorePolicy), "请选择实际在场刺杀目标或空刀");
-      }
-      // Resolve hidden identity only as part of ending the game; no preview oracle.
-      winner = scoring.resolveWinner(option, input.scoreTarget, players, next.board, next.scorePolicy);
-      facts = { reason: option.id, ...(option.requiresTarget ? { target: input.scoreTarget } : {}) };
+      ({ winner, facts } = scoring.resolveSettlement(option, input, players, next.board, next.scorePolicy));
     } else if (input.funReason !== undefined) {
       const option = fun.settlementOptions(next.board).find(item => item.id === input.funReason);
       requireRule(option, "趣味结束原因无效");
@@ -1736,7 +1728,9 @@ function applyCommand(room, uid, input) {
     }
     const finalFacts = facts || next.fun?.pendingTerminal;
     const assassin = next.players.find(player => next.roles[player.uid] === "assassin" && next.knights?.players[player.uid].alive !== false);
-    if (assassin && ["assassination", "early_assassination"].includes(finalFacts?.reason)) {
+    if (facts?.board) {
+      requireRule(input.funActor === undefined, "此板子按线下结果登记带刀方");
+    } else if (assassin && ["assassination", "early_assassination"].includes(finalFacts?.reason)) {
       requireRule(input.funActor === undefined || input.funActor === assassin.seat, "场上有刺客，无需另选带刀人");
       finalFacts.actor = assassin.seat;
     } else if (input.funActor !== undefined) {

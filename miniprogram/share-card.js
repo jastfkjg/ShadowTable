@@ -1,4 +1,5 @@
 // Explicit display projections: only personal summaries and requested public neighbors reach the renderer.
+const { factionNames } = require("./role-portraits");
 const funCopy = require("./fun-copy");
 const monthlyCards = require("./monthly-report-card");
 const leaderboardCards = require("./leaderboard-share-card");
@@ -37,7 +38,7 @@ function record(row) {
   return { total: row.total, wins: row.wins, losses: row.total - row.wins, ratio: row.wins / row.total, rate: percent(row.wins / row.total * 100) };
 }
 function breakdown(stats) {
-  const labels = { good: "好人", evil: "坏人", third: "第三阵营", unknown: "未知阵营" };
+  const labels = { ...factionNames, third: "第三阵营", unknown: "未知阵营" };
   const factions = Object.keys(labels).flatMap(id => {
     const summary = record(stats.byFaction?.find(row => row.faction === id) || {});
     return summary ? [{ id, label: labels[id], ...summary }] : [];

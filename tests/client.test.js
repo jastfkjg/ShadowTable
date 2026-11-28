@@ -2744,3 +2744,24 @@ test('本局用卡只在确认时替换，选项来自当前板子，关闭重�
   assert.equal(p.data.avoidance.tab, 'faction'); assert.equal(p.data.avoidanceDraft, 'third');
   p.cancelAvoidance(); assert.equal(commands[1][1].role, null);
 });
+
+test('小程序内奸计分表单提交带刀方与房主确认的独赢条件', async () => {
+  const scoring = require('../server/scoring'), p = page({});
+  p.data.room = { code:'123456', stage:'shadow-finish', canUseTools:true, players:[{seat:1,name:'甲'}],
+    scoreSettlement:scoring.optionsFor('shadow-assist',scoring.policy()), settlementRequiresActor:false };
+  let sent;
+  p.cmd = async (type, input) => { sent = input; };
+  const choose = (method, dataset) => p[method]({currentTarget:{dataset}});
+  p.finishTools();
+  choose('pickScoreReason',{id:'assassination'}); p.nextResult();
+  choose('pickScoreTarget',{seat:1}); p.nextResult();
+  assert.equal(p.data.resultStep,'board');
+  choose('pickBoardChoice',{field:'knife',value:'traitor'}); p.nextResult();
+  assert.equal(p.data.resultStep,'board');
+  choose('pickBoardChoice',{field:'blueSolo',value:'yes'}); p.nextResult();
+  assert.equal(p.data.resultStep,'review');
+  p.confirm = async () => true;
+  await p.saveResult();
+  assert.deepEqual({...sent.boardChoices},{knife:'traitor',blueSolo:'yes'});
+  assert.equal(sent.scoreTarget,1);
+});

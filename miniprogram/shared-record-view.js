@@ -1,5 +1,4 @@
-const { portrait } = require("./role-portraits");
-const factions = { good: "好人阵营", evil: "坏人阵营", third: "盗贼阵营", unknown: "未知阵营" };
+const { portrait, factionLabels: factions } = require("./role-portraits");
 const labels = { stats: "战绩分享", match: "对局分享", fun: "趣味成绩分享", matches: "对局记录概览", funSummary: "趣味记录概览" };
 const value = number => Number.isFinite(number) ? String(number) : "—";
 const rate = number => Number.isFinite(number) ? value(number) + "%" : "—";

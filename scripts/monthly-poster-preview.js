@@ -22,7 +22,7 @@ function posterScript(response, selector) {
     const renderer=window.shadowtableMonthlyCard, card=renderer.cards(${JSON.stringify(response).replace(/</g,"\\u003c")})[0];
     const urls=${JSON.stringify(urls)};
     const images=new Map(await Promise.all(renderer.imagePaths(card).map(path=>new Promise(resolve=>{
-      const image=new Image(); image.onload=()=>resolve([path,image]); image.onerror=()=>resolve([path,null]); image.src=urls[path]||path;
+      const image=new Image(); image.onload=()=>resolve([path,image]); image.onerror=()=>resolve([path,null]); image.src=urls[path]||(path.startsWith("/assets/")?"/miniprogram"+path:path);
     }))));
     const canvas=document.createElement('canvas'), size=renderer.renderDimensions(card);
     Object.assign(canvas,{width:size.width,height:size.height});

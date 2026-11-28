@@ -323,6 +323,7 @@ function createAdmin({ store, origin, key, body, limit }) {
         const saved=JSON.parse(row.snapshot);
         return {id:row.id,boardName:saved.boardName,endedAt:saved.endedAt,winner:saved.winner,revision:saved.scoreRevision || 0,
           correctionKind:saved.scorePolicy && !saved.scoreEligibilityReason ? "score" : "fun", needsActor:fun.modeFor(saved.board)==="knights" && !!saved.funFacts,
+          boardChoices:saved.scoringFacts?.choices,
           options:saved.scorePolicy && !saved.scoreEligibilityReason ? scoring.optionsFor(saved.board, saved.scorePolicy) : saved.funFacts && saved.excludedReason!=="对局终止" ? fun.settlementOptions(saved.board) : [],
           players:store.db.prepare("SELECT snapshot FROM match_players WHERE match_id=?").all(row.id).map(p=>{const player=JSON.parse(p.snapshot);return {seat:player.seat,name:player.name,alive:player.alive ?? true};})};
       });

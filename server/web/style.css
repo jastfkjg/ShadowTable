@@ -2130,3 +2130,9 @@ button.badge-wear-button.is-equipped { color: var(--accent); border-color: var(-
 button.player-collection-link { display: flex; align-items: center; justify-content: center; gap: 6px; width: auto; min-height: 44px; margin: 0; padding: 0 2px 0 6px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; }
 .player-badge-button + .player-collection-link::before { content: ""; width: 1px; height: 16px; margin-right: 2px; background: var(--border); }
 .player-collection-chevron { width: 6px; height: 6px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }
+.score-board-rules { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 0 14px; }
+.score-board-rules summary { cursor: pointer; padding: 14px 0; font-weight: 600; }
+.score-board-row { padding: 12px 0; border-top: 1px solid var(--border); }
+.score-board-values { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 6px; color: var(--muted); }
+.score-board-values b { color: var(--accent); }
+.score-board-field + .score-board-field { margin-top: 16px; }

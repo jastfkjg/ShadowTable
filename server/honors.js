@@ -24,7 +24,7 @@ function matchFor(store, id) {
 }
 function participants(store, match) {
   const players = match.players || store.matchParticipants(match);
-  return players.map(p => p.uid.startsWith("test:") && ["good", "evil", "third"].includes(p.faction)
+  return players.map(p => p.uid.startsWith("test:") && ["good", "evil", "third", "fourth", "redTraitor", "blueTraitor"].includes(p.faction)
     ? { ...p, outcome: p.faction === match.winner ? "win" : "loss" } : p)
     .filter(p => ["win", "loss"].includes(p.outcome));
 }

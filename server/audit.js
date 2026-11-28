@@ -495,7 +495,7 @@ function completeActionDetails(details, before, room) {
       text:
         room.phase === "terminated"
           ? "对局已终止"
-          : { good: "好人获胜", evil: "坏人获胜", third: "盗贼阵营获胜" }[
+          : { good: "好人获胜", evil: "坏人获胜", third: "盗贼阵营获胜", fourth: "捣蛋鬼获胜", redTraitor: "红内奸获胜", blueTraitor: "蓝内奸获胜" }[
               room.result?.winner
             ] || "对局结束，未登记胜负",
       winner: room.result?.winner || null,

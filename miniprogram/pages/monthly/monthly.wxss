@@ -1,3 +1,4 @@
+@import "./roster.wxss";
 .page.monthly-page { max-width: 520px; margin: 0 auto; padding: 0 0 calc(82px + env(safe-area-inset-bottom)); }
 .monthly-tools { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:0 16px; }
 .monthly-picker { display:flex; align-items:center; gap:8px; min-height:44px; color:var(--text); font-size:14px; }

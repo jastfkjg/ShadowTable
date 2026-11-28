@@ -1692,6 +1692,7 @@ button.room-filter.active[disabled]:not([type]) { color: var(--accent); backgrou
 .score-scroll { height: 100%; width: 100%; }
 .score-content { box-sizing: border-box; padding: 23px 22px 22px; }
 .score-content.score-registration-content { padding-top: 18px; padding-bottom: 18px; }
+.score-board-field + .score-board-field { margin-top: 16px; }
 .score-section-title { margin: 0 0 5px; font-size: 17px; font-weight: 600; line-height: 1.5; }
 .score-dialog .small { font-size: 13px; }
 .score-helper { color: var(--muted); margin: 0 0 18px; font-size: 13px; line-height: 1.65; white-space: pre-line; }

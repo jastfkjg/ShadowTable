@@ -35,14 +35,14 @@ function html(n) {
 }
 const defs=catalogue.filter(b=>b.permanent),find=s=>defs.find(b=>b.id==='october_2026_'+s);
 const scenes={champion:[find('crown'),find('table'),find('book')],runner:[find('silver'),find('table'),find('book')],third:[find('stag'),find('table'),find('book')],scored:[find('table'),find('book')],participant:[find('table')]};
-const placements=[1,2,3].map(rank=>monthlyAward('monthly_points_2026-11_'+rank));
 const base=css('app.wxss')+css('components/app-dialog/app-dialog.wxss')+'body{margin:0}button{font-family:inherit}img{object-fit:contain}.award-scroll{overflow-y:auto}';
 const fit=`<script>function fit(){const box=document.querySelector('.award-scroll'),body=document.querySelector('.award-scroll-content'),actions=document.querySelector('.award-actions');if(box&&body)box.style.height=Math.min(body.getBoundingClientRect().height,innerHeight-50-actions.getBoundingClientRect().height)+'px';}addEventListener('load',fit);addEventListener('resize',fit);</script>`;
 async function render() {
-  await Promise.all(placements.map(async badge => {
-    const art=await renderMonthlyArt(badge.month,badge.rank);
+  await Promise.all([1,2,3,'4-12'].map(async place => {
+    const badge=monthlyAward('monthly_points_2026-11_'+place);
+    const art=await renderMonthlyArt(badge.month,place);
     monthlyAssets.set(badge.imageUrl,'data:image/png;base64,'+art.toString('base64'));
-    scenes['monthly-'+badge.rank]=[badge];
+    scenes['monthly-'+place]=[badge];
   }));
   for(const[name,badges]of Object.entries(scenes)) {
     const value=present({badges});

@@ -75,6 +75,7 @@ const assets = {
   "/monthly-report.js": ["../../miniprogram/monthly-report.js", "text/javascript; charset=utf-8"],
   "/monthly-report-card.js": ["../../miniprogram/monthly-report-card.js", "text/javascript; charset=utf-8"],
   "/poster-canvas.js": ["../../miniprogram/poster-canvas.js", "text/javascript; charset=utf-8"],
+  "/monthly-roster.css": ["../../miniprogram/pages/monthly/roster.wxss", "text/css; charset=utf-8"],
   "/monthly.css": ["monthly.css", "text/css; charset=utf-8"],
   "/assets/room-share-background.jpg": ["../../miniprogram/assets/room-share-background.jpg", "image/jpeg"],
   "/assets/monthly-report-background.jpg": ["../../miniprogram/assets/monthly-report-background.jpg", "image/jpeg"],

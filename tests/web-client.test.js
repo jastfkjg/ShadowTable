@@ -2914,3 +2914,31 @@ test('网页逆仆两刀结束流程按计分开关提交，保留草稿且常�
     assert.doesNotMatch(c.viewResultDialog(),/逆仆刀目标|五次否决/);
   }
 });
+
+test('网页混沌计分表单要求离线结果，核对后提交盗贼胜负与捣蛋鬼归属', async () => {
+  const scoring = require('../server/scoring'), writes = [];
+  const c = client(async (url, options) => {
+    if (options.method === 'POST') writes.push(JSON.parse(options.body));
+    return response({});
+  });
+  c.setRefresh(async () => {});
+  c.state.room = { code:'123456', stage:'chaos-finish', canUseTools:true, players:[{seat:1,name:'甲'}],
+    scoreSettlement:scoring.optionsFor('chaos',scoring.policy()), settlementRequiresActor:false };
+  c.ACTIONS.finishTools();
+  c.ACTIONS.pickScoreReason({dataset:{id:'assassination'}});
+  c.ACTIONS.nextResult();
+  c.ACTIONS.pickScoreTarget({dataset:{seat:1}});
+  c.ACTIONS.nextResult();
+  assert.match(c.viewResultDialog(),/盗贼结果/);
+  c.ACTIONS.pickBoardChoice({dataset:{field:'thieves',value:'win'}});
+  c.ACTIONS.nextResult();
+  assert.equal(c.state.resultStep,'board');
+  c.ACTIONS.pickBoardChoice({dataset:{field:'trickster',value:'mixed'}});
+  c.ACTIONS.nextResult();
+  assert.equal(c.state.resultStep,'review');
+  assert.match(c.viewResultDialog(),/挡刀时成为第四方/);
+  c.setConfirm(async () => true);
+  await c.ACTIONS.saveResult();
+  assert.deepEqual(writes[0].boardChoices,{thieves:'win',trickster:'mixed'});
+  assert.equal(writes[0].scoreTarget,1);
+});

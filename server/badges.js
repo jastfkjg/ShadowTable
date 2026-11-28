@@ -26,11 +26,11 @@ function readBadges(store, uid, now = store.clock()) {
     const row = snapshot.aggregates.get(uid);
     if (row?.rank === 1) badges.push({ ...definition, equipped: false });
   }
-  const awarded = new Set(store.db.prepare('SELECT badge_id FROM badge_awards WHERE uid=? ORDER BY granted_at DESC, id').all(uid).map(row => row.badge_id));
+  const awarded = new Map(store.db.prepare('SELECT badge_id,rank_at_grant FROM badge_awards WHERE uid=? ORDER BY granted_at DESC, id').all(uid).map(row => [row.badge_id, row.rank_at_grant]));
   for (const definition of catalogue) if (definition.permanent && awarded.has(definition.id)) badges.push({ ...definition, equipped: false });
-  for (const id of awarded) {
+  for (const [id, rank] of awarded) {
     const definition = monthlyAward(id);
-    if (definition) badges.push({ ...definition, equipped: false });
+    if (definition) badges.push({ ...rankedBadge(definition, rank), equipped: false });
   }
   // Explicit choices take priority over newly awarded defaults, including legacy preferences.
   const selected = badges.filter(b => preferences.get(b.id) === true)

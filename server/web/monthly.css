@@ -1,3 +1,5 @@
+@import url("/monthly-roster.css");
+html:has(.monthly-roster-backdrop) { overflow:hidden; }
 .page.monthly-page-shell { max-width:520px; padding:0; }
 .monthly-web-header { position:sticky; top:0; z-index:100; display:grid; grid-template-columns:44px minmax(0,1fr) 44px; align-items:center; height:52px; padding:0 12px; background:var(--bg); border-bottom:1px solid var(--border); }
 .monthly-web-header h1 { margin:0; font-size:16px; font-weight:600; text-align:center; }
@@ -21,7 +23,8 @@
 .monthly-poster { position:relative; width:100%; background:var(--bg); }
 .monthly-poster-image { display:block; width:100%; height:auto; }
 .monthly-targets { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-.monthly-targets button.monthly-player { pointer-events:auto; display:block; width:100%; height:100%; min-height:0; min-width:0; margin:0; padding:0; border:0; border-radius:6px; background:transparent; }
+.monthly-roster-image[hidden] { display:none; }
+.monthly-targets button.monthly-player { position:relative; pointer-events:auto; display:block; width:100%; height:100%; min-height:0; min-width:0; margin:0; padding:0; border:0; border-radius:6px; background:transparent; }
 .monthly-picker:focus-within, .monthly-page button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .monthly-message, .monthly-page .inline-error { padding:24px 16px; color:var(--muted); text-align:center; }
 .monthly-share-bar { position:fixed; z-index:30; bottom:0; left:0; right:0; padding:10px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--bg); }

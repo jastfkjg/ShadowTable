@@ -4,7 +4,8 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '新对局仅在房间开启「徽章获取」后计入徽章进度和排名。月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。每月1日结算上月参与徽章获取的积分排名，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
+  const placementRule = '每月1日按北京时间结算上月徽章积分排名。前三名获得对应的永久荣誉徽章，第4至12名获得永久趣味徽章「圆桌有席」，均含并列。';
+  const rules = '新对局仅在房间开启「徽章获取」后计入徽章进度和排名。月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。' + placementRule + '活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
@@ -86,17 +87,21 @@
   const collectionCatalogue = monthly.slice(0, standard.length).concat(funByRole, seasonal, permanent);
   const placementTitles = ['交剑王冠', '持枪骑士', '铜铸城钥'];
   function monthlyAward(id) {
-    const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3])$/.exec(id);
+    const match = /^monthly_points_(\d{4}-(?:0[1-9]|1[0-2]))_([1-3]|4-12)$/.exec(id);
     if (!match) return null;
     const [, month, place] = match;
-    const rank = Number(place), periodLabel = month.replace('-', '年') + '月';
-    const condition = periodLabel + '积分月榜第' + rank + '名';
-    return { id, month, rank, periodLabel, title: placementTitles[rank - 1], condition,
-      description: condition, category: '荣誉徽章', metric: 'monthly_points', permanent: true,
-      imageUrl: '/assets/badges/monthly-points/' + month + '/' + rank + '.png',
-      holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月徽章积分排名，新对局须同时开启计分和徽章获取。前三名（含并列）获得对应名次的永久徽章。' };
+    const shared = place === '4-12', rank = shared ? null : Number(place);
+    const periodLabel = month.replace('-', '年') + '月';
+    const condition = periodLabel + '积分月榜第' + (shared ? '4至12' : place) + '名';
+    return { id, month, rank, periodLabel, title: shared ? '圆桌有席' : placementTitles[rank - 1], condition,
+      description: condition, category: shared ? '趣味徽章' : '荣誉徽章', metric: 'monthly_points', permanent: true,
+      imageUrl: '/assets/badges/monthly-points/' + month + '/' + place + '.png',
+      holdingRule: '获得后永久保留', rules: placementRule + '新对局须同时开启计分和徽章获取。' };
   }
-  const awardDefinition = id => monthlyAward(id) || permanent.find(b => b.id === id);
+  function awardDefinition(id, rank) {
+    const placement = monthlyAward(id);
+    return placement ? rankedBadge(placement, rank) : permanent.find(b => b.id === id);
+  }
   const MAX_EQUIPPED = 3;
   const usesServerArt = badge => !!(badge.achievement || badge.permanent || ['good_shield', 'honor_svp'].includes(badge.id) || Object.hasOwn(copy.roleRecords, badge.id));
   const badgeImageUrl = (badge, assetUrl) => usesServerArt(badge) ? assetUrl(badge.imageUrl) : badge.imageUrl;
@@ -113,6 +118,10 @@
     return 'transform:scale(' + scale + ')';
   }
   function rankedBadge(definition, rank) {
+    if (definition.metric === 'monthly_points' && !definition.rank && Number.isInteger(rank) && rank >= 4 && rank <= 12) {
+      const condition = definition.periodLabel + '积分月榜第' + rank + '名';
+      return { ...definition, rank, condition, description: condition };
+    }
     if (definition.metric !== 'podium' || ![1,2,3].includes(rank)) return definition;
     return { ...definition, rank, imageUrl: definition.imageUrl.replace('.png', ['', '-silver', '-bronze'][rank - 1] + '.png') };
   }

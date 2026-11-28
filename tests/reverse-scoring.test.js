@@ -126,7 +126,7 @@ test('两刀归档可更正第一刀，计分与不计分的阵营、胜负及�
   }
 });
 
-test('9、11人逆仆默认关闭，不提供提前盘刀，未开放扩展板仍不计分', () => {
+test('9、11人逆仆默认关闭，不提供提前盘刀', () => {
   for (const [board, capacity] of boards) {
     const lobby = newRoom('123456', 'wx:1', '房主', board, capacity);
     assert.deepEqual(scoring.settings(lobby), { enabled: false, editable: true,
@@ -134,9 +134,6 @@ test('9、11人逆仆默认关闭，不提供提前盘刀，未开放扩展板�
     const room = deal(board, capacity);
     assert.deepEqual(publicView(room, room.host).scoreSettlement.map(item => item.id), ['assassination', 'quest_fail']);
     assert.throws(() => finish(room, 'early_assassination'), /结束原因无效/);
-  }
-  for (const [board, capacity] of [['shadow-assist', 12], ['chaos', 12]]) {
-    assert.equal(scoring.settings(newRoom('123456', 'wx:1', '房主', board, capacity)).unavailableReason, '本板子暂未参与计分');
   }
 });
 

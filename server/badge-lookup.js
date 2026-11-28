@@ -12,7 +12,7 @@ const gameCounts = new Set(['win_streak', 'loss_streak', 'alternating_streak', '
 function lookupCatalogue(store, now) {
   settleMonthly(store, now);
   const months = store.db.prepare("SELECT id FROM badge_campaigns WHERE id GLOB 'monthly-points-????-??' ORDER BY id DESC").all();
-  const placements = months.flatMap(({id}) => [1, 2, 3].map(place => monthlyAward('monthly_points_' + id.slice(-7) + '_' + place)));
+  const placements = months.flatMap(({id}) => [1, 2, 3, '4-12'].map(place => monthlyAward('monthly_points_' + id.slice(-7) + '_' + place)));
   return [...catalogue, ...placements];
 }
 

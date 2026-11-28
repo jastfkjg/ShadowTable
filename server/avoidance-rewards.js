@@ -40,7 +40,7 @@ function reconcile(store, matchIds) {
     WHERE p.uid=? AND p.outcome IN ('win','loss') AND coalesce(c.state,'active')='active'
       AND coalesce(json_extract(m.snapshot,'$.recordPurpose'),'normal')='normal'
       AND json_extract(m.snapshot,'$.excludedReason') IS NULL
-      AND json_extract(m.snapshot,'$.winner') IN ('good','evil','third')`);
+      AND json_extract(m.snapshot,'$.winner') IN ('good','evil','third','fourth','redTraitor','blueTraitor')`);
   for (const { uid } of affected) {
     if (!avoidance.eligible(uid)) continue;
     const { wins, losses, faction_matches } = totals.get(uid);

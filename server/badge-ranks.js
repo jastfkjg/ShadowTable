@@ -31,8 +31,8 @@ class BadgeRanks {
     this.insert = db.prepare(`INSERT OR IGNORE INTO ranked_badges(uid,badge_id,category,permanent,rank)
       VALUES(?,?,?,?,?)`);
     // Permanent grants survive restarts. Recalculate monthly ownership from eligible games.
-    for (const row of db.prepare("SELECT uid,badge_id FROM badge_awards").iterate())
-      this.record(row.uid, row.badge_id);
+    for (const row of db.prepare("SELECT uid,badge_id,rank_at_grant FROM badge_awards").iterate())
+      this.record(row.uid, row.badge_id, row.rank_at_grant);
   }
   record(uid, id, rank = null) {
     if (!/^(wx|guest|dev):/.test(uid)) return;
@@ -43,7 +43,7 @@ class BadgeRanks {
         id,
         categoryOf(b),
         b.permanent ? 1 : 0,
-        b.metric === "podium" && [1, 2, 3].includes(rank) ? rank : null,
+        b.metric === "monthly_points" || (b.metric === "podium" && [1, 2, 3].includes(rank)) ? rank : null,
       );
   }
   captureMonthly(now = this.store.clock()) {

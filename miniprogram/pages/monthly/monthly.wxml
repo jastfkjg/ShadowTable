@@ -10,7 +10,7 @@
     </view>
     <view wx:if="{{imagePath}}" class="monthly-poster">
       <image class="monthly-poster-image" src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" binderror="imageError" aria-label="{{description}}" />
-      <button wx:for="{{targets}}" wx:key="key" class="monthly-player" hover-class="none" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" aria-label="{{item.label}}" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.width}}%;height:{{item.height}}%" />
+      <button wx:for="{{targets}}" wx:key="key" class="monthly-player" hover-class="none" data-id="{{item.publicId}}" data-board="{{item.boardId}}" data-rank="{{item.rank}}" bindtap="openMonthlyTarget" aria-label="{{item.label}}" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.width}}%;height:{{item.height}}%"><view wx:if="{{item.boardId}}" class="monthly-count-arrow" aria-hidden="true" /></button>
     </view>
   </view>
   <view wx:if="{{loading && !imagePath && !connectionVisible}}" class="monthly-message" role="status">正在生成月度战报…</view>
@@ -21,5 +21,20 @@
 </view>
 <canvas type="2d" id="share-canvas" class="monthly-canvas" aria-hidden="true" />
 <view wx:if="{{rulesExpanded && report}}" class="monthly-rules-backdrop" catchtap="closeRules" catchtouchmove="blockScroll"><view class="monthly-rules-sheet" style="max-height: calc(100vh - {{navTop}}px - 16px);" role="dialog" aria-modal="true" aria-label="月报统计口径" catchtap="blockScroll"><view class="monthly-sheet-handle" aria-hidden="true" /><view class="monthly-rules-heading"><image src="/assets/record-info.svg" aria-hidden="true" /><view>统计口径<text>{{report.monthLabel}}</text></view><button bindtap="closeRules" hover-class="none" aria-label="关闭统计说明">×</button></view><scroll-view scroll-y class="monthly-rules-body"><view wx:for="{{report.rules}}" wx:key="*this" class="monthly-rule"><text>{{index+1}}</text><view>{{item}}</view></view></scroll-view><view class="monthly-rules-footer"><button bindtap="closeRules" hover-class="none">知道了</button></view></view></view>
+<view wx:if="{{roster}}" class="monthly-roster-backdrop" catchtap="closeRoster" catchtouchmove="blockScroll">
+  <view class="monthly-roster-sheet" style="max-height:calc(100vh - {{navTop}}px - 16px)" role="dialog" aria-modal="true" aria-label="{{roster.title+'，'+roster.place}}" catchtap="blockScroll">
+    <view class="monthly-roster-grip" aria-hidden="true" />
+    <button class="monthly-roster-close" aria-label="关闭名单" bindtap="closeRoster" hover-class="none">×</button>
+    <text class="monthly-roster-title">{{roster.title}}</text>
+    <view class="monthly-roster-heading"><text class="monthly-roster-place">{{roster.place}}</text><text>{{roster.result}}</text></view>
+    <text class="monthly-roster-total">{{roster.members.length}} 位玩家</text>
+    <scroll-view scroll-y class="monthly-roster-scroll"><view class="monthly-roster-grid">
+      <button wx:for="{{roster.members}}" wx:key="publicId" class="monthly-roster-person" hover-class="none" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" aria-label="{{'查看'+item.name+'的战绩'}}">
+        <view class="monthly-roster-avatar"><image wx:if="{{item.avatar}}" class="monthly-roster-image" src="{{item.avatar}}" mode="aspectFill" lazy-load data-src="{{item.avatar}}" data-index="{{index}}" binderror="rosterAvatarError" /></view>
+        <view>{{item.name}}<text wx:if="{{item.sample}}" class="monthly-roster-sample">{{item.sample}}</text></view>
+      </button>
+    </view></scroll-view>
+  </view>
+</view>
 <include src="../../player-card.wxml" />
 <app-dialog id="app-dialog" />

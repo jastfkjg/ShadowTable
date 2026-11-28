@@ -83,7 +83,7 @@ test('各类徽章含名次边框与详情大图，在同一图框中的可见�
       }
     }
   }
-  for (const rank of [1, 2, 3]) {
+  for (const rank of [1, 2, 3, '4-12']) {
     const badge = monthlyAward('monthly_points_2026-11_' + rank);
     await measure(badge, badge.imageUrl, await render(badge.month, rank));
   }
