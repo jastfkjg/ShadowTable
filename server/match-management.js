@@ -26,6 +26,14 @@ function initialize(store) {
     CREATE VIEW leaderboard_match_players AS
       SELECT p.* FROM visible_match_players p JOIN matches m ON m.id=p.match_id
       WHERE CAST(json_extract(m.snapshot,'$.capacity') AS INTEGER)>=${RANK_MIN_PLAYERS};
+    -- Archives predating the switches keep their original eligibility.
+    CREATE INDEX IF NOT EXISTS matches_without_badges ON matches(id) WHERE json_extract(snapshot,'$.badgeEnabled')=0;
+    CREATE VIEW IF NOT EXISTS badge_excluded_matches AS
+      SELECT id FROM matches INDEXED BY matches_without_badges WHERE json_extract(snapshot,'$.badgeEnabled')=0;
+    CREATE VIEW IF NOT EXISTS badge_match_players AS
+      SELECT p.* FROM visible_match_players p WHERE NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=p.match_id);
+    CREATE VIEW IF NOT EXISTS badge_leaderboard_players AS
+      SELECT p.* FROM leaderboard_match_players p WHERE NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=p.match_id);
     CREATE VIEW active_match_scores AS
       SELECT s.rowid AS rowid,s.* FROM match_scores s LEFT JOIN match_controls c ON c.match_id=s.match_id
       WHERE (c.state IS NULL OR c.state='active') AND NOT EXISTS(

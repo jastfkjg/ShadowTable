@@ -29,7 +29,7 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.ok(last.top+last.box.height<=box.footerTop,"all content clears the footer");
   assert.ok(box.height/(1080/480)-(last.top+last.box.height)<540,"the footer does not add a page of empty space");
   assert.ok(box.sections.every(s=> s.box.lanes.flatMap(l=>l.tiles).length===s.section.rows.length));
-  assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
+  assert.deepEqual(box.sections.map(s=>s.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
   const labels=trace(pages[0]).map(t=>t.value);
   assert.equal(labels.filter(label=>label==="炉边来信").length,1);
   assert.doesNotMatch(shares.describe(pages[0]),/第 .* 张|续/);
@@ -42,6 +42,20 @@ test("月报各主榜完整保留、同级展示，综合和荣誉连续排入�
   assert.ok(monthly.dimensions(monthly.cards(sparse)[0]).height<monthly.dimensions(sample[0]).height,"short reports shrink with their content");
 });
 
+test("中央领奖台与可点击头像一一对应，并列第三名保留各自的计分局数", () => {
+  const report = require("../miniprogram/monthly-report").presentReport(shareMonthlyFixture());
+  const card = monthly.cardFromReport(report), { box } = monthly.layout(card).sections[0];
+  const [first, second, third] = box.lanes;
+  assert.ok(box.podium && second.x < first.x && first.x < third.x);
+  assert.ok(first.plinthTop < second.plinthTop && second.plinthTop < third.plinthTop);
+  assert.equal(first.x + first.width / 2, box.width / 2);
+  assert.deepEqual(third.tiles.map(t => t.sampleLines.join("")), ["6 场计分局", "4 场计分局"]);
+  const targets = monthly.playerTargets(card, report).filter(t => t.key.startsWith("points/"));
+  assert.deepEqual(targets.map(t => t.publicId), report.mainBoards[0].rows.map(r => r.publicId));
+  assert.ok(targets[1].x < targets[0].x && targets[0].x < targets[2].x);
+  assert.ok(targets[2].x + targets[2].width <= targets[3].x);
+});
+
 test("积分卡显示昵称、总分和计分局数，趣味与娱乐榜只画上榜次数", () => {
   const report=shareMonthlyFixture(),name="与梅林一起守护圆桌的长昵称玩家😀".repeat(3);
   Object.assign(report.mainBoards[0].rows[0],{nickname:name,points:-123456789,adjustmentPoints:-34,tied:true});
@@ -49,12 +63,12 @@ test("积分卡显示昵称、总分和计分局数，趣味与娱乐榜只画�
   const pages=monthly.cards(report),texts=pages.flatMap(trace);
   assert.ok(texts.map(t=>t.value).join("").includes(name)); assert.ok(monthly.describe(pages[0]).includes(name));
   assert.ok(texts.some(t=>t.value==="6 场计分局")); assert.doesNotMatch(texts.map(t=>t.value).join(""),/调整/);
-  assert.ok(texts.some(t=>t.value==="-123456789分"&&t.maxWidth>0));
-  assert.ok(texts.some(t=>t.value==="0分"));
+  assert.ok(texts.some((t,i)=>t.value==="-123456789" && t.maxWidth>0 && texts[i+1]?.value==="分"));
+  assert.ok(texts.some((t,i)=>t.value==="0" && texts[i+1]?.value==="分"));
   assert.equal(pages.length,1);
   const complete=monthly.cards(monthlyFixture());
   assert.doesNotMatch(complete.flatMap(trace).map(t=>t.value).join(""), /成功率|发生率|次机会/);
-  assert.ok(complete.flatMap(trace).some(t => t.value === "73.3%"));
+  assert.ok(complete.flatMap(trace).some((t, i, all) => t.value === "73.3" && all[i + 1]?.value === "%"));
   assert.doesNotMatch(complete.flatMap(trace).map(t=>t.value).join(""),/娱乐版/);
 });
 
@@ -77,7 +91,7 @@ test("并列荣誉的长昵称换行完整绘制，在头像区域内与次数�
   const report=monthlyFixture(),board=report.funBoards.find(b=>b.id===report.featuredIds[0]);
   Object.assign(board.rows[0],{nickname:"圆桌旁的长昵称玩家".repeat(5),count:123456789,opportunities:370370367,rate:33.3,tied:true});
   const card=monthly.cards(report)[0],texts=trace(card);
-  const drawn=texts.find(t=>t.value==="123456789次");
+  const drawn=texts.find((t,i)=>t.value==="123456789" && texts[i+1]?.value==="次");
   const section=monthly.layout(card).sections.find(s=>s.section.id===board.metric);
   const tile=section.box.lanes[0].tiles[0];
   assert.ok(texts.map(t=>t.value).join("").includes(board.rows[0].nickname));

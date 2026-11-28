@@ -25,6 +25,8 @@ function client(fetch, storage = new Map([["session", "session"]]), layout, runt
   };
   context.window.shadowtableBadges = require('../miniprogram/badges');
   context.window.shadowtableHonors = require('../miniprogram/honors');
+  context.window.shadowtableRankPicker = require('../miniprogram/pages/leaderboard/picker');
+  context.window.shadowtableBadgeRanks = require('../miniprogram/pages/badges/rank-controller');
   context.window.shadowtableLeaderboard = require('../miniprogram/leaderboard-presentation');
   context.window.shadowtableRecordClearing = require('../miniprogram/pages/data-management/presentation');
   context.window.shadowtableMonthlyReport = require('../miniprogram/monthly-report');
@@ -1310,22 +1312,23 @@ test('网页房主计分开关自动保存，板子与人数默认值及发牌�
     if(options?.method==='POST'){const data=JSON.parse(options.body);writes.push(data);command(room,'host',data);return response({accepted:true});}
     return response(path==='/api/boards'?{boards:BOARDS}:publicView(room,'host'));
   });
+  c.setConfirm(async () => "test-password");
   c.state.showRoomSettings=true;c.state.settings={busy:false};await c.loadSettings();
   assert.equal(c.state.settings.scoreEnabled,false);assert.match(c.viewSettingsDialog(),/aria-label="本局计分"/);
   await c.CHANGES.settingsScoring({checked:true});assert.equal(room.scoreEnabled,true);assert.equal(writes[0].scoreEnabled,true);
   await c.CHANGES.settingsCapacity({value:'12'});assert.equal(room.scoreEnabled,false);assert.equal(writes.at(-1).scoreEnabled,false);
-  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,false);
   await c.CHANGES.settingsScoring({checked:false});assert.equal(room.scoreEnabled,false);
   await c.loadSettings();assert.equal(c.state.settings.scoreEnabled,false);
   await c.CHANGES.settingsBoard({value:'classic-court'});assert.equal(room.scoreEnabled,false);
   await c.CHANGES.settingsScoring({checked:true});assert.equal(room.scoreEnabled,true);
   await c.CHANGES.settingsBoard({value:'chaos'});assert.equal(room.scoreEnabled,false);
-  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsBoard({value:'knights'});assert.equal(room.scoreEnabled,false);
   await c.CHANGES.settingsCapacity({value:'10'});assert.equal(room.scoreEnabled,false);
-  await c.CHANGES.settingsBoard({value:'knights-10'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsBoard({value:'knights-10'});assert.equal(room.scoreEnabled,false);
   await c.CHANGES.settingsCapacity({value:'11'});assert.equal(room.scoreEnabled,false);
-  await c.CHANGES.settingsBoard({value:'knights-11'});assert.equal(room.scoreEnabled,true);
-  await c.CHANGES.settingsCapacity({value:'13'});assert.equal(room.scoreEnabled,true);
+  await c.CHANGES.settingsBoard({value:'knights-11'});assert.equal(room.scoreEnabled,false);
+  await c.CHANGES.settingsCapacity({value:'13'});assert.equal(room.scoreEnabled,false);
   await c.CHANGES.settingsCapacity({value:'6'});assert.equal(room.scoreEnabled,false);
   for(let i=2;i<=6;i++)enter(room,'p'+i,'玩家'+i);room.players.forEach(p=>p.ready=true);
   command(room,'host',{type:'start',stage:room.stage,flexible:true});await c.loadSettings();const count=writes.length;
@@ -2061,7 +2064,7 @@ test('网页趣味榜弹层呈现分组指标、跨板子汇总与迟到响应�
   assert.equal(c.state.rankBoard.metric,'fun_kill_enemy');assert.match(urls[1],/mode=all&sort=rate&role=gareth/);assert.match(c.viewLeaderboard(),/还差 6 次机会/);assert.match(c.viewLeaderboard(),/成功 3 次 · 共 4 次机会/);
   c.ACTIONS.rankToggleMetrics();
   const options=require('../miniprogram/leaderboard-presentation').funOptions(defs,{includeFinal:true});
-  assert.equal(c.state.rankFunCategory,'all');
+  assert.equal(c.state.rankPickerView.funCategory,'all');
   let html='';
   for(const category of ['all','good','evil','other']) {
     c.ACTIONS.funRankCategory({dataset:{value:category}});
@@ -2291,10 +2294,46 @@ test('网页趣味弹层草稿可取消，确认后请求；弹层互斥且背�
   c.ACTIONS.rankToggleMetrics();c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
   assert.match(c.viewLeaderboard(),/rank-workspace" inert/);assert.equal(urls.length,1);
   c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankMetric,'fun_defense_ally');
-  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankPendingMetric,'fun_defense_ally');
+  c.ACTIONS.rankToggleMetrics();assert.equal(c.state.rankPickerView.pendingFunMetric,'fun_defense_ally');
   c.ACTIONS.funRankCategory({dataset:{value:'evil'}});c.ACTIONS.funRankPreview({dataset:{value:'fun_assassin_miss'}});
   await c.ACTIONS.funRankConfirm();assert.match(urls.at(-1),/metric=fun_assassin_miss/);assert.equal(c.state.rankMetricsExpanded,false);
   c.ACTIONS.rankToggleRules();c.ACTIONS.rankToggleMine();assert.equal(c.state.rankRulesExpanded,false);
+});
+
+test('网页在同一弹层检索称号和徽章，直接查看获得者后返回原搜索', async () => {
+  const urls = [], definitions = require('../server/fun').publicMetrics();
+  const c = client(async url => {
+    urls.push(url);
+    if (url === '/api/leaderboard/badges') return response({ ids: ['five_wins', 'games', 'success_courier', 'monthly_points_2026-11_1'] });
+    if (url === '/api/leaderboard/badges/five_wins') return response({ holdersOnly: true, total: 0, rows: [], nextOffset: null });
+    return response(webRanks('fun_percival_clear', { fun: true, availableFunMetrics: definitions }));
+  });
+  await c.applyRoute('#/leaderboard');
+  const action = (name, value) => c.ACTIONS[name]({ dataset: { value } });
+  c.ACTIONS.rankToggleMetrics();
+  c.INPUTS.rankPickerSearch({ value: '派西维尔' });
+  assert.ok(c.state.rankPickerView.filteredFunOptions.every(item => item.roleLabel.includes('派西维尔')));
+  await action('rankPickerMode', 'badges');
+  assert.match(c.viewLeaderboard(), /成功使者/);
+  assert.match(c.viewLeaderboard(), /查看获得者/);
+  action('funRankCategory', 'permanent');
+  assert.deepEqual(c.state.rankPickerView.filteredFunOptions.map(b => b.key), ['five_wins', 'monthly_points_2026-11_1']);
+  c.INPUTS.rankPickerSearch({ value: '不存在' });
+  assert.equal(c.state.rankPickerView.pendingFunOption, null);
+  assert.match(c.viewLeaderboard(), /没有找到匹配的徽章/);
+  c.INPUTS.rankPickerSearch({ value: '五连' });
+  action('rankPickerMode', 'metrics');
+  assert.equal(c.state.rankPickerView.pickerQuery, '派西维尔');
+  action('rankPickerMode', 'badges');
+  assert.equal(c.state.rankPickerView.funCategory, 'permanent');
+  await c.ACTIONS.funRankConfirm();
+  assert.equal(c.state.page, 'badge-ranks');
+  assert.equal(urls.at(-1), '/api/leaderboard/badges/five_wins');
+  await c.applyRoute('#/leaderboard');
+  assert.equal(c.state.rankMetricsExpanded, true);
+  assert.equal(c.state.rankPickerView.pickerQuery, '五连');
+  assert.equal(c.state.rankPickerView.pendingFunMetric, 'five_wins');
+  assert.equal(urls.length, 3);
 });
 
 test('月报首页直接显示完整图片，仅保留生成分享图；空月隐藏图片和分享', () => {
@@ -2601,6 +2640,8 @@ test('网页版优先提示暂无回避卡，发牌后隐藏牌桌回避卡入�
     const html = c.viewAvoidance();
     assert.match(html, /class="avoidance-note">暂无回避卡<\/div>/);
     assert.doesNotMatch(html, /取消准备后|当前无法使用回避卡/);
+    c.state.avoidance = { tab: 'faction', factions: [], balance: 2, factionBalance: 0, editable: true };
+    assert.match(c.viewAvoidance(), /class="avoidance-note">暂无阵营卡<\/div>/);
     c.ACTIONS.closeAvoidance();
     assert.match(c.viewRoom(), /data-action="openAvoidance" aria-label="用卡，共 0 张">/);
     assert.match(c.viewRoom(), />×0<\/span><\/span><span class="avoidance-entry-state">用卡</);

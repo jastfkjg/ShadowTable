@@ -22,7 +22,7 @@
           <view wx:if="{{avoidanceLoading}}" class="avoidance-note" role="status">正在读取本局用卡…</view>
           <block wx:elif="{{avoidance.tab==='faction'}}">
             <view class="card-question">这局想加入哪个阵营？</view>
-            <view wx:if="{{!avoidance.factionBalance}}" class="avoidance-note">暂无阵营卡，每完成 10 场有效正式对局可获得 1 张。</view>
+            <view wx:if="{{!avoidance.factionBalance}}" class="avoidance-note">暂无阵营卡</view>
             <view class="faction-choices">
               <button hover-class="entry-option-pressed" wx:for="{{avoidance.factions}}" wx:key="id" class="faction-choice faction-{{item.id}} {{avoidanceDraft===item.id?'is-selected':''}}" bindtap="chooseAvoidance" data-id="{{item.id}}" aria-pressed="{{avoidanceDraft===item.id}}" disabled="{{!avoidance.editable || !avoidance.factionBalance || busy || hasPendingRequest}}">
                 <view wx:if="{{avoidanceDraft===item.id}}" class="card-check" aria-hidden="true">✓</view>

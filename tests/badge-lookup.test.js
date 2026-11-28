@@ -3,7 +3,6 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { Store } = require('../server/store');
-const { Leaderboard } = require('../server/leaderboard');
 const { read } = require('../server/badge-lookup');
 const { catalogue } = require('../miniprogram/badges');
 const { readProfile, saveProfile } = require('../server/profile');
@@ -13,11 +12,10 @@ const { create } = require('../miniprogram/pages/badges/rank-controller');
 function fixture(t) {
   let now = Date.parse('2026-11-15T12:00:00+08:00');
   const store = new Store(':memory:', { clock: () => now });
-  const board = new Leaderboard(store);
   t.after(() => store.close());
-  return { store, lookup: (id, params) => read(store, board, id, new URLSearchParams(params), now),
-    game(players) {
-      store.archiveMatch({ id: randomUUID(), board: 'classic-court', capacity: 9, endedAt: ++now, winner: 'good',
+  return { store, lookup: (id, params) => read(store, id, new URLSearchParams(params), now),
+    game(players, settings = {}) {
+      store.archiveMatch({ id: randomUUID(), board: 'classic-court', capacity: 9, endedAt: ++now, winner: 'good', ...settings,
         players: players.map(([uid, roleId, outcome], i) => ({ uid, roleId, role: roleId, seat: i + 1, outcome,
           faction: 'good', score: { status: 'scored', total: 2, breakdown: [] } })) });
     }, nextMonth() { now = Date.parse('2026-12-01T00:00:00+08:00'); } };
@@ -90,4 +88,31 @@ test('两端共用的徽章查询支持名称搜索、无匹配状态和翻页',
   assert.equal(detail.state.badge.title, '五连捷徽');
   assert.deepEqual(detail.state.board.rows.map(r => r.nickname), ['甲','乙']);
   assert.deepEqual(paths, ['/api/leaderboard/badges','/api/leaderboard/badges/five_wins','/api/leaderboard/badges/five_wins?offset=1&version=v']);
+});
+
+test('仅开启徽章的对局参与徽章榜、出勤、永久连胜和月末积分发奖', t => {
+  const f = fixture(t);
+  const eligible = 'wx:eligible', ordinary = 'wx:ordinary';
+  const ids = uid => require('../server/badges').readBadges(f.store, uid).badges.map(b => b.id);
+  for (let i = 0; i < 7; i++) f.game([[ordinary, 'merlin', 'win']], { badgeEnabled: false });
+  for (let i = 0; i < 4; i++) f.game([[eligible, 'merlin', 'win']], { badgeEnabled: true });
+  f.game([[eligible, 'merlin', 'win']], { badgeEnabled: false });
+  assert.ok(!ids(eligible).includes('five_wins'));
+  f.game([[eligible, 'merlin', 'loss']], { badgeEnabled: false });
+  f.game([[eligible, 'merlin', 'win']], { badgeEnabled: true });
+  assert.deepEqual(ids(ordinary), []);
+  for (const id of ['five_wins', 'games', 'points', 'attendance', 'win_streak']) {
+    assert.ok(ids(eligible).includes(id), id);
+    assert.equal(f.lookup(id).total, 1);
+  }
+  assert.equal(f.lookup('games').rows[0].value, 5);
+  assert.equal(f.lookup('points').rows[0].value, 10);
+  assert.deepEqual(f.store.badgeRanks.detail(ordinary, 'honor', 'self').badges, []);
+  assert.ok(f.store.badgeRanks.detail(eligible, 'honor', 'self').badges.some(b => b.id === 'points'));
+  const board = new (require('../server/leaderboard').Leaderboard)(f.store);
+  assert.equal(board.snapshot('points', 'month', f.store.clock()).aggregates.get(ordinary).points, 14);
+  f.nextMonth();
+  assert.equal(f.lookup('monthly_points_2026-11_1').total, 1);
+  assert.ok(ids(eligible).includes('monthly_points_2026-11_1'));
+  assert.deepEqual(ids(ordinary), []);
 });

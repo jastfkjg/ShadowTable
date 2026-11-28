@@ -4,6 +4,7 @@ const { RuleError } = require('./engine');
 const { settleMonthly } = require('./badge-awards');
 const { monthlyAchievements, achievementStandings } = require('./monthly-achievements');
 const { catalogue, monthlyAward } = require('../miniprogram/badges');
+const { badgeLeaderboard } = require('./leaderboard');
 const fun = require('./fun');
 
 const pageSize = 30;
@@ -43,7 +44,7 @@ function standings(store, board, badge, now) {
   }));
 }
 
-function read(store, board, id, params, now) {
+function read(store, id, params, now) {
   const offset = params.get('offset') ?? '0', version = params.get('version');
   if ([...params.keys()].some(k => !id || !['offset','version'].includes(k) || params.getAll(k).length !== 1)
     || !/^(0|[1-9]\d{0,8})$/.test(offset) || (+offset && !version))
@@ -55,7 +56,7 @@ function read(store, board, id, params, now) {
 
   // Preserve the actual award ranks when a player hides their badge details.
   const visibleColumn = badge.category === '趣味徽章' ? 'fun_visible' : 'honor_visible';
-  const candidates = standings(store, board, badge, now);
+  const candidates = standings(store, badgeLeaderboard(store), badge, now);
   const profiles = store.db.prepare(`SELECT f.uid,f.public_id AS publicId,f.nickname,f.avatar_hash
     FROM profiles f LEFT JOIN badge_rank_players b ON b.uid=f.uid
     WHERE f.uid IN (SELECT value FROM json_each(?)) AND (f.uid LIKE 'wx:%' OR f.uid LIKE 'dev:%') AND f.leaderboard_visible AND f.public_id IS NOT NULL

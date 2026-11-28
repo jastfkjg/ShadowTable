@@ -200,7 +200,8 @@ function newRoom(code, uid, name, boardId = "classic", capacity = 6) {
     host: uid,
     board: boardId,
     capacity,
-    scoreEnabled: scoring.defaultEnabled(boardId, capacity),
+    scoreEnabled: false,
+    badgeEnabled: false,
     recordPurpose: "normal",
     fairyEnabled: capacity >= 8,
     phase: "lobby",
@@ -249,6 +250,7 @@ function end(room, winner, reason, source = "system", facts = null) {
     requireRule(!error, error);
   }
   room.result = { winner, reason, source };
+  if (source === "manual" && winner === null) room.result.reason += "本局扣除的卡片已退还给原玩家。";
   room.scoringFacts = facts;
   if (room.fun) room.fun.terminal = fun.terminal(room, facts || room.fun.pendingTerminal, ROLES, source);
   stage(room, "ended");
@@ -271,6 +273,7 @@ function archiveResult(room) {
     id: room.matchId || randomUUID(), code: room.code, game: room.game,
     board: room.board, boardName: boardName(room), capacity: room.capacity,
     startedAt: room.startedAt || null, endedAt: Date.now(),
+    badgeEnabled: room.badgeEnabled === true,
     recordPurpose: room.recordPurpose || "normal",
     winner: room.result?.winner || null, source: room.result?.source || null, excludedReason,
     scorePolicy: room.scorePolicy || null, scoringFacts: room.scoringFacts || null,
@@ -423,6 +426,8 @@ for (const b of BOARDS) {
     );
 }
 function clearGame(room) {
+  room.scoreEnabled = false;
+  room.badgeEnabled = false;
   room.fairyEnabled = fairy.enabled(room);
   for (const key of [
     "roles",
@@ -1366,6 +1371,7 @@ function publicView(room, uid) {
     flexible: !!room.flexible,
     canUseTools: room.host === uid && canUseTools(room),
     winnerOptions: winnerOptions(room),
+    unrecordedCardNotice: "本局已扣的回避卡和阵营卡将退还给对应玩家。",
     scoreSettlement: registrationOptions(scoring.settlementOptions(room)),
     reverseSettlement: scoring.isReverseBoard(room),
     funSettlement: registrationOptions(fun.settlementOptions(room.board)),
@@ -1373,6 +1379,7 @@ function publicView(room, uid) {
     recordSettings: {purpose:room.recordPurpose || "normal",editable:room.phase === "lobby"},
     recordNotice,
     scoreSettings: scoring.settings(room),
+    badgeSettings: { enabled: room.badgeEnabled === true, editable: room.phase === "lobby" },
     scoreNotice: excludedRecord || room.recordPurpose === "test" && managedState !== "active" ? "本局不计积分" : room.phase === "lobby" ? scoring.settings(room).unavailableReason || (!scoring.enabled(room) ? "本局未开启计分" : null) : scoring.exclusion(room),
     myScore: excludedRecord ? {status:"excluded",total:0,breakdown:[],reason:room.recordManagement.state === "deleted" ? "管理员已删除本局记录" : room.recordManagement.reason || "本局不计战绩"} : room.matchRecord?.players.find(player => player.uid === uid)?.score || null,
     myFun: excludedRecord ? null : funCopy.story(room.matchRecord?.players.find(player => player.uid === uid)?.fun) || null,
@@ -1542,6 +1549,15 @@ function applyCommand(room, uid, input) {
       if (input.scoreEnabled !== scoring.enabled(next)) {
         requireRule(next.phase === "lobby", "计分开关只能在发牌前修改", 409);
         next.scoreEnabled = input.scoreEnabled;
+        next.players.forEach(player => (player.ready = false));
+        stage(next, "lobby");
+      }
+    }
+    if (input.badgeEnabled !== undefined) {
+      requireRule(typeof input.badgeEnabled === "boolean", "徽章设置无效");
+      if (input.badgeEnabled !== (next.badgeEnabled === true)) {
+        requireRule(next.phase === "lobby", "徽章开关只能在发牌前修改", 409);
+        next.badgeEnabled = input.badgeEnabled;
         next.players.forEach(player => (player.ready = false));
         stage(next, "lobby");
       }
@@ -1838,7 +1854,7 @@ function applyCommand(room, uid, input) {
       room.fairyEnabled = input.capacity >= 8;
     }
     if (room.board !== input.board || room.capacity !== input.capacity)
-      room.scoreEnabled = scoring.defaultEnabled(input.board, input.capacity);
+      room.scoreEnabled = false;
     room.board = input.board;
     room.capacity = input.capacity;
     delete room.avoidanceChoices;

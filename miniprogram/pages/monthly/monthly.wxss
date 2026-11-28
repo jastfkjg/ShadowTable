@@ -3,13 +3,20 @@
 .monthly-picker { display:flex; align-items:center; gap:8px; min-height:44px; color:var(--text); font-size:14px; }
 .monthly-arrow { width:6px; height:6px; border-right:1px solid currentColor; border-bottom:1px solid currentColor; transform:rotate(45deg); }
 button.monthly-rules-link { width:auto; min-height:44px; margin:0; padding:0 4px; color:var(--muted); font-size:13px; }
-.monthly-poster { position:relative; width:100%; background:#281f24; }
+
+.monthly-stage { position:relative; }
+.monthly-cover-tools { position:absolute; z-index:2; inset:0 0 auto; min-height:0; height:0; padding:0; pointer-events:none; }
+.monthly-cover-tools .monthly-month-control { position:absolute; top:0; left:3%; width:24%; margin-top:calc(10.2% - 22px); pointer-events:auto; }
+.monthly-cover-tools .monthly-picker, .monthly-cover-tools .monthly-month-control.monthly-picker { justify-content:flex-end; padding-right:3px; color:var(--accent); }
+.monthly-cover-tools button.monthly-rules-link { position:absolute; right:1%; top:3px; display:flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0; background:transparent; border:0; pointer-events:auto; }
+.monthly-info { display:block; box-sizing:border-box; width:17px; height:17px; border:1px solid var(--muted); border-radius:50%; background:rgba(16,28,36,.65); color:var(--text); font:600 12px/15px Georgia, serif; text-align:center; }
+.monthly-poster { position:relative; width:100%; background:var(--bg); }
 .monthly-poster-image { display:block; width:100%; }
 button.monthly-player { position:absolute; min-height:0; min-width:0; margin:0; padding:0; background:transparent; border:0; border-radius:6px; }
 .monthly-player::after { border:0; }
 .monthly-message, .monthly-page .inline-error { padding:24px 16px; color:var(--muted); text-align:center; }
 .monthly-share-bar { position:fixed; z-index:30; bottom:0; left:0; right:0; padding:10px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--bg); }
-button.monthly-share { width:100%; max-width:488px; margin:0 auto; min-height:48px; border-radius:12px; color:#281f24; background:#efbd8f; font-weight:600; }
+button.monthly-share { width:100%; max-width:488px; margin:0 auto; min-height:44px; border-radius:9px; color:var(--bg); background:var(--accent); font-weight:600; }
 .monthly-canvas { position:fixed; left:-1100px; top:0; width:1080px; height:1080px; pointer-events:none; }
 .monthly-rules-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center; background:var(--overlay-scrim); }
 .monthly-rules-sheet { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 520px; min-height: 0; border-radius:var(--sheet-radius) var(--sheet-radius) 0 0; background: var(--surface); border-top: 1px solid var(--overlay-border); padding: 10px 20px calc(12px + env(safe-area-inset-bottom)); }

@@ -14,6 +14,7 @@ function initialize(store) {
     CREATE INDEX IF NOT EXISTS avoidance_ledger_user ON avoidance_ledger(uid,created DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS avoidance_spend_match ON avoidance_ledger(uid,match_id) WHERE source='spend';
     CREATE UNIQUE INDEX IF NOT EXISTS faction_spend_match ON avoidance_ledger(uid,match_id) WHERE source='faction_spend';
+    CREATE INDEX IF NOT EXISTS card_spends_by_match ON avoidance_ledger(match_id) WHERE source IN ('spend','faction_spend');
     CREATE TABLE IF NOT EXISTS avoidance_grant_reads(uid TEXT NOT NULL, ledger_id TEXT NOT NULL, PRIMARY KEY(uid,ledger_id));`);
   store.transaction(() => {
     if (!store.db.prepare("PRAGMA table_info(avoidance_accounts)").all().some(column => column.name === "faction_balance"))
@@ -44,7 +45,7 @@ function entryBalances(store, uid) {
   return { balance: cards.balance, totalBalance: cards.balance + cards.factionBalance };
 }
 function wallet(store, uid) {
-  return { ...grantNotice(store, uid), history: store.db.prepare(`SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? AND source NOT IN (${factionGrants},'faction_spend') ORDER BY created DESC,rowid DESC LIMIT 30`).all(uid) };
+  return { ...grantNotice(store, uid), history: store.db.prepare(`SELECT id,delta,balance,source,note,created FROM avoidance_ledger WHERE uid=? AND source NOT IN (${factionGrants},'faction_spend','faction_refund') ORDER BY created DESC,rowid DESC LIMIT 30`).all(uid) };
 }
 function grantNotice(store, uid, includeFaction = false) {
   const grantSources = includeFaction ? allCardGrants : avoidanceGrants;
@@ -133,6 +134,23 @@ function settle(store, room) {
         result.faction ? "本局阵营卡生效" : "本局回避生效", room.matchId, store.clock());
   }
 }
+function refundUnrecordedMatch(store, room) {
+  fail(store.inTransaction, "用卡退还需要在事务中执行");
+  if (!room.matchId) return;
+  // A refund is keyed to the original debit, including for games dealt before this upgrade.
+  const spends = store.db.prepare(`SELECT s.uid, s.source, -s.delta AS amount, 'refund:' || s.id AS refundId
+    FROM avoidance_ledger s WHERE s.match_id=? AND s.source IN ('spend','faction_spend') AND s.delta<0
+    AND NOT EXISTS (SELECT 1 FROM avoidance_ledger r WHERE r.id='refund:' || s.id)`).all(room.matchId);
+  for (const { uid, source, amount, refundId } of spends) {
+    const faction = source === "faction_spend", column = faction ? "faction_balance" : "balance";
+    const after = balance(store, uid, faction) + amount;
+    fail(Number.isSafeInteger(after), "卡片数量超出有效范围");
+    store.db.prepare(`UPDATE avoidance_accounts SET ${column}=? WHERE uid=?`).run(after, uid);
+    store.db.prepare("INSERT INTO avoidance_ledger VALUES(?,?,?,?,?,?,?,?)")
+      .run(refundId, uid, amount, after, faction ? "faction_refund" : "refund", "本局不计战绩，退还用卡", room.matchId, store.clock());
+    if (room.avoidanceResults?.[uid]) room.avoidanceResults[uid].refunded = true;
+  }
+}
 function resultView(store, room, uid) {
   const result = room.avoidanceResults?.[uid];
   if (!result) return null;
@@ -190,4 +208,4 @@ function grant(store, input) {
   }
   return { batchId, recipients: targets.length, amount: input.amount, cardType };
 }
-module.exports = { initialize, eligible, ensureAccount, balance, entryBalances, wallet, grantNotice, acknowledgeGrant, choiceResult, deal, prepare, settle, resultView, roomView, players, grant };
+module.exports = { initialize, eligible, ensureAccount, balance, entryBalances, wallet, grantNotice, acknowledgeGrant, choiceResult, deal, prepare, settle, refundUnrecordedMatch, resultView, roomView, players, grant };

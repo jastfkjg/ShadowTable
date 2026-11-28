@@ -196,7 +196,7 @@ function monthlyAchievements(store, now) {
     json_extract(p.snapshot,'$.seat') AS seat, json_extract(p.snapshot,'$.roleId') AS roleId,
     json_extract(p.snapshot,'$.role') AS role, p.outcome IN ('win','loss') AS valid,
     s.status='scored' AS scored, f.leaderboard_visible AND f.public_id IS NOT NULL AS visible
-    FROM visible_match_players p LEFT JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
+    FROM badge_match_players p LEFT JOIN active_match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
     LEFT JOIN profiles f ON f.uid=p.uid WHERE p.ended>=? AND p.ended<? ORDER BY p.ended,p.match_id`,
     )
     .all(start, end);
@@ -214,7 +214,7 @@ function monthlyAchievements(store, now) {
     JOIN match_players p ON p.match_id=s.match_id AND p.uid=s.uid
     LEFT JOIN match_controls c ON c.match_id=s.match_id
     WHERE s.ended>=? AND s.ended<? AND s.status='scored' AND p.outcome IN ('win','loss')
-    AND coalesce(c.state,'active')='active'`,
+    AND NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=s.match_id) AND coalesce(c.state,'active')='active'`,
     )
     .get(start, end).n;
   for (const [id, players] of groups) {

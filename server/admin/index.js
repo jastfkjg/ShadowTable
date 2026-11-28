@@ -194,6 +194,15 @@ function createAdmin({ store, origin, key, body, limit }) {
     }
     const session = authenticate(req, res);
     limit("admin:" + session.hash, 600);
+    if (path === "/api/admin/room-password" && req.method === "POST") {
+      const { password } = await body(req);
+      store.transaction(() => {
+        require("../room-password").set(store, password);
+        audit("set-room-password");
+      });
+      send(200, { ok: true });
+      return true;
+    }
     if (path === "/api/admin/feedback" && req.method === "GET") {
       send(200, playerFeedback.list(store, null, new URL(req.url, origin).searchParams));
       return true;

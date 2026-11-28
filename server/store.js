@@ -70,6 +70,22 @@ class Store {
       CREATE TABLE IF NOT EXISTS score_adjustments(id TEXT PRIMARY KEY, uid TEXT NOT NULL, delta INTEGER NOT NULL, mode TEXT NOT NULL, before_points INTEGER NOT NULL, after_points INTEGER NOT NULL, reason TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS score_adjustments_user ON score_adjustments(uid,created DESC);
       CREATE TABLE IF NOT EXISTS receipts(uid TEXT NOT NULL, request TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(uid, request));`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS room_settings_password(
+      id INTEGER PRIMARY KEY CHECK(id=1), salt BLOB NOT NULL, digest BLOB NOT NULL)`);
+    this.transaction(() => {
+      const update = this.db.prepare("UPDATE rooms SET state=? WHERE code=?");
+      for (const row of this.db.prepare("SELECT code,state FROM rooms WHERE json_type(state,'$.badgeEnabled') IS NULL").all()) {
+        const room = JSON.parse(row.state);
+        // Dealt games finish under the old rules. A waiting table must confirm the new rules before dealing.
+        room.badgeEnabled = room.phase !== "lobby";
+        if (room.phase === "lobby") {
+          room.scoreEnabled = false;
+          room.stage = randomUUID();
+          room.players.forEach(player => (player.ready = false));
+        }
+        update.run(JSON.stringify(room), row.code);
+      }
+    });
     require("./feedback").initialize(this.db);
     require("./avatar-uploads").initialize(this.db);
     management.initialize(this);

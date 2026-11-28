@@ -8,6 +8,7 @@ const labels = {
   rematch: "同房重开",
   delete: "删除房间",
   login: "管理员登录",
+  "set-room-password": "修改房间设置密码",
   "correct-result": "更正对局结果",
   "adjust-player-score": "调整玩家积分",
   "grant-avoidance": "发放回避卡",
@@ -48,6 +49,8 @@ function showSession(on) {
   $("dashboard").hidden = !on;
   $("logout").hidden = !on;
   if (!on) {
+    $("room-password").value = "";
+    $("room-password-status").textContent = "";
     $("rooms").replaceChildren();
     $("audit").replaceChildren();
     window.FeedbackInbox?.clear();
@@ -55,6 +58,22 @@ function showSession(on) {
     window.AvoidanceAdmin?.clear();
   }
 }
+$("room-password-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const input = $("room-password"), button = $("room-password-save"), status = $("room-password-status");
+  if (button.disabled) return;
+  button.disabled = input.disabled = true;
+  status.textContent = "正在保存…";
+  try {
+    await api("room-password", { password: input.value });
+    input.value = "";
+    status.textContent = "房间设置密码已保存";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = input.disabled = false;
+  }
+});
 function el(tag, text, cls) {
   const node = document.createElement(tag);
   node.textContent = text;

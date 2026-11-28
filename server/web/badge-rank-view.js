@@ -9,7 +9,7 @@ window.shadowtableBadgeRankView = function (s, esc, renderDetail) {
       : '<span class="br-avatar" aria-hidden="true">' +
         esc(p.initial) +
         "</span>";
-  const back = s.lookup ? (s.badgeId ? 'badge-ranks/lookup' : 'leaderboard') : s.player ? 'badge-ranks/' + kind : 'badges';
+  const back = s.lookup ? (s.badgeId && !s.fromLeaderboard ? 'badge-ranks/lookup' : 'leaderboard') : s.player ? 'badge-ranks/' + kind : 'badges';
   const parent = s.lookup ? (s.badgeId ? '徽章查询' : '排行榜') : s.player ? '徽章榜' : '徽章收藏';
   const title = s.lookup ? '查徽章' : s.player ? label : '徽章榜';
   let html = `<section class="br-page br-${kind}"${s.selectedBadge ? ' inert' : ''}>

@@ -36,7 +36,7 @@
     if (needsActor) summary.push({ label: "实际带刀人", value: actor ? actor.seat + "号 · " + actor.name : "尚未选择" });
     if (needsReverse) summary.push({ label: "逆仆刀目标", value: reverseTarget ? reverseTarget.seat + "号 · " + reverseTarget.name : "尚未选择" });
     if (reason?.requiresTarget) summary.push({ label: needsReverse ? "梅林刀目标" : "实际刺杀目标", value: data.resultTarget === 0 ? "空刀" : target ? target.seat + "号 · " + target.name : "尚未选择" });
-    const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" : reason ? room.scoreSettlement?.length ? "记录胜负、积分及趣味结果。" : "记录胜负及趣味结果，不计积分。" : "仅记录胜负，不计积分。";
+    const notice = data.resultChoice === "none" ? "本局不计战绩及积分。" + (room.unrecordedCardNotice || "") : reason ? room.scoreSettlement?.length ? "记录胜负、积分及趣味结果。" : "记录胜负及趣味结果，不计积分。" : "仅记录胜负，不计积分。";
     const nextHint = current.id === "review" ? "确认后归档，不能直接修改" : "";
     return {
       resultOther: other, resultReasonOptions: options,

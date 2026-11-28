@@ -39,7 +39,7 @@ function grantContributor(store, uid) {
 // or personal record removal cannot revoke an already earned milestone.
 function reconcileMilestones(store, uids) {
   const candidates = uids || store.db.prepare("SELECT DISTINCT uid FROM match_players").all().map(row => row.uid);
-  const outcomes = store.db.prepare(`SELECT outcome FROM visible_match_players
+  const outcomes = store.db.prepare(`SELECT outcome FROM badge_match_players
     WHERE uid=? AND outcome IN ('win','loss') ORDER BY ended,match_id`);
   const existing = store.db.prepare("SELECT badge_id FROM badge_awards WHERE uid=? AND campaign='milestones'");
   for (const uid of new Set(candidates)) {
@@ -68,6 +68,7 @@ function reconcileParticipants(store, uid = null) {
       LEFT JOIN match_scores s ON s.match_id=p.match_id AND s.uid=p.uid
       WHERE p.ended>=? AND p.ended<? AND p.ended<=?
         AND coalesce(c.state,'active')='active'
+        AND NOT EXISTS (SELECT 1 FROM badge_excluded_matches b WHERE b.id=p.match_id)
         AND coalesce(json_extract(m.snapshot,'$.recordPurpose'),'normal')='normal'
         AND (p.uid LIKE 'wx:%' OR p.uid LIKE 'dev:%' OR p.uid LIKE 'guest:%')
         ${uid === null ? '' : 'AND p.uid=?'} GROUP BY p.uid`)
@@ -85,7 +86,7 @@ function activate(store) {
   if (store.clock() < START) return null;
   return transaction(store, () => {
     if (!store.db.prepare('SELECT 1 FROM badge_campaigns WHERE id=?').get(CAMPAIGN)) {
-      const rows = pointsPodium(new Leaderboard(store), Math.min(store.clock(), END - 1));
+      const rows = pointsPodium(new Leaderboard(store, { badgesOnly: true }), Math.min(store.clock(), END - 1));
       store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)').run(CAMPAIGN, store.clock(), JSON.stringify(rows));
       for (const { uid, rank, points } of rows) grant(store, uid, rankedIds[rank - 1], { rank, points });
     }
@@ -110,7 +111,7 @@ function settleMonthly(store, now = store.clock()) {
   transaction(store, () => {
     const last = lastSettled.get(first, latest)?.id;
     let month = last ? monthAt(monthRange(last.slice(-7)).end) : FIRST_MONTH;
-    const board = new Leaderboard(store);
+    const board = new Leaderboard(store, { badgesOnly: true });
     const freeze = store.db.prepare('INSERT INTO badge_campaigns VALUES(?,?,?)');
     while (month <= lastClosedMonth) {
       const { end } = monthRange(month), campaign = monthlyCampaign(month);

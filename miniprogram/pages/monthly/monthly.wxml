@@ -1,15 +1,19 @@
 <app-nav title="月度战报" back="{{true}}" backLabel="返回我的" bindback="back" />
 <view class="page monthly-page">
-  <view class="monthly-tools">
-    <picker mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="{{'选择月报月份，'+month}}"><view class="monthly-picker">{{month}}<view class="monthly-arrow" /></view></picker>
-    <button wx:if="{{report}}" class="monthly-rules-link" bindtap="openRules" hover-class="none">统计口径</button>
+  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert">{{error}}<button class="secondary" bindtap="retry" hover-class="none">重试</button></view>
+  <view class="monthly-stage">
+    <view class="monthly-tools {{imagePath ? 'monthly-cover-tools' : ''}}">
+      <picker class="monthly-month-control" mode="date" fields="month" value="{{month}}" start="{{minMonth}}" end="{{maxMonth}}" bindchange="chooseMonth" aria-label="{{'选择月报月份，'+month}}">
+        <view class="monthly-picker"><text wx:if="{{!imagePath}}">{{month}}</text><view class="monthly-arrow" /></view>
+      </picker>
+      <button wx:if="{{report}}" class="monthly-rules-link" bindtap="openRules" hover-class="none" aria-label="统计口径"><text wx:if="{{imagePath}}" class="monthly-info">i</text><text wx:else>统计口径</text></button>
+    </view>
+    <view wx:if="{{imagePath}}" class="monthly-poster">
+      <image class="monthly-poster-image" src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" binderror="imageError" aria-label="{{description}}" />
+      <button wx:for="{{targets}}" wx:key="key" class="monthly-player" hover-class="none" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" aria-label="{{item.label}}" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.width}}%;height:{{item.height}}%" />
+    </view>
   </view>
   <view wx:if="{{loading && !imagePath && !connectionVisible}}" class="monthly-message" role="status">正在生成月度战报…</view>
-  <view wx:if="{{error && !connectionVisible}}" class="inline-error" role="alert">{{error}}<button class="secondary" bindtap="retry" hover-class="none">重试</button></view>
-  <view wx:if="{{imagePath}}" class="monthly-poster">
-    <image class="monthly-poster-image" src="{{imagePath}}" data-path="{{imagePath}}" mode="widthFix" binderror="imageError" aria-label="{{description}}" />
-    <button wx:for="{{targets}}" wx:key="key" class="monthly-player" hover-class="none" data-id="{{item.publicId}}" bindtap="openMonthlyPlayer" aria-label="{{item.label}}" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.width}}%;height:{{item.height}}%" />
-  </view>
   <view wx:elif="{{report && !report.canShare && !loading && !error}}" class="monthly-message">这个月还没有有效对局</view>
   <view wx:if="{{imagePath}}" class="monthly-share-bar">
     <button class="monthly-share" bindtap="share" disabled="{{shareOpening || loading || error}}" hover-class="none">生成分享图</button>

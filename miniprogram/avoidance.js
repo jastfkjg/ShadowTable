@@ -55,13 +55,14 @@
   function result(value) {
     if (!value) return null;
     const effective = value.status === "effective";
+    const spent = (value.refunded ? "本局不计战绩，已退还 1 张" : "已消耗 1 张") + (value.faction ? "阵营卡" : "回避卡");
     if (value.faction) return { ...value, effective,
       title: effective ? "已分到" + factionNames[value.faction] : "本局阵营卡未生效",
-      detail: effective ? "已消耗 1 张阵营卡" : value.status === "unavailable" ? "发牌时阵营卡不足，本次未扣卡" : "未分到所选阵营，本次未扣卡",
+      detail: effective ? spent : value.status === "unavailable" ? "发牌时阵营卡不足，本次未扣卡" : "未分到所选阵营，本次未扣卡",
     };
     return { ...value, effective,
       title: effective ? "已回避「" + value.roleName + "」" : "本局回避未生效",
-      detail: effective ? "已消耗 1 张回避卡" : value.status === "unavailable" ? "发牌时回避卡不足，本次未扣卡" : "需保留完整角色配置，本次未扣卡",
+      detail: effective ? spent : value.status === "unavailable" ? "发牌时回避卡不足，本次未扣卡" : "需保留完整角色配置，本次未扣卡",
     };
   }
   function grantCopy(value) {

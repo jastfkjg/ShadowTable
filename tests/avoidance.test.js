@@ -157,8 +157,80 @@ test("全员回避梅林只失败1人，成功才扣，重复发牌不多扣，�
   assert.equal((await a.cmd(path, tokens[0], "start")).status, 400);
   await a.cmd(path, tokens[0], "terminate");
   assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='spend'").get().n, 5);
+  assert.equal(a.store.db.prepare("SELECT count(*) AS n FROM avoidance_ledger WHERE source='refund'").get().n, 0);
   await a.cmd(path, tokens[0], "rematch");
   for (const token of tokens) assert.equal((await a.request(path + "/avoidance", token)).data.selected, null);
+});
+test("房主不计战绩结算只退本局实际扣卡，并与归档和结束回执一起提交", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens), code = path.split("/").pop();
+  const db = a.store.db, host = tokens[0];
+  const balances = () => db.prepare("SELECT uid,balance,faction_balance FROM avoidance_accounts ORDER BY uid").all();
+  const refunds = () => db.prepare("SELECT source,match_id,delta FROM avoidance_ledger WHERE source IN ('refund','faction_refund') ORDER BY source").all();
+  const act = async (token, type, fields) => assert.equal((await a.cmd(path, token, type, fields)).status, 200);
+  a.store.transaction(() => avoidance.grant(a.store, { cardType: "faction", scope: "all", expectedCount: 6, amount: 1 }));
+
+  // A recorded game on the same table has its own debit, even when scoring is off.
+  await act(tokens[4], "avoidance", { role: "merlin" });
+  await a.ready(path, tokens); await act(host, "start", { flexible: true });
+  await act(host, "finishTools", { winner: "good" });
+  assert.equal((await a.request(path + "/avoidance", tokens[4])).data.balance, 0);
+  assert.equal(refunds().length, 0);
+  await act(host, "rematch");
+  for (const token of tokens.slice(0, 3)) await act(token, "avoidance", { faction: "evil" });
+  await act(tokens[3], "avoidance", { role: "merlin" });
+  const original = balances();
+  await a.ready(path, tokens); await act(host, "start", { flexible: true });
+  const running = a.store.get(code), rolePlayer = running.players.find(p => p.seat === 4).uid;
+  assert.equal(Object.values(running.avoidanceResults).filter(r => r.status === "effective").length, 3);
+  // A concurrent gift stays in this player's wallet after the debit is reversed.
+  a.store.transaction(() => avoidance.grant(a.store, { scope: "player", uid: rolePlayer, amount: 2 }));
+  original.find(p => p.uid === rolePlayer).balance += 2;
+  const beforeEnd = balances(), body = { type: "finishTools", winner: null, replace: true, stage: running.stage }, id = randomUUID();
+  assert.equal((await a.request(path + "/commands", tokens[1], body)).status, 403);
+  const save = a.store.save;
+  try {
+    a.store.save = () => { throw Error("模拟归档失败"); };
+    assert.equal((await a.request(path + "/commands", host, body, id)).status, 500);
+  } finally { a.store.save = save; }
+  assert.equal(a.store.get(code).stage, running.stage);
+  assert.deepEqual(balances(), beforeEnd); assert.equal(refunds().length, 0);
+
+  const finish = () => a.request(path + "/commands", host, body, id);
+  for (const res of await Promise.all([finish(), finish()])) assert.equal(res.status, 200);
+  const ended = a.store.get(code);
+  assert.equal(ended.phase, "ended"); assert.equal(ended.matchRecord.winner, null);
+  a.store.transaction(() => avoidance.refundUnrecordedMatch(a.store, ended));
+  assert.deepEqual(balances(), original);
+  assert.deepEqual(refunds().map(r => r.source), ["faction_refund", "faction_refund", "refund"]);
+  assert.ok(refunds().every(r => r.match_id === running.matchId && r.delta === 1));
+  for (const token of tokens) {
+    const secret = (await a.request(path + "/private", token)).data;
+    const card = secret.factionCard || secret.avoidance;
+    if (card) assert.equal(!!card.refunded, card.status === "effective");
+    const wallet = (await a.request("/api/me/avoidance", token)).data;
+    assert.ok(wallet.history.every(row => row.source !== "faction_refund"));
+  }
+  await act(host, "rematch");
+  assert.deepEqual(balances(), original);
+});
+test("旧版线下结算同样按最终结果退卡，仅完成线下操作并继续游戏时仍保留扣卡", async t => {
+  const a = await setup(t), tokens = await tokensFor(a), path = await a.room(tokens), host = tokens[0];
+  assert.equal((await a.cmd(path, host, "configure", { board: "shadow-assist", capacity: 12 })).status, 200);
+  for (let i = 6; i < 12; i++) {
+    tokens.push(await a.login("offline" + i));
+    assert.equal((await a.request(path + "/join", tokens[i], { name: "玩家" + i })).status, 200);
+  }
+  for (const keepPlaying of [false, true]) {
+    assert.equal((await a.cmd(path, host, "avoidance", { role: "merlin" })).status, 200);
+    await a.ready(path, tokens);
+    assert.equal((await a.cmd(path, host, "start")).status, 200);
+    assert.equal((await a.cmd(path, host, "offline")).status, 200);
+    assert.equal((await a.cmd(path, host, "closeOffline", { winner: null, keepPlaying })).status, 200);
+    const view = (await a.request(path, host)).data;
+    assert.equal(view.phase, keepPlaying ? "tools" : "ended");
+    assert.equal(view.me.avoidance.balance, keepPlaying ? 0 : 1);
+    if (!keepPlaying) assert.equal((await a.cmd(path, host, "rematch")).status, 200);
+  }
 });
 test("另一房间先耗尽余额时不重复扣卡，本房间发牌成功并私密说明未生效", async t => {
   const a = await setup(t), tokens = await tokensFor(a), first = await a.room(tokens), second = await a.room(tokens);

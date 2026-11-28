@@ -6,22 +6,14 @@
   if (typeof module === "object" && module.exports) module.exports = value;
   else root.shadowtableMonthlyCard = value;
 })(typeof window === "object" ? window : this, function (presentation, canvas) {
-  const { WIDTH, clean, wrap, painter } = canvas;
+  const { WIDTH, clean, wrap, painter, colors } = canvas;
   const BACKGROUND_PATH = "/assets/room-share-background.jpg";
   const W = 480,
     SCALE = WIDTH / W,
     M = 23,
     INNER = W - 2 * M,
-    HERO = 178;
-  const color = {
-    bg: "#281f24",
-    surface: "#33262b",
-    ink: "#f7e9da",
-    accent: "#efbd8f",
-    muted: "#d1c0b8",
-    line: "#554249",
-    border: "#926e66",
-  };
+    HERO = 229;
+  const color = { ...colors, line: "#32434c" };
   const rowProjection = (row) => ({
     rank: row.rank,
     tied: row.tied,
@@ -50,66 +42,80 @@
     };
   }
   const cards = (response) => [cardFromReport(presentation.presentReport(response))];
-  // Tied players share a rank and score. Each avatar keeps its own nickname and optional game sample.
+  // Coordinates are shared by the exported bitmap and the player links on the home page.
+  function podiumLayout(lanes, width) {
+    const side = (width - 4) / 3.16, center = side * 1.16;
+    let height = 0, sampleHeight = 0;
+    for (const lane of lanes) {
+      const winner = lane.rank === 1;
+      lane.width = winner ? center : side;
+      lane.x = winner ? side + 2 : lane.rank === 2 ? 0 : side + center + 4;
+      lane.plinth = winner ? 86 : lane.rank === 2 ? 66 : 60;
+      const cell = lane.width / lane.members.length;
+      const diameter = Math.min(winner ? 64 : 50, cell - 14);
+      lane.tiles = lane.members.map((row, i) => {
+        const labelWidth = cell - 8;
+        const nameLines = wrap(row.name, 18, labelWidth);
+        const sampleLines = row.secondary ? wrap(row.secondary, 12, labelWidth) : [];
+        return { row, x: (i + 0.5) * cell - diameter / 2, diameter, labelWidth, nameLines, sampleLines };
+      });
+      lane.nameHeight = Math.max(...lane.tiles.map(tile => tile.nameLines.length)) * 22;
+      sampleHeight = Math.max(sampleHeight, (Math.max(...lane.tiles.map(tile => tile.sampleLines.length)) - 1) * 15);
+      height = Math.max(height, diameter + 10 + lane.nameHeight + 10 + lane.plinth);
+    }
+    for (const lane of lanes) {
+      lane.plinthTop = height - lane.plinth;
+      lane.plinth += sampleHeight;
+      for (const tile of lane.tiles) {
+        tile.y = lane.plinthTop - 10 - lane.nameHeight - 10 - tile.diameter;
+      }
+    }
+    return height + sampleHeight;
+  }
+  function boardLayout(lanes, width, stacked, points) {
+    let bottom = 0;
+    for (const [index, lane] of lanes.entries()) {
+      lane.x = stacked ? 0 : index * width / lanes.length;
+      lane.width = stacked ? width : width / lanes.length;
+      lane.top = stacked ? bottom : 0;
+      const inset = !stacked && index ? 13 : 0;
+      const cols = stacked ? Math.min(3, lane.members.length) : 1;
+      const cell = (lane.width - inset) / cols;
+      const diameter = 31;
+      const labelWidth = cell - diameter - 13;
+      let y = lane.top + 33;
+      lane.tiles = [];
+      for (let i = 0; i < lane.members.length; i += cols) {
+        let rowHeight = diameter;
+        for (const [col, row] of lane.members.slice(i, i + cols).entries()) {
+          const nameLines = wrap(row.name, 15, labelWidth);
+          const sampleLines = points ? wrap(row.secondary, 12, labelWidth) : [];
+          const textHeight = nameLines.length * 18 + sampleLines.length * 15;
+          lane.tiles.push({ row, x: inset + col * cell, y, diameter, labelWidth, nameLines, sampleLines,
+            textTop: Math.max(0, (diameter - textHeight) / 2) });
+          rowHeight = Math.max(rowHeight, textHeight);
+        }
+        y += rowHeight + 6;
+      }
+      bottom = Math.max(bottom, y + (stacked ? 8 : 0));
+    }
+    return bottom;
+  }
   function sectionLayout(section, width = INNER) {
     const points = section.id === "points";
-    const inset = points ? 0 : 10,
-      gap = 7;
-    const title = wrap(points ? "本月积分榜" : section.title, 16, width - inset * 2);
-    const subtitle = points ? [] : wrap(section.subtitle, 12, width - inset * 2);
-    const heading = 10 + title.length * 22 + subtitle.length * 17 + 7;
+    const title = wrap(points ? "本月积分榜" : section.title, 20, width);
+    const subtitle = section.type === "honor" && section.subtitle ? wrap(section.subtitle, 14, width) : [];
+    const heading = 17 + title.length * 25 + subtitle.length * 20 + 13;
     const lanes = [];
     for (const row of section.rows) {
       if (lanes[lanes.length - 1]?.rank !== row.rank) lanes.push({ rank: row.rank, members: [] });
       lanes[lanes.length - 1].members.push(row);
     }
-    const weight = (lane) => Math.min(3, lane.members.length);
-    const total = lanes.reduce((sum, lane) => sum + weight(lane), 0);
-    const space = width - inset * 2 - gap * (lanes.length - 1);
-    let x = inset,
-      tallest = 0;
-    for (const lane of lanes) {
-      lane.x = x;
-      lane.width = (space * weight(lane)) / total;
-      const padding = points ? 7 : 2;
-      const available = lane.width - padding * 2;
-      const cols = Math.min(lane.members.length, Math.max(1, Math.floor(available / (points ? 85 : 66))));
-      const tileWidth = available / cols;
-      const diameter = Math.min(tileWidth - 4, points ? (lane.rank === 1 ? 65 : 54) : 38);
-      const vertical = points || tileWidth < 114;
-      const labelWidth = Math.max(22, tileWidth - (vertical ? 4 : diameter + 7));
-      let cursor = points ? 27 : 26;
-      lane.tiles = [];
-      for (let index = 0; index < lane.members.length; index += cols) {
-        let rowHeight = 0;
-        for (const [column, row] of lane.members.slice(index, index + cols).entries()) {
-          const nameLines = wrap(row.name, 14, labelWidth);
-          const sampleLines = row.secondary ? wrap(row.secondary, 11, labelWidth) : [];
-          const sampleOffset = nameLines.length * 18 + 1;
-          const textHeight = sampleLines.length ? sampleOffset + sampleLines.length * 15 : nameLines.length * 18;
-          const textTop = vertical ? diameter + 4 : Math.max(0, (diameter - textHeight) / 2);
-          const height = Math.max(diameter, textTop + textHeight);
-          lane.tiles.push({
-            row,
-            x: padding + column * tileWidth,
-            y: cursor,
-            tileWidth,
-            diameter,
-            avatarOffset: vertical ? (tileWidth - diameter) / 2 : 0,
-            vertical,
-            labelWidth,
-            textTop, nameLines, sampleLines, sampleOffset,
-          });
-          rowHeight = Math.max(rowHeight, height);
-        }
-        cursor += rowHeight + 6;
-      }
-      lane.height = cursor + (points ? 31 : 1);
-      tallest = Math.max(tallest, lane.height);
-      x += lane.width + gap;
-    }
-    if (points) for (const lane of lanes) lane.height = tallest;
-    return { title, subtitle, heading, lanes, height: heading + tallest + 8, width };
+    // Large tied groups flow across the full width so every player and sample stays legible.
+    const stacked = lanes.some(lane => lane.members.length > 2);
+    const podium = points && !stacked;
+    const contentHeight = podium ? podiumLayout(lanes, width) : boardLayout(lanes, width, stacked, points);
+    return { title, subtitle, heading, lanes, podium, stacked, height: heading + contentHeight + (points ? 22 : 11), width };
   }
   function layout(card) {
     let y = HERO,
@@ -117,14 +123,14 @@
     const sections = [];
     for (const section of card.sections) {
       const points = section.id === "points";
-      const title = section.groupTitle === "综合榜单" ? "胜率与场次" : section.groupTitle;
+      const title = section.groupTitle === "综合榜单" ? "" : section.groupTitle;
       const chapter = !points && title !== previous ? title : "";
       if (!points) previous = title;
       const groupTop = y;
       if (chapter) y += 42;
       const box = sectionLayout(section);
       sections.push({ section, box, x: M, top: y, chapter, groupTop });
-      y += box.height + 6;
+      y += box.height;
     }
     return { sections, footerTop: y + 10, width: WIDTH, height: Math.ceil((y + 54) * SCALE) };
   }
@@ -150,7 +156,7 @@
           key: section.id + "/" + publicId,
           publicId,
           label: section.title + "，" + (row.tied ? "并列" : "") + "第" + row.rank + "名，" + row.name + "，" + row.value + section.unit + "，查看玩家战绩",
-          x: percent(x + lane.x + tile.x + tile.avatarOffset, W),
+          x: percent(x + lane.x + tile.x, W),
           y: percent(top + box.heading + tile.y, height),
           width: percent(tile.diameter, W), height: percent(tile.diameter, height),
         });
@@ -176,12 +182,15 @@
       ]),
     ].join("，");
   }
-  function avatar(ctx, p, row, x, y, size, images) {
+  function avatar(ctx, p, row, x, y, size, images, circular = false) {
     const art = images.get(row.avatar);
     ctx.save();
-    p.round(x, y, size, size, 7, color.line);
+    if (circular) {
+      circle(ctx, x + size / 2, y + size / 2, size / 2, color.line);
+    } else {
+      p.round(x, y, size, size, 6, color.line);
+    }
     if (art?.width && art.height) {
-      // round() leaves the rounded path current on native and browser Canvas.
       ctx.clip();
       const side = Math.min(art.width, art.height);
       ctx.drawImage(art, (art.width - side) / 2, (art.height - side) / 2, side, side, x, y, size, size);
@@ -194,83 +203,121 @@
     }
     ctx.restore();
   }
+  function circle(ctx, x, y, radius, fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function gradient(ctx, x, y, endX, endY, stops) {
+    const fill = ctx.createLinearGradient?.(x, y, endX, endY);
+    if (!fill?.addColorStop) return stops[0][1];
+    for (const [position, color] of stops) fill.addColorStop(position, color);
+    return fill;
+  }
+  function numberFont(ctx, size) {
+    ctx.font = "600 " + size + "px 'DIN Alternate', 'Helvetica Neue', sans-serif";
+  }
+  function measured(ctx, value, size) {
+    return ctx.measureText?.(value)?.width || canvas.width(value, size);
+  }
+  // Set the unit on the number's baseline and reserve its width even for a large negative score.
+  function score(ctx, p, row, unit, x, y, size, limit, center = false) {
+    const ink = row.rank === 1 ? color.gold : color.text;
+    const unitSize = 13;
+    numberFont(ctx, size);
+    const unitWidth = canvas.width(unit, unitSize), gap = unit === "%" ? 1 : 3;
+    const numberWidth = Math.min(measured(ctx, row.value, size), limit - unitWidth - gap);
+    const left = center ? x - (numberWidth + unitWidth + gap) / 2 : x;
+    ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = ink;
+    ctx.fillText(row.value, left, y, numberWidth);
+    p.text(unit, left + numberWidth + gap, y + (size - unitSize) * 0.82, unitSize,
+      center && row.rank === 1 ? color.gold : color.muted, unitWidth + 1);
+  }
+  function drawPodium(ctx, p, section, lane, x, y, images) {
+    const winner = lane.rank === 1, third = lane.rank === 3;
+    const top = y + lane.plinthTop;
+    const fill = gradient(ctx, x, top, x, top + lane.plinth, [
+      [0, winner ? "#31434a" : "#223642"], [1, winner ? "#1a2b34" : "#192933"],
+    ]);
+    p.rect(x, top, lane.width, lane.plinth, fill);
+    p.rect(x, top, lane.width, winner ? 2 : 1, winner ? color.gold : "#617681");
+    score(ctx, p, lane.members[0], section.unit, x + lane.width / 2, top + (winner ? 10 : 6),
+      winner ? 40 : 30, lane.width - 10, true);
+    for (const tile of lane.tiles) {
+      const ax = x + tile.x, ay = y + tile.y, d = tile.diameter, cx = ax + d / 2;
+      if (winner) {
+        circle(ctx, cx, ay + d / 2, d / 2 + 5, "#ac965e");
+        circle(ctx, cx, ay + d / 2, d / 2 + 3.5, color.bg);
+      }
+      avatar(ctx, p, tile.row, ax, ay, d, images, true);
+      const badgeX = ax + d - 3, badgeY = ay + d - 3;
+      circle(ctx, badgeX, badgeY, 10, color.bg);
+      circle(ctx, badgeX, badgeY, 8.5, winner ? color.gold : third ? "#aca59a" : "#a3b6c0");
+      p.text(lane.rank, badgeX, badgeY - 6, 12, color.bg, 15, "center", 600);
+      p.lines(tile.nameLines, cx, ay + d + 10, 18, color.text, tile.labelWidth, 22, 600, "center");
+      p.lines(tile.sampleLines, cx, top + (winner ? 57 : 41), 12, color.muted, tile.labelWidth, 15, 400, "center");
+    }
+  }
+  function drawBoard(ctx, p, section, box, lane, x, y, images) {
+    const first = lane.members[0], inset = !box.stacked && lane.x ? 13 : 0;
+    const top = y + lane.top, left = x + inset, tied = first.tied || lane.members.length > 1;
+    if (box.stacked && lane.top) p.line(x, top - 5, x + lane.width, color.line);
+    if (inset) p.rect(x, top, 1, box.height - box.heading - 18, color.line);
+    const label = String(lane.rank).padStart(2, "0") + (tied ? " 并列" : "");
+    p.text(label, left, top + 6, 13, first.rank === 1 ? color.gold : color.muted, 50);
+    const scoreX = left + (tied ? 58 : 24);
+    score(ctx, p, first, section.unit, scoreX, top, 23, x + lane.width - scoreX - 5);
+    for (const tile of lane.tiles) {
+      const ax = x + tile.x, ay = y + tile.y, tx = ax + tile.diameter + 7;
+      avatar(ctx, p, tile.row, ax, ay, tile.diameter, images);
+      p.lines(tile.nameLines, tx, ay + tile.textTop, 15, color.text, tile.labelWidth, 18, 600);
+      p.lines(tile.sampleLines, tx, ay + tile.textTop + tile.nameLines.length * 18, 12, color.muted, tile.labelWidth, 15);
+    }
+  }
   function drawCard(ctx, card, images = new Map()) {
-    const page = layout(card),
-      p = painter(ctx);
+    const page = layout(card), p = painter(ctx);
     ctx.save();
     ctx.scale(SCALE, SCALE);
     p.rect(0, 0, W, page.height / SCALE, color.bg);
     const art = images.get(BACKGROUND_PATH);
     if (art?.width && art.height) {
-      const scale = Math.max(W / art.width, HERO / art.height),
-        crop = HERO / scale;
-      ctx.drawImage(art, (art.width - W / scale) / 2, (art.height - crop) * 0.6, W / scale, crop, 0, 0, W, HERO);
-      const gradient = ctx.createLinearGradient?.(0, 0, W, 0);
-      if (gradient?.addColorStop) {
-        gradient.addColorStop(0, "#251f26");
-        gradient.addColorStop(0.42, "rgba(37,31,38,.85)");
-        gradient.addColorStop(1, "rgba(37,31,38,0)");
-        p.rect(0, 0, W, HERO, gradient);
-      }
+      const scale = Math.max(W / art.width, HERO / art.height), crop = HERO / scale;
+      ctx.drawImage(art, (art.width - W / scale) / 2, (art.height - crop) * 0.58, W / scale, crop, 0, 0, W, HERO);
+      p.rect(0, 0, W, HERO, gradient(ctx, 0, 0, W, 0, [
+        [0, "rgba(16,28,36,.95)"], [.35, "rgba(16,28,36,.73)"], [.75, "rgba(16,28,36,0)"],
+      ]));
+      p.rect(0, HERO * .77, W, HERO * .23, gradient(ctx, 0, HERO * .77, 0, HERO, [
+        [0, "rgba(16,28,36,0)"], [1, color.bg],
+      ]));
     }
-    const m = Number(card.month.slice(5)),
-      month = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"][m - 1];
-    p.text("桌边助手", M, 15, 12, color.ink, 120, "left", 600);
-    p.text(card.month.replace(".", " / "), W - M, 15, 14, color.ink, 120, "right");
-    p.text(month + "月", M, 44, 34, color.ink, 220, "left", 600, true);
-    p.text("炉边来信", M, 84, 34, color.ink, 230, "left", 600, true);
-    p.text(card.overview.games + " 场对局   |   " + card.overview.players + " 位玩家", M, 141, 15, color.ink, 280);
+    p.text(card.month.replace(".", "  /  "), M, 40, 17, color.gold, 95, "left", 600);
+    p.text("炉边来信", M, 74, 54, color.text, INNER, "left", 600, true);
+    let statX = M;
+    for (const [value, unit] of [[card.overview.games, "场对局"], [card.overview.players, "位玩家"]]) {
+      if (statX !== M) { p.rect(statX, 159, 1, 13, "#617078"); statX += 15; }
+      const count = String(value);
+      p.font(21, 600);
+      const digits = Math.min(90, measured(ctx, count, 21));
+      p.text(count, statX, 152, 21, color.text, digits, "left", 600);
+      p.text(unit, statX + digits + 5, 158, 14, color.muted, 46);
+      statX += digits + 62;
+    }
     for (const { section, box, x, top, chapter, groupTop } of page.sections) {
       if (chapter) {
-        p.line(M, groupTop + 4, W - M, color.border);
-        p.text(chapter, M, groupTop + 11, 21, color.ink, INNER, "left", 600, true);
-      }
-      const points = section.id === "points",
-        inset = points ? 0 : 10;
-      if (!points) p.round(x, top, box.width, box.height, 7, color.surface);
-      p.lines(box.title, x + inset, top + 7, 16, color.ink, box.width - 2 * inset, 22, 600);
-      if (points) p.text("前三名", x + box.width, top + 10, 12, color.muted, 80, "right");
-      p.lines(box.subtitle, x + inset, top + 8 + box.title.length * 22, 12, color.muted, box.width - 2 * inset, 17);
-      const ly = top + box.heading;
+        p.line(M, groupTop, W - M, "#536570");
+        p.text(chapter, M, groupTop + 13, 25, color.gold, INNER, "left", 600, true);
+      } else if (top > HERO) p.line(M, top, W - M, color.line);
+      p.lines(box.title, x, top + 14, 20, color.text, box.width, 25, 600);
+      p.lines(box.subtitle, x, top + 16 + box.title.length * 25, 14, color.muted, box.width, 20);
       for (const lane of box.lanes) {
-        const lx = x + lane.x,
-          lead = lane.members[0],
-          ink = lane.rank === 1 ? color.accent : color.ink;
-        const label = (lead.tied || lane.members.length > 1 ? "并列" : "") + "第" + lane.rank + "名";
-        if (points) {
-          p.round(lx, ly, lane.width, lane.height, 8, lane.rank === 1 ? "#b68a66" : color.border);
-          p.round(lx + 1, ly + 1, lane.width - 2, lane.height - 2, 7, lane.rank === 1 ? "#594039" : "#402e34");
-          p.text(label, lx + lane.width / 2, ly + 6, 12, ink, lane.width - 8, "center");
-          p.text(
-            lead.value + section.unit,
-            lx + lane.width / 2,
-            ly + lane.height - 31,
-            24,
-            ink,
-            lane.width - 8,
-            "center",
-            600,
-          );
-        } else {
-          const rankWidth = Math.min(lane.width * 0.46, label.length * 12);
-          p.text(label, lx + 2, ly + 3, 11, color.muted, rankWidth);
-          p.text(lead.value + section.unit, lx + rankWidth + 5, ly, 16, ink, lane.width - rankWidth - 6, "left", 600);
-        }
-        for (const tile of lane.tiles) {
-          const left = lx + tile.x,
-            y = ly + tile.y;
-          const ax = left + tile.avatarOffset;
-          avatar(ctx, p, tile.row, ax, y, tile.diameter, images);
-          const align = tile.vertical ? "center" : "left";
-          const tx = left + (tile.vertical ? tile.tileWidth / 2 : tile.diameter + 5);
-          const ty = y + tile.textTop;
-          p.lines(tile.nameLines, tx, ty, 14, color.ink, tile.labelWidth, 18, 600, align);
-          p.lines(tile.sampleLines, tx, ty + tile.sampleOffset, 11, color.muted, tile.labelWidth, 15, 400, align);
-        }
+        const lx = x + lane.x, ly = top + box.heading;
+        if (box.podium) drawPodium(ctx, p, section, lane, lx, ly, images);
+        else drawBoard(ctx, p, section, box, lane, lx, ly, images);
       }
     }
     p.line(M, page.footerTop, W - M, color.line);
-    p.text("桌边助手", M, page.footerTop + 11, 12, color.ink, 110, "left", 600);
+    p.text("桌边助手", M, page.footerTop + 11, 12, color.text, 110, "left", 600);
     p.text(
       (card.status ? card.status + " · " : "") + "截至 " + card.asOf,
       W - M,

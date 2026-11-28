@@ -25,8 +25,8 @@ function html(node) {
   }).join(" ");
   return "<" + tag + " " + attributes + ">" + (node.children || []).map(html).join("") + (tag === "img" ? "" : "</" + tag + ">");
 }
-async function receipt(kind, reasons) {
-  const value = { balance: 1, notice: { kind, reasons, through: "preview", amount: 1, grants: 1 } };
+async function receipt(notice) {
+  const value = { balance: notice.amount - (notice.factionAmount || 0), totalBalance: notice.amount, notice };
   const controller = { alive: true, foreground: true, data: { room: { phase: "lobby" } }, setData() {} };
   const shared = { dialogQueue: [] };
   const host = Object.assign(controller, { route: "pages/table/table", selectComponent: () => shared });
@@ -49,7 +49,9 @@ async function main() {
   const scenes = [["loss", "累计失利 2 场", "loss"], ["win", "累计胜利 4 场", "win"],
     ["admin-reason", "后台发放 · 已填写原因", "generic", ["感谢参加本次聚会，送你一张回避卡！"]],
     ["admin-empty", "后台发放 · 未填写原因", "generic"],
-    ["admin-long", "长原因与特殊字符", "generic", ["感谢参加本次线下聚会！\n\n" + "期待下次继续一起游戏，收获更多精彩对局。".repeat(7) + "<b>这段保持原文</b>"]]];
+    ["admin-long", "长原因与特殊字符", "generic", ["感谢参加本次线下聚会！\n\n" + "期待下次继续一起游戏，收获更多精彩对局。".repeat(7) + "<b>这段保持原文</b>"]],
+    ["faction-reward", "对局奖励", "generic", [], 1],
+    ["faction-admin", "管理员赠卡", "generic", ["感谢参加周末牌局！"], 1]];
   const presentation = require("../miniprogram/avoidance");
   const webSource = fs.readFileSync(path.resolve(__dirname, "../server/web/app.js"), "utf8");
   const webConfirm = webSource.slice(webSource.indexOf("  function confirm(title,"), webSource.indexOf("  let grantNoticeOpen"));
@@ -59,10 +61,12 @@ async function main() {
   const webStyle = fs.readFileSync(path.resolve(__dirname, "../server/web/style.css"), "utf8");
   fs.mkdirSync(path.join(output, "assets"), { recursive: true });
   fs.copyFileSync(path.join(root, "assets/table-cards.svg"), path.join(output, "assets/table-cards.svg"));
-  for (const [name, , kind, reasons] of scenes) {
-    const markup = html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...await receipt(kind, reasons), id: 1 }, bodyHeight: 0 }));
-    fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>收到回避卡</title><style>${style}</style><body>${markup}${measure}</body></html>`);
-    const value = { title: "收到回避卡", amount: 1, ...presentation.grantCopy({ notice: { kind, amount: 1, reasons } }) };
+  for (const [name, , kind, reasons, factionAmount] of scenes) {
+    const notice = { kind, reasons, factionAmount, through: "preview", amount: 1, grants: 1 };
+    const dialog = await receipt(notice);
+    const markup = html(factory("components/app-dialog/app-dialog.wxml")({ dialog: { ...dialog, id: 1 }, bodyHeight: 0 }));
+    fs.writeFileSync(path.join(output, name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(dialog.title)}</title><style>${style}</style><body>${markup}${measure}</body></html>`);
+    const value = { title: "收到回避卡", amount: notice.amount, ...presentation.grantCopy({ notice }) };
     const data = JSON.stringify(value).replace(/</g, "\\u003c");
     fs.writeFileSync(path.join(output, "web-" + name + ".html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1"><title>网页收卡弹窗</title><style>${webStyle}</style><body>${webModal}<script>const modal=document.getElementById('modal'),modalTitle=document.getElementById('modal-title'),modalMessage=document.getElementById('modal-message'),modalOk=document.getElementById('modal-ok'),modalCancel=document.getElementById('modal-cancel');${webEscape}${webConfirm}const value=${data};confirm(value.title,value.content,false,'知道了',{amount:value.amount,lead:value.lead});</script></body></html>`);
   }

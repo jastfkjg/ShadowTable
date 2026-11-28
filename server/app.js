@@ -9,7 +9,8 @@ const { playerStatsId, readRoomPlayerStats, readLeaderboardPlayerStats } = requi
 const { Leaderboard } = require("./leaderboard");
 const { MonthlyReport } = require("./monthly-report");
 const { readMonthlyReset, acknowledgeMonthlyReset } = require("./monthly-reset");
-const { publicRules: scoreRules } = require("./scoring");
+const roomPassword = require("./room-password");
+const { enabled: scoringEnabled, publicRules: scoreRules } = require("./scoring");
 const fun = require("./fun");
 const honors = require("./honors");
 const avoidance = require("./avoidance");
@@ -338,7 +339,7 @@ function createApp({
       const lookup = path.match(/^\/api\/leaderboard\/badges(?:\/([a-z0-9_-]+))?$/);
       if (req.method === 'GET' && lookup) {
         res.setHeader('Cache-Control', 'no-store');
-        return send(200, require('./badge-lookup').read(store, leaderboard, lookup[1], requestUrl.searchParams, clock()));
+        return send(200, require('./badge-lookup').read(store, lookup[1], requestUrl.searchParams, clock()));
       }
       const badgeRank = path.match(/^\/api\/badge-ranks\/(honor|fun)(?:\/(self|[0-9a-f]{32}))?$/);
       if (badgeRank) {
@@ -540,7 +541,7 @@ function createApp({
         "接口不存在",
         404,
       );
-      const b = await body(req, path === "/api/me/rooms/cleanup" ? 65536 : 8192),
+      const { settingsPassword, ...b } = await body(req, path === "/api/me/rooms/cleanup" ? 65536 : 8192),
         id = req.headers["idempotency-key"];
       check(
         typeof id === "string" && /^[a-zA-Z0-9_-]{16,100}$/.test(id),
@@ -652,9 +653,18 @@ function createApp({
               check(avoidance.balance(store, uid, b.faction !== undefined) > 0, b.faction !== undefined ? "暂无阵营卡" : "暂无回避卡");
             if (b.type === "start") avoidance.prepare(store, room);
             command(room, uid, b);
+            if (b.type === "updateSettings" && (
+              room.badgeEnabled && !auditBefore.badgeEnabled ||
+              room.scoreEnabled && (!scoringEnabled(auditBefore) || room.board !== auditBefore.board || room.capacity !== auditBefore.capacity)
+            )) {
+              limit("room-password:" + uid, 12);
+              roomPassword.verify(store, settingsPassword);
+            }
             if (b.type === "start") {
               avoidance.settle(store, room);
               avoidanceRewards.registerStart(store, room);
+            } else if (["finishTools", "closeOffline"].includes(b.type) && room.phase === "ended" && room.result.winner === null) {
+              avoidance.refundUnrecordedMatch(store, room);
             }
           }
           if (!details) details = actionDetails(room, uid, match[2], b);

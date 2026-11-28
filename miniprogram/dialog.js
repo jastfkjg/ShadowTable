@@ -20,6 +20,7 @@ function present(options = {}) {
     ...(options.variant === "avoidance-grant" ? { variant: options.variant, lead: typeof options.lead === "string" ? options.lead : "" } : {}),
     ...(options.variant === "quest-settlement" ? { variant: options.variant, lead: questLines[0],
       ruleParts: questLines.slice(1).join("\n").split(/(成功|失败)/).map(text => ({ text, tone: text === "成功" ? "good" : text === "失败" ? "evil" : "" })) } : {}),
+    ...(options.variant === "room-password" ? { variant: options.variant } : {}),
     title: options.title || "操作提示",
     content: options.content || "",
     contextLabel: options.contextLabel || "",

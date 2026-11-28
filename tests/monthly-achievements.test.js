@@ -254,6 +254,7 @@ test('逐票匹配成功车，未通过的提案、异队任务和弃权有各�
 });
 test('经典工具对局在归档前记录投票阵营和亲手出牌，不向房间泄露私有事实', (t) => {
   const room = newRoom('123456', 'wx:1', '房主', 'classic-court', 9);
+  room.badgeEnabled = true;
   const run = (type, input = {}, uid = room.host) => command(room, uid, { type, stage: room.stage, ...input });
   for (let i = 2; i <= 9; i++) enter(room, 'wx:' + i, '玩家' + i);
   room.players.forEach((p) => (p.ready = true));

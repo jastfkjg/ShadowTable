@@ -231,7 +231,6 @@ html:has(.rank-sheet-backdrop) { overflow: hidden; }
   .rank-rules-footer { padding: 12px 16px; }
 }
 
-.fun-rank-filters .badge-lookup-link {
-  display: flex; align-items: center; justify-content: flex-start; min-height: 44px;
-  margin: 0; padding: 0 8px; color: var(--accent, #e5c68b); font-size: 14px; background: transparent; border: 0;
-}
+
+.rank-picker-search:focus-within { border-color: var(--accent); }
+.rank-picker-input::placeholder { color: var(--muted); }

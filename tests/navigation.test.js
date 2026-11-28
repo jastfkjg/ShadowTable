@@ -2894,6 +2894,36 @@ test('趣味指标弹层取消不换榜，确认才请求，切分类保留草�
   p.toggleRules();p.toggleMine();assert.equal(p.data.rulesExpanded,false);
 });
 
+test('小程序弹层隔离迟到目录、支持重试和徽章直达，返回保留搜索', async () => {
+  let finish, attempts = 0;
+  const { p, navigations } = page('leaderboard', { ...apiBase, request: async () => {
+    attempts++;
+    if (attempts === 1) return new Promise(resolve => { finish = resolve; });
+    if (attempts === 2) throw Error('暂时离线');
+    return { ids: ['games', 'win_streak', 'five_wins'] };
+  } });
+  const options = require('../miniprogram/leaderboard-presentation').funOptions(require('../server/fun').publicMetrics());
+  p.setData({ funOptions: options, metric: options[0].key, loading: false });
+  const pick = (name, id) => p[name]({ currentTarget: { dataset: { id } } });
+  p.toggleMetrics();
+  const old = pick('choosePickerMode', 'badges');
+  p.toggleMetrics(); p.toggleMetrics();
+  finish({ ids: ['five_wins'] }); await old;
+  assert.equal(p.data.pickerMode, 'metrics');
+  await pick('choosePickerMode', 'badges');
+  assert.equal(p.data.pickerError, '暂时离线');
+  await p.retryPickerBadges();
+  p.searchPicker({ detail: { value: '长胜' } });
+  assert.equal(p.data.pickerAction, '查看榜单');
+  p.searchPicker({ detail: { value: '五连' } });
+  assert.equal(p.data.pickerAction, '查看获得者');
+  p.confirmFunMetric(); p.onHide(); await p.onShow();
+  assert.equal(navigations.at(-1), '/pages/badges/ranks?kind=lookup&badge=five_wins');
+  assert.equal(p.data.metricsExpanded, true);
+  assert.equal(p.data.pickerQuery, '五连');
+  assert.equal(attempts, 3);
+});
+
 test('荣誉徽章独立页展示全部目录，筛选、详情和佩戴操作使用本月资格', async () => {
   const { catalogue } = require('../miniprogram/badges');
   let current = { badges: catalogue.filter(b => ['games','assassin_miss'].includes(b.id)).map(b => ({ ...b, equipped: true })), version: 0, periodStart: Date.UTC(2026,8,30,16) };

@@ -1,3 +1,4 @@
+@import "./picker.wxss";
 .leaderboard-page { --rank-line: rgba(177,191,198,.13); --rank-selected: rgba(229,198,139,.12); max-width: 600px; padding: 12px 16px calc(136px + env(safe-area-inset-bottom)); }
 .leaderboard-page.has-wide-rank { padding-bottom: calc(192px + env(safe-area-inset-bottom)); }
 .rank-toolbar, .rank-tools, .rank-period { display: flex; align-items: center; }
@@ -217,8 +218,3 @@ button.rank-details-close { width: 44px; min-width: 44px; min-height: 44px; heig
 }
 
 .rank-month-label { padding:0 4px; color:var(--accent); font-size:16px; font-weight:600; }
-
-.fun-rank-filters .badge-lookup-link {
-  display: flex; align-items: center; justify-content: flex-start; min-height: 44px;
-  margin: 0; padding: 0 8px; color: var(--accent, #e5c68b); font-size: 14px; background: transparent; border: 0;
-}

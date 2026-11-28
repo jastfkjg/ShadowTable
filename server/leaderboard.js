@@ -74,9 +74,13 @@ function neighbors(eligible, uid, present) {
   return eligible.slice(start, start + 5).map(present);
 }
 class Leaderboard {
-  constructor(store) { this.store = store; this.cache = new Map(); }
+  constructor(store, { badgesOnly = false } = {}) {
+    this.store = store;
+    this.cache = new Map();
+    this.playersView = badgesOnly ? "badge_leaderboard_players" : "leaderboard_match_players";
+  }
   recentRange(now) {
-    const latest = this.store.db.prepare(`SELECT s.ended FROM leaderboard_match_players p ${SCORED_MATCH_JOIN}
+    const latest = this.store.db.prepare(`SELECT s.ended FROM ${this.playersView} p ${SCORED_MATCH_JOIN}
       WHERE p.outcome IN ('win','loss') AND s.ended<=? ORDER BY s.ended DESC LIMIT 1`).get(now);
     return latest ? periodRange("day", latest.ended) : { start: null, end: null };
   }
@@ -88,7 +92,7 @@ class Leaderboard {
     const aggregates = range.start === null ? [] : this.store.db.prepare(`SELECT p.uid, count(*) AS total, sum(p.outcome='win') AS wins,
       ${metric === "points" ? "sum(s.points) AS points," : ""}
       f.nickname, f.avatar_hash, f.public_id, f.leaderboard_visible
-      FROM leaderboard_match_players p LEFT JOIN profiles f ON f.uid=p.uid
+      FROM ${this.playersView} p LEFT JOIN profiles f ON f.uid=p.uid
       ${metric === "points" ? SCORED_MATCH_JOIN : ""}
       WHERE p.outcome IN ('win','loss') AND p.ended>=? ${range.end === null ? "" : "AND p.ended<?"}
       ${faction ? "AND p.faction=?" : ""} GROUP BY p.uid`)
@@ -164,7 +168,7 @@ class Leaderboard {
         count(DISTINCT CASE WHEN s.status='known' THEN s.match_id END) AS knownGames,
         count(DISTINCT CASE WHEN s.status='unknown' THEN s.match_id END) AS unknownGames,
         f.nickname,f.avatar_hash,f.public_id,f.leaderboard_visible
-        FROM match_fun_stats s JOIN leaderboard_match_players p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
+        FROM match_fun_stats s JOIN ${this.playersView} p ON p.match_id=s.match_id AND p.uid=s.uid LEFT JOIN profiles f ON f.uid=s.uid
         WHERE p.outcome IN ('win','loss') AND s.metric=? ${mode === "all" ? "" : "AND s.mode=?"} AND s.ended>=? ${range.end === null ? "" : "AND s.ended<?"} ${role ? "AND s.role=?" : ""}
         GROUP BY s.uid`).all(def.id, ...(mode === "all" ? [] : [mode]), range.start, ...(range.end === null ? [] : [range.end]), ...(role ? [role] : []));
       const eligible = aggregates.filter(row => /^(wx|dev):/.test(row.uid) && row.leaderboard_visible && row.public_id && (sort === "rate" ? row.opportunities : row.count) >= threshold);
@@ -203,4 +207,9 @@ class Leaderboard {
       nextOffset:nextOffset<end ? nextOffset : null,hasMore:nextOffset<end,me:{...stats,rank:own?.rank || null,status,remaining} };
   }
 }
-module.exports = { Leaderboard, periodRange, compareWinRate };
+const badgeBoards = new WeakMap();
+function badgeLeaderboard(store) {
+  if (!badgeBoards.has(store)) badgeBoards.set(store, new Leaderboard(store, { badgesOnly: true }));
+  return badgeBoards.get(store);
+}
+module.exports = { Leaderboard, badgeLeaderboard, periodRange, compareWinRate };

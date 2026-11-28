@@ -455,7 +455,7 @@ test('趣味榜指标在分组弹层中选择，排序独立且不显示重复�
   for(const category of presentation.categories) {
     const filtered=presentation.filterFunOptions(options,category.id);
     const tree=renderRank({...data,metricsExpanded:true,funCategory:category.id,filteredFunOptions:filtered});
-    assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标'));
+    assert.ok(nodes(tree).some(n=>n.attr?.role==='dialog' && n.attr.ariaLabel==='选择趣味指标或徽章'));
     const choices=nodes(tree).filter(n=>n.attr?.bindtap==='previewFunMetric');
     assert.equal(choices.length,filtered.length);
     assert.ok(choices.every(n=>n.tag==='wx-button'));
@@ -2502,7 +2502,18 @@ test('徽章榜卡片打开只读图文详情，隐藏的明细无法打开', as
 
 test('趣味榜进入徽章查询后按名称选徽章，达成名单只显示获得者', async () => {
   const board = factory('pages/leaderboard/leaderboard.wxml')({ metric: 'fun_merlin_evade', funSelected: true });
-  assert.ok(nodes(board).some(n => n.attr?.url === '/pages/badges/ranks?kind=lookup'));
+  assert.ok(byHandler(board, 'toggleMetrics'));
+  assert.ok(!nodes(board).some(n => n.attr?.url?.includes('kind=lookup')));
+  const picker = require('../miniprogram/pages/leaderboard/picker').create({
+    options: [], metric: '', request: async () => ({ ids: ['five_wins', 'ten_wins'] }), update() {},
+  });
+  await picker.switchMode('badges');
+  picker.search('五连');
+  const sheet = factory('pages/leaderboard/leaderboard.wxml')({ metricsExpanded: true, ...picker.view() });
+  assert.equal(nodes(sheet).filter(n => n.attr?.bindtap === 'choosePickerMode').length, 2);
+  assert.equal(nodes(sheet).find(n => n.attr?.bindinput === 'searchPicker').attr.placeholder, '搜索徽章名称');
+  assert.equal(byHandler(sheet, 'previewFunMetric').attr['data-id'], 'five_wins');
+  assert.match(JSON.stringify(byHandler(sheet, 'confirmFunMetric')), /查看获得者/);
   const { create } = require('../miniprogram/pages/badges/rank-controller');
   const render = state => factory('pages/badges/ranks.wxml')({ rank: state });
   const directory = create({ request: async () => ({ ids: ['five_wins','ten_wins'] }), update() {} }, 'lookup');
@@ -2527,6 +2538,8 @@ test('本局用卡按板子显示阵营，底栏显示本人总张数与选择�
     me.me.avoidance = { balance: 3, totalBalance: 4, selected: true };
     const options = engine.avoidanceOptions(room);
     const value = { options, selected: 'merlin', balance: 3, factionBalance: 1, editable: true };
+    const noFaction = renderTable({ ...base, room: me, avoidanceOpen: true, ...cards.panel({ ...value, factionBalance: 0 }, 'faction') });
+    assert.equal(nodes(noFaction).find(n => n.attr?.class === 'avoidance-note').children.join(''), '暂无阵营卡');
     const tree = renderTable({ ...base, room: me, avoidanceOpen: true, ...cards.panel(value, 'faction', board === 'chaos' ? 'third' : 'good') });
     const choices = nodes(tree).filter(n => n.attr?.bindtap === 'chooseAvoidance');
     assert.equal(choices.length, expected);

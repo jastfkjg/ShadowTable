@@ -26,6 +26,7 @@ function deal(knight = false, uid = "wx:1", classicCapacity = 6) {
     knight ? "knights" : classicCapacity >= 9 ? "classic-court" : "classic",
     knight ? 12 : classicCapacity,
   );
+  r.scoreEnabled = knight;
   for (let i = 2; i <= r.capacity; i++) enter(r, "wx:" + i, "玩家" + i);
   r.players.forEach((p) => (p.ready = true));
   run(r, "start", { flexible: true });

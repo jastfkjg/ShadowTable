@@ -53,3 +53,5 @@
 .is-quest-settlement .app-dialog-actions .app-dialog-cancel { border-color:#627680; background:#2a3b45; }
 @media(max-width:350px) { .app-dialog.is-quest-settlement { padding:22px 20px; }.is-quest-settlement .app-dialog-title { font-size:19px; }.is-quest-settlement .app-dialog-message { font-size:13px; }.is-quest-settlement .app-dialog-actions { gap:10px; } }
 @media(max-height:380px) { .app-dialog-backdrop.is-quest-settlement-backdrop { padding:16px; }.app-dialog.is-quest-settlement { padding:20px; }.is-quest-settlement .app-dialog-actions { margin-top:20px; } }
+
+.room-password-input { margin: 16rpx 0; min-height: 88rpx; padding: 0 20rpx; border: 1px solid currentColor; border-radius: 12rpx; }

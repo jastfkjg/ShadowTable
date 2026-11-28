@@ -93,7 +93,7 @@ test("月报原生Canvas绘制图片范围安全，超长昵称和负数不会�
   renderer.drawCard(context, card);
   assert.ok(positions.every(({ x, y }) => x >= 0 && x <= size.width && y > 0 && y < size.height));
   assert.ok(positions.map(row => row.value).join("").includes(response.mainBoards[0].rows[0].nickname));
-  assert.ok(positions.some(({ value }) => value === "-123456789分"));
+  assert.ok(positions.some(({ value }, i) => value === "-123456789" && positions[i + 1]?.value === "分"));
   assert.ok(positions.some(({ value }) => value === "炉边来信"));
   assert.ok(size.height > 1920);
 });
@@ -147,7 +147,7 @@ test("纵排趣味荣誉在大量并列时仍生成一张长图，标题不重�
   assert.ok(renderer.dimensions(pages[0]).height > renderer.dimensions(renderer.cards(monthlyFixture())[0]).height);
   const rows = pages.flatMap(card => card.sections).filter(section => section.id === "merlin_evade").flatMap(section => section.rows);
   assert.equal(rows.length, 105); assert.equal(new Set(rows.map(row => row.name)).size, 105);
-  assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["胜率与场次","趣味荣誉","娱乐榜"]);
+  assert.deepEqual(renderer.layout(pages[0]).sections.map(x=>x.chapter).filter(Boolean),["趣味荣誉","娱乐榜"]);
   assert.equal(pages[0].sections.filter(section=>section.id==="merlin_evade").length,1);
   const otherHonors = pages.flatMap(card => card.sections).filter(section => ["assassin_hit", "defense_ally"].includes(section.id));
   assert.equal(otherHonors.flatMap(section => section.rows).length, 6);

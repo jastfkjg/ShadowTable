@@ -199,7 +199,7 @@ test('计分局必须结算一次逆仆刀，拒绝跳过、重复和矛盾终�
     run(room, 'rematch');
     assert.equal(room.reverseStrike, undefined);
     assert.equal(room.convertedReverse, undefined);
-    assert.equal(room.scoreEnabled, true);
+    assert.equal(room.scoreEnabled, false);
   }
 });
 

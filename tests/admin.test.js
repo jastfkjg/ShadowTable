@@ -652,7 +652,8 @@ test("在线陪测不归档个人对局数据，接口仍绑定管理会话与�
   await panel.add(code);await panel.fill();
   const hostCommand = (type, extra = {}) => a.api("/api/rooms/" + code + "/commands",
     {type, stage:a.app.store.get(code).stage, ...extra}, a.auth(token));
-  await hostCommand("updateSettings", {board:"classic",capacity:6,visible:false,scoreEnabled:true});
+  await a.api("/api/admin/room-password", { password: "test-password" });
+  await hostCommand("updateSettings", {board:"classic",capacity:6,visible:false,scoreEnabled:true,settingsPassword:"test-password"});
   await panel.refresh();await panel.batch("ready");await hostCommand("ready",{ready:true});
   await hostCommand("start",{flexible:true});
   const room=a.app.store.get(code);
@@ -716,7 +717,8 @@ test("六人测试房间的管理陪测可投 MVP/SVP，真人获奖留在个人
   await panel.add(code); await panel.fill();
   const hostCommand = (type, extra = {}, id = randomUUID()) => a.api(`/api/rooms/${code}/commands`,
     { type, stage: a.app.store.get(code).stage, ...extra }, { ...a.auth(token), "Idempotency-Key": id });
-  await hostCommand("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true });
+  await a.api("/api/admin/room-password", { password: "test-password" });
+  await hostCommand("updateSettings", { board: "classic", capacity: 6, visible: false, scoreEnabled: true, settingsPassword: "test-password" });
   await panel.refresh(); await panel.batch("ready"); await hostCommand("ready", { ready: true });
   await hostCommand("start", { flexible: true });
   const room = a.app.store.get(code);
@@ -1169,4 +1171,45 @@ test("回复和采纳互相独立，首次采纳发放永久羽笔，重复采�
   assert.ok(items.every(row => row.acceptedAt && row.reply));
   assert.equal((await a.api(notices, undefined, loginAgain)).notice, null);
   assert.equal((await a.api("/api/me/badges", undefined, loginAgain)).badges.filter(b => b.id === "feedback_contributor").length, 1);
+});
+
+test("两个开关各自验证当前后台密码，失败回滚设置，幂等重试不重复开启", async t => {
+  const a = await setup(t);
+  const { code, token } = await a.room(), path = '/api/rooms/' + code;
+  const view = () => a.api(path, undefined, a.auth(token));
+  const update = async (settings, id = randomUUID(), stage) => a.api(path + '/commands', {
+    type: 'updateSettings', stage: stage || (await view()).stage, board: 'classic', capacity: 6, visible: false, ...settings,
+  }, { ...a.auth(token), 'Idempotency-Key': id });
+  const state = async () => {
+    const room = await view();
+    return [room.badgeSettings.enabled, room.scoreSettings.enabled];
+  };
+  const before = (await view()).stage;
+  await assert.rejects(update({ badgeEnabled: true }), /请先联系管理员/);
+  await assert.rejects(a.api('/api/admin/room-password', { password: 'before-login' }, a.auth(token)), { status: 401 });
+  await a.login();
+  await assert.rejects(a.api('/api/admin/room-password', { password: ' ' }), { status: 400 });
+  await a.api('/api/admin/room-password', { password: 'initial-room-secret' });
+  await assert.rejects(update({ scoreEnabled: true }), /密码错误/);
+  await assert.rejects(update({ badgeEnabled: true, scoreEnabled: true, settingsPassword: 'wrong' }), /密码错误/);
+  assert.deepEqual(await state(), [false, false]);
+  assert.equal((await view()).stage, before);
+
+  const id = randomUUID(), badgeOn = { badgeEnabled: true, settingsPassword: 'initial-room-secret' };
+  await update(badgeOn, id, before);
+  assert.deepEqual(await state(), [true, false]);
+  await a.api('/api/admin/room-password', { password: 'rotated-room-secret' });
+  await update(badgeOn, id, before);
+  await assert.rejects(update({ scoreEnabled: true, settingsPassword: 'initial-room-secret' }), /密码错误/);
+  await update({ scoreEnabled: true, settingsPassword: 'rotated-room-secret' });
+  await update({ badgeEnabled: false, scoreEnabled: true });
+  assert.deepEqual(await state(), [false, true]);
+  await assert.rejects(update({ badgeEnabled: true }), /密码错误/);
+  await update({ scoreEnabled: false });
+  assert.deepEqual(await state(), [false, false]);
+  for (const rows of [await view(), a.app.store.get(code),
+    a.app.store.db.prepare('SELECT * FROM admin_audit').all(),
+    a.app.store.db.prepare('SELECT * FROM receipts').all(),
+    a.app.store.db.prepare('SELECT * FROM room_settings_password').all()])
+    assert.doesNotMatch(JSON.stringify(rows), /initial-room-secret|rotated-room-secret|settingsPassword/);
 });

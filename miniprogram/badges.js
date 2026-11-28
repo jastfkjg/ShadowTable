@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.shadowtableBadges = value;
 })(typeof window === 'object' ? window : this, function (copy) {
-  const rules = '月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。每月1日结算上月公开积分月榜，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
+  const rules = '新对局仅在房间开启「徽章获取」后计入徽章进度和排名。月度徽章按北京时间每月重置。次数榜、连胜负榜随公开排名更新；个人达成徽章按本人有效记录计算。新增胜率榜按当月有效计分对局排名，金、银、铜框对应前三名。五连捷徽、十连胜者、百胜传奇跨月累计，达成后永久保留。每月1日结算上月参与徽章获取的积分排名，前三名（含并列）获得永久徽章。活动纪念徽章获得后也永久保留。反馈首次被采纳可获得永久「共建者」徽章。';
   const standard = [
     { id: 'points', title: '积分王者', description: '本月积分榜第一。每一分，都是牌桌上的实力积累。', metric: 'points' },
     { id: 'games', title: '牌桌常青树', description: '本月场次榜第一。常驻牌桌，热爱从不缺席。', metric: 'games' },
@@ -94,7 +94,7 @@
     return { id, month, rank, periodLabel, title: placementTitles[rank - 1], condition,
       description: condition, category: '荣誉徽章', metric: 'monthly_points', permanent: true,
       imageUrl: '/assets/badges/monthly-points/' + month + '/' + rank + '.png',
-      holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月公开积分月榜。前三名（含并列）获得对应名次的永久徽章。' };
+      holdingRule: '获得后永久保留', rules: '每月1日按北京时间结算上月徽章积分排名，新对局须同时开启计分和徽章获取。前三名（含并列）获得对应名次的永久徽章。' };
   }
   const awardDefinition = id => monthlyAward(id) || permanent.find(b => b.id === id);
   const MAX_EQUIPPED = 3;

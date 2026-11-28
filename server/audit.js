@@ -101,6 +101,7 @@ function actionDetails(room, uid, type, input) {
     "winner",
     "scoreReason",
     "scoreEnabled",
+    "badgeEnabled",
     "recordPurpose",
     "scoreTarget",
     "reverseTarget",

@@ -68,7 +68,7 @@ Component({
       this.deliver(job, confirm);
     },
     deliver(job, confirm) {
-      const result = { confirm, cancel: !confirm, errMsg: "showDialog:ok", ...(job.action ? { action: job.action } : {}) };
+      const result = { confirm, cancel: !confirm, errMsg: "showDialog:ok", ...(job.action ? { action: job.action } : {}), ...(confirm && job.options.variant === "room-password" ? { password: job.password || "" } : {}) };
       try { job.options.success?.(result); }
       finally {
         try { job.options.complete?.(result); }
@@ -86,6 +86,9 @@ Component({
       this.setData({ dialog: null });
       this.releaseTabBar();
       for (const job of jobs) this.deliver(job, false);
+    },
+    passwordInput(e) {
+      if (this.currentDialog?.options.variant === "room-password") this.currentDialog.password = e.detail.value;
     },
     confirm(e) { this.finish(true, e.currentTarget.dataset.id); },
     showAward(e) {

@@ -61,7 +61,7 @@ class BadgeRanks {
     )
       return;
     // Every tied leader holds the title, including players outside the first page.
-    const board = new Leaderboard(store);
+    const board = new Leaderboard(store, { badgesOnly: true });
     for (const id of ["points", "games"]) {
       for (const row of board.snapshot(id, "month", now).eligible) {
         if (row.rank !== 1) break;
@@ -75,7 +75,7 @@ class BadgeRanks {
       .prepare(
         `WITH totals AS (
       SELECT s.metric,s.uid,sum(CASE WHEN s.status='known' THEN s.count ELSE 0 END) AS n
-      FROM match_fun_stats s JOIN leaderboard_match_players m ON m.match_id=s.match_id AND m.uid=s.uid
+      FROM match_fun_stats s JOIN badge_leaderboard_players m ON m.match_id=s.match_id AND m.uid=s.uid
       JOIN profiles f ON f.uid=s.uid WHERE s.ended>=? AND s.ended<? AND m.outcome IN ('win','loss')
       AND (s.uid LIKE 'wx:%' OR s.uid LIKE 'dev:%') AND f.leaderboard_visible AND f.public_id IS NOT NULL
       GROUP BY s.metric,s.uid), places AS (SELECT *,rank() OVER(PARTITION BY metric ORDER BY n DESC) AS place FROM totals)

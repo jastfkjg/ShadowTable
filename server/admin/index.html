@@ -101,6 +101,15 @@
           <p>
             现有正式房间可在准备阶段开启陪测。开启后小程序会显示测试标记，原玩家和房间号保留。
           </p>
+          <details class="score-editor">
+            <summary>房间设置密码</summary>
+            <p class="score-hint">房主开启本局计分或徽章获取时使用此密码。保存新密码后立即生效。</p>
+            <form id="room-password-form" class="score-search">
+              <div class="score-field"><label for="room-password">新密码</label><input id="room-password" type="password" autocomplete="new-password" maxlength="128" required /></div>
+              <button id="room-password-save" class="primary" type="submit">保存密码</button>
+            </form>
+            <p id="room-password-status" role="status"></p>
+          </details>
           <div class="room-list-heading" aria-hidden="true">
             <span>房间</span><span>当前状态</span><span>操作</span>
           </div>

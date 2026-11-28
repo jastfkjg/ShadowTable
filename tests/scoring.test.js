@@ -40,10 +40,10 @@ function legacyDeal(version) {
   for (const award of room.scorePolicy.awards) if (Object.hasOwn(points, award.id)) award.points = points[award.id];
   return room;
 }
-test('十二骑士10到13人默认计分，三绿和提前盘刀按新分值计分且派西挡刀不额外加分，经典板不提供提前盘刀',()=>{
+test('十二骑士10到13人开启计分后，三绿和提前盘刀按新分值计分且派西挡刀不额外加分，经典板不提供提前盘刀',()=>{
   for(const [board,capacity] of [['knights-10',10],['knights-11',11],['knights',12],['knights-13',13]]) {
     const room=newRoom('123456','wx:host','房主',board,capacity);
-    assert.equal(room.scoreEnabled,true);assert.equal(publicView(room,room.host).scoreSettings.unavailableReason,null);
+    assert.equal(room.scoreEnabled,false);assert.equal(publicView(room,room.host).scoreSettings.unavailableReason,null);
     for(const reason of ['assassination','early_assassination']) {
       const good=deal({board,capacity}),target=good.players.find(player=>good.roles[player.uid]==='percival').seat;
       assert.deepEqual(publicView(good,good.host).scoreSettlement.map(option=>option.id),['assassination','quest_fail']);
@@ -120,16 +120,15 @@ test('十二骑士积分进入明细榜单和跨板汇总，关闭仍排除，�
     assert.match(publicRules().scopeLabel,/十二骑士/);assert.match(publicRules().notes.join(''),/结束时的角色与阵营/);
   }finally {store.close();}
 });
-test('仅十二骑士10到13人默认计分，其他板子默认关闭；旧准备房间采用同一默认值',()=>{
-  const knights=new Set(['knights-10','knights-11','knights','knights-13']);
+test('所有板子和人数的计分及徽章默认关闭',()=>{
   for(const board of BOARDS.filter(board=>board.available)) for(const capacity of board.counts) {
-    const expected=knights.has(board.id);
     const room=newRoom('123456','wx:host','房主',board.id,capacity);
-    assert.equal(room.scoreEnabled,expected);assert.equal(publicView(room,room.host).scoreSettings.enabled,expected);
+    assert.equal(room.scoreEnabled,false);
+    assert.equal(publicView(room,room.host).badgeSettings.enabled,false);
     delete room.scoreEnabled;
-    assert.equal(publicView(room,room.host).scoreSettings.enabled,expected);
+    assert.equal(publicView(room,room.host).scoreSettings.enabled,false);
   }
-  assert.match(publicRules().notes.join(''),/仅十二骑士 10、11、12、13 人默认开启计分；其他板子默认关闭，房主可手动开启/);
+  assert.match(publicRules().notes.join(''),/所有对局默认关闭计分/);
 });
 test('房主可手动修改计分；切换板子或人数重设默认并让全员重新准备，相同配置保留选择',()=>{
   const room=newRoom('123456','wx:1','房主');enter(room,'wx:2','朋友');room.players.forEach(p=>p.ready=true);
@@ -145,31 +144,17 @@ test('房主可手动修改计分；切换板子或人数重设默认并让全�
   run(room,'configure',{board:room.board,capacity:room.capacity});assert.equal(room.scoreEnabled,true);
   run(room,'configure',{board:'classic',capacity:6});assert.equal(room.scoreEnabled,false);
   for(const [board,capacity,other] of [['knights-10',10,'classic-court'],['knights-11',11,'classic-11'],['knights',12,'classic-court']]) {
-    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,true);
+    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,false);
     run(room,'updateSettings',{board,capacity,visible:false,scoreEnabled:false});
     run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,false);
     room.players.forEach(p=>p.ready=true);
     run(room,'configure',{board:other,capacity});assert.equal(room.scoreEnabled,false);assert.ok(room.players.every(p=>!p.ready));
-    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,true);
+    run(room,'configure',{board,capacity});assert.equal(room.scoreEnabled,false);
   }
-  run(room,'configure',{board:'knights-13',capacity:13});assert.equal(room.scoreEnabled,true);
+  run(room,'configure',{board:'knights-13',capacity:13});assert.equal(room.scoreEnabled,false);
   run(room,'configure',{board:'chaos',capacity:12});assert.equal(room.scoreEnabled,false);
 });
-test('计分默认板子与人数由服务端配置并下发，拒绝无效范围',()=>{
-  const original=configured.defaultEnabledBoards;
-  try {
-    configured.defaultEnabledBoards={classic:[6]};
-    const room=newRoom('123456','wx:host','房主');assert.equal(room.scoreEnabled,true);
-    assert.equal(newRoom('123456','wx:host','房主','classic',8).scoreEnabled,false);
-    assert.equal(newRoom('123456','wx:host','房主','knights',12).scoreEnabled,false);
-    const settings=publicView(room,room.host).scoreSettings;assert.deepEqual(settings.defaultEnabledBoards,{classic:[6]});
-    settings.defaultEnabledBoards.classic.push(8);assert.deepEqual(configured.defaultEnabledBoards,{classic:[6]});
-  } finally {configured.defaultEnabledBoards=original;}
-  for(const defaults of [null,[],{unknown:[10]},{knights:[10]},{knights:[]},{knights:'12'},{knights:[NaN]}]) {
-    const rules=policy();rules.defaultEnabledBoards=defaults;assert.throws(()=>validateRules(rules),/默认板子/);
-  }
-});
-test('发牌后锁定，旧进行中牌局兼容且重开保留房主选择',()=>{
+test('发牌后锁定，旧进行中牌局兼容且重开关闭计分',()=>{
   const room=deal();const snapshot=structuredClone(room);
   assert.equal(publicView(room,room.host).scoreSettings.editable,false);
   assert.throws(()=>run(room,'updateSettings',{board:room.board,capacity:room.capacity,visible:false,scoreEnabled:false}),e=>e.status===409);
@@ -178,7 +163,7 @@ test('发牌后锁定，旧进行中牌局兼容且重开保留房主选择',()=
   assert.equal(publicView(room,room.host).scoreSettings.enabled,true);assert.equal(finish(room)[2],15);
   run(room,'rematch');assert.equal(room.scorePolicy,undefined);assert.equal(room.scoringFacts,undefined);
   assert.equal(publicView(room,room.host).scoreSettings.enabled,false);
-  const enabledRoom=deal();finish(enabledRoom);run(enabledRoom,'rematch');assert.equal(enabledRoom.scoreEnabled,true);
+  const enabledRoom=deal();finish(enabledRoom);run(enabledRoom,'rematch');assert.equal(enabledRoom.scoreEnabled,false);
   const disabledKnights=knightDeal({scoreEnabled:false});run(disabledKnights,'terminate');run(disabledKnights,'rematch');assert.equal(disabledKnights.scoreEnabled,false);
 });
 test('房主关闭只排除积分，胜负仍归档，不改变已有积分；开启不能绕过板子范围',()=>{
@@ -211,7 +196,7 @@ test('测试房间和开发账号可归档及更正积分，纯陪测对局不�
   for(const prefix of ['wx:','dev:','test:']) {
     const lobby=newRoom('123456',prefix+'1','房主','knights',12);lobby.testRoom=true;
     assert.equal(publicView(lobby,lobby.host).scoreSettings.unavailableReason,null);
-    assert.equal(publicView(lobby,lobby.host).scoreNotice,null);
+    assert.equal(publicView(lobby,lobby.host).scoreNotice,"本局未开启计分");
     run(lobby,'updateSettings',{board:lobby.board,capacity:lobby.capacity,visible:false,scoreEnabled:false});
     assert.equal(publicView(lobby,lobby.host).scoreNotice,'本局未开启计分');
     run(lobby,'updateSettings',{board:lobby.board,capacity:lobby.capacity,visible:false,scoreEnabled:true});
@@ -551,4 +536,51 @@ test('服务端配置支持负分，记录与规则说明使用正确符号且�
     const shown=presentMatches([{endedAt:1,members:[],score:room.matchRecord.players[2].score}]);
     assert.equal(shown[0].scoreLabel,'-4 分');
   }finally{configured.awards[0].points=original;}
+});
+
+test('徽章单独开启后随对局归档，发牌后不能修改，同房重开清空两项授权', () => {
+  const room = newRoom('123456', 'wx:1', '房主');
+  for (let i = 2; i <= room.capacity; i++) enter(room, 'wx:' + i, '玩家' + i);
+  const settings = { board: room.board, capacity: room.capacity, visible: false };
+  assert.throws(() => run(room, 'updateSettings', { ...settings, badgeEnabled: true }, 'wx:2'), { status: 403 });
+  room.players.forEach(p => (p.ready = true));
+  run(room, 'updateSettings', { ...settings, badgeEnabled: true });
+  assert.ok(room.players.every(p => !p.ready));
+  room.players.forEach(p => (p.ready = true));
+  run(room, 'start', { flexible: true });
+  assert.throws(() => run(room, 'updateSettings', { ...settings, badgeEnabled: false }), { status: 409 });
+  run(room, 'finishTools', { winner: 'good' });
+  assert.equal(room.matchRecord.badgeEnabled, true);
+  assert.ok(room.matchRecord.players.every(p => p.score.status === 'excluded'));
+  run(room, 'rematch');
+  assert.equal(room.badgeEnabled, false);
+  assert.equal(room.scoreEnabled, false);
+});
+
+test('升级旧准备房间清空默认授权，已发牌房间保留资格，改密与新局设置能跨重启保存', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'shadowtable-room-switches-'));
+  const file = join(dir, 'room.sqlite'), password = require('../server/room-password');
+  let store = new Store(file);
+  t.after(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
+  const waiting = newRoom('654321', 'wx:1', '房主', 'knights', 12);
+  waiting.scoreEnabled = true; waiting.players[0].ready = true;
+  const dealt = deal();
+  delete waiting.badgeEnabled; delete dealt.badgeEnabled;
+  store.save(waiting); store.save(dealt);
+  password.set(store, 'before'); password.set(store, 'after');
+  const reopen = () => { store.close(); store = new Store(file); };
+  reopen();
+  const lobby = store.get(waiting.code);
+  assert.equal(lobby.scoreEnabled, false);
+  assert.equal(lobby.badgeEnabled, false);
+  assert.ok(!lobby.players[0].ready && lobby.stage !== waiting.stage);
+  assert.equal(store.get(dealt.code).badgeEnabled, true);
+  assert.equal(store.get(dealt.code).scoreEnabled, true);
+  assert.throws(() => password.verify(store, 'before'), /密码错误/);
+  password.verify(store, 'after');
+  run(lobby, 'updateSettings', { board: lobby.board, capacity: lobby.capacity, visible: false, scoreEnabled: true, badgeEnabled: true });
+  store.save(lobby); reopen();
+  assert.equal(store.get(lobby.code).scoreEnabled, true);
+  assert.equal(store.get(lobby.code).badgeEnabled, true);
+  assert.equal(store.get(lobby.code).stage, lobby.stage);
 });
