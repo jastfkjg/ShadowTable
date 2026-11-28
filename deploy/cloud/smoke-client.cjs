@@ -42,7 +42,7 @@ async function main() {
     // These images are referenced by rendered views rather than the HTML shell.
     const { assetNames: roleAssets } = require(require("node:path").join(process.cwd(), "miniprogram/role-portraits"));
     for (const asset of ["/assets/board-search.svg", "/assets/board-directory.svg", "/assets/table-cards.svg", "/assets/chevron-left.svg", "/assets/about-merlin.svg",
-      "/assets/badge-category-grid.svg", "/assets/badge-category-mask.svg",
+      "/assets/badge-category-grid.svg", "/assets/badge-category-mask.svg", "/assets/faction-mask-evil.svg",
       ...["home-table-blue", "home-refresh", "home-clock", "table-lock", "identity-hide-muted", "share-dark", "record-more", "room-menu-remove", "room-menu-leave", "room-menu-delete"].map(name => "/assets/" + name + ".svg"),
       ...["home-create-outline", "home-join-outline", "home-create-blue", "home-join-gold", "home-help", "room-invite", "room-config", "room-settings", "sheet-book", "sheet-user", "sheet-shield", "sheet-flask", "sheet-copy", "edit", "process-eye", "lake-fairy"].map(name => "/assets/" + name + ".svg"),
       ...["home-wordmark", "home-subtitle", "tab-table", "tab-table-active", "tab-me", "tab-me-active"].map(name => "/assets/" + name + ".png"),
